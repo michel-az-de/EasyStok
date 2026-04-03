@@ -1,9 +1,8 @@
 using EasyStok.Domain.Entities;
 
-namespace EasyStok.Domain.Interfaces
+namespace EasyStok.Domain.Interfaces.Repositories
 {
  public interface IItemEstoqueRepository : IBaseRepository<ItemEstoque>
  {
- // Add ItemEstoque-specific methods here if needed
  }
 }

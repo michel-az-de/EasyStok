@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace EasyStok.Domain.Interfaces
+namespace EasyStok.Domain.Interfaces.Repositories
 {
  public interface IBaseRepository<T> where T : class
  {
