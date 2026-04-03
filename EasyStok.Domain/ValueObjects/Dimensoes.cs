@@ -1,9 +1,10 @@
-
+using System;
 
 namespace EasyStok.Domain.ValueObjects
 {
     public sealed record Dimensoes
     {
+        // Unidade implícita: quilogramas (peso) e centímetros (dimensões)
         public decimal PesoKg { get; }
         public decimal LarguraCm { get; }
         public decimal AlturaCm { get; }
@@ -19,7 +20,8 @@ namespace EasyStok.Domain.ValueObjects
 
         public static Dimensoes From(decimal pesoKg, decimal larguraCm, decimal alturaCm, decimal comprimentoCm)
         {
-
+            // Decisão: permitir zero nas dimensões físicas quando não aplicável (ex: serviço) não se aplica: VO representa dimensões válidas preenchidas,
+            // então exigimos >=0 para permitir0 como valor legítimo (ex.: peso0 para itens sem peso) mas prevenimos valores negativos.
             if (pesoKg < 0) throw new ArgumentOutOfRangeException(nameof(pesoKg), "Peso não pode ser negativo.");
             if (larguraCm < 0) throw new ArgumentOutOfRangeException(nameof(larguraCm), "Largura não pode ser negativa.");
             if (alturaCm < 0) throw new ArgumentOutOfRangeException(nameof(alturaCm), "Altura não pode ser negativa.");

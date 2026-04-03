@@ -2,7 +2,8 @@ using System;
 
 namespace EasyStok.Domain.ValueObjects
 {
-
+    // Escolha: usar `sealed record` para VOs que são imutáveis, têm igualdade por valor
+    // e permitem sintaxe concisa. `sealed record` fornece igualdade por valor por padrão.
     public sealed record Dinheiro
     {
         public decimal Valor { get; }
