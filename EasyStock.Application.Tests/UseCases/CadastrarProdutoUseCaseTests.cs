@@ -13,6 +13,7 @@ public class CadastrarProdutoUseCaseTests
     public async Task Deve_cadastrar_produto_com_variacoes_caracteristicas_e_embalagens()
     {
         var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
@@ -20,14 +21,19 @@ public class CadastrarProdutoUseCaseTests
 
         var useCase = new CadastrarProdutoUseCase(
             produtoRepository,
+            categoriaRepository,
             caracteristicaRepository,
             embalagemRepository,
             variacaoRepository,
             unitOfWork);
 
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+
         var command = new CadastrarProdutoCommand(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
+            empresaId,
+            categoriaId,
             "Galaxy Buds FE",
             "Fone bluetooth",
             "Samsung",

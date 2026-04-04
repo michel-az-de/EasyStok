@@ -34,6 +34,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
 
     public class CadastrarProdutoUseCase(
         IProdutoRepository produtoRepository,
+        ICategoriaRepository categoriaRepository,
         IProdutoCaracteristicaRepository caracteristicaRepository,
         IProdutoEmbalagemRepository embalagemRepository,
         IProdutoVariacaoRepository variacaoRepository,
@@ -42,6 +43,12 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         public async Task<CadastrarProdutoResult> ExecuteAsync(CadastrarProdutoCommand command)
         {
             Validar(command);
+
+            var categoria = await categoriaRepository.GetByIdAsync(command.CategoriaId)
+                ?? throw new UseCaseValidationException("Categoria nao encontrada.");
+
+            if (categoria.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("A categoria informada nao pertence a empresa.");
 
             var agora = DateTime.UtcNow;
             var produto = new Produto
@@ -145,6 +152,16 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
             if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId e obrigatorio.");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto e obrigatorio.");
+            if ((command.Embalagens ?? []).Count(e => e.Padrao) > 1) throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
+
+            var skus = (command.Variacoes ?? [])
+                .Select(v => v.Sku?.Trim())
+                .Where(sku => !string.IsNullOrWhiteSpace(sku))
+                .Select(sku => sku!.ToUpperInvariant())
+                .ToArray();
+
+            if (skus.Length != skus.Distinct().Count())
+                throw new UseCaseValidationException("Nao e permitido cadastrar variacoes com o mesmo SKU.");
         }
     }
 }

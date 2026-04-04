@@ -9,6 +9,7 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.ReporEstoque
 {
     public sealed record ReporEstoqueCommand(
+        Guid EmpresaId,
         Guid ItemEstoqueId,
         int QuantidadeAdicional,
         decimal? NovoCustoUnitario,
@@ -36,53 +37,51 @@ namespace EasyStock.Application.UseCases.ReporEstoque
     {
         public async Task<ReporEstoqueResult> ExecuteAsync(ReporEstoqueCommand command)
         {
+            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
             if (command.QuantidadeAdicional <= 0) throw new QuantidadeInvalidaException(command.QuantidadeAdicional);
 
             var item = await itemEstoqueRepository.GetByIdAsync(command.ItemEstoqueId)
                 ?? throw new UseCaseValidationException("Item de estoque nao encontrado.");
 
+            if (item.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("O item de estoque nao pertence a empresa.");
+
             var produto = await produtoRepository.GetByIdAsync(item.ProdutoId)
                 ?? throw new UseCaseValidationException("Produto do item de estoque nao encontrado.");
+
+            if (produto.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("O produto do item de estoque nao pertence a empresa.");
 
             if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
                 throw new ProdutoInativoException(produto.Id);
 
             var quantidadeAnterior = item.QuantidadeAtual.Value;
+            var agora = DateTime.UtcNow;
             var quantidadeAdicional = Quantidade.From(command.QuantidadeAdicional);
-            item.QuantidadeAtual = item.QuantidadeAtual.Add(quantidadeAdicional);
-            item.Status = StatusItemEstoque.Ativo;
-            item.VariacaoDescricao = command.VariacaoDescricao?.Trim() ?? item.VariacaoDescricao;
-            item.Cor = command.Cor?.Trim() ?? item.Cor;
-            item.Tamanho = command.Tamanho?.Trim() ?? item.Tamanho;
-            item.Observacoes = command.Observacoes?.Trim() ?? item.Observacoes;
-            item.DimensoesReais = command.DimensoesReais.ToValueObjectOrNull() ?? item.DimensoesReais;
-            item.ValidadeEm = command.NovaValidade.HasValue ? Validade.From(command.NovaValidade.Value) : item.ValidadeEm;
-            item.UltimaMovimentacaoEm = command.DataReposicao;
-            item.AlteradoEm = DateTime.UtcNow;
+            item.RegistrarReposicao(
+                quantidadeAdicional,
+                command.DataReposicao,
+                command.VariacaoDescricao,
+                command.Cor,
+                command.Tamanho,
+                command.Observacoes,
+                command.DimensoesReais.ToValueObjectOrNull(),
+                command.NovaValidade.HasValue ? Validade.From(command.NovaValidade.Value) : null,
+                command.NovoCustoUnitario.HasValue ? Dinheiro.FromDecimal(command.NovoCustoUnitario.Value) : null,
+                command.NovoPrecoVendaSugerido.HasValue ? Dinheiro.FromDecimal(command.NovoPrecoVendaSugerido.Value) : null,
+                agora);
 
-            if (command.NovoCustoUnitario.HasValue)
-                item.CustoUnitario = Dinheiro.FromDecimal(command.NovoCustoUnitario.Value);
-
-            if (command.NovoPrecoVendaSugerido.HasValue)
-                item.PrecoVendaSugerido = Dinheiro.FromDecimal(command.NovoPrecoVendaSugerido.Value);
-
-            var movimentacao = new MovimentacaoEstoque
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = item.EmpresaId,
-                ItemEstoqueId = item.Id,
-                ProdutoId = item.ProdutoId,
-                ProdutoVariacaoId = item.ProdutoVariacaoId,
-                Tipo = TipoMovimentacaoEstoque.Entrada,
-                Natureza = NaturezaMovimentacaoEstoque.Reposicao,
-                Quantidade = quantidadeAdicional,
-                ValorUnitario = item.CustoUnitario,
-                ValorTotal = Dinheiro.FromDecimal(item.CustoUnitario.Valor * quantidadeAdicional.Value),
-                DataMovimentacao = command.DataReposicao,
-                Descricao = "Reposicao de estoque",
-                DocumentoReferencia = command.DocumentoReferencia?.Trim(),
-                CriadoEm = DateTime.UtcNow
-            };
+            var movimentacao = MovimentacaoEstoque.CriarEntrada(
+                Guid.NewGuid(),
+                item.EmpresaId,
+                item,
+                NaturezaMovimentacaoEstoque.Reposicao,
+                quantidadeAdicional,
+                item.CustoUnitario,
+                command.DataReposicao,
+                "Reposicao de estoque",
+                command.DocumentoReferencia,
+                agora);
 
             await itemEstoqueRepository.UpdateAsync(item);
             await movimentacaoEstoqueRepository.AddAsync(movimentacao);

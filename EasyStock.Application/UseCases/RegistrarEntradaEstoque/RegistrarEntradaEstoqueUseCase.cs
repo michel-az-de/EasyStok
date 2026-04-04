@@ -54,6 +54,9 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             var produto = await produtoRepository.GetByIdAsync(command.ProdutoId)
                 ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
+            if (produto.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("O produto informado nao pertence a empresa.");
+
             if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
                 throw new ProdutoInativoException(produto.Id);
 
@@ -65,58 +68,51 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 
                 if (variacao.ProdutoId != produto.Id)
                     throw new UseCaseValidationException("A variacao informada nao pertence ao produto.");
+
+                if (variacao.EmpresaId != command.EmpresaId)
+                    throw new UseCaseValidationException("A variacao informada nao pertence a empresa.");
+
+                if (!variacao.Ativa)
+                    throw new UseCaseValidationException("A variacao informada esta inativa.");
             }
 
             var quantidade = Quantidade.From(command.Quantidade);
             var descricaoAnuncio = await ResolverDescricaoAnuncioAsync(command, produto, variacao);
             var agora = DateTime.UtcNow;
 
-            var item = new ItemEstoque
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = command.EmpresaId,
-                ProdutoId = produto.Id,
-                ProdutoVariacaoId = variacao?.Id,
-                CodigoInterno = command.CodigoInterno?.Trim(),
-                CodigoLote = string.IsNullOrWhiteSpace(command.CodigoLote) ? null : CodigoLote.From(command.CodigoLote),
-                CodigoMarketplace = command.CodigoMarketplace?.Trim(),
-                ChavePesquisa = MontarChavePesquisa(produto, variacao, command.CodigoInterno, command.CodigoMarketplace, command.CodigoLote),
-                VariacaoDescricao = command.VariacaoDescricao?.Trim() ?? variacao?.DescricaoComercial ?? variacao?.Nome,
-                Cor = command.Cor?.Trim() ?? variacao?.Cor,
-                Tamanho = command.Tamanho?.Trim() ?? variacao?.Tamanho,
-                DescricaoAnuncio = descricaoAnuncio,
-                DimensoesReais = command.DimensoesReais.ToValueObjectOrNull() ?? variacao?.DimensoesPadrao ?? produto.Dimensoes,
-                FornecedorNome = command.FornecedorNome?.Trim(),
-                QuantidadeInicial = quantidade,
-                QuantidadeAtual = quantidade,
-                CustoUnitario = Dinheiro.FromDecimal(command.CustoUnitario),
-                PrecoVendaSugerido = command.PrecoVendaSugerido.HasValue ? Dinheiro.FromDecimal(command.PrecoVendaSugerido.Value) : produto.PrecoReferencia,
-                EntradaEm = command.DataEntrada,
-                ValidadeEm = command.Validade.HasValue ? Validade.From(command.Validade.Value) : null,
-                UltimaMovimentacaoEm = command.DataEntrada,
-                Status = StatusItemEstoque.Ativo,
-                Observacoes = command.Observacoes?.Trim(),
-                CriadoEm = agora,
-                AlteradoEm = agora
-            };
+            var item = ItemEstoque.CriarParaEntrada(
+                Guid.NewGuid(),
+                command.EmpresaId,
+                produto,
+                variacao,
+                quantidade,
+                Dinheiro.FromDecimal(command.CustoUnitario),
+                command.PrecoVendaSugerido.HasValue ? Dinheiro.FromDecimal(command.PrecoVendaSugerido.Value) : null,
+                command.DataEntrada,
+                command.CodigoInterno,
+                string.IsNullOrWhiteSpace(command.CodigoLote) ? null : CodigoLote.From(command.CodigoLote),
+                command.CodigoMarketplace,
+                command.VariacaoDescricao,
+                command.Cor,
+                command.Tamanho,
+                descricaoAnuncio,
+                command.DimensoesReais.ToValueObjectOrNull(),
+                command.FornecedorNome,
+                command.Validade.HasValue ? Validade.From(command.Validade.Value) : null,
+                command.Observacoes,
+                agora);
 
-            var movimentacao = new MovimentacaoEstoque
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = command.EmpresaId,
-                ItemEstoqueId = item.Id,
-                ProdutoId = produto.Id,
-                ProdutoVariacaoId = variacao?.Id,
-                Tipo = TipoMovimentacaoEstoque.Entrada,
-                Natureza = command.Natureza,
-                Quantidade = quantidade,
-                ValorUnitario = item.CustoUnitario,
-                ValorTotal = Dinheiro.FromDecimal(item.CustoUnitario.Valor * quantidade.Value),
-                DataMovimentacao = command.DataEntrada,
-                Descricao = descricaoAnuncio,
-                DocumentoReferencia = command.DocumentoReferencia?.Trim(),
-                CriadoEm = agora
-            };
+            var movimentacao = MovimentacaoEstoque.CriarEntrada(
+                Guid.NewGuid(),
+                command.EmpresaId,
+                item,
+                command.Natureza,
+                quantidade,
+                item.CustoUnitario,
+                command.DataEntrada,
+                descricaoAnuncio,
+                command.DocumentoReferencia,
+                agora);
 
             await itemEstoqueRepository.AddAsync(item);
             await movimentacaoEstoqueRepository.AddAsync(movimentacao);
@@ -134,26 +130,6 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 return produto.SugestaoDescricaoAnuncio;
 
             return await geradorDescricaoAnuncio.GerarAsync(produto, variacao, null, command.InstrucoesGeracaoDescricao);
-        }
-
-        private static string MontarChavePesquisa(Produto produto, ProdutoVariacao? variacao, string? codigoInterno, string? codigoMarketplace, string? codigoLote)
-        {
-            var partes = new[]
-            {
-                codigoInterno,
-                variacao?.Sku?.Value,
-                produto.SkuBase?.Value,
-                codigoMarketplace,
-                codigoLote,
-                produto.Nome,
-                variacao?.Nome,
-                variacao?.Cor,
-                variacao?.Tamanho,
-                produto.CodigoBarras,
-                variacao?.CodigoBarras
-            };
-
-            return string.Join(" ", partes.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()));
         }
     }
 }

@@ -20,10 +20,12 @@ public class RegistrarEntradaEstoqueUseCaseTests
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var gerador = Substitute.For<IGeradorDescricaoAnuncio>();
+        var empresaId = Guid.NewGuid();
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
             Nome = "Galaxy Buds FE",
             Status = StatusProduto.Ativo,
             PrecoReferencia = Dinheiro.FromDecimal(399.90m),
@@ -42,7 +44,7 @@ public class RegistrarEntradaEstoqueUseCaseTests
             gerador);
 
         var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
-            Guid.NewGuid(),
+            empresaId,
             produto.Id,
             null,
             10,

@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Infra.Postgre.IntegrationTests;
+﻿namespace EasyStock.Api.UnitTests;
 
 public class UnitTest1
 {

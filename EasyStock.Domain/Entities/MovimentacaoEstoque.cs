@@ -30,5 +30,65 @@ namespace EasyStock.Domain.Entities
         public Produto? Produto { get; set; }
         public ProdutoVariacao? ProdutoVariacao { get; set; }
         public Venda? Venda { get; set; }
+
+        public static MovimentacaoEstoque CriarEntrada(
+            Guid id,
+            Guid empresaId,
+            ItemEstoque item,
+            NaturezaMovimentacaoEstoque natureza,
+            Quantidade quantidade,
+            Dinheiro valorUnitario,
+            DateTime dataMovimentacao,
+            string? descricao,
+            string? documentoReferencia,
+            DateTime criadoEm) =>
+            new()
+            {
+                Id = id,
+                EmpresaId = empresaId,
+                ItemEstoqueId = item.Id,
+                ProdutoId = item.ProdutoId,
+                ProdutoVariacaoId = item.ProdutoVariacaoId,
+                Tipo = TipoMovimentacaoEstoque.Entrada,
+                Natureza = natureza,
+                Quantidade = quantidade,
+                ValorUnitario = valorUnitario,
+                ValorTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidade.Value),
+                DataMovimentacao = dataMovimentacao,
+                Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim(),
+                DocumentoReferencia = string.IsNullOrWhiteSpace(documentoReferencia) ? null : documentoReferencia.Trim(),
+                CriadoEm = criadoEm
+            };
+
+        public static MovimentacaoEstoque CriarSaida(
+            Guid id,
+            Guid empresaId,
+            ItemEstoque item,
+            Guid vendaId,
+            NaturezaMovimentacaoEstoque natureza,
+            Quantidade quantidade,
+            Dinheiro valorUnitario,
+            DateTime dataMovimentacao,
+            string? descricao,
+            string? documentoReferencia,
+            DateTime criadoEm) =>
+            new()
+            {
+                Id = id,
+                EmpresaId = empresaId,
+                ItemEstoqueId = item.Id,
+                ProdutoId = item.ProdutoId,
+                ProdutoVariacaoId = item.ProdutoVariacaoId,
+                VendaId = vendaId,
+                Tipo = TipoMovimentacaoEstoque.Saida,
+                Natureza = natureza,
+                Quantidade = quantidade,
+                ValorUnitario = valorUnitario,
+                ValorTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidade.Value),
+                DataMovimentacao = dataMovimentacao,
+                Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim(),
+                DocumentoReferencia = string.IsNullOrWhiteSpace(documentoReferencia) ? null : documentoReferencia.Trim(),
+                CriadoEm = criadoEm
+            };
     }
 }
