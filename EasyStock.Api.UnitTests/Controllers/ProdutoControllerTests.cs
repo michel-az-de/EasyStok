@@ -5,6 +5,7 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -13,11 +14,25 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class ProdutoControllerTests
 {
     private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
-    private readonly CadastrarProdutoUseCase _cadastrarProdutoUseCase = Substitute.For<CadastrarProdutoUseCase>();
+    private readonly ICategoriaRepository _categoriaRepository = Substitute.For<ICategoriaRepository>();
+    private readonly IProdutoCaracteristicaRepository _produtoCaracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+    private readonly IProdutoEmbalagemRepository _produtoEmbalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+    private readonly IProdutoVariacaoRepository _produtoVariacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ILogger<CadastrarProdutoUseCase> _logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+    private readonly CadastrarProdutoUseCase _cadastrarProdutoUseCase;
     private readonly ProdutoController _controller;
 
     public ProdutoControllerTests()
     {
+        _cadastrarProdutoUseCase = new CadastrarProdutoUseCase(
+            _produtoRepository,
+            _categoriaRepository,
+            _produtoCaracteristicaRepository,
+            _produtoEmbalagemRepository,
+            _produtoVariacaoRepository,
+            _unitOfWork,
+            _logger);
         _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase);
     }
 
@@ -34,7 +49,7 @@ public class ProdutoControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult.Value.Should().BeEquivalentTo(produtos);
+        okResult!.Value.Should().BeEquivalentTo(produtos);
     }
 
     [Fact]
@@ -50,7 +65,7 @@ public class ProdutoControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult.Value.Should().Be(produto);
+        okResult!.Value.Should().Be(produto);
     }
 
     [Fact]
@@ -82,16 +97,17 @@ public class ProdutoControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult.Value.Should().BeEquivalentTo(produtos);
+        okResult!.Value.Should().BeEquivalentTo(produtos);
     }
 
     [Fact]
     public async Task Create_DeveRetornarCreated_ComResultado()
     {
-        // Arrange
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
         var command = new CadastrarProdutoCommand(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
+            empresaId,
+            categoriaId,
             "Produto",
             null,
             null,
@@ -108,17 +124,23 @@ public class ProdutoControllerTests
             null,
             null,
             null);
-        var resultado = new CadastrarProdutoResult(Guid.NewGuid(), new List<Guid>(), new List<Guid>(), new List<Guid>());
-        _cadastrarProdutoUseCase.ExecuteAsync(command).Returns(resultado);
+        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+        _unitOfWork.CommitAsync().Returns(1);
 
-        // Act
         var result = await _controller.Create(command);
 
-        // Assert
         result.Should().BeOfType<CreatedAtActionResult>();
         var createdResult = result as CreatedAtActionResult;
-        createdResult.Value.Should().Be(resultado);
+        createdResult!.Value.Should().BeOfType<CadastrarProdutoResult>();
+        var payload = createdResult.Value as CadastrarProdutoResult;
+        payload!.ProdutoId.Should().NotBe(Guid.Empty);
         createdResult.ActionName.Should().Be("GetById");
+        await _produtoRepository.Received(1).AddAsync(Arg.Any<Produto>());
     }
 
     [Fact]

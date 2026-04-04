@@ -5,10 +5,12 @@ using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 
@@ -37,6 +39,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemEstoqueRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
+                NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
                 new GeradorDescricaoFake("Descricao gerada por IA"));
 
             var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
@@ -240,6 +243,210 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             movimentacoes.Should().HaveCount(2);
             movimentacoes.Should().OnlyContain(m => m.Tipo == TipoMovimentacaoEstoque.Saida);
             movimentacoes.Should().OnlyContain(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+        }
+    }
+
+    [Fact]
+    public async Task RegistrarSaida_nao_deve_persistir_movimentacoes_quando_item_esta_bloqueado()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = itemId,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(250m),
+                Status = StatusItemEstoque.Bloqueado,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            var useCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new VendaRepository(context),
+                new ItemVendaRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context);
+
+            var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(itemId, 1, 399.90m, "Tentativa bloqueada")],
+                new DateTime(2026, 4, 5, 10, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 4, 5, 10, 5, 0, DateTimeKind.Utc),
+                null,
+                null,
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Item bloqueado"));
+
+            await act.Should().ThrowAsync<ItemEstoqueBloqueadoException>();
+        }
+
+        await using (var assertContext = fixture.CreateDbContext())
+        {
+            var item = await assertContext.ItensEstoque.SingleAsync();
+            var vendas = await assertContext.Vendas.CountAsync();
+            var itensVenda = await assertContext.ItensVenda.CountAsync();
+            var movimentacoes = await assertContext.MovimentacoesEstoque.CountAsync();
+
+            item.QuantidadeAtual.Value.Should().Be(10);
+            item.Status.Should().Be(StatusItemEstoque.Bloqueado);
+            vendas.Should().Be(0);
+            itensVenda.Should().Be(0);
+            movimentacoes.Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task RegistrarSaida_nao_deve_persistir_quando_item_esta_vencido()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = itemId,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(4),
+                QuantidadeAtual = Quantidade.From(4),
+                CustoUnitario = Dinheiro.FromDecimal(250m),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+                ValidadeEm = Validade.From(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)),
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            var useCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new VendaRepository(context),
+                new ItemVendaRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context);
+
+            var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(itemId, 1, 399.90m, "Tentativa vencida")],
+                new DateTime(2026, 4, 5, 10, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 4, 5, 10, 5, 0, DateTimeKind.Utc),
+                null,
+                null,
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Item vencido"));
+
+            await act.Should().ThrowAsync<ItemEstoqueVencidoException>();
+        }
+
+        await using (var assertContext = fixture.CreateDbContext())
+        {
+            var item = await assertContext.ItensEstoque.SingleAsync();
+            var vendas = await assertContext.Vendas.CountAsync();
+            var movimentacoes = await assertContext.MovimentacoesEstoque.CountAsync();
+
+            item.QuantidadeAtual.Value.Should().Be(4);
+            vendas.Should().Be(0);
+            movimentacoes.Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task ReporEstoque_nao_deve_persistir_quando_item_pertence_a_outra_empresa()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, outraEmpresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = itemId,
+                EmpresaId = outraEmpresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(5),
+                QuantidadeAtual = Quantidade.From(5),
+                CustoUnitario = Dinheiro.FromDecimal(200m),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            var useCase = new ReporEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context);
+
+            var act = () => useCase.ExecuteAsync(new ReporEstoqueCommand(
+                empresaId,
+                itemId,
+                7,
+                210m,
+                450m,
+                new DateTime(2026, 4, 4, 10, 0, 0, DateTimeKind.Utc),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+            await act.Should().ThrowAsync<UseCaseValidationException>()
+                .WithMessage("*nao pertence a empresa*");
+        }
+
+        await using (var assertContext = fixture.CreateDbContext())
+        {
+            var item = await assertContext.ItensEstoque.SingleAsync();
+            var movimentacoes = await assertContext.MovimentacoesEstoque.CountAsync();
+
+            item.QuantidadeAtual.Value.Should().Be(5);
+            movimentacoes.Should().Be(0);
         }
     }
 

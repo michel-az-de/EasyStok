@@ -6,6 +6,7 @@ using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 {
@@ -44,10 +45,13 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IItemEstoqueRepository itemEstoqueRepository,
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
         IUnitOfWork unitOfWork,
+        ILogger<RegistrarEntradaEstoqueUseCase> logger,
         IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null)
     {
         public async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
+            logger.LogInformation("Registrando entrada de estoque. ProdutoId: {ProdutoId}, Quantidade: {Quantidade}", command.ProdutoId, command.Quantidade);
+
             if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
             if (command.Quantidade <= 0) throw new QuantidadeInvalidaException(command.Quantidade);
 
@@ -117,6 +121,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             await itemEstoqueRepository.AddAsync(item);
             await movimentacaoEstoqueRepository.AddAsync(movimentacao);
             await unitOfWork.CommitAsync();
+
+            logger.LogInformation("Entrada de estoque registrada com sucesso. ItemEstoqueId: {ItemEstoqueId}, MovimentacaoId: {MovimentacaoId}", item.Id, movimentacao.Id);
 
             return new RegistrarEntradaEstoqueResult(item.Id, movimentacao.Id, descricaoAnuncio, item.ChavePesquisa ?? string.Empty);
         }

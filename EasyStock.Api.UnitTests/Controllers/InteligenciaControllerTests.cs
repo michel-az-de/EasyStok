@@ -34,7 +34,7 @@ public class InteligenciaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -54,7 +54,7 @@ public class InteligenciaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -74,7 +74,7 @@ public class InteligenciaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -93,7 +93,7 @@ public class InteligenciaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 }

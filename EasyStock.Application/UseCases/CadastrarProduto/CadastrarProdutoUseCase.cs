@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.CadastrarProduto
 {
@@ -38,10 +39,13 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IProdutoCaracteristicaRepository caracteristicaRepository,
         IProdutoEmbalagemRepository embalagemRepository,
         IProdutoVariacaoRepository variacaoRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<CadastrarProdutoUseCase> logger)
     {
         public async Task<CadastrarProdutoResult> ExecuteAsync(CadastrarProdutoCommand command)
         {
+            logger.LogInformation("Iniciando cadastro de produto. EmpresaId: {EmpresaId}, Nome: {Nome}", command.EmpresaId, command.Nome);
+
             Validar(command);
 
             var categoria = await categoriaRepository.GetByIdAsync(command.CategoriaId)
@@ -143,6 +147,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             }
 
             await unitOfWork.CommitAsync();
+
+            logger.LogInformation("Produto cadastrado com sucesso. ProdutoId: {ProdutoId}, EmpresaId: {EmpresaId}", produto.Id, command.EmpresaId);
 
             return new CadastrarProdutoResult(produto.Id, caracteristicasIds, embalagensIds, variacoesIds);
         }

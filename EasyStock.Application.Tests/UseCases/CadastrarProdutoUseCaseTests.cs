@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -18,6 +19,7 @@ public class CadastrarProdutoUseCaseTests
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(
             produtoRepository,
@@ -25,7 +27,8 @@ public class CadastrarProdutoUseCaseTests
             caracteristicaRepository,
             embalagemRepository,
             variacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();

@@ -1,0 +1,310 @@
+using EasyStock.Api.Controllers;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
+using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Application.UseCases.ReporEstoque;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using Xunit;
+
+namespace EasyStock.Api.UnitTests.Controllers;
+
+public class ItemEstoqueControllerTests
+{
+    private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
+    private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
+    private readonly IProdutoVariacaoRepository _produtoVariacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IMovimentacaoEstoqueRepository _movimentacaoEstoqueRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+    private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
+    private readonly IItemVendaRepository _itemVendaRepository = Substitute.For<IItemVendaRepository>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ILogger<RegistrarEntradaEstoqueUseCase> _registrarEntradaLogger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
+    private readonly RegistrarEntradaEstoqueUseCase _registrarEntradaUseCase;
+    private readonly RegistrarSaidaEstoqueUseCase _registrarSaidaUseCase;
+    private readonly ReporEstoqueUseCase _reporEstoqueUseCase;
+    private readonly ItemEstoqueController _controller;
+
+    public ItemEstoqueControllerTests()
+    {
+        _registrarEntradaUseCase = new RegistrarEntradaEstoqueUseCase(
+            _produtoRepository,
+            _produtoVariacaoRepository,
+            _itemEstoqueRepository,
+            _movimentacaoEstoqueRepository,
+            _unitOfWork,
+            _registrarEntradaLogger);
+        _registrarSaidaUseCase = new RegistrarSaidaEstoqueUseCase(
+            _produtoRepository,
+            _itemEstoqueRepository,
+            _vendaRepository,
+            _itemVendaRepository,
+            _movimentacaoEstoqueRepository,
+            _unitOfWork);
+        _reporEstoqueUseCase = new ReporEstoqueUseCase(
+            _produtoRepository,
+            _itemEstoqueRepository,
+            _movimentacaoEstoqueRepository,
+            _unitOfWork);
+        _controller = new ItemEstoqueController(
+            _itemEstoqueRepository,
+            _registrarEntradaUseCase,
+            _registrarSaidaUseCase,
+            _reporEstoqueUseCase);
+    }
+
+    [Fact]
+    public async Task GetAll_DeveRetornarOk_ComListaDeItens()
+    {
+        var itens = new List<ItemEstoque>
+        {
+            new() { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) }
+        };
+        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+
+        var result = await _controller.GetAll();
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result as OkObjectResult;
+        okResult!.Value.Should().BeEquivalentTo(itens);
+    }
+
+    [Fact]
+    public async Task GetById_DeveRetornarOk_QuandoItemEncontrado()
+    {
+        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
+        _itemEstoqueRepository.GetByIdAsync(item.Id).Returns(item);
+
+        var result = await _controller.GetById(item.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result as OkObjectResult;
+        okResult!.Value.Should().Be(item);
+    }
+
+    [Fact]
+    public async Task GetById_DeveRetornarNotFound_QuandoItemNaoEncontrado()
+    {
+        var id = Guid.NewGuid();
+        _itemEstoqueRepository.GetByIdAsync(id).Returns((ItemEstoque?)null);
+
+        var result = await _controller.GetById(id);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Create_DeveRetornarCreated_ComItem()
+    {
+        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
+
+        var result = await _controller.Create(item);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+        var createdResult = result as CreatedAtActionResult;
+        createdResult!.Value.Should().Be(item);
+        createdResult.ActionName.Should().Be("GetById");
+    }
+
+    [Fact]
+    public async Task Update_DeveRetornarNoContent_QuandoSucesso()
+    {
+        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
+
+        var result = await _controller.Update(item.Id, item);
+
+        result.Should().BeOfType<NoContentResult>();
+        await _itemEstoqueRepository.Received(1).UpdateAsync(item);
+    }
+
+    [Fact]
+    public async Task Update_DeveRetornarBadRequest_QuandoIdsNaoCoincidem()
+    {
+        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
+
+        var result = await _controller.Update(Guid.NewGuid(), item);
+
+        result.Should().BeOfType<BadRequestResult>();
+    }
+
+    [Fact]
+    public async Task Delete_DeveRetornarNoContent()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await _controller.Delete(id);
+
+        result.Should().BeOfType<NoContentResult>();
+        await _itemEstoqueRepository.Received(1).DeleteAsync(id);
+    }
+
+    [Fact]
+    public async Task RegistrarEntrada_DeveRetornarOk_ComResultado()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var variacaoId = Guid.NewGuid();
+        var command = new RegistrarEntradaEstoqueCommand(
+            empresaId,
+            produtoId,
+            variacaoId,
+            10,
+            199.90m,
+            249.90m,
+            DateTime.UtcNow,
+            NaturezaMovimentacaoEstoque.Compra,
+            "CAP3426",
+            "LOTE-01",
+            "ML-123",
+            "Preto / P",
+            "Preto",
+            "P",
+            "Fornecedor Teste",
+            DateTime.UtcNow.AddMonths(6),
+            "Entrada teste",
+            null,
+            "DOC-01",
+            new DimensoesInput(0.35m, 10m, 5m, 12m),
+            "Anuncio para marketplace");
+        _produtoRepository.GetByIdAsync(produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CategoriaId = Guid.NewGuid()
+        });
+        _produtoVariacaoRepository.GetByIdAsync(variacaoId).Returns(new ProdutoVariacao
+        {
+            Id = variacaoId,
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            Nome = "Preto / P",
+            DescricaoComercial = "Buds FE Preto",
+            Ativa = true
+        });
+        _unitOfWork.CommitAsync().Returns(1);
+
+        var result = await _controller.RegistrarEntrada(command);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result as OkObjectResult;
+        okResult!.Value.Should().BeOfType<RegistrarEntradaEstoqueResult>();
+        var payload = okResult.Value as RegistrarEntradaEstoqueResult;
+        payload!.ItemEstoqueId.Should().NotBe(Guid.Empty);
+        payload.MovimentacaoId.Should().NotBe(Guid.Empty);
+        payload.ChavePesquisa.Should().Contain("CAP3426");
+    }
+
+    [Fact]
+    public async Task RegistrarSaida_DeveRetornarOk_ComResultado()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var itemCommand = new RegistrarSaidaEstoqueItemCommand(itemId, 5, 399.90m, "Venda teste");
+        var command = new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            new[] { itemCommand },
+            DateTime.UtcNow,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddDays(1),
+            "NF-123",
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            "Saida teste");
+        _itemEstoqueRepository.GetByIdAsync(itemId).Returns(new ItemEstoque
+        {
+            Id = itemId,
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(8),
+            QuantidadeInicial = Quantidade.From(8),
+            CustoUnitario = Dinheiro.FromDecimal(150m),
+            Status = StatusItemEstoque.Ativo,
+            EntradaEm = DateTime.UtcNow.AddDays(-2),
+            UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-1)
+        });
+        _produtoRepository.GetByIdAsync(produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            DescricaoBase = "Fone bluetooth",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CategoriaId = Guid.NewGuid()
+        });
+        _unitOfWork.CommitAsync().Returns(1);
+
+        var result = await _controller.RegistrarSaida(command);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result as OkObjectResult;
+        okResult!.Value.Should().BeOfType<RegistrarSaidaEstoqueResult>();
+        var payload = okResult.Value as RegistrarSaidaEstoqueResult;
+        payload!.VendaId.Should().NotBe(Guid.Empty);
+        payload.Itens.Should().ContainSingle();
+        payload.ValorTotal.Should().Be(1999.50m);
+    }
+
+    [Fact]
+    public async Task ReporEstoque_DeveRetornarOk_ComResultado()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var command = new ReporEstoqueCommand(
+            empresaId,
+            itemId,
+            20,
+            180m,
+            239.90m,
+            DateTime.UtcNow,
+            "Preto / M",
+            "Preto",
+            "M",
+            "Reposicao teste",
+            "DOC-REP-01",
+            new DimensoesInput(0.4m, 10m, 5m, 12m),
+            DateTime.UtcNow.AddMonths(8));
+        _itemEstoqueRepository.GetByIdAsync(itemId).Returns(new ItemEstoque
+        {
+            Id = itemId,
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(150m),
+            Status = StatusItemEstoque.Ativo,
+            EntradaEm = DateTime.UtcNow.AddDays(-10),
+            UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-2)
+        });
+        _produtoRepository.GetByIdAsync(produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CategoriaId = Guid.NewGuid()
+        });
+        _unitOfWork.CommitAsync().Returns(1);
+
+        var result = await _controller.ReporEstoque(command);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result as OkObjectResult;
+        okResult!.Value.Should().BeOfType<ReporEstoqueResult>();
+        var payload = okResult.Value as ReporEstoqueResult;
+        payload!.ItemEstoqueId.Should().Be(itemId);
+        payload.QuantidadeAnterior.Should().Be(10);
+        payload.QuantidadeAtual.Should().Be(30);
+    }
+}

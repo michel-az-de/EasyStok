@@ -31,7 +31,7 @@ public class VendaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult.Value.Should().BeEquivalentTo(vendas);
+        okResult!.Value.Should().BeEquivalentTo(vendas);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class VendaControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult.Value.Should().Be(venda);
+        okResult!.Value.Should().Be(venda);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class VendaControllerTests
     {
         // Arrange
         var id = Guid.NewGuid();
-        _vendaRepository.GetByIdAsync(id).Returns((Venda)null);
+        _vendaRepository.GetByIdAsync(id).Returns((Venda?)null);
 
         // Act
         var result = await _controller.GetById(id);
@@ -76,7 +76,7 @@ public class VendaControllerTests
         // Assert
         result.Should().BeOfType<CreatedAtActionResult>();
         var createdResult = result as CreatedAtActionResult;
-        createdResult.Value.Should().Be(venda);
+        createdResult!.Value.Should().Be(venda);
         createdResult.ActionName.Should().Be("GetById");
     }
 
