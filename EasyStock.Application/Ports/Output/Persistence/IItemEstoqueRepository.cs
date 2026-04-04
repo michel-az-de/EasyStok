@@ -13,6 +13,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20);
         Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId);
+        Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
+        Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId);
+        Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId);
+        Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId);
         Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id);
         Task InsertAsync(ItemEstoque itemEstoque);
         Task UpdateAsync(ItemEstoque itemEstoque);

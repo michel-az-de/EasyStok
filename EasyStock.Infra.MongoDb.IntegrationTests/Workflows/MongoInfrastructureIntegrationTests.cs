@@ -147,6 +147,69 @@ public class MongoInfrastructureIntegrationTests(MongoDbFixture fixture) : IClas
     }
 
     [Fact]
+    public async Task RegistrarSaida_deve_consumir_lotes_em_fifo_automaticamente_no_mongo()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var loteAntigoId = Guid.NewGuid();
+        var loteNovoId = Guid.NewGuid();
+        var entradaBase = new DateTime(2026, 4, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        await SeedProdutoAsync(empresaId, categoriaId, produtoId);
+        await SeedItemEstoqueAsync(empresaId, produtoId, loteAntigoId, 10, 250m, "Lote antigo", entradaBase);
+        await SeedItemEstoqueAsync(empresaId, produtoId, loteNovoId, 5, 255m, "Lote novo", entradaBase.AddDays(2));
+
+        await using (var provider = fixture.CreateServiceProvider())
+        {
+            using var scope = provider.CreateScope();
+            var useCase = scope.ServiceProvider.GetRequiredService<RegistrarSaidaEstoqueUseCase>();
+
+            var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(produtoId, null, 12, 399.90m, "Venda FIFO Mongo")],
+                new DateTime(2026, 4, 5, 14, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 4, 5, 14, 5, 0, DateTimeKind.Utc),
+                null,
+                "NF-MONGO-FIFO",
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Venda FIFO Mongo"));
+
+            result.Itens.Should().HaveCount(2);
+            result.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
+        }
+
+        await using var assertProvider = fixture.CreateServiceProvider();
+        using var assertScope = assertProvider.CreateScope();
+        var context = assertScope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
+
+        var lotes = await context.GetCollection<ItemEstoque>("itens_estoque")
+            .Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
+            .SortBy(x => x.EntradaEm)
+            .ToListAsync();
+        var vendas = await context.GetCollection<Venda>("vendas").Find(FilterDefinition<Venda>.Empty).ToListAsync();
+        var itensVenda = await context.GetCollection<ItemVenda>("itens_venda").Find(FilterDefinition<ItemVenda>.Empty).ToListAsync();
+        var movimentacoes = await context.GetCollection<MovimentacaoEstoque>("movimentacoes_estoque")
+            .Find(FilterDefinition<MovimentacaoEstoque>.Empty)
+            .SortBy(x => x.DataMovimentacao)
+            .ToListAsync();
+
+        lotes.Should().Contain(i => i.Id == loteAntigoId && i.QuantidadeAtual.Value == 0 && i.Status == StatusItemEstoque.Critical);
+        lotes.Should().Contain(i => i.Id == loteNovoId && i.QuantidadeAtual.Value == 3 && i.Status == StatusItemEstoque.Warn);
+        lotes.Should().OnlyContain(i => i.VelocidadeSaidaDiaria > 0m);
+        lotes.Should().OnlyContain(i => i.PrevisaoZeramentoDias.HasValue);
+        vendas.Should().HaveCount(1);
+        itensVenda.Should().HaveCount(2);
+        movimentacoes.Should().HaveCount(2);
+        movimentacoes.Select(m => m.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
+        movimentacoes.Select(m => m.Quantidade.Value).Should().Equal(10, 2);
+    }
+
+    [Fact]
     public async Task ReporEstoque_deve_atualizar_quantidade_e_gerar_movimentacao_no_mongo()
     {
         if (!fixture.IsAvailable) return;
@@ -268,11 +331,13 @@ public class MongoInfrastructureIntegrationTests(MongoDbFixture fixture) : IClas
         });
     }
 
-    private async Task SeedItemEstoqueAsync(Guid empresaId, Guid produtoId, Guid itemId, int quantidade, decimal custoUnitario, string descricaoAnuncio)
+    private async Task SeedItemEstoqueAsync(Guid empresaId, Guid produtoId, Guid itemId, int quantidade, decimal custoUnitario, string descricaoAnuncio, DateTime? entradaEm = null)
     {
         await using var provider = fixture.CreateServiceProvider();
         using var scope = provider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
+
+        var dataEntrada = entradaEm ?? DateTime.UtcNow;
 
         await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(new ItemEstoque
         {
@@ -281,11 +346,13 @@ public class MongoInfrastructureIntegrationTests(MongoDbFixture fixture) : IClas
             ProdutoId = produtoId,
             QuantidadeInicial = Quantidade.From(quantidade),
             QuantidadeAtual = Quantidade.From(quantidade),
+            QuantidadeMinima = 5,
             CustoUnitario = Dinheiro.FromDecimal(custoUnitario),
-            Status = StatusItemEstoque.Ativo,
-            EntradaEm = DateTime.UtcNow,
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow,
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = dataEntrada,
+            UltimaMovimentacaoEm = dataEntrada,
+            CriadoEm = dataEntrada,
+            AlteradoEm = dataEntrada,
             DescricaoAnuncio = descricaoAnuncio
         });
     }

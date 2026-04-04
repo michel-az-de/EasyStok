@@ -33,8 +33,28 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             if (usuario is null || !usuario.Ativo)
                 throw new CredenciaisInvalidasException();
 
+            // Verificar lockout
+            if (usuario.EstaBloqueado())
+            {
+                logger.LogWarning("Tentativa de login para usuario bloqueado: {Email}", command.Email);
+                throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
+            }
+
             if (!BCrypt.Net.BCrypt.Verify(command.Senha, usuario.SenhaHash))
+            {
+                usuario.IncrementarTentativasFalha();
+                if (usuario.FailedLoginAttempts >= 5)
+                {
+                    usuario.BloquearPorTentativas(15);
+                    logger.LogWarning("Usuario bloqueado apos 5 tentativas falhidas: {Email}", command.Email);
+                }
+                await usuarioRepository.UpdateAsync(usuario);
+                await unitOfWork.CommitAsync();
                 throw new CredenciaisInvalidasException();
+            }
+
+            // Resetar tentativas em login bem-sucedido
+            usuario.ResetarTentativasFalha();
 
             if (command.EmpresaId.HasValue)
             {

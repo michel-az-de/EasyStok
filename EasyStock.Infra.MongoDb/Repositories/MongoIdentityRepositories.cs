@@ -331,3 +331,94 @@ public sealed class UsuarioPerfilRepository(MongoEasyStockContext context, Mongo
         return Task.CompletedTask;
     }
 }
+
+public sealed class RefreshTokenRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IRefreshTokenRepository
+{
+    private IMongoCollection<RefreshToken> Collection => Context.GetCollection<RefreshToken>(MongoCollectionNames.RefreshTokens);
+
+    public async Task<RefreshToken?> GetByTokenHashAsync(string tokenHash) =>
+        await Collection.Find(x => x.TokenHash == tokenHash).FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<RefreshToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
+        await Collection.Find(x => x.UsuarioId == usuarioId).ToListAsync();
+
+    public Task AddAsync(RefreshToken refreshToken)
+    {
+        EnqueueInsert(Collection, refreshToken);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(RefreshToken refreshToken)
+    {
+        EnqueueReplace(Collection, refreshToken.Id, refreshToken);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
+        return Task.CompletedTask;
+    }
+
+    public async Task DeleteExpiredAsync()
+    {
+        var filter = Builders<RefreshToken>.Filter.Lt(x => x.ExpiraEm, DateTime.UtcNow);
+        await Collection.DeleteManyAsync(filter);
+    }
+}
+
+public sealed class ResetTokenRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IResetTokenRepository
+{
+    private IMongoCollection<ResetToken> Collection => Context.GetCollection<ResetToken>(MongoCollectionNames.ResetTokens);
+
+    public async Task<ResetToken?> GetByTokenAsync(string token) =>
+        await Collection.Find(x => x.Token == token).FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
+        await Collection.Find(x => x.UsuarioId == usuarioId).ToListAsync();
+
+    public Task AddAsync(ResetToken resetToken)
+    {
+        EnqueueInsert(Collection, resetToken);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(ResetToken resetToken)
+    {
+        EnqueueReplace(Collection, resetToken.Id, resetToken);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
+        return Task.CompletedTask;
+    }
+
+    public async Task DeleteExpiredAsync()
+    {
+        var filter = Builders<ResetToken>.Filter.Lt(x => x.ExpiraEm, DateTime.UtcNow);
+        await Collection.DeleteManyAsync(filter);
+    }
+}
+
+public sealed class AuditLogRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IAuditLogRepository
+{
+    private IMongoCollection<AuditLog> Collection => Context.GetCollection<AuditLog>(MongoCollectionNames.AuditLogs);
+
+    public Task AddAsync(AuditLog auditLog)
+    {
+        EnqueueInsert(Collection, auditLog);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IEnumerable<AuditLog>> GetByUsuarioIdAsync(Guid usuarioId, int page, int pageSize) =>
+        await Collection.Find(x => x.UsuarioId == usuarioId)
+            .SortByDescending(x => x.DataHora)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+}

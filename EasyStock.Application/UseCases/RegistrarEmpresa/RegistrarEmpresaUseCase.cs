@@ -48,14 +48,7 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
 
             var agora = DateTime.UtcNow;
 
-            var empresa = new Empresa
-            {
-                Id = Guid.NewGuid(),
-                Nome = command.NomeEmpresa.Trim(),
-                Documento = command.Documento?.Trim(),
-                CriadoEm = agora,
-                AlteradoEm = agora
-            };
+            var empresa = Empresa.Criar(command.NomeEmpresa, command.Documento);
 
             await empresaRepository.AddAsync(empresa);
 

@@ -2,8 +2,12 @@ namespace EasyStock.Domain.Enums
 {
     public enum StatusItemEstoque
     {
-        Ativo,
-        Esgotado,
+        Ok,
+        Warn,
+        Critical,
+        Slow,
+        Ativo = Ok,
+        Esgotado = Critical,
         Vencido,
         Descartado,
         Bloqueado

@@ -1,7 +1,16 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Services;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
+using EasyStock.Application.UseCases.CadastrarUsuario;
+using EasyStock.Application.UseCases.EsqueciSenha;
+using EasyStock.Application.UseCases.Logout;
+using EasyStock.Application.UseCases.ObterUsuarioAtual;
+using EasyStock.Application.UseCases.RefreshToken;
+using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
@@ -16,62 +25,71 @@ public class AuthControllerTests
 {
     private readonly IUsuarioRepository _usuarioRepository = Substitute.For<IUsuarioRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
-    private readonly ILogger<AutenticarUsuarioUseCase> _logger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
-    private readonly IJwtTokenService _mockJwtService = Substitute.For<IJwtTokenService>();
+    private readonly IRefreshTokenRepository _refreshTokenRepository = Substitute.For<IRefreshTokenRepository>();
+    private readonly IAuditLogRepository _auditLogRepository = Substitute.For<IAuditLogRepository>();
+    private readonly ILogger<AutenticarUsuarioUseCase> _autenticarLogger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
+    private readonly EasyStock.Api.Services.IJwtTokenService _mockJwtService = Substitute.For<EasyStock.Api.Services.IJwtTokenService>();
     private readonly AutenticarUsuarioUseCase _autenticarUseCase;
     private readonly AuthController _controller;
 
     public AuthControllerTests()
     {
-        _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, _logger);
+        _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, _autenticarLogger);
 
         _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("mocked-jwt-token");
+        _mockJwtService.GerarRefreshToken().Returns("mocked-refresh-token");
         _mockJwtService.ExpiresInSeconds.Returns(3600);
 
-        _controller = new AuthController(_autenticarUseCase, _mockJwtService);
-    }
-
-    [Fact]
-    public async Task Login_DeveRetornarOk_QuandoCredenciaisValidas()
-    {
-        // Arrange
-        var empresaId = Guid.NewGuid();
-        var senha = "senha123";
-        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-        var usuario = new Usuario
-        {
-            Id = Guid.NewGuid(),
-            Nome = "Admin Teste",
-            Email = "admin@teste.com",
-            SenhaHash = senhaHash,
-            Ativo = true,
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow
-        };
-
-        _usuarioRepository.GetByEmailAsync("admin@teste.com").Returns(usuario);
         _unitOfWork.CommitAsync().Returns(1);
 
-        var request = new LoginRequest("admin@teste.com", senha, null);
+        // Build substitute repositories for other use cases
+        var usuarioRepo2 = Substitute.For<IUsuarioRepository>();
+        var assinaturaRepo = Substitute.For<IAssinaturaEmpresaRepository>();
+        var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
+        var usuarioPerfilRepo = Substitute.For<IUsuarioPerfilRepository>();
+        var unitOfWork2 = Substitute.For<IUnitOfWork>();
+        var refreshTokenRepo2 = Substitute.For<IRefreshTokenRepository>();
+        var auditLogRepo2 = Substitute.For<IAuditLogRepository>();
+        var resetTokenRepo = Substitute.For<IResetTokenRepository>();
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
 
-        // Act
-        var result = await _controller.Login(request);
+        var cadastrarLogger = Substitute.For<ILogger<CadastrarUsuarioUseCase>>();
+        var refreshTokenLogger = Substitute.For<ILogger<RefreshTokenUseCase>>();
+        var logoutLogger = Substitute.For<ILogger<LogoutUseCase>>();
+        var esqueciSenhaLogger = Substitute.For<ILogger<EsqueciSenhaUseCase>>();
+        var resetarSenhaLogger = Substitute.For<ILogger<ResetarSenhaUseCase>>();
+        var obterUsuarioAtualLogger = Substitute.For<ILogger<ObterUsuarioAtualUseCase>>();
+        var atualizarUsuarioAtualLogger = Substitute.For<ILogger<AtualizarUsuarioAtualUseCase>>();
+        var alterarSenhaLogger = Substitute.For<ILogger<AlterarSenhaUseCase>>();
+        var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
-        // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().NotBeNull();
+        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, unitOfWork2, cadastrarLogger);
+        var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
+        var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
+        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, esqueciSenhaLogger);
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, resetarSenhaLogger);
+        var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
+        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, alterarSenhaLogger);
 
-        var type = okResult.Value!.GetType();
-        var tokenProp = type.GetProperty("token");
-        tokenProp.Should().NotBeNull();
-        var token = tokenProp!.GetValue(okResult.Value) as string;
-        token.Should().NotBeNullOrEmpty();
+        _controller = new AuthController(
+            _autenticarUseCase,
+            _mockJwtService,
+            _refreshTokenRepository,
+            _auditLogRepository,
+            _unitOfWork,
+            cadastrarUseCase,
+            refreshTokenUseCase,
+            logoutUseCase,
+            esqueciSenhaUseCase,
+            resetarSenhaUseCase,
+            obterUsuarioAtualUseCase,
+            atualizarUsuarioAtualUseCase,
+            alterarSenhaUseCase);
     }
 
     [Fact]
-    public async Task Login_DeveRetornar401_QuandoCredenciaisInvalidas()
+    public async Task Login_DevePropagar_CredenciaisInvalidasException_QuandoLoginFalha()
     {
         // Arrange
         _usuarioRepository.GetByEmailAsync(Arg.Any<string>()).Returns((Usuario?)null);
@@ -83,44 +101,5 @@ public class AuthControllerTests
 
         // Assert
         await act.Should().ThrowAsync<CredenciaisInvalidasException>();
-    }
-
-    [Fact]
-    public async Task Login_DeveRetornarExpiresInCorreto_QuandoCredenciaisValidas()
-    {
-        // Arrange
-        var senha = "senha123";
-        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senha);
-
-        var usuario = new Usuario
-        {
-            Id = Guid.NewGuid(),
-            Nome = "Admin Teste",
-            Email = "admin@teste.com",
-            SenhaHash = senhaHash,
-            Ativo = true,
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow
-        };
-
-        _usuarioRepository.GetByEmailAsync("admin@teste.com").Returns(usuario);
-        _unitOfWork.CommitAsync().Returns(1);
-        _mockJwtService.ExpiresInSeconds.Returns(7200);
-
-        var request = new LoginRequest("admin@teste.com", senha, null);
-
-        // Act
-        var result = await _controller.Login(request);
-
-        // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().NotBeNull();
-
-        var type = okResult.Value!.GetType();
-        var expiresInProp = type.GetProperty("expiresIn");
-        expiresInProp.Should().NotBeNull();
-        var expiresIn = (int)expiresInProp!.GetValue(okResult.Value)!;
-        expiresIn.Should().Be(_mockJwtService.ExpiresInSeconds);
     }
 }

@@ -8,12 +8,100 @@ using EasyStock.Domain.Events;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 
 public class RegistrarSaidaEstoqueUseCaseTests
 {
+    [Fact]
+    public async Task Deve_consumir_lotes_em_fifo_automaticamente()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = Guid.NewGuid(),
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        var loteAntigo = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = produto.EmpresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            QuantidadeMinima = 5,
+            CustoUnitario = Dinheiro.FromDecimal(250m),
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var loteNovo = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = produto.EmpresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(5),
+            QuantidadeInicial = Quantidade.From(5),
+            QuantidadeMinima = 5,
+            CustoUnitario = Dinheiro.FromDecimal(250m),
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(produto.EmpresaId, produto.Id, null)
+            .Returns([loteAntigo, loteNovo]);
+        movimentacaoRepository.GetTaxaSaidaDiariaAsync(produto.EmpresaId, produto.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>())
+            .Returns(0m);
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger);
+
+        var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            produto.EmpresaId,
+            [new RegistrarSaidaEstoqueItemCommand(produto.Id, null, 12, 399.90m, "Venda FIFO")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            "NF-123",
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            "FIFO"));
+
+        result.Itens.Should().HaveCount(2);
+        result.Itens.Select(i => i.QuantidadeSaida).Should().BeEquivalentTo([10, 2]);
+
+        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
+            i.Id == loteAntigo.Id &&
+            i.QuantidadeAtual.Value == 0));
+
+        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
+            i.Id == loteNovo.Id &&
+            i.QuantidadeAtual.Value == 3));
+
+        await itemVendaRepository.Received(2).InsertAsync(Arg.Any<ItemVenda>());
+        await movimentacaoRepository.Received(2).InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
     [Fact]
     public async Task Deve_registrar_saida_multi_item_e_baixar_quantidade_do_estoque()
     {
@@ -60,13 +148,15 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdAsync(item1.Id).Returns(item1);
         itemRepository.GetByIdAsync(item2.Id).Returns(item2);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
         var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             produto.EmpresaId,
@@ -139,15 +229,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda bloqueada")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -200,15 +292,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 3, 399.90m, "Venda sem saldo")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -224,6 +318,77 @@ public class RegistrarSaidaEstoqueUseCaseTests
         await vendaRepository.DidNotReceive().InsertAsync(Arg.Any<Venda>());
         await itemVendaRepository.DidNotReceive().InsertAsync(Arg.Any<ItemVenda>());
         await movimentacaoRepository.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Deve_falhar_quando_soma_dos_lotes_em_fifo_e_insuficiente()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var empresaId = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null)
+            .Returns([
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produto.Id,
+                    QuantidadeAtual = Quantidade.From(2),
+                    QuantidadeInicial = Quantidade.From(2),
+                    CustoUnitario = Dinheiro.FromDecimal(250m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produto.Id,
+                    QuantidadeAtual = Quantidade.From(1),
+                    QuantidadeInicial = Quantidade.From(1),
+                    CustoUnitario = Dinheiro.FromDecimal(250m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc)
+                }
+            ]);
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger);
+
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            [new RegistrarSaidaEstoqueItemCommand(produto.Id, null, 5, 399.90m, "Sem saldo FIFO")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            null,
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            null));
+
+        await act.Should().ThrowAsync<EstoqueInsuficienteException>();
         await unitOfWork.DidNotReceive().CommitAsync();
     }
 
@@ -259,15 +424,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
 
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             Guid.NewGuid(),
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda invalida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -321,15 +488,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda invalida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -382,15 +551,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda vencida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -455,15 +626,17 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdAsync(itemValido.Id).Returns(itemValido);
         itemRepository.GetByIdAsync(itemSemSaldo.Id).Returns(itemSemSaldo);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
             vendaRepository,
             itemVendaRepository,
             movimentacaoRepository,
-            unitOfWork);
+            unitOfWork,
+            logger);
 
-        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [
                 new RegistrarSaidaEstoqueItemCommand(itemValido.Id, 2, 399.90m, "Item 1"),
@@ -521,6 +694,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
         itemRepository.GetByIdAsync(item.Id).Returns(item);
 
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -528,6 +702,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             itemVendaRepository,
             movimentacaoRepository,
             unitOfWork,
+            logger,
             publicadorEventos);
 
         var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(

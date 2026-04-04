@@ -82,6 +82,23 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
     public async Task<Produto?> GetByIdAsync(Guid empresaId, Guid id) =>
         await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
+    public async Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+
+    public Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null)
+    {
+        skuBase = skuBase.Trim();
+
+        var filter = Builders<Produto>.Filter.And(
+            Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<Produto>.Filter.Eq("SkuBase", skuBase),
+            ignoreProdutoId.HasValue
+                ? Builders<Produto>.Filter.Ne(x => x.Id, ignoreProdutoId.Value)
+                : Builders<Produto>.Filter.Empty);
+
+        return Collection.Find(filter).AnyAsync();
+    }
+
     public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo)
     {
         if (string.IsNullOrWhiteSpace(termo))
@@ -137,6 +154,28 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
     public async Task<ProdutoVariacao?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
+    public async Task<ProdutoVariacao?> GetByIdAsync(Guid empresaId, Guid produtoId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<ProdutoVariacao>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
+            .SortBy(x => x.Nome)
+            .ToListAsync();
+
+    public Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null)
+    {
+        sku = sku.Trim();
+
+        var filter = Builders<ProdutoVariacao>.Filter.And(
+            Builders<ProdutoVariacao>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<ProdutoVariacao>.Filter.Eq("Sku", sku),
+            ignoreVariacaoId.HasValue
+                ? Builders<ProdutoVariacao>.Filter.Ne(x => x.Id, ignoreVariacaoId.Value)
+                : Builders<ProdutoVariacao>.Filter.Empty);
+
+        return Collection.Find(filter).AnyAsync();
+    }
+
     public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo)
     {
         if (string.IsNullOrWhiteSpace(termo))
@@ -162,6 +201,12 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
     public Task InsertAsync(ProdutoVariacao variacao)
     {
         EnqueueInsert(Collection, variacao);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(ProdutoVariacao variacao)
+    {
+        EnqueueReplace(Collection, variacao.Id, variacao);
         return Task.CompletedTask;
     }
 }

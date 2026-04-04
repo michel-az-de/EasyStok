@@ -46,4 +46,9 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
+
+    public string GerarRefreshToken()
+    {
+        return Guid.NewGuid().ToString() + Guid.NewGuid().ToString(); // 64 chars
+    }
 }

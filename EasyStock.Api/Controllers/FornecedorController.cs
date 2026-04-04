@@ -1,6 +1,9 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.GerenciarFornecedor;
+using EasyStock.Application.UseCases.AtualizarFornecedor;
+using EasyStock.Application.UseCases.CriarFornecedor;
+using EasyStock.Application.UseCases.DesativarFornecedor;
+using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +14,10 @@ namespace EasyStock.Api.Controllers;
 [Route("api/fornecedores")]
 [Authorize(Policy = "Operador")]
 public class FornecedorController(
-    GerenciarFornecedorUseCase fornecedorUseCase,
+    CriarFornecedorUseCase criarUseCase,
+    AtualizarFornecedorUseCase atualizarUseCase,
+    DesativarFornecedorUseCase desativarUseCase,
+    ListarFornecedoresUseCase listarUseCase,
     IFornecedorRepository fornecedorRepository,
     ICurrentUserAccessor currentUser) : ControllerBase
 {
@@ -21,7 +27,7 @@ public class FornecedorController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
-        var (fornecedores, total) = await fornecedorUseCase.ListarAsync(empresaId, page, pageSize);
+        var (fornecedores, total) = await listarUseCase.ExecuteAsync(new ListarFornecedoresQuery(empresaId, page, pageSize));
         return Ok(new { Fornecedores = fornecedores, TotalCount = total, Page = page, PageSize = pageSize });
     }
 
@@ -29,7 +35,12 @@ public class FornecedorController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var fornecedor = await fornecedorRepository.GetByIdAsync(id);
-        return fornecedor is null ? NotFound() : Ok(fornecedor);
+        if (fornecedor is null) return NotFound();
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin
+            && currentUser.EmpresaId != Guid.Empty
+            && currentUser.EmpresaId != fornecedor.EmpresaId)
+            return Forbid();
+        return Ok(fornecedor);
     }
 
     [HttpPost]
@@ -38,7 +49,7 @@ public class FornecedorController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
             return Forbid();
 
-        var resultado = await fornecedorUseCase.CriarAsync(command);
+        var resultado = await criarUseCase.ExecuteAsync(command);
         return Created($"/api/fornecedores/{resultado.Id}", resultado);
     }
 
@@ -48,7 +59,7 @@ public class FornecedorController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
             return Forbid();
 
-        await fornecedorUseCase.AtualizarAsync(command);
+        await atualizarUseCase.ExecuteAsync(command);
         return NoContent();
     }
 
@@ -58,7 +69,7 @@ public class FornecedorController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
-        await fornecedorUseCase.DesativarAsync(id, empresaId);
+        await desativarUseCase.ExecuteAsync(new DesativarFornecedorCommand(id, empresaId));
         return NoContent();
     }
 }

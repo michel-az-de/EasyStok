@@ -15,6 +15,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(l => l.Documento).HasMaxLength(30);
             builder.Property(l => l.Endereco).HasMaxLength(300);
             builder.Property(l => l.Telefone).HasMaxLength(30);
+            builder.Property(l => l.LogoUrl).HasMaxLength(500);
 
             builder.HasOne(l => l.Empresa)
                 .WithMany(e => e.Lojas)

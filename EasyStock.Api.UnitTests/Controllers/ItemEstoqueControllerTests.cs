@@ -26,6 +26,7 @@ public class ItemEstoqueControllerTests
     private readonly IItemVendaRepository _itemVendaRepository = Substitute.For<IItemVendaRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<RegistrarEntradaEstoqueUseCase> _registrarEntradaLogger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
+    private readonly ILogger<RegistrarSaidaEstoqueUseCase> _registrarSaidaLogger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
     private readonly RegistrarEntradaEstoqueUseCase _registrarEntradaUseCase;
     private readonly RegistrarSaidaEstoqueUseCase _registrarSaidaUseCase;
     private readonly ReporEstoqueUseCase _reporEstoqueUseCase;
@@ -47,7 +48,8 @@ public class ItemEstoqueControllerTests
             _vendaRepository,
             _itemVendaRepository,
             _movimentacaoEstoqueRepository,
-            _unitOfWork);
+            _unitOfWork,
+            _registrarSaidaLogger);
         _reporEstoqueUseCase = new ReporEstoqueUseCase(
             _produtoRepository,
             _itemEstoqueRepository,
@@ -220,6 +222,79 @@ public class ItemEstoqueControllerTests
         payload!.VendaId.Should().NotBe(Guid.Empty);
         payload.Itens.Should().ContainSingle();
         payload.ValorTotal.Should().Be(1999.50m);
+    }
+
+    [Fact]
+    public async Task RegistrarSaida_DeveAceitarSaidaPorProdutoEConsumirLotesEmFifo()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var loteAntigoId = Guid.NewGuid();
+        var loteNovoId = Guid.NewGuid();
+        var itemCommand = new RegistrarSaidaEstoqueItemCommand(produtoId, null, 12, 399.90m, "Venda FIFO");
+        var command = new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            new[] { itemCommand },
+            DateTime.UtcNow,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddDays(1),
+            "NF-456",
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            "Saida fifo teste");
+
+        _itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null).Returns(
+            new[]
+            {
+                new ItemEstoque
+                {
+                    Id = loteAntigoId,
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(10),
+                    QuantidadeInicial = Quantidade.From(10),
+                    QuantidadeMinima = 5,
+                    CustoUnitario = Dinheiro.FromDecimal(150m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = DateTime.UtcNow.AddDays(-5),
+                    UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-3)
+                },
+                new ItemEstoque
+                {
+                    Id = loteNovoId,
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(5),
+                    QuantidadeInicial = Quantidade.From(5),
+                    QuantidadeMinima = 5,
+                    CustoUnitario = Dinheiro.FromDecimal(150m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = DateTime.UtcNow.AddDays(-1),
+                    UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-1)
+                }
+            });
+        _produtoRepository.GetByIdAsync(produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            DescricaoBase = "Fone bluetooth",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CategoriaId = Guid.NewGuid()
+        });
+        _movimentacaoEstoqueRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(0.2m);
+        _unitOfWork.CommitAsync().Returns(1);
+
+        var result = await _controller.RegistrarSaida(command);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = (OkObjectResult)result;
+        var payload = okResult.Value.Should().BeOfType<RegistrarSaidaEstoqueResult>().Subject;
+        payload.Itens.Should().HaveCount(2);
+        payload.Itens.Select(i => i.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
+        payload.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
+        payload.ValorTotal.Should().Be(4798.80m);
     }
 
     [Fact]

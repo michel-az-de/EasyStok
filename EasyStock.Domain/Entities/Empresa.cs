@@ -11,6 +11,19 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
 
+        public static Empresa Criar(string nome, string? documento)
+        {
+            var agora = DateTime.UtcNow;
+            return new Empresa
+            {
+                Id = Guid.NewGuid(),
+                Nome = nome.Trim(),
+                Documento = documento?.Trim(),
+                CriadoEm = agora,
+                AlteradoEm = agora
+            };
+        }
+
         public ICollection<Categoria>? Categorias { get; set; }
         public ICollection<Produto>? Produtos { get; set; }
         public ICollection<ProdutoVariacao>? VariacoesProduto { get; set; }

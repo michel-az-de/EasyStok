@@ -1,5 +1,8 @@
 using EasyStock.Application.Ports.Output;
-using EasyStock.Application.UseCases.GerenciarLoja;
+using EasyStock.Application.UseCases.AtualizarLoja;
+using EasyStock.Application.UseCases.CriarLoja;
+using EasyStock.Application.UseCases.DesativarLoja;
+using EasyStock.Application.UseCases.ListarLojas;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +13,10 @@ namespace EasyStock.Api.Controllers;
 [Route("api/lojas")]
 [Authorize(Policy = "Gerente")]
 public class LojaController(
-    GerenciarLojaUseCase lojaUseCase,
+    CriarLojaUseCase criarUseCase,
+    AtualizarLojaUseCase atualizarUseCase,
+    DesativarLojaUseCase desativarUseCase,
+    ListarLojasUseCase listarUseCase,
     ICurrentUserAccessor currentUser) : ControllerBase
 {
     [HttpGet]
@@ -19,7 +25,7 @@ public class LojaController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
-        var lojas = await lojaUseCase.ListarAsync(empresaId);
+        var lojas = await listarUseCase.ExecuteAsync(new ListarLojasQuery(empresaId));
         return Ok(lojas);
     }
 
@@ -29,7 +35,7 @@ public class LojaController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
             return Forbid();
 
-        var resultado = await lojaUseCase.CriarAsync(command);
+        var resultado = await criarUseCase.ExecuteAsync(command);
         return Created($"/api/lojas/{resultado.Id}", resultado);
     }
 
@@ -42,7 +48,7 @@ public class LojaController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
             return Forbid();
 
-        await lojaUseCase.AtualizarAsync(command);
+        await atualizarUseCase.ExecuteAsync(command);
         return NoContent();
     }
 
@@ -52,7 +58,7 @@ public class LojaController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
-        await lojaUseCase.DesativarAsync(id, empresaId);
+        await desativarUseCase.ExecuteAsync(new DesativarLojaCommand(id, empresaId));
         return NoContent();
     }
 }

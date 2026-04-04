@@ -148,6 +148,41 @@ namespace EasyStock.Infra.Postgre.Repositories
                 resumo.Average(i => i.PrecoReferencia));
         }
 
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+            await dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId)
+                .OrderByDescending(i => i.EntradaEm)
+                .ToListAsync();
+
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId)
+        {
+            var query = dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId &&
+                            i.ProdutoId == produtoId &&
+                            i.QuantidadeAtual.Value > 0);
+
+            if (produtoVariacaoId.HasValue)
+                query = query.Where(i => i.ProdutoVariacaoId == produtoVariacaoId.Value);
+            else
+                query = query.Where(i => i.ProdutoVariacaoId == null);
+
+            return await query
+                .OrderBy(i => i.EntradaEm)
+                .ThenBy(i => i.CriadoEm)
+                .ToListAsync();
+        }
+
+        public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
+            dbContext.ItensEstoque
+                .AsNoTracking()
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.QuantidadeAtual.Value > 0);
+
+        public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
+            dbContext.ItensEstoque
+                .AsNoTracking()
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.ProdutoVariacaoId == variacaoId && i.QuantidadeAtual.Value > 0);
+
         public Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id) =>
             dbContext.ItensEstoque
                 .AsNoTracking()

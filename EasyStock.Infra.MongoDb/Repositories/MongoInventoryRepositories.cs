@@ -102,6 +102,32 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             resumo["TicketMedioSugerido"].ToDecimal());
     }
 
+    public async Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
+            .SortByDescending(x => x.EntradaEm)
+            .ToListAsync();
+
+    public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId)
+    {
+        var filter = Builders<ItemEstoque>.Filter.And(
+            Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<ItemEstoque>.Filter.Eq(x => x.ProdutoId, produtoId),
+            Builders<ItemEstoque>.Filter.Gt("QuantidadeAtual", 0),
+            produtoVariacaoId.HasValue
+                ? Builders<ItemEstoque>.Filter.Eq(x => x.ProdutoVariacaoId, produtoVariacaoId.Value)
+                : Builders<ItemEstoque>.Filter.Eq(x => x.ProdutoVariacaoId, null));
+
+        return await Collection.Find(filter)
+            .Sort(Builders<ItemEstoque>.Sort.Ascending(x => x.EntradaEm).Ascending(x => x.CriadoEm))
+            .ToListAsync();
+    }
+
+    public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+
+    public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.ProdutoVariacaoId == variacaoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+
     public async Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id)
     {
         var item = await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
@@ -179,6 +205,11 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
 
     public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId) =>
         await Collection.Find(x => x.ItemEstoqueId == itemEstoqueId)
+            .SortByDescending(x => x.DataMovimentacao)
+            .ToListAsync();
+
+    public async Task<IEnumerable<MovimentacaoEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
             .SortByDescending(x => x.DataMovimentacao)
             .ToListAsync();
 

@@ -40,6 +40,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasConversion(q => q.Value, value => Quantidade.From(value));
             builder.Property(i => i.QuantidadeAtual)
                 .HasConversion(q => q.Value, value => Quantidade.From(value));
+            builder.Property(i => i.QuantidadeMinima)
+                .HasDefaultValue(5);
+            builder.Property(i => i.VelocidadeSaidaDiaria)
+                .HasColumnType("decimal(10,2)");
+            builder.Property(i => i.DiasSemMovimentacao);
+            builder.Property(i => i.PrevisaoZeramentoDias);
             builder.Property(i => i.CustoUnitario)
                 .HasConversion(d => d.Valor, value => Dinheiro.FromDecimal(value))
                 .HasColumnType("decimal(18,2)");

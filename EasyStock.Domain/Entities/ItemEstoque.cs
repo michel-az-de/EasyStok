@@ -31,6 +31,10 @@ namespace EasyStock.Domain.Entities
 
         public Quantidade QuantidadeInicial { get; set; } = null!;
         public Quantidade QuantidadeAtual { get; set; } = null!;
+        public int QuantidadeMinima { get; set; } = 5;
+        public decimal VelocidadeSaidaDiaria { get; set; }
+        public int DiasSemMovimentacao { get; set; }
+        public int? PrevisaoZeramentoDias { get; set; }
 
         public Dinheiro CustoUnitario { get; set; } = null!;
         public Dinheiro? PrecoVendaSugerido { get; set; }
@@ -92,18 +96,22 @@ namespace EasyStock.Domain.Entities
                 FornecedorNome = NormalizarTexto(fornecedorNome),
                 QuantidadeInicial = quantidade,
                 QuantidadeAtual = quantidade,
+                QuantidadeMinima = 5,
+                VelocidadeSaidaDiaria = 0m,
+                DiasSemMovimentacao = 0,
+                PrevisaoZeramentoDias = null,
                 CustoUnitario = custoUnitario,
                 PrecoVendaSugerido = precoVendaSugerido ?? produto.PrecoReferencia,
                 EntradaEm = dataEntrada,
                 ValidadeEm = validade,
                 UltimaMovimentacaoEm = dataEntrada,
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 Observacoes = NormalizarTexto(observacoes),
                 CriadoEm = criadoEm,
                 AlteradoEm = criadoEm
             };
 
-            item.RecalcularStatus(dataEntrada);
+            item.RecalcularIndicadores(dataEntrada);
             item.ChavePesquisa = item.MontarChavePesquisa(produto, variacao);
             return item;
         }
@@ -134,7 +142,7 @@ namespace EasyStock.Domain.Entities
             if (novoCustoUnitario is not null) CustoUnitario = novoCustoUnitario;
             if (novoPrecoVendaSugerido is not null) PrecoVendaSugerido = novoPrecoVendaSugerido;
 
-            RecalcularStatus(dataReposicao);
+            RecalcularIndicadores(dataReposicao);
             return QuantidadeAtual;
         }
 
@@ -148,7 +156,7 @@ namespace EasyStock.Domain.Entities
             QuantidadeAtual = QuantidadeAtual.Subtract(quantidadeSaida);
             UltimaMovimentacaoEm = dataSaida;
             AlteradoEm = alteradoEm;
-            Status = QuantidadeAtual.Value == 0 ? StatusItemEstoque.Esgotado : StatusItemEstoque.Ativo;
+            RecalcularIndicadores(dataSaida);
 
             return QuantidadeAtual;
         }
@@ -168,18 +176,54 @@ namespace EasyStock.Domain.Entities
                 throw new EstoqueInsuficienteException(ProdutoId, 1, QuantidadeAtual.Value);
         }
 
-        public void RecalcularStatus(DateTime dataReferencia)
+        public void AtualizarVelocidadeSaida(decimal velocidadeSaidaDiaria, DateTime dataReferencia)
+        {
+            VelocidadeSaidaDiaria = Math.Max(0m, decimal.Round(velocidadeSaidaDiaria, 2));
+            RecalcularIndicadores(dataReferencia);
+        }
+
+        public void RecalcularStatus(DateTime dataReferencia) =>
+            RecalcularIndicadores(dataReferencia);
+
+        public void RecalcularIndicadores(DateTime dataReferencia, int diasAlertaParado = 30)
         {
             if (ValidadeEm?.EstaVencido(dataReferencia) == true)
             {
                 Status = StatusItemEstoque.Vencido;
+                AtualizarDiasSemMovimentacao(dataReferencia);
+                AtualizarPrevisao();
                 return;
             }
 
             if (Status == StatusItemEstoque.Bloqueado || Status == StatusItemEstoque.Descartado)
+            {
+                AtualizarDiasSemMovimentacao(dataReferencia);
+                AtualizarPrevisao();
                 return;
+            }
 
-            Status = QuantidadeAtual.Value == 0 ? StatusItemEstoque.Esgotado : StatusItemEstoque.Ativo;
+            AtualizarDiasSemMovimentacao(dataReferencia);
+            AtualizarPrevisao();
+
+            if (QuantidadeAtual.Value <= 2)
+            {
+                Status = StatusItemEstoque.Critical;
+                return;
+            }
+
+            if (QuantidadeAtual.Value < QuantidadeMinima)
+            {
+                Status = StatusItemEstoque.Warn;
+                return;
+            }
+
+            if (DiasSemMovimentacao >= diasAlertaParado)
+            {
+                Status = StatusItemEstoque.Slow;
+                return;
+            }
+
+            Status = StatusItemEstoque.Ok;
         }
 
         public string MontarChavePesquisa(Produto produto, ProdutoVariacao? variacao)
@@ -204,5 +248,18 @@ namespace EasyStock.Domain.Entities
 
         private static string? NormalizarTexto(string? valor) =>
             string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
+
+        private void AtualizarDiasSemMovimentacao(DateTime dataReferencia)
+        {
+            var baseDate = (UltimaMovimentacaoEm ?? EntradaEm).Date;
+            DiasSemMovimentacao = Math.Max(0, (dataReferencia.Date - baseDate).Days);
+        }
+
+        private void AtualizarPrevisao()
+        {
+            PrevisaoZeramentoDias = VelocidadeSaidaDiaria <= 0m
+                ? null
+                : (int?)Math.Floor(QuantidadeAtual.Value / VelocidadeSaidaDiaria);
+        }
     }
 }

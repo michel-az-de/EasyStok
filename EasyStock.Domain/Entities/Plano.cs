@@ -4,6 +4,8 @@ namespace EasyStock.Domain.Entities
 {
     public class Plano
     {
+        public const int SemLimite = -1;
+
         public Guid Id { get; set; }
         public string Nome { get; set; } = null!;
         public string? Descricao { get; set; }
@@ -13,5 +15,9 @@ namespace EasyStock.Domain.Entities
         public decimal PrecoMensal { get; set; }
         public bool Ativo { get; set; }
         public DateTime CriadoEm { get; set; }
+
+        public bool LojasSaoIlimitadas => LimiteLojas == SemLimite;
+        public bool UsuariosSaoIlimitados => LimiteUsuarios == SemLimite;
+        public bool ProdutosSaoIlimitados => LimiteProdutos == SemLimite;
     }
 }

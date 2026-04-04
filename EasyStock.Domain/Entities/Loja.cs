@@ -12,6 +12,7 @@ namespace EasyStock.Domain.Entities
         public string? Documento { get; set; }
         public string? Endereco { get; set; }
         public string? Telefone { get; set; }
+        public string? LogoUrl { get; set; }
         public bool Ativa { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }

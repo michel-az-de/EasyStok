@@ -211,7 +211,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new VendaRepository(context),
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
-                context);
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -243,6 +244,106 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             movimentacoes.Should().HaveCount(2);
             movimentacoes.Should().OnlyContain(m => m.Tipo == TipoMovimentacaoEstoque.Saida);
             movimentacoes.Should().OnlyContain(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+        }
+    }
+
+    [Fact]
+    public async Task RegistrarSaida_deve_consumir_lotes_em_fifo_automaticamente_no_postgre()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var loteAntigoId = Guid.NewGuid();
+        var loteNovoId = Guid.NewGuid();
+        var entradaBase = new DateTime(2026, 4, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.AddRange(
+                new ItemEstoque
+                {
+                    Id = loteAntigoId,
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeInicial = Quantidade.From(10),
+                    QuantidadeAtual = Quantidade.From(10),
+                    QuantidadeMinima = 5,
+                    CustoUnitario = Dinheiro.FromDecimal(250m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = entradaBase,
+                    UltimaMovimentacaoEm = entradaBase,
+                    CriadoEm = entradaBase,
+                    AlteradoEm = entradaBase,
+                    DescricaoAnuncio = "Lote antigo"
+                },
+                new ItemEstoque
+                {
+                    Id = loteNovoId,
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeInicial = Quantidade.From(5),
+                    QuantidadeAtual = Quantidade.From(5),
+                    QuantidadeMinima = 5,
+                    CustoUnitario = Dinheiro.FromDecimal(255m),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = entradaBase.AddDays(2),
+                    UltimaMovimentacaoEm = entradaBase.AddDays(2),
+                    CriadoEm = entradaBase.AddDays(2),
+                    AlteradoEm = entradaBase.AddDays(2),
+                    DescricaoAnuncio = "Lote novo"
+                });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            var useCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new VendaRepository(context),
+                new ItemVendaRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+
+            var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(produtoId, null, 12, 399.90m, "Venda FIFO Postgre")],
+                new DateTime(2026, 4, 5, 10, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 4, 5, 10, 5, 0, DateTimeKind.Utc),
+                null,
+                "NF-FIFO-POSTGRE",
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Saida FIFO"));
+
+            result.Itens.Should().HaveCount(2);
+            result.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
+        }
+
+        await using (var assertContext = fixture.CreateDbContext())
+        {
+            var lotes = await assertContext.ItensEstoque
+                .OrderBy(i => i.EntradaEm)
+                .ToListAsync();
+            var venda = await assertContext.Vendas.Include(v => v.ItensVenda).SingleAsync();
+            var movimentacoes = await assertContext.MovimentacoesEstoque
+                .OrderBy(m => m.DataMovimentacao)
+                .ToListAsync();
+
+            lotes.Should().Contain(i => i.Id == loteAntigoId && i.QuantidadeAtual.Value == 0 && i.Status == StatusItemEstoque.Critical);
+            lotes.Should().Contain(i => i.Id == loteNovoId && i.QuantidadeAtual.Value == 3 && i.Status == StatusItemEstoque.Warn);
+            lotes.Should().OnlyContain(i => i.VelocidadeSaidaDiaria > 0m);
+            lotes.Should().OnlyContain(i => i.PrevisaoZeramentoDias.HasValue);
+
+            venda.ItensVenda.Should().HaveCount(2);
+            movimentacoes.Should().HaveCount(2);
+            movimentacoes.Select(m => m.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
+            movimentacoes.Select(m => m.Quantidade.Value).Should().Equal(10, 2);
         }
     }
 
@@ -284,7 +385,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new VendaRepository(context),
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
-                context);
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
 
             var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -354,7 +456,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new VendaRepository(context),
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
-                context);
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
 
             var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -682,7 +785,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new VendaRepository(context),
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
-                context);
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -706,7 +810,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new VendaRepository(context),
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
-                context);
+                context,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,

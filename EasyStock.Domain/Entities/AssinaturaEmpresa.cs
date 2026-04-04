@@ -1,5 +1,6 @@
 using System;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Entities
 {
@@ -19,18 +20,28 @@ namespace EasyStock.Domain.Entities
 
         public void Suspender()
         {
+            if (Status == StatusAssinatura.Suspensa)
+                return;
+            if (Status == StatusAssinatura.Cancelada)
+                throw new RegraDeDominioVioladaException("Assinatura cancelada nao pode ser suspensa.");
             Status = StatusAssinatura.Suspensa;
             AlteradoEm = DateTime.UtcNow;
         }
 
         public void Cancelar()
         {
+            if (Status == StatusAssinatura.Cancelada)
+                return;
+            DataFim = DateTime.UtcNow;
             Status = StatusAssinatura.Cancelada;
             AlteradoEm = DateTime.UtcNow;
         }
 
         public void Reativar()
         {
+            if (Status == StatusAssinatura.Cancelada)
+                throw new RegraDeDominioVioladaException("Assinatura cancelada nao pode ser reativada. Crie uma nova assinatura.");
+            DataFim = null;
             Status = StatusAssinatura.Ativa;
             AlteradoEm = DateTime.UtcNow;
         }

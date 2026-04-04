@@ -10,8 +10,8 @@ namespace EasyStock.Infra.Postgre.Repositories
     // Proposed PostgreSQL index for performance:
     // CREATE INDEX idx_produtos_empresa_nome ON produtos (empresaid, nome);
 
-    public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache cache)
-        : BaseRepository<Produto>(dbContext), IProdutoRepository
+    public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
+        : IProdutoRepository
     {
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
@@ -22,6 +22,25 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.Produtos
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
+        public Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id) =>
+            dbContext.Produtos
+                .AsNoTracking()
+                .Include(p => p.Caracteristicas)
+                .Include(p => p.Embalagens)
+                .Include(p => p.Variacoes)
+                .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
+        public Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null)
+        {
+            skuBase = skuBase.Trim();
+
+            return dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.SkuBase != null && p.SkuBase.Value == skuBase)
+                .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
+                .AnyAsync();
+        }
 
         public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo)
         {
@@ -45,14 +64,17 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var cacheKey = $"produtos_paginados_{empresaId}_{page}_{pageSize}";
 
-            var cachedData = await cache.GetStringAsync(cacheKey);
-            if (!string.IsNullOrEmpty(cachedData))
+            if (cache is not null)
             {
-                var result = JsonSerializer.Deserialize<(IEnumerable<Produto>, int)>(cachedData);
-                return result;
+                var cachedData = await cache.GetStringAsync(cacheKey);
+                if (!string.IsNullOrEmpty(cachedData))
+                {
+                    var cachedResult = JsonSerializer.Deserialize<(IEnumerable<Produto>, int)>(cachedData);
+                    return cachedResult;
+                }
             }
 
-            var query = DbContext.Produtos
+            var query = dbContext.Produtos
                 .AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId);
 
@@ -64,11 +86,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
             var result = (produtos, totalCount);
-            var serialized = JsonSerializer.Serialize(result);
-            await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
+
+            if (cache is not null)
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
-            });
+                var serialized = JsonSerializer.Serialize(result);
+                await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                });
+            }
 
             return result;
         }

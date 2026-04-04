@@ -39,24 +39,19 @@ namespace EasyStock.Api.Services
         public bool TemPermissao(Permissao permissao)
         {
             var user = httpContextAccessor.HttpContext?.User;
-            if (user?.Identity?.IsAuthenticated != true)
-                return false;
+            if (user?.Identity?.IsAuthenticated != true) return false;
 
-            var permissionClaims = user.FindAll("permissao")
-                .Select(x => x.Value)
-                .Concat(user.FindAll("permissoes")
-                    .SelectMany(x => x.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+            var permissaoClaims = user.FindAll("permissao").Select(x => x.Value).ToList();
 
-            foreach (var claim in permissionClaims)
-            {
-                if (Enum.TryParse<Permissao>(claim, true, out var parsed) && parsed == permissao)
-                    return true;
-            }
+            // Se tem claims explícitas de permissão, usar SOMENTE elas (autoridade do Perfil)
+            if (permissaoClaims.Count > 0)
+                return permissaoClaims.Any(c =>
+                    Enum.TryParse<Permissao>(c, true, out var p) && p == permissao);
 
+            // Sem claims de permissão (ex: autenticado sem empresa) → fallback por Nivel
             return Nivel switch
             {
-                NivelAcesso.SuperAdmin => true,
-                NivelAcesso.Admin => true,
+                NivelAcesso.SuperAdmin or NivelAcesso.Admin => true,
                 NivelAcesso.Gerente => permissao is not Permissao.GerenciarUsuarios,
                 NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos,
                 _ => permissao is Permissao.VisualizarRelatorios

@@ -1,8 +1,10 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -74,5 +76,56 @@ public class CadastrarProdutoUseCaseTests
             v.Nome == "Grafite"));
 
         await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Deve_falhar_quando_sku_base_ja_existe_na_empresa()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+
+        var useCase = new CadastrarProdutoUseCase(
+            produtoRepository,
+            categoriaRepository,
+            caracteristicaRepository,
+            embalagemRepository,
+            variacaoRepository,
+            unitOfWork,
+            logger);
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+        produtoRepository.ExistsSkuBaseAsync(empresaId, "BUDS-FE", Arg.Any<Guid?>()).Returns(true);
+
+        var command = new CadastrarProdutoCommand(
+            empresaId,
+            categoriaId,
+            "Galaxy Buds FE",
+            null,
+            null,
+            TipoProduto.Fisico,
+            "BUDS-FE",
+            null,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        var act = () => useCase.ExecuteAsync(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*SKU duplicado*");
     }
 }

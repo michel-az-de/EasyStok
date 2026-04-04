@@ -2,6 +2,7 @@ using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Services;
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Validators;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.MongoDb.DependencyInjection;
@@ -20,6 +21,7 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,6 +103,17 @@ builder.Services.AddEasyStockApplication();
 // Configuration
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection("EasyStock"));
+builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection("FileStorage"));
+
+var fileStorageOptions = builder.Configuration.GetSection("FileStorage").Get<FileStorageOptions>() ?? new FileStorageOptions();
+if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
+}
 
 // Observability
 builder.Services.AddSingleton<EasyStock.Api.Observability.MetricsService>();
@@ -112,7 +125,9 @@ var jwtKey = builder.Configuration["Jwt:SecretKey"]
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
+    sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -239,6 +254,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
+{
+    var localStorage = app.Services.GetRequiredService<IFileStorage>() as LocalFileStorage;
+    if (localStorage is not null)
+    {
+        var rootPath = localStorage.GetRootPath();
+        Directory.CreateDirectory(rootPath);
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(rootPath),
+            RequestPath = fileStorageOptions.PublicBaseUrl
+        });
+    }
+}
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();

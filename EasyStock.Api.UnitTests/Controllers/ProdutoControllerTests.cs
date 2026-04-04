@@ -1,6 +1,11 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.GerenciarProduto;
+using EasyStock.Application.UseCases.GerenciarUploads;
+using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -18,6 +23,11 @@ public class ProdutoControllerTests
     private readonly IProdutoCaracteristicaRepository _produtoCaracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
     private readonly IProdutoEmbalagemRepository _produtoEmbalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
     private readonly IProdutoVariacaoRepository _produtoVariacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
+    private readonly IMovimentacaoEstoqueRepository _movimentacaoEstoqueRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+    private readonly ILojaRepository _lojaRepository = Substitute.For<ILojaRepository>();
+    private readonly IUsuarioRepository _usuarioRepository = Substitute.For<IUsuarioRepository>();
+    private readonly IFileStorage _fileStorage = Substitute.For<IFileStorage>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<CadastrarProdutoUseCase> _logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
     private readonly CadastrarProdutoUseCase _cadastrarProdutoUseCase;
@@ -33,7 +43,29 @@ public class ProdutoControllerTests
             _produtoVariacaoRepository,
             _unitOfWork,
             _logger);
-        _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase);
+
+        var gerenciarProdutoUseCase = new GerenciarProdutoUseCase(
+            _produtoRepository,
+            _categoriaRepository,
+            _produtoVariacaoRepository,
+            _itemEstoqueRepository,
+            _movimentacaoEstoqueRepository,
+            _unitOfWork);
+
+        var gerenciarVariacaoProdutoUseCase = new GerenciarVariacaoProdutoUseCase(
+            _produtoRepository,
+            _produtoVariacaoRepository,
+            _itemEstoqueRepository,
+            _unitOfWork);
+
+        var gerenciarUploadsUseCase = new GerenciarUploadsUseCase(
+            _fileStorage,
+            _produtoRepository,
+            _usuarioRepository,
+            _lojaRepository,
+            _unitOfWork);
+
+        _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase);
     }
 
     [Fact]
@@ -60,8 +92,17 @@ public class ProdutoControllerTests
     {
         // Arrange
         var empresaId = Guid.NewGuid();
-        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Produto1" };
-        _produtoRepository.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            CategoriaId = Guid.NewGuid(),
+            Nome = "Produto1",
+            Status = StatusProduto.Ativo
+        };
+        _produtoRepository.GetDetalheAsync(empresaId, produto.Id).Returns(produto);
+        _produtoVariacaoRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
+        _itemEstoqueRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
 
         // Act
         var result = await _controller.GetById(produto.Id, empresaId);
@@ -69,7 +110,9 @@ public class ProdutoControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult!.Value.Should().Be(produto);
+        okResult!.Value.Should().BeOfType<ProdutoDetalheResult>();
+        var payload = okResult.Value as ProdutoDetalheResult;
+        payload!.ProdutoId.Should().Be(produto.Id);
     }
 
     [Fact]
@@ -78,7 +121,7 @@ public class ProdutoControllerTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        _produtoRepository.GetByIdAsync(empresaId, id).Returns((Produto?)null);
+        _produtoRepository.GetDetalheAsync(empresaId, id).Returns((Produto?)null);
 
         // Act
         var result = await _controller.GetById(id, empresaId);
@@ -146,6 +189,34 @@ public class ProdutoControllerTests
         payload!.ProdutoId.Should().NotBe(Guid.Empty);
         createdResult.ActionName.Should().Be("GetById");
         await _produtoRepository.Received(1).InsertAsync(Arg.Any<Produto>());
+    }
+
+    [Fact]
+    public async Task Delete_DeveRetornarNoContent_QuandoProdutoPodeSerInativado()
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Produto", Status = StatusProduto.Ativo };
+        _produtoRepository.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produto.Id).Returns(false);
+
+        var result = await _controller.Delete(produto.Id, empresaId);
+
+        result.Should().BeOfType<NoContentResult>();
+        await _produtoRepository.Received(1).UpdateAsync(Arg.Is<Produto>(p => p.Status == StatusProduto.Inativo));
+    }
+
+    [Fact]
+    public async Task Delete_DeveLancarValidation_QuandoProdutoPossuiEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Produto", Status = StatusProduto.Ativo };
+        _produtoRepository.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produto.Id).Returns(true);
+
+        var act = () => _controller.Delete(produto.Id, empresaId);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*estoque disponivel*");
     }
 
     private static T ObterPropriedade<T>(object? source, string nome)

@@ -55,6 +55,28 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             if (categoria.EmpresaId != command.EmpresaId)
                 throw new UseCaseValidationException("A categoria informada nao pertence a empresa.");
 
+            if (!string.IsNullOrWhiteSpace(command.SkuBase))
+            {
+                var skuBase = command.SkuBase.Trim();
+                if (await produtoRepository.ExistsSkuBaseAsync(command.EmpresaId, skuBase) ||
+                    await variacaoRepository.ExistsSkuAsync(command.EmpresaId, skuBase))
+                {
+                    throw new UseCaseValidationException("SKU duplicado para esta empresa.");
+                }
+            }
+
+            foreach (var skuVariacao in (command.Variacoes ?? [])
+                         .Select(v => v.Sku?.Trim())
+                         .Where(v => !string.IsNullOrWhiteSpace(v))
+                         .Cast<string>())
+            {
+                if (await produtoRepository.ExistsSkuBaseAsync(command.EmpresaId, skuVariacao) ||
+                    await variacaoRepository.ExistsSkuAsync(command.EmpresaId, skuVariacao))
+                {
+                    throw new UseCaseValidationException("SKU duplicado para esta empresa.");
+                }
+            }
+
             var agora = DateTime.UtcNow;
             var produto = new Produto
             {
@@ -169,6 +191,12 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
 
             if (skus.Length != skus.Distinct().Count())
                 throw new UseCaseValidationException("Nao e permitido cadastrar variacoes com o mesmo SKU.");
+
+            if (!string.IsNullOrWhiteSpace(command.SkuBase) &&
+                skus.Contains(command.SkuBase.Trim().ToUpperInvariant()))
+            {
+                throw new UseCaseValidationException("SKU base do produto nao pode ser igual ao SKU de uma variacao.");
+            }
         }
     }
 }
