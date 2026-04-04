@@ -8,6 +8,7 @@ using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 {
@@ -49,12 +50,16 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         IItemVendaRepository itemVendaRepository,
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
         IUnitOfWork unitOfWork,
+        ILogger<RegistrarSaidaEstoqueUseCase> logger,
         IPublicadorEventos? publicadorEventos = null)
     {
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
             if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
             if (command.Itens is null || command.Itens.Count == 0) throw new VendaSemItensException(Guid.Empty);
+
+            logger.LogInformation("Iniciando registro de saída de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",
+                command.EmpresaId, command.Itens.Count, command.Natureza);
 
             var agora = DateTime.UtcNow;
 
@@ -102,7 +107,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     Id = Guid.NewGuid(),
                     VendaId = venda.Id,
                     ItemEstoqueId = item.Id,
-                    ProdutoId = item.ProdutoId,
+                    ProductoId = item.ProdutoId,
                     ProdutoVariacaoId = item.ProdutoVariacaoId,
                     DescricaoSnapshot = comandoItem.Descricao?.Trim() ?? item.DescricaoAnuncio ?? produto.DescricaoBase,
                     VariacaoSnapshot = item.VariacaoDescricao,
@@ -150,6 +155,9 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             foreach (var movimentacao in movimentacoes)
                 await movimentacaoEstoqueRepository.InsertAsync(movimentacao);
             await unitOfWork.CommitAsync();
+
+            logger.LogWarning("AUDIT: Saída de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
+                venda.Id, command.EmpresaId, venda.ValorTotal.Valor, itensResult.Count);
 
             if (publicadorEventos is not null)
             {

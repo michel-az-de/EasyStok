@@ -100,7 +100,7 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
                 Builders<Produto>.Filter.Regex("SkuBase", regex),
                 Builders<Produto>.Filter.Regex(x => x.CodigoBarras, regex)));
 
-        return await Collection.Find(filter).Limit(50).ToListAsync();
+        return await Collection.Find(filter).ToListAsync();
     }
 
     public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20)
@@ -156,7 +156,7 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
                 Builders<ProdutoVariacao>.Filter.Regex("Sku", regex),
                 Builders<ProdutoVariacao>.Filter.Regex(x => x.CodigoBarras, regex)));
 
-        return await Collection.Find(filter).Limit(50).ToListAsync();
+        return await Collection.Find(filter).ToListAsync();
     }
 
     public Task InsertAsync(ProdutoVariacao variacao)

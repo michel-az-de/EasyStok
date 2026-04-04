@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -49,6 +50,60 @@ public class AutenticarUsuarioUseCaseTests
         Assert.Equal(usuarioId, result.UsuarioId);
         Assert.Equal("Joao Silva", result.Nome);
         Assert.Equal("joao@empresa.com", result.Email);
+    }
+
+    [Fact]
+    public async Task Autenticar_DeveRetornarPermissoesDoPerfilDaEmpresa()
+    {
+        var usuarioId = Guid.NewGuid();
+        var empresaId = Guid.NewGuid();
+
+        var usuario = new Usuario
+        {
+            Id = usuarioId,
+            Nome = "Admin",
+            Email = "admin@empresa.com",
+            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            Ativo = true,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+            Empresas = new List<UsuarioEmpresa>
+            {
+                new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = empresaId, Ativo = true, CriadoEm = DateTime.UtcNow }
+            },
+            Perfis = new List<UsuarioPerfil>
+            {
+                new UsuarioPerfil
+                {
+                    Id = Guid.NewGuid(),
+                    UsuarioId = usuarioId,
+                    EmpresaId = empresaId,
+                    PerfilId = Guid.NewGuid(),
+                    AtribuidoEm = DateTime.UtcNow,
+                    Perfil = new Perfil
+                    {
+                        Id = Guid.NewGuid(),
+                        Nome = "Admin",
+                        Nivel = NivelAcesso.Admin,
+                        Permissoes = new List<PerfilPermissao>
+                        {
+                            new() { Id = Guid.NewGuid(), Permissao = Permissao.GerenciarUsuarios },
+                            new() { Id = Guid.NewGuid(), Permissao = Permissao.GerenciarEstoque }
+                        }
+                    }
+                }
+            }
+        };
+
+        var usuarioRepository = Substitute.For<IUsuarioRepository>();
+        usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        var useCase = CriarUseCase(usuarioRepository);
+
+        var result = await useCase.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senha123", empresaId));
+
+        Assert.Contains(Permissao.GerenciarUsuarios, result.Permissoes);
+        Assert.Contains(Permissao.GerenciarEstoque, result.Permissoes);
     }
 
     [Fact]

@@ -16,7 +16,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         Guid? EmpresaId,
         string Nome,
         string Email,
-        NivelAcesso Nivel);
+        NivelAcesso Nivel,
+        IReadOnlyCollection<Permissao> Permissoes);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -45,6 +46,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             }
 
             var nivel = NivelAcesso.Visualizador;
+            IReadOnlyCollection<Permissao> permissoes = [];
 
             if (command.EmpresaId.HasValue && usuario.Perfis is not null)
             {
@@ -54,7 +56,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                     .FirstOrDefault();
 
                 if (perfilDaEmpresa?.Perfil is not null)
+                {
                     nivel = perfilDaEmpresa.Perfil.Nivel;
+                    permissoes = perfilDaEmpresa.Perfil.Permissoes?
+                        .Select(p => p.Permissao)
+                        .Distinct()
+                        .ToArray() ?? [];
+                }
             }
 
             usuario.AtualizarUltimoAcesso();
@@ -68,7 +76,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 EmpresaId: command.EmpresaId,
                 Nome: usuario.Nome,
                 Email: usuario.Email,
-                Nivel: nivel);
+                Nivel: nivel,
+                Permissoes: permissoes);
         }
     }
 }

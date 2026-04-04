@@ -30,6 +30,9 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         if (resultado.EmpresaId.HasValue)
             claims.Add(new Claim("empresaId", resultado.EmpresaId.Value.ToString()));
 
+        foreach (var permissao in resultado.Permissoes.Distinct())
+            claims.Add(new Claim("permissao", permissao.ToString()));
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),

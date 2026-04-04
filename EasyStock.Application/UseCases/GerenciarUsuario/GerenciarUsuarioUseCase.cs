@@ -135,13 +135,12 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
             var usuario = await usuarioRepository.GetByIdAsync(usuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            var linkEmpresa = usuario.Empresas?.FirstOrDefault(e => e.EmpresaId == empresaId);
+            var linkEmpresa = await usuarioEmpresaRepository.GetByUsuarioEEmpresaAsync(usuarioId, empresaId);
             if (linkEmpresa is null)
                 throw new UseCaseValidationException("Associacao do usuario com a empresa nao encontrada.");
 
             linkEmpresa.Ativo = false;
-
-            await usuarioRepository.UpdateAsync(usuario);
+            await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
             await unitOfWork.CommitAsync();
         }
 
@@ -157,13 +156,13 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
             var usuario = await usuarioRepository.GetByIdAsync(usuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            var perfilExistente = usuario.Perfis?.FirstOrDefault(
-                p => p.EmpresaId == empresaId && p.PerfilId == perfilId);
+            var perfilExistente = await usuarioPerfilRepository.GetByUsuarioEmpresaEPerfilAsync(usuarioId, empresaId, perfilId);
 
             if (perfilExistente is not null)
             {
                 perfilExistente.LojaId = lojaId;
                 perfilExistente.AtribuidoEm = DateTime.UtcNow;
+                await usuarioPerfilRepository.UpdateAsync(perfilExistente);
             }
             else
             {
@@ -180,7 +179,6 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
                 await usuarioPerfilRepository.AddAsync(usuarioPerfil);
             }
 
-            await usuarioRepository.UpdateAsync(usuario);
             await unitOfWork.CommitAsync();
         }
     }

@@ -197,6 +197,11 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.AddMemoryCache();
 
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+});
+
 builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
 
 var app = builder.Build();

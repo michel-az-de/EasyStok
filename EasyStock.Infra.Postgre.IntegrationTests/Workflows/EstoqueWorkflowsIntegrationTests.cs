@@ -549,7 +549,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     EmpresaId = empresaId,
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(1), // Baixo
-                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(20)), // Próximo vencimento
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(20)), // PrÃ³ximo vencimento
                     Status = StatusItemEstoque.Ativo,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
@@ -580,7 +580,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             totalBaixo.Should().Be(3); // 3 itens com <=5
             baixo.Should().AllSatisfy(i => i.QuantidadeAtual.Value.Should().BeLessThanOrEqualTo(5));
 
-            // Teste próximo vencimento
+            // Teste prÃ³ximo vencimento
             var (proximos, totalProximos) = await repository.GetProximoVencimentoAsync(empresaId, 30, 1, 10);
             proximos.Should().ContainSingle();
             totalProximos.Should().Be(1);
@@ -592,7 +592,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             totalParados.Should().Be(1);
             parados.Single().Should().Match<ItemEstoque>(i => !i.UltimaMovimentacaoEm.HasValue || i.UltimaMovimentacaoEm < DateTime.UtcNow.AddDays(-90));
 
-            // Teste sugestão reposição
+            // Teste sugestÃ£o reposiÃ§Ã£o
             var (sugestoes, totalSugestoes) = await repository.GetSugestaoReposicaoAsync(empresaId, 1, 10);
             sugestoes.Should().HaveCount(3);
             totalSugestoes.Should().Be(3);
@@ -672,7 +672,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             await setupContext.SaveChangesAsync();
         }
 
-        // Simular duas saídas concorrentes
+        // Simular duas saÃ­das concorrentes
         var task1 = Task.Run(async () =>
         {
             await using var context = fixture.CreateDbContext();
@@ -698,7 +698,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
 
         var task2 = Task.Run(async () =>
         {
-            await Task.Delay(100); // Pequeno delay para garantir concorrência
+            await Task.Delay(100); // Pequeno delay para garantir concorrÃªncia
             await using var context = fixture.CreateDbContext();
             var useCase = new RegistrarSaidaEstoqueUseCase(
                 new ProdutoRepository(context),
@@ -729,10 +729,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             var vendas = await assertContext.Vendas.ToListAsync();
             var movimentacoes = await assertContext.MovimentacoesEstoque.ToListAsync();
 
-            // Deve ter exatamente uma venda e movimentação, saldo reduzido por 3 ou 2
+            // Deve ter exatamente uma venda e movimentaÃ§Ã£o, saldo reduzido por 3 ou 2
             vendas.Should().HaveCount(1);
             movimentacoes.Should().HaveCount(1);
-            item.QuantidadeAtual.Value.Should().Be(10 - vendas.Single().ItensVenda.Sum(iv => iv.Quantidade.Value));
+            item.QuantidadeAtual.Value.Should().Be(10 - (vendas.Single().ItensVenda ?? []).Sum(iv => iv.Quantidade.Value));
         }
     }
 }

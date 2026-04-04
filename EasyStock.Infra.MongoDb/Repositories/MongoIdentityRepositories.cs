@@ -108,8 +108,7 @@ public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOf
             .Limit(pageSize)
             .ToListAsync();
 
-        foreach (var usuario in usuarios)
-            await HydrateUsuarioAsync(usuario);
+        await HydrateUsuariosAsync(usuarios);
 
         return (usuarios, ids.Count);
     }
@@ -147,6 +146,34 @@ public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOf
 
         usuario.Empresas = empresas;
         usuario.Perfis = perfis;
+    }
+
+    private async Task HydrateUsuariosAsync(List<Usuario> usuarios)
+    {
+        var usuarioIds = usuarios.Select(x => x.Id).ToList();
+        if (usuarioIds.Count == 0)
+            return;
+
+        var empresas = await UsuariosEmpresas.Find(x => usuarioIds.Contains(x.UsuarioId)).ToListAsync();
+        var perfis = await UsuariosPerfis.Find(x => usuarioIds.Contains(x.UsuarioId)).ToListAsync();
+        var perfilIds = perfis.Select(x => x.PerfilId).Distinct().ToList();
+        var perfisBase = perfilIds.Count == 0 ? [] : await Perfis.Find(x => perfilIds.Contains(x.Id)).ToListAsync();
+        var permissoes = perfilIds.Count == 0 ? [] : await PerfisPermissoes.Find(x => perfilIds.Contains(x.PerfilId)).ToListAsync();
+
+        foreach (var perfil in perfisBase)
+            perfil.Permissoes = permissoes.Where(x => x.PerfilId == perfil.Id).ToList();
+
+        foreach (var usuarioPerfil in perfis)
+            usuarioPerfil.Perfil = perfisBase.FirstOrDefault(x => x.Id == usuarioPerfil.PerfilId);
+
+        var empresasPorUsuario = empresas.GroupBy(x => x.UsuarioId).ToDictionary(x => x.Key, x => (ICollection<UsuarioEmpresa>)x.ToList());
+        var perfisPorUsuario = perfis.GroupBy(x => x.UsuarioId).ToDictionary(x => x.Key, x => (ICollection<UsuarioPerfil>)x.ToList());
+
+        foreach (var usuario in usuarios)
+        {
+            usuario.Empresas = empresasPorUsuario.GetValueOrDefault(usuario.Id, []);
+            usuario.Perfis = perfisPorUsuario.GetValueOrDefault(usuario.Id, []);
+        }
     }
 }
 
@@ -270,6 +297,15 @@ public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, Mong
         EnqueueInsert(UsuariosEmpresas, usuarioEmpresa);
         return Task.CompletedTask;
     }
+
+    public async Task<UsuarioEmpresa?> GetByUsuarioEEmpresaAsync(Guid usuarioId, Guid empresaId) =>
+        await UsuariosEmpresas.Find(x => x.UsuarioId == usuarioId && x.EmpresaId == empresaId).FirstOrDefaultAsync();
+
+    public Task UpdateAsync(UsuarioEmpresa usuarioEmpresa)
+    {
+        EnqueueReplace(UsuariosEmpresas, usuarioEmpresa.Id, usuarioEmpresa);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class UsuarioPerfilRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -282,6 +318,12 @@ public sealed class UsuarioPerfilRepository(MongoEasyStockContext context, Mongo
         EnqueueInsert(UsuariosPerfis, usuarioPerfil);
         return Task.CompletedTask;
     }
+
+    public async Task<UsuarioPerfil?> GetByUsuarioEmpresaEPerfilAsync(Guid usuarioId, Guid empresaId, Guid perfilId) =>
+        await UsuariosPerfis.Find(x =>
+            x.UsuarioId == usuarioId &&
+            x.EmpresaId == empresaId &&
+            x.PerfilId == perfilId).FirstOrDefaultAsync();
 
     public Task UpdateAsync(UsuarioPerfil usuarioPerfil)
     {

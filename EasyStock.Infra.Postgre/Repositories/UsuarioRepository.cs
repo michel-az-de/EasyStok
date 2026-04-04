@@ -10,13 +10,15 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Usuario?> GetByIdAsync(Guid id) =>
             dbContext.Usuarios
                 .Include(u => u.Empresas)
-                .Include("Perfis.Perfil")
+                .Include(u => u.Perfis!)
+                .ThenInclude(up => up.Perfil)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
         public Task<Usuario?> GetByEmailAsync(string email) =>
             dbContext.Usuarios
                 .Include(u => u.Empresas)
-                .Include("Perfis.Perfil")
+                .Include(u => u.Perfis!)
+                .ThenInclude(up => up.Perfil)
                 .FirstOrDefaultAsync(u => u.Email == email);
 
         public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)

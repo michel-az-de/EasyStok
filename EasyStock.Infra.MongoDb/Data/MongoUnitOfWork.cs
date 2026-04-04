@@ -43,6 +43,10 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
 
     private static bool SupportsFallback(Exception ex) =>
         ex is NotSupportedException ||
-        ex is MongoClientException ||
-        ex is MongoCommandException;
+        ex is MongoCommandException mongoCommandException && (
+            mongoCommandException.CodeName?.Contains("Transaction", StringComparison.OrdinalIgnoreCase) == true ||
+            mongoCommandException.Message.Contains("Transaction", StringComparison.OrdinalIgnoreCase) ||
+            mongoCommandException.Message.Contains("replica set", StringComparison.OrdinalIgnoreCase)) ||
+        ex is MongoClientException mongoClientException &&
+        mongoClientException.Message.Contains("Transaction", StringComparison.OrdinalIgnoreCase);
     }

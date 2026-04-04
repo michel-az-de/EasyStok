@@ -41,6 +41,12 @@ public class UsuarioController(
     [Authorize(Policy = "Admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarUsuarioCommand command)
     {
+        if (id != command.UsuarioId)
+            return BadRequest("O id da rota difere do corpo da requisicao.");
+
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty)
+            return Forbid();
+
         await usuarioUseCase.AtualizarAsync(command);
         return NoContent();
     }
@@ -60,6 +66,9 @@ public class UsuarioController(
     [Authorize]
     public async Task<IActionResult> AlterarSenha(Guid id, [FromBody] AlterarSenhaRequest request)
     {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.UsuarioId != id)
+            return Forbid();
+
         await usuarioUseCase.AlterarSenhaAsync(new AlterarSenhaCommand(id, request.SenhaAtual, request.NovaSenha));
         return NoContent();
     }
@@ -68,6 +77,9 @@ public class UsuarioController(
     [Authorize(Policy = "Admin")]
     public async Task<IActionResult> AtribuirPerfil(Guid id, [FromBody] AtribuirPerfilRequest request)
     {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != request.EmpresaId)
+            return Forbid();
+
         await usuarioUseCase.AtribuirPerfilAsync(id, request.EmpresaId, request.PerfilId, request.LojaId);
         return NoContent();
     }

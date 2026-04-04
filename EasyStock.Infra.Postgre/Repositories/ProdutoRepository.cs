@@ -2,17 +2,17 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
     // Proposed PostgreSQL index for performance:
     // CREATE INDEX idx_produtos_empresa_nome ON produtos (empresaid, nome);
 
-    public sealed class ProdutoRepository(EasyStockDbContext dbContext, IMemoryCache? cache = null)
-        : IProdutoRepository
+    public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache cache)
+        : BaseRepository<Produto>(dbContext), IProdutoRepository
     {
-        private readonly IMemoryCache _cache = cache ?? new MemoryCache(new MemoryCacheOptions());
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
         public Task<Produto?> GetByIdAsync(Guid id) =>
@@ -45,12 +45,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var cacheKey = $"produtos_paginados_{empresaId}_{page}_{pageSize}";
 
-            if (_cache.TryGetValue(cacheKey, out (IEnumerable<Produto> Produtos, int TotalCount) cachedResult))
+            var cachedData = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
             {
-                return cachedResult;
+                var result = JsonSerializer.Deserialize<(IEnumerable<Produto>, int)>(cachedData);
+                return result;
             }
 
-            var query = dbContext.Produtos
+            var query = DbContext.Produtos
                 .AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId);
 
@@ -62,7 +64,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
             var result = (produtos, totalCount);
-            _cache.Set(cacheKey, result, CacheDuration);
+            var serialized = JsonSerializer.Serialize(result);
+            await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            });
 
             return result;
         }
