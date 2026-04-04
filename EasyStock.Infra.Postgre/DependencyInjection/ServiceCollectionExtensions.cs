@@ -38,7 +38,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IPerfilRepository, PerfilRepository>();
             services.AddScoped<IPlanoRepository, PlanoRepository>();
             services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
-            services.AddScoped<IRegistrarEmpresaRepository, RegistrarEmpresaRepository>();
+            services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
+            services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // AI: usa implementacao real se Anthropic:Enabled = true, caso contrario usa stub

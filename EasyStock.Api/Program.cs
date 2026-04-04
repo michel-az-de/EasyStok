@@ -9,6 +9,7 @@ using EasyStock.Application.UseCases.GerenciarCategoria;
 using EasyStock.Application.UseCases.GerenciarFornecedor;
 using EasyStock.Application.UseCases.GerenciarLoja;
 using EasyStock.Application.UseCases.GerenciarUsuario;
+using EasyStock.Application.UseCases.ListarPlanos;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
@@ -114,6 +115,7 @@ builder.Services.AddScoped<EasyStock.Application.UseCases.ReporEstoque.ReporEsto
 builder.Services.AddScoped<EasyStock.Application.UseCases.BuscarEstoqueInteligente.BuscarEstoqueInteligenteUseCase>();
 builder.Services.AddScoped<EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio.GerarSugestaoDescricaoAnuncioUseCase>();
 builder.Services.AddScoped<GerenciarCategoriaUseCase>();
+builder.Services.AddScoped<ListarPlanosUseCase>();
 
 // Configuration
 builder.Services.Configure<EasyStockConfiguracoes>(
@@ -129,6 +131,7 @@ var jwtKey = builder.Configuration["Jwt:SecretKey"]
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -261,3 +264,7 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+public partial class Program
+{
+}

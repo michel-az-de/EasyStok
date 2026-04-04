@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Api", "EasyStock.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Api.UnitTests", "EasyStock.Api.UnitTests\EasyStock.Api.UnitTests.csproj", "{B66E1999-6687-403B-8210-F862AC3DD850}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Infra.MongoDb.IntegrationTests", "EasyStock.Infra.MongoDb.IntegrationTests\EasyStock.Infra.MongoDb.IntegrationTests.csproj", "{77516DC4-9C41-4529-8069-6F82C0B9CAFD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -171,6 +173,18 @@ Global
 		{B66E1999-6687-403B-8210-F862AC3DD850}.Release|x64.Build.0 = Release|Any CPU
 		{B66E1999-6687-403B-8210-F862AC3DD850}.Release|x86.ActiveCfg = Release|Any CPU
 		{B66E1999-6687-403B-8210-F862AC3DD850}.Release|x86.Build.0 = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|x64.Build.0 = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Debug|x86.Build.0 = Debug|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|x64.ActiveCfg = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|x64.Build.0 = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|x86.ActiveCfg = Release|Any CPU
+		{77516DC4-9C41-4529-8069-6F82C0B9CAFD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

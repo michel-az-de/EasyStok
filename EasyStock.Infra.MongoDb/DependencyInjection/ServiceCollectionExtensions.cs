@@ -44,7 +44,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IPlanoRepository, PlanoRepository>();
         services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
-        services.AddScoped<IRegistrarEmpresaRepository, RegistrarEmpresaRepository>();
+        services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
+        services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
         services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
         services.AddSingleton<MongoDatabaseHealthCheck>(sp => new MongoDatabaseHealthCheck(sp.GetRequiredService<IMongoClient>(), databaseName));

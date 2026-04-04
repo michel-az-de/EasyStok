@@ -1,10 +1,69 @@
-﻿namespace EasyStock.Api.IntegrationTests;
+using DotNet.Testcontainers.Builders;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Testcontainers.MongoDb;
 
-public class UnitTest1
+namespace EasyStock.Api.IntegrationTests;
+
+public class UnitTest1 : IAsyncLifetime
 {
-    [Fact]
-    public void Test1()
-    {
+    private MongoDbContainer? _container;
+    private bool _isAvailable;
 
+    public async Task InitializeAsync()
+    {
+        try
+        {
+            _container = new MongoDbBuilder("mongo:7.0")
+                .Build();
+
+            await _container.StartAsync();
+            _isAvailable = true;
+        }
+        catch (DockerUnavailableException)
+        {
+            _isAvailable = false;
+        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_container is not null)
+            await _container.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Health_deve_subir_com_provider_mongo()
+    {
+        if (!_isAvailable || _container is null) return;
+
+        var databaseName = $"easystock_api_tests_{Guid.NewGuid():N}";
+
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["Database:Provider"] = "MongoDb",
+                        ["Database:MongoDatabase"] = databaseName,
+                        ["ConnectionStrings:MongoConnection"] = _container.GetConnectionString(),
+                        ["Anthropic:Enabled"] = "false",
+                        ["Jwt:Issuer"] = "EasyStock",
+                        ["Jwt:Audience"] = "EasyStock",
+                        ["Jwt:SecretKey"] = "EasyStock-SuperSecretKey-Min32Chars!!"
+                    });
+                });
+            });
+
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost")
+        });
+
+        var response = await client.GetAsync("/health");
+
+        response.EnsureSuccessStatusCode();
     }
 }

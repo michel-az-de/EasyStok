@@ -114,6 +114,9 @@ public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOf
         return (usuarios, ids.Count);
     }
 
+    public async Task<int> CountByEmpresaAsync(Guid empresaId) =>
+        (int)await UsuariosEmpresas.CountDocumentsAsync(x => x.EmpresaId == empresaId && x.Ativo);
+
     public Task AddAsync(Usuario usuario)
     {
         EnqueueInsert(Usuarios, usuario);
@@ -257,28 +260,32 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
     }
 }
 
-public sealed class RegistrarEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
-    : MongoRepositoryBase(context, unitOfWork), IRegistrarEmpresaRepository
+public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IUsuarioEmpresaRepository
 {
-    private IMongoCollection<Empresa> Empresas => Context.GetCollection<Empresa>(MongoCollectionNames.Empresas);
     private IMongoCollection<UsuarioEmpresa> UsuariosEmpresas => Context.GetCollection<UsuarioEmpresa>(MongoCollectionNames.UsuariosEmpresas);
-    private IMongoCollection<UsuarioPerfil> UsuariosPerfis => Context.GetCollection<UsuarioPerfil>(MongoCollectionNames.UsuariosPerfis);
 
-    public Task AddEmpresaAsync(Empresa empresa)
-    {
-        EnqueueInsert(Empresas, empresa);
-        return Task.CompletedTask;
-    }
-
-    public Task AddUsuarioEmpresaAsync(UsuarioEmpresa usuarioEmpresa)
+    public Task AddAsync(UsuarioEmpresa usuarioEmpresa)
     {
         EnqueueInsert(UsuariosEmpresas, usuarioEmpresa);
         return Task.CompletedTask;
     }
+}
 
-    public Task AddUsuarioPerfilAsync(UsuarioPerfil usuarioPerfil)
+public sealed class UsuarioPerfilRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IUsuarioPerfilRepository
+{
+    private IMongoCollection<UsuarioPerfil> UsuariosPerfis => Context.GetCollection<UsuarioPerfil>(MongoCollectionNames.UsuariosPerfis);
+
+    public Task AddAsync(UsuarioPerfil usuarioPerfil)
     {
         EnqueueInsert(UsuariosPerfis, usuarioPerfil);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(UsuarioPerfil usuarioPerfil)
+    {
+        EnqueueReplace(UsuariosPerfis, usuarioPerfil.Id, usuarioPerfil);
         return Task.CompletedTask;
     }
 }

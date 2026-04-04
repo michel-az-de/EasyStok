@@ -32,7 +32,8 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
     public class GerenciarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IAssinaturaEmpresaRepository assinaturaRepository,
-        IRegistrarEmpresaRepository registrarEmpresaRepository,
+        IUsuarioEmpresaRepository usuarioEmpresaRepository,
+        IUsuarioPerfilRepository usuarioPerfilRepository,
         IUnitOfWork unitOfWork,
         ILogger<GerenciarUsuarioUseCase> logger)
     {
@@ -45,12 +46,9 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
                 throw new UseCaseValidationException("Email ja cadastrado.");
 
             var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
-            if (assinatura?.Plano is not null)
-            {
-                var (usuariosEmpresa, totalUsuarios) = await usuarioRepository.GetByEmpresaAsync(command.EmpresaId, 1, 1);
-                if (totalUsuarios >= assinatura.Plano.LimiteUsuarios)
-                    throw new PlanoLimiteAtingidoException("usuarios");
-            }
+            var totalUsuarios = await usuarioRepository.CountByEmpresaAsync(command.EmpresaId);
+            if (assinatura?.Plano is not null && assinatura.Plano.LimiteUsuarios != -1 && totalUsuarios >= assinatura.Plano.LimiteUsuarios)
+                throw new PlanoLimiteAtingidoException("usuarios");
 
             var agora = DateTime.UtcNow;
             var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.Senha);
@@ -67,7 +65,7 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
                 CriadoEm = agora
             };
 
-            await registrarEmpresaRepository.AddUsuarioEmpresaAsync(usuarioEmpresa);
+            await usuarioEmpresaRepository.AddAsync(usuarioEmpresa);
 
             if (command.PerfilId.HasValue)
             {
@@ -81,7 +79,7 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
                     AtribuidoEm = agora
                 };
 
-                await registrarEmpresaRepository.AddUsuarioPerfilAsync(usuarioPerfil);
+                await usuarioPerfilRepository.AddAsync(usuarioPerfil);
             }
 
             await unitOfWork.CommitAsync();
@@ -179,7 +177,7 @@ namespace EasyStock.Application.UseCases.GerenciarUsuario
                     AtribuidoEm = DateTime.UtcNow
                 };
 
-                await registrarEmpresaRepository.AddUsuarioPerfilAsync(usuarioPerfil);
+                await usuarioPerfilRepository.AddAsync(usuarioPerfil);
             }
 
             await usuarioRepository.UpdateAsync(usuario);

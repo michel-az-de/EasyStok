@@ -1,9 +1,12 @@
 namespace EasyStock.Domain.Exceptions
 {
-    public class UsuarioNaoAutorizadoException() : RegraDeDominioVioladaException("Usuario nao autorizado a realizar esta operacao.")
+    public class UsuarioNaoAutorizadoException : RegraDeDominioVioladaException
     {
-        public UsuarioNaoAutorizadoException(string message) : this()
+        public UsuarioNaoAutorizadoException()
+            : base("Usuario nao autorizado a realizar esta operacao.")
         {
         }
+
+        public UsuarioNaoAutorizadoException(string message) : base(message) { }
     }
 }

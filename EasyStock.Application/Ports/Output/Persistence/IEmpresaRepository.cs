@@ -6,5 +6,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task<Empresa?> GetByIdAsync(Guid id);
         Task<IEnumerable<Empresa>> GetAllAsync();
+        Task AddAsync(Empresa empresa);
     }
 }

@@ -12,6 +12,6 @@ public class EmpresaController(RegistrarEmpresaUseCase registrarUseCase) : Contr
     public async Task<IActionResult> Registrar([FromBody] RegistrarEmpresaCommand command)
     {
         var resultado = await registrarUseCase.ExecuteAsync(command);
-        return Created("", resultado);
+        return Created($"/api/empresas/{resultado.EmpresaId}", resultado);
     }
 }

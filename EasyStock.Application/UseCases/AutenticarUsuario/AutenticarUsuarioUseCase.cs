@@ -16,8 +16,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         Guid? EmpresaId,
         string Nome,
         string Email,
-        NivelAcesso Nivel,
-        int ExpiresIn);
+        NivelAcesso Nivel);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -26,7 +25,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
     {
         public async Task<AutenticarUsuarioResult> ExecuteAsync(AutenticarUsuarioCommand command)
         {
-            logger.LogInformation("Tentativa de autenticacao para o email: {Email}", command.Email);
+            logger.LogDebug("Tentativa de autenticacao para o email: {Email}", command.Email);
 
             var usuario = await usuarioRepository.GetByEmailAsync(command.Email);
 
@@ -69,8 +68,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 EmpresaId: command.EmpresaId,
                 Nome: usuario.Nome,
                 Email: usuario.Email,
-                Nivel: nivel,
-                ExpiresIn: 3600);
+                Nivel: nivel);
         }
     }
 }

@@ -25,7 +25,9 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
         IPlanoRepository planoRepository,
         IPerfilRepository perfilRepository,
         IAssinaturaEmpresaRepository assinaturaRepository,
-        IRegistrarEmpresaRepository registrarEmpresaRepository,
+        IEmpresaRepository empresaRepository,
+        IUsuarioEmpresaRepository usuarioEmpresaRepository,
+        IUsuarioPerfilRepository usuarioPerfilRepository,
         IUnitOfWork unitOfWork,
         ILogger<RegistrarEmpresaUseCase> logger)
     {
@@ -55,7 +57,7 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
                 AlteradoEm = agora
             };
 
-            await registrarEmpresaRepository.AddEmpresaAsync(empresa);
+            await empresaRepository.AddAsync(empresa);
 
             var assinatura = new AssinaturaEmpresa
             {
@@ -84,24 +86,22 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
                 CriadoEm = agora
             };
 
-            await registrarEmpresaRepository.AddUsuarioEmpresaAsync(usuarioEmpresa);
+            await usuarioEmpresaRepository.AddAsync(usuarioEmpresa);
 
             var perfispadrao = await perfilRepository.GetPadroesAsync();
-            var perfilAdmin = perfispadrao.FirstOrDefault(p => p.Nome == "Admin");
+            var perfilAdmin = perfispadrao.FirstOrDefault(p => p.Nome == "Admin")
+                ?? throw new UseCaseValidationException("Perfil 'Admin' padrao nao encontrado. Configure os planos e perfis antes de registrar empresas.");
 
-            if (perfilAdmin is not null)
+            var usuarioPerfil = new UsuarioPerfil
             {
-                var usuarioPerfil = new UsuarioPerfil
-                {
-                    Id = Guid.NewGuid(),
-                    UsuarioId = usuario.Id,
-                    EmpresaId = empresa.Id,
-                    PerfilId = perfilAdmin.Id,
-                    AtribuidoEm = agora
-                };
+                Id = Guid.NewGuid(),
+                UsuarioId = usuario.Id,
+                EmpresaId = empresa.Id,
+                PerfilId = perfilAdmin.Id,
+                AtribuidoEm = agora
+            };
 
-                await registrarEmpresaRepository.AddUsuarioPerfilAsync(usuarioPerfil);
-            }
+            await usuarioPerfilRepository.AddAsync(usuarioPerfil);
 
             await unitOfWork.CommitAsync();
 

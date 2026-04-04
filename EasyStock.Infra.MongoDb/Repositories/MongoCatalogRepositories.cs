@@ -63,6 +63,12 @@ public sealed class EmpresaRepository(MongoEasyStockContext context, MongoUnitOf
 
     public async Task<IEnumerable<Empresa>> GetAllAsync() =>
         await Collection.Find(FilterDefinition<Empresa>.Empty).ToListAsync();
+
+    public Task AddAsync(Empresa empresa)
+    {
+        EnqueueInsert(Collection, empresa);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

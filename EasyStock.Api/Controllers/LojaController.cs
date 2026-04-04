@@ -1,4 +1,6 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.GerenciarLoja;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,11 +9,16 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/lojas")]
 [Authorize(Policy = "Gerente")]
-public class LojaController(GerenciarLojaUseCase lojaUseCase) : ControllerBase
+public class LojaController(
+    GerenciarLojaUseCase lojaUseCase,
+    ICurrentUserAccessor currentUser) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid empresaId)
     {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
         var lojas = await lojaUseCase.ListarAsync(empresaId);
         return Ok(lojas);
     }
@@ -19,13 +26,22 @@ public class LojaController(GerenciarLojaUseCase lojaUseCase) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CriarLojaCommand command)
     {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
+            return Forbid();
+
         var resultado = await lojaUseCase.CriarAsync(command);
-        return Created("", resultado);
+        return Created($"/api/lojas/{resultado.Id}", resultado);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarLojaCommand command)
     {
+        if (id != command.LojaId)
+            return BadRequest("Id da rota nao corresponde ao Id do comando.");
+
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
+            return Forbid();
+
         await lojaUseCase.AtualizarAsync(command);
         return NoContent();
     }
@@ -33,6 +49,9 @@ public class LojaController(GerenciarLojaUseCase lojaUseCase) : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
         await lojaUseCase.DesativarAsync(id, empresaId);
         return NoContent();
     }

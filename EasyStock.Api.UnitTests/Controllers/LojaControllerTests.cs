@@ -1,7 +1,9 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.GerenciarLoja;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,13 +18,15 @@ public class LojaControllerTests
     private readonly IAssinaturaEmpresaRepository _assinaturaRepository = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<GerenciarLojaUseCase> _logger = Substitute.For<ILogger<GerenciarLojaUseCase>>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly GerenciarLojaUseCase _lojaUseCase;
     private readonly LojaController _controller;
 
     public LojaControllerTests()
     {
         _lojaUseCase = new GerenciarLojaUseCase(_lojaRepository, _assinaturaRepository, _unitOfWork, _logger);
-        _controller = new LojaController(_lojaUseCase);
+        _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
+        _controller = new LojaController(_lojaUseCase, _currentUser);
     }
 
     [Fact]

@@ -35,6 +35,9 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (usuarios, total);
         }
 
+        public async Task<int> CountByEmpresaAsync(Guid empresaId) =>
+            await dbContext.UsuariosEmpresas.CountAsync(ue => ue.EmpresaId == empresaId && ue.Ativo);
+
         public Task AddAsync(Usuario usuario) =>
             dbContext.Usuarios.AddAsync(usuario).AsTask();
 
