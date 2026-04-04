@@ -53,6 +53,41 @@ public class GlobalExceptionHandler : IExceptionHandler
                 "Produto inativo",
                 produtoInativoException.Message,
                 false),
+            EstoqueInsuficienteException estoqueInsuficienteException => (
+                StatusCodes.Status409Conflict,
+                "Estoque insuficiente",
+                estoqueInsuficienteException.Message,
+                false),
+            ItemEstoqueBloqueadoException itemBloqueadoException => (
+                StatusCodes.Status409Conflict,
+                "Item de estoque bloqueado",
+                itemBloqueadoException.Message,
+                false),
+            ItemEstoqueVencidoException itemVencidoException => (
+                StatusCodes.Status422UnprocessableEntity,
+                "Item de estoque vencido",
+                itemVencidoException.Message,
+                false),
+            ConflitoConcorrenciaException conflitoConcorrenciaException => (
+                StatusCodes.Status409Conflict,
+                "Conflito de concorrencia de dominio",
+                conflitoConcorrenciaException.Message,
+                false),
+            CredenciaisInvalidasException credenciaisInvalidasException => (
+                StatusCodes.Status401Unauthorized,
+                "Credenciais invalidas",
+                credenciaisInvalidasException.Message,
+                false),
+            UsuarioNaoAutorizadoException usuarioNaoAutorizadoException => (
+                StatusCodes.Status403Forbidden,
+                "Acesso negado",
+                usuarioNaoAutorizadoException.Message,
+                false),
+            PlanoLimiteAtingidoException planoLimiteAtingidoException => (
+                StatusCodes.Status422UnprocessableEntity,
+                "Limite do plano atingido",
+                planoLimiteAtingidoException.Message,
+                false),
             RegraDeDominioVioladaException regraDeDominioVioladaException => (
                 StatusCodes.Status409Conflict,
                 "Conflito de negocio",

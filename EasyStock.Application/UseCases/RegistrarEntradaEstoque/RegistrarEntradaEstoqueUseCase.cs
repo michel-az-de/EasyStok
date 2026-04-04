@@ -1,5 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Events;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -11,11 +14,11 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 {
     public sealed record RegistrarEntradaEstoqueCommand(
-        Guid EmpresaId,
-        Guid ProdutoId,
+        [property: Required] Guid EmpresaId,
+        [property: Required] Guid ProdutoId,
         Guid? ProdutoVariacaoId,
-        int Quantidade,
-        decimal CustoUnitario,
+        [property: Range(1, int.MaxValue)] int Quantidade,
+        [property: Range(0, double.MaxValue)] decimal CustoUnitario,
         decimal? PrecoVendaSugerido,
         DateTime DataEntrada,
         NaturezaMovimentacaoEstoque Natureza,
@@ -46,7 +49,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
         IUnitOfWork unitOfWork,
         ILogger<RegistrarEntradaEstoqueUseCase> logger,
-        IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null)
+        IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null,
+        IPublicadorEventos? publicadorEventos = null)
     {
         public async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
@@ -118,11 +122,16 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 command.DocumentoReferencia,
                 agora);
 
-            await itemEstoqueRepository.AddAsync(item);
-            await movimentacaoEstoqueRepository.AddAsync(movimentacao);
+            await itemEstoqueRepository.InsertAsync(item);
+            await movimentacaoEstoqueRepository.InsertAsync(movimentacao);
             await unitOfWork.CommitAsync();
 
             logger.LogInformation("Entrada de estoque registrada com sucesso. ItemEstoqueId: {ItemEstoqueId}, MovimentacaoId: {MovimentacaoId}", item.Id, movimentacao.Id);
+
+            if (publicadorEventos is not null)
+                await publicadorEventos.PublicarAsync(new EntradaEstoqueRegistrada(
+                    Guid.NewGuid(), agora, item.Id, item.ProdutoId, item.EmpresaId,
+                    item.QuantidadeAtual.Value, item.CodigoLote?.ToString()));
 
             return new RegistrarEntradaEstoqueResult(item.Id, movimentacao.Id, descricaoAnuncio, item.ChavePesquisa ?? string.Empty);
         }

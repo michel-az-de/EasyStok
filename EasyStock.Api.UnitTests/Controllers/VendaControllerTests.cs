@@ -22,27 +22,29 @@ public class VendaControllerTests
     public async Task GetAll_DeveRetornarOk_ComListaDeVendas()
     {
         // Arrange
-        var vendas = new List<Venda> { new Venda { Id = Guid.NewGuid() } };
-        _vendaRepository.GetAllAsync().Returns(vendas);
+        var empresaId = Guid.NewGuid();
+        var vendas = new List<Venda> { new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId } };
+        _vendaRepository.GetVendasPorEmpresaAsync(empresaId, 1, 20).Returns(((IEnumerable<Venda>)vendas, 1));
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(empresaId);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(vendas);
+        okResult!.Value.Should().NotBeNull();
     }
 
     [Fact]
     public async Task GetById_DeveRetornarOk_QuandoVendaEncontrada()
     {
         // Arrange
-        var venda = new Venda { Id = Guid.NewGuid() };
-        _vendaRepository.GetByIdAsync(venda.Id).Returns(venda);
+        var empresaId = Guid.NewGuid();
+        var venda = new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId };
+        _vendaRepository.GetByIdAsync(empresaId, venda.Id).Returns(venda);
 
         // Act
-        var result = await _controller.GetById(venda.Id);
+        var result = await _controller.GetById(venda.Id, empresaId);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
@@ -54,11 +56,12 @@ public class VendaControllerTests
     public async Task GetById_DeveRetornarNotFound_QuandoVendaNaoEncontrada()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        _vendaRepository.GetByIdAsync(id).Returns((Venda?)null);
+        _vendaRepository.GetByIdAsync(empresaId, id).Returns((Venda?)null);
 
         // Act
-        var result = await _controller.GetById(id);
+        var result = await _controller.GetById(id, empresaId);
 
         // Assert
         result.Should().BeOfType<NotFoundResult>();

@@ -19,6 +19,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnType("decimal(18,2)");
 
             builder.HasOne(v => v.Empresa).WithMany(e => e.Vendas).HasForeignKey(v => v.EmpresaId);
+
+            builder.Property(x => x.LojaId).HasColumnType("uuid");
+            builder.HasOne(x => x.Loja).WithMany(l => l.Vendas).HasForeignKey(x => x.LojaId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

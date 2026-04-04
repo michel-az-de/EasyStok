@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -8,9 +9,9 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Application.UseCases.CadastrarProduto
 {
     public sealed record CadastrarProdutoCommand(
-        Guid EmpresaId,
-        Guid CategoriaId,
-        string Nome,
+        [property: Required] Guid EmpresaId,
+        [property: Required] Guid CategoriaId,
+        [property: Required][property: MinLength(1)][property: MaxLength(180)] string Nome,
         string? DescricaoBase,
         string? Marca,
         TipoProduto Tipo,
@@ -78,7 +79,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 AlteradoEm = agora
             };
 
-            await produtoRepository.AddAsync(produto);
+            await produtoRepository.InsertAsync(produto);
 
             var caracteristicasIds = new List<Guid>();
             foreach (var caracteristica in command.Caracteristicas ?? [])
@@ -97,7 +98,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     AlteradoEm = agora
                 };
 
-                await caracteristicaRepository.AddAsync(entity);
+                await caracteristicaRepository.InsertAsync(entity);
                 caracteristicasIds.Add(entity.Id);
             }
 
@@ -117,7 +118,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     AlteradoEm = agora
                 };
 
-                await embalagemRepository.AddAsync(entity);
+                await embalagemRepository.InsertAsync(entity);
                 embalagensIds.Add(entity.Id);
             }
 
@@ -142,7 +143,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     AlteradoEm = agora
                 };
 
-                await variacaoRepository.AddAsync(entity);
+                await variacaoRepository.InsertAsync(entity);
                 variacoesIds.Add(entity.Id);
             }
 

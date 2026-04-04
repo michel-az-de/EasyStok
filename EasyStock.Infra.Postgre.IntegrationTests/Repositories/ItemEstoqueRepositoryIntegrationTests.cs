@@ -124,4 +124,152 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             item.ValidadeEm!.DataValidade.Should().Be(new DateTime(2026, 12, 31));
         }
     }
+
+    [Fact]
+    public async Task GetItensEstoquePaginadosAsync_deve_respeitar_tenant_por_empresaId()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaA = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa A", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var empresaB = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa B", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaA = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaA.Id, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var produtoA = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaA.Id,
+            CategoriaId = categoriaA.Id,
+            Nome = "Produto A",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+
+        context.Empresas.AddRange(empresaA, empresaB);
+        context.Categorias.Add(categoriaA);
+        context.Produtos.Add(produtoA);
+        context.ItensEstoque.AddRange(
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                ProdutoId = produtoA.Id,
+                QuantidadeAtual = Quantidade.From(10),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                ProdutoId = produtoA.Id,
+                QuantidadeAtual = Quantidade.From(5),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaB.Id,
+                ProdutoId = Guid.NewGuid(), // Produto B, mas não importa
+                QuantidadeAtual = Quantidade.From(20),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        var (itensA, totalA) = await repository.GetItensEstoquePaginadosAsync(empresaA.Id, 1, 10);
+        var (itensB, totalB) = await repository.GetItensEstoquePaginadosAsync(empresaB.Id, 1, 10);
+
+        itensA.Should().HaveCount(2);
+        itensA.Should().AllSatisfy(i => i.EmpresaId.Should().Be(empresaA.Id));
+        totalA.Should().Be(2);
+
+        itensB.Should().HaveCount(1);
+        itensB.Should().AllSatisfy(i => i.EmpresaId.Should().Be(empresaB.Id));
+        totalB.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetEstoqueBaixoAsync_deve_respeitar_tenant_e_filtros()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaA = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa A", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var empresaB = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa B", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaA = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaA.Id, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var produtoA = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaA.Id,
+            CategoriaId = categoriaA.Id,
+            Nome = "Produto A",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+
+        context.Empresas.AddRange(empresaA, empresaB);
+        context.Categorias.Add(categoriaA);
+        context.Produtos.Add(produtoA);
+        context.ItensEstoque.AddRange(
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                ProdutoId = produtoA.Id,
+                QuantidadeAtual = Quantidade.From(3), // Baixo
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                ProdutoId = produtoA.Id,
+                QuantidadeAtual = Quantidade.From(10), // Normal
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaB.Id,
+                ProdutoId = Guid.NewGuid(),
+                QuantidadeAtual = Quantidade.From(2), // Baixo, mas empresa B
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        var (itensBaixoA, totalA) = await repository.GetEstoqueBaixoAsync(empresaA.Id, 5, 1, 10);
+
+        itensBaixoA.Should().ContainSingle();
+        itensBaixoA.Single().QuantidadeAtual.Value.Should().Be(3);
+        itensBaixoA.Single().EmpresaId.Should().Be(empresaA.Id);
+        totalA.Should().Be(1);
+    }
 }

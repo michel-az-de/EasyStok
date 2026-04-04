@@ -1,9 +1,11 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CadastrarProduto;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/produtos")]
 public class ProdutoController : ControllerBase
@@ -25,9 +27,9 @@ public class ProdutoController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(Guid id)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
     {
-        var produto = await _produtoRepository.GetByIdAsync(id);
+        var produto = await _produtoRepository.GetByIdAsync(empresaId, id);
         if (produto == null) return NotFound();
         return Ok(produto);
     }

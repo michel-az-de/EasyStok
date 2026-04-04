@@ -5,7 +5,9 @@ using EasyStock.Infra.Postgre.Data;
 namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class ItemVendaRepository(EasyStockDbContext dbContext)
-        : BaseRepository<ItemVenda>(dbContext), IItemVendaRepository
+        : IItemVendaRepository
     {
+        public Task InsertAsync(ItemVenda itemVenda) =>
+            dbContext.ItensVenda.AddAsync(itemVenda).AsTask();
     }
 }

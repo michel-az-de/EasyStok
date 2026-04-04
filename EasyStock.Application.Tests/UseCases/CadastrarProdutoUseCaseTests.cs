@@ -56,20 +56,20 @@ public class CadastrarProdutoUseCaseTests
 
         var result = await useCase.ExecuteAsync(command);
 
-        await produtoRepository.Received(1).AddAsync(Arg.Is<Produto>(p =>
+        await produtoRepository.Received(1).InsertAsync(Arg.Is<Produto>(p =>
             p.Id == result.ProdutoId &&
             p.Nome == "Galaxy Buds FE" &&
             p.Status == StatusProduto.Ativo));
 
-        await caracteristicaRepository.Received(1).AddAsync(Arg.Is<ProdutoCaracteristica>(c =>
+        await caracteristicaRepository.Received(1).InsertAsync(Arg.Is<ProdutoCaracteristica>(c =>
             c.ProdutoId == result.ProdutoId &&
             c.Nome == "Cor"));
 
-        await embalagemRepository.Received(1).AddAsync(Arg.Is<ProdutoEmbalagem>(e =>
+        await embalagemRepository.Received(1).InsertAsync(Arg.Is<ProdutoEmbalagem>(e =>
             e.ProdutoId == result.ProdutoId &&
             e.Nome == "Caixa"));
 
-        await variacaoRepository.Received(1).AddAsync(Arg.Is<ProdutoVariacao>(v =>
+        await variacaoRepository.Received(1).InsertAsync(Arg.Is<ProdutoVariacao>(v =>
             v.ProdutoId == result.ProdutoId &&
             v.Nome == "Grafite"));
 

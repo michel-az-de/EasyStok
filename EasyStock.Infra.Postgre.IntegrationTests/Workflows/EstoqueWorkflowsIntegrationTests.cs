@@ -496,6 +496,110 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
     }
 
+    [Fact]
+    public async Task Queries_de_inteligencia_devem_respeitar_paginacao_e_filtros()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.AddRange(
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(3), // Baixo
+                    Status = StatusItemEstoque.Ativo,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(2), // Baixo
+                    Status = StatusItemEstoque.Ativo,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(10), // Normal
+                    Status = StatusItemEstoque.Ativo,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(1), // Baixo
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(20)), // Próximo vencimento
+                    Status = StatusItemEstoque.Ativo,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ProdutoId = produtoId,
+                    QuantidadeAtual = Quantidade.From(5),
+                    UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-100), // Parado
+                    Status = StatusItemEstoque.Ativo,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            var repository = new ItemEstoqueRepository(context);
+
+            // Teste estoque baixo
+            var (baixo, totalBaixo) = await repository.GetEstoqueBaixoAsync(empresaId, 5, 1, 2);
+            baixo.Should().HaveCount(2);
+            totalBaixo.Should().Be(3); // 3 itens com <=5
+            baixo.Should().AllSatisfy(i => i.QuantidadeAtual.Value.Should().BeLessThanOrEqualTo(5));
+
+            // Teste próximo vencimento
+            var (proximos, totalProximos) = await repository.GetProximoVencimentoAsync(empresaId, 30, 1, 10);
+            proximos.Should().ContainSingle();
+            totalProximos.Should().Be(1);
+            proximos.Single().ValidadeEm.Should().NotBeNull();
+
+            // Teste itens parados
+            var (parados, totalParados) = await repository.GetItensParadosAsync(empresaId, 90, 1, 10);
+            parados.Should().ContainSingle();
+            totalParados.Should().Be(1);
+            parados.Single().Should().Match<ItemEstoque>(i => !i.UltimaMovimentacaoEm.HasValue || i.UltimaMovimentacaoEm < DateTime.UtcNow.AddDays(-90));
+
+            // Teste sugestão reposição
+            var (sugestoes, totalSugestoes) = await repository.GetSugestaoReposicaoAsync(empresaId, 1, 10);
+            sugestoes.Should().HaveCount(3);
+            totalSugestoes.Should().Be(3);
+            sugestoes.Should().AllSatisfy(i => i.QuantidadeAtual.Value.Should().BeLessThan(5));
+        }
+    }
+
     private static async Task SeedProdutoAsync(DbContext context, Guid empresaId, Guid categoriaId, Guid produtoId)
     {
         context.Set<Empresa>().Add(new Empresa
@@ -536,5 +640,99 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
     {
         public Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null) =>
             Task.FromResult(descricao);
+    }
+
+    [Fact]
+    public async Task Concorrencia_em_registrar_saida_deve_manter_saldo_consistente()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = itemId,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(250m),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        // Simular duas saídas concorrentes
+        var task1 = Task.Run(async () =>
+        {
+            await using var context = fixture.CreateDbContext();
+            var useCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new VendaRepository(context),
+                new ItemVendaRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context);
+
+            await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(itemId, 3, 399.90m, "Saida 1")],
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                null,
+                null,
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Concorrente 1"));
+        });
+
+        var task2 = Task.Run(async () =>
+        {
+            await Task.Delay(100); // Pequeno delay para garantir concorrência
+            await using var context = fixture.CreateDbContext();
+            var useCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(context),
+                new ItemEstoqueRepository(context),
+                new VendaRepository(context),
+                new ItemVendaRepository(context),
+                new MovimentacaoEstoqueRepository(context),
+                context);
+
+            await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                empresaId,
+                [new RegistrarSaidaEstoqueItemCommand(itemId, 2, 399.90m, "Saida 2")],
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                null,
+                null,
+                NaturezaMovimentacaoEstoque.Venda,
+                CanalVenda.MercadoLivre,
+                "Concorrente 2"));
+        });
+
+        // Uma deve passar, a outra falhar
+        await Task.WhenAll(task1, task2);
+
+        await using (var assertContext = fixture.CreateDbContext())
+        {
+            var item = await assertContext.ItensEstoque.SingleAsync();
+            var vendas = await assertContext.Vendas.ToListAsync();
+            var movimentacoes = await assertContext.MovimentacoesEstoque.ToListAsync();
+
+            // Deve ter exatamente uma venda e movimentação, saldo reduzido por 3 ou 2
+            vendas.Should().HaveCount(1);
+            movimentacoes.Should().HaveCount(1);
+            item.QuantidadeAtual.Value.Should().Be(10 - vendas.Single().ItensVenda.Sum(iv => iv.Quantidade.Value));
+        }
     }
 }

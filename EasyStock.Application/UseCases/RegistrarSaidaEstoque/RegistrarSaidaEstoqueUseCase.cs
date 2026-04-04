@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Events;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -9,14 +12,14 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 {
     public sealed record RegistrarSaidaEstoqueItemCommand(
-        Guid ItemEstoqueId,
-        int Quantidade,
-        decimal ValorVendaUnitario,
+        [property: Required] Guid ItemEstoqueId,
+        [property: Range(1, int.MaxValue)] int Quantidade,
+        [property: Range(0, double.MaxValue)] decimal ValorVendaUnitario,
         string? Descricao);
 
     public sealed record RegistrarSaidaEstoqueCommand(
-        Guid EmpresaId,
-        IReadOnlyCollection<RegistrarSaidaEstoqueItemCommand> Itens,
+        [property: Required] Guid EmpresaId,
+        [property: Required][property: MinLength(1)] IReadOnlyCollection<RegistrarSaidaEstoqueItemCommand> Itens,
         DateTime DataVenda,
         DateTime DataSaida,
         DateTime? DataEnvio,
@@ -27,9 +30,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
     public sealed record RegistrarSaidaEstoqueItemResult(
         Guid ItemEstoqueId,
+        Guid ProdutoId,
         Guid ItemVendaId,
         Guid MovimentacaoId,
-        int QuantidadeRestante);
+        int QuantidadeSaida,
+        int QuantidadeRestante,
+        string? Motivo);
 
     public sealed record RegistrarSaidaEstoqueResult(
         Guid VendaId,
@@ -42,7 +48,8 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         IVendaRepository vendaRepository,
         IItemVendaRepository itemVendaRepository,
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPublicadorEventos? publicadorEventos = null)
     {
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
@@ -121,7 +128,14 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
                 itensVenda.Add(itemVenda);
                 movimentacoes.Add(movimentacao);
-                itensResult.Add(new RegistrarSaidaEstoqueItemResult(item.Id, itemVenda.Id, movimentacao.Id, item.QuantidadeAtual.Value));
+                itensResult.Add(new RegistrarSaidaEstoqueItemResult(
+                    item.Id,
+                    item.ProdutoId,
+                    itemVenda.Id,
+                    movimentacao.Id,
+                    quantidadeSolicitada.Value,
+                    item.QuantidadeAtual.Value,
+                    command.Observacoes));
 
                 await itemEstoqueRepository.UpdateAsync(item);
                 venda.AdicionarItem(itemVenda);
@@ -130,12 +144,21 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             if (!new VendaPossuiItensValidosSpecification().EhSatisfeitaPor(venda))
                 throw new VendaSemItensException(venda.Id);
 
-            await vendaRepository.AddAsync(venda);
+            await vendaRepository.InsertAsync(venda);
             foreach (var itemVenda in itensVenda)
-                await itemVendaRepository.AddAsync(itemVenda);
+                await itemVendaRepository.InsertAsync(itemVenda);
             foreach (var movimentacao in movimentacoes)
-                await movimentacaoEstoqueRepository.AddAsync(movimentacao);
+                await movimentacaoEstoqueRepository.InsertAsync(movimentacao);
             await unitOfWork.CommitAsync();
+
+            if (publicadorEventos is not null)
+            {
+                await publicadorEventos.PublicarAsync(new VendaRegistrada(
+                    Guid.NewGuid(), agora, venda.Id, venda.EmpresaId, venda.ValorTotal.Valor));
+                foreach (var r in itensResult)
+                    await publicadorEventos.PublicarAsync(new SaidaEstoqueRegistrada(
+                        Guid.NewGuid(), agora, r.ItemEstoqueId, r.ProdutoId, command.EmpresaId, r.QuantidadeSaida, r.Motivo));
+            }
 
             return new RegistrarSaidaEstoqueResult(venda.Id, itensResult, venda.ValorTotal.Valor);
         }

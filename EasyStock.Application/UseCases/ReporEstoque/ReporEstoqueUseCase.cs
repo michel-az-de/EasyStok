@@ -84,7 +84,7 @@ namespace EasyStock.Application.UseCases.ReporEstoque
                 agora);
 
             await itemEstoqueRepository.UpdateAsync(item);
-            await movimentacaoEstoqueRepository.AddAsync(movimentacao);
+            await movimentacaoEstoqueRepository.InsertAsync(movimentacao);
             await unitOfWork.CommitAsync();
 
             return new ReporEstoqueResult(item.Id, movimentacao.Id, quantidadeAnterior, item.QuantidadeAtual.Value);

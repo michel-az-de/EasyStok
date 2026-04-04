@@ -12,6 +12,7 @@ namespace EasyStock.Domain.Entities
         public Guid EmpresaId { get; set; }
         public Guid ProdutoId { get; set; }
         public Guid? ProdutoVariacaoId { get; set; }
+        public Guid? LojaId { get; set; }
 
         public string? CodigoInterno { get; set; }
         public CodigoLote? CodigoLote { get; set; }
@@ -26,6 +27,7 @@ namespace EasyStock.Domain.Entities
         public Dimensoes? DimensoesReais { get; set; }
 
         public string? FornecedorNome { get; set; }
+        public Guid? FornecedorId { get; set; }
 
         public Quantidade QuantidadeInicial { get; set; } = null!;
         public Quantidade QuantidadeAtual { get; set; } = null!;
@@ -48,6 +50,8 @@ namespace EasyStock.Domain.Entities
         public ProdutoVariacao? ProdutoVariacao { get; set; }
         public ICollection<ItemVenda>? ItensVenda { get; set; }
         public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
+        public Loja? Loja { get; set; }
+        public Fornecedor? Fornecedor { get; set; }
 
         public static ItemEstoque CriarParaEntrada(
             Guid id,

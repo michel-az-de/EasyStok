@@ -19,5 +19,6 @@ namespace EasyStock.Domain.Entities
         public ICollection<ItemEstoque>? ItensEstoque { get; set; }
         public ICollection<Venda>? Vendas { get; set; }
         public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
+        public ICollection<Loja>? Lojas { get; set; }
     }
 }

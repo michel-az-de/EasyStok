@@ -110,4 +110,69 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
             produto.PrecoReferencia!.Valor.Should().Be(399.90m);
         }
     }
+
+    [Fact]
+    public async Task GetProdutosPaginadosAsync_deve_respeitar_tenant_por_empresaId()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaA = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa A", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var empresaB = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa B", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaA = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaA.Id, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaB = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+
+        context.Empresas.AddRange(empresaA, empresaB);
+        context.Categorias.AddRange(categoriaA, categoriaB);
+        context.Produtos.AddRange(
+            new Produto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                CategoriaId = categoriaA.Id,
+                Nome = "Produto A1",
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new Produto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaA.Id,
+                CategoriaId = categoriaA.Id,
+                Nome = "Produto A2",
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new Produto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaB.Id,
+                CategoriaId = categoriaB.Id,
+                Nome = "Produto B1",
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ProdutoRepository(context);
+
+        var (produtosA, totalA) = await repository.GetProdutosPaginadosAsync(empresaA.Id, 1, 10);
+        var (produtosB, totalB) = await repository.GetProdutosPaginadosAsync(empresaB.Id, 1, 10);
+
+        produtosA.Should().HaveCount(2);
+        produtosA.Should().AllSatisfy(p => p.EmpresaId.Should().Be(empresaA.Id));
+        totalA.Should().Be(2);
+
+        produtosB.Should().HaveCount(1);
+        produtosB.Should().AllSatisfy(p => p.EmpresaId.Should().Be(empresaB.Id));
+        totalB.Should().Be(1);
+    }
 }

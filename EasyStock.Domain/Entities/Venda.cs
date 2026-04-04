@@ -9,6 +9,7 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid EmpresaId { get; set; }
+        public Guid? LojaId { get; set; }
         public CanalVenda Canal { get; set; }
         public NaturezaMovimentacaoEstoque Natureza { get; set; }
         public DateTime DataVenda { get; set; }
@@ -19,6 +20,7 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
 
         public Empresa? Empresa { get; set; }
+        public Loja? Loja { get; set; }
         public ICollection<ItemVenda>? ItensVenda { get; set; }
         public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
 

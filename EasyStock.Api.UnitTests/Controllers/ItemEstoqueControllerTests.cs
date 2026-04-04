@@ -1,6 +1,7 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.ReporEstoque;
@@ -28,6 +29,7 @@ public class ItemEstoqueControllerTests
     private readonly RegistrarEntradaEstoqueUseCase _registrarEntradaUseCase;
     private readonly RegistrarSaidaEstoqueUseCase _registrarSaidaUseCase;
     private readonly ReporEstoqueUseCase _reporEstoqueUseCase;
+    private readonly BuscarEstoqueInteligenteUseCase _buscarUseCase;
     private readonly ItemEstoqueController _controller;
 
     public ItemEstoqueControllerTests()
@@ -51,11 +53,16 @@ public class ItemEstoqueControllerTests
             _itemEstoqueRepository,
             _movimentacaoEstoqueRepository,
             _unitOfWork);
+        _buscarUseCase = new BuscarEstoqueInteligenteUseCase(
+            _produtoRepository,
+            _produtoVariacaoRepository,
+            _itemEstoqueRepository);
         _controller = new ItemEstoqueController(
             _itemEstoqueRepository,
             _registrarEntradaUseCase,
             _registrarSaidaUseCase,
-            _reporEstoqueUseCase);
+            _reporEstoqueUseCase,
+            _buscarUseCase);
     }
 
     [Fact]
@@ -79,10 +86,11 @@ public class ItemEstoqueControllerTests
     [Fact]
     public async Task GetById_DeveRetornarOk_QuandoItemEncontrado()
     {
-        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
-        _itemEstoqueRepository.GetByIdAsync(item.Id).Returns(item);
+        var empresaId = Guid.NewGuid();
+        var item = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, QuantidadeAtual = Quantidade.From(10) };
+        _itemEstoqueRepository.GetByIdAsync(empresaId, item.Id).Returns(item);
 
-        var result = await _controller.GetById(item.Id);
+        var result = await _controller.GetById(item.Id, empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
@@ -92,10 +100,11 @@ public class ItemEstoqueControllerTests
     [Fact]
     public async Task GetById_DeveRetornarNotFound_QuandoItemNaoEncontrado()
     {
+        var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        _itemEstoqueRepository.GetByIdAsync(id).Returns((ItemEstoque?)null);
+        _itemEstoqueRepository.GetByIdAsync(empresaId, id).Returns((ItemEstoque?)null);
 
-        var result = await _controller.GetById(id);
+        var result = await _controller.GetById(id, empresaId);
 
         result.Should().BeOfType<NotFoundResult>();
     }

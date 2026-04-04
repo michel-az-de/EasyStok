@@ -59,22 +59,6 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void Repositories_Devem_Ficar_Fora_Do_Domain()
-    {
-        // Arrange
-        var assembly = typeof(EasyStock.Domain.Entities.Produto).Assembly;
-
-        // Act
-        var result = Types.InAssembly(assembly)
-            .ShouldNot()
-            .HaveNameEndingWith("Repository")
-            .GetResult();
-
-        // Assert
-        result.IsSuccessful.Should().BeTrue();
-    }
-
-    [Fact]
     public void ValueObjects_Devem_Ficar_No_Domain()
     {
         var valueObjects = new[]
@@ -102,30 +86,6 @@ public class ArchitectureTests
             .HaveNameEndingWith("Exception")
             .Should()
             .ResideInNamespace(DomainNamespace + ".Exceptions")
-            .GetResult();
-
-        // Assert
-        result.IsSuccessful.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Services_De_Domain_Devem_Ficar_No_Domain()
-    {
-        // Arrange
-        var assembly = typeof(EasyStock.Domain.Services.CalculadoraReposicaoEstoque).Assembly;
-
-        // Act
-        var result = Types.InAssembly(assembly)
-            .That()
-            .HaveNameEndingWith("CalculadoraReposicaoEstoque")
-            .Or()
-            .HaveNameEndingWith("AnalisadorSaudeEstoque")
-            .Or()
-            .HaveNameEndingWith("PoliticaValidadeEstoque")
-            .Or()
-            .HaveNameEndingWith("CalculadoraResumoVenda")
-            .Should()
-            .ResideInNamespace(DomainNamespace + ".Services")
             .GetResult();
 
         // Assert

@@ -20,6 +20,18 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Venda> Vendas { get; set; } = null!;
         public DbSet<ItemVenda> ItensVenda { get; set; } = null!;
         public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
+        public DbSet<Notificacao> Notificacoes { get; set; } = null!;
+        public DbSet<Loja> Lojas { get; set; } = null!;
+        public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
+
+        // Identity / SaaS DbSets
+        public DbSet<Usuario> Usuarios { get; set; } = null!;
+        public DbSet<UsuarioEmpresa> UsuariosEmpresas { get; set; } = null!;
+        public DbSet<Perfil> Perfis { get; set; } = null!;
+        public DbSet<PerfilPermissao> PerfisPermissoes { get; set; } = null!;
+        public DbSet<UsuarioPerfil> UsuariosPerfis { get; set; } = null!;
+        public DbSet<Plano> Planos { get; set; } = null!;
+        public DbSet<AssinaturaEmpresa> AssinaturasEmpresa { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {

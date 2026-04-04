@@ -1,0 +1,284 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using EasyStock.Infra.MongoDb.Data;
+using MongoDB.Driver;
+
+namespace EasyStock.Infra.MongoDb.Repositories;
+
+public sealed class LojaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), ILojaRepository
+{
+    private IMongoCollection<Loja> Collection => Context.GetCollection<Loja>(MongoCollectionNames.Lojas);
+
+    public Task<Loja?> GetByIdAsync(Guid id) =>
+        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<Loja>> GetByEmpresaAsync(Guid empresaId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId).SortBy(x => x.Nome).ToListAsync();
+
+    public async Task<int> CountByEmpresaAsync(Guid empresaId) =>
+        (int)await Collection.CountDocumentsAsync(x => x.EmpresaId == empresaId && x.Ativa);
+
+    public Task AddAsync(Loja loja)
+    {
+        EnqueueInsert(Collection, loja);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Loja loja)
+    {
+        EnqueueReplace(Collection, loja.Id, loja);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IFornecedorRepository
+{
+    private IMongoCollection<Fornecedor> Collection => Context.GetCollection<Fornecedor>(MongoCollectionNames.Fornecedores);
+
+    public Task<Fornecedor?> GetByIdAsync(Guid id) =>
+        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
+    {
+        var filter = Builders<Fornecedor>.Filter.Eq(x => x.EmpresaId, empresaId);
+        var total = (int)await Collection.CountDocumentsAsync(filter);
+        var items = await Collection.Find(filter)
+            .SortBy(x => x.Nome)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
+
+    public Task AddAsync(Fornecedor fornecedor)
+    {
+        EnqueueInsert(Collection, fornecedor);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Fornecedor fornecedor)
+    {
+        EnqueueReplace(Collection, fornecedor.Id, fornecedor);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IUsuarioRepository
+{
+    private IMongoCollection<Usuario> Usuarios => Context.GetCollection<Usuario>(MongoCollectionNames.Usuarios);
+    private IMongoCollection<UsuarioEmpresa> UsuariosEmpresas => Context.GetCollection<UsuarioEmpresa>(MongoCollectionNames.UsuariosEmpresas);
+    private IMongoCollection<UsuarioPerfil> UsuariosPerfis => Context.GetCollection<UsuarioPerfil>(MongoCollectionNames.UsuariosPerfis);
+    private IMongoCollection<Perfil> Perfis => Context.GetCollection<Perfil>(MongoCollectionNames.Perfis);
+    private IMongoCollection<PerfilPermissao> PerfisPermissoes => Context.GetCollection<PerfilPermissao>(MongoCollectionNames.PerfisPermissoes);
+
+    public async Task<Usuario?> GetByIdAsync(Guid id)
+    {
+        var usuario = await Usuarios.Find(x => x.Id == id).FirstOrDefaultAsync();
+        if (usuario is null) return null;
+
+        await HydrateUsuarioAsync(usuario);
+        return usuario;
+    }
+
+    public async Task<Usuario?> GetByEmailAsync(string email)
+    {
+        var usuario = await Usuarios.Find(x => x.Email == email).FirstOrDefaultAsync();
+        if (usuario is null) return null;
+
+        await HydrateUsuarioAsync(usuario);
+        return usuario;
+    }
+
+    public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
+    {
+        var links = await UsuariosEmpresas.Find(x => x.EmpresaId == empresaId && x.Ativo).ToListAsync();
+        var ids = links.Select(x => x.UsuarioId).Distinct().ToList();
+
+        if (ids.Count == 0)
+            return ([], 0);
+
+        var usuarios = await Usuarios.Find(x => ids.Contains(x.Id))
+            .SortBy(x => x.Nome)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        foreach (var usuario in usuarios)
+            await HydrateUsuarioAsync(usuario);
+
+        return (usuarios, ids.Count);
+    }
+
+    public Task AddAsync(Usuario usuario)
+    {
+        EnqueueInsert(Usuarios, usuario);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Usuario usuario)
+    {
+        usuario.Empresas = null;
+        usuario.Perfis = null;
+        EnqueueReplace(Usuarios, usuario.Id, usuario);
+        return Task.CompletedTask;
+    }
+
+    private async Task HydrateUsuarioAsync(Usuario usuario)
+    {
+        var empresas = await UsuariosEmpresas.Find(x => x.UsuarioId == usuario.Id).ToListAsync();
+        var perfis = await UsuariosPerfis.Find(x => x.UsuarioId == usuario.Id).ToListAsync();
+        var perfilIds = perfis.Select(x => x.PerfilId).Distinct().ToList();
+        var perfisBase = perfilIds.Count == 0 ? [] : await Perfis.Find(x => perfilIds.Contains(x.Id)).ToListAsync();
+        var permissoes = perfilIds.Count == 0 ? [] : await PerfisPermissoes.Find(x => perfilIds.Contains(x.PerfilId)).ToListAsync();
+
+        foreach (var perfil in perfisBase)
+            perfil.Permissoes = permissoes.Where(x => x.PerfilId == perfil.Id).ToList();
+
+        foreach (var usuarioPerfil in perfis)
+            usuarioPerfil.Perfil = perfisBase.FirstOrDefault(x => x.Id == usuarioPerfil.PerfilId);
+
+        usuario.Empresas = empresas;
+        usuario.Perfis = perfis;
+    }
+}
+
+public sealed class PerfilRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IPerfilRepository
+{
+    private IMongoCollection<Perfil> Perfis => Context.GetCollection<Perfil>(MongoCollectionNames.Perfis);
+    private IMongoCollection<PerfilPermissao> Permissoes => Context.GetCollection<PerfilPermissao>(MongoCollectionNames.PerfisPermissoes);
+
+    public async Task<Perfil?> GetByIdAsync(Guid id)
+    {
+        var perfil = await Perfis.Find(x => x.Id == id).FirstOrDefaultAsync();
+        if (perfil is null) return null;
+
+        perfil.Permissoes = await Permissoes.Find(x => x.PerfilId == perfil.Id).ToListAsync();
+        return perfil;
+    }
+
+    public async Task<IEnumerable<Perfil>> GetPadroesAsync()
+    {
+        var perfis = await Perfis.Find(x => x.EmpresaId == null).ToListAsync();
+        await HydratePermissoesAsync(perfis);
+        return perfis;
+    }
+
+    public async Task<IEnumerable<Perfil>> GetByEmpresaAsync(Guid empresaId)
+    {
+        var perfis = await Perfis.Find(x => x.EmpresaId == empresaId).ToListAsync();
+        await HydratePermissoesAsync(perfis);
+        return perfis;
+    }
+
+    public Task AddAsync(Perfil perfil)
+    {
+        EnqueueInsert(Perfis, perfil);
+        return Task.CompletedTask;
+    }
+
+    private async Task HydratePermissoesAsync(List<Perfil> perfis)
+    {
+        var ids = perfis.Select(x => x.Id).ToList();
+        if (ids.Count == 0) return;
+
+        var permissoes = await Permissoes.Find(x => ids.Contains(x.PerfilId)).ToListAsync();
+        foreach (var perfil in perfis)
+            perfil.Permissoes = permissoes.Where(x => x.PerfilId == perfil.Id).ToList();
+    }
+}
+
+public sealed class PlanoRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IPlanoRepository
+{
+    private IMongoCollection<Plano> Collection => Context.GetCollection<Plano>(MongoCollectionNames.Planos);
+
+    public Task<Plano?> GetByIdAsync(Guid id) =>
+        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<Plano>> GetAtivosAsync() =>
+        await Collection.Find(x => x.Ativo).ToListAsync();
+
+    public Task AddAsync(Plano plano)
+    {
+        EnqueueInsert(Collection, plano);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IAssinaturaEmpresaRepository
+{
+    private IMongoCollection<AssinaturaEmpresa> Collection => Context.GetCollection<AssinaturaEmpresa>(MongoCollectionNames.AssinaturasEmpresa);
+    private IMongoCollection<Plano> Planos => Context.GetCollection<Plano>(MongoCollectionNames.Planos);
+
+    public async Task<IEnumerable<AssinaturaEmpresa>> GetByEmpresaAsync(Guid empresaId)
+    {
+        var assinaturas = await Collection.Find(x => x.EmpresaId == empresaId).ToListAsync();
+        await HydratePlanosAsync(assinaturas);
+        return assinaturas;
+    }
+
+    public async Task<AssinaturaEmpresa?> GetAtivaAsync(Guid empresaId)
+    {
+        var assinatura = await Collection.Find(x => x.EmpresaId == empresaId && x.Status == StatusAssinatura.Ativa).FirstOrDefaultAsync();
+        if (assinatura is null) return null;
+
+        assinatura.Plano = await Planos.Find(x => x.Id == assinatura.PlanoId).FirstOrDefaultAsync();
+        return assinatura;
+    }
+
+    public Task AddAsync(AssinaturaEmpresa assinatura)
+    {
+        EnqueueInsert(Collection, assinatura);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(AssinaturaEmpresa assinatura)
+    {
+        assinatura.Plano = null;
+        EnqueueReplace(Collection, assinatura.Id, assinatura);
+        return Task.CompletedTask;
+    }
+
+    private async Task HydratePlanosAsync(List<AssinaturaEmpresa> assinaturas)
+    {
+        var ids = assinaturas.Select(x => x.PlanoId).Distinct().ToList();
+        if (ids.Count == 0) return;
+
+        var planos = await Planos.Find(x => ids.Contains(x.Id)).ToListAsync();
+        foreach (var assinatura in assinaturas)
+            assinatura.Plano = planos.FirstOrDefault(x => x.Id == assinatura.PlanoId);
+    }
+}
+
+public sealed class RegistrarEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IRegistrarEmpresaRepository
+{
+    private IMongoCollection<Empresa> Empresas => Context.GetCollection<Empresa>(MongoCollectionNames.Empresas);
+    private IMongoCollection<UsuarioEmpresa> UsuariosEmpresas => Context.GetCollection<UsuarioEmpresa>(MongoCollectionNames.UsuariosEmpresas);
+    private IMongoCollection<UsuarioPerfil> UsuariosPerfis => Context.GetCollection<UsuarioPerfil>(MongoCollectionNames.UsuariosPerfis);
+
+    public Task AddEmpresaAsync(Empresa empresa)
+    {
+        EnqueueInsert(Empresas, empresa);
+        return Task.CompletedTask;
+    }
+
+    public Task AddUsuarioEmpresaAsync(UsuarioEmpresa usuarioEmpresa)
+    {
+        EnqueueInsert(UsuariosEmpresas, usuarioEmpresa);
+        return Task.CompletedTask;
+    }
+
+    public Task AddUsuarioPerfilAsync(UsuarioPerfil usuarioPerfil)
+    {
+        EnqueueInsert(UsuariosPerfis, usuarioPerfil);
+        return Task.CompletedTask;
+    }
+}

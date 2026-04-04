@@ -6,8 +6,11 @@ using Microsoft.EntityFrameworkCore;
 namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class ProdutoVariacaoRepository(EasyStockDbContext dbContext)
-        : BaseRepository<ProdutoVariacao>(dbContext), IProdutoVariacaoRepository
+        : IProdutoVariacaoRepository
     {
+        public Task<ProdutoVariacao?> GetByIdAsync(Guid id) =>
+            dbContext.ProdutosVariacao.FirstOrDefaultAsync(v => v.Id == id);
+
         public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo)
         {
             termo = termo.Trim();
@@ -15,7 +18,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var pattern = $"%{termo}%";
 
-            return await DbContext.ProdutosVariacao
+            return await dbContext.ProdutosVariacao
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId &&
                     (EF.Functions.ILike(v.Nome, pattern) ||
@@ -23,8 +26,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (v.Tamanho != null && EF.Functions.ILike(v.Tamanho, pattern)) ||
                      (v.DescricaoComercial != null && EF.Functions.ILike(v.DescricaoComercial, pattern)) ||
                      EF.Functions.ILike(EF.Property<string?>(v, nameof(ProdutoVariacao.Sku))!, pattern) ||
-                     (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
+                    (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
                 .ToListAsync();
         }
+
+        public Task InsertAsync(ProdutoVariacao variacao) =>
+            dbContext.ProdutosVariacao.AddAsync(variacao).AsTask();
     }
 }

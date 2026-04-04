@@ -59,11 +59,12 @@ public class ProdutoControllerTests
     public async Task GetById_DeveRetornarOk_QuandoProdutoEncontrado()
     {
         // Arrange
-        var produto = new Produto { Id = Guid.NewGuid(), Nome = "Produto1" };
-        _produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        var empresaId = Guid.NewGuid();
+        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Produto1" };
+        _produtoRepository.GetByIdAsync(empresaId, produto.Id).Returns(produto);
 
         // Act
-        var result = await _controller.GetById(produto.Id);
+        var result = await _controller.GetById(produto.Id, empresaId);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
@@ -75,11 +76,12 @@ public class ProdutoControllerTests
     public async Task GetById_DeveRetornarNotFound_QuandoProdutoNaoEncontrado()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        _produtoRepository.GetByIdAsync(id).Returns((Produto?)null);
+        _produtoRepository.GetByIdAsync(empresaId, id).Returns((Produto?)null);
 
         // Act
-        var result = await _controller.GetById(id);
+        var result = await _controller.GetById(id, empresaId);
 
         // Assert
         result.Should().BeOfType<NotFoundResult>();
@@ -143,7 +145,7 @@ public class ProdutoControllerTests
         var payload = createdResult.Value as CadastrarProdutoResult;
         payload!.ProdutoId.Should().NotBe(Guid.Empty);
         createdResult.ActionName.Should().Be("GetById");
-        await _produtoRepository.Received(1).AddAsync(Arg.Any<Produto>());
+        await _produtoRepository.Received(1).InsertAsync(Arg.Any<Produto>());
     }
 
     private static T ObterPropriedade<T>(object? source, string nome)
