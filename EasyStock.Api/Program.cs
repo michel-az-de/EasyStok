@@ -1,14 +1,10 @@
 using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Infra.Postgre.Data;
-using EasyStock.Infra.Postgre.Repositories;
-using Microsoft.EntityFrameworkCore;
+using EasyStock.Infra.Postgre.DependencyInjection;
 using Serilog;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,23 +26,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Database
-builder.Services.AddDbContext<EasyStockDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Repositories
-builder.Services.AddScoped<IProdutoRepository, ProdutoRepository>();
-builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
-builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
-builder.Services.AddScoped<IItemEstoqueRepository, ItemEstoqueRepository>();
-builder.Services.AddScoped<IVendaRepository, VendaRepository>();
-builder.Services.AddScoped<IItemVendaRepository, ItemVendaRepository>();
-builder.Services.AddScoped<IMovimentacaoEstoqueRepository, MovimentacaoEstoqueRepository>();
-builder.Services.AddScoped<IProdutoVariacaoRepository, ProdutoVariacaoRepository>();
-builder.Services.AddScoped<IProdutoCaracteristicaRepository, ProdutoCaracteristicaRepository>();
-builder.Services.AddScoped<IProdutoEmbalagemRepository, ProdutoEmbalagemRepository>();
-
-// Unit of Work
-builder.Services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<EasyStockDbContext>());
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' nao configurada.");
+builder.Services.AddEasyStockPostgreInfrastructure(connectionString);
 
  // Use Cases
 builder.Services.AddScoped<CadastrarProdutoUseCase>();
@@ -56,10 +38,11 @@ builder.Services.AddScoped<EasyStock.Application.UseCases.ReporEstoque.ReporEsto
 
 // Observability
 builder.Services.AddSingleton<EasyStock.Api.Observability.MetricsService>();
+builder.Services.AddProblemDetails();
 
 // Health Checks
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "PostgreSQL");
+    .AddNpgSql(connectionString, name: "PostgreSQL");
 
 // Exception Handler
 builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalExceptionHandler>();

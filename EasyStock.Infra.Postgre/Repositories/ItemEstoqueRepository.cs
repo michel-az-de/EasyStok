@@ -5,6 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
+    // Proposed PostgreSQL indexes for performance:
+    // CREATE INDEX idx_itensestoque_empresa_quantidade ON itensestoque (empresaid, quantidadeatual);
+    // CREATE INDEX idx_itensestoque_empresa_validade ON itensestoque (empresaid, validadeem);
+    // CREATE INDEX idx_itensestoque_empresa_ultimamov ON itensestoque (empresaid, ultimamovimentacaoem);
+
     public sealed class ItemEstoqueRepository(EasyStockDbContext dbContext)
         : BaseRepository<ItemEstoque>(dbContext), IItemEstoqueRepository
     {
@@ -26,6 +31,89 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern)) ||
                      (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern))))
                 .ToListAsync();
+        }
+
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20)
+        {
+            var query = DbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value <= limite);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .OrderBy(i => i.QuantidadeAtual.Value)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(dias);
+            var query = DbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoff);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .OrderBy(i => EF.Property<DateTime?>(i, nameof(ItemEstoque.ValidadeEm)))
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-diasSemMovimento);
+            var query = DbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId &&
+                    (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(i => i.UltimaMovimentacaoEm ?? DateTime.MinValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int page = 1, int pageSize = 20)
+        {
+            var query = DbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value < 5);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .OrderBy(i => i.QuantidadeAtual.Value)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20)
+        {
+            var query = DbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .OrderBy(i => i.ProdutoId)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
         }
     }
 }

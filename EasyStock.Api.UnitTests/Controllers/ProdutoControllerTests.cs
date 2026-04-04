@@ -40,18 +40,21 @@ public class ProdutoControllerTests
     public async Task GetAll_DeveRetornarOk_ComListaDeProdutos()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto1" } };
-        _produtoRepository.GetAllAsync().Returns(produtos);
+        _produtoRepository.GetProdutosPaginadosAsync(empresaId, 1, 20).Returns((produtos, 1));
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(empresaId);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(produtos);
+        var produtosRetornados = ObterPropriedade<IEnumerable<Produto>>(okResult!.Value, "Produtos");
+        var totalCount = ObterPropriedade<int>(okResult.Value, "TotalCount");
+        produtosRetornados.Should().BeEquivalentTo(produtos);
+        totalCount.Should().Be(1);
     }
-
     [Fact]
     public async Task GetById_DeveRetornarOk_QuandoProdutoEncontrado()
     {
@@ -143,44 +146,11 @@ public class ProdutoControllerTests
         await _produtoRepository.Received(1).AddAsync(Arg.Any<Produto>());
     }
 
-    [Fact]
-    public async Task Update_DeveRetornarNoContent_QuandoSucesso()
+    private static T ObterPropriedade<T>(object? source, string nome)
     {
-        // Arrange
-        var produto = new Produto { Id = Guid.NewGuid(), Nome = "Produto Atualizado" };
-
-        // Act
-        var result = await _controller.Update(produto.Id, produto);
-
-        // Assert
-        result.Should().BeOfType<NoContentResult>();
-        await _produtoRepository.Received(1).UpdateAsync(produto);
-    }
-
-    [Fact]
-    public async Task Update_DeveRetornarBadRequest_QuandoIdsNaoCoincidem()
-    {
-        // Arrange
-        var produto = new Produto { Id = Guid.NewGuid(), Nome = "Produto" };
-
-        // Act
-        var result = await _controller.Update(Guid.NewGuid(), produto);
-
-        // Assert
-        result.Should().BeOfType<BadRequestResult>();
-    }
-
-    [Fact]
-    public async Task Delete_DeveRetornarNoContent()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-
-        // Act
-        var result = await _controller.Delete(id);
-
-        // Assert
-        result.Should().BeOfType<NoContentResult>();
-        await _produtoRepository.Received(1).DeleteAsync(id);
+        source.Should().NotBeNull();
+        var propriedade = source!.GetType().GetProperty(nome);
+        propriedade.Should().NotBeNull();
+        return (T)propriedade!.GetValue(source)!;
     }
 }

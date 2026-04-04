@@ -11,6 +11,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
         {
             builder.ToTable("itens_estoque");
             builder.HasKey(i => i.Id);
+            builder.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .IsRowVersion();
             builder.Property(i => i.CodigoInterno).HasMaxLength(120);
             builder.Property(i => i.CodigoLote)
                 .HasConversion(

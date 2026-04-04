@@ -23,18 +23,19 @@ public class InteligenciaControllerTests
     public async Task EstoqueBaixo_DeveRetornarOk_ComItensAbaixoDoLimite()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var item1 = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(5) };
         var item2 = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(15) };
-        var itens = new List<ItemEstoque> { item1, item2 };
-        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+        var itens = new List<ItemEstoque> { item1 };
+        _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, 10, 1, 20).Returns((itens, 1));
 
         // Act
-        var result = await _controller.EstoqueBaixo(10);
+        var result = await _controller.EstoqueBaixo(empresaId, 10);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -42,19 +43,19 @@ public class InteligenciaControllerTests
     public async Task ProximoVencimento_DeveRetornarOk_ComItensProximosAoVencimento()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var hoje = DateTime.UtcNow.Date;
         var item1 = new ItemEstoque { Id = Guid.NewGuid(), ValidadeEm = Validade.From(hoje.AddDays(25)) };
-        var item2 = new ItemEstoque { Id = Guid.NewGuid(), ValidadeEm = Validade.From(hoje.AddDays(35)) };
-        var itens = new List<ItemEstoque> { item1, item2 };
-        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+        var itens = new List<ItemEstoque> { item1 };
+        _itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, 30, 1, 20).Returns((itens, 1));
 
         // Act
-        var result = await _controller.ProximoVencimento(30);
+        var result = await _controller.ProximoVencimento(empresaId, 30);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -62,19 +63,19 @@ public class InteligenciaControllerTests
     public async Task ItensParados_DeveRetornarOk_ComItensSemMovimentacao()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var hoje = DateTime.UtcNow;
         var item1 = new ItemEstoque { Id = Guid.NewGuid(), UltimaMovimentacaoEm = hoje.AddDays(-100) };
-        var item2 = new ItemEstoque { Id = Guid.NewGuid(), UltimaMovimentacaoEm = hoje.AddDays(-50) };
-        var itens = new List<ItemEstoque> { item1, item2 };
-        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+        var itens = new List<ItemEstoque> { item1 };
+        _itemEstoqueRepository.GetItensParadosAsync(empresaId, 90, 1, 20).Returns((itens, 1));
 
         // Act
-        var result = await _controller.ItensParados(90);
+        var result = await _controller.ItensParados(empresaId, 90);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
     }
 
@@ -82,18 +83,26 @@ public class InteligenciaControllerTests
     public async Task SugestaoReposicao_DeveRetornarOk_ComItensComEstoqueBaixo()
     {
         // Arrange
+        var empresaId = Guid.NewGuid();
         var item1 = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(3) };
-        var item2 = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
-        var itens = new List<ItemEstoque> { item1, item2 };
-        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+        var itens = new List<ItemEstoque> { item1 };
+        _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, 1, 20).Returns((itens, 1));
 
         // Act
-        var result = await _controller.SugestaoReposicao();
+        var result = await _controller.SugestaoReposicao(empresaId);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        var returnedItens = okResult!.Value as IEnumerable<ItemEstoque>;
+        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
         returnedItens.Should().ContainSingle().Which.Should().Be(item1);
+    }
+
+    private static T ObterPropriedade<T>(object? source, string nome)
+    {
+        source.Should().NotBeNull();
+        var propriedade = source!.GetType().GetProperty(nome);
+        propriedade.Should().NotBeNull();
+        return (T)propriedade!.GetValue(source)!;
     }
 }

@@ -11,7 +11,7 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
         ItemEstoque
     }
 
-    public sealed record BuscarEstoqueInteligenteQuery(Guid EmpresaId, string Termo);
+    public sealed record BuscarEstoqueInteligenteQuery(Guid EmpresaId, string Termo, int Limite = 50);
 
     public sealed record ResultadoBuscaInteligente(
         TipoResultadoBuscaInteligente Tipo,
@@ -46,6 +46,7 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
             return resultados
                 .OrderByDescending(r => r.Score)
                 .ThenBy(r => r.Titulo)
+                .Take(query.Limite)
                 .ToArray();
         }
 

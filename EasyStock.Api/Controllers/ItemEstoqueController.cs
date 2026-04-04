@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
@@ -29,10 +28,10 @@ public class ItemEstoqueController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var itens = await _itemEstoqueRepository.GetAllAsync();
-        return Ok(itens);
+        var (itens, totalCount) = await _itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, page, pageSize);
+        return Ok(new { Items = itens, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("{id}")]
@@ -43,33 +42,11 @@ public class ItemEstoqueController : ControllerBase
         return Ok(item);
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create(ItemEstoque item)
-    {
-        await _itemEstoqueRepository.AddAsync(item);
-        return CreatedAtAction(nameof(GetById), new { id = item.Id }, item);
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, ItemEstoque item)
-    {
-        if (id != item.Id) return BadRequest();
-        await _itemEstoqueRepository.UpdateAsync(item);
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        await _itemEstoqueRepository.DeleteAsync(id);
-        return NoContent();
-    }
-
     [HttpPost("entrada")]
     public async Task<IActionResult> RegistrarEntrada(RegistrarEntradaEstoqueCommand command)
     {
         var result = await _registrarEntradaUseCase.ExecuteAsync(command);
-        return Ok(result);
+        return CreatedAtAction(nameof(GetById), new { id = result.ItemEstoqueId }, result);
     }
 
     [HttpPost("saida")]

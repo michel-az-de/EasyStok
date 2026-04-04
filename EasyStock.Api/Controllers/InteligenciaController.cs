@@ -15,37 +15,30 @@ public class InteligenciaController : ControllerBase
     }
 
     [HttpGet("estoque-baixo")]
-    public async Task<IActionResult> EstoqueBaixo([FromQuery] int limite = 10)
+    public async Task<IActionResult> EstoqueBaixo([FromQuery] Guid empresaId, [FromQuery] int limite = 10, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        // Simples: itens com quantidade <= limite
-        var itens = await _itemEstoqueRepository.GetAllAsync();
-        var baixo = itens.Where(i => i.QuantidadeAtual.Value <= limite);
-        return Ok(baixo);
+        var (items, totalCount) = await _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limite, page, pageSize);
+        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("proximo-vencimento")]
-    public async Task<IActionResult> ProximoVencimento([FromQuery] int dias = 30)
+    public async Task<IActionResult> ProximoVencimento([FromQuery] Guid empresaId, [FromQuery] int dias = 30, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var itens = await _itemEstoqueRepository.GetAllAsync();
-        var proximos = itens.Where(i => i.ValidadeEm != null && i.ValidadeEm.DiasAteVencimento() <= dias);
-        return Ok(proximos);
+        var (items, totalCount) = await _itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, dias, page, pageSize);
+        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("parados")]
-    public async Task<IActionResult> ItensParados([FromQuery] int diasSemMovimento = 90)
+    public async Task<IActionResult> ItensParados([FromQuery] Guid empresaId, [FromQuery] int diasSemMovimento = 90, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var itens = await _itemEstoqueRepository.GetAllAsync();
-        var parados = itens.Where(i => i.UltimaMovimentacaoEm == null ||
-                                       (DateTime.UtcNow - i.UltimaMovimentacaoEm.Value).TotalDays > diasSemMovimento);
-        return Ok(parados);
+        var (items, totalCount) = await _itemEstoqueRepository.GetItensParadosAsync(empresaId, diasSemMovimento, page, pageSize);
+        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("sugestao-reposicao")]
-    public async Task<IActionResult> SugestaoReposicao()
+    public async Task<IActionResult> SugestaoReposicao([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        // Simples: itens com quantidade baixa
-        var itens = await _itemEstoqueRepository.GetAllAsync();
-        var sugestoes = itens.Where(i => i.QuantidadeAtual.Value < 5); // Exemplo
-        return Ok(sugestoes);
+        var (items, totalCount) = await _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, page, pageSize);
+        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 }

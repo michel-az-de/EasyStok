@@ -1,6 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
@@ -19,10 +18,10 @@ public class ProdutoController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var produtos = await _produtoRepository.GetAllAsync();
-        return Ok(produtos);
+        var (produtos, totalCount) = await _produtoRepository.GetProdutosPaginadosAsync(empresaId, page, pageSize);
+        return Ok(new { Produtos = produtos, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("{id}")]
@@ -45,20 +44,5 @@ public class ProdutoController : ControllerBase
     {
         var result = await _cadastrarProdutoUseCase.ExecuteAsync(command);
         return CreatedAtAction(nameof(GetById), new { id = result.ProdutoId }, result);
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, Produto produto)
-    {
-        if (id != produto.Id) return BadRequest();
-        await _produtoRepository.UpdateAsync(produto);
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        await _produtoRepository.DeleteAsync(id);
-        return NoContent();
     }
 }

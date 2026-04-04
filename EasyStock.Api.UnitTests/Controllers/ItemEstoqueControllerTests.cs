@@ -61,17 +61,19 @@ public class ItemEstoqueControllerTests
     [Fact]
     public async Task GetAll_DeveRetornarOk_ComListaDeItens()
     {
+        var empresaId = Guid.NewGuid();
         var itens = new List<ItemEstoque>
         {
             new() { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) }
         };
-        _itemEstoqueRepository.GetAllAsync().Returns(itens);
+        _itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, 1, 20).Returns((itens, 1));
 
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
         var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(itens);
+        var itensRetornados = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
+        itensRetornados.Should().BeEquivalentTo(itens);
     }
 
     [Fact]
@@ -99,52 +101,7 @@ public class ItemEstoqueControllerTests
     }
 
     [Fact]
-    public async Task Create_DeveRetornarCreated_ComItem()
-    {
-        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
-
-        var result = await _controller.Create(item);
-
-        result.Should().BeOfType<CreatedAtActionResult>();
-        var createdResult = result as CreatedAtActionResult;
-        createdResult!.Value.Should().Be(item);
-        createdResult.ActionName.Should().Be("GetById");
-    }
-
-    [Fact]
-    public async Task Update_DeveRetornarNoContent_QuandoSucesso()
-    {
-        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
-
-        var result = await _controller.Update(item.Id, item);
-
-        result.Should().BeOfType<NoContentResult>();
-        await _itemEstoqueRepository.Received(1).UpdateAsync(item);
-    }
-
-    [Fact]
-    public async Task Update_DeveRetornarBadRequest_QuandoIdsNaoCoincidem()
-    {
-        var item = new ItemEstoque { Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(10) };
-
-        var result = await _controller.Update(Guid.NewGuid(), item);
-
-        result.Should().BeOfType<BadRequestResult>();
-    }
-
-    [Fact]
-    public async Task Delete_DeveRetornarNoContent()
-    {
-        var id = Guid.NewGuid();
-
-        var result = await _controller.Delete(id);
-
-        result.Should().BeOfType<NoContentResult>();
-        await _itemEstoqueRepository.Received(1).DeleteAsync(id);
-    }
-
-    [Fact]
-    public async Task RegistrarEntrada_DeveRetornarOk_ComResultado()
+    public async Task RegistrarEntrada_DeveRetornarCreated_ComResultado()
     {
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
@@ -193,10 +150,12 @@ public class ItemEstoqueControllerTests
 
         var result = await _controller.RegistrarEntrada(command);
 
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeOfType<RegistrarEntradaEstoqueResult>();
-        var payload = okResult.Value as RegistrarEntradaEstoqueResult;
+        result.Should().BeOfType<CreatedAtActionResult>();
+        var createdResult = result as CreatedAtActionResult;
+        createdResult!.ActionName.Should().Be("GetById");
+        createdResult.RouteValues!["id"].Should().NotBeNull();
+        createdResult.Value.Should().BeOfType<RegistrarEntradaEstoqueResult>();
+        var payload = createdResult.Value as RegistrarEntradaEstoqueResult;
         payload!.ItemEstoqueId.Should().NotBe(Guid.Empty);
         payload.MovimentacaoId.Should().NotBe(Guid.Empty);
         payload.ChavePesquisa.Should().Contain("CAP3426");
@@ -306,5 +265,13 @@ public class ItemEstoqueControllerTests
         payload!.ItemEstoqueId.Should().Be(itemId);
         payload.QuantidadeAnterior.Should().Be(10);
         payload.QuantidadeAtual.Should().Be(30);
+    }
+
+    private static T ObterPropriedade<T>(object? source, string nome)
+    {
+        source.Should().NotBeNull();
+        var propriedade = source!.GetType().GetProperty(nome);
+        propriedade.Should().NotBeNull();
+        return (T)propriedade!.GetValue(source)!;
     }
 }

@@ -450,6 +450,52 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
+    [Fact]
+    public async Task Atualizacoes_concorrentes_no_mesmo_item_devem_gerar_conflito()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        await using (var setupContext = fixture.CreateDbContext())
+        {
+            await SeedProdutoAsync(setupContext, empresaId, categoriaId, produtoId);
+            setupContext.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = itemId,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(250m),
+                Status = StatusItemEstoque.Ativo,
+                EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using var context1 = fixture.CreateDbContext();
+        await using var context2 = fixture.CreateDbContext();
+
+        var itemContext1 = await context1.ItensEstoque.SingleAsync(i => i.Id == itemId);
+        var itemContext2 = await context2.ItensEstoque.SingleAsync(i => i.Id == itemId);
+
+        itemContext1.RegistrarSaida(Quantidade.From(3), new DateTime(2026, 4, 5, 10, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+        await context1.SaveChangesAsync();
+
+        itemContext2.RegistrarSaida(Quantidade.From(2), new DateTime(2026, 4, 5, 10, 1, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        var act = () => context2.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
+    }
+
     private static async Task SeedProdutoAsync(DbContext context, Guid empresaId, Guid categoriaId, Guid produtoId)
     {
         context.Set<Empresa>().Add(new Empresa
