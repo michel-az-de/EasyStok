@@ -11,8 +11,8 @@ public sealed class LojaRepository(MongoEasyStockContext context, MongoUnitOfWor
 {
     private IMongoCollection<Loja> Collection => Context.GetCollection<Loja>(MongoCollectionNames.Lojas);
 
-    public Task<Loja?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Loja?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<Loja>> GetByEmpresaAsync(Guid empresaId) =>
         await Collection.Find(x => x.EmpresaId == empresaId).SortBy(x => x.Nome).ToListAsync();
@@ -38,8 +38,8 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
 {
     private IMongoCollection<Fornecedor> Collection => Context.GetCollection<Fornecedor>(MongoCollectionNames.Fornecedores);
 
-    public Task<Fornecedor?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Fornecedor?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
     {
@@ -201,8 +201,8 @@ public sealed class PlanoRepository(MongoEasyStockContext context, MongoUnitOfWo
 {
     private IMongoCollection<Plano> Collection => Context.GetCollection<Plano>(MongoCollectionNames.Planos);
 
-    public Task<Plano?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Plano?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<Plano>> GetAtivosAsync() =>
         await Collection.Find(x => x.Ativo).ToListAsync();

@@ -58,8 +58,8 @@ public sealed class EmpresaRepository(MongoEasyStockContext context, MongoUnitOf
 {
     private IMongoCollection<Empresa> Collection => Context.GetCollection<Empresa>(MongoCollectionNames.Empresas);
 
-    public Task<Empresa?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Empresa?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<Empresa>> GetAllAsync() =>
         await Collection.Find(FilterDefinition<Empresa>.Empty).ToListAsync();
@@ -76,22 +76,24 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
 {
     private IMongoCollection<Produto> Collection => Context.GetCollection<Produto>(MongoCollectionNames.Produtos);
 
-    public Task<Produto?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Produto?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public Task<Produto?> GetByIdAsync(Guid empresaId, Guid id) =>
-        Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+    public async Task<Produto?> GetByIdAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
 
+        termo = termo.Trim();
         var pattern = BuildContainsPattern(termo);
         var regex = new MongoDB.Bson.BsonRegularExpression(pattern, "i");
         var filter = Builders<Produto>.Filter.And(
             Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId),
             Builders<Produto>.Filter.Or(
+                Builders<Produto>.Filter.Text(termo),
                 Builders<Produto>.Filter.Regex(x => x.Nome, regex),
                 Builders<Produto>.Filter.Regex(x => x.Marca, regex),
                 Builders<Produto>.Filter.Regex(x => x.DescricaoBase, regex),
@@ -132,19 +134,21 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
 {
     private IMongoCollection<ProdutoVariacao> Collection => Context.GetCollection<ProdutoVariacao>(MongoCollectionNames.ProdutosVariacao);
 
-    public Task<ProdutoVariacao?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<ProdutoVariacao?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
 
+        termo = termo.Trim();
         var pattern = BuildContainsPattern(termo);
         var regex = new MongoDB.Bson.BsonRegularExpression(pattern, "i");
         var filter = Builders<ProdutoVariacao>.Filter.And(
             Builders<ProdutoVariacao>.Filter.Eq(x => x.EmpresaId, empresaId),
             Builders<ProdutoVariacao>.Filter.Or(
+                Builders<ProdutoVariacao>.Filter.Text(termo),
                 Builders<ProdutoVariacao>.Filter.Regex(x => x.Nome, regex),
                 Builders<ProdutoVariacao>.Filter.Regex(x => x.Cor, regex),
                 Builders<ProdutoVariacao>.Filter.Regex(x => x.Tamanho, regex),

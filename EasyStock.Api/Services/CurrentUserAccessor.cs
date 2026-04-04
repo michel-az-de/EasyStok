@@ -36,6 +36,31 @@ namespace EasyStock.Api.Services
             }
         }
 
-        public bool TemPermissao(Permissao permissao) => false;
+        public bool TemPermissao(Permissao permissao)
+        {
+            var user = httpContextAccessor.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true)
+                return false;
+
+            var permissionClaims = user.FindAll("permissao")
+                .Select(x => x.Value)
+                .Concat(user.FindAll("permissoes")
+                    .SelectMany(x => x.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+
+            foreach (var claim in permissionClaims)
+            {
+                if (Enum.TryParse<Permissao>(claim, true, out var parsed) && parsed == permissao)
+                    return true;
+            }
+
+            return Nivel switch
+            {
+                NivelAcesso.SuperAdmin => true,
+                NivelAcesso.Admin => true,
+                NivelAcesso.Gerente => permissao is not Permissao.GerenciarUsuarios,
+                NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos,
+                _ => permissao is Permissao.VisualizarRelatorios
+            };
+        }
     }
 }

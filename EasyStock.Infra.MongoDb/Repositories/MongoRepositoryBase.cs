@@ -18,11 +18,20 @@ public abstract class MongoRepositoryBase
     protected static string BuildContainsPattern(string value) => Regex.Escape(value.Trim());
 
     protected void EnqueueInsert<TDocument>(IMongoCollection<TDocument> collection, TDocument document) =>
-        UnitOfWork.Enqueue(ct => collection.InsertOneAsync(document, cancellationToken: ct));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? collection.InsertOneAsync(document, cancellationToken: ct)
+                : collection.InsertOneAsync(session, document, cancellationToken: ct));
 
     protected void EnqueueReplace<TDocument>(IMongoCollection<TDocument> collection, Guid id, TDocument document) =>
-        UnitOfWork.Enqueue(ct => collection.ReplaceOneAsync(Builders<TDocument>.Filter.Eq("Id", id), document, cancellationToken: ct));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? collection.ReplaceOneAsync(Builders<TDocument>.Filter.Eq("Id", id), document, cancellationToken: ct)
+                : collection.ReplaceOneAsync(session, Builders<TDocument>.Filter.Eq("Id", id), document, cancellationToken: ct));
 
     protected void EnqueueDelete<TDocument>(IMongoCollection<TDocument> collection, Guid id) =>
-        UnitOfWork.Enqueue(ct => collection.DeleteOneAsync(Builders<TDocument>.Filter.Eq("Id", id), ct));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? collection.DeleteOneAsync(Builders<TDocument>.Filter.Eq("Id", id), ct)
+                : collection.DeleteOneAsync(session, Builders<TDocument>.Filter.Eq("Id", id), null, ct));
 }

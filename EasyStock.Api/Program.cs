@@ -1,16 +1,9 @@
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Services;
+using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Validators;
 using EasyStock.Application.Ports.Output;
-using EasyStock.Application.UseCases.AutenticarUsuario;
-using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Application.UseCases.GerenciarCategoria;
-using EasyStock.Application.UseCases.GerenciarFornecedor;
-using EasyStock.Application.UseCases.GerenciarLoja;
-using EasyStock.Application.UseCases.GerenciarUsuario;
-using EasyStock.Application.UseCases.ListarPlanos;
-using EasyStock.Application.UseCases.RegistrarEmpresa;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -102,20 +95,8 @@ switch (databaseProvider.Trim().ToLowerInvariant())
         throw new InvalidOperationException($"Database:Provider '{databaseProvider}' nao suportado.");
 }
 
-// Use Cases
-builder.Services.AddScoped<AutenticarUsuarioUseCase>();
-builder.Services.AddScoped<RegistrarEmpresaUseCase>();
-builder.Services.AddScoped<GerenciarUsuarioUseCase>();
-builder.Services.AddScoped<GerenciarLojaUseCase>();
-builder.Services.AddScoped<GerenciarFornecedorUseCase>();
-builder.Services.AddScoped<CadastrarProdutoUseCase>();
-builder.Services.AddScoped<EasyStock.Application.UseCases.RegistrarEntradaEstoque.RegistrarEntradaEstoqueUseCase>();
-builder.Services.AddScoped<EasyStock.Application.UseCases.RegistrarSaidaEstoque.RegistrarSaidaEstoqueUseCase>();
-builder.Services.AddScoped<EasyStock.Application.UseCases.ReporEstoque.ReporEstoqueUseCase>();
-builder.Services.AddScoped<EasyStock.Application.UseCases.BuscarEstoqueInteligente.BuscarEstoqueInteligenteUseCase>();
-builder.Services.AddScoped<EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio.GerarSugestaoDescricaoAnuncioUseCase>();
-builder.Services.AddScoped<GerenciarCategoriaUseCase>();
-builder.Services.AddScoped<ListarPlanosUseCase>();
+// Application
+builder.Services.AddEasyStockApplication();
 
 // Configuration
 builder.Services.Configure<EasyStockConfiguracoes>(

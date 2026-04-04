@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.MongoDb.Data;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace EasyStock.Infra.MongoDb.Repositories;
@@ -13,21 +14,23 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
     private IMongoCollection<Produto> Produtos => Context.GetCollection<Produto>(MongoCollectionNames.Produtos);
     private IMongoCollection<ProdutoVariacao> Variacoes => Context.GetCollection<ProdutoVariacao>(MongoCollectionNames.ProdutosVariacao);
 
-    public Task<ItemEstoque?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<ItemEstoque?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public Task<ItemEstoque?> GetByIdAsync(Guid empresaId, Guid id) =>
-        Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+    public async Task<ItemEstoque?> GetByIdAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
     public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
 
-        var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(termo), "i");
+        termo = termo.Trim();
+        var regex = new BsonRegularExpression(BuildContainsPattern(termo), "i");
         var filter = Builders<ItemEstoque>.Filter.And(
             Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId),
             Builders<ItemEstoque>.Filter.Or(
+                Builders<ItemEstoque>.Filter.Text(termo),
                 Builders<ItemEstoque>.Filter.Regex(x => x.CodigoInterno, regex),
                 Builders<ItemEstoque>.Filter.Regex(x => x.CodigoMarketplace, regex),
                 Builders<ItemEstoque>.Filter.Regex(x => x.ChavePesquisa, regex),
@@ -79,13 +82,24 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
 
     public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
     {
-        var items = await Collection.Find(x => x.EmpresaId == empresaId).ToListAsync();
-        if (items.Count == 0) return (0, 0m, 0m);
+        var resumo = await Collection.Aggregate()
+            .Match(x => x.EmpresaId == empresaId)
+            .Group(new BsonDocument
+            {
+                { "_id", BsonNull.Value },
+                { "QuantidadeEmEstoque", new BsonDocument("$sum", "$QuantidadeAtual") },
+                { "ValorTotalEstoque", new BsonDocument("$sum", new BsonDocument("$multiply", new BsonArray { "$QuantidadeAtual", "$CustoUnitario" })) },
+                { "TicketMedioSugerido", new BsonDocument("$avg", new BsonDocument("$ifNull", new BsonArray { "$PrecoVendaSugerido", new BsonDocument("$multiply", new BsonArray { "$CustoUnitario", 1.3m }) })) }
+            })
+            .FirstOrDefaultAsync();
+
+        if (resumo is null)
+            return (0, 0m, 0m);
 
         return (
-            items.Sum(x => x.QuantidadeAtual.Value),
-            items.Sum(x => x.CustoUnitario.Valor * x.QuantidadeAtual.Value),
-            items.Average(x => x.PrecoVendaSugerido?.Valor ?? x.CustoUnitario.Valor * 1.3m));
+            resumo["QuantidadeEmEstoque"].ToInt32(),
+            resumo["ValorTotalEstoque"].ToDecimal(),
+            resumo["TicketMedioSugerido"].ToDecimal());
     }
 
     public async Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id)
@@ -93,9 +107,9 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         var item = await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
         if (item is null) return null;
 
-        item.Produto = await Produtos.Find(x => x.Id == item.ProdutoId).FirstOrDefaultAsync();
+        item.Produto = await Produtos.Find(x => x.EmpresaId == empresaId && x.Id == item.ProdutoId).FirstOrDefaultAsync();
         if (item.ProdutoVariacaoId.HasValue)
-            item.ProdutoVariacao = await Variacoes.Find(x => x.Id == item.ProdutoVariacaoId.Value).FirstOrDefaultAsync();
+            item.ProdutoVariacao = await Variacoes.Find(x => x.EmpresaId == empresaId && x.Id == item.ProdutoVariacaoId.Value).FirstOrDefaultAsync();
 
         return item;
     }
@@ -144,15 +158,23 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
 
     public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, int page = 1, int pageSize = 20)
     {
-        var items = await Collection.Find(x => x.EmpresaId == empresaId).ToListAsync();
-        var filtered = items.Where(x =>
-                (!de.HasValue || x.DataMovimentacao >= de.Value) &&
-                (!ate.HasValue || x.DataMovimentacao <= ate.Value) &&
-                (!tipo.HasValue || x.Tipo == tipo.Value))
-            .OrderByDescending(x => x.DataMovimentacao)
-            .ToList();
+        var filter = Builders<MovimentacaoEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
 
-        return (filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList(), filtered.Count);
+        if (de.HasValue)
+            filter &= Builders<MovimentacaoEstoque>.Filter.Gte(x => x.DataMovimentacao, de.Value);
+        if (ate.HasValue)
+            filter &= Builders<MovimentacaoEstoque>.Filter.Lte(x => x.DataMovimentacao, ate.Value);
+        if (tipo.HasValue)
+            filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Tipo, tipo.Value);
+
+        var total = (int)await Collection.CountDocumentsAsync(filter);
+        var items = await Collection.Find(filter)
+            .SortByDescending(x => x.DataMovimentacao)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        return (items, total);
     }
 
     public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId) =>
@@ -162,15 +184,22 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
 
     public async Task<decimal> GetTaxaSaidaDiariaAsync(Guid empresaId, Guid? produtoId, DateTime de, DateTime ate)
     {
-        var items = await Collection.Find(x =>
+        var totalSaidas = await Collection.Aggregate()
+            .Match(x =>
             x.EmpresaId == empresaId &&
             x.Tipo == TipoMovimentacaoEstoque.Saida &&
             x.DataMovimentacao >= de &&
             x.DataMovimentacao <= ate &&
-            (!produtoId.HasValue || x.ProdutoId == produtoId.Value)).ToListAsync();
+            (!produtoId.HasValue || x.ProdutoId == produtoId.Value))
+            .Group(new BsonDocument
+            {
+                { "_id", BsonNull.Value },
+                { "TotalSaidas", new BsonDocument("$sum", "$Quantidade") }
+            })
+            .FirstOrDefaultAsync();
 
         var dias = Math.Max(1, (ate - de).Days);
-        return items.Sum(x => x.Quantidade.Value) / (decimal)dias;
+        return totalSaidas is null ? 0m : totalSaidas["TotalSaidas"].ToDecimal() / dias;
     }
 
     public async Task<IReadOnlyDictionary<Guid, decimal>> GetTaxaSaidaDiariaPorProdutoAsync(Guid empresaId, IEnumerable<Guid> produtoIds, DateTime de, DateTime ate)
@@ -178,32 +207,55 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
         var ids = produtoIds.Distinct().ToHashSet();
         if (ids.Count == 0) return new Dictionary<Guid, decimal>();
 
-        var items = await Collection.Find(x =>
-            x.EmpresaId == empresaId &&
-            ids.Contains(x.ProdutoId) &&
-            x.Tipo == TipoMovimentacaoEstoque.Saida &&
-            x.DataMovimentacao >= de &&
-            x.DataMovimentacao <= ate).ToListAsync();
-
         var dias = Math.Max(1, (ate - de).Days);
-        return items.GroupBy(x => x.ProdutoId)
-            .ToDictionary(x => x.Key, x => x.Sum(y => y.Quantidade.Value) / (decimal)dias);
+        var items = await Collection.Aggregate()
+            .Match(x =>
+                x.EmpresaId == empresaId &&
+                ids.Contains(x.ProdutoId) &&
+                x.Tipo == TipoMovimentacaoEstoque.Saida &&
+                x.DataMovimentacao >= de &&
+                x.DataMovimentacao <= ate)
+            .Group(new BsonDocument
+            {
+                { "_id", "$ProdutoId" },
+                { "TotalSaidas", new BsonDocument("$sum", "$Quantidade") }
+            })
+            .ToListAsync();
+
+        return items.ToDictionary(
+            x => x["_id"].AsGuid,
+            x => x["TotalSaidas"].ToDecimal() / dias);
     }
 
     public async Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(Guid empresaId, Guid produtoId, int meses = 12)
     {
         var de = DateTime.UtcNow.AddMonths(-meses);
-        var items = await Collection.Find(x =>
-            x.EmpresaId == empresaId &&
-            x.ProdutoId == produtoId &&
-            x.Tipo == TipoMovimentacaoEstoque.Saida &&
-            x.DataMovimentacao >= de).ToListAsync();
+        var items = await Collection.Aggregate()
+            .Match(x =>
+                x.EmpresaId == empresaId &&
+                x.ProdutoId == produtoId &&
+                x.Tipo == TipoMovimentacaoEstoque.Saida &&
+                x.DataMovimentacao >= de)
+            .Group(new BsonDocument
+            {
+                {
+                    "_id", new BsonDocument
+                    {
+                        { "Ano", new BsonDocument("$year", "$DataMovimentacao") },
+                        { "Mes", new BsonDocument("$month", "$DataMovimentacao") }
+                    }
+                },
+                { "TotalSaidas", new BsonDocument("$sum", "$Quantidade") },
+                { "ValorTotal", new BsonDocument("$sum", new BsonDocument("$ifNull", new BsonArray { "$ValorTotal", 0m })) }
+            })
+            .Sort(new BsonDocument("_id.Ano", 1).Add("_id.Mes", 1))
+            .ToListAsync();
 
-        return items.GroupBy(x => new { x.DataMovimentacao.Year, x.DataMovimentacao.Month })
-            .Select(g => (g.Key.Year, g.Key.Month, g.Sum(x => x.Quantidade.Value), g.Sum(x => x.ValorTotal?.Valor ?? 0m)))
-            .OrderBy(x => x.Year)
-            .ThenBy(x => x.Month)
-            .Select(x => (x.Year, x.Month, x.Item3, x.Item4))
+        return items.Select(x => (
+            x["_id"]["Ano"].ToInt32(),
+            x["_id"]["Mes"].ToInt32(),
+            x["TotalSaidas"].ToInt32(),
+            x["ValorTotal"].ToDecimal()))
             .ToList();
     }
 }
@@ -213,11 +265,11 @@ public sealed class VendaRepository(MongoEasyStockContext context, MongoUnitOfWo
 {
     private IMongoCollection<Venda> Collection => Context.GetCollection<Venda>(MongoCollectionNames.Vendas);
 
-    public Task<Venda?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Venda?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public Task<Venda?> GetByIdAsync(Guid empresaId, Guid id) =>
-        Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+    public async Task<Venda?> GetByIdAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
     public async Task<(IEnumerable<Venda> Vendas, int TotalCount)> GetVendasPorEmpresaAsync(Guid empresaId, int page = 1, int pageSize = 20)
     {
@@ -257,17 +309,23 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
 {
     private IMongoCollection<Notificacao> Collection => Context.GetCollection<Notificacao>(MongoCollectionNames.Notificacoes);
 
-    public Task<Notificacao?> GetByIdAsync(Guid id) =>
-        Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async Task<Notificacao?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
     public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, int page = 1, int pageSize = 20)
     {
-        var items = await Collection.Find(x => x.EmpresaId == empresaId).ToListAsync();
-        var filtered = items.Where(x => !lida.HasValue || x.Lida == lida.Value)
-            .OrderByDescending(x => x.CriadaEm)
-            .ToList();
+        var filter = Builders<Notificacao>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (lida.HasValue)
+            filter &= Builders<Notificacao>.Filter.Eq(x => x.Lida, lida.Value);
 
-        return (filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList(), filtered.Count);
+        var total = (int)await Collection.CountDocumentsAsync(filter);
+        var items = await Collection.Find(filter)
+            .SortByDescending(x => x.CriadaEm)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        return (items, total);
     }
 
     public Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>
@@ -285,10 +343,24 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
         return Task.CompletedTask;
     }
 
-    public Task MarcarTodasComoLidasAsync(Guid empresaId) =>
-        Collection.UpdateManyAsync(
-            Builders<Notificacao>.Filter.Where(x => x.EmpresaId == empresaId && !x.Lida),
-            Builders<Notificacao>.Update
-                .Set(x => x.Lida, true)
-                .Set(x => x.LidaEm, DateTime.UtcNow));
+    public Task MarcarTodasComoLidasAsync(Guid empresaId)
+    {
+        var agora = DateTime.UtcNow;
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? Collection.UpdateManyAsync(
+                    Builders<Notificacao>.Filter.Where(x => x.EmpresaId == empresaId && !x.Lida),
+                    Builders<Notificacao>.Update
+                        .Set(x => x.Lida, true)
+                        .Set(x => x.LidaEm, agora),
+                    cancellationToken: ct)
+                : Collection.UpdateManyAsync(
+                    session,
+                    Builders<Notificacao>.Filter.Where(x => x.EmpresaId == empresaId && !x.Lida),
+                    Builders<Notificacao>.Update
+                        .Set(x => x.Lida, true)
+                        .Set(x => x.LidaEm, agora),
+                    cancellationToken: ct));
+        return Task.CompletedTask;
+    }
 }

@@ -13,19 +13,38 @@ public sealed class MongoMigrationRunner(MongoEasyStockContext context)
             cancellationToken);
 
         await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.Produto>(MongoCollectionNames.Produtos),
-            [new CreateIndexModel<EasyStock.Domain.Entities.Produto>(
-                Builders<EasyStock.Domain.Entities.Produto>.IndexKeys
-                    .Ascending(x => x.EmpresaId)
-                    .Ascending(x => x.Nome),
-                new CreateIndexOptions { Name = "ix_produtos_empresa_nome" })],
+            [
+                new CreateIndexModel<EasyStock.Domain.Entities.Produto>(
+                    Builders<EasyStock.Domain.Entities.Produto>.IndexKeys
+                        .Ascending(x => x.EmpresaId)
+                        .Ascending(x => x.Nome),
+                    new CreateIndexOptions { Name = "ix_produtos_empresa_nome" }),
+                new CreateIndexModel<EasyStock.Domain.Entities.Produto>(
+                    Builders<EasyStock.Domain.Entities.Produto>.IndexKeys
+                        .Text(x => x.Nome)
+                        .Text(x => x.Marca)
+                        .Text(x => x.DescricaoBase)
+                        .Text(x => x.CodigoBarras),
+                    new CreateIndexOptions { Name = "ix_produtos_busca_texto" })
+            ],
             cancellationToken);
 
         await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.ProdutoVariacao>(MongoCollectionNames.ProdutosVariacao),
-            [new CreateIndexModel<EasyStock.Domain.Entities.ProdutoVariacao>(
-                Builders<EasyStock.Domain.Entities.ProdutoVariacao>.IndexKeys
-                    .Ascending(x => x.EmpresaId)
-                    .Ascending(x => x.ProdutoId),
-                new CreateIndexOptions { Name = "ix_variacoes_empresa_produto" })],
+            [
+                new CreateIndexModel<EasyStock.Domain.Entities.ProdutoVariacao>(
+                    Builders<EasyStock.Domain.Entities.ProdutoVariacao>.IndexKeys
+                        .Ascending(x => x.EmpresaId)
+                        .Ascending(x => x.ProdutoId),
+                    new CreateIndexOptions { Name = "ix_variacoes_empresa_produto" }),
+                new CreateIndexModel<EasyStock.Domain.Entities.ProdutoVariacao>(
+                    Builders<EasyStock.Domain.Entities.ProdutoVariacao>.IndexKeys
+                        .Text(x => x.Nome)
+                        .Text(x => x.Cor)
+                        .Text(x => x.Tamanho)
+                        .Text(x => x.DescricaoComercial)
+                        .Text(x => x.CodigoBarras),
+                    new CreateIndexOptions { Name = "ix_variacoes_busca_texto" })
+            ],
             cancellationToken);
 
         await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.ItemEstoque>(MongoCollectionNames.ItensEstoque),
@@ -38,7 +57,17 @@ public sealed class MongoMigrationRunner(MongoEasyStockContext context)
                     new CreateIndexOptions { Name = "ix_itens_codigo_interno", Sparse = true }),
                 new CreateIndexModel<EasyStock.Domain.Entities.ItemEstoque>(
                     Builders<EasyStock.Domain.Entities.ItemEstoque>.IndexKeys.Ascending(x => x.CodigoMarketplace),
-                    new CreateIndexOptions { Name = "ix_itens_codigo_marketplace", Sparse = true })
+                    new CreateIndexOptions { Name = "ix_itens_codigo_marketplace", Sparse = true }),
+                new CreateIndexModel<EasyStock.Domain.Entities.ItemEstoque>(
+                    Builders<EasyStock.Domain.Entities.ItemEstoque>.IndexKeys
+                        .Text(x => x.CodigoInterno)
+                        .Text(x => x.CodigoMarketplace)
+                        .Text(x => x.ChavePesquisa)
+                        .Text(x => x.VariacaoDescricao)
+                        .Text(x => x.Cor)
+                        .Text(x => x.Tamanho)
+                        .Text(x => x.DescricaoAnuncio),
+                    new CreateIndexOptions { Name = "ix_itens_busca_texto" })
             ],
             cancellationToken);
 
