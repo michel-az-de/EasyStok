@@ -1,0 +1,69 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using NSubstitute;
+
+namespace EasyStock.Application.Tests.UseCases;
+
+public class CadastrarProdutoUseCaseTests
+{
+    [Fact]
+    public async Task Deve_cadastrar_produto_com_variacoes_caracteristicas_e_embalagens()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var useCase = new CadastrarProdutoUseCase(
+            produtoRepository,
+            caracteristicaRepository,
+            embalagemRepository,
+            variacaoRepository,
+            unitOfWork);
+
+        var command = new CadastrarProdutoCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Galaxy Buds FE",
+            "Fone bluetooth",
+            "Samsung",
+            TipoProduto.Fisico,
+            "BUDS-FE",
+            "7890000000001",
+            false,
+            new DimensoesInput(0.3m, 10m, 5m, 8m),
+            250m,
+            399.90m,
+            59.96m,
+            "{\"cor\":\"grafite\"}",
+            "[\"foto1.jpg\"]",
+            [new ProdutoCaracteristicaInput("Cor", "Cor principal", null, "Grafite", 1)],
+            [new ProdutoEmbalagemInput("Caixa", "Caixa padrao", new DimensoesInput(0.4m, 12m, 6m, 10m), true)],
+            [new ProdutoVariacaoInput("Grafite", "Grafite", "Unico", "Buds FE Grafite", "BUDS-FE-GRAF", "7890000000002", null, null)]);
+
+        var result = await useCase.ExecuteAsync(command);
+
+        await produtoRepository.Received(1).AddAsync(Arg.Is<Produto>(p =>
+            p.Id == result.ProdutoId &&
+            p.Nome == "Galaxy Buds FE" &&
+            p.Status == StatusProduto.Ativo));
+
+        await caracteristicaRepository.Received(1).AddAsync(Arg.Is<ProdutoCaracteristica>(c =>
+            c.ProdutoId == result.ProdutoId &&
+            c.Nome == "Cor"));
+
+        await embalagemRepository.Received(1).AddAsync(Arg.Is<ProdutoEmbalagem>(e =>
+            e.ProdutoId == result.ProdutoId &&
+            e.Nome == "Caixa"));
+
+        await variacaoRepository.Received(1).AddAsync(Arg.Is<ProdutoVariacao>(v =>
+            v.ProdutoId == result.ProdutoId &&
+            v.Nome == "Grafite"));
+
+        await unitOfWork.Received(1).CommitAsync();
+    }
+}

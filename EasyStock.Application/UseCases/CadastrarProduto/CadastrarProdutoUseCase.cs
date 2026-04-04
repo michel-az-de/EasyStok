@@ -1,0 +1,150 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
+
+namespace EasyStock.Application.UseCases.CadastrarProduto
+{
+    public sealed record CadastrarProdutoCommand(
+        Guid EmpresaId,
+        Guid CategoriaId,
+        string Nome,
+        string? DescricaoBase,
+        string? Marca,
+        TipoProduto Tipo,
+        string? SkuBase,
+        string? CodigoBarras,
+        bool ControlaValidade,
+        DimensoesInput? Dimensoes,
+        decimal? CustoReferencia,
+        decimal? PrecoReferencia,
+        decimal? MargemEstimada,
+        string? AtributosJson,
+        string? FotosJson,
+        IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
+        IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
+        IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes);
+
+    public sealed record CadastrarProdutoResult(
+        Guid ProdutoId,
+        IReadOnlyCollection<Guid> CaracteristicasIds,
+        IReadOnlyCollection<Guid> EmbalagensIds,
+        IReadOnlyCollection<Guid> VariacoesIds);
+
+    public class CadastrarProdutoUseCase(
+        IProdutoRepository produtoRepository,
+        IProdutoCaracteristicaRepository caracteristicaRepository,
+        IProdutoEmbalagemRepository embalagemRepository,
+        IProdutoVariacaoRepository variacaoRepository,
+        IUnitOfWork unitOfWork)
+    {
+        public async Task<CadastrarProdutoResult> ExecuteAsync(CadastrarProdutoCommand command)
+        {
+            Validar(command);
+
+            var agora = DateTime.UtcNow;
+            var produto = new Produto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = command.EmpresaId,
+                CategoriaId = command.CategoriaId,
+                Nome = command.Nome.Trim(),
+                DescricaoBase = command.DescricaoBase?.Trim(),
+                Marca = command.Marca?.Trim(),
+                Tipo = command.Tipo,
+                SkuBase = string.IsNullOrWhiteSpace(command.SkuBase) ? null : CodigoSku.From(command.SkuBase),
+                CodigoBarras = command.CodigoBarras?.Trim(),
+                ControlaValidade = command.ControlaValidade,
+                Dimensoes = command.Dimensoes.ToValueObjectOrNull(),
+                CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null,
+                PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null,
+                MargemEstimada = command.MargemEstimada,
+                AtributosJson = command.AtributosJson,
+                FotosJson = command.FotosJson,
+                Status = StatusProduto.Ativo,
+                CriadoEm = agora,
+                AlteradoEm = agora
+            };
+
+            await produtoRepository.AddAsync(produto);
+
+            var caracteristicasIds = new List<Guid>();
+            foreach (var caracteristica in command.Caracteristicas ?? [])
+            {
+                var entity = new ProdutoCaracteristica
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = produto.Id,
+                    Nome = caracteristica.Nome.Trim(),
+                    Descricao = caracteristica.Descricao?.Trim(),
+                    QuantidadeReferencia = caracteristica.QuantidadeReferencia,
+                    VariacaoPadrao = caracteristica.VariacaoPadrao?.Trim(),
+                    OrdemExibicao = caracteristica.OrdemExibicao,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                };
+
+                await caracteristicaRepository.AddAsync(entity);
+                caracteristicasIds.Add(entity.Id);
+            }
+
+            var embalagensIds = new List<Guid>();
+            foreach (var embalagem in command.Embalagens ?? [])
+            {
+                var entity = new ProdutoEmbalagem
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = produto.Id,
+                    Nome = embalagem.Nome.Trim(),
+                    Descricao = embalagem.Descricao?.Trim(),
+                    Dimensoes = embalagem.Dimensoes.ToValueObjectOrNull(),
+                    Padrao = embalagem.Padrao,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                };
+
+                await embalagemRepository.AddAsync(entity);
+                embalagensIds.Add(entity.Id);
+            }
+
+            var variacoesIds = new List<Guid>();
+            foreach (var variacao in command.Variacoes ?? [])
+            {
+                var entity = new ProdutoVariacao
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = produto.Id,
+                    Nome = variacao.Nome.Trim(),
+                    Cor = variacao.Cor?.Trim(),
+                    Tamanho = variacao.Tamanho?.Trim(),
+                    DescricaoComercial = variacao.DescricaoComercial?.Trim(),
+                    Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
+                    CodigoBarras = variacao.CodigoBarras?.Trim(),
+                    AtributosJson = variacao.AtributosJson,
+                    DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
+                    Ativa = variacao.Ativa,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                };
+
+                await variacaoRepository.AddAsync(entity);
+                variacoesIds.Add(entity.Id);
+            }
+
+            await unitOfWork.CommitAsync();
+
+            return new CadastrarProdutoResult(produto.Id, caracteristicasIds, embalagensIds, variacoesIds);
+        }
+
+        private static void Validar(CadastrarProdutoCommand command)
+        {
+            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
+            if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId e obrigatorio.");
+            if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto e obrigatorio.");
+        }
+    }
+}

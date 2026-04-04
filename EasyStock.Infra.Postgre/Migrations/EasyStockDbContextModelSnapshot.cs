@@ -22,7 +22,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Categoria", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -57,7 +57,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("categorias", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Empresa", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Empresa", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -86,7 +86,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("empresas", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.ItemEstoque", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ItemEstoque", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -95,8 +95,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("AlturaReal")
-                        .HasColumnType("decimal(10,2)");
+                    b.Property<string>("ChavePesquisa")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("CodigoInterno")
                         .HasMaxLength(120)
@@ -110,9 +111,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<decimal?>("ComprimentoReal")
-                        .HasColumnType("decimal(10,2)");
-
                     b.Property<string>("Cor")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
@@ -123,6 +121,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<decimal>("CustoUnitario")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("DescricaoAnuncio")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
@@ -132,19 +133,16 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("FornecedorNome")
                         .HasColumnType("text");
 
-                    b.Property<decimal?>("LarguraReal")
-                        .HasColumnType("decimal(10,2)");
-
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("PesoReal")
-                        .HasColumnType("decimal(10,3)");
 
                     b.Property<decimal?>("PrecoVendaSugerido")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProdutoVariacaoId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("QuantidadeAtual")
@@ -178,10 +176,12 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("ProdutoId");
 
+                    b.HasIndex("ProdutoVariacaoId");
+
                     b.ToTable("itens_estoque", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.ItemVenda", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ItemVenda", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -205,8 +205,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("ProdutoId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProdutoVariacaoId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Quantidade")
                         .HasColumnType("integer");
+
+                    b.Property<string>("VariacaoSnapshot")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
 
                     b.Property<Guid>("VendaId")
                         .HasColumnType("uuid");
@@ -217,12 +224,14 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("ProdutoId");
 
+                    b.HasIndex("ProdutoVariacaoId");
+
                     b.HasIndex("VendaId");
 
                     b.ToTable("itens_venda", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.MovimentacaoEstoque", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.MovimentacaoEstoque", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -254,6 +263,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("ProdutoId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProdutoVariacaoId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Quantidade")
                         .HasColumnType("integer");
 
@@ -279,12 +291,14 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("ProdutoId");
 
+                    b.HasIndex("ProdutoVariacaoId");
+
                     b.HasIndex("VendaId");
 
                     b.ToTable("movimentacoes_estoque", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Produto", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Produto", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -292,12 +306,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("Altura")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<bool>("Ativo")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("AtributosJson")
                         .HasColumnType("jsonb");
@@ -308,9 +316,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("CodigoBarras")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<decimal?>("Comprimento")
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<bool>("ControlaValidade")
                         .HasColumnType("boolean");
@@ -324,17 +329,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("DescricaoBase")
                         .HasColumnType("text");
 
-                    b.Property<string>("EmbalagemJson")
-                        .HasColumnType("jsonb");
-
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("FotosJson")
                         .HasColumnType("jsonb");
-
-                    b.Property<decimal?>("Largura")
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<string>("Marca")
                         .HasMaxLength(120)
@@ -348,15 +347,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)");
 
-                    b.Property<decimal?>("Peso")
-                        .HasColumnType("decimal(10,3)");
-
                     b.Property<decimal?>("PrecoReferencia")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("SkuBase")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SugestaoDescricaoAnuncio")
+                        .HasColumnType("text");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
@@ -372,7 +376,147 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("produtos", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Venda", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoCaracteristica", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("OrdemExibicao")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("QuantidadeReferencia")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VariacaoPadrao")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.ToTable("produto_caracteristicas", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoEmbalagem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("Padrao")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.ToTable("produto_embalagens", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoVariacao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Ativa")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AtributosJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("CodigoBarras")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Cor")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DescricaoComercial")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Tamanho")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("ProdutoId", "Sku");
+
+                    b.ToTable("produto_variacoes", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Venda", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -417,13 +561,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("vendas", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Categoria", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.Categoria", "CategoriaPai")
+                    b.HasOne("EasyStock.Domain.Entities.Categoria", "CategoriaPai")
                         .WithMany("SubCategorias")
                         .HasForeignKey("CategoriaPaiId");
 
-                    b.HasOne("EasyStok.Domain.Entities.Empresa", "Empresa")
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
                         .WithMany("Categorias")
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -434,40 +578,81 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.ItemEstoque", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ItemEstoque", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.Empresa", "Empresa")
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
                         .WithMany("ItensEstoque")
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Produto", "Produto")
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
                         .WithMany("ItensEstoque")
                         .HasForeignKey("ProdutoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EasyStock.Domain.Entities.ProdutoVariacao", "ProdutoVariacao")
+                        .WithMany("ItensEstoque")
+                        .HasForeignKey("ProdutoVariacaoId");
+
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.Dimensoes", "DimensoesReais", b1 =>
+                        {
+                            b1.Property<Guid>("ItemEstoqueId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Altura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("altura_real");
+
+                            b1.Property<decimal>("Comprimento")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("comprimento_real");
+
+                            b1.Property<decimal>("Largura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("largura_real");
+
+                            b1.Property<decimal>("Peso")
+                                .HasColumnType("decimal(10,3)")
+                                .HasColumnName("peso_real");
+
+                            b1.HasKey("ItemEstoqueId");
+
+                            b1.ToTable("itens_estoque");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ItemEstoqueId");
+                        });
+
+                    b.Navigation("DimensoesReais");
+
                     b.Navigation("Empresa");
 
                     b.Navigation("Produto");
+
+                    b.Navigation("ProdutoVariacao");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.ItemVenda", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ItemVenda", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.ItemEstoque", "ItemEstoque")
+                    b.HasOne("EasyStock.Domain.Entities.ItemEstoque", "ItemEstoque")
                         .WithMany("ItensVenda")
                         .HasForeignKey("ItemEstoqueId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Produto", "Produto")
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
                         .WithMany("ItensVenda")
                         .HasForeignKey("ProdutoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Venda", "Venda")
+                    b.HasOne("EasyStock.Domain.Entities.ProdutoVariacao", "ProdutoVariacao")
+                        .WithMany("ItensVenda")
+                        .HasForeignKey("ProdutoVariacaoId");
+
+                    b.HasOne("EasyStock.Domain.Entities.Venda", "Venda")
                         .WithMany("ItensVenda")
                         .HasForeignKey("VendaId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -477,30 +662,36 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Navigation("Produto");
 
+                    b.Navigation("ProdutoVariacao");
+
                     b.Navigation("Venda");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.MovimentacaoEstoque", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.MovimentacaoEstoque", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.Empresa", "Empresa")
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
                         .WithMany("Movimentacoes")
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.ItemEstoque", "ItemEstoque")
+                    b.HasOne("EasyStock.Domain.Entities.ItemEstoque", "ItemEstoque")
                         .WithMany("Movimentacoes")
                         .HasForeignKey("ItemEstoqueId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Produto", "Produto")
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
                         .WithMany("Movimentacoes")
                         .HasForeignKey("ProdutoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Venda", "Venda")
+                    b.HasOne("EasyStock.Domain.Entities.ProdutoVariacao", "ProdutoVariacao")
+                        .WithMany("Movimentacoes")
+                        .HasForeignKey("ProdutoVariacaoId");
+
+                    b.HasOne("EasyStock.Domain.Entities.Venda", "Venda")
                         .WithMany("Movimentacoes")
                         .HasForeignKey("VendaId");
 
@@ -510,31 +701,183 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Navigation("Produto");
 
+                    b.Navigation("ProdutoVariacao");
+
                     b.Navigation("Venda");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Produto", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Produto", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.Categoria", "Categoria")
+                    b.HasOne("EasyStock.Domain.Entities.Categoria", "Categoria")
                         .WithMany("Produtos")
                         .HasForeignKey("CategoriaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStok.Domain.Entities.Empresa", "Empresa")
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
                         .WithMany("Produtos")
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.Dimensoes", "Dimensoes", b1 =>
+                        {
+                            b1.Property<Guid>("ProdutoId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Altura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("altura");
+
+                            b1.Property<decimal>("Comprimento")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("comprimento");
+
+                            b1.Property<decimal>("Largura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("largura");
+
+                            b1.Property<decimal>("Peso")
+                                .HasColumnType("decimal(10,3)")
+                                .HasColumnName("peso");
+
+                            b1.HasKey("ProdutoId");
+
+                            b1.ToTable("produtos");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ProdutoId");
+                        });
+
                     b.Navigation("Categoria");
+
+                    b.Navigation("Dimensoes");
 
                     b.Navigation("Empresa");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Venda", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoCaracteristica", b =>
                 {
-                    b.HasOne("EasyStok.Domain.Entities.Empresa", "Empresa")
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
+                        .WithMany("CaracteristicasProduto")
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
+                        .WithMany("Caracteristicas")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoEmbalagem", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
+                        .WithMany("EmbalagensProduto")
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
+                        .WithMany("Embalagens")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.Dimensoes", "Dimensoes", b1 =>
+                        {
+                            b1.Property<Guid>("ProdutoEmbalagemId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Altura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("altura");
+
+                            b1.Property<decimal>("Comprimento")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("comprimento");
+
+                            b1.Property<decimal>("Largura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("largura");
+
+                            b1.Property<decimal>("Peso")
+                                .HasColumnType("decimal(10,3)")
+                                .HasColumnName("peso");
+
+                            b1.HasKey("ProdutoEmbalagemId");
+
+                            b1.ToTable("produto_embalagens");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ProdutoEmbalagemId");
+                        });
+
+                    b.Navigation("Dimensoes");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoVariacao", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
+                        .WithMany("VariacoesProduto")
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Produto")
+                        .WithMany("Variacoes")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.Dimensoes", "DimensoesPadrao", b1 =>
+                        {
+                            b1.Property<Guid>("ProdutoVariacaoId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Altura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("altura");
+
+                            b1.Property<decimal>("Comprimento")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("comprimento");
+
+                            b1.Property<decimal>("Largura")
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("largura");
+
+                            b1.Property<decimal>("Peso")
+                                .HasColumnType("decimal(10,3)")
+                                .HasColumnName("peso");
+
+                            b1.HasKey("ProdutoVariacaoId");
+
+                            b1.ToTable("produto_variacoes");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ProdutoVariacaoId");
+                        });
+
+                    b.Navigation("DimensoesPadrao");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Venda", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
                         .WithMany("Vendas")
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -543,16 +886,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Categoria", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
                 {
                     b.Navigation("Produtos");
 
                     b.Navigation("SubCategorias");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Empresa", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Empresa", b =>
                 {
+                    b.Navigation("CaracteristicasProduto");
+
                     b.Navigation("Categorias");
+
+                    b.Navigation("EmbalagensProduto");
 
                     b.Navigation("ItensEstoque");
 
@@ -560,17 +907,34 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Navigation("Produtos");
 
+                    b.Navigation("VariacoesProduto");
+
                     b.Navigation("Vendas");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.ItemEstoque", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.ItemEstoque", b =>
                 {
                     b.Navigation("ItensVenda");
 
                     b.Navigation("Movimentacoes");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Produto", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Produto", b =>
+                {
+                    b.Navigation("Caracteristicas");
+
+                    b.Navigation("Embalagens");
+
+                    b.Navigation("ItensEstoque");
+
+                    b.Navigation("ItensVenda");
+
+                    b.Navigation("Movimentacoes");
+
+                    b.Navigation("Variacoes");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoVariacao", b =>
                 {
                     b.Navigation("ItensEstoque");
 
@@ -579,7 +943,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Movimentacoes");
                 });
 
-            modelBuilder.Entity("EasyStok.Domain.Entities.Venda", b =>
+            modelBuilder.Entity("EasyStock.Domain.Entities.Venda", b =>
                 {
                     b.Navigation("ItensVenda");
 

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -20,8 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EasyStok.Domain\EasyStok.Domain.csproj" />
-    <ProjectReference Include="..\EasyStok.Application\EasyStok.Application.csproj" />
+    <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
+    <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
   </ItemGroup>
 
 </Project>

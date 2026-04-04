@@ -1,4 +1,4 @@
-using EasyStok.Domain.Entities;
+using EasyStock.Domain.Entities;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.IdGenerators;
 

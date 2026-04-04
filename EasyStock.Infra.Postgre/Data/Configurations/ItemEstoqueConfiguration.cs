@@ -1,4 +1,5 @@
-using EasyStok.Domain.Entities;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,23 +12,47 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.ToTable("itens_estoque");
             builder.HasKey(i => i.Id);
             builder.Property(i => i.CodigoInterno).HasMaxLength(120);
-            builder.Property(i => i.CodigoLote).HasMaxLength(120);
+            builder.Property(i => i.CodigoLote)
+                .HasConversion(
+                    lote => lote == null ? null : lote.Value,
+                    value => string.IsNullOrWhiteSpace(value) ? null : CodigoLote.From(value))
+                .HasMaxLength(120);
             builder.Property(i => i.CodigoMarketplace).HasMaxLength(120);
+            builder.Property(i => i.ChavePesquisa).HasMaxLength(300);
             builder.Property(i => i.VariacaoDescricao).HasMaxLength(180);
             builder.Property(i => i.Cor).HasMaxLength(60);
             builder.Property(i => i.Tamanho).HasMaxLength(60);
-            builder.Property(i => i.Status).IsRequired().HasMaxLength(50);
+            builder.Property(i => i.DescricaoAnuncio).HasColumnType("text");
+            builder.Property(i => i.Status).HasConversion<string>().IsRequired().HasMaxLength(50);
 
-            builder.Property(i => i.PesoReal).HasColumnType("decimal(10,3)");
-            builder.Property(i => i.LarguraReal).HasColumnType("decimal(10,2)");
-            builder.Property(i => i.AlturaReal).HasColumnType("decimal(10,2)");
-            builder.Property(i => i.ComprimentoReal).HasColumnType("decimal(10,2)");
+            builder.OwnsOne(i => i.DimensoesReais, dimensions =>
+            {
+                dimensions.Property(d => d.Peso).HasColumnName("peso_real").HasColumnType("decimal(10,3)");
+                dimensions.Property(d => d.Largura).HasColumnName("largura_real").HasColumnType("decimal(10,2)");
+                dimensions.Property(d => d.Altura).HasColumnName("altura_real").HasColumnType("decimal(10,2)");
+                dimensions.Property(d => d.Comprimento).HasColumnName("comprimento_real").HasColumnType("decimal(10,2)");
+            });
 
-            builder.Property(i => i.CustoUnitario).HasColumnType("decimal(18,2)");
-            builder.Property(i => i.PrecoVendaSugerido).HasColumnType("decimal(18,2)");
+            builder.Property(i => i.QuantidadeInicial)
+                .HasConversion(q => q.Value, value => Quantidade.From(value));
+            builder.Property(i => i.QuantidadeAtual)
+                .HasConversion(q => q.Value, value => Quantidade.From(value));
+            builder.Property(i => i.CustoUnitario)
+                .HasConversion(d => d.Valor, value => Dinheiro.FromDecimal(value))
+                .HasColumnType("decimal(18,2)");
+            builder.Property(i => i.PrecoVendaSugerido)
+                .HasConversion(
+                    d => d == null ? (decimal?)null : d.Valor,
+                    value => value.HasValue ? Dinheiro.FromDecimal(value.Value) : null)
+                .HasColumnType("decimal(18,2)");
+            builder.Property(i => i.ValidadeEm)
+                .HasConversion(
+                    validade => validade == null ? (DateTime?)null : validade.DataValidade,
+                    value => value.HasValue ? Validade.From(value.Value) : null);
 
             builder.HasOne(i => i.Empresa).WithMany(e => e.ItensEstoque).HasForeignKey(i => i.EmpresaId);
             builder.HasOne(i => i.Produto).WithMany(p => p.ItensEstoque).HasForeignKey(i => i.ProdutoId);
+            builder.HasOne(i => i.ProdutoVariacao).WithMany(v => v.ItensEstoque).HasForeignKey(i => i.ProdutoVariacaoId).IsRequired(false);
         }
     }
 }

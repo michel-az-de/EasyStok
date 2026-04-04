@@ -6,7 +6,6 @@ namespace EasyStock.Infra.MongoDb.Data.Mappings
         {
             EmpresaMap.Register();
             ProdutoMap.Register();
-            // register other maps as needed
         }
     }
 }
