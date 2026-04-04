@@ -19,7 +19,7 @@ namespace EasyStok.Domain.ValueObjects
             return new Dinheiro(valor);
         }
 
-        public static Dinheiro Zero => new Dinheiro(0m);
+        public static Dinheiro Zero => new(0m);
 
         public Dinheiro Add(Dinheiro other) => FromDecimal(Valor + other.Valor);
         public Dinheiro Subtract(Dinheiro other)

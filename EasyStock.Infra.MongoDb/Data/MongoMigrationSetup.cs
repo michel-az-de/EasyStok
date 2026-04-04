@@ -12,7 +12,7 @@ namespace EasyStock.Infra.MongoDb.Data
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddEnvironmentVariables();
-            var config = builder.Build();
+            _ = builder.Build();
 
             // Placeholder: integration with a MongoDB migration library (e.g. Mongo.Migration) can be added here.
             // The current project includes Mongo.Migration package, but the startup extension may require

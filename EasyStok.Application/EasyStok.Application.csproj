@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EasyStok.Domain\EasyStok.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

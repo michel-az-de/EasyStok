@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EasyStok.Domain\EasyStok.Domain.csproj" />
+    <ProjectReference Include="..\EasyStok.Application\EasyStok.Application.csproj" />
   </ItemGroup>
 
 </Project>

@@ -7,25 +7,25 @@ using System.IO;
 
 namespace EasyStock.Infra.Postgre.Data
 {
- public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<EasyStockDbContext>
- {
- public EasyStockDbContext CreateDbContext(string[] args)
- {
- // Build configuration
- var builder = new ConfigurationBuilder()
- .SetBasePath(Directory.GetCurrentDirectory())
- .AddJsonFile("appsettings.json", optional: true)
- .AddEnvironmentVariables();
+    public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<EasyStockDbContext>
+    {
+        public EasyStockDbContext CreateDbContext(string[] args)
+        {
+            // Build configuration
+            var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables();
 
- var configuration = builder.Build();
+            var configuration = builder.Build();
 
- var optionsBuilder = new DbContextOptionsBuilder<EasyStockDbContext>();
- var connectionString = configuration.GetConnectionString("DefaultConnection")
- ?? "Host=localhost;Port=5432;Database=easystock_db;Username=postgres;Password=postgres";
+            var optionsBuilder = new DbContextOptionsBuilder<EasyStockDbContext>();
+            var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? "Host=localhost;Port=5432;Database=easystock_db;Username=postgres;Password=postgres";
 
- optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseNpgsql(connectionString);
 
- return new EasyStockDbContext(optionsBuilder.Options);
- }
- }
+            return new EasyStockDbContext(optionsBuilder.Options);
+        }
+    }
 }

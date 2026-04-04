@@ -17,7 +17,7 @@ namespace EasyStok.Domain.ValueObjects
             return new Quantidade(value);
         }
 
-        public static Quantidade Zero => new Quantidade(0);
+        public static Quantidade Zero => new(0);
         public Quantidade Add(Quantidade other) => From(Value + other.Value);
         public Quantidade Subtract(Quantidade other)
         {
