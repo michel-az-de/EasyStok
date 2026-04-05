@@ -1,0 +1,379 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-04-05",
+    "appName": "EasyStok",
+    "appVersion": "1.0.0",
+    "appTagline": {
+      "pt": "Gestão inteligente de estoque para o seu negócio",
+      "en": "Intelligent inventory management for your business"
+    },
+    "appDescription": {
+      "pt": "EasyStok é uma plataforma SaaS completa de gestão de estoque construída com .NET 9 e Clean Architecture. Oferece controle de inventário em tempo real, alertas inteligentes, análises preditivas e integração com IA para empresas de todos os tamanhos.",
+      "en": "EasyStok is a complete SaaS inventory management platform built with .NET 9 and Clean Architecture. It provides real-time inventory control, smart alerts, predictive analytics, and AI integration for businesses of all sizes."
+    }
+  },
+
+  "nav": {
+    "links": [
+      {
+        "id": "overview",
+        "label": { "pt": "Visão Geral", "en": "Overview" }
+      },
+      {
+        "id": "features",
+        "label": { "pt": "Funcionalidades", "en": "Features" },
+        "children": [
+          { "id": "products",    "label": { "pt": "Gestão de Produtos",       "en": "Product Management" } },
+          { "id": "stock",       "label": { "pt": "Controle de Estoque",      "en": "Stock Control" } },
+          { "id": "sales",       "label": { "pt": "Gestão de Vendas",         "en": "Sales Management" } },
+          { "id": "suppliers",   "label": { "pt": "Fornecedores",             "en": "Suppliers" } },
+          { "id": "alerts",      "label": { "pt": "Alertas Inteligentes",     "en": "Smart Alerts" } },
+          { "id": "analytics",   "label": { "pt": "Analytics & IA",           "en": "Analytics & AI" } }
+        ]
+      },
+      {
+        "id": "api",
+        "label": { "pt": "API", "en": "API" },
+        "children": [
+          { "id": "auth-api",      "label": { "pt": "Autenticação",     "en": "Authentication" } },
+          { "id": "products-api",  "label": { "pt": "Produtos",         "en": "Products" } },
+          { "id": "stock-api",     "label": { "pt": "Estoque",          "en": "Stock" } },
+          { "id": "analytics-api", "label": { "pt": "Analytics",        "en": "Analytics" } },
+          { "id": "ai-api",        "label": { "pt": "Inteligência IA",  "en": "AI Intelligence" } }
+        ]
+      },
+      {
+        "id": "architecture",
+        "label": { "pt": "Arquitetura", "en": "Architecture" }
+      },
+      {
+        "id": "changelog",
+        "label": { "pt": "Changelog", "en": "Changelog" }
+      }
+    ]
+  },
+
+  "stats": [
+    { "id": "entities",    "value": 27, "label": { "pt": "Entidades de Domínio",  "en": "Domain Entities" },  "icon": "🗂️" },
+    { "id": "endpoints",   "value": 50, "label": { "pt": "Endpoints de API",       "en": "API Endpoints" },     "icon": "🔌" },
+    { "id": "controllers", "value": 17, "label": { "pt": "Controladores REST",     "en": "REST Controllers" },  "icon": "🎛️" },
+    { "id": "tests",       "value": 6,  "label": { "pt": "Projetos de Testes",     "en": "Test Projects" },     "icon": "✅" }
+  ],
+
+  "evolutionChart": {
+    "title": { "pt": "Evolução do Produto", "en": "Product Evolution" },
+    "subtitle": { "pt": "Crescimento de funcionalidades ao longo das versões", "en": "Feature growth across versions" },
+    "labels": ["v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6", "v0.7", "v0.8", "v0.9", "v1.0"],
+    "datasets": [
+      {
+        "labelKey": "endpoints",
+        "label": { "pt": "Endpoints", "en": "Endpoints" },
+        "data": [3, 7, 12, 18, 24, 30, 36, 42, 47, 50],
+        "borderColor": "#6366f1",
+        "backgroundColor": "rgba(99,102,241,0.12)"
+      },
+      {
+        "labelKey": "entities",
+        "label": { "pt": "Entidades", "en": "Entities" },
+        "data": [4, 6, 9, 13, 17, 20, 22, 24, 26, 27],
+        "borderColor": "#10b981",
+        "backgroundColor": "rgba(16,185,129,0.12)"
+      },
+      {
+        "labelKey": "tests",
+        "label": { "pt": "Projetos de Teste", "en": "Test Projects" },
+        "data": [1, 1, 2, 2, 3, 4, 4, 5, 6, 6],
+        "borderColor": "#f59e0b",
+        "backgroundColor": "rgba(245,158,11,0.12)"
+      }
+    ]
+  },
+
+  "features": [
+    {
+      "id": "products",
+      "icon": "📦",
+      "title": { "pt": "Gestão de Produtos", "en": "Product Management" },
+      "summary": {
+        "pt": "Cadastro completo de produtos com SKU, código de barras, variações, embalagens e atributos personalizados.",
+        "en": "Complete product registration with SKU, barcode, variations, packaging and custom attributes."
+      },
+      "details": [
+        { "pt": "CRUD completo com suporte a múltiplos atributos",           "en": "Full CRUD with multi-attribute support" },
+        { "pt": "Gerenciamento de SKU e código de barras",                   "en": "SKU and barcode management" },
+        { "pt": "Múltiplas variações por produto (cor, tamanho, etc.)",      "en": "Multiple variations per product (color, size, etc.)" },
+        { "pt": "Opções de embalagem/unidade",                               "en": "Packaging / unit options" },
+        { "pt": "Atributos personalizados (JSON)",                           "en": "Custom characteristics (JSON attributes)" },
+        { "pt": "Galeria de fotos (AWS S3)",                                 "en": "Photo gallery (AWS S3)" },
+        { "pt": "Pesquisa inteligente por texto, SKU e código de barras",    "en": "Intelligent full-text search by SKU and barcode" }
+      ]
+    },
+    {
+      "id": "stock",
+      "icon": "🏭",
+      "title": { "pt": "Controle de Estoque", "en": "Stock Control" },
+      "summary": {
+        "pt": "Rastreamento de lotes e números de série, múltiplos armazéns, histórico de movimentações e cálculo de velocidade de saída.",
+        "en": "Lot and serial number tracking, multiple warehouses, movement history and exit velocity calculation."
+      },
+      "details": [
+        { "pt": "Rastreamento de lote/batch com números de série",           "en": "Lot/batch tracking with serial numbers" },
+        { "pt": "Monitoramento de data de validade",                         "en": "Expiry date monitoring" },
+        { "pt": "Suporte a múltiplos armazéns",                              "en": "Multiple warehouse support" },
+        { "pt": "Movimentações de entrada, saída e transferência",           "en": "Entry, exit and transfer movements" },
+        { "pt": "Histórico de movimentações com auditoria",                  "en": "Movement history with audit trail" },
+        { "pt": "Alertas de quantidade mínima",                              "en": "Minimum quantity alerts" },
+        { "pt": "Cálculo de velocidade (taxa diária de saída)",              "en": "Velocity calculation (daily exit rate)" },
+        { "pt": "Rastreamento de dias sem movimentação",                     "en": "Days without movement tracking" }
+      ]
+    },
+    {
+      "id": "sales",
+      "icon": "🛒",
+      "title": { "pt": "Gestão de Vendas", "en": "Sales Management" },
+      "summary": {
+        "pt": "Controle de pedidos multi-canal com rastreamento de notas fiscais, cálculo automático de totais e suporte a devoluções.",
+        "en": "Multi-channel order control with invoice tracking, automatic total calculation and return support."
+      },
+      "details": [
+        { "pt": "Vendas multi-canal (online, PDV, etc.)",                    "en": "Multi-channel sales (online, POS, etc.)" },
+        { "pt": "Rastreamento de notas fiscais",                             "en": "Invoice tracking" },
+        { "pt": "Vendas por loja",                                           "en": "Sales by store" },
+        { "pt": "Cálculo automático de totais",                              "en": "Auto-calculate totals" },
+        { "pt": "Suporte a devolução/retorno",                               "en": "Refund / return support" },
+        { "pt": "Rastreamento de data de envio",                             "en": "Shipping date tracking" }
+      ]
+    },
+    {
+      "id": "suppliers",
+      "icon": "🚚",
+      "title": { "pt": "Gestão de Fornecedores", "en": "Supplier Management" },
+      "summary": {
+        "pt": "Perfis completos de fornecedores com histórico de pedidos, acompanhamento de custos e estatísticas de desempenho.",
+        "en": "Complete supplier profiles with order history, cost tracking and performance statistics."
+      },
+      "details": [
+        { "pt": "Perfis de fornecedores",                                    "en": "Supplier profiles" },
+        { "pt": "Histórico de pedidos de compra",                            "en": "Purchase order history" },
+        { "pt": "Rastreamento de custos",                                    "en": "Cost tracking" },
+        { "pt": "Estatísticas (prazo médio, qualidade)",                     "en": "Statistics (avg lead time, quality)" }
+      ]
+    },
+    {
+      "id": "alerts",
+      "icon": "🔔",
+      "title": { "pt": "Alertas Inteligentes", "en": "Smart Alerts" },
+      "summary": {
+        "pt": "Alertas automáticos para estoque baixo, itens próximos do vencimento e produtos parados há muito tempo.",
+        "en": "Automatic alerts for low stock, items near expiry and stalled products."
+      },
+      "details": [
+        { "pt": "Detecção de estoque baixo",                                 "en": "Low stock detection" },
+        { "pt": "Avisos de data de validade (dias configuráveis)",           "en": "Expiry date warnings (configurable days)" },
+        { "pt": "Inventário parado (sem movimentação por N dias)",           "en": "Stalled inventory (no movement for N days)" },
+        { "pt": "Configurável por loja",                                     "en": "Configurable per store" }
+      ]
+    },
+    {
+      "id": "analytics",
+      "icon": "📊",
+      "title": { "pt": "Analytics & Inteligência IA", "en": "Analytics & AI Intelligence" },
+      "summary": {
+        "pt": "Projeções de ruptura de estoque, análise de sazonalidade, sugestões de reposição e geração de anúncios via IA com streaming.",
+        "en": "Stock rupture projections, seasonality analysis, replenishment suggestions and AI-powered announcement generation with streaming."
+      },
+      "details": [
+        { "pt": "Projeções de ruptura de estoque",                           "en": "Stock rupture projections" },
+        { "pt": "Análise de sazonalidade",                                   "en": "Seasonality analysis" },
+        { "pt": "Sugestões de reposição",                                    "en": "Replenishment suggestions" },
+        { "pt": "Cálculo de margem de lucro",                                "en": "Profit margin calculations" },
+        { "pt": "Tendências de receita",                                     "en": "Revenue trends" },
+        { "pt": "Anúncios de produto via IA com streaming (SSE)",            "en": "AI product announcements with SSE streaming" },
+        { "pt": "Rastreamento de uso de IA por empresa",                     "en": "AI usage tracking per company" }
+      ]
+    },
+    {
+      "id": "saas",
+      "icon": "🏢",
+      "title": { "pt": "SaaS Multi-Tenant", "en": "SaaS Multi-Tenant" },
+      "summary": {
+        "pt": "Isolamento por empresa, múltiplas lojas/armazéns, planos de assinatura e controle de acesso baseado em papéis.",
+        "en": "Company-level isolation, multiple stores/warehouses, subscription plans and role-based access control."
+      },
+      "details": [
+        { "pt": "Isolamento de dados por empresa",                           "en": "Company-based data isolation" },
+        { "pt": "Configuração por loja",                                     "en": "Store-level configuration" },
+        { "pt": "JWT Bearer + rotação de refresh token",                     "en": "JWT Bearer + refresh token rotation" },
+        { "pt": "Papéis: Admin, Gerente, Operador",                          "en": "Roles: Admin, Manager, Operator" },
+        { "pt": "Planos de assinatura com limites de funcionalidades",       "en": "Subscription plans with feature limits" },
+        { "pt": "Trilha de auditoria de login e ações",                      "en": "Login and action audit trail" }
+      ]
+    }
+  ],
+
+  "apiGroups": [
+    {
+      "id": "auth-api",
+      "icon": "🔐",
+      "title": { "pt": "Autenticação", "en": "Authentication" },
+      "baseUrl": "/api/auth",
+      "endpoints": [
+        { "method": "POST", "path": "/login",           "description": { "pt": "Login do usuário (retorna JWT)",             "en": "User login (returns JWT)" } },
+        { "method": "POST", "path": "/register",        "description": { "pt": "Registro de novo usuário",                   "en": "Register new user" } },
+        { "method": "POST", "path": "/refresh",         "description": { "pt": "Renovar token JWT",                          "en": "Refresh JWT token" } },
+        { "method": "POST", "path": "/logout",          "description": { "pt": "Logout e invalidar token",                   "en": "Logout & invalidate token" } },
+        { "method": "POST", "path": "/forgot-password", "description": { "pt": "Iniciar redefinição de senha",               "en": "Initiate password reset" } },
+        { "method": "POST", "path": "/reset-password",  "description": { "pt": "Concluir redefinição de senha",              "en": "Complete password reset" } },
+        { "method": "GET",  "path": "/me",              "description": { "pt": "Obter usuário atual",                        "en": "Get current user" } },
+        { "method": "PATCH","path": "/me",              "description": { "pt": "Atualizar perfil do usuário atual",          "en": "Update current user profile" } },
+        { "method": "PATCH","path": "/me/password",     "description": { "pt": "Alterar senha",                              "en": "Change password" } }
+      ]
+    },
+    {
+      "id": "products-api",
+      "icon": "📦",
+      "title": { "pt": "Produtos", "en": "Products" },
+      "baseUrl": "/api/produtos",
+      "endpoints": [
+        { "method": "GET",   "path": "",                  "description": { "pt": "Listar produtos (paginado)",               "en": "List products (paginated)" } },
+        { "method": "POST",  "path": "",                  "description": { "pt": "Criar produto",                            "en": "Create product" } },
+        { "method": "GET",   "path": "/{id}",             "description": { "pt": "Obter produto com variações",              "en": "Get product with variations" } },
+        { "method": "PATCH", "path": "/{id}",             "description": { "pt": "Atualizar produto",                        "en": "Update product" } },
+        { "method": "GET",   "path": "/search",           "description": { "pt": "Pesquisar produtos por termo",             "en": "Search products by term" } },
+        { "method": "POST",  "path": "/{id}/variacoes",   "description": { "pt": "Adicionar variação ao produto",            "en": "Add product variation" } },
+        { "method": "POST",  "path": "/{id}/embalagens",  "description": { "pt": "Adicionar embalagem/SKU",                  "en": "Add packaging/SKU" } }
+      ]
+    },
+    {
+      "id": "stock-api",
+      "icon": "🏭",
+      "title": { "pt": "Estoque", "en": "Stock" },
+      "baseUrl": "/api/estoque",
+      "endpoints": [
+        { "method": "GET",  "path": "",              "description": { "pt": "Listar itens de estoque (paginado)",            "en": "List stock items (paginated)" } },
+        { "method": "GET",  "path": "/{id}",         "description": { "pt": "Obter detalhes do item",                       "en": "Get item details" } },
+        { "method": "GET",  "path": "/buscar",       "description": { "pt": "Busca inteligente (texto, SKU, código barras)","en": "Intelligent search (text, SKU, barcode)" } },
+        { "method": "POST", "path": "/entrada",      "description": { "pt": "Registrar entrada de estoque",                 "en": "Register stock entry" } },
+        { "method": "POST", "path": "/saida",        "description": { "pt": "Registrar saída de estoque/venda",             "en": "Register stock exit / sale" } },
+        { "method": "GET",  "path": "/{id}/para-reposicao", "description": { "pt": "Sugestões de reposição",                "en": "Replenishment suggestions" } }
+      ]
+    },
+    {
+      "id": "analytics-api",
+      "icon": "📊",
+      "title": { "pt": "Analytics", "en": "Analytics" },
+      "baseUrl": "/api/analytics",
+      "endpoints": [
+        { "method": "GET", "path": "/dashboard",    "description": { "pt": "Dashboard resumido (período 30 dias)",          "en": "Summary dashboard (30-day period)" } },
+        { "method": "GET", "path": "/projecoes",    "description": { "pt": "Projeções de ruptura de estoque",               "en": "Stock rupture projections" } },
+        { "method": "GET", "path": "/reposicao",    "description": { "pt": "Análise detalhada de reposição",                "en": "Detailed replenishment analysis" } },
+        { "method": "GET", "path": "/sazonalidade", "description": { "pt": "Tendências de sazonalidade por produto",        "en": "Seasonality trends by product" } },
+        { "method": "GET", "path": "/alertas",      "description": { "pt": "Alertas de vencimento",                        "en": "Expiry alerts" } },
+        { "method": "GET", "path": "/receita",      "description": { "pt": "Receita por período (mensal)",                  "en": "Revenue by period (monthly)" } },
+        { "method": "GET", "path": "/margem",       "description": { "pt": "Análise de margem de lucro",                   "en": "Profit margin analysis" } }
+      ]
+    },
+    {
+      "id": "ai-api",
+      "icon": "🤖",
+      "title": { "pt": "Inteligência IA", "en": "AI Intelligence" },
+      "baseUrl": "/api/ia",
+      "endpoints": [
+        { "method": "POST",   "path": "/anuncio",      "description": { "pt": "Gerar anúncio do produto (SSE streaming)",  "en": "Generate product announcement (SSE streaming)" } },
+        { "method": "POST",   "path": "/rascunho",     "description": { "pt": "Salvar rascunho de anúncio",                "en": "Save draft announcement" } },
+        { "method": "GET",    "path": "/anuncios",     "description": { "pt": "Listar anúncios gerados por IA",            "en": "List AI-generated announcements" } },
+        { "method": "DELETE", "path": "/anuncios/{id}","description": { "pt": "Excluir anúncio",                           "en": "Delete announcement" } },
+        { "method": "GET",    "path": "/uso",          "description": { "pt": "Obter estatísticas de uso de IA",           "en": "Get AI usage stats" } }
+      ]
+    }
+  ],
+
+  "techStack": [
+    { "category": { "pt": "Framework", "en": "Framework" },          "items": [".NET 9", "ASP.NET Core 9", "C# 12"] },
+    { "category": { "pt": "Arquitetura", "en": "Architecture" },     "items": ["Clean Architecture", "CQRS", "DDD", "Repository Pattern"] },
+    { "category": { "pt": "Banco de Dados", "en": "Databases" },     "items": ["PostgreSQL", "MongoDB", "Entity Framework Core 9"] },
+    { "category": { "pt": "Segurança", "en": "Security" },           "items": ["JWT Bearer", "BCrypt", "Refresh Token Rotation"] },
+    { "category": { "pt": "Observabilidade", "en": "Observability" },"items": ["Serilog", "OpenTelemetry 1.15", "Health Checks"] },
+    { "category": { "pt": "Cache & Fila", "en": "Cache & Queue" },   "items": ["Redis", "Background Queue Service"] },
+    { "category": { "pt": "Armazenamento", "en": "Storage" },        "items": ["AWS S3"] },
+    { "category": { "pt": "Testes", "en": "Testing" },               "items": ["xUnit", "FluentAssertions", "NetArchTest", "Benchmarks"] },
+    { "category": { "pt": "Validação", "en": "Validation" },         "items": ["FluentValidation 11.3"] },
+    { "category": { "pt": "Documentação API", "en": "API Docs" },    "items": ["Swagger / OpenAPI", "Swashbuckle 6.4"] }
+  ],
+
+  "architecture": {
+    "title": { "pt": "Arquitetura do Sistema", "en": "System Architecture" },
+    "description": {
+      "pt": "EasyStok segue os princípios da Clean Architecture, garantindo que as regras de negócio fiquem independentes de detalhes de infraestrutura.",
+      "en": "EasyStok follows Clean Architecture principles, ensuring that business rules remain independent from infrastructure details."
+    },
+    "layers": [
+      {
+        "name": "EasyStock.Domain",
+        "color": "#6366f1",
+        "description": {
+          "pt": "Entidades, Value Objects, Eventos de Domínio, Especificações, Serviços de Domínio. Sem dependências externas.",
+          "en": "Entities, Value Objects, Domain Events, Specifications, Domain Services. No external dependencies."
+        }
+      },
+      {
+        "name": "EasyStock.Application",
+        "color": "#10b981",
+        "description": {
+          "pt": "Casos de uso, Comandos, Queries, Validadores, Interfaces de Repositório, DTOs.",
+          "en": "Use Cases, Commands, Queries, Validators, Repository Interfaces, DTOs."
+        }
+      },
+      {
+        "name": "EasyStock.Infra.*",
+        "color": "#f59e0b",
+        "description": {
+          "pt": "Implementações de repositório (PostgreSQL, MongoDB), serviços de email, fila assíncrona, cache Redis, armazenamento S3.",
+          "en": "Repository implementations (PostgreSQL, MongoDB), email services, async queue, Redis cache, S3 storage."
+        }
+      },
+      {
+        "name": "EasyStock.Api",
+        "color": "#ef4444",
+        "description": {
+          "pt": "Controllers REST, Middleware, configuração de DI, Rate Limiting, autenticação JWT, Swagger.",
+          "en": "REST Controllers, Middleware, DI configuration, Rate Limiting, JWT authentication, Swagger."
+        }
+      }
+    ]
+  },
+
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2025-04-05",
+      "changes": {
+        "pt": [
+          "Lançamento inicial da plataforma EasyStok",
+          "Gestão completa de produtos com variações e embalagens",
+          "Controle de estoque com rastreamento de lotes e validade",
+          "Gestão de vendas multi-canal",
+          "Alertas inteligentes (estoque baixo, vencimento, itens parados)",
+          "Analytics preditivo e análise de sazonalidade",
+          "Geração de anúncios via IA com streaming SSE",
+          "Multi-tenancy com isolamento por empresa",
+          "Autenticação JWT com rotação de refresh token",
+          "Suporte dual a PostgreSQL e MongoDB"
+        ],
+        "en": [
+          "Initial release of EasyStok platform",
+          "Complete product management with variations and packaging",
+          "Stock control with lot and expiry tracking",
+          "Multi-channel sales management",
+          "Smart alerts (low stock, expiry, stalled items)",
+          "Predictive analytics and seasonality analysis",
+          "AI announcement generation with SSE streaming",
+          "Multi-tenancy with company-level isolation",
+          "JWT authentication with refresh token rotation",
+          "Dual support for PostgreSQL and MongoDB"
+        ]
+      }
+    }
+  ]
+}
