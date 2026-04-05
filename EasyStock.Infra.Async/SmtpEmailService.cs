@@ -48,6 +48,7 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
     public async Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
+        Exception? lastException = null;
         for (var tentativa = 1; tentativa <= MaxRetries; tentativa++)
         {
             try
@@ -55,11 +56,15 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
                 await EnviarInternamenteAsync(to, subject, body, attachments, isHtml);
                 return;
             }
-            catch (SmtpException ex) when (tentativa < MaxRetries && EhFalhaTransiente(ex))
+            catch (SmtpException ex) when (EhFalhaTransiente(ex))
             {
-                await Task.Delay(RetryDelay * tentativa);
+                lastException = ex;
+                if (tentativa < MaxRetries)
+                    await Task.Delay(RetryDelay * tentativa);
             }
         }
+
+        throw lastException!;
     }
 
     private async Task EnviarInternamenteAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml)

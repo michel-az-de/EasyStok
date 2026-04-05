@@ -42,11 +42,11 @@ public static class CacheKeys
     /// <summary>
     /// Retorna todas as chaves de cache relacionadas a um produto específico.
     /// </summary>
-    public static IEnumerable<string> ProdutoRelacionadas(Guid empresaId, Guid produtoId)
-    {
-        yield return Produto(empresaId, produtoId);
-        yield return ProdutoListagem(empresaId);
-        yield return ProdutoEstatisticas(empresaId, produtoId);
-        yield return Dashboard(empresaId);
-    }
+    public static IReadOnlyList<string> ProdutoRelacionadas(Guid empresaId, Guid produtoId) =>
+    [
+        Produto(empresaId, produtoId),
+        ProdutoListagem(empresaId),
+        ProdutoEstatisticas(empresaId, produtoId),
+        Dashboard(empresaId),
+    ];
 }
