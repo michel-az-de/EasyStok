@@ -88,6 +88,46 @@ public sealed class MongoMigrationRunner(MongoEasyStockContext context)
                     .Ascending(x => x.ReferenciaId),
                 new CreateIndexOptions { Name = "ix_notificacoes_empresa_tipo_referencia" })],
             cancellationToken);
+
+        await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.ConfiguracaoLoja>(MongoCollectionNames.ConfiguracoesLoja),
+            [new CreateIndexModel<EasyStock.Domain.Entities.ConfiguracaoLoja>(
+                Builders<EasyStock.Domain.Entities.ConfiguracaoLoja>.IndexKeys
+                    .Ascending(x => x.LojaId),
+                new CreateIndexOptions { Name = "ux_configuracoes_loja_loja", Unique = true })],
+            cancellationToken);
+
+        await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.Fornecedor>(MongoCollectionNames.Fornecedores),
+            [
+                new CreateIndexModel<EasyStock.Domain.Entities.Fornecedor>(
+                    Builders<EasyStock.Domain.Entities.Fornecedor>.IndexKeys
+                        .Ascending(x => x.EmpresaId)
+                        .Ascending(x => x.Nome),
+                    new CreateIndexOptions { Name = "ix_fornecedores_empresa_nome" }),
+                new CreateIndexModel<EasyStock.Domain.Entities.Fornecedor>(
+                    Builders<EasyStock.Domain.Entities.Fornecedor>.IndexKeys
+                        .Text(x => x.Nome)
+                        .Text(x => x.Documento)
+                        .Text(x => x.Email)
+                        .Text(x => x.Contato),
+                    new CreateIndexOptions { Name = "ix_fornecedores_busca_texto" })
+            ],
+            cancellationToken);
+
+        await EnsureIndexesAsync(context.GetCollection<EasyStock.Domain.Entities.PedidoFornecedor>(MongoCollectionNames.PedidosFornecedor),
+            [
+                new CreateIndexModel<EasyStock.Domain.Entities.PedidoFornecedor>(
+                    Builders<EasyStock.Domain.Entities.PedidoFornecedor>.IndexKeys
+                        .Ascending(x => x.EmpresaId)
+                        .Ascending(x => x.FornecedorId)
+                        .Ascending(x => x.Status),
+                    new CreateIndexOptions { Name = "ix_pedidos_fornecedor_empresa_fornecedor_status" }),
+                new CreateIndexModel<EasyStock.Domain.Entities.PedidoFornecedor>(
+                    Builders<EasyStock.Domain.Entities.PedidoFornecedor>.IndexKeys
+                        .Ascending(x => x.EmpresaId)
+                        .Ascending(x => x.DataPedido),
+                    new CreateIndexOptions { Name = "ix_pedidos_fornecedor_empresa_data" })
+            ],
+            cancellationToken);
     }
 
     private static Task EnsureIndexesAsync<TDocument>(

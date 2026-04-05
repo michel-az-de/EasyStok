@@ -8,6 +8,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Async.DependencyInjection;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -100,6 +101,9 @@ switch (databaseProvider.Trim().ToLowerInvariant())
 // Application
 builder.Services.AddEasyStockApplication();
 
+// Async Infrastructure
+builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
+
 // Configuration
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection("EasyStock"));
@@ -125,6 +129,7 @@ var jwtKey = builder.Configuration["Jwt:SecretKey"]
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+builder.Services.AddScoped<GeradorNotificacoesAutomaticas>();
 builder.Services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
     sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());

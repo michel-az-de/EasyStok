@@ -34,7 +34,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         string? DescricaoAnuncio,
         string? DocumentoReferencia,
         DimensoesInput? DimensoesReais,
-        string? InstrucoesGeracaoDescricao);
+        string? InstrucoesGeracaoDescricao,
+        Guid? LojaId = null);
 
     public sealed record RegistrarEntradaEstoqueResult(
         Guid ItemEstoqueId,
@@ -50,7 +51,9 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IUnitOfWork unitOfWork,
         ILogger<RegistrarEntradaEstoqueUseCase> logger,
         IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null,
-        IPublicadorEventos? publicadorEventos = null)
+        IPublicadorEventos? publicadorEventos = null,
+        ILojaRepository? lojaRepository = null,
+        IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
     {
         public async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
@@ -67,6 +70,18 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 
             if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
                 throw new ProdutoInativoException(produto.Id);
+
+            Domain.Entities.ConfiguracaoLoja? configuracaoLoja = null;
+            if (command.LojaId.HasValue)
+            {
+                if (lojaRepository is null || configuracaoLojaRepository is null)
+                    throw new UseCaseValidationException("Configuracao de loja indisponivel para esta operacao.");
+
+                var loja = await lojaRepository.GetByIdAsync(command.EmpresaId, command.LojaId.Value)
+                    ?? throw new UseCaseValidationException("Loja nao encontrada.");
+
+                configuracaoLoja = await configuracaoLojaRepository.GetOrDefaultAsync(loja.Id);
+            }
 
             ProdutoVariacao? variacao = null;
             if (command.ProdutoVariacaoId.HasValue)
@@ -109,6 +124,13 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 command.Validade.HasValue ? Validade.From(command.Validade.Value) : null,
                 command.Observacoes,
                 agora);
+
+            if (command.LojaId.HasValue)
+            {
+                item.LojaId = command.LojaId.Value;
+                item.QuantidadeMinima = configuracaoLoja?.QuantidadeMinimaPadrao ?? item.QuantidadeMinima;
+                item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? 30);
+            }
 
             var movimentacao = MovimentacaoEstoque.CriarEntrada(
                 Guid.NewGuid(),

@@ -41,11 +41,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value <= limite);
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -57,12 +60,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
             var cutoff = DateTime.UtcNow.AddDays(dias);
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoff);
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -74,13 +80,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
             var cutoff = DateTime.UtcNow.AddDays(-diasSemMovimento);
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -92,11 +101,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value < limiteQuantidade);
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query

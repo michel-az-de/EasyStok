@@ -8,6 +8,7 @@ public sealed record DesativarFornecedorCommand(Guid FornecedorId, Guid EmpresaI
 
 public class DesativarFornecedorUseCase(
     IFornecedorRepository fornecedorRepository,
+    IPedidoFornecedorRepository pedidoFornecedorRepository,
     IUnitOfWork unitOfWork,
     ILogger<DesativarFornecedorUseCase> logger)
 {
@@ -17,8 +18,11 @@ public class DesativarFornecedorUseCase(
         if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
-        fornecedor.Ativo = false;
-        fornecedor.AlteradoEm = DateTime.UtcNow;
+        var pedidosEmAberto = await pedidoFornecedorRepository.CountPedidosAbertosOuEmTransitoAsync(command.EmpresaId, command.FornecedorId);
+        if (pedidosEmAberto > 0)
+            throw new UseCaseValidationException("Nao e permitido desativar fornecedor com pedido aberto ou em transito.");
+
+        fornecedor.Desativar();
 
         await fornecedorRepository.UpdateAsync(fornecedor);
         await unitOfWork.CommitAsync();

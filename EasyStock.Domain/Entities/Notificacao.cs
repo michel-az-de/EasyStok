@@ -27,6 +27,11 @@ namespace EasyStock.Domain.Entities
                 CriadaEm = DateTime.UtcNow
             };
 
+        public void AtualizarMensagem(string mensagem)
+        {
+            Mensagem = mensagem;
+        }
+
         public void MarcarComoLida()
         {
             Lida = true;

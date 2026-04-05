@@ -10,7 +10,8 @@
       "Bash(xargs grep:*)",
       "Bash(ls /c/rep/EasyStok/*.sln)",
       "Bash(git stash:*)",
-      "Bash(ls -la \"C:\\\\rep\\\\EasyStok\\\\EasyStock.Application.Tests\\\\UseCases\"\" 2>/dev/null || echo \"Diretório não encontrado \")"
+      "Bash(ls -la \"C:\\\\rep\\\\EasyStok\\\\EasyStock.Application.Tests\\\\UseCases\"\" 2>/dev/null || echo \"Diretório não encontrado \")",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

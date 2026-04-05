@@ -10,6 +10,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Loja?> GetByIdAsync(Guid id) =>
             dbContext.Lojas.FirstOrDefaultAsync(l => l.Id == id);
 
+        public Task<Loja?> GetByIdAsync(Guid empresaId, Guid id) =>
+            dbContext.Lojas.FirstOrDefaultAsync(l => l.EmpresaId == empresaId && l.Id == id);
+
         public async Task<IEnumerable<Loja>> GetByEmpresaAsync(Guid empresaId) =>
             await dbContext.Lojas
                 .AsNoTracking()

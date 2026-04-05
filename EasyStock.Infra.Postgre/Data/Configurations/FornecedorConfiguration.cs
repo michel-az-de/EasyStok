@@ -15,6 +15,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(f => f.Email).HasMaxLength(150);
             builder.Property(f => f.Telefone).HasMaxLength(30);
             builder.Property(f => f.Contato).HasMaxLength(150);
+            builder.Property(f => f.Categoria).HasMaxLength(120);
+            builder.Property(f => f.Tipo).HasMaxLength(60);
+            builder.Property(f => f.LeadTimeEstimadoDias);
+            builder.Property(f => f.LeadTimeRealMedioDias).HasColumnType("decimal(10,2)");
+            builder.Property(f => f.SiteUrl).HasMaxLength(255);
+            builder.Property(f => f.PedidoMinimo).HasMaxLength(120);
+            builder.Property(f => f.FretePadrao).HasMaxLength(120);
+            builder.Property(f => f.Observacoes).HasColumnType("text");
 
             builder.HasOne(f => f.Empresa)
                 .WithMany()

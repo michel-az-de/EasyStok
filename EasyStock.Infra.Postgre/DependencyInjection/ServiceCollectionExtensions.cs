@@ -33,13 +33,18 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IVendaRepository, VendaRepository>();
             services.AddScoped<INotificacaoRepository, NotificacaoRepository>();
             services.AddScoped<ILojaRepository, LojaRepository>();
+            services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
             services.AddScoped<IFornecedorRepository, FornecedorRepository>();
+            services.AddScoped<IPedidoFornecedorRepository, PedidoFornecedorRepository>();
             services.AddScoped<IUsuarioRepository, UsuarioRepository>();
             services.AddScoped<IPerfilRepository, PerfilRepository>();
             services.AddScoped<IPlanoRepository, PlanoRepository>();
             services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
             services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
             services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
+            services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+            services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
+            services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // AI: usa implementacao real se Anthropic:Enabled = true, caso contrario usa stub
@@ -48,10 +53,12 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             {
                 services.AddHttpClient("Anthropic");
                 services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
+                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
             }
             else
             {
                 services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
+                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
             }
 
             return services;

@@ -39,7 +39,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IVendaRepository, VendaRepository>();
         services.AddScoped<INotificacaoRepository, NotificacaoRepository>();
         services.AddScoped<ILojaRepository, LojaRepository>();
+        services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
         services.AddScoped<IFornecedorRepository, FornecedorRepository>();
+        services.AddScoped<IPedidoFornecedorRepository, PedidoFornecedorRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IPlanoRepository, PlanoRepository>();

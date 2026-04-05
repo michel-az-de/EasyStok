@@ -11,7 +11,14 @@ public sealed record AtualizarFornecedorCommand(
     string? Documento,
     string? Email,
     string? Telefone,
-    string? Contato);
+    string? Contato,
+    string? Categoria,
+    string? Tipo,
+    int? LeadTimeEstimadoDias,
+    string? SiteUrl,
+    string? PedidoMinimo,
+    string? FretePadrao,
+    string? Observacoes);
 
 public class AtualizarFornecedorUseCase(
     IFornecedorRepository fornecedorRepository,
@@ -27,12 +34,19 @@ public class AtualizarFornecedorUseCase(
         if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
-        fornecedor.Nome = command.Nome.Trim();
-        fornecedor.Documento = command.Documento?.Trim();
-        fornecedor.Email = command.Email?.Trim();
-        fornecedor.Telefone = command.Telefone?.Trim();
-        fornecedor.Contato = command.Contato?.Trim();
-        fornecedor.AlteradoEm = DateTime.UtcNow;
+        fornecedor.AtualizarCadastro(
+            command.Nome,
+            command.Documento,
+            command.Email,
+            command.Telefone,
+            command.Contato,
+            command.Categoria,
+            command.Tipo,
+            command.LeadTimeEstimadoDias,
+            command.SiteUrl,
+            command.PedidoMinimo,
+            command.FretePadrao,
+            command.Observacoes);
 
         await fornecedorRepository.UpdateAsync(fornecedor);
         await unitOfWork.CommitAsync();

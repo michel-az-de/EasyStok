@@ -15,47 +15,54 @@ public class InteligenciaController : ControllerBase
 {
     private readonly IItemEstoqueRepository _itemEstoqueRepository;
     private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository;
+    private readonly IConfiguracaoLojaRepository _configuracaoLojaRepository;
     private readonly EasyStockConfiguracoes _config;
 
     public InteligenciaController(
         IItemEstoqueRepository itemEstoqueRepository,
         IMovimentacaoEstoqueRepository movimentacaoRepository,
+        IConfiguracaoLojaRepository configuracaoLojaRepository,
         IOptions<EasyStockConfiguracoes> config)
     {
         _itemEstoqueRepository = itemEstoqueRepository;
         _movimentacaoRepository = movimentacaoRepository;
+        _configuracaoLojaRepository = configuracaoLojaRepository;
         _config = config.Value;
     }
 
     [HttpGet("estoque-baixo")]
-    public async Task<IActionResult> EstoqueBaixo([FromQuery] Guid empresaId, [FromQuery] int? limite, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> EstoqueBaixo([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? limite, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var limiteEfetivo = limite ?? _config.LimiteEstoqueBaixoDefault;
-        var (items, totalCount) = await _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limiteEfetivo, page, pageSize);
+        var configuracao = await ObterConfiguracaoAsync(lojaId);
+        var limiteEfetivo = limite ?? configuracao?.QuantidadeMinimaPadrao ?? _config.LimiteEstoqueBaixoDefault;
+        var (items, totalCount) = await _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
         return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("proximo-vencimento")]
-    public async Task<IActionResult> ProximoVencimento([FromQuery] Guid empresaId, [FromQuery] int? dias, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> ProximoVencimento([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? dias, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var diasEfetivos = dias ?? _config.DiasAlertaVencimento;
-        var (items, totalCount) = await _itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, diasEfetivos, page, pageSize);
+        var configuracao = await ObterConfiguracaoAsync(lojaId);
+        var diasEfetivos = dias ?? configuracao?.DiasAlertaValidade ?? _config.DiasAlertaVencimento;
+        var (items, totalCount) = await _itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
         return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("parados")]
-    public async Task<IActionResult> ItensParados([FromQuery] Guid empresaId, [FromQuery] int? diasSemMovimento, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> ItensParados([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? diasSemMovimento, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var diasEfetivos = diasSemMovimento ?? _config.DiasItemParado;
-        var (items, totalCount) = await _itemEstoqueRepository.GetItensParadosAsync(empresaId, diasEfetivos, page, pageSize);
+        var configuracao = await ObterConfiguracaoAsync(lojaId);
+        var diasEfetivos = diasSemMovimento ?? configuracao?.DiasAlertaParado ?? _config.DiasItemParado;
+        var (items, totalCount) = await _itemEstoqueRepository.GetItensParadosAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
         return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
     [HttpGet("sugestao-reposicao")]
-    public async Task<IActionResult> SugestaoReposicao([FromQuery] Guid empresaId, [FromQuery] int? limiteQuantidade = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> SugestaoReposicao([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? limiteQuantidade = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var limiteEfetivo = limiteQuantidade ?? _config.LimiteEstoqueBaixoDefault;
-        var (items, totalCount) = await _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, limiteEfetivo, page, pageSize);
+        var configuracao = await ObterConfiguracaoAsync(lojaId);
+        var limiteEfetivo = limiteQuantidade ?? configuracao?.QuantidadeMinimaPadrao ?? _config.LimiteEstoqueBaixoDefault;
+        var (items, totalCount) = await _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
         return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
     }
 
@@ -159,5 +166,13 @@ public class InteligenciaController : ControllerBase
             ProjecaoVendasPeriodo = Math.Round(taxaDiaria * periodo, 0),
             ProjecaoReceitaPeriodo = Math.Round(taxaDiaria * periodo * ticketMedioSugerido, 2)
         });
+    }
+
+    private async Task<EasyStock.Domain.Entities.ConfiguracaoLoja?> ObterConfiguracaoAsync(Guid? lojaId)
+    {
+        if (!lojaId.HasValue)
+            return null;
+
+        return await _configuracaoLojaRepository.GetByLojaIdAsync(lojaId.Value);
     }
 }

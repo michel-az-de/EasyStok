@@ -15,6 +15,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(
             Guid empresaId,
             bool? lida = null,
+            TipoAlertaEstoque? tipo = null,
             int page = 1,
             int pageSize = 20)
         {
@@ -24,6 +25,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             if (lida.HasValue)
                 query = query.Where(n => n.Lida == lida.Value);
+            if (tipo.HasValue)
+                query = query.Where(n => n.TipoAlerta == tipo.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -42,6 +45,21 @@ namespace EasyStock.Infra.Postgre.Repositories
                 n.ReferenciaId == referenciaId &&
                 !n.Lida);
 
+        public Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia)
+        {
+            var inicio = dataReferencia.Date;
+            var fim = inicio.AddDays(1);
+            return dbContext.Notificacoes.AnyAsync(n =>
+                n.EmpresaId == empresaId &&
+                n.TipoAlerta == tipo &&
+                n.ReferenciaId == referenciaId &&
+                n.CriadaEm >= inicio &&
+                n.CriadaEm < fim);
+        }
+
+        public Task<int> CountNaoLidasAsync(Guid empresaId) =>
+            dbContext.Notificacoes.CountAsync(n => n.EmpresaId == empresaId && !n.Lida);
+
         public Task AddAsync(Notificacao notificacao) =>
             dbContext.Notificacoes.AddAsync(notificacao).AsTask();
 
@@ -59,6 +77,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(n => n.Lida, true)
                     .SetProperty(n => n.LidaEm, agora));
+        }
+
+        public Task DeleteAsync(Guid id)
+        {
+            dbContext.Notificacoes.Remove(new Notificacao { Id = id });
+            return Task.CompletedTask;
         }
     }
 }

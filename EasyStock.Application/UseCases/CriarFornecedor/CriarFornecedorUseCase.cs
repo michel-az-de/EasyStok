@@ -12,7 +12,14 @@ public sealed record CriarFornecedorCommand(
     [property: MaxLength(30)] string? Documento,
     [property: MaxLength(255)] string? Email,
     [property: MaxLength(20)] string? Telefone,
-    [property: MaxLength(150)] string? Contato);
+    [property: MaxLength(150)] string? Contato,
+    [property: MaxLength(120)] string? Categoria = null,
+    [property: MaxLength(60)] string? Tipo = null,
+    int? LeadTimeEstimadoDias = null,
+    [property: MaxLength(255)] string? SiteUrl = null,
+    [property: MaxLength(120)] string? PedidoMinimo = null,
+    [property: MaxLength(120)] string? FretePadrao = null,
+    string? Observacoes = null);
 
 public class CriarFornecedorUseCase(
     IFornecedorRepository fornecedorRepository,
@@ -22,17 +29,43 @@ public class CriarFornecedorUseCase(
 {
     public async Task<FornecedorResult> ExecuteAsync(CriarFornecedorCommand command)
     {
+        _ = assinaturaRepository;
         var fornecedor = FornecedorEntity.Criar(command.EmpresaId, command.Nome.Trim());
-        fornecedor.Documento = command.Documento?.Trim();
-        fornecedor.Email = command.Email?.Trim();
-        fornecedor.Telefone = command.Telefone?.Trim();
-        fornecedor.Contato = command.Contato?.Trim();
+        fornecedor.AtualizarCadastro(
+            command.Nome,
+            command.Documento,
+            command.Email,
+            command.Telefone,
+            command.Contato,
+            command.Categoria,
+            command.Tipo,
+            command.LeadTimeEstimadoDias,
+            command.SiteUrl,
+            command.PedidoMinimo,
+            command.FretePadrao,
+            command.Observacoes);
 
         await fornecedorRepository.AddAsync(fornecedor);
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Fornecedor {FornecedorId} criado para empresa {EmpresaId}.", fornecedor.Id, fornecedor.EmpresaId);
 
-        return new FornecedorResult(fornecedor.Id, fornecedor.EmpresaId, fornecedor.Nome, fornecedor.Ativo);
+        return new FornecedorResult(
+            fornecedor.Id,
+            fornecedor.EmpresaId,
+            fornecedor.Nome,
+            fornecedor.Ativo,
+            fornecedor.Documento,
+            fornecedor.Email,
+            fornecedor.Telefone,
+            fornecedor.Contato,
+            fornecedor.Categoria,
+            fornecedor.Tipo,
+            fornecedor.LeadTimeEstimadoDias,
+            fornecedor.LeadTimeRealMedioDias,
+            fornecedor.SiteUrl,
+            fornecedor.PedidoMinimo,
+            fornecedor.FretePadrao,
+            fornecedor.Observacoes);
     }
 }

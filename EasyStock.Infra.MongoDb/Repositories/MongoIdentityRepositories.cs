@@ -14,6 +14,9 @@ public sealed class LojaRepository(MongoEasyStockContext context, MongoUnitOfWor
     public async Task<Loja?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
+    public async Task<Loja?> GetByIdAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+
     public async Task<IEnumerable<Loja>> GetByEmpresaAsync(Guid empresaId) =>
         await Collection.Find(x => x.EmpresaId == empresaId).SortBy(x => x.Nome).ToListAsync();
 
@@ -41,9 +44,23 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     public async Task<Fornecedor?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
+    public async Task<Fornecedor?> GetByIdAsync(Guid empresaId, Guid id) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize, bool? ativo = null, string? search = null)
     {
         var filter = Builders<Fornecedor>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (ativo.HasValue)
+            filter &= Builders<Fornecedor>.Filter.Eq(x => x.Ativo, ativo.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(search.Trim()), "i");
+            filter &= Builders<Fornecedor>.Filter.Or(
+                Builders<Fornecedor>.Filter.Regex(x => x.Nome, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Documento, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Email, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Contato, regex));
+        }
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)
             .SortBy(x => x.Nome)
@@ -64,6 +81,79 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     {
         EnqueueReplace(Collection, fornecedor.Id, fornecedor);
         return Task.CompletedTask;
+    }
+}
+
+public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
+    : MongoRepositoryBase(context, unitOfWork), IPedidoFornecedorRepository
+{
+    private IMongoCollection<PedidoFornecedor> Collection => Context.GetCollection<PedidoFornecedor>(MongoCollectionNames.PedidosFornecedor);
+
+    public async Task<PedidoFornecedor?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public Task AddAsync(PedidoFornecedor pedido)
+    {
+        EnqueueInsert(Collection, pedido);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(PedidoFornecedor pedido)
+    {
+        EnqueueReplace(Collection, pedido.Id, pedido);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyCollection<PedidoFornecedor>> GetHistoricoPorFornecedorAsync(Guid empresaId, Guid fornecedorId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.FornecedorId == fornecedorId)
+            .SortByDescending(x => x.DataPedido)
+            .ToListAsync();
+
+    public async Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosAtrasadosAsync(Guid empresaId, DateTime referencia) =>
+        await Collection.Find(x => x.EmpresaId == empresaId &&
+                                   x.PrevisaoEntrega.HasValue &&
+                                   x.PrevisaoEntrega.Value.Date < referencia.Date &&
+                                   (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito))
+            .ToListAsync();
+
+    public async Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosRecebidosNoPeriodoAsync(Guid empresaId, DateTime de, DateTime ate) =>
+        await Collection.Find(x => x.EmpresaId == empresaId &&
+                                   x.Status == StatusPedidoFornecedor.Recebido &&
+                                   x.DataRecebimento.HasValue &&
+                                   x.DataRecebimento.Value >= de &&
+                                   x.DataRecebimento.Value <= ate)
+            .ToListAsync();
+
+    public async Task<int> CountPedidosAbertosOuEmTransitoAsync(Guid empresaId, Guid fornecedorId) =>
+        (int)await Collection.CountDocumentsAsync(x => x.EmpresaId == empresaId &&
+                                                      x.FornecedorId == fornecedorId &&
+                                                      (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito));
+
+    public async Task<(int QuantidadePedidos, decimal TotalGasto, decimal? LeadTimeRealMedioDias, decimal FrequenciaPedidosPorMes)> GetEstatisticasAsync(Guid empresaId, Guid fornecedorId)
+    {
+        var pedidos = await Collection.Find(x => x.EmpresaId == empresaId && x.FornecedorId == fornecedorId).ToListAsync();
+        if (pedidos.Count == 0)
+            return (0, 0m, null, 0m);
+
+        var totalGasto = pedidos
+            .Where(x => x.Status != StatusPedidoFornecedor.Cancelado)
+            .Sum(x => x.ValorEstimado ?? 0m);
+
+        var leadTimes = pedidos
+            .Where(x => x.DataRecebimento.HasValue && x.DataRecebimento.Value >= x.DataPedido)
+            .Select(x => (decimal)(x.DataRecebimento!.Value.Date - x.DataPedido.Date).TotalDays)
+            .ToList();
+
+        var primeiroPedido = pedidos.Min(x => x.DataPedido.Date);
+        var ultimoMarco = pedidos.Max(x => (x.DataRecebimento ?? x.DataPedido).Date);
+        var meses = Math.Max(1m, (decimal)(ultimoMarco - primeiroPedido).TotalDays / 30m);
+        var frequencia = decimal.Round(pedidos.Count / meses, 2);
+
+        return (
+            pedidos.Count,
+            totalGasto,
+            leadTimes.Count == 0 ? null : decimal.Round(leadTimes.Average(), 2),
+            frequencia);
     }
 }
 

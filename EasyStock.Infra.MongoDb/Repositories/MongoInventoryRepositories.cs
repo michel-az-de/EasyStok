@@ -42,37 +42,41 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         return await Collection.Find(filter).Limit(100).ToListAsync();
     }
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20) =>
-        PaginateAsync(Builders<ItemEstoque>.Filter.Where(x => x.EmpresaId == empresaId && x.QuantidadeAtual.Value <= limite),
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20, Guid? lojaId = null) =>
+        PaginateAsync(Builders<ItemEstoque>.Filter.Where(x => x.EmpresaId == empresaId && x.QuantidadeAtual.Value <= limite &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value)),
             Builders<ItemEstoque>.Sort.Ascending("QuantidadeAtual"),
             page,
             pageSize);
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20)
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
         var cutoff = DateTime.UtcNow.AddDays(dias);
         return PaginateAsync(Builders<ItemEstoque>.Filter.Where(x =>
             x.EmpresaId == empresaId &&
             x.ValidadeEm != null &&
-            x.ValidadeEm.DataValidade <= cutoff),
+            x.ValidadeEm.DataValidade <= cutoff &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value)),
             Builders<ItemEstoque>.Sort.Ascending("ValidadeEm"),
             page,
             pageSize);
     }
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20)
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
         var cutoff = DateTime.UtcNow.AddDays(-diasSemMovimento);
         return PaginateAsync(Builders<ItemEstoque>.Filter.Where(x =>
             x.EmpresaId == empresaId &&
-            (x.UltimaMovimentacaoEm == null || x.UltimaMovimentacaoEm < cutoff)),
+            (x.UltimaMovimentacaoEm == null || x.UltimaMovimentacaoEm < cutoff) &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value)),
             Builders<ItemEstoque>.Sort.Descending(x => x.UltimaMovimentacaoEm),
             page,
             pageSize);
     }
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20) =>
-        PaginateAsync(Builders<ItemEstoque>.Filter.Where(x => x.EmpresaId == empresaId && x.QuantidadeAtual.Value < limiteQuantidade),
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20, Guid? lojaId = null) =>
+        PaginateAsync(Builders<ItemEstoque>.Filter.Where(x => x.EmpresaId == empresaId && x.QuantidadeAtual.Value < limiteQuantidade &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value)),
             Builders<ItemEstoque>.Sort.Ascending("QuantidadeAtual"),
             page,
             pageSize);
@@ -343,11 +347,13 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
     public async Task<Notificacao?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, int page = 1, int pageSize = 20)
+    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, TipoAlertaEstoque? tipo = null, int page = 1, int pageSize = 20)
     {
         var filter = Builders<Notificacao>.Filter.Eq(x => x.EmpresaId, empresaId);
         if (lida.HasValue)
             filter &= Builders<Notificacao>.Filter.Eq(x => x.Lida, lida.Value);
+        if (tipo.HasValue)
+            filter &= Builders<Notificacao>.Filter.Eq(x => x.TipoAlerta, tipo.Value);
 
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)
@@ -361,6 +367,20 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
 
     public Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>
         Collection.Find(x => x.EmpresaId == empresaId && x.TipoAlerta == tipo && x.ReferenciaId == referenciaId && !x.Lida).AnyAsync();
+
+    public Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia)
+    {
+        var inicio = dataReferencia.Date;
+        var fim = inicio.AddDays(1);
+        return Collection.Find(x => x.EmpresaId == empresaId &&
+                                    x.TipoAlerta == tipo &&
+                                    x.ReferenciaId == referenciaId &&
+                                    x.CriadaEm >= inicio &&
+                                    x.CriadaEm < fim).AnyAsync();
+    }
+
+    public async Task<int> CountNaoLidasAsync(Guid empresaId) =>
+        (int)await Collection.CountDocumentsAsync(x => x.EmpresaId == empresaId && !x.Lida);
 
     public Task AddAsync(Notificacao notificacao)
     {
@@ -392,6 +412,12 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
                         .Set(x => x.Lida, true)
                         .Set(x => x.LidaEm, agora),
                     cancellationToken: ct));
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
         return Task.CompletedTask;
     }
 }

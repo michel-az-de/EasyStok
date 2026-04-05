@@ -16,8 +16,11 @@ namespace EasyStock.Domain.Entities
         public bool Ativo { get; set; }
         public DateTime CriadoEm { get; set; }
 
+        public int LimiteGeracoesIaMensais { get; set; }
+
         public bool LojasSaoIlimitadas => LimiteLojas == SemLimite;
         public bool UsuariosSaoIlimitados => LimiteUsuarios == SemLimite;
         public bool ProdutosSaoIlimitados => LimiteProdutos == SemLimite;
+        public bool GeracoesIaSaoIlimitadas => LimiteGeracoesIaMensais == SemLimite;
     }
 }

@@ -14,7 +14,9 @@ internal static class MongoCollectionNames
     public const string MovimentacoesEstoque = "movimentacoes_estoque";
     public const string Notificacoes = "notificacoes";
     public const string Lojas = "lojas";
+    public const string ConfiguracoesLoja = "configuracoes_loja";
     public const string Fornecedores = "fornecedores";
+    public const string PedidosFornecedor = "pedidos_fornecedor";
     public const string Usuarios = "usuarios";
     public const string RefreshTokens = "refresh_tokens";
     public const string ResetTokens = "reset_tokens";
