@@ -42,6 +42,8 @@ namespace EasyStock.Infra.Postgre.Services
                 yield break;
             }
 
+            using (response)
+            {
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
 
@@ -75,6 +77,7 @@ namespace EasyStock.Infra.Postgre.Services
 
                 if (!string.IsNullOrEmpty(text))
                     yield return text;
+            }
             }
         }
 

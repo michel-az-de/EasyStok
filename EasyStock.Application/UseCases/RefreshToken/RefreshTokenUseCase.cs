@@ -24,7 +24,7 @@ public sealed class RefreshTokenUseCase(
         logger.LogInformation("Iniciando refresh token");
 
         // Verificar se refresh token existe e e valido
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(command.RefreshToken);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
         if (refreshToken == null || !refreshToken.EstaValido())
         {
@@ -46,7 +46,7 @@ public sealed class RefreshTokenUseCase(
 
         // Criar novo refresh token
         var novoRefreshTokenValue = Guid.NewGuid().ToString();
-        var novoTokenHash = BCrypt.Net.BCrypt.HashPassword(novoRefreshTokenValue);
+        var novoTokenHash = TokenHashHelper.ComputeSha256Hash(novoRefreshTokenValue);
         var expiraEm = DateTime.UtcNow.AddDays(7); // 7 dias
         var novoRefreshToken = RefreshTokenEntity.Criar(
             usuario.Id,

@@ -2,10 +2,13 @@ using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+[SwaggerTag("Uploads")]
 [Authorize]
 [ApiController]
 [Route("api/uploads")]
@@ -13,6 +16,10 @@ public class UploadsController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
     ICurrentUserAccessor currentUserAccessor) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Upload product photo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("produto/{id}/foto")]
     public async Task<IActionResult> UploadFotoProduto(Guid id, [FromQuery] Guid empresaId, IFormFile file, CancellationToken cancellationToken)
     {
@@ -20,6 +27,10 @@ public class UploadsController(
         return DataOk(result);
     }
 
+    [SwaggerOperation(Summary = "Upload user avatar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("usuario/avatar")]
     public async Task<IActionResult> UploadAvatar(IFormFile file, CancellationToken cancellationToken)
     {
@@ -34,6 +45,10 @@ public class UploadsController(
         return DataOk(result);
     }
 
+    [SwaggerOperation(Summary = "Upload store logo (Admin only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [Authorize(Policy = "Admin")]
     [HttpPost("loja/logo")]
     public async Task<IActionResult> UploadLogoLoja([FromQuery] Guid lojaId, IFormFile file, CancellationToken cancellationToken)

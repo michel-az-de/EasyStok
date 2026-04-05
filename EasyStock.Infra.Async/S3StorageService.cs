@@ -56,7 +56,7 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
         return Task.FromResult(false);
     }
 
-    public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = null)
+    public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = "")
     {
         // IFileStorage não suporta listagem
         return Task.FromResult(Enumerable.Empty<string>());

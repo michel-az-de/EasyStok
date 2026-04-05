@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Logout;
@@ -16,7 +15,7 @@ public sealed class LogoutUseCase(
     {
         logger.LogInformation("Iniciando logout");
 
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(command.RefreshToken);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
         if (refreshToken == null || !refreshToken.EstaValido())
         {
