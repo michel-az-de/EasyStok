@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.ConfiguracoesLoja;
 using EasyStock.Domain.Entities;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -14,6 +15,7 @@ public class ConfiguracaoLojaUseCaseTests
         var lojaRepository = Substitute.For<ILojaRepository>();
         var configuracaoRepository = Substitute.For<IConfiguracaoLojaRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<AtualizarConfiguracaoLojaUseCase>>();
 
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
@@ -24,7 +26,7 @@ public class ConfiguracaoLojaUseCaseTests
         lojaRepository.GetByIdAsync(empresaId, lojaId).Returns(loja);
         configuracaoRepository.GetByLojaIdAsync(lojaId).Returns(configuracao);
 
-        var useCase = new AtualizarConfiguracaoLojaUseCase(lojaRepository, configuracaoRepository, unitOfWork);
+        var useCase = new AtualizarConfiguracaoLojaUseCase(lojaRepository, configuracaoRepository, unitOfWork, logger);
 
         var result = await useCase.ExecuteAsync(new AtualizarConfiguracaoLojaCommand(
             empresaId,
@@ -57,6 +59,7 @@ public class ConfiguracaoLojaUseCaseTests
         var lojaRepository = Substitute.For<ILojaRepository>();
         var configuracaoRepository = Substitute.For<IConfiguracaoLojaRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<ResetarConfiguracaoLojaUseCase>>();
 
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
@@ -67,7 +70,7 @@ public class ConfiguracaoLojaUseCaseTests
         lojaRepository.GetByIdAsync(empresaId, lojaId).Returns(loja);
         configuracaoRepository.GetByLojaIdAsync(lojaId).Returns(configuracao);
 
-        var useCase = new ResetarConfiguracaoLojaUseCase(lojaRepository, configuracaoRepository, unitOfWork);
+        var useCase = new ResetarConfiguracaoLojaUseCase(lojaRepository, configuracaoRepository, unitOfWork, logger);
 
         var result = await useCase.ExecuteAsync(new ResetarConfiguracaoLojaCommand(empresaId, lojaId));
 

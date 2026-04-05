@@ -1,5 +1,6 @@
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -80,7 +81,7 @@ public class UploadsController(
     private static async Task<(string FileName, string ContentType, byte[] Content)> LerArquivoAsync(IFormFile file, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
-            throw new InvalidOperationException("Arquivo nao informado.");
+            throw new UseCaseValidationException("Arquivo nao informado ou vazio.");
 
         await using var memoryStream = new MemoryStream();
         await file.CopyToAsync(memoryStream, cancellationToken);

@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.ConfiguracoesLoja;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Controllers;
@@ -20,8 +21,10 @@ public class ConfiguracoesControllerTests
     public ConfiguracoesControllerTests()
     {
         var obter = new ObterConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository);
-        var atualizar = new AtualizarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork);
-        var resetar = new ResetarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork);
+        var atualizarLogger = Substitute.For<ILogger<AtualizarConfiguracaoLojaUseCase>>();
+        var resetarLogger = Substitute.For<ILogger<ResetarConfiguracaoLojaUseCase>>();
+        var atualizar = new AtualizarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork, atualizarLogger);
+        var resetar = new ResetarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork, resetarLogger);
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _controller = new ConfiguracoesController(obter, atualizar, resetar, _currentUser);
     }

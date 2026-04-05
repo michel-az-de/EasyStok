@@ -76,10 +76,10 @@ public class GlobalExceptionHandlerTests
     }
 
     [Fact]
-    public async Task Deve_retornar_422_para_plano_limite_atingido()
+    public async Task Deve_retornar_402_para_plano_limite_atingido()
     {
         var handler = new GlobalExceptionHandler();
-        var context = CriarHttpContext("/api/ia/anuncio", "corr-422");
+        var context = CriarHttpContext("/api/ia/anuncio", "corr-402");
 
         var handled = await handler.TryHandleAsync(
             context,
@@ -87,7 +87,7 @@ public class GlobalExceptionHandlerTests
             CancellationToken.None);
 
         Assert.True(handled);
-        Assert.Equal(StatusCodes.Status422UnprocessableEntity, context.Response.StatusCode);
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
 
         var payload = await LerRespostaAsync(context);
         var error = payload.RootElement.GetProperty("error");

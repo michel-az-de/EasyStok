@@ -36,4 +36,19 @@ public class VendaController(IVendaRepository vendaRepository) : EasyStockContro
         var venda = await vendaRepository.GetByIdAsync(empresaId, id);
         return venda is null ? DataNotFound() : DataOk(venda);
     }
+
+    [SwaggerOperation(Summary = "Get sale items", Description = "Returns the list of items that compose a sale.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id}/itens")]
+    public async Task<IActionResult> GetItens(Guid id, [FromQuery] Guid empresaId)
+    {
+        var venda = await vendaRepository.GetByIdAsync(empresaId, id);
+        if (venda is null)
+            return DataNotFound();
+
+        var itens = venda.ItensVenda ?? Enumerable.Empty<Domain.Entities.ItemVenda>();
+        return DataOk(itens);
+    }
 }
