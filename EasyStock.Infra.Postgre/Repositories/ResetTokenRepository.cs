@@ -9,8 +9,8 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
 {
     private readonly EasyStockDbContext _context = context;
 
-    public async Task<ResetToken?> GetByTokenAsync(string token) =>
-        await _context.ResetTokens.FirstOrDefaultAsync(rt => rt.Token == token);
+    public Task<ResetToken?> GetByTokenAsync(string token) =>
+        _context.ResetTokens.FirstOrDefaultAsync(rt => rt.Token == token);
 
     public async Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await _context.ResetTokens.Where(rt => rt.UsuarioId == usuarioId).ToListAsync();

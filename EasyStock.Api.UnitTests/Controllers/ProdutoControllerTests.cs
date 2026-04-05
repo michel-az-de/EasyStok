@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
@@ -72,26 +73,21 @@ public class ProdutoControllerTests
     [Fact]
     public async Task GetAll_DeveRetornarOk_ComListaDeProdutos()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto1" } };
         _produtoRepository.GetProdutosPaginadosAsync(empresaId, 1, 20).Returns((produtos, 1));
 
-        // Act
         var result = await _controller.GetAll(empresaId);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        var produtosRetornados = ObterPropriedade<IEnumerable<Produto>>(okResult!.Value, "Produtos");
-        var totalCount = ObterPropriedade<int>(okResult.Value, "TotalCount");
-        produtosRetornados.Should().BeEquivalentTo(produtos);
-        totalCount.Should().Be(1);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<Produto>>>().Subject;
+        envelope.Data.Should().BeEquivalentTo(produtos);
+        envelope.Meta.Should().BeOfType<PagedMeta>().Which.Total.Should().Be(1);
     }
+
     [Fact]
     public async Task GetById_DeveRetornarOk_QuandoProdutoEncontrado()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
         var produto = new Produto
         {
@@ -105,48 +101,38 @@ public class ProdutoControllerTests
         _produtoVariacaoRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
         _itemEstoqueRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
 
-        // Act
         var result = await _controller.GetById(produto.Id, empresaId);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeOfType<ProdutoDetalheResult>();
-        var payload = okResult.Value as ProdutoDetalheResult;
-        payload!.ProdutoId.Should().Be(produto.Id);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ProdutoDetalheResult>>().Subject;
+        envelope.Data.ProdutoId.Should().Be(produto.Id);
     }
 
     [Fact]
     public async Task GetById_DeveRetornarNotFound_QuandoProdutoNaoEncontrado()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
         _produtoRepository.GetDetalheAsync(empresaId, id).Returns((Produto?)null);
 
-        // Act
         var result = await _controller.GetById(id, empresaId);
 
-        // Assert
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
     public async Task Search_DeveRetornarOk_ComProdutosFiltrados()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
         var termo = "teste";
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto Teste" } };
         _produtoRepository.SearchAsync(empresaId, termo).Returns(produtos);
 
-        // Act
         var result = await _controller.Search(empresaId, termo);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(produtos);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<Produto>>>().Subject;
+        envelope.Data.Should().BeEquivalentTo(produtos);
     }
 
     [Fact]
@@ -183,12 +169,10 @@ public class ProdutoControllerTests
 
         var result = await _controller.Create(command);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
-        var createdResult = result as CreatedAtActionResult;
-        createdResult!.Value.Should().BeOfType<CadastrarProdutoResult>();
-        var payload = createdResult.Value as CadastrarProdutoResult;
-        payload!.ProdutoId.Should().NotBe(Guid.Empty);
-        createdResult.ActionName.Should().Be("GetById");
+        result.Should().BeOfType<CreatedResult>();
+        var createdResult = (CreatedResult)result;
+        var envelope = createdResult.Value.Should().BeOfType<ApiResponse<CadastrarProdutoResult>>().Subject;
+        envelope.Data.ProdutoId.Should().NotBe(Guid.Empty);
         await _produtoRepository.Received(1).InsertAsync(Arg.Any<Produto>());
     }
 
@@ -220,11 +204,4 @@ public class ProdutoControllerTests
             .WithMessage("*estoque disponivel*");
     }
 
-    private static T ObterPropriedade<T>(object? source, string nome)
-    {
-        source.Should().NotBeNull();
-        var propriedade = source!.GetType().GetProperty(nome);
-        propriedade.Should().NotBeNull();
-        return (T)propriedade!.GetValue(source)!;
-    }
 }

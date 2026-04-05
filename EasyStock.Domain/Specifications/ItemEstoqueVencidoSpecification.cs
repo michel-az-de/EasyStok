@@ -8,11 +8,11 @@ public class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
 
     public ItemEstoqueVencidoSpecification(DateTime dataReferencia)
     {
-        _dataReferencia = dataReferencia;
+        _dataReferencia = dataReferencia.Date;
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)
     {
-        return item.ValidadeEm?.DataValidade < _dataReferencia;
+        return item.ValidadeEm?.DataValidade.Date < _dataReferencia;
     }
 }

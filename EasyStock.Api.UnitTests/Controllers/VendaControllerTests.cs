@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using FluentAssertions;
@@ -48,23 +49,20 @@ public class VendaControllerTests
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().Be(venda);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<Venda>>().Subject;
+        envelope.Data.Should().Be(venda);
     }
 
     [Fact]
     public async Task GetById_DeveRetornarNotFound_QuandoVendaNaoEncontrada()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
         _vendaRepository.GetByIdAsync(empresaId, id).Returns((Venda?)null);
 
-        // Act
         var result = await _controller.GetById(id, empresaId);
 
-        // Assert
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
 }

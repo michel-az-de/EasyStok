@@ -9,8 +9,8 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
 {
     private readonly EasyStockDbContext _context = context;
 
-    public async Task<RefreshToken?> GetByTokenHashAsync(string tokenHash) =>
-        await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
+    public Task<RefreshToken?> GetByTokenHashAsync(string tokenHash) =>
+        _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
 
     public async Task<IEnumerable<RefreshToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId).ToListAsync();

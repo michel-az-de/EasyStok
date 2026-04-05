@@ -44,8 +44,8 @@ public static class ServiceCollectionExtensions
 }
 
 /// <summary>
-/// Implementação de email que apenas loga no console.
-/// Útil para desenvolvimento e testes.
+/// Implementacao de email que apenas loga no console.
+/// Util para desenvolvimento e testes.
 /// </summary>
 public sealed class ConsoleEmailService : IEmailService
 {

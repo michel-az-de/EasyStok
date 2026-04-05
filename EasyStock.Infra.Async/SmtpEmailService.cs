@@ -6,8 +6,8 @@ using System.Net.Sockets;
 namespace EasyStock.Infra.Async;
 
 /// <summary>
-/// Implementa��o SMTP do servi�o de email.
-/// Suporte a templates b�sicos, anexos e retry autom�tico em falhas transientes.
+/// Implementacao SMTP do servico de email.
+/// Suporte a templates basicos, anexos e retry automatico em falhas transientes.
 /// </summary>
 public sealed class SmtpEmailService : IEmailService, IDisposable
 {
@@ -21,7 +21,6 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
     {
         _fromEmail = fromEmail;
         _fromName = fromName;
-
         _smtpClient = new SmtpClient(host, port)
         {
             Credentials = new NetworkCredential(username, password),
@@ -31,20 +30,14 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
         };
     }
 
-    public async Task SendAsync(string to, string subject, string body, bool isHtml = false)
-    {
-        await SendAsync(new[] { to }, subject, body, isHtml);
-    }
+    public Task SendAsync(string to, string subject, string body, bool isHtml = false) =>
+        SendAsync(new[] { to }, subject, body, isHtml);
 
-    public async Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
-    {
-        await SendAsync(new[] { to }, subject, body, attachments, isHtml);
-    }
+    public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false) =>
+        SendAsync(new[] { to }, subject, body, attachments, isHtml);
 
-    public async Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false)
-    {
-        await SendAsync(to, subject, body, Enumerable.Empty<EmailAttachment>(), isHtml);
-    }
+    public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false) =>
+        SendAsync(to, subject, body, Enumerable.Empty<EmailAttachment>(), isHtml);
 
     public async Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
@@ -76,18 +69,15 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
             Body = body,
             IsBodyHtml = isHtml
         };
-
         foreach (var recipient in to)
         {
             mailMessage.To.Add(recipient);
         }
-
         foreach (var attachment in attachments)
         {
             var mailAttachment = new Attachment(new MemoryStream(attachment.Content), attachment.FileName, attachment.ContentType);
             mailMessage.Attachments.Add(mailAttachment);
         }
-
         await _smtpClient.SendMailAsync(mailMessage);
     }
 
@@ -100,7 +90,7 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        // Implementa��o b�sica - em produ��o usar template engine como Razor ou Handlebars
+        // Implementacao basica - em producao usar template engine como Razor ou Handlebars
         var body = $"Template: {templateName}\n\nModel: {System.Text.Json.JsonSerializer.Serialize(model)}";
         return SendAsync(to, subject, body, isHtml);
     }

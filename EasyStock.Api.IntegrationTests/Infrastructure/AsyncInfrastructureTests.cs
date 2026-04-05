@@ -6,7 +6,7 @@ using Xunit;
 namespace EasyStock.Api.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Testes de integração para a infraestrutura assíncrona.
+/// Testes de integraÃ§Ã£o para a infraestrutura assÃ­ncrona.
 /// Testa cache, fila, email e storage em conjunto.
 /// </summary>
 public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture>
@@ -24,7 +24,7 @@ public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture
         // Arrange
         var cache = _fixture.CacheService;
         var key = "test-key";
-        var value = new TestData { Id = 1, Name = "Test" };
+        var value = new TestData(1, "Test");
 
         // Act
         await cache.SetAsync(key, value, TimeSpan.FromMinutes(5));
@@ -56,7 +56,7 @@ public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture
         // Arrange
         var queue = _fixture.QueueService;
         var queueName = "test-queue";
-        var message = new TestMessage { Content = "Hello World" };
+        var message = new TestMessage("Hello World");
         var processedMessages = new List<TestMessage>();
 
         // Act
@@ -64,9 +64,10 @@ public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture
 
         // Processar a mensagem
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await queue.ProcessQueueAsync(queueName, async (TestMessage msg) =>
+        await queue.ProcessQueueAsync(queueName, (TestMessage msg) =>
         {
             processedMessages.Add(msg);
+            return Task.CompletedTask;
         }, cts.Token);
 
         // Assert
@@ -80,7 +81,7 @@ public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture
         // Arrange
         var emailService = _fixture.EmailService;
 
-        // Act & Assert - Não deve lançar exceção
+        // Act & Assert - NÃ£o deve lanÃ§ar exceÃ§Ã£o
         await emailService.SendAsync(
             "test@example.com",
             "Test Subject",
@@ -134,7 +135,7 @@ public class AsyncInfrastructureTests : IClassFixture<AsyncInfrastructureFixture
     }
 }
 
-/// <summary>Fixture para compartilhar instâncias de infraestrutura entre testes.</summary>
+/// <summary>Fixture para compartilhar instÃ¢ncias de infraestrutura entre testes.</summary>
 public sealed class AsyncInfrastructureFixture : IDisposable
 {
     public ICacheService CacheService { get; }
@@ -144,10 +145,10 @@ public sealed class AsyncInfrastructureFixture : IDisposable
 
     public AsyncInfrastructureFixture()
     {
-        // Em testes, usar implementações em memória/simuladas
+        // Em testes, usar implementaÃ§Ãµes em memÃ³ria/simuladas
         CacheService = new InMemoryCacheService();
         QueueService = new BackgroundQueueService();
-        EmailService = new ConsoleEmailService();
+        EmailService = new TestEmailService();
         StorageService = new InMemoryStorageService();
     }
 
@@ -158,7 +159,7 @@ public sealed class AsyncInfrastructureFixture : IDisposable
     }
 }
 
-/// <summary>Implementação em memória do cache para testes.</summary>
+/// <summary>ImplementaÃ§Ã£o em memÃ³ria do cache para testes.</summary>
 public sealed class InMemoryCacheService : ICacheService
 {
     private readonly Dictionary<string, (object Value, DateTime Expiry)> _cache = new();
@@ -194,7 +195,7 @@ public sealed class InMemoryCacheService : ICacheService
 
     public async Task<long> IncrementAsync(string key, long value = 1)
     {
-        var current = await GetAsync<long>(key) ?? 0;
+        var current = await GetAsync<long>(key);
         var newValue = current + value;
         await SetAsync(key, newValue);
         return newValue;
@@ -217,7 +218,20 @@ public sealed class InMemoryCacheService : ICacheService
     }
 }
 
-/// <summary>Implementação em memória do storage para testes.</summary>
+public sealed class TestEmailService : IEmailService
+{
+    public Task SendAsync(string to, string subject, string body, bool isHtml = false) => Task.CompletedTask;
+
+    public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false) =>
+        Task.CompletedTask;
+
+    public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false) => Task.CompletedTask;
+
+    public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true) =>
+        Task.CompletedTask;
+}
+
+/// <summary>ImplementaÃ§Ã£o em memÃ³ria do storage para testes.</summary>
 public sealed class InMemoryStorageService : IStorageService
 {
     private readonly Dictionary<string, byte[]> _files = new();
@@ -265,7 +279,7 @@ public sealed class InMemoryStorageService : IStorageService
         return Task.FromResult(_files.ContainsKey(key));
     }
 
-    public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = null)
+    public Task<IEnumerable<string>> ListFilesAsync(string container, string? prefix = null)
     {
         var files = _files.Keys
             .Where(k => k.StartsWith($"{container}/"))
