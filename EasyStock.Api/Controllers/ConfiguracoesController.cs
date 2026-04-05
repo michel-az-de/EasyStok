@@ -3,10 +3,13 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.ConfiguracoesLoja;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+[SwaggerTag("Store Configuration / Configurações")]
 [ApiController]
 [Route("api/configuracoes")]
 [Authorize(Policy = "Gerente")]
@@ -16,6 +19,9 @@ public class ConfiguracoesController(
     ResetarConfiguracaoLojaUseCase resetarUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Get store configuration (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] Guid empresaId, [FromQuery] Guid lojaId)
     {
@@ -25,6 +31,10 @@ public class ConfiguracoesController(
         return DataOk(await obterUseCase.ExecuteAsync(new ObterConfiguracaoLojaQuery(empresaId, lojaId)));
     }
 
+    [SwaggerOperation(Summary = "Update store configuration (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPatch]
     public async Task<IActionResult> Patch([FromBody] AtualizarConfiguracaoLojaCommand command)
     {
@@ -34,6 +44,9 @@ public class ConfiguracoesController(
         return DataOk(await atualizarUseCase.ExecuteAsync(command));
     }
 
+    [SwaggerOperation(Summary = "Reset store configuration to defaults (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("reset")]
     public async Task<IActionResult> Reset([FromBody] ResetarConfiguracaoLojaCommand command)
     {

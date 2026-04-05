@@ -3,12 +3,15 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Application.UseCases.Common;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using System.Text;
 using System.Text.Json;
 
 namespace EasyStock.Api.Controllers;
 
+[SwaggerTag("AI Listings / Anúncios IA")]
 [ApiController]
 [Route("api/ia")]
 [Authorize]
@@ -25,6 +28,10 @@ public class IaAnuncioController(
     /// Eventos: data: {"texto":"..."} ... data: [DONE]
     /// Erros SSE: event: erro\ndata: {"error": {...}}
     /// </summary>
+    [SwaggerOperation(Summary = "Generate AI product listing (SSE stream)", Description = "Streams AI-generated product listing text via Server-Sent Events. Requires Operador role. Rate limited to 10 req/min.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("anuncio")]
     [Authorize(Policy = "Operador")]
     public async Task GerarAnuncioSse([FromBody] GerarAnuncioRequest request, CancellationToken ct)
@@ -63,6 +70,10 @@ public class IaAnuncioController(
     }
 
     /// <summary>Salva um rascunho gerado.</summary>
+    [SwaggerOperation(Summary = "Save generated listing")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("anuncio/salvar")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> SalvarAnuncio([FromBody] SalvarAnuncioRequest request)
@@ -82,6 +93,9 @@ public class IaAnuncioController(
     }
 
     /// <summary>Lista anuncios salvos de um produto.</summary>
+    [SwaggerOperation(Summary = "List saved listings for a product")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("anuncios/{prodId:guid}")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> ListarAnuncios(Guid prodId, [FromQuery] Guid? empresaId)
@@ -91,6 +105,10 @@ public class IaAnuncioController(
     }
 
     /// <summary>Exclui um anuncio salvo.</summary>
+    [SwaggerOperation(Summary = "Delete saved listing")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpDelete("anuncios/{id:guid}")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> ExcluirAnuncio(Guid id, [FromQuery] Guid? empresaId)
@@ -101,6 +119,9 @@ public class IaAnuncioController(
     }
 
     /// <summary>Consumo de IA do mes corrente para a empresa.</summary>
+    [SwaggerOperation(Summary = "Get AI usage statistics")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("uso")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> ObterUso([FromQuery] Guid? empresaId)
