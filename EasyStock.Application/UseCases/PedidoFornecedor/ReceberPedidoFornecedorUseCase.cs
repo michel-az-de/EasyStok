@@ -70,7 +70,8 @@ public class ReceberPedidoFornecedorUseCase(
                 }
             }
 
-            var quantidade = Quantidade.From((int)Math.Max(1, Math.Round(item.Quantidade)));
+            // Quantities are validated > 0 at order creation; rounding handles fractional decimal storage.
+            var quantidade = Quantidade.From((int)Math.Round(item.Quantidade));
             var custoUnitario = item.CustoUnitario.HasValue
                 ? Dinheiro.FromDecimal(item.CustoUnitario.Value)
                 : Dinheiro.FromDecimal(0m);
@@ -146,7 +147,10 @@ public class ReceberPedidoFornecedorUseCase(
         }
         else
         {
-            // Rolling average: keep existing mean and blend with the new observation
+            // Simplified exponential moving average (EMA-2): blends the current rolling mean with
+            // the new observation using equal weight. This intentionally gives more recent deliveries
+            // increasing influence while avoiding the need to store historical counts.
+            // A full true-average is always available via GetEstatisticasAsync.
             var novaMedia = decimal.Round((fornecedor.LeadTimeRealMedioDias.Value + leadTimeDias) / 2m, 2);
             fornecedor.AtualizarLeadTimeReal(novaMedia);
         }
