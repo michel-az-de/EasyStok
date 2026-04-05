@@ -24,10 +24,19 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
             using var session = await mongoClient.StartSessionAsync();
             session.StartTransaction();
 
-            foreach (var operation in pending)
-                await operation(session, CancellationToken.None);
+            try
+            {
+                foreach (var operation in pending)
+                    await operation(session, CancellationToken.None);
 
-            await session.CommitTransactionAsync();
+                await session.CommitTransactionAsync();
+            }
+            catch
+            {
+                await session.AbortTransactionAsync();
+                throw;
+            }
+
             _operations.Clear();
             return pending.Length;
         }

@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
-/// Serviço de cache distribuído para armazenamento temporário de dados.
-/// Suporte a serialização JSON automática e TTL configurável.
+/// Serviï¿½o de cache distribuï¿½do para armazenamento temporï¿½rio de dados.
+/// Suporte a serializaï¿½ï¿½o JSON automï¿½tica e TTL configurï¿½vel.
 /// </summary>
 public interface ICacheService
 {
@@ -20,37 +20,37 @@ public interface ICacheService
     /// <summary>Verifica se uma chave existe no cache.</summary>
     Task<bool> ExistsAsync(string key);
 
-    /// <summary>Incrementa um valor numérico no cache.</summary>
+    /// <summary>Incrementa um valor numï¿½rico no cache.</summary>
     Task<long> IncrementAsync(string key, long value = 1);
 
     /// <summary>Define TTL para uma chave existente.</summary>
     Task SetExpiryAsync(string key, TimeSpan ttl);
 
-    /// <summary>Remove múltiplas chaves do cache.</summary>
+    /// <summary>Remove mï¿½ltiplas chaves do cache.</summary>
     Task RemoveAsync(IEnumerable<string> keys);
 }
 
 /// <summary>
-/// Serviço de fila para processamento assíncrono de mensagens/jobs.
+/// Serviï¿½o de fila para processamento assï¿½ncrono de mensagens/jobs.
 /// Suporte a enfileiramento e processamento em background.
 /// </summary>
 public interface IQueueService
 {
-    /// <summary>Enfileira uma mensagem para processamento assíncrono.</summary>
+    /// <summary>Enfileira uma mensagem para processamento assï¿½ncrono.</summary>
     Task EnqueueAsync<T>(string queueName, T message);
 
-    /// <summary>Processa mensagens de uma fila específica.</summary>
+    /// <summary>Processa mensagens de uma fila especï¿½fica.</summary>
     Task ProcessQueueAsync<T>(string queueName, Func<T, Task> processor, CancellationToken cancellationToken);
 
-    /// <summary>Obtém o tamanho da fila.</summary>
+    /// <summary>Obtï¿½m o tamanho da fila.</summary>
     Task<int> GetQueueLengthAsync(string queueName);
 
-    /// <summary>Limpa uma fila específica.</summary>
+    /// <summary>Limpa uma fila especï¿½fica.</summary>
     Task ClearQueueAsync(string queueName);
 }
 
 /// <summary>
-/// Serviço para envio de emails transacionais.
+/// Serviï¿½o para envio de emails transacionais.
 /// Suporte a templates e anexos.
 /// </summary>
 public interface IEmailService
@@ -61,7 +61,7 @@ public interface IEmailService
     /// <summary>Envia um email com anexos.</summary>
     Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false);
 
-    /// <summary>Envia email para múltiplos destinatários.</summary>
+    /// <summary>Envia email para mï¿½ltiplos destinatï¿½rios.</summary>
     Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false);
 
     /// <summary>Envia email usando template.</summary>
@@ -72,7 +72,7 @@ public interface IEmailService
 public sealed record EmailAttachment(string FileName, byte[] Content, string ContentType);
 
 /// <summary>
-/// Serviço de storage para upload/download de arquivos.
+/// Serviï¿½o de storage para upload/download de arquivos.
 /// Suporte a S3, R2, Azure Blob, etc.
 /// </summary>
 public interface IStorageService
@@ -86,7 +86,7 @@ public interface IStorageService
     /// <summary>Faz download de um arquivo.</summary>
     Task<Stream> DownloadAsync(string container, string fileName);
 
-    /// <summary>Obtém URL pública de um arquivo.</summary>
+    /// <summary>Obtï¿½m URL pï¿½blica de um arquivo.</summary>
     Task<string> GetPublicUrlAsync(string container, string fileName, TimeSpan? expiry = null);
 
     /// <summary>Remove um arquivo.</summary>
@@ -96,5 +96,5 @@ public interface IStorageService
     Task<bool> ExistsAsync(string container, string fileName);
 
     /// <summary>Lista arquivos em um container.</summary>
-    Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = null);
+    Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = "");
 }
