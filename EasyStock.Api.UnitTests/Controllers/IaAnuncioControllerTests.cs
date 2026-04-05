@@ -55,7 +55,7 @@ public class IaAnuncioControllerTests
         var result = await _controller.ListarAnuncios(produtoId, _empresaId);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var envelope = ok.Value.Should().BeOfType<ApiResponse<IEnumerable<AnuncioIaResult>>>().Subject;
+        var envelope = ok.Value.Should().BeOfType<ApiResponse<IReadOnlyList<AnuncioIaResult>>>().Subject;
         envelope.Data.Should().HaveCount(1);
         envelope.Meta.Should().NotBeNull();
     }

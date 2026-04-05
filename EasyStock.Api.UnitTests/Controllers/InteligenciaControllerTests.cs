@@ -1,5 +1,6 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
@@ -39,9 +40,8 @@ public class InteligenciaControllerTests
         var result = await _controller.EstoqueBaixo(empresaId, null, 10);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
-        returnedItens.Should().ContainSingle().Which.Should().Be(item1);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<ItemEstoque>>>().Subject;
+        envelope.Data.Should().ContainSingle().Which.Should().Be(item1);
     }
 
     [Fact]
@@ -72,9 +72,8 @@ public class InteligenciaControllerTests
         var result = await _controller.ItensParados(empresaId, null, 90);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
-        returnedItens.Should().ContainSingle().Which.Should().Be(item1);
+        var envelope2 = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<ItemEstoque>>>().Subject;
+        envelope2.Data.Should().ContainSingle().Which.Should().Be(item1);
     }
 
     [Fact]
@@ -87,16 +86,7 @@ public class InteligenciaControllerTests
         var result = await _controller.SugestaoReposicao(empresaId, null);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        var returnedItens = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
-        returnedItens.Should().ContainSingle().Which.Should().Be(item1);
-    }
-
-    private static T ObterPropriedade<T>(object? source, string nome)
-    {
-        source.Should().NotBeNull();
-        var propriedade = source!.GetType().GetProperty(nome);
-        propriedade.Should().NotBeNull();
-        return (T)propriedade!.GetValue(source)!;
+        var envelope3 = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<ItemEstoque>>>().Subject;
+        envelope3.Data.Should().ContainSingle().Which.Should().Be(item1);
     }
 }

@@ -48,6 +48,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
         services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
         services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
+        services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+        services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
+        services.AddScoped<IUsoIaRepository, UsoIaRepository>();
         services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
         services.AddSingleton<MongoDatabaseHealthCheck>(sp => new MongoDatabaseHealthCheck(sp.GetRequiredService<IMongoClient>(), databaseName));
@@ -59,6 +62,7 @@ public static class ServiceCollectionExtensions
         {
             services.AddHttpClient("Anthropic");
             services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
+            services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
         }
         else
         {

@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
@@ -80,9 +81,9 @@ public class ItemEstoqueControllerTests
         var result = await _controller.GetAll(empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        var itensRetornados = ObterPropriedade<IEnumerable<ItemEstoque>>(okResult!.Value, "Items");
-        itensRetornados.Should().BeEquivalentTo(itens);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<ItemEstoque>>>().Subject;
+        envelope.Data.Should().BeEquivalentTo(itens);
+        envelope.Meta.Should().BeOfType<PagedMeta>().Which.Total.Should().Be(1);
     }
 
     [Fact]
@@ -95,8 +96,8 @@ public class ItemEstoqueControllerTests
         var result = await _controller.GetById(item.Id, empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().Be(item);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ItemEstoque>>().Subject;
+        envelope.Data.Should().Be(item);
     }
 
     [Fact]
@@ -108,7 +109,7 @@ public class ItemEstoqueControllerTests
 
         var result = await _controller.GetById(id, empresaId);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -161,15 +162,12 @@ public class ItemEstoqueControllerTests
 
         var result = await _controller.RegistrarEntrada(command);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
-        var createdResult = result as CreatedAtActionResult;
-        createdResult!.ActionName.Should().Be("GetById");
-        createdResult.RouteValues!["id"].Should().NotBeNull();
-        createdResult.Value.Should().BeOfType<RegistrarEntradaEstoqueResult>();
-        var payload = createdResult.Value as RegistrarEntradaEstoqueResult;
-        payload!.ItemEstoqueId.Should().NotBe(Guid.Empty);
-        payload.MovimentacaoId.Should().NotBe(Guid.Empty);
-        payload.ChavePesquisa.Should().Contain("CAP3426");
+        result.Should().BeOfType<CreatedResult>();
+        var createdResult = (CreatedResult)result;
+        var envelope = createdResult.Value.Should().BeOfType<ApiResponse<RegistrarEntradaEstoqueResult>>().Subject;
+        envelope.Data.ItemEstoqueId.Should().NotBe(Guid.Empty);
+        envelope.Data.MovimentacaoId.Should().NotBe(Guid.Empty);
+        envelope.Data.ChavePesquisa.Should().Contain("CAP3426");
     }
 
     [Fact]
@@ -216,12 +214,10 @@ public class ItemEstoqueControllerTests
         var result = await _controller.RegistrarSaida(command);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeOfType<RegistrarSaidaEstoqueResult>();
-        var payload = okResult.Value as RegistrarSaidaEstoqueResult;
-        payload!.VendaId.Should().NotBe(Guid.Empty);
-        payload.Itens.Should().ContainSingle();
-        payload.ValorTotal.Should().Be(1999.50m);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<RegistrarSaidaEstoqueResult>>().Subject;
+        envelope.Data.VendaId.Should().NotBe(Guid.Empty);
+        envelope.Data.Itens.Should().ContainSingle();
+        envelope.Data.ValorTotal.Should().Be(1999.50m);
     }
 
     [Fact]
@@ -289,12 +285,11 @@ public class ItemEstoqueControllerTests
         var result = await _controller.RegistrarSaida(command);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = (OkObjectResult)result;
-        var payload = okResult.Value.Should().BeOfType<RegistrarSaidaEstoqueResult>().Subject;
-        payload.Itens.Should().HaveCount(2);
-        payload.Itens.Select(i => i.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
-        payload.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
-        payload.ValorTotal.Should().Be(4798.80m);
+        var envelope2 = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<RegistrarSaidaEstoqueResult>>().Subject;
+        envelope2.Data.Itens.Should().HaveCount(2);
+        envelope2.Data.Itens.Select(i => i.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
+        envelope2.Data.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
+        envelope2.Data.ValorTotal.Should().Be(4798.80m);
     }
 
     [Fact]
@@ -343,19 +338,10 @@ public class ItemEstoqueControllerTests
         var result = await _controller.ReporEstoque(command);
 
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().BeOfType<ReporEstoqueResult>();
-        var payload = okResult.Value as ReporEstoqueResult;
-        payload!.ItemEstoqueId.Should().Be(itemId);
-        payload.QuantidadeAnterior.Should().Be(10);
-        payload.QuantidadeAtual.Should().Be(30);
+        var envelope3 = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ReporEstoqueResult>>().Subject;
+        envelope3.Data.ItemEstoqueId.Should().Be(itemId);
+        envelope3.Data.QuantidadeAnterior.Should().Be(10);
+        envelope3.Data.QuantidadeAtual.Should().Be(30);
     }
 
-    private static T ObterPropriedade<T>(object? source, string nome)
-    {
-        source.Should().NotBeNull();
-        var propriedade = source!.GetType().GetProperty(nome);
-        propriedade.Should().NotBeNull();
-        return (T)propriedade!.GetValue(source)!;
-    }
 }

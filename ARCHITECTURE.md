@@ -1,44 +1,48 @@
-# Diagrama de Arquitetura - EasyStok
+ï»¿# Diagrama de Arquitetura - EasyStok
 
-## Visão Geral
-```
-???????????????????    ????????????????????    ???????????????????
-?   API Layer     ?    ? Application Layer?    ?  Domain Layer  ?
-?                 ?    ?                  ?    ?                 ?
-? - Controllers   ?????? - Use Cases      ?????? - Entities      ?
-? - Middlewares   ?    ? - Validators     ?    ? - Value Objects ?
-? - Swagger       ?    ? - Ports/Adapters?    ? - Specifications?
-? - Auth/JWT      ?    ?                  ?    ? - Domain Events ?
-???????????????????    ????????????????????    ???????????????????
-         ?                        ?                        ?
-         ?                        ?                        ?
-???????????????????    ????????????????????    ???????????????????
-?Infrastructure   ?    ?   External       ?    ?   Tests         ?
-?Layer            ?    ?   Services       ?    ?                 ?
-?                 ?    ?                  ?    ? - Unit Tests    ?
-? - Repositories  ?????? - PostgreSQL     ?    ? - Integration   ?
-? - DB Context    ?    ? - MongoDB        ?    ? - Architecture  ?
-? - Migrations    ?    ? - Redis (Cache)  ?    ?                 ?
-? - External APIs ?    ? - OpenTelemetry  ?    ???????????????????
-???????????????????    ????????????????????
+## VisÃ£o Geral
+
+```text
++---------------------+    +------------------------+    +-------------------+
+| API Layer           |    | Application Layer      |    | Domain Layer      |
+|                     |    |                        |    |                   |
+| - Controllers       |--->| - Use Cases            |--->| - Entities        |
+| - Middlewares       |    | - Validators           |    | - Value Objects   |
+| - Swagger           |    | - Ports/Adapters       |    | - Specifications  |
+| - Auth/JWT          |    |                        |    | - Domain Events   |
++---------------------+    +------------------------+    +-------------------+
+          |                            |                            |
+          v                            v                            v
++---------------------+    +------------------------+    +-------------------+
+| Infrastructure      |    | External Services      |    | Tests             |
+| Layer               |    |                        |    |                   |
+|                     |    | - PostgreSQL           |    | - Unit Tests      |
+| - Repositories      |    | - MongoDB              |    | - Integration     |
+| - DB Context        |    | - Redis (Cache)        |    | - Architecture    |
+| - Migrations        |    | - OpenTelemetry        |    |                   |
+| - External APIs     |    |                        |    |                   |
++---------------------+    +------------------------+    +-------------------+
 ```
 
 ## Fluxo de Dados
-1. **Request** ? Controller (API) ? Use Case (Application) ? Repository (Infra) ? DB.
-2. **Response** ? Controller ? Use Case ? Repository ? DB.
-3. **Domain Events** ? Handlers (Application) ? External Services (Infra).
 
-## Dependências
+1. **Request**: Controller (API) -> Use Case (Application) -> Repository (Infrastructure) -> Banco.
+2. **Response**: Banco -> Repository -> Use Case -> Controller.
+3. **Domain Events**: Domain/Application -> Handlers -> External Services.
+
+## DependÃªncias
+
 - **API** depende de **Application** e **Infrastructure**.
 - **Application** depende de **Domain**.
 - **Infrastructure** depende de **Domain** e **Application**.
-- **Domain** é independente.
-- **Tests** dependem de todas as camadas.
+- **Domain** Ã© independente.
+- **Tests** dependem das camadas necessÃ¡rias para validaÃ§Ã£o.
 
-## Componentes Chave
-- **Entities**: Produto, ItemEstoque, Venda, etc.
-- **Value Objects**: Dinheiro, Quantidade, Validade, etc.
-- **Specifications**: Regras de negócio (e.g., EstoqueSuficiente).
-- **Use Cases**: Lógica de aplicação (e.g., CadastrarProduto).
-- **Repositories**: Abstração de persistência.
-- **Middlewares**: Auth, Logging, Health Checks.
+## Componentes-Chave
+
+- **Entities**: Produto, ItemEstoque, Venda e agregados relacionados.
+- **Value Objects**: Dinheiro, Quantidade, Validade e outros tipos de domÃ­nio.
+- **Specifications**: Regras de negÃ³cio reutilizÃ¡veis.
+- **Use Cases**: LÃ³gica de aplicaÃ§Ã£o e orquestraÃ§Ã£o.
+- **Repositories**: AbstraÃ§Ã£o de persistÃªncia.
+- **Middlewares**: Auth, logging, health checks e concerns transversais.

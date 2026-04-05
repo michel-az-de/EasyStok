@@ -6,49 +6,32 @@ namespace EasyStock.Api.Services
 {
     public sealed class CurrentUserAccessor(IHttpContextAccessor httpContextAccessor) : ICurrentUserAccessor
     {
-        public Guid EmpresaId
-        {
-            get
-            {
-                var claim = httpContextAccessor.HttpContext?.User.FindFirstValue("empresaId");
-                return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
-            }
-        }
+        private const string EmpresaIdClaim = "empresaId";
+        private const string UsuarioIdClaim = "sub";
+        private const string NivelClaim = "nivel";
+        private const string PermissaoClaim = "permissao";
+
+        public Guid EmpresaId => GetGuidClaimOrDefault(EmpresaIdClaim);
 
         public bool IsAuthenticated =>
-            httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true;
+            CurrentUser?.Identity?.IsAuthenticated == true;
 
-        public Guid UsuarioId
-        {
-            get
-            {
-                var claim = httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
-                return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
-            }
-        }
+        public Guid UsuarioId => GetGuidClaimOrDefault(UsuarioIdClaim);
 
-        public NivelAcesso Nivel
-        {
-            get
-            {
-                var claim = httpContextAccessor.HttpContext?.User.FindFirstValue("nivel");
-                return Enum.TryParse<NivelAcesso>(claim, out var nivel) ? nivel : NivelAcesso.Visualizador;
-            }
-        }
+        public NivelAcesso Nivel => GetNivelClaimOrDefault();
 
         public bool TemPermissao(Permissao permissao)
         {
-            var user = httpContextAccessor.HttpContext?.User;
-            if (user?.Identity?.IsAuthenticated != true) return false;
+            if (!IsAuthenticated)
+                return false;
 
-            var permissaoClaims = user.FindAll("permissao").Select(x => x.Value).ToList();
+            var permissoesExplicitas = GetPermissaoClaims();
 
-            // Se tem claims explícitas de permissão, usar SOMENTE elas (autoridade do Perfil)
-            if (permissaoClaims.Count > 0)
-                return permissaoClaims.Any(c =>
-                    Enum.TryParse<Permissao>(c, true, out var p) && p == permissao);
+            // Se tem claims explicitas de permissao, usar somente elas.
+            if (permissoesExplicitas.Count > 0)
+                return permissoesExplicitas.Contains(permissao);
 
-            // Sem claims de permissão (ex: autenticado sem empresa) → fallback por Nivel
+            // Sem claims de permissao, aplicar fallback por nivel.
             return Nivel switch
             {
                 NivelAcesso.SuperAdmin or NivelAcesso.Admin => true,
@@ -56,6 +39,43 @@ namespace EasyStock.Api.Services
                 NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos,
                 _ => permissao is Permissao.VisualizarRelatorios
             };
+        }
+
+        private ClaimsPrincipal? CurrentUser => httpContextAccessor.HttpContext?.User;
+
+        private Guid GetGuidClaimOrDefault(string claimType)
+        {
+            var claimValue = CurrentUser?.FindFirstValue(claimType);
+            return Guid.TryParse(claimValue, out var id) ? id : Guid.Empty;
+        }
+
+        private NivelAcesso GetNivelClaimOrDefault()
+        {
+            var claimValue = CurrentUser?.FindFirstValue(NivelClaim);
+            return Enum.TryParse<NivelAcesso>(claimValue, out var nivel)
+                ? nivel
+                : NivelAcesso.Visualizador;
+        }
+
+        private HashSet<Permissao> GetPermissaoClaims()
+        {
+            var values = CurrentUser?
+                .FindAll(PermissaoClaim)
+                .Select(static claim => claim.Value)
+                .ToList();
+
+            if (values is not { Count: > 0 })
+                return [];
+
+            var permissoes = new HashSet<Permissao>();
+
+            foreach (var value in values)
+            {
+                if (Enum.TryParse<Permissao>(value, ignoreCase: true, out var permissao))
+                    permissoes.Add(permissao);
+            }
+
+            return permissoes;
         }
     }
 }

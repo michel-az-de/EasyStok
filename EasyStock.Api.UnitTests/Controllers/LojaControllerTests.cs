@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarLoja;
@@ -59,11 +60,8 @@ public class LojaControllerTests
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
-        okResult!.Value.Should().NotBeNull();
-        var lojaResults = okResult.Value as IEnumerable<LojaResult>;
-        lojaResults.Should().NotBeNull();
-        lojaResults!.Should().HaveCount(1);
+        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<LojaResult>>>().Subject;
+        envelope.Data.Should().HaveCount(1);
     }
 
     [Fact]
@@ -81,10 +79,8 @@ public class LojaControllerTests
 
         // Assert
         result.Should().BeOfType<CreatedResult>();
-        var createdResult = result as CreatedResult;
-        createdResult!.Value.Should().BeOfType<LojaResult>();
-        var lojaResult = createdResult.Value as LojaResult;
-        lojaResult!.Nome.Should().Be("Nova Loja");
-        lojaResult.EmpresaId.Should().Be(empresaId);
+        var envelope = ((CreatedResult)result).Value.Should().BeOfType<ApiResponse<LojaResult>>().Subject;
+        envelope.Data.Nome.Should().Be("Nova Loja");
+        envelope.Data.EmpresaId.Should().Be(empresaId);
     }
 }

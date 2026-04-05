@@ -30,11 +30,13 @@ public class NotificacaoControllerTests
 
         result.Should().BeOfType<OkObjectResult>();
         var ok = (OkObjectResult)result;
-        var envelope = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
-        // badge fica em data.count (camelCase)
-        var countProp = envelope.Data.GetType().GetProperty("count");
-        countProp.Should().NotBeNull();
-        countProp!.GetValue(envelope.Data).Should().Be(4);
+        ok.Value.Should().NotBeNull();
+        var dataProp = ok.Value!.GetType().GetProperty("Data");
+        dataProp.Should().NotBeNull();
+        var data = dataProp!.GetValue(ok.Value);
+        var countProp = data!.GetType().GetProperty("count");
+        countProp.Should().NotBeNull($"propriedade 'count' nao encontrada");
+        countProp!.GetValue(data).Should().Be(4);
     }
 
     [Fact]
