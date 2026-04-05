@@ -1,0 +1,286 @@
+@model EntradaFormViewModel
+@{
+    var csrfToken = Html.AntiForgeryToken();
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a href="/estoque" class="text-slate-400 hover:text-slate-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <div class="pg-hd">
+        <h1>Nova Entrada de Estoque</h1>
+        <p>Registre a entrada de produtos no estoque</p>
+    </div>
+</div>
+
+<div x-data="entradaWizard()" class="max-w-3xl">
+
+    <!-- Barra de progresso -->
+    <div class="ws mb-6">
+        <div class="flex items-center">
+            @{
+                var steps = new[] { "Produto", "Detalhes", "Revisão", "Concluído" };
+            }
+            @for (int i = 0; i < steps.Length; i++)
+            {
+                var stepNum = i + 1;
+                var isLast = i == steps.Length - 1;
+                <div class="flex items-center @(isLast ? "" : "flex-1")">
+                    <div class="step-circle" :class="step > @stepNum ? 'done' : step === @stepNum ? 'active' : ''">@stepNum</div>
+                    <div class="ml-2 hidden sm:block">
+                        <div class="text-xs font-semibold" :class="step === @stepNum ? 'text-indigo-600' : 'text-slate-400'">@steps[i]</div>
+                    </div>
+                    @if (!isLast)
+                    {
+                        <div class="flex-1 mx-3 h-0.5 bg-slate-200" :class="step > @stepNum ? 'bg-indigo-500' : ''"></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <form asp-action="Criar" asp-controller="Entradas" method="post" x-ref="mainForm">
+        @Html.AntiForgeryToken()
+
+        <!-- Campos hidden para dados coletados nos passos -->
+        <input type="hidden" name="ProdutoId" x-model="produtoId" />
+        <input type="hidden" name="ProdutoNome" x-model="produtoNome" />
+        <input type="hidden" name="ProdutoSku" x-model="produtoSku" />
+        <input type="hidden" name="EstoqueAtual" x-model="estoqueAtual" />
+        <input type="hidden" name="VarId" x-model="varId" />
+        <input type="hidden" name="Qty" x-model="qty" />
+        <input type="hidden" name="Custo" x-model="custo" />
+        <input type="hidden" name="Preco" x-model="preco" />
+        <input type="hidden" name="FornecedorId" x-model="fornecedorId" />
+        <input type="hidden" name="Lote" x-model="lote" />
+        <input type="hidden" name="Validade" x-model="validade" />
+        <input type="hidden" name="Observacoes" x-model="observacoes" />
+        <input type="hidden" name="Data" x-model="data" />
+
+        <!-- Passo 1: Selecionar produto -->
+        <div x-show="step === 1">
+            <div class="ws">
+                <h3 class="font-bold text-slate-800 mb-4">Selecione o produto</h3>
+                <div class="relative mb-4">
+                    <input type="text" x-model="buscaTerm"
+                           @@input.debounce.300ms="buscarProduto()"
+                           placeholder="Buscar por nome ou SKU..."
+                           class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    <div x-show="buscando" class="absolute right-3 top-3 text-slate-400 text-sm">Buscando...</div>
+                </div>
+
+                <div class="space-y-2" x-show="resultados.length > 0">
+                    <template x-for="p in resultados" :key="p.id">
+                        <button type="button" @@click="selecionarProduto(p)"
+                                class="w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left">
+                            <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                                 x-text="p.emoji || '📦'"></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-semibold text-slate-900 truncate" x-text="p.nome"></div>
+                                <div class="text-xs text-slate-400 font-mono" x-text="p.sku"></div>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+
+                <div x-show="buscaTerm.length > 1 && !buscando && resultados.length === 0" class="text-center py-6 text-slate-400 text-sm">
+                    Nenhum produto encontrado
+                </div>
+            </div>
+        </div>
+
+        <!-- Passo 2: Detalhes -->
+        <div x-show="step === 2">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 ws space-y-4">
+                    <h3 class="font-bold text-slate-800 mb-2">Detalhes da entrada</h3>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Quantidade *</label>
+                            <input type="number" x-model.number="qty" min="1"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   @@input="calcularTotal()" />
+                        </div>
+                        <div>
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Custo unitário (R$) *</label>
+                            <input type="number" x-model.number="custo" step="0.01" min="0"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   @@input="calcularTotal()" />
+                        </div>
+                        <div>
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Preço sugerido (R$)</label>
+                            <input type="number" x-model.number="preco" step="0.01" min="0"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </div>
+                        <div>
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Lote</label>
+                            <input type="text" x-model="lote"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </div>
+                        <div>
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Validade</label>
+                            <input type="date" x-model="validade"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Data da entrada *</label>
+                            <input type="date" x-model="data"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Observações</label>
+                            <textarea x-model="observacoes" rows="2"
+                                      class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 mt-4">
+                        <button type="button" @@click="step = 1"
+                                class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
+                            ← Voltar
+                        </button>
+                        <button type="button" @@click="step = 3" :disabled="!qty || !custo || !data"
+                                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors disabled:opacity-50">
+                            Revisar →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel lateral: Produto selecionado + total -->
+                <div class="ws h-fit">
+                    <h4 class="font-bold text-slate-800 mb-3">Produto selecionado</h4>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-2xl" x-text="produtoEmoji || '📦'"></span>
+                        <div>
+                            <div class="font-semibold text-sm text-slate-900" x-text="produtoNome"></div>
+                            <div class="text-xs text-slate-400 font-mono" x-text="produtoSku"></div>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-100 pt-3 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Qtd</span>
+                            <span class="font-semibold" x-text="qty || 0"></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Custo unit.</span>
+                            <span class="font-semibold" x-text="'R$ ' + (custo || 0).toFixed(2).replace('.', ',')"></span>
+                        </div>
+                        <div class="flex justify-between text-sm font-bold border-t border-slate-100 pt-2">
+                            <span>Total</span>
+                            <span class="text-indigo-600" x-text="'R$ ' + total.toFixed(2).replace('.', ',')"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Passo 3: Revisão -->
+        <div x-show="step === 3">
+            <div class="ws">
+                <h3 class="font-bold text-slate-800 mb-4">Revisar entrada</h3>
+                <dl class="space-y-3 mb-6">
+                    <div class="flex justify-between py-2 border-b border-slate-50">
+                        <dt class="text-sm text-slate-500">Produto</dt>
+                        <dd class="text-sm font-semibold" x-text="produtoNome"></dd>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-50">
+                        <dt class="text-sm text-slate-500">Quantidade</dt>
+                        <dd class="text-sm font-semibold" x-text="qty"></dd>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-50">
+                        <dt class="text-sm text-slate-500">Custo unitário</dt>
+                        <dd class="text-sm font-semibold" x-text="'R$ ' + (custo || 0).toFixed(2)"></dd>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-50">
+                        <dt class="text-sm text-slate-500">Total</dt>
+                        <dd class="text-sm font-bold text-indigo-600" x-text="'R$ ' + total.toFixed(2)"></dd>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-50">
+                        <dt class="text-sm text-slate-500">Estoque atual → após entrada</dt>
+                        <dd class="text-sm font-semibold">
+                            <span x-text="estoqueAtual"></span> → <span class="text-emerald-600" x-text="Number(estoqueAtual) + Number(qty)"></span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-50" x-show="lote">
+                        <dt class="text-sm text-slate-500">Lote</dt>
+                        <dd class="text-sm font-semibold font-mono" x-text="lote"></dd>
+                    </div>
+                    <div class="flex justify-between py-2" x-show="validade">
+                        <dt class="text-sm text-slate-500">Validade</dt>
+                        <dd class="text-sm font-semibold" x-text="validade"></dd>
+                    </div>
+                </dl>
+
+                <div class="flex gap-3">
+                    <button type="button" @@click="step = 2"
+                            class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
+                        ← Voltar
+                    </button>
+                    <button type="submit"
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
+                        Confirmar entrada ✓
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Passo 4: Confirmado (não é atingido via form submit, é alcançado após redirect com toast) -->
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/js/entradas.js"></script>
+    <script>
+        function entradaWizard() {
+            return {
+                step: 1,
+                buscaTerm: '',
+                buscando: false,
+                resultados: [],
+                produtoId: '',
+                produtoNome: '',
+                produtoSku: '',
+                produtoEmoji: '',
+                estoqueAtual: 0,
+                varId: '',
+                qty: 1,
+                custo: null,
+                preco: null,
+                fornecedorId: '',
+                lote: '',
+                validade: '',
+                observacoes: '',
+                data: new Date().toISOString().split('T')[0],
+                total: 0,
+
+                async buscarProduto() {
+                    if (this.buscaTerm.length < 2) { this.resultados = []; return; }
+                    this.buscando = true;
+                    try {
+                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm));
+                        if (r.ok) this.resultados = await r.json();
+                    } finally {
+                        this.buscando = false;
+                    }
+                },
+
+                selecionarProduto(p) {
+                    this.produtoId = p.id;
+                    this.produtoNome = p.nome;
+                    this.produtoSku = p.sku;
+                    this.produtoEmoji = p.emoji || '📦';
+                    this.estoqueAtual = p.estoqueTotal || 0;
+                    this.varId = p.variacoes && p.variacoes.length > 0 ? p.variacoes[0].id : '';
+                    this.step = 2;
+                },
+
+                calcularTotal() {
+                    this.total = (this.qty || 0) * (this.custo || 0);
+                }
+            };
+        }
+    </script>
+}

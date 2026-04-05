@@ -1,0 +1,88 @@
+using System.Globalization;
+using System.Net.Http.Headers;
+using EasyStock.Web.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
+
+var builder = WebApplication.CreateBuilder(args);
+var config = builder.Configuration;
+
+// 1. Cultura pt-BR global
+var ptBR = new CultureInfo("pt-BR");
+CultureInfo.DefaultThreadCurrentCulture = ptBR;
+CultureInfo.DefaultThreadCurrentUICulture = ptBR;
+
+// 2. Session
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(o =>
+{
+    o.IdleTimeout = TimeSpan.FromMinutes(config.GetValue<int>("Session:IdleTimeoutMinutes"));
+    o.Cookie.HttpOnly = true;
+    o.Cookie.IsEssential = true;
+    o.Cookie.SameSite = SameSiteMode.Strict;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    o.Cookie.Name = config["Session:CookieName"]!;
+});
+
+// 3. HttpContextAccessor (needed by SessionService inside TokenRefreshHandler)
+builder.Services.AddHttpContextAccessor();
+
+// 4. Register SessionService first (used by TokenRefreshHandler)
+builder.Services.AddScoped<SessionService>();
+
+// 5. HttpClient with TokenRefreshHandler
+builder.Services.AddScoped<TokenRefreshHandler>();
+builder.Services.AddHttpClient<ApiClient>(client =>
+{
+    client.BaseAddress = new Uri(config["ApiSettings:BaseUrl"]!);
+    client.Timeout = TimeSpan.FromSeconds(config.GetValue<int>("ApiSettings:TimeoutSeconds"));
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+}).AddHttpMessageHandler<TokenRefreshHandler>();
+
+// 6. Domain services
+builder.Services.AddScoped<ProdutosService>();
+builder.Services.AddScoped<EstoqueService>();
+builder.Services.AddScoped<EntradasService>();
+builder.Services.AddScoped<SaidasService>();
+builder.Services.AddScoped<FornecedoresService>();
+builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<NotificacoesService>();
+builder.Services.AddScoped<UsuariosService>();
+builder.Services.AddScoped<AssinaturaService>();
+builder.Services.AddScoped<ConfiguracoesService>();
+builder.Services.AddScoped<AnunciosService>();
+
+// 7. MVC + Antiforgery automático
+builder.Services.AddControllersWithViews(o =>
+    o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
+
+// 8. Cookie Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/auth/login";
+        o.LogoutPath = "/auth/logout";
+        o.ExpireTimeSpan = TimeSpan.FromMinutes(480);
+        o.SlidingExpiration = true;
+    });
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/auth/login");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseSession();           // BEFORE Authentication
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Dashboard}/{action=Index}/{id?}");
+
+app.Run();

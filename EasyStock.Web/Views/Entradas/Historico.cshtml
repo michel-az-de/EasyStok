@@ -1,0 +1,112 @@
+@model EntradasHistoricoViewModel
+@{
+    var tiposOpcoes = new[] { ("", "Todos"), ("entrada", "Entradas"), ("saida", "Saídas"), ("reposicao", "Reposições") };
+}
+
+<div class="pg-hd mb-6">
+    <h1>Histórico de Movimentações</h1>
+    <p>@Model.Paginacao.Total movimentação(ões) encontrada(s)</p>
+</div>
+
+<!-- Filtros -->
+<div class="ws mb-4">
+    <form method="get" class="flex flex-wrap gap-3 items-center">
+        <!-- Pills de tipo -->
+        <div class="flex gap-1">
+            @foreach (var (val, label) in tiposOpcoes)
+            {
+                var isActive = (Model.Tipo ?? "") == val;
+                <a href="?tipo=@val&periodoInicio=@Model.PeriodoInicio&periodoFim=@Model.PeriodoFim"
+                   class="px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors @(isActive ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-300 hover:border-indigo-300")">
+                    @label
+                </a>
+            }
+        </div>
+
+        <input type="date" name="periodoInicio" value="@Model.PeriodoInicio"
+               class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        <span class="text-slate-400 text-sm">até</span>
+        <input type="date" name="periodoFim" value="@Model.PeriodoFim"
+               class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        <button type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Filtrar
+        </button>
+    </form>
+</div>
+
+<!-- Tabela -->
+<div class="ws">
+    @if (Model.Entradas.Any())
+    {
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Produto</th>
+                    <th>Variação</th>
+                    <th class="text-center">Qtd</th>
+                    <th class="text-right">Custo unit.</th>
+                    <th class="text-right">Total</th>
+                    <th class="text-right">Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Entradas)
+                {
+                    var tipoBadge = e.Tipo?.ToLower() switch
+                    {
+                        "entrada" => "badge-ok",
+                        "reposicao" or "reposição" => "badge-slow",
+                        "saida" or "saída" => "badge-warn",
+                        _ => "badge-slow"
+                    };
+                    var total = (e.Custo ?? 0) * e.Qty;
+                    <tr>
+                        <td>
+                            <span class="badge @tipoBadge px-2 py-0.5 rounded-full text-xs font-semibold">@e.Tipo</span>
+                        </td>
+                        <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
+                        <td class="text-slate-500">@(e.Variacao?.Nome ?? "-")</td>
+                        <td class="text-center font-mono">@e.Qty</td>
+                        <td class="text-right font-mono text-slate-600">
+                            @(e.Custo.HasValue ? e.Custo.Value.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
+                        </td>
+                        <td class="text-right font-mono font-semibold">
+                            @(e.Custo.HasValue ? total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
+                        </td>
+                        <td class="text-right text-slate-500">@e.Data.ToString("dd/MM/yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Paginação -->
+        @if (Model.Paginacao.Pages > 1)
+        {
+            <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                <span class="text-sm text-slate-500">Página @Model.Paginacao.Page de @Model.Paginacao.Pages</span>
+                <div class="flex gap-2">
+                    @if (Model.Paginacao.HasPrevious)
+                    {
+                        <a href="?page=@(Model.Paginacao.Page - 1)&tipo=@Model.Tipo"
+                           class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">← Anterior</a>
+                    }
+                    @if (Model.Paginacao.HasNext)
+                    {
+                        <a href="?page=@(Model.Paginacao.Page + 1)&tipo=@Model.Tipo"
+                           class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Próximo →</a>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="text-center py-12 text-slate-400">
+            <div class="text-5xl mb-3">📋</div>
+            <p class="font-semibold text-slate-600">Nenhuma movimentação encontrada</p>
+            <p class="text-sm mt-1">Tente ajustar os filtros ou registre uma <a href="/entradas/nova" class="text-indigo-600 hover:underline">nova entrada</a>.</p>
+        </div>
+    }
+</div>

@@ -51,6 +51,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
         services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
         services.AddScoped<IUsoIaRepository, UsoIaRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
         services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
         services.AddSingleton<MongoDatabaseHealthCheck>(sp => new MongoDatabaseHealthCheck(sp.GetRequiredService<IMongoClient>(), databaseName));
