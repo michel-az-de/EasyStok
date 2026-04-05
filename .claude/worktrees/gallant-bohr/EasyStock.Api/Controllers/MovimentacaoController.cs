@@ -1,0 +1,31 @@
+using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace EasyStock.Api.Controllers;
+
+[Authorize]
+[ApiController]
+[Route("api/movimentacoes")]
+public class MovimentacaoController(IMovimentacaoEstoqueRepository movimentacaoRepository) : EasyStockControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] Guid empresaId,
+        [FromQuery] DateTime? de,
+        [FromQuery] DateTime? ate,
+        [FromQuery] TipoMovimentacaoEstoque? tipo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
+            empresaId, de, ate, tipo, page, pageSize);
+        return DataPaged(items, totalCount, page, pageSize);
+    }
+
+    [HttpGet("item/{itemEstoqueId}")]
+    public async Task<IActionResult> GetByItem(Guid itemEstoqueId)
+        => DataOk(await movimentacaoRepository.GetByItemEstoqueAsync(itemEstoqueId));
+}
