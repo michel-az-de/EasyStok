@@ -31,7 +31,7 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
 
                 await session.CommitTransactionAsync();
             }
-            catch
+            catch (Exception)
             {
                 await session.AbortTransactionAsync();
                 throw;
