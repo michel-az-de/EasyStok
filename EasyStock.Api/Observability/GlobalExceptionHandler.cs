@@ -32,7 +32,7 @@ public class GlobalExceptionHandler : IExceptionHandler
     private static (int StatusCode, string Code, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
         exception switch
         {
-            // Exceções específicas que NÃO herdam de RegraDeDominioVioladaException
+            // Exceï¿½ï¿½es especï¿½ficas que Nï¿½O herdam de RegraDeDominioVioladaException
             UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
                 "VALIDATION_ERROR",
@@ -62,13 +62,13 @@ public class GlobalExceptionHandler : IExceptionHandler
                 false),
 
             PlanoLimiteAtingidoException ex => (
-                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status402PaymentRequired,
                 "PLAN_LIMIT_REACHED",
                 "Limite do plano atingido",
                 ex.Message,
                 false),
 
-            // Exceções de infraestrutura
+            // Exceï¿½ï¿½es de infraestrutura
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "CONCURRENCY_CONFLICT",
@@ -76,7 +76,7 @@ public class GlobalExceptionHandler : IExceptionHandler
                 "Os dados foram alterados por outro processo. Recarregue as informacoes e tente novamente.",
                 false),
 
-            // Exceções de domínio (todas herdam de RegraDeDominioVioladaException - case genérico)
+            // Exceï¿½ï¿½es de domï¿½nio (todas herdam de RegraDeDominioVioladaException - case genï¿½rico)
             RegraDeDominioVioladaException ex => (
                 StatusCodes.Status409Conflict,
                 "BUSINESS_RULE_VIOLATION",

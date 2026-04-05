@@ -192,6 +192,35 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 20;
     });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = ((int)retryAfter.TotalSeconds).ToString();
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = ((int)retryAfter.TotalSeconds).ToString();
+        }
+        else
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = "60";
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = "60";
+        }
+
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            errors = new[]
+            {
+                new
+                {
+                    code = "RATE_LIMIT_EXCEEDED",
+                    title = "Muitas requisicoes",
+                    detail = "Limite de requisicoes atingido. Tente novamente mais tarde."
+                }
+            }
+        }, cancellationToken);
+    };
 });
 
 // Background Services

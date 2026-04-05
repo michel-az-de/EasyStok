@@ -1,18 +1,21 @@
 using EasyStock.Application.Ports.Output;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Sockets;
 
 namespace EasyStock.Infra.Async;
 
 /// <summary>
-/// Implementação SMTP do serviço de email.
-/// Suporte a templates básicos e anexos.
+/// Implementaï¿½ï¿½o SMTP do serviï¿½o de email.
+/// Suporte a templates bï¿½sicos, anexos e retry automï¿½tico em falhas transientes.
 /// </summary>
 public sealed class SmtpEmailService : IEmailService, IDisposable
 {
     private readonly SmtpClient _smtpClient;
     private readonly string _fromEmail;
     private readonly string _fromName;
+    private const int MaxRetries = 3;
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
     public SmtpEmailService(string host, int port, string username, string password, string fromEmail, string fromName, bool enableSsl = true)
     {
@@ -45,6 +48,22 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
     public async Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
+        for (var tentativa = 1; tentativa <= MaxRetries; tentativa++)
+        {
+            try
+            {
+                await EnviarInternamenteAsync(to, subject, body, attachments, isHtml);
+                return;
+            }
+            catch (SmtpException ex) when (tentativa < MaxRetries && EhFalhaTransiente(ex))
+            {
+                await Task.Delay(RetryDelay * tentativa);
+            }
+        }
+    }
+
+    private async Task EnviarInternamenteAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml)
+    {
         using var mailMessage = new MailMessage
         {
             From = new MailAddress(_fromEmail, _fromName),
@@ -67,9 +86,16 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
         await _smtpClient.SendMailAsync(mailMessage);
     }
 
+    private static bool EhFalhaTransiente(SmtpException ex) =>
+        ex.StatusCode is SmtpStatusCode.ServiceNotAvailable
+            or SmtpStatusCode.MailboxBusy
+            or SmtpStatusCode.MailboxUnavailable
+            or SmtpStatusCode.InsufficientStorage
+        || ex.InnerException is SocketException or IOException;
+
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        // Implementação básica - em produção usar template engine como Razor ou Handlebars
+        // Implementaï¿½ï¿½o bï¿½sica - em produï¿½ï¿½o usar template engine como Razor ou Handlebars
         var body = $"Template: {templateName}\n\nModel: {System.Text.Json.JsonSerializer.Serialize(model)}";
         return SendAsync(to, subject, body, isHtml);
     }

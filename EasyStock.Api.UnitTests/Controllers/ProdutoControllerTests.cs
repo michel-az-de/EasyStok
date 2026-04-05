@@ -56,7 +56,8 @@ public class ProdutoControllerTests
             _produtoRepository,
             _produtoVariacaoRepository,
             _itemEstoqueRepository,
-            _unitOfWork);
+            _unitOfWork,
+            Substitute.For<ILogger<GerenciarVariacaoProdutoUseCase>>());
 
         var gerenciarUploadsUseCase = new GerenciarUploadsUseCase(
             _fileStorage,
