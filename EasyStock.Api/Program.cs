@@ -208,18 +208,14 @@ builder.Services.AddRateLimiter(options =>
         }
 
         context.HttpContext.Response.ContentType = "application/json";
-        await context.HttpContext.Response.WriteAsJsonAsync(new
-        {
-            errors = new[]
-            {
-                new
-                {
-                    code = "RATE_LIMIT_EXCEEDED",
-                    title = "Muitas requisicoes",
-                    detail = "Limite de requisicoes atingido. Tente novamente mais tarde."
-                }
-            }
-        }, cancellationToken);
+        var correlationId = context.HttpContext.Items["CorrelationId"] as string ?? context.HttpContext.TraceIdentifier;
+        var envelope = new EasyStock.Api.Http.ApiErrorResponse(
+            new EasyStock.Api.Http.ApiError(
+                "RATE_LIMIT_EXCEEDED",
+                "Muitas requisicoes",
+                "Limite de requisicoes atingido. Tente novamente mais tarde.",
+                correlationId));
+        await context.HttpContext.Response.WriteAsJsonAsync(envelope, cancellationToken);
     };
 });
 

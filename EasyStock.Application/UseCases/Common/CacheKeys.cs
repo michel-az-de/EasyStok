@@ -2,7 +2,10 @@ namespace EasyStock.Application.UseCases.Common;
 
 /// <summary>
 /// Centraliza as chaves de cache utilizadas na aplicação.
-/// Todas as chaves seguem o padrão: {modulo}:{empresaId}:{recurso}:{id?}
+/// As chaves seguem convenções por contexto, normalmente no formato
+/// {modulo}:{recurso}:{empresaId}:{id?} ou variações equivalentes.
+/// Algumas chaves são globais (sem escopo de empresa), como plano:listagem,
+/// e outras utilizam identificadores específicos do domínio, como lojaId.
 /// </summary>
 public static class CacheKeys
 {

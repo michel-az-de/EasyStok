@@ -72,7 +72,7 @@ public sealed class EsqueciSenhaUseCase(
         }
         else
         {
-            logger.LogInformation("Token de reset gerado para usuario {UsuarioId}: {Token}", usuario.Id, token);
+            logger.LogInformation("Token de reset gerado para usuario {UsuarioId} com ResetTokenId {ResetTokenId}", usuario.Id, resetToken.Id);
         }
 
         return new EsqueciSenhaResult(true);
