@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AtualizarLoja;
 using EasyStock.Application.UseCases.CriarLoja;
@@ -17,7 +18,7 @@ public class LojaController(
     AtualizarLojaUseCase atualizarUseCase,
     DesativarLojaUseCase desativarUseCase,
     ListarLojasUseCase listarUseCase,
-    ICurrentUserAccessor currentUser) : ControllerBase
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid empresaId)
@@ -26,7 +27,7 @@ public class LojaController(
             return Forbid();
 
         var lojas = await listarUseCase.ExecuteAsync(new ListarLojasQuery(empresaId));
-        return Ok(lojas);
+        return DataOk(lojas);
     }
 
     [HttpPost]
@@ -36,14 +37,14 @@ public class LojaController(
             return Forbid();
 
         var resultado = await criarUseCase.ExecuteAsync(command);
-        return Created($"/api/lojas/{resultado.Id}", resultado);
+        return DataCreated($"/api/lojas/{resultado.Id}", resultado);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarLojaCommand command)
     {
         if (id != command.LojaId)
-            return BadRequest("Id da rota nao corresponde ao Id do comando.");
+            return DataBadRequest("Id da rota nao corresponde ao Id do comando.");
 
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
             return Forbid();

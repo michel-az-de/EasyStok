@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,17 +8,10 @@ namespace EasyStock.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/notificacoes")]
-public class NotificacaoController : ControllerBase
+public class NotificacaoController(
+    INotificacaoRepository notificacaoRepository,
+    IUnitOfWork unitOfWork) : EasyStockControllerBase
 {
-    private readonly INotificacaoRepository _notificacaoRepository;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public NotificacaoController(INotificacaoRepository notificacaoRepository, IUnitOfWork unitOfWork)
-    {
-        _notificacaoRepository = notificacaoRepository;
-        _unitOfWork = unitOfWork;
-    }
-
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid empresaId,
@@ -26,27 +20,27 @@ public class NotificacaoController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (items, totalCount) = await _notificacaoRepository.GetByEmpresaAsync(empresaId, lida, tipo, page, pageSize);
-        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(empresaId, lida, tipo, page, pageSize);
+        return DataPaged(items, totalCount, page, pageSize);
     }
 
     [HttpGet("badge")]
     public async Task<IActionResult> GetBadge([FromQuery] Guid empresaId)
     {
-        var count = await _notificacaoRepository.CountNaoLidasAsync(empresaId);
-        return Ok(new { Count = count });
+        var count = await notificacaoRepository.CountNaoLidasAsync(empresaId);
+        return DataOk(new { count });
     }
 
     [HttpPut("{id}/marcar-lida")]
     [HttpPatch("{id}/lida")]
     public async Task<IActionResult> MarcarLida(Guid id)
     {
-        var notificacao = await _notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null) return NotFound();
+        var notificacao = await notificacaoRepository.GetByIdAsync(id);
+        if (notificacao == null) return DataNotFound();
 
         notificacao.MarcarComoLida();
-        await _notificacaoRepository.UpdateAsync(notificacao);
-        await _unitOfWork.CommitAsync();
+        await notificacaoRepository.UpdateAsync(notificacao);
+        await unitOfWork.CommitAsync();
 
         return NoContent();
     }
@@ -55,19 +49,19 @@ public class NotificacaoController : ControllerBase
     [HttpPost("marcar-todas")]
     public async Task<IActionResult> MarcarTodasLidas([FromQuery] Guid empresaId)
     {
-        await _notificacaoRepository.MarcarTodasComoLidasAsync(empresaId);
-        await _unitOfWork.CommitAsync();
+        await notificacaoRepository.MarcarTodasComoLidasAsync(empresaId);
+        await unitOfWork.CommitAsync();
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var notificacao = await _notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null) return NotFound();
+        var notificacao = await notificacaoRepository.GetByIdAsync(id);
+        if (notificacao == null) return DataNotFound();
 
-        await _notificacaoRepository.DeleteAsync(id);
-        await _unitOfWork.CommitAsync();
+        await notificacaoRepository.DeleteAsync(id);
+        await unitOfWork.CommitAsync();
         return NoContent();
     }
 }

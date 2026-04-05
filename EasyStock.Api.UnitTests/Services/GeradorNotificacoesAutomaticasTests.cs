@@ -1,4 +1,3 @@
-using EasyStock.Api.Configuration;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
@@ -6,7 +5,6 @@ using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Services;
@@ -17,48 +15,49 @@ public class GeradorNotificacoesAutomaticasTests
     public async Task Deve_gerar_notificacoes_sem_duplicar_no_mesmo_dia()
     {
         var empresaRepository = Substitute.For<IEmpresaRepository>();
+        var lojaRepository = Substitute.For<ILojaRepository>();
+        var configuracaoLojaRepository = Substitute.For<IConfiguracaoLojaRepository>();
         var estoqueRepository = Substitute.For<IItemEstoqueRepository>();
         var notificacaoRepository = Substitute.For<INotificacaoRepository>();
         var pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var logger = Substitute.For<ILogger<GeradorNotificacoesAutomaticas>>();
-        var config = Options.Create(new EasyStockConfiguracoes
-        {
-            LimiteEstoqueBaixoDefault = 5,
-            DiasAlertaVencimento = 30,
-            DiasItemParado = 30
-        });
 
         var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         empresaRepository.GetAllAsync().Returns(new[] { new Empresa { Id = empresaId, Nome = "Empresa" } });
-        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100)
+        lojaRepository.GetByEmpresaAsync(empresaId).Returns(new[] { new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja", Ativa = true } });
+        configuracaoLojaRepository.GetOrDefaultAsync(lojaId).Returns(ConfiguracaoLoja.CriarPadrao(lojaId));
+        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId)
             .Returns((new[]
             {
                 new ItemEstoque
                 {
                     Id = itemId,
                     EmpresaId = empresaId,
+                    LojaId = lojaId,
                     QuantidadeAtual = Quantidade.From(1),
                     QuantidadeMinima = 5,
                     CodigoInterno = "CAP3426"
                 }
             }, 1));
-        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 2, 100).Returns((Array.Empty<ItemEstoque>(), 1));
-        estoqueRepository.GetProximoVencimentoAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
-        estoqueRepository.GetItensParadosAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
-        estoqueRepository.GetSugestaoReposicaoAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 2, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 1));
+        estoqueRepository.GetProximoVencimentoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetItensParadosAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetSugestaoReposicaoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
         pedidoRepository.GetPedidosAtrasadosAsync(empresaId, Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
         pedidoRepository.GetPedidosRecebidosNoPeriodoAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
         notificacaoRepository.ExisteNotificacaoDoDiaAsync(empresaId, TipoAlertaEstoque.EstoqueCritico, itemId, Arg.Any<DateTime>()).Returns(false);
 
         var service = new GeradorNotificacoesAutomaticas(
             empresaRepository,
+            lojaRepository,
+            configuracaoLojaRepository,
             estoqueRepository,
             notificacaoRepository,
             pedidoRepository,
             unitOfWork,
-            config,
             logger);
 
         await service.ExecutarAsync();
@@ -74,21 +73,25 @@ public class GeradorNotificacoesAutomaticasTests
     public async Task Deve_gerar_alertas_de_pedido_atrasado_e_pedido_recebido()
     {
         var empresaRepository = Substitute.For<IEmpresaRepository>();
+        var lojaRepository = Substitute.For<ILojaRepository>();
+        var configuracaoLojaRepository = Substitute.For<IConfiguracaoLojaRepository>();
         var estoqueRepository = Substitute.For<IItemEstoqueRepository>();
         var notificacaoRepository = Substitute.For<INotificacaoRepository>();
         var pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var logger = Substitute.For<ILogger<GeradorNotificacoesAutomaticas>>();
-        var config = Options.Create(new EasyStockConfiguracoes());
 
         var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
         var pedidoAtrasadoId = Guid.NewGuid();
         var pedidoRecebidoId = Guid.NewGuid();
         empresaRepository.GetAllAsync().Returns(new[] { new Empresa { Id = empresaId, Nome = "Empresa" } });
-        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
-        estoqueRepository.GetProximoVencimentoAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
-        estoqueRepository.GetItensParadosAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
-        estoqueRepository.GetSugestaoReposicaoAsync(empresaId, Arg.Any<int>(), 1, 100).Returns((Array.Empty<ItemEstoque>(), 0));
+        lojaRepository.GetByEmpresaAsync(empresaId).Returns(new[] { new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja", Ativa = true } });
+        configuracaoLojaRepository.GetOrDefaultAsync(lojaId).Returns(ConfiguracaoLoja.CriarPadrao(lojaId));
+        estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetProximoVencimentoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetItensParadosAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
+        estoqueRepository.GetSugestaoReposicaoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));
         pedidoRepository.GetPedidosAtrasadosAsync(empresaId, Arg.Any<DateTime>()).Returns(new[]
         {
             new PedidoFornecedor { Id = pedidoAtrasadoId, EmpresaId = empresaId, PrevisaoEntrega = DateTime.UtcNow.AddDays(-2), Status = StatusPedidoFornecedor.EmTransito }
@@ -102,11 +105,12 @@ public class GeradorNotificacoesAutomaticasTests
 
         var service = new GeradorNotificacoesAutomaticas(
             empresaRepository,
+            lojaRepository,
+            configuracaoLojaRepository,
             estoqueRepository,
             notificacaoRepository,
             pedidoRepository,
             unitOfWork,
-            config,
             logger);
 
         await service.ExecutarAsync();

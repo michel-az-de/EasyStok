@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
@@ -46,23 +47,17 @@ public class FornecedorControllerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Fornecedor",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null));
+            null, null, null, null, null, null, null, null, null, null, null));
 
+        // Novo contrato: BadRequestObjectResult com { error: { code: "BAD_REQUEST" } }
         result.Should().BeOfType<BadRequestObjectResult>();
+        var badRequest = (BadRequestObjectResult)result;
+        var envelope = badRequest.Value.Should().BeOfType<ApiErrorResponse>().Subject;
+        envelope.Error.Code.Should().Be("BAD_REQUEST");
     }
 
     [Fact]
-    public async Task GetEstatisticas_DeveRetornarOk()
+    public async Task GetEstatisticas_DeveRetornarEnvelopeComEstatisticas()
     {
         var empresaId = Guid.NewGuid();
         var fornecedorId = Guid.NewGuid();
@@ -77,7 +72,27 @@ public class FornecedorControllerTests
         var result = await _controller.GetEstatisticas(fornecedorId, empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
-        var payload = ((OkObjectResult)result).Value.Should().BeOfType<FornecedorEstatisticasResult>().Subject;
-        payload.TotalGasto.Should().Be(1000m);
+        var ok = (OkObjectResult)result;
+        var envelope = ok.Value.Should().BeOfType<ApiResponse<FornecedorEstatisticasResult>>().Subject;
+        envelope.Data.TotalGasto.Should().Be(1000m);
+    }
+
+    [Fact]
+    public async Task GetAll_DeveRetornarPagedEnvelope()
+    {
+        var empresaId = Guid.NewGuid();
+        _fornecedorRepository.GetByEmpresaAsync(empresaId, 1, 20, null, null, "nome", "asc")
+            .Returns((new List<Fornecedor>
+            {
+                new() { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Fornecedor A", Ativo = true }
+            }, 1));
+
+        var result = await _controller.GetAll(empresaId, 1, 20);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var envelope = ok.Value.Should().BeOfType<ApiResponse<IEnumerable<FornecedorResult>>>().Subject;
+        var meta = envelope.Meta.Should().BeOfType<PagedMeta>().Subject;
+        meta.Total.Should().Be(1);
+        meta.Limit.Should().Be(20);
     }
 }

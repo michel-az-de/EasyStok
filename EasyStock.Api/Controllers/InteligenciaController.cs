@@ -1,4 +1,5 @@
 using EasyStock.Api.Configuration;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,59 +12,68 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/inteligencia")]
 [EnableRateLimiting("ai")]
-public class InteligenciaController : ControllerBase
+public class InteligenciaController(
+    IItemEstoqueRepository itemEstoqueRepository,
+    IMovimentacaoEstoqueRepository movimentacaoRepository,
+    IConfiguracaoLojaRepository configuracaoLojaRepository,
+    IOptions<EasyStockConfiguracoes> config) : EasyStockControllerBase
 {
-    private readonly IItemEstoqueRepository _itemEstoqueRepository;
-    private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository;
-    private readonly IConfiguracaoLojaRepository _configuracaoLojaRepository;
-    private readonly EasyStockConfiguracoes _config;
-
-    public InteligenciaController(
-        IItemEstoqueRepository itemEstoqueRepository,
-        IMovimentacaoEstoqueRepository movimentacaoRepository,
-        IConfiguracaoLojaRepository configuracaoLojaRepository,
-        IOptions<EasyStockConfiguracoes> config)
-    {
-        _itemEstoqueRepository = itemEstoqueRepository;
-        _movimentacaoRepository = movimentacaoRepository;
-        _configuracaoLojaRepository = configuracaoLojaRepository;
-        _config = config.Value;
-    }
+    private readonly EasyStockConfiguracoes _config = config.Value;
 
     [HttpGet("estoque-baixo")]
-    public async Task<IActionResult> EstoqueBaixo([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? limite, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> EstoqueBaixo(
+        [FromQuery] Guid empresaId,
+        [FromQuery] Guid? lojaId,
+        [FromQuery] int? limite,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var configuracao = await ObterConfiguracaoAsync(lojaId);
         var limiteEfetivo = limite ?? configuracao?.QuantidadeMinimaPadrao ?? _config.LimiteEstoqueBaixoDefault;
-        var (items, totalCount) = await _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
-        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (items, totalCount) = await itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
+        return DataPaged(items, totalCount, page, pageSize);
     }
 
     [HttpGet("proximo-vencimento")]
-    public async Task<IActionResult> ProximoVencimento([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? dias, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> ProximoVencimento(
+        [FromQuery] Guid empresaId,
+        [FromQuery] Guid? lojaId,
+        [FromQuery] int? dias,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var configuracao = await ObterConfiguracaoAsync(lojaId);
         var diasEfetivos = dias ?? configuracao?.DiasAlertaValidade ?? _config.DiasAlertaVencimento;
-        var (items, totalCount) = await _itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
-        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (items, totalCount) = await itemEstoqueRepository.GetProximoVencimentoAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
+        return DataPaged(items, totalCount, page, pageSize);
     }
 
     [HttpGet("parados")]
-    public async Task<IActionResult> ItensParados([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? diasSemMovimento, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> ItensParados(
+        [FromQuery] Guid empresaId,
+        [FromQuery] Guid? lojaId,
+        [FromQuery] int? diasSemMovimento,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var configuracao = await ObterConfiguracaoAsync(lojaId);
         var diasEfetivos = diasSemMovimento ?? configuracao?.DiasAlertaParado ?? _config.DiasItemParado;
-        var (items, totalCount) = await _itemEstoqueRepository.GetItensParadosAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
-        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (items, totalCount) = await itemEstoqueRepository.GetItensParadosAsync(empresaId, diasEfetivos, page, pageSize, lojaId);
+        return DataPaged(items, totalCount, page, pageSize);
     }
 
     [HttpGet("sugestao-reposicao")]
-    public async Task<IActionResult> SugestaoReposicao([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId, [FromQuery] int? limiteQuantidade = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> SugestaoReposicao(
+        [FromQuery] Guid empresaId,
+        [FromQuery] Guid? lojaId,
+        [FromQuery] int? limiteQuantidade = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var configuracao = await ObterConfiguracaoAsync(lojaId);
         var limiteEfetivo = limiteQuantidade ?? configuracao?.QuantidadeMinimaPadrao ?? _config.LimiteEstoqueBaixoDefault;
-        var (items, totalCount) = await _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
-        return Ok(new { Items = items, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (items, totalCount) = await itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, limiteEfetivo, page, pageSize, lojaId);
+        return DataPaged(items, totalCount, page, pageSize);
     }
 
     [HttpGet("rotatividade")]
@@ -74,16 +84,16 @@ public class InteligenciaController : ControllerBase
     {
         var ate = DateTime.UtcNow;
         var de = ate.AddDays(-diasHistorico);
-        var taxaDiaria = await _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, de, ate);
+        var taxaDiaria = await movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, de, ate);
 
-        return Ok(new
+        return DataOk(new
         {
-            EmpresaId = empresaId,
-            ProdutoId = produtoId,
-            PeriodoDias = diasHistorico,
-            TaxaSaidaDiaria = Math.Round(taxaDiaria, 2),
-            TaxaSaidaSemanal = Math.Round(taxaDiaria * 7, 2),
-            TaxaSaidaMensal = Math.Round(taxaDiaria * 30, 2)
+            empresaId,
+            produtoId,
+            periodoDias = diasHistorico,
+            taxaSaidaDiaria = Math.Round(taxaDiaria, 2),
+            taxaSaidaSemanal = Math.Round(taxaDiaria * 7, 2),
+            taxaSaidaMensal = Math.Round(taxaDiaria * 30, 2)
         });
     }
 
@@ -93,58 +103,43 @@ public class InteligenciaController : ControllerBase
         [FromQuery] Guid produtoId,
         [FromQuery] int meses = 12)
     {
-        var dados = await _movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, meses);
-        return Ok(dados.Select(d => new
-        {
-            Ano = d.Ano,
-            Mes = d.Mes,
-            TotalSaidas = d.TotalSaidas,
-            ValorTotal = d.ValorTotal
-        }));
+        var dados = await movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, meses);
+        return DataOk(dados.Select(d => new { d.Ano, d.Mes, d.TotalSaidas, d.ValorTotal }));
     }
 
     [HttpGet("projecao-ruptura")]
-    public async Task<IActionResult> ProjecaoRuptura([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> ProjecaoRuptura(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var (itens, totalCount) = await _itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, page, pageSize);
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, page, pageSize);
         var ate = DateTime.UtcNow;
         var de = ate.AddDays(-30);
         var itensLista = itens.ToList();
-        var taxasPorProduto = await _movimentacaoRepository.GetTaxaSaidaDiariaPorProdutoAsync(
-            empresaId,
-            itensLista.Select(i => i.ProdutoId),
-            de,
-            ate);
+        var taxasPorProduto = await movimentacaoRepository.GetTaxaSaidaDiariaPorProdutoAsync(
+            empresaId, itensLista.Select(i => i.ProdutoId), de, ate);
 
-        var projecoes = new List<object>();
-        foreach (var item in itensLista)
+        var projecoes = itensLista.Select(item =>
         {
             var taxaDiaria = taxasPorProduto.TryGetValue(item.ProdutoId, out var taxa) ? taxa : 0m;
             var diasAteRuptura = taxaDiaria > 0
-                ? (int)Math.Floor(item.QuantidadeAtual.Value / taxaDiaria)
-                : (int?)null;
-
-            projecoes.Add(new
+                ? (int?)Math.Floor(item.QuantidadeAtual.Value / taxaDiaria)
+                : null;
+            return new
             {
-                ItemEstoqueId = item.Id,
-                ProdutoId = item.ProdutoId,
-                CodigoInterno = item.CodigoInterno,
-                QuantidadeAtual = item.QuantidadeAtual.Value,
-                TaxaSaidaDiaria = Math.Round(taxaDiaria, 2),
-                DiasAteRuptura = diasAteRuptura,
-                DataEstimadaRuptura = diasAteRuptura.HasValue
-                    ? (DateTime?)DateTime.UtcNow.AddDays(diasAteRuptura.Value)
-                    : null
-            });
-        }
+                itemEstoqueId = item.Id,
+                produtoId = item.ProdutoId,
+                codigoInterno = item.CodigoInterno,
+                quantidadeAtual = item.QuantidadeAtual.Value,
+                taxaSaidaDiaria = Math.Round(taxaDiaria, 2),
+                diasAteRuptura,
+                dataEstimadaRuptura = diasAteRuptura.HasValue
+                    ? (DateTime?)DateTime.UtcNow.AddDays(diasAteRuptura.Value) : null
+            };
+        }).OrderBy(p => p.diasAteRuptura ?? int.MaxValue);
 
-        return Ok(new
-        {
-            Items = projecoes.OrderBy(p => ((dynamic)p).DiasAteRuptura ?? int.MaxValue),
-            TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize
-        });
+        return DataPaged(projecoes, totalCount, page, pageSize);
     }
 
     [HttpGet("board")]
@@ -152,27 +147,24 @@ public class InteligenciaController : ControllerBase
     {
         var ate = DateTime.UtcNow;
         var de = ate.AddDays(-periodo);
+        var taxaDiaria = await movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, de, ate);
+        var (quantidadeEmEstoque, valorTotalEstoque, ticketMedioSugerido) = await itemEstoqueRepository.GetResumoEstoqueAsync(empresaId);
 
-        var taxaDiaria = await _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, de, ate);
-        var (quantidadeEmEstoque, valorTotalEstoque, ticketMedioSugerido) = await _itemEstoqueRepository.GetResumoEstoqueAsync(empresaId);
-
-        return Ok(new
+        return DataOk(new
         {
-            EmpresaId = empresaId,
-            Periodo = periodo,
-            QuantidadeEmEstoque = quantidadeEmEstoque,
-            ValorTotalEstoque = Math.Round(valorTotalEstoque, 2),
-            MediaVendasDiaria = Math.Round(taxaDiaria, 2),
-            ProjecaoVendasPeriodo = Math.Round(taxaDiaria * periodo, 0),
-            ProjecaoReceitaPeriodo = Math.Round(taxaDiaria * periodo * ticketMedioSugerido, 2)
+            empresaId,
+            periodo,
+            quantidadeEmEstoque,
+            valorTotalEstoque = Math.Round(valorTotalEstoque, 2),
+            mediaVendasDiaria = Math.Round(taxaDiaria, 2),
+            projecaoVendasPeriodo = Math.Round(taxaDiaria * periodo, 0),
+            projecaoReceitaPeriodo = Math.Round(taxaDiaria * periodo * ticketMedioSugerido, 2)
         });
     }
 
     private async Task<EasyStock.Domain.Entities.ConfiguracaoLoja?> ObterConfiguracaoAsync(Guid? lojaId)
     {
-        if (!lojaId.HasValue)
-            return null;
-
-        return await _configuracaoLojaRepository.GetByLojaIdAsync(lojaId.Value);
+        if (!lojaId.HasValue) return null;
+        return await configuracaoLojaRepository.GetByLojaIdAsync(lojaId.Value);
     }
 }

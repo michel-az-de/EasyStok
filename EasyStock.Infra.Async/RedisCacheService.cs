@@ -7,6 +7,11 @@ namespace EasyStock.Infra.Async;
 /// <summary>
 /// Implementação Redis do serviço de cache distribuído.
 /// Usa IDistributedCache do ASP.NET Core com serialização JSON.
+///
+/// ⚠️ LIMITAÇÕES CONHECIDAS:
+/// - IncrementAsync não é atômico (devido a limitações do IDistributedCache)
+/// - SetExpiryAsync não é suportado
+/// - Para operações atômicas em produção, considere usar StackExchange.Redis diretamente
 /// </summary>
 public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 {
@@ -18,6 +23,9 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null)
     {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
         var json = JsonSerializer.Serialize(value, JsonOptions);
         var options = ttl.HasValue
             ? new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl }
@@ -28,39 +36,111 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task<T?> GetAsync<T>(string key)
     {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
         var json = await cache.GetStringAsync(key);
         return json is null ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
-    public Task RemoveAsync(string key) =>
-        cache.RemoveAsync(key);
+    public async Task RemoveAsync(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+        await cache.RemoveAsync(key);
+    }
 
     public async Task<bool> ExistsAsync(string key)
     {
-        var value = await cache.GetAsync(key);
-        return value is not null;
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+        // Otimizado: usa GetStringAsync em vez de GetAsync para evitar download desnecessário de bytes
+        var json = await cache.GetStringAsync(key);
+        return !string.IsNullOrEmpty(json);
     }
 
     public async Task<long> IncrementAsync(string key, long value = 1)
     {
-        // Redis incrementa diretamente, mas IDistributedCache não suporta
-        // Implementação básica usando get/set
-        var current = (await GetAsync<long?>(key)) ?? 0L;
-        var newValue = current + value;
-        await SetAsync(key, newValue);
-        return newValue;
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+        // ⚠️ LIMITAÇÃO CRÍTICA: IDistributedCache não suporta operações atômicas nativas
+        // Esta implementação NÃO é thread-safe e pode causar race conditions em ambientes concorrentes
+        // Para produção com alta concorrência, considere:
+        // 1. Usar IConnectionMultiplexer do StackExchange.Redis diretamente
+        // 2. Implementar lock distribuído (ex: Redis Lock)
+        // 3. Usar operações atômicas específicas do provedor
+
+        if (value == 0)
+            return (await GetAsync<long?>(key)) ?? 0L;
+
+        try
+        {
+            var current = (await GetAsync<long?>(key)) ?? 0L;
+            var newValue = checked(current + value); // Previne overflow
+
+            // Define TTL padrão de 24h para counters se não especificado
+            await SetAsync(key, newValue, TimeSpan.FromHours(24));
+
+            return newValue;
+        }
+        catch (OverflowException)
+        {
+            throw new InvalidOperationException($"Incremento causaria overflow no counter '{key}'");
+        }
     }
 
-    public Task SetExpiryAsync(string key, TimeSpan ttl)
+    public async Task SetExpiryAsync(string key, TimeSpan ttl)
     {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+        if (ttl <= TimeSpan.Zero)
+            throw new ArgumentException("TTL must be positive", nameof(ttl));
+
         // IDistributedCache não suporta alterar TTL diretamente
-        // Esta é uma limitação da abstração do ASP.NET Core
-        throw new NotSupportedException("SetExpiryAsync não é suportado pelo IDistributedCache do ASP.NET Core");
+        // Estratégia alternativa: re-setar o valor com novo TTL
+        // ⚠️ LIMITAÇÃO: só funciona se o tipo for serializável e não causar perda de dados
+
+        try
+        {
+            var json = await cache.GetStringAsync(key);
+            if (!string.IsNullOrEmpty(json))
+            {
+                var options = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = ttl
+                };
+                await cache.SetStringAsync(key, json, options);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new NotSupportedException(
+                $"SetExpiryAsync falhou para chave '{key}': {ex.Message}. " +
+                "IDistributedCache não suporta alteração de TTL nativamente.", ex);
+        }
     }
 
     public async Task RemoveAsync(IEnumerable<string> keys)
     {
-        var tasks = keys.Select(key => cache.RemoveAsync(key));
+        if (keys == null)
+            throw new ArgumentNullException(nameof(keys));
+
+        var keyArray = keys.ToArray();
+        if (keyArray.Length == 0)
+            return;
+
+        // Valida todas as chaves antes de processar
+        foreach (var key in keyArray)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Keys cannot contain null or empty values", nameof(keys));
+        }
+
+        var tasks = keyArray.Select(key => cache.RemoveAsync(key));
         await Task.WhenAll(tasks);
     }
 }

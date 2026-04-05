@@ -11,7 +11,9 @@
       "Bash(ls /c/rep/EasyStok/*.sln)",
       "Bash(git stash:*)",
       "Bash(ls -la \"C:\\\\rep\\\\EasyStok\\\\EasyStock.Application.Tests\\\\UseCases\"\" 2>/dev/null || echo \"Diretório não encontrado \")",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(grep -E \"\\\\.\\(cs\\)$\")"
     ]
   }
 }

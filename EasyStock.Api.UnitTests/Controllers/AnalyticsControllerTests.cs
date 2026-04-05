@@ -1,8 +1,10 @@
-﻿using EasyStock.Api.Controllers;
+﻿using EasyStock.Api.Configuration;
+using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -11,9 +13,18 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class AnalyticsControllerTests
 {
     private readonly IAnalyticsRepository _repo = Substitute.For<IAnalyticsRepository>();
+    private readonly IConfiguracaoLojaRepository _configuracaoLojaRepository = Substitute.For<IConfiguracaoLojaRepository>();
     private readonly AnalyticsController _controller;
 
-    public AnalyticsControllerTests() => _controller = new AnalyticsController(_repo);
+    public AnalyticsControllerTests()
+    {
+        var config = Options.Create(new EasyStockConfiguracoes
+        {
+            DiasAlertaVencimento = 30,
+            DiasItemParado = 90
+        });
+        _controller = new AnalyticsController(_repo, _configuracaoLojaRepository, config);
+    }
 
     // ?? helpers ??????????????????????????????????????????????????????????????
 
@@ -183,7 +194,7 @@ await _repo.Received(1).GetDashboardResumoAsync(empresaId, 30);
         _repo.GetAlertasValidadeAsync(empresaId, 30, 1, 20)
              .Returns(((IReadOnlyList<ValidadeAlerta>)alertas, 1));
 
- var result = await _controller.Alertas(empresaId, 30, 1, 20);
+ var result = await _controller.Alertas(empresaId, null, 30, 1, 20);
 
         result.Should().BeOfType<OkObjectResult>();
         Prop<int>(((OkObjectResult)result).Value, "TotalCount").Should().Be(1);
@@ -198,7 +209,7 @@ await _repo.Received(1).GetDashboardResumoAsync(empresaId, 30);
     _repo.GetAlertasValidadeAsync(empresaId, 30, 1, 20)
     .Returns(((IReadOnlyList<ValidadeAlerta>)new[] { alerta }, 1));
 
-        var result = await _controller.Alertas(empresaId);
+        var result = await _controller.Alertas(empresaId, null);
 
       var items = Prop<IReadOnlyList<ValidadeAlerta>>(((OkObjectResult)result).Value, "Items");
         items[0].ValorEmRisco.Should().Be(500m);
@@ -324,7 +335,7 @@ public async Task Movimentacoes_DeveUsarDatasPadraoQuandoNaoInformadas()
         _repo.GetAlertasValidadeAsync(empresaId, 30, 1, 20)
              .Returns(((IReadOnlyList<ValidadeAlerta>)alertas, 1));
 
-      var result = await _controller.Validade(empresaId, 30, 1, 20);
+      var result = await _controller.Validade(empresaId, null, 30, 1, 20);
 
     result.Should().BeOfType<OkObjectResult>();
     Prop<IReadOnlyList<ValidadeAlerta>>(((OkObjectResult)result).Value, "Items")
@@ -340,7 +351,7 @@ public async Task Movimentacoes_DeveUsarDatasPadraoQuandoNaoInformadas()
         _repo.GetAlertasValidadeAsync(empresaId, 30, 1, 20)
     .Returns(((IReadOnlyList<ValidadeAlerta>)new[] { alerta }, 1));
 
-        var result = await _controller.Validade(empresaId);
+        var result = await _controller.Validade(empresaId, null);
 
      var items = Prop<IReadOnlyList<ValidadeAlerta>>(((OkObjectResult)result).Value, "Items");
         items[0].DiasAteVencimento.Should().BeGreaterThanOrEqualTo(0);
@@ -360,7 +371,7 @@ public async Task Movimentacoes_DeveUsarDatasPadraoQuandoNaoInformadas()
 _repo.GetItensParadosDetalhadosAsync(empresaId, 90, 1, 20)
      .Returns(((IReadOnlyList<ItemParadoDetalhe>)parados, 1));
 
-        var result = await _controller.Parados(empresaId, 90, 1, 20);
+        var result = await _controller.Parados(empresaId, null, 90, 1, 20);
 
         result.Should().BeOfType<OkObjectResult>();
         Prop<int>(((OkObjectResult)result).Value, "TotalCount").Should().Be(1);
@@ -376,7 +387,7 @@ _repo.GetItensParadosDetalhadosAsync(empresaId, 90, 1, 20)
         _repo.GetItensParadosDetalhadosAsync(empresaId, 90, 1, 20)
        .Returns(((IReadOnlyList<ItemParadoDetalhe>)new[] { item }, 1));
 
-        var result = await _controller.Parados(empresaId);
+        var result = await _controller.Parados(empresaId, null);
 
     var items = Prop<IReadOnlyList<ItemParadoDetalhe>>(((OkObjectResult)result).Value, "Items");
         items[0].ValorParado.Should().Be(2000m);
@@ -435,4 +446,7 @@ _repo.GetItensParadosDetalhadosAsync(empresaId, 90, 1, 20)
             empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>());
     }
 }
+
+
+
 

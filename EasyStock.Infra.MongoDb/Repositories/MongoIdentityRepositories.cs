@@ -47,7 +47,10 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     public async Task<Fornecedor?> GetByIdAsync(Guid empresaId, Guid id) =>
         await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize, bool? ativo = null, string? search = null)
+    public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(
+        Guid empresaId, int page, int pageSize,
+        bool? ativo = null, string? search = null,
+        string? sort = "nome", string? order = "asc")
     {
         var filter = Builders<Fornecedor>.Filter.Eq(x => x.EmpresaId, empresaId);
         if (ativo.HasValue)
@@ -62,8 +65,14 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
                 Builders<Fornecedor>.Filter.Regex(x => x.Contato, regex));
         }
         var total = (int)await Collection.CountDocumentsAsync(filter);
-        var items = await Collection.Find(filter)
-            .SortBy(x => x.Nome)
+        var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+        var findFluent = Collection.Find(filter);
+        var sorted = sort?.ToLowerInvariant() switch
+        {
+            "criadoem" => desc ? findFluent.SortByDescending(x => x.CriadoEm) : findFluent.SortBy(x => x.CriadoEm),
+            _          => desc ? findFluent.SortByDescending(x => x.Nome) : findFluent.SortBy(x => x.Nome),
+        };
+        var items = await sorted
             .Skip((page - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync();

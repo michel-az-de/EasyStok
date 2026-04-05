@@ -60,9 +60,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
         }
 
-        public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20)
+        public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
+            Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
         {
-            var cacheKey = $"produtos_paginados_{empresaId}_{page}_{pageSize}";
+            var cacheKey = $"produtos_paginados_{empresaId}_{page}_{pageSize}_{sort}_{order}";
 
             if (cache is not null)
             {
@@ -79,8 +80,16 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(p => p.EmpresaId == empresaId);
 
             var totalCount = await query.CountAsync();
+
+            var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+            query = sort?.ToLowerInvariant() switch
+            {
+                "status"    => desc ? query.OrderByDescending(p => p.Status) : query.OrderBy(p => p.Status),
+                "criadoem"  => desc ? query.OrderByDescending(p => p.CriadoEm) : query.OrderBy(p => p.CriadoEm),
+                _           => desc ? query.OrderByDescending(p => p.Nome) : query.OrderBy(p => p.Nome),
+            };
+
             var produtos = await query
-                .OrderBy(p => p.Nome)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -92,7 +101,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 var serialized = JsonSerializer.Serialize(result);
                 await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                    AbsoluteExpirationRelativeToNow = CacheDuration
                 });
             }
 

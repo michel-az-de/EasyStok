@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.AspNetCore.Authorization;
@@ -10,13 +11,13 @@ namespace EasyStock.Api.Controllers;
 [Route("api/uploads")]
 public class UploadsController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
-    ICurrentUserAccessor currentUserAccessor) : ControllerBase
+    ICurrentUserAccessor currentUserAccessor) : EasyStockControllerBase
 {
     [HttpPost("produto/{id}/foto")]
     public async Task<IActionResult> UploadFotoProduto(Guid id, [FromQuery] Guid empresaId, IFormFile file, CancellationToken cancellationToken)
     {
         var result = await UploadProdutoAsync(empresaId, id, file, cancellationToken);
-        return Ok(result);
+        return DataOk(result);
     }
 
     [HttpPost("usuario/avatar")]
@@ -30,7 +31,7 @@ public class UploadsController(
             payload.Content,
             cancellationToken);
 
-        return Ok(result);
+        return DataOk(result);
     }
 
     [Authorize(Policy = "Admin")]
@@ -46,7 +47,7 @@ public class UploadsController(
             payload.Content,
             cancellationToken);
 
-        return Ok(result);
+        return DataOk(result);
     }
 
     internal async Task<UploadedFileResult> UploadProdutoAsync(Guid empresaId, Guid produtoId, IFormFile file, CancellationToken cancellationToken)

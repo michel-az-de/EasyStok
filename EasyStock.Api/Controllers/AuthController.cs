@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
@@ -34,29 +35,15 @@ public class AuthController(
     ResetarSenhaUseCase resetarSenhaUseCase,
     ObterUsuarioAtualUseCase obterUsuarioAtualUseCase,
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
-    AlterarSenhaUseCase alterarSenhaUseCase) : ControllerBase
+    AlterarSenhaUseCase alterarSenhaUseCase) : EasyStockControllerBase
 {
-    private readonly AutenticarUsuarioUseCase _autenticarUseCase = autenticarUseCase;
-    private readonly IJwtTokenService _jwtService = jwtService;
-    private readonly IRefreshTokenRepository _refreshTokenRepository = refreshTokenRepository;
-    private readonly IAuditLogRepository _auditLogRepository = auditLogRepository;
-    private readonly IUnitOfWork _unitOfWork = unitOfWork;
-    private readonly CadastrarUsuarioUseCase _cadastrarUsuarioUseCase = cadastrarUsuarioUseCase;
-    private readonly RefreshTokenUseCase _refreshTokenUseCase = refreshTokenUseCase;
-    private readonly LogoutUseCase _logoutUseCase = logoutUseCase;
-    private readonly EsqueciSenhaUseCase _esqueciSenhaUseCase = esqueciSenhaUseCase;
-    private readonly ResetarSenhaUseCase _resetarSenhaUseCase = resetarSenhaUseCase;
-    private readonly ObterUsuarioAtualUseCase _obterUsuarioAtualUseCase = obterUsuarioAtualUseCase;
-    private readonly AtualizarUsuarioAtualUseCase _atualizarUsuarioAtualUseCase = atualizarUsuarioAtualUseCase;
-    private readonly AlterarSenhaUseCase _alterarSenhaUseCase = alterarSenhaUseCase;
-
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var resultado = await _autenticarUseCase.ExecuteAsync(
+        var resultado = await autenticarUseCase.ExecuteAsync(
             new AutenticarUsuarioCommand(request.Email, request.Senha, request.EmpresaId));
-        var token = _jwtService.GerarToken(resultado);
-        var refreshTokenValue = _jwtService.GerarRefreshToken();
+        var token = jwtService.GerarToken(resultado);
+        var refreshTokenValue = jwtService.GerarRefreshToken();
         var refreshTokenHash = BCrypt.Net.BCrypt.HashPassword(refreshTokenValue);
         var expiraEm = DateTime.UtcNow.AddDays(7);
 
@@ -67,9 +54,8 @@ public class AuthController(
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             HttpContext.Request.Headers.UserAgent);
 
-        await _refreshTokenRepository.AddAsync(refreshToken);
+        await refreshTokenRepository.AddAsync(refreshToken);
 
-        // Auditar login
         var auditLog = AuditLogEntity.Criar(
             resultado.UsuarioId,
             "login",
@@ -77,70 +63,45 @@ public class AuthController(
             "Login realizado com sucesso",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             HttpContext.Request.Headers.UserAgent);
-        await _auditLogRepository.AddAsync(auditLog);
+        await auditLogRepository.AddAsync(auditLog);
+        await unitOfWork.CommitAsync();
 
-        await _unitOfWork.CommitAsync();
-
-        return Ok(new { data = new LoginResponse(
+        return DataOk(new LoginResponse(
             token,
             refreshTokenValue,
-            _jwtService.ExpiresInSeconds,
-            new LoginUsuarioInfo(resultado.UsuarioId, resultado.Nome, resultado.Email, resultado.Nivel.ToString())), meta = new { }, error = (object?)null });
+            jwtService.ExpiresInSeconds,
+            new LoginUsuarioInfo(resultado.UsuarioId, resultado.Nome, resultado.Email, resultado.Nivel.ToString())));
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] CadastrarUsuarioCommand command)
-    {
-        var result = await _cadastrarUsuarioUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await cadastrarUsuarioUseCase.ExecuteAsync(command));
 
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command)
-    {
-        var result = await _refreshTokenUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await refreshTokenUseCase.ExecuteAsync(command));
 
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutCommand command)
-    {
-        var result = await _logoutUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await logoutUseCase.ExecuteAsync(command));
 
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaCommand command)
-    {
-        var result = await _esqueciSenhaUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await esqueciSenhaUseCase.ExecuteAsync(command));
 
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaCommand command)
-    {
-        var result = await _resetarSenhaUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await resetarSenhaUseCase.ExecuteAsync(command));
 
     [HttpGet("me")]
     public async Task<IActionResult> GetMe()
-    {
-        var result = await _obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand());
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
     [HttpPatch("me")]
     public async Task<IActionResult> UpdateMe([FromBody] AtualizarUsuarioAtualCommand command)
-    {
-        var result = await _atualizarUsuarioAtualUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await atualizarUsuarioAtualUseCase.ExecuteAsync(command));
 
     [HttpPatch("me/password")]
     public async Task<IActionResult> ChangePassword([FromBody] AlterarSenhaCommand command)
-    {
-        var result = await _alterarSenhaUseCase.ExecuteAsync(command);
-        return Ok(new { data = result, meta = new { }, error = (object?)null });
-    }
+        => DataOk(await alterarSenhaUseCase.ExecuteAsync(command));
 }

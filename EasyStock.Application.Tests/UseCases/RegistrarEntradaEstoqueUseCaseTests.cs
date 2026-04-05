@@ -410,4 +410,77 @@ public class RegistrarEntradaEstoqueUseCaseTests
             e.Quantidade == 10 &&
             e.CodigoLote == "LOTE-01"));
     }
+
+    [Fact]
+    public async Task Deve_aplicar_quantidade_minima_da_configuracao_da_loja_quando_loja_informada()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
+        var lojaRepository = Substitute.For<ILojaRepository>();
+        var configuracaoLojaRepository = Substitute.For<IConfiguracaoLojaRepository>();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        lojaRepository.GetByIdAsync(empresaId, lojaId).Returns(new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja 1", Ativa = true });
+        configuracaoLojaRepository.GetOrDefaultAsync(lojaId).Returns(new ConfiguracaoLoja
+        {
+            Id = Guid.NewGuid(),
+            LojaId = lojaId,
+            QuantidadeMinimaPadrao = 12,
+            DiasAlertaParado = 45
+        });
+
+        var useCase = new RegistrarEntradaEstoqueUseCase(
+            produtoRepository,
+            variacaoRepository,
+            itemRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger,
+            null,
+            null,
+            lojaRepository,
+            configuracaoLojaRepository);
+
+        await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
+            empresaId,
+            produto.Id,
+            null,
+            10,
+            250m,
+            null,
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            NaturezaMovimentacaoEstoque.Compra,
+            "CAP3426",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            lojaId));
+
+        await itemRepository.Received(1).InsertAsync(Arg.Is<ItemEstoque>(i =>
+            i.LojaId == lojaId &&
+            i.QuantidadeMinima == 12));
+    }
 }

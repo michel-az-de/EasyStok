@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,28 +8,22 @@ namespace EasyStock.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/vendas")]
-public class VendaController : ControllerBase
+public class VendaController(IVendaRepository vendaRepository) : EasyStockControllerBase
 {
-    private readonly IVendaRepository _vendaRepository;
-
-    public VendaController(IVendaRepository vendaRepository)
-    {
-        _vendaRepository = vendaRepository;
-    }
-
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var (vendas, totalCount) = await _vendaRepository.GetVendasPorEmpresaAsync(empresaId, page, pageSize);
-        return Ok(new { Items = vendas, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        var (vendas, totalCount) = await vendaRepository.GetVendasPorEmpresaAsync(empresaId, page, pageSize);
+        return DataPaged(vendas, totalCount, page, pageSize);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
     {
-        var venda = await _vendaRepository.GetByIdAsync(empresaId, id);
-        if (venda == null) return NotFound();
-        return Ok(venda);
+        var venda = await vendaRepository.GetByIdAsync(empresaId, id);
+        return venda is null ? DataNotFound() : DataOk(venda);
     }
-
 }

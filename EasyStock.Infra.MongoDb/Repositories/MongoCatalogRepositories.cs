@@ -120,12 +120,22 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         return await Collection.Find(filter).ToListAsync();
     }
 
-    public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20)
+    public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
+        Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
     {
         var filter = Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId);
         var total = (int)await Collection.CountDocumentsAsync(filter);
-        var items = await Collection.Find(filter)
-            .SortBy(x => x.Nome)
+
+        var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+        var findFluent = Collection.Find(filter);
+        var sorted = sort?.ToLowerInvariant() switch
+        {
+            "status"   => desc ? findFluent.SortByDescending(x => x.Status) : findFluent.SortBy(x => x.Status),
+            "criadoem" => desc ? findFluent.SortByDescending(x => x.CriadoEm) : findFluent.SortBy(x => x.CriadoEm),
+            _          => desc ? findFluent.SortByDescending(x => x.Nome) : findFluent.SortBy(x => x.Nome),
+        };
+
+        var items = await sorted
             .Skip((page - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync();

@@ -13,7 +13,10 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Fornecedor?> GetByIdAsync(Guid empresaId, Guid id) =>
             dbContext.Fornecedores.FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Id == id);
 
-        public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize, bool? ativo = null, string? search = null)
+        public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(
+            Guid empresaId, int page, int pageSize,
+            bool? ativo = null, string? search = null,
+            string? sort = "nome", string? order = "asc")
         {
             var query = dbContext.Fornecedores
                 .AsNoTracking()
@@ -33,8 +36,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             }
 
             var total = await query.CountAsync();
+
+            var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+            query = sort?.ToLowerInvariant() switch
+            {
+                "criadoem" => desc ? query.OrderByDescending(f => f.CriadoEm) : query.OrderBy(f => f.CriadoEm),
+                _          => desc ? query.OrderByDescending(f => f.Nome) : query.OrderBy(f => f.Nome),
+            };
+
             var fornecedores = await query
-                .OrderBy(f => f.Nome)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

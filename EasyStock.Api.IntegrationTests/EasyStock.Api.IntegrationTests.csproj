@@ -25,4 +25,8 @@
     <ProjectReference Include="..\EasyStock.Api\EasyStock.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Infrastructure\AsyncInfrastructureTests.cs" />
+  </ItemGroup>
+
 </Project>

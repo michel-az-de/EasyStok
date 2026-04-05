@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AlterarSenhaUsuario;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
@@ -23,17 +24,20 @@ public class UsuarioController(
     DesativarUsuarioUseCase desativarUseCase,
     ListarUsuariosUseCase listarUseCase,
     AtribuirPerfilUsuarioUseCase atribuirPerfilUseCase,
-    ICurrentUserAccessor currentUser) : ControllerBase
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [HttpGet]
     [Authorize(Policy = "Admin")]
-    public async Task<IActionResult> GetAll([FromQuery] Guid empresaId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
         var (usuarios, total) = await listarUseCase.ExecuteAsync(new ListarUsuariosQuery(empresaId, page, pageSize));
-        return Ok(new { Usuarios = usuarios, TotalCount = total, Page = page, PageSize = pageSize });
+        return DataPaged(usuarios, total, page, pageSize);
     }
 
     [HttpPost]
@@ -44,7 +48,7 @@ public class UsuarioController(
             return Forbid();
 
         var resultado = await criarUseCase.ExecuteAsync(command);
-        return Created($"/api/usuarios/{resultado.UsuarioId}", resultado);
+        return DataCreated($"/api/usuarios/{resultado.UsuarioId}", resultado);
     }
 
     [HttpPut("{id}")]
@@ -52,7 +56,7 @@ public class UsuarioController(
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarUsuarioCommand command)
     {
         if (id != command.UsuarioId)
-            return BadRequest("Id da rota nao corresponde ao Id do comando.");
+            return DataBadRequest("Id da rota nao corresponde ao Id do comando.");
         await atualizarUseCase.ExecuteAsync(command);
         return NoContent();
     }

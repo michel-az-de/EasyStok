@@ -1,8 +1,8 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 namespace EasyStock.Api.Observability;
@@ -13,93 +13,80 @@ public class GlobalExceptionHandler : IExceptionHandler
     {
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
 
-        var (statusCode, title, detail, logAsError) = MapException(exception);
+        var (statusCode, code, title, detail, logAsError) = MapException(exception);
 
         if (logAsError)
             Log.Error(exception, "Erro inesperado na API. CorrelationId: {CorrelationId}", correlationId);
         else
             Log.Warning(exception, "Erro tratado na API. CorrelationId: {CorrelationId}", correlationId);
 
-        var problemDetails = new ProblemDetails
-        {
-            Status = statusCode,
-            Title = title,
-            Detail = detail,
-            Instance = httpContext.Request.Path
-        };
-        problemDetails.Extensions["correlationId"] = correlationId;
+        var envelope = new ApiErrorResponse(new ApiError(code, title, detail, correlationId));
 
         httpContext.Response.StatusCode = statusCode;
-        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+        httpContext.Response.ContentType = "application/json";
+        await httpContext.Response.WriteAsJsonAsync(envelope, cancellationToken);
 
         return true;
     }
 
-    private static (int StatusCode, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
+    private static (int StatusCode, string Code, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
         exception switch
         {
-            UseCaseValidationException validationException => (
+            // Exceções específicas que NÃO herdam de RegraDeDominioVioladaException
+            UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
                 "Requisicao invalida",
-                validationException.Message,
+                ex.Message,
                 false),
-            QuantidadeInvalidaException quantidadeInvalidaException => (
+
+            QuantidadeInvalidaException ex => (
                 StatusCodes.Status400BadRequest,
+                "INVALID_QUANTITY",
                 "Quantidade invalida",
-                quantidadeInvalidaException.Message,
+                ex.Message,
                 false),
-            ProdutoInativoException produtoInativoException => (
-                StatusCodes.Status409Conflict,
-                "Produto inativo",
-                produtoInativoException.Message,
-                false),
-            EstoqueInsuficienteException estoqueInsuficienteException => (
-                StatusCodes.Status409Conflict,
-                "Estoque insuficiente",
-                estoqueInsuficienteException.Message,
-                false),
-            ItemEstoqueBloqueadoException itemBloqueadoException => (
-                StatusCodes.Status409Conflict,
-                "Item de estoque bloqueado",
-                itemBloqueadoException.Message,
-                false),
-            ItemEstoqueVencidoException itemVencidoException => (
-                StatusCodes.Status422UnprocessableEntity,
-                "Item de estoque vencido",
-                itemVencidoException.Message,
-                false),
-            ConflitoConcorrenciaException conflitoConcorrenciaException => (
-                StatusCodes.Status409Conflict,
-                "Conflito de concorrencia de dominio",
-                conflitoConcorrenciaException.Message,
-                false),
-            CredenciaisInvalidasException credenciaisInvalidasException => (
+
+            CredenciaisInvalidasException ex => (
                 StatusCodes.Status401Unauthorized,
+                "UNAUTHORIZED",
                 "Credenciais invalidas",
-                credenciaisInvalidasException.Message,
+                ex.Message,
                 false),
-            UsuarioNaoAutorizadoException usuarioNaoAutorizadoException => (
+
+            UsuarioNaoAutorizadoException ex => (
                 StatusCodes.Status403Forbidden,
+                "FORBIDDEN",
                 "Acesso negado",
-                usuarioNaoAutorizadoException.Message,
+                ex.Message,
                 false),
-            PlanoLimiteAtingidoException planoLimiteAtingidoException => (
+
+            PlanoLimiteAtingidoException ex => (
                 StatusCodes.Status422UnprocessableEntity,
+                "PLAN_LIMIT_REACHED",
                 "Limite do plano atingido",
-                planoLimiteAtingidoException.Message,
+                ex.Message,
                 false),
-            RegraDeDominioVioladaException regraDeDominioVioladaException => (
-                StatusCodes.Status409Conflict,
-                "Conflito de negocio",
-                regraDeDominioVioladaException.Message,
-                false),
+
+            // Exceções de infraestrutura
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
+                "CONCURRENCY_CONFLICT",
                 "Conflito de concorrencia",
                 "Os dados foram alterados por outro processo. Recarregue as informacoes e tente novamente.",
                 false),
+
+            // Exceções de domínio (todas herdam de RegraDeDominioVioladaException - case genérico)
+            RegraDeDominioVioladaException ex => (
+                StatusCodes.Status409Conflict,
+                "BUSINESS_RULE_VIOLATION",
+                "Violacao de regra de negocio",
+                ex.Message,
+                false),
+
             _ => (
                 StatusCodes.Status500InternalServerError,
+                "INTERNAL_ERROR",
                 "Erro interno do servidor",
                 "Ocorreu um erro inesperado. Tente novamente mais tarde.",
                 true)

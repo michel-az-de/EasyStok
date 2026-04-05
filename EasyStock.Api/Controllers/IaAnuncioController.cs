@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Application.UseCases.Common;
@@ -17,10 +18,12 @@ public class IaAnuncioController(
     ListarAnunciosUseCase listarUseCase,
     ExcluirAnuncioUseCase excluirUseCase,
     ObterUsoIaUseCase obterUsoUseCase,
-    ICurrentUserAccessor currentUser) : ControllerBase
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     /// <summary>
     /// Gera descricao de anuncio via SSE (streaming).
+    /// Eventos: data: {"texto":"..."} ... data: [DONE]
+    /// Erros SSE: event: erro\ndata: {"error": {...}}
     /// </summary>
     [HttpPost("anuncio")]
     [Authorize(Policy = "Operador")]
@@ -52,15 +55,14 @@ public class IaAnuncioController(
         }
         catch (UseCaseValidationException ex)
         {
-            var err = JsonSerializer.Serialize(new { erro = ex.Message });
+            var err = JsonSerializer.Serialize(new ApiErrorResponse(
+                new ApiError("VALIDATION_ERROR", "Requisicao invalida", ex.Message, null)));
             await Response.WriteAsync($"event: erro\ndata: {err}\n\n", Encoding.UTF8, ct);
             await Response.Body.FlushAsync(ct);
         }
     }
 
-    /// <summary>
-    /// Salva um rascunho gerado.
-    /// </summary>
+    /// <summary>Salva um rascunho gerado.</summary>
     [HttpPost("anuncio/salvar")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> SalvarAnuncio([FromBody] SalvarAnuncioRequest request)
@@ -76,43 +78,35 @@ public class IaAnuncioController(
             request.InstrucoesUsadas,
             request.TokensConsumidos));
 
-        return Created($"/api/ia/anuncios/{resultado.Id}", resultado);
+        return DataCreated($"/api/ia/anuncios/{resultado.Id}", resultado);
     }
 
-    /// <summary>
-    /// Lista anuncios salvos de um produto.
-    /// </summary>
+    /// <summary>Lista anuncios salvos de um produto.</summary>
     [HttpGet("anuncios/{prodId:guid}")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> ListarAnuncios(Guid prodId, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> ListarAnuncios(Guid prodId, [FromQuery] Guid? empresaId)
     {
         var eid = ResolverEmpresaId(empresaId);
-        var anuncios = await listarUseCase.ExecuteAsync(new ListarAnunciosQuery(eid, prodId));
-        return Ok(anuncios);
+        return DataOk(await listarUseCase.ExecuteAsync(new ListarAnunciosQuery(eid, prodId)));
     }
 
-    /// <summary>
-    /// Exclui um anuncio salvo.
-    /// </summary>
+    /// <summary>Exclui um anuncio salvo.</summary>
     [HttpDelete("anuncios/{id:guid}")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> ExcluirAnuncio(Guid id, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> ExcluirAnuncio(Guid id, [FromQuery] Guid? empresaId)
     {
         var eid = ResolverEmpresaId(empresaId);
         await excluirUseCase.ExecuteAsync(new ExcluirAnuncioCommand(eid, id));
         return NoContent();
     }
 
-    /// <summary>
-    /// Retorna o consumo de IA do mes corrente para a empresa.
-    /// </summary>
+    /// <summary>Consumo de IA do mes corrente para a empresa.</summary>
     [HttpGet("uso")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> ObterUso([FromQuery] Guid empresaId)
+    public async Task<IActionResult> ObterUso([FromQuery] Guid? empresaId)
     {
         var eid = ResolverEmpresaId(empresaId);
-        var uso = await obterUsoUseCase.ExecuteAsync(new ObterUsoIaQuery(eid));
-        return Ok(uso);
+        return DataOk(await obterUsoUseCase.ExecuteAsync(new ObterUsoIaQuery(eid)));
     }
 
     private Guid ResolverEmpresaId(Guid? solicitada) =>
