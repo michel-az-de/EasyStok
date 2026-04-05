@@ -11,6 +11,41 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
     public Task<PedidoFornecedor?> GetByIdAsync(Guid id) =>
         dbContext.PedidosFornecedor.FirstOrDefaultAsync(x => x.Id == id);
 
+    public Task<PedidoFornecedor?> GetByIdComItensAsync(Guid id) =>
+        dbContext.PedidosFornecedor
+            .Include(x => x.Itens)
+            .Include(x => x.Fornecedor)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+    public async Task<(IEnumerable<PedidoFornecedor> Pedidos, int Total)> GetPedidosPaginadosAsync(
+        Guid empresaId,
+        Guid? fornecedorId = null,
+        StatusPedidoFornecedor? status = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var query = dbContext.PedidosFornecedor
+            .AsNoTracking()
+            .Include(x => x.Itens)
+            .Include(x => x.Fornecedor)
+            .Where(x => x.EmpresaId == empresaId);
+
+        if (fornecedorId.HasValue)
+            query = query.Where(x => x.FornecedorId == fornecedorId.Value);
+
+        if (status.HasValue)
+            query = query.Where(x => x.Status == status.Value);
+
+        var total = await query.CountAsync();
+        var pedidos = await query
+            .OrderByDescending(x => x.DataPedido)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (pedidos, total);
+    }
+
     public Task AddAsync(PedidoFornecedor pedido) =>
         dbContext.PedidosFornecedor.AddAsync(pedido).AsTask();
 

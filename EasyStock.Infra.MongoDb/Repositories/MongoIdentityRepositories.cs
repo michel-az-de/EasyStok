@@ -164,6 +164,32 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
             leadTimes.Count == 0 ? null : decimal.Round(leadTimes.Average(), 2),
             frequencia);
     }
+
+    public async Task<PedidoFornecedor?> GetByIdComItensAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public async Task<(IEnumerable<PedidoFornecedor> Pedidos, int Total)> GetPedidosPaginadosAsync(
+        Guid empresaId,
+        Guid? fornecedorId = null,
+        StatusPedidoFornecedor? status = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var filter = Builders<PedidoFornecedor>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (fornecedorId.HasValue)
+            filter &= Builders<PedidoFornecedor>.Filter.Eq(x => x.FornecedorId, fornecedorId.Value);
+        if (status.HasValue)
+            filter &= Builders<PedidoFornecedor>.Filter.Eq(x => x.Status, status.Value);
+
+        var total = (int)await Collection.CountDocumentsAsync(filter);
+        var pedidos = await Collection.Find(filter)
+            .SortByDescending(x => x.DataPedido)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        return (pedidos, total);
+    }
 }
 
 public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
