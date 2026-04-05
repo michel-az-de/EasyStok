@@ -2,12 +2,15 @@ using EasyStock.Api.Configuration;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+[SwaggerTag("Intelligence / Inteligência")]
 [Authorize]
 [ApiController]
 [Route("api/inteligencia")]
@@ -20,6 +23,9 @@ public class InteligenciaController(
 {
     private readonly EasyStockConfiguracoes _config = config.Value;
 
+    [SwaggerOperation(Summary = "Get low-stock items")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("estoque-baixo")]
     public async Task<IActionResult> EstoqueBaixo(
         [FromQuery] Guid empresaId,
@@ -34,6 +40,9 @@ public class InteligenciaController(
         return DataPaged(items, totalCount, page, pageSize);
     }
 
+    [SwaggerOperation(Summary = "Get items expiring soon")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("proximo-vencimento")]
     public async Task<IActionResult> ProximoVencimento(
         [FromQuery] Guid empresaId,
@@ -48,6 +57,9 @@ public class InteligenciaController(
         return DataPaged(items, totalCount, page, pageSize);
     }
 
+    [SwaggerOperation(Summary = "Get slow-moving items", Description = "Items without any stock movement in N days.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("parados")]
     public async Task<IActionResult> ItensParados(
         [FromQuery] Guid empresaId,
@@ -62,6 +74,9 @@ public class InteligenciaController(
         return DataPaged(items, totalCount, page, pageSize);
     }
 
+    [SwaggerOperation(Summary = "Get AI replenishment suggestions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("sugestao-reposicao")]
     public async Task<IActionResult> SugestaoReposicao(
         [FromQuery] Guid empresaId,
@@ -76,6 +91,9 @@ public class InteligenciaController(
         return DataPaged(items, totalCount, page, pageSize);
     }
 
+    [SwaggerOperation(Summary = "Get product turnover rate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("rotatividade")]
     public async Task<IActionResult> Rotatividade(
         [FromQuery] Guid empresaId,
@@ -97,6 +115,9 @@ public class InteligenciaController(
         });
     }
 
+    [SwaggerOperation(Summary = "Get product seasonality")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("sazonalidade")]
     public async Task<IActionResult> Sazonalidade(
         [FromQuery] Guid empresaId,
@@ -107,6 +128,9 @@ public class InteligenciaController(
         return DataOk(dados.Select(d => new { d.Ano, d.Mes, d.TotalSaidas, d.ValorTotal }));
     }
 
+    [SwaggerOperation(Summary = "Get stockout projections")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("projecao-ruptura")]
     public async Task<IActionResult> ProjecaoRuptura(
         [FromQuery] Guid empresaId,
@@ -142,6 +166,9 @@ public class InteligenciaController(
         return DataPaged(projecoes, totalCount, page, pageSize);
     }
 
+    [SwaggerOperation(Summary = "Get intelligence board summary")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("board")]
     public async Task<IActionResult> Board([FromQuery] Guid empresaId, [FromQuery] int periodo = 30)
     {
