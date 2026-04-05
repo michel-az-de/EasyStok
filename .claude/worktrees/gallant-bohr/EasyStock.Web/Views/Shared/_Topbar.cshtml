@@ -1,0 +1,88 @@
+@{
+    var usuarioNome = ViewBag.UsuarioNome as string ?? "Usuário";
+    var iniciais = string.Join("", (usuarioNome).Split(' ').Take(2).Select(p => p.Length > 0 ? p[0].ToString().ToUpper() : ""));
+    if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
+}
+
+<header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 flex-shrink-0">
+    <!-- Busca decorativa -->
+    <div class="flex-1 max-w-md">
+        <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
+            </svg>
+            <input type="text" placeholder="Buscar produtos, SKUs..."
+                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+    </div>
+
+    <!-- Ação rápida -->
+    <div x-data="{ open: false }" class="relative">
+        <button @@click="open = !open"
+                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Ação rápida
+        </button>
+        <div x-show="open" @@click.outside="open = false"
+             class="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+            <a href="/entradas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>📥</span> Nova entrada
+            </a>
+            <a href="#" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>📤</span> Nova saída
+            </a>
+            <a href="/entradas/reposicao" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>🔄</span> Repor estoque
+            </a>
+            <a href="/estoque" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>📦</span> Ver estoque
+            </a>
+            <div class="border-t border-slate-100 my-1"></div>
+            <a href="#" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>🤖</span> Anúncio com IA
+            </a>
+            <a href="#" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span>📊</span> Ver movimentações
+            </a>
+        </div>
+    </div>
+
+    <!-- Notificações -->
+    <button class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span id="topbar-notif-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center"></span>
+    </button>
+
+    <!-- Avatar / usuário -->
+    <div x-data="{ open: false }" class="relative">
+        <button @@click="open = !open"
+                class="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                @iniciais
+            </div>
+            <div class="text-left hidden sm:block">
+                <div class="text-sm font-semibold text-slate-800 leading-tight">@usuarioNome</div>
+            </div>
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+        <div x-show="open" @@click.outside="open = false"
+             class="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-100">@usuarioNome</div>
+            <form asp-controller="Auth" asp-action="Logout" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sair
+                </button>
+            </form>
+        </div>
+    </div>
+</header>

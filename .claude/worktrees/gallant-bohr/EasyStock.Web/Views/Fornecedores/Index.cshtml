@@ -1,0 +1,171 @@
+@model FornecedoresListViewModel
+@{
+    ViewBag.Title = "Fornecedores";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Fornecedores</h1>
+    <div class="flex gap-3">
+        <a asp-action="PedidosAbertos" asp-controller="Fornecedores"
+           class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+            Pedidos em Aberto
+        </a>
+        <button type="button" x-data
+                @@click="$dispatch('open-modal', 'novo-fornecedor')"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            + Novo Fornecedor
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 flex-wrap">
+        <input type="text" name="search" value="@Model.Search" placeholder="Buscar fornecedor..."
+               class="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48" />
+        <div class="flex gap-2">
+            @foreach (var (val, label) in new[] { ("", "Todos"), ("ativo", "Ativos"), ("inativo", "Inativos") })
+            {
+                var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
+                <a href="@Url.Action("Index", "Fornecedores", new { search = Model.Search, status = val == "" ? null : val })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50")">
+                    @label
+                </a>
+            }
+        </div>
+        <button type="submit" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm hover:bg-gray-200">
+            Buscar
+        </button>
+    </form>
+</div>
+
+<!-- Lista -->
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        <div class="text-center py-12 text-gray-400">
+            <p class="text-sm">Nenhum fornecedor cadastrado</p>
+        </div>
+    }
+    else
+    {
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Lead (dias)</th>
+                    <th>Categorias</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="font-medium text-gray-900">@f.Nome</div>
+                            @if (!string.IsNullOrEmpty(f.Email))
+                            {
+                                <div class="text-xs text-gray-500">@f.Email</div>
+                            }
+                        </td>
+                        <td class="text-gray-600 text-sm capitalize">@f.Tipo</td>
+                        <td class="text-gray-600">@f.Lead</td>
+                        <td class="text-gray-500 text-sm">@f.Cats</td>
+                        <td>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600")">
+                                @f.Status
+                            </span>
+                        </td>
+                        <td>
+                            <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@f.Id"
+                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<!-- Modal novo fornecedor -->
+<div x-data="{ open: false }" @@open-modal.window="open = ($event.detail === 'novo-fornecedor')"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     @@click.self="open = false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 overflow-y-auto max-h-screen">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Novo Fornecedor</h2>
+        <form asp-action="Criar" asp-controller="Fornecedores" method="post">
+            @Html.AntiForgeryToken()
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                    <input type="text" name="nome" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">CNPJ/CPF</label>
+                    <input type="text" name="cnpj" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
+                    <input type="text" name="resp" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                    <input type="text" name="tel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                    <select name="tipo" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="nacional">Nacional</option>
+                        <option value="importado">Importado</option>
+                        <option value="dropshipping">Dropshipping</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead Time (dias)</label>
+                    <input type="number" name="lead" value="7" min="0"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pagamento *</label>
+                    <select name="pgto" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="a_vista">À vista</option>
+                        <option value="30d">30 dias</option>
+                        <option value="60d">60 dias</option>
+                        <option value="boleto">Boleto</option>
+                        <option value="pix">PIX</option>
+                    </select>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categorias</label>
+                    <input type="text" name="cats" placeholder="Ex: eletrônicos, roupas..."
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                    <textarea name="obs" rows="2"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-3 border-t">
+                <button type="button" @@click="open = false"
+                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    Criar Fornecedor
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
