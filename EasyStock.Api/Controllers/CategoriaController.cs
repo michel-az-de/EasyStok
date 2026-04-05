@@ -62,6 +62,7 @@ public class CategoriaController(GerenciarCategoriaUseCase useCase) : EasyStockC
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {
+        await useCase.RemoverAsync(id, empresaId);
         return NoContent();
     }
 }
