@@ -74,7 +74,7 @@ public class GlobalExceptionHandlerTests
     }
 
     [Fact]
-    public async Task Deve_retornar_422_para_plano_limite_atingido()
+    public async Task Deve_retornar_402_para_plano_limite_atingido()
     {
         var handler = CriarHandler();
         var context = CriarHttpContext("/api/ia/anuncio", "corr-422");
@@ -85,7 +85,7 @@ public class GlobalExceptionHandlerTests
             CancellationToken.None);
 
         Assert.True(handled);
-        Assert.Equal(StatusCodes.Status422UnprocessableEntity, context.Response.StatusCode);
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
 
         var payload = await LerRespostaAsync(context);
         var error = payload.RootElement.GetProperty("error");

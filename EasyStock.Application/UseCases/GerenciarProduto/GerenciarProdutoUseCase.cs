@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -98,7 +99,8 @@ public sealed class GerenciarProdutoUseCase(
     IProdutoVariacaoRepository produtoVariacaoRepository,
     IItemEstoqueRepository itemEstoqueRepository,
     IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICacheService? cacheService = null)
 {
     public async Task AtualizarAsync(AtualizarProdutoCommand command)
     {
@@ -149,6 +151,9 @@ public sealed class GerenciarProdutoUseCase(
 
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(command.EmpresaId, command.ProdutoId));
     }
 
     public async Task RemoverAsync(Guid empresaId, Guid produtoId)
@@ -164,6 +169,9 @@ public sealed class GerenciarProdutoUseCase(
 
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
     }
 
     public async Task<ProdutoDetalheResult> ObterDetalheAsync(Guid empresaId, Guid produtoId)

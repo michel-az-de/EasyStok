@@ -32,6 +32,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     private static (int StatusCode, string Code, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
         exception switch
         {
+            // Exce��es espec�ficas que N�O herdam de RegraDeDominioVioladaException
             UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
                 "VALIDATION_ERROR",
@@ -61,12 +62,13 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 false),
 
             PlanoLimiteAtingidoException ex => (
-                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status402PaymentRequired,
                 "PLAN_LIMIT_REACHED",
                 "Limite do plano atingido",
                 ex.Message,
                 false),
 
+            // Exce��es de infraestrutura
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "CONCURRENCY_CONFLICT",
@@ -74,6 +76,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Os dados foram alterados por outro processo. Recarregue as informacoes e tente novamente.",
                 false),
 
+            // Exce��es de dom�nio (todas herdam de RegraDeDominioVioladaException - case gen�rico)
             RegraDeDominioVioladaException ex => (
                 StatusCodes.Status409Conflict,
                 "BUSINESS_RULE_VIOLATION",

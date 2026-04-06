@@ -6,10 +6,13 @@ using EasyStock.Application.UseCases.DesativarLoja;
 using EasyStock.Application.UseCases.ListarLojas;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+[SwaggerTag("Stores / Lojas")]
 [ApiController]
 [Route("api/lojas")]
 [Authorize(Policy = "Gerente")]
@@ -20,6 +23,9 @@ public class LojaController(
     ListarLojasUseCase listarUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "List stores (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid empresaId)
     {
@@ -30,6 +36,10 @@ public class LojaController(
         return DataOk(lojas);
     }
 
+    [SwaggerOperation(Summary = "Create store (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CriarLojaCommand command)
     {
@@ -40,6 +50,11 @@ public class LojaController(
         return DataCreated($"/api/lojas/{resultado.Id}", resultado);
     }
 
+    [SwaggerOperation(Summary = "Update store (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarLojaCommand command)
     {
@@ -53,6 +68,11 @@ public class LojaController(
         return NoContent();
     }
 
+    [SwaggerOperation(Summary = "Delete store (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {

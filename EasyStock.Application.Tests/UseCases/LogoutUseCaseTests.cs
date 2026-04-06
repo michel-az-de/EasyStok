@@ -22,7 +22,7 @@ public class LogoutUseCaseTests
     public async Task Logout_DeveRevogarToken_QuandoTokenValido()
     {
         var tokenValue = Guid.NewGuid().ToString();
-        var tokenHash = TokenHashHelper.ComputeSha256(tokenValue);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(tokenValue);
         var usuarioId = Guid.NewGuid();
 
         var refreshToken = new RefreshToken
@@ -72,7 +72,7 @@ public class LogoutUseCaseTests
     public async Task Logout_DeveRetornarFalse_QuandoTokenRevogado()
     {
         var tokenValue = Guid.NewGuid().ToString();
-        var tokenHash = TokenHashHelper.ComputeSha256(tokenValue);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(tokenValue);
 
         var refreshToken = new RefreshToken
         {
@@ -102,7 +102,7 @@ public class LogoutUseCaseTests
     public async Task Logout_DeveRetornarFalse_QuandoTokenExpirado()
     {
         var tokenValue = Guid.NewGuid().ToString();
-        var tokenHash = TokenHashHelper.ComputeSha256(tokenValue);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(tokenValue);
 
         var refreshToken = new RefreshToken
         {
@@ -131,7 +131,7 @@ public class LogoutUseCaseTests
     public async Task Logout_DeveCriarAuditLog_QuandoLogoutBemSucedido()
     {
         var tokenValue = Guid.NewGuid().ToString();
-        var tokenHash = TokenHashHelper.ComputeSha256(tokenValue);
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(tokenValue);
         var usuarioId = Guid.NewGuid();
 
         var refreshToken = new RefreshToken

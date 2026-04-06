@@ -23,6 +23,7 @@ using OpenTelemetry.Resources;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.FileProviders;
+using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,28 +43,32 @@ builder.Services.AddControllers();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddEndpointsApiExplorer();
 
-// Swagger com suporte a JWT Bearer
+// Swagger com suporte a JWT Bearer, dois idiomas e exemplos
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EasyStock API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header. Formato: 'Bearer {token}'",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
-    });
+    // ── Two language documents ────────────────────────────────────────────
+    c.SwaggerDoc("v1-ptbr", SwaggerConfiguration.InfoPortuguese);
+    c.SwaggerDoc("v1-en",   SwaggerConfiguration.InfoEnglish);
+
+    // ── Security ──────────────────────────────────────────────────────────
+    c.AddSecurityDefinition("Bearer", SwaggerConfiguration.BearerScheme);
+    c.AddSecurityRequirement(SwaggerConfiguration.BearerRequirement);
+
+    // ── Annotations ───────────────────────────────────────────────────────
+    c.EnableAnnotations();
+
+    // ── XML comments ──────────────────────────────────────────────────────
+    SwaggerXmlExtensions.IncludeXmlComments(c);
+
+    // ── Schema & operation filters ────────────────────────────────────────
+    c.SchemaFilter<SchemaExamplesFilter>();
+    c.OperationFilter<GetOperationExamplesFilter>();
+
+    // ── Use fully-qualified names to avoid schema conflicts ───────────────
+    c.CustomSchemaIds(type => type.FullName?.Replace('+', '.'));
+
+    // ── Order operations alphabetically by path ───────────────────────────
+    c.OrderActionsBy(api => $"{api.GroupName}_{api.RelativePath}");
 });
 
 // Database
@@ -187,6 +192,31 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 20;
     });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = ((int)retryAfter.TotalSeconds).ToString();
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = ((int)retryAfter.TotalSeconds).ToString();
+        }
+        else
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = "60";
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = "60";
+        }
+
+        context.HttpContext.Response.ContentType = "application/json";
+        var correlationId = context.HttpContext.Items["CorrelationId"] as string ?? context.HttpContext.TraceIdentifier;
+        var envelope = new EasyStock.Api.Http.ApiErrorResponse(
+            new EasyStock.Api.Http.ApiError(
+                "RATE_LIMIT_EXCEEDED",
+                "Muitas requisicoes",
+                "Limite de requisicoes atingido. Tente novamente mais tarde.",
+                correlationId));
+        await context.HttpContext.Response.WriteAsJsonAsync(envelope, cancellationToken);
+    };
 });
 
 // Background Services
@@ -255,10 +285,38 @@ app.UseSerilogRequestLogging(options =>
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        // ── Two language documents ────────────────────────────────────────
+        c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
+        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+
+        // ── Custom route ──────────────────────────────────────────────────
+        c.RoutePrefix = "swagger";
+
+        // ── UI Behaviour ──────────────────────────────────────────────────
+        c.DocumentTitle        = "EasyStock API Docs";
+        c.DefaultModelsExpandDepth(1);       // show models collapsed by default
+        c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
+        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+        c.EnableFilter();
+        c.EnablePersistAuthorization();
+        c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
+        c.ShowExtensions();
+        c.ShowCommonExtensions();
+
+        // ── Custom assets ─────────────────────────────────────────────────
+        c.InjectStylesheet("/swagger-ui/custom.css");
+        c.InjectJavascript("/swagger-ui/custom.js");
+    });
 }
 
 app.UseHttpsRedirection();
+
+// Serve custom Swagger UI assets (CSS/JS) from wwwroot/swagger-ui
+app.UseStaticFiles(); // serves wwwroot by default
 if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
 {
     var localStorage = app.Services.GetRequiredService<IFileStorage>() as LocalFileStorage;

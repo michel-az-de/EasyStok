@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.ConfiguracoesLoja;
 
@@ -20,10 +21,13 @@ public sealed record AtualizarConfiguracaoLojaCommand(
 public class AtualizarConfiguracaoLojaUseCase(
     ILojaRepository lojaRepository,
     IConfiguracaoLojaRepository configuracaoRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ILogger<AtualizarConfiguracaoLojaUseCase> logger)
 {
     public async Task<ConfiguracaoLojaResult> ExecuteAsync(AtualizarConfiguracaoLojaCommand command)
     {
+        logger.LogInformation("Atualizando configuracao da loja {LojaId} na empresa {EmpresaId}.", command.LojaId, command.EmpresaId);
+
         var loja = await lojaRepository.GetByIdAsync(command.EmpresaId, command.LojaId)
             ?? throw new UseCaseValidationException("Loja nao encontrada.");
 
@@ -47,6 +51,8 @@ public class AtualizarConfiguracaoLojaUseCase(
         else await configuracaoRepository.UpdateAsync(configuracao);
 
         await unitOfWork.CommitAsync();
+
+        logger.LogInformation("Configuracao da loja {LojaId} {Acao} com sucesso.", command.LojaId, nova ? "criada" : "atualizada");
 
         return new ConfiguracaoLojaResult(
             configuracao.LojaId,

@@ -49,7 +49,7 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
         throw new NotSupportedException("Verificacao de existencia nao e suportada pela interface IFileStorage atual");
     }
 
-    public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = null)
+    public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = "")
     {
         throw new NotSupportedException("Listagem de arquivos nao e suportada pela interface IFileStorage atual");
     }

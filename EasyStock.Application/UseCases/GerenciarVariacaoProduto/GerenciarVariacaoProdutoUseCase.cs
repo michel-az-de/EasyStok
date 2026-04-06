@@ -5,6 +5,7 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.GerenciarVariacaoProduto;
 
@@ -48,10 +49,13 @@ public sealed class GerenciarVariacaoProdutoUseCase(
     IProdutoRepository produtoRepository,
     IProdutoVariacaoRepository produtoVariacaoRepository,
     IItemEstoqueRepository itemEstoqueRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ILogger<GerenciarVariacaoProdutoUseCase> logger)
 {
     public async Task<VariacaoProdutoResult> CriarAsync(CriarVariacaoProdutoCommand command)
     {
+        logger.LogInformation("Criando variacao do produto {ProdutoId}. EmpresaId: {EmpresaId}.", command.ProdutoId, command.EmpresaId);
+
         var produto = await ValidarProdutoAtivoAsync(command.EmpresaId, command.ProdutoId);
         await ValidarSkuAsync(command.EmpresaId, command.Sku, null);
 
@@ -77,11 +81,15 @@ public sealed class GerenciarVariacaoProdutoUseCase(
         await produtoVariacaoRepository.InsertAsync(variacao);
         await unitOfWork.CommitAsync();
 
+        logger.LogInformation("Variacao {VariacaoId} criada para produto {ProdutoId}.", variacao.Id, command.ProdutoId);
+
         return Map(variacao);
     }
 
     public async Task<VariacaoProdutoResult> AtualizarAsync(AtualizarVariacaoProdutoCommand command)
     {
+        logger.LogInformation("Atualizando variacao {VariacaoId} do produto {ProdutoId}.", command.VariacaoId, command.ProdutoId);
+
         _ = await ValidarProdutoAtivoAsync(command.EmpresaId, command.ProdutoId);
 
         var variacao = await produtoVariacaoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId, command.VariacaoId)
@@ -103,11 +111,15 @@ public sealed class GerenciarVariacaoProdutoUseCase(
         await produtoVariacaoRepository.UpdateAsync(variacao);
         await unitOfWork.CommitAsync();
 
+        logger.LogInformation("Variacao {VariacaoId} atualizada com sucesso.", command.VariacaoId);
+
         return Map(variacao);
     }
 
     public async Task RemoverAsync(Guid empresaId, Guid produtoId, Guid variacaoId)
     {
+        logger.LogInformation("Removendo variacao {VariacaoId} do produto {ProdutoId}. EmpresaId: {EmpresaId}.", variacaoId, produtoId, empresaId);
+
         _ = await ValidarProdutoAtivoAsync(empresaId, produtoId);
 
         var variacao = await produtoVariacaoRepository.GetByIdAsync(empresaId, produtoId, variacaoId)
@@ -120,6 +132,8 @@ public sealed class GerenciarVariacaoProdutoUseCase(
         variacao.AlteradoEm = DateTime.UtcNow;
         await produtoVariacaoRepository.UpdateAsync(variacao);
         await unitOfWork.CommitAsync();
+
+        logger.LogInformation("Variacao {VariacaoId} inativada com sucesso.", variacaoId);
     }
 
     private async Task<Produto> ValidarProdutoAtivoAsync(Guid empresaId, Guid produtoId)
