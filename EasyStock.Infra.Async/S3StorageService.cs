@@ -47,12 +47,12 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
     public Task<bool> ExistsAsync(string container, string fileName)
     {
         // IFileStorage nao suporta verificacao de existencia.
-        return Task.FromResult(false);
+        throw new NotSupportedException("Verificacao de existencia nao e suportada pela interface IFileStorage atual");
     }
 
     public Task<IEnumerable<string>> ListFilesAsync(string container, string prefix = "")
     {
         // IFileStorage nao suporta listagem.
-        return Task.FromResult(Enumerable.Empty<string>());
+        throw new NotSupportedException("Listagem de arquivos nao e suportada pela interface IFileStorage atual");
     }
 }
