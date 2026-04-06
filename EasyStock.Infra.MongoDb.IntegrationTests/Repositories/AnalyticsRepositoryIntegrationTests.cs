@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.MongoDb.Data;
 using EasyStock.Infra.MongoDb.IntegrationTests;
 using FluentAssertions;
@@ -14,61 +15,59 @@ namespace EasyStock.Infra.MongoDb.IntegrationTests.Repositories;
 [Collection("MongoDbTestCollection")]
 public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
 {
-    private readonly IServiceProvider _services = fixture.Services;
-
     [Fact]
     public async Task GetDashboardResumoAsync_DeveRetornarResumoCorreto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
         var empresaId = Guid.NewGuid();
 
-        // Adicionar dados de teste
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
+            QuantidadeAtual = Quantidade.From(10),
             QuantidadeMinima = 5,
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m)
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m)
         };
-        await context.GetCollection<ItemEstoque>(MongoCollectionNames.ItensEstoque).InsertOneAsync(itemEstoque);
+        await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(itemEstoque);
 
         var venda = new Venda
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             DataVenda = DateTime.UtcNow,
-            ValorTotal = new Dinheiro(150m),
+            ValorTotal = Dinheiro.FromDecimal(150m),
             ItensVenda = new List<ItemVenda>
             {
                 new ItemVenda
                 {
                     Id = Guid.NewGuid(),
                     ProdutoId = produto.Id,
-                    Quantidade = new Quantidade(2),
-                    ValorUnitario = new Dinheiro(75m)
+                    Quantidade = Quantidade.From(2),
+                    PrecoUnitario = Dinheiro.FromDecimal(75m),
+                    PrecoTotal = Dinheiro.FromDecimal(150m)
                 }
             }
         };
-        await context.GetCollection<Venda>(MongoCollectionNames.Vendas).InsertOneAsync(venda);
+        await context.GetCollection<Venda>("vendas").InsertOneAsync(venda);
 
         // Act
         var result = await repo.GetDashboardResumoAsync(empresaId, 30);
@@ -83,9 +82,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetReceitaPorPeriodoAsync_DeveRetornarReceitasAgrupadas()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -96,17 +95,19 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             DataVenda = DateTime.UtcNow,
-            ValorTotal = new Dinheiro(100m),
+            ValorTotal = Dinheiro.FromDecimal(100m),
             ItensVenda = new List<ItemVenda>
             {
                 new ItemVenda
                 {
                     Id = Guid.NewGuid(),
-                    Quantidade = new Quantidade(1)
+                    Quantidade = Quantidade.From(1),
+                    PrecoUnitario = Dinheiro.FromDecimal(100m),
+                    PrecoTotal = Dinheiro.FromDecimal(100m)
                 }
             }
         };
-        await context.GetCollection<Venda>(MongoCollectionNames.Vendas).InsertOneAsync(venda);
+        await context.GetCollection<Venda>("vendas").InsertOneAsync(venda);
 
         // Act
         var result = await repo.GetReceitaPorPeriodoAsync(empresaId, 12);
@@ -120,9 +121,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargens()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -133,10 +134,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var movimentacao = new MovimentacaoEstoque
         {
@@ -145,14 +146,14 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             ProdutoId = produto.Id,
             Tipo = TipoMovimentacaoEstoque.Saida,
             DataMovimentacao = DateTime.UtcNow,
-            Quantidade = new Quantidade(5),
-            ValorUnitario = new Dinheiro(60m),
-            ValorTotal = new Dinheiro(300m)
+            Quantidade = Quantidade.From(5),
+            ValorUnitario = Dinheiro.FromDecimal(60m),
+            ValorTotal = Dinheiro.FromDecimal(300m)
         };
-        await context.GetCollection<MovimentacaoEstoque>(MongoCollectionNames.MovimentacoesEstoque).InsertOneAsync(movimentacao);
+        await context.GetCollection<MovimentacaoEstoque>("movimentacoes_estoque").InsertOneAsync(movimentacao);
 
         // Act
-        var (items, _) = await repo.GetMargemPorProdutoAsync(empresaId, 30);
+        var items = await repo.GetMargemPorProdutoAsync(empresaId, 30);
 
         // Assert
         items.Should().NotBeEmpty();
@@ -163,9 +164,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetMovimentacoesResumoAsync_DeveRetornarResumoMovimentacoes()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -177,10 +178,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             EmpresaId = empresaId,
             Tipo = TipoMovimentacaoEstoque.Saida,
             DataMovimentacao = DateTime.UtcNow,
-            Quantidade = new Quantidade(10),
-            ValorTotal = new Dinheiro(500m)
+            Quantidade = Quantidade.From(10),
+            ValorTotal = Dinheiro.FromDecimal(500m)
         };
-        await context.GetCollection<MovimentacaoEstoque>(MongoCollectionNames.MovimentacoesEstoque).InsertOneAsync(movimentacao);
+        await context.GetCollection<MovimentacaoEstoque>("movimentacoes_estoque").InsertOneAsync(movimentacao);
 
         // Act
         var result = await repo.GetMovimentacoesResumoAsync(empresaId, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1));
@@ -194,9 +195,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetAlertasValidadeAsync_DeveRetornarItensComValidadeProxima()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -207,21 +208,21 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(5),
-            CustoUnitario = new Dinheiro(50m),
-            ValidadeEm = new Validade(DateTime.UtcNow.AddDays(15))
+            QuantidadeAtual = Quantidade.From(5),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(15))
         };
-        await context.GetCollection<ItemEstoque>(MongoCollectionNames.ItensEstoque).InsertOneAsync(itemEstoque);
+        await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(itemEstoque);
 
         // Act
         var (items, _) = await repo.GetAlertasValidadeAsync(empresaId, 30);
@@ -235,9 +236,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetItensParadosDetalhadosAsync_DeveRetornarItensSemMovimento()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -248,21 +249,21 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
+            QuantidadeAtual = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-100)
         };
-        await context.GetCollection<ItemEstoque>(MongoCollectionNames.ItensEstoque).InsertOneAsync(itemEstoque);
+        await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(itemEstoque);
 
         // Act
         var (items, _) = await repo.GetItensParadosDetalhadosAsync(empresaId, 90);
@@ -276,9 +277,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetSazonalidadeAsync_DeveRetornarSazonalidadeMensal()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -292,10 +293,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             ProdutoId = produtoId,
             Tipo = TipoMovimentacaoEstoque.Saida,
             DataMovimentacao = DateTime.UtcNow,
-            Quantidade = new Quantidade(20),
-            ValorTotal = new Dinheiro(1000m)
+            Quantidade = Quantidade.From(20),
+            ValorTotal = Dinheiro.FromDecimal(1000m)
         };
-        await context.GetCollection<MovimentacaoEstoque>(MongoCollectionNames.MovimentacoesEstoque).InsertOneAsync(movimentacao);
+        await context.GetCollection<MovimentacaoEstoque>("movimentacoes_estoque").InsertOneAsync(movimentacao);
 
         // Act
         var result = await repo.GetSazonalidadeAsync(empresaId, produtoId, 12);
@@ -309,9 +310,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoes()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -322,21 +323,21 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(2),
+            QuantidadeAtual = Quantidade.From(2),
             QuantidadeMinima = 10,
-            CustoUnitario = new Dinheiro(50m)
+            CustoUnitario = Dinheiro.FromDecimal(50m)
         };
-        await context.GetCollection<ItemEstoque>(MongoCollectionNames.ItensEstoque).InsertOneAsync(itemEstoque);
+        await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(itemEstoque);
 
         // Act
         var (items, _) = await repo.GetSugestaoReposicaoDetalhadaAsync(empresaId, 30);
@@ -350,9 +351,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoes()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -363,20 +364,20 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
-            SkuBase = "SKU123",
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo
         };
-        await context.GetCollection<Produto>(MongoCollectionNames.Produtos).InsertOneAsync(produto);
+        await context.GetCollection<Produto>("produtos").InsertOneAsync(produto);
 
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m)
+            QuantidadeAtual = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m)
         };
-        await context.GetCollection<ItemEstoque>(MongoCollectionNames.ItensEstoque).InsertOneAsync(itemEstoque);
+        await context.GetCollection<ItemEstoque>("itens_estoque").InsertOneAsync(itemEstoque);
 
         // Act
         var (items, _) = await repo.GetProjecaoRupturaAsync(empresaId, 30);
@@ -390,9 +391,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetVendasPorCanalAsync_DeveRetornarVendasAgrupadasPorCanal()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         var repo = new Infra.MongoDb.Repositories.AnalyticsRepository(context, cache);
 
@@ -403,24 +404,26 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             DataVenda = DateTime.UtcNow,
-            Canal = CanalVenda.Marketplace,
-            ValorTotal = new Dinheiro(200m),
+            Canal = CanalVenda.MercadoLivre,
+            ValorTotal = Dinheiro.FromDecimal(200m),
             ItensVenda = new List<ItemVenda>
             {
                 new ItemVenda
                 {
                     Id = Guid.NewGuid(),
-                    Quantidade = new Quantidade(2)
+                    Quantidade = Quantidade.From(2),
+                    PrecoUnitario = Dinheiro.FromDecimal(100m),
+                    PrecoTotal = Dinheiro.FromDecimal(200m)
                 }
             }
         };
-        await context.GetCollection<Venda>(MongoCollectionNames.Vendas).InsertOneAsync(venda);
+        await context.GetCollection<Venda>("vendas").InsertOneAsync(venda);
 
         // Act
         var result = await repo.GetVendasPorCanalAsync(empresaId, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1));
 
         // Assert
         result.Should().NotBeEmpty();
-        result.First().Canal.Should().Be(CanalVenda.Marketplace);
+        result.First().Canal.Should().Be(CanalVenda.MercadoLivre);
     }
 }

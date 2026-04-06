@@ -11,13 +11,12 @@ namespace EasyStock.Infra.MongoDb.IntegrationTests.Repositories;
 [Collection("MongoDbTestCollection")]
 public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
 {
-    private readonly IServiceProvider _services = fixture.Services;
-
     [Fact]
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.AnuncioIaRepository(context, unitOfWork);
@@ -30,25 +29,27 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o teste",
+            Titulo = "T√≠tulo teste",
+            Conteudo = "Descri√ß√£o teste",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).InsertOneAsync(anuncio);
+        await context.GetCollection<AnuncioIa>("anuncios_ia").InsertOneAsync(anuncio);
 
         // Act
         var result = await repo.GetByIdAsync(empresaId, anuncio.Id);
 
         // Assert
         result.Should().NotBeNull();
-        result!.DescricaoGerada.Should().Be("DescriÁ„o teste");
+        result!.Conteudo.Should().Be("Descri√ß√£o teste");
     }
 
     [Fact]
     public async Task GetByProdutoAsync_DeveRetornarAnunciosDoProduto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.AnuncioIaRepository(context, unitOfWork);
@@ -61,7 +62,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o 1",
+            Titulo = "T√≠tulo 1",
+            Conteudo = "Descri√ß√£o 1",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
@@ -70,25 +72,27 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o 2",
+            Titulo = "T√≠tulo 2",
+            Conteudo = "Descri√ß√£o 2",
             Salvo = false,
             CriadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).InsertManyAsync([anuncio1, anuncio2]);
+        await context.GetCollection<AnuncioIa>("anuncios_ia").InsertManyAsync([anuncio1, anuncio2]);
 
         // Act
         var result = await repo.GetByProdutoAsync(empresaId, produtoId);
 
         // Assert
         result.Should().HaveCount(1);
-        result.First().DescricaoGerada.Should().Be("DescriÁ„o 1");
+        result.First().Conteudo.Should().Be("Descri√ß√£o 1");
     }
 
     [Fact]
     public async Task AddAsync_DeveAdicionarAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.AnuncioIaRepository(context, unitOfWork);
@@ -101,26 +105,28 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "Nova descriÁ„o",
+            Titulo = "Novo t√≠tulo",
+            Conteudo = "Nova descri√ß√£o",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
 
         // Act
         await repo.AddAsync(anuncio);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitAsync();
 
         // Assert
-        var saved = await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
+        var saved = await context.GetCollection<AnuncioIa>("anuncios_ia").Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
         saved.Should().NotBeNull();
-        saved!.DescricaoGerada.Should().Be("Nova descriÁ„o");
+        saved!.Conteudo.Should().Be("Nova descri√ß√£o");
     }
 
     [Fact]
     public async Task UpdateAsync_DeveAtualizarAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.AnuncioIaRepository(context, unitOfWork);
@@ -133,27 +139,29 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o original",
+            Titulo = "T√≠tulo original",
+            Conteudo = "Descri√ß√£o original",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).InsertOneAsync(anuncio);
+        await context.GetCollection<AnuncioIa>("anuncios_ia").InsertOneAsync(anuncio);
 
         // Act
-        anuncio.DescricaoGerada = "DescriÁ„o atualizada";
+        anuncio.Conteudo = "Descri√ß√£o atualizada";
         await repo.UpdateAsync(anuncio);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitAsync();
 
         // Assert
-        var updated = await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
-        updated!.DescricaoGerada.Should().Be("DescriÁ„o atualizada");
+        var updated = await context.GetCollection<AnuncioIa>("anuncios_ia").Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
+        updated!.Conteudo.Should().Be("Descri√ß√£o atualizada");
     }
 
     [Fact]
     public async Task RemoveAsync_DeveRemoverAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.AnuncioIaRepository(context, unitOfWork);
@@ -166,18 +174,19 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o para remover",
+            Titulo = "T√≠tulo para remover",
+            Conteudo = "Descri√ß√£o para remover",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).InsertOneAsync(anuncio);
+        await context.GetCollection<AnuncioIa>("anuncios_ia").InsertOneAsync(anuncio);
 
         // Act
         await repo.RemoveAsync(anuncio);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitAsync();
 
         // Assert
-        var removed = await context.GetCollection<AnuncioIa>(MongoCollectionNames.AnunciosIa).Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
+        var removed = await context.GetCollection<AnuncioIa>("anuncios_ia").Find(x => x.Id == anuncio.Id).FirstOrDefaultAsync();
         removed.Should().BeNull();
     }
 }

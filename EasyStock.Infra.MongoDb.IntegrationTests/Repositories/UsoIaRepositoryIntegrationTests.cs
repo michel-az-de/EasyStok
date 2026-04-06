@@ -11,13 +11,12 @@ namespace EasyStock.Infra.MongoDb.IntegrationTests.Repositories;
 [Collection("MongoDbTestCollection")]
 public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
 {
-    private readonly IServiceProvider _services = fixture.Services;
-
     [Fact]
     public async Task GetAsync_DeveRetornarUsoCorreto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.UsoIaRepository(context, unitOfWork);
@@ -32,25 +31,25 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
             EmpresaId = empresaId,
             Ano = ano,
             Mes = mes,
-            TokensUsados = 1000,
-            Custos = 0.5m,
-            CriadoEm = DateTime.UtcNow
+            TotalTokens = 1000,
+            AtualizadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<UsoIa>(MongoCollectionNames.UsoIa).InsertOneAsync(uso);
+        await context.GetCollection<UsoIa>("uso_ia").InsertOneAsync(uso);
 
         // Act
         var result = await repo.GetAsync(empresaId, ano, mes);
 
         // Assert
         result.Should().NotBeNull();
-        result!.TokensUsados.Should().Be(1000);
+        result!.TotalTokens.Should().Be(1000);
     }
 
     [Fact]
     public async Task AddAsync_DeveAdicionarUso()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.UsoIaRepository(context, unitOfWork);
@@ -65,26 +64,26 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
             EmpresaId = empresaId,
             Ano = ano,
             Mes = mes,
-            TokensUsados = 500,
-            Custos = 0.25m,
-            CriadoEm = DateTime.UtcNow
+            TotalTokens = 500,
+            AtualizadoEm = DateTime.UtcNow
         };
 
         // Act
         await repo.AddAsync(uso);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitAsync();
 
         // Assert
-        var saved = await context.GetCollection<UsoIa>(MongoCollectionNames.UsoIa).Find(x => x.Id == uso.Id).FirstOrDefaultAsync();
+        var saved = await context.GetCollection<UsoIa>("uso_ia").Find(x => x.Id == uso.Id).FirstOrDefaultAsync();
         saved.Should().NotBeNull();
-        saved!.TokensUsados.Should().Be(500);
+        saved!.TotalTokens.Should().Be(500);
     }
 
     [Fact]
     public async Task UpdateAsync_DeveAtualizarUso()
     {
         // Arrange
-        using var scope = _services.CreateScope();
+        await using var services = fixture.CreateServiceProvider();
+        using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<MongoUnitOfWork>();
         var repo = new Infra.MongoDb.Repositories.UsoIaRepository(context, unitOfWork);
@@ -99,19 +98,18 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
             EmpresaId = empresaId,
             Ano = ano,
             Mes = mes,
-            TokensUsados = 200,
-            Custos = 0.1m,
-            CriadoEm = DateTime.UtcNow
+            TotalTokens = 200,
+            AtualizadoEm = DateTime.UtcNow
         };
-        await context.GetCollection<UsoIa>(MongoCollectionNames.UsoIa).InsertOneAsync(uso);
+        await context.GetCollection<UsoIa>("uso_ia").InsertOneAsync(uso);
 
         // Act
-        uso.TokensUsados = 300;
+        uso.TotalTokens = 300;
         await repo.UpdateAsync(uso);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitAsync();
 
         // Assert
-        var updated = await context.GetCollection<UsoIa>(MongoCollectionNames.UsoIa).Find(x => x.Id == uso.Id).FirstOrDefaultAsync();
-        updated!.TokensUsados.Should().Be(300);
+        var updated = await context.GetCollection<UsoIa>("uso_ia").Find(x => x.Id == uso.Id).FirstOrDefaultAsync();
+        updated!.TotalTokens.Should().Be(300);
     }
 }

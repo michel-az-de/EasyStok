@@ -2,7 +2,6 @@ using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.IntegrationTests;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
@@ -10,14 +9,11 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
-    private readonly IServiceProvider _services = fixture.Services;
-
     [Fact]
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
@@ -28,7 +24,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o teste",
+            Titulo = "T√≠tulo teste",
+            Conteudo = "Descri√ß√£o teste",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
@@ -40,15 +37,14 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         // Assert
         result.Should().NotBeNull();
-        result!.DescricaoGerada.Should().Be("DescriÁ„o teste");
+        result!.Conteudo.Should().Be("Descri√ß√£o teste");
     }
 
     [Fact]
     public async Task GetByProdutoAsync_DeveRetornarAnunciosDoProduto()
     {
         // Arrange
-        using var scope = _services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
@@ -59,7 +55,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o 1",
+            Titulo = "T√≠tulo 1",
+            Conteudo = "Descri√ß√£o 1",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
@@ -68,7 +65,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o 2",
+            Titulo = "T√≠tulo 2",
+            Conteudo = "Descri√ß√£o 2",
             Salvo = false,
             CriadoEm = DateTime.UtcNow
         };
@@ -80,15 +78,14 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         // Assert
         result.Should().HaveCount(1);
-        result.First().DescricaoGerada.Should().Be("DescriÁ„o 1");
+        result.First().Conteudo.Should().Be("Descri√ß√£o 1");
     }
 
     [Fact]
     public async Task AddAsync_DeveAdicionarAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
@@ -99,7 +96,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "Nova descriÁ„o",
+            Titulo = "Novo t√≠tulo",
+            Conteudo = "Nova descri√ß√£o",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
@@ -111,15 +109,14 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         // Assert
         var saved = await dbContext.AnunciosIa.FindAsync(anuncio.Id);
         saved.Should().NotBeNull();
-        saved!.DescricaoGerada.Should().Be("Nova descriÁ„o");
+        saved!.Conteudo.Should().Be("Nova descri√ß√£o");
     }
 
     [Fact]
     public async Task UpdateAsync_DeveAtualizarAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
@@ -130,7 +127,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o original",
+            Titulo = "T√≠tulo original",
+            Conteudo = "Descri√ß√£o original",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };
@@ -138,21 +136,20 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         await dbContext.SaveChangesAsync();
 
         // Act
-        anuncio.DescricaoGerada = "DescriÁ„o atualizada";
+        anuncio.Conteudo = "Descri√ß√£o atualizada";
         await repo.UpdateAsync(anuncio);
         await dbContext.SaveChangesAsync();
 
         // Assert
         var updated = await dbContext.AnunciosIa.FindAsync(anuncio.Id);
-        updated!.DescricaoGerada.Should().Be("DescriÁ„o atualizada");
+        updated!.Conteudo.Should().Be("Descri√ß√£o atualizada");
     }
 
     [Fact]
     public async Task RemoveAsync_DeveRemoverAnuncio()
     {
         // Arrange
-        using var scope = _services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
@@ -163,7 +160,8 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produtoId,
-            DescricaoGerada = "DescriÁ„o para remover",
+            Titulo = "T√≠tulo para remover",
+            Conteudo = "Descri√ß√£o para remover",
             Salvo = true,
             CriadoEm = DateTime.UtcNow
         };

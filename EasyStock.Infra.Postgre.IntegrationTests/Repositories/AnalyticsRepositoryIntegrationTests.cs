@@ -15,35 +15,33 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetDashboardResumoAsync_DeveRetornarResumoCorreto()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            QuantidadeInicial = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
@@ -51,34 +49,31 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         };
         dbContext.ItensEstoque.Add(itemEstoque);
 
-        // Criar venda
         var venda = new Venda
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
-            Canal = CanalVenda.Online,
+            Canal = CanalVenda.LojaPropria,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
             DataVenda = DateTime.UtcNow,
-            ValorTotal = new Dinheiro(150m),
+            ValorTotal = Dinheiro.FromDecimal(150m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.Vendas.Add(venda);
 
-        // Criar item venda
         var itemVenda = new ItemVenda
         {
             Id = Guid.NewGuid(),
             VendaId = venda.Id,
             ItemEstoqueId = itemEstoque.Id,
             ProdutoId = produto.Id,
-            Quantidade = new Quantidade(2),
-            PrecoUnitario = new Dinheiro(75m),
-            PrecoTotal = new Dinheiro(150m),
+            Quantidade = Quantidade.From(2),
+            PrecoUnitario = Dinheiro.FromDecimal(75m),
+            PrecoTotal = Dinheiro.FromDecimal(150m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.ItensVenda.Add(itemVenda);
 
-        // Criar movimentacao
         var movimentacao = new MovimentacaoEstoque
         {
             Id = Guid.NewGuid(),
@@ -87,9 +82,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             ProdutoId = produto.Id,
             Tipo = TipoMovimentacaoEstoque.Saida,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
-            Quantidade = new Quantidade(2),
-            ValorUnitario = new Dinheiro(75m),
-            ValorTotal = new Dinheiro(150m),
+            Quantidade = Quantidade.From(2),
+            ValorUnitario = Dinheiro.FromDecimal(75m),
+            ValorTotal = Dinheiro.FromDecimal(150m),
             DataMovimentacao = DateTime.UtcNow,
             CriadoEm = DateTime.UtcNow
         };
@@ -109,35 +104,33 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargensCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            QuantidadeInicial = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
@@ -145,7 +138,6 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         };
         dbContext.ItensEstoque.Add(itemEstoque);
 
-        // Criar movimentacao
         var movimentacao = new MovimentacaoEstoque
         {
             Id = Guid.NewGuid(),
@@ -154,9 +146,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             ProdutoId = produto.Id,
             Tipo = TipoMovimentacaoEstoque.Saida,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
-            Quantidade = new Quantidade(1),
-            ValorUnitario = new Dinheiro(75m),
-            ValorTotal = new Dinheiro(75m),
+            Quantidade = Quantidade.From(1),
+            ValorUnitario = Dinheiro.FromDecimal(75m),
+            ValorTotal = Dinheiro.FromDecimal(75m),
             DataMovimentacao = DateTime.UtcNow,
             CriadoEm = DateTime.UtcNow
         };
@@ -178,34 +170,32 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetReceitaPorPeriodoAsync_DeveRetornarReceitasCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar venda
         var venda = new Venda
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
-            Canal = CanalVenda.Online,
+            Canal = CanalVenda.LojaPropria,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
             DataVenda = DateTime.UtcNow,
-            ValorTotal = new Dinheiro(100m),
+            ValorTotal = Dinheiro.FromDecimal(100m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.Vendas.Add(venda);
 
-        // Criar item venda
         var itemVenda = new ItemVenda
         {
             Id = Guid.NewGuid(),
             VendaId = venda.Id,
-            ItemEstoqueId = Guid.NewGuid(), // dummy
-            ProdutoId = Guid.NewGuid(), // dummy
-            Quantidade = new Quantidade(1),
-            PrecoUnitario = new Dinheiro(100m),
-            PrecoTotal = new Dinheiro(100m),
+            ItemEstoqueId = Guid.NewGuid(),
+            ProdutoId = Guid.NewGuid(),
+            Quantidade = Quantidade.From(1),
+            PrecoUnitario = Dinheiro.FromDecimal(100m),
+            PrecoTotal = Dinheiro.FromDecimal(100m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.ItensVenda.Add(itemVenda);
@@ -223,35 +213,33 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetMovimentacoesResumoAsync_DeveRetornarMovimentacoesCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            QuantidadeInicial = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
@@ -259,7 +247,6 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         };
         dbContext.ItensEstoque.Add(itemEstoque);
 
-        // Criar movimentacao
         var movimentacao = new MovimentacaoEstoque
         {
             Id = Guid.NewGuid(),
@@ -268,9 +255,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             ProdutoId = produto.Id,
             Tipo = TipoMovimentacaoEstoque.Saida,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
-            Quantidade = new Quantidade(2),
-            ValorUnitario = new Dinheiro(75m),
-            ValorTotal = new Dinheiro(150m),
+            Quantidade = Quantidade.From(2),
+            ValorUnitario = Dinheiro.FromDecimal(75m),
+            ValorTotal = Dinheiro.FromDecimal(150m),
             DataMovimentacao = DateTime.UtcNow,
             CriadoEm = DateTime.UtcNow
         };
@@ -289,37 +276,35 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetAlertasValidadeAsync_DeveRetornarAlertasCorretos()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(5),
-            QuantidadeInicial = new Quantidade(5),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(5),
+            QuantidadeInicial = Quantidade.From(5),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
-            ValidadeEm = new Validade(DateTime.UtcNow.AddDays(15)),
+            ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(15)),
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
@@ -339,35 +324,33 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetItensParadosDetalhadosAsync_DeveRetornarItensParadosCorretos()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            QuantidadeInicial = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow.AddDays(-100),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-100),
             Status = StatusItemEstoque.Ok,
@@ -389,36 +372,34 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoesCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque com quantidade baixa
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(2),
-            QuantidadeInicial = new Quantidade(10),
+            QuantidadeAtual = Quantidade.From(2),
+            QuantidadeInicial = Quantidade.From(10),
             QuantidadeMinima = 5,
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
@@ -439,35 +420,33 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoesCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar produto
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
-            SkuBase = new CodigoSku("SKU123"),
+            SkuBase = CodigoSku.From("SKU123"),
             Status = StatusProduto.Ativo,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
         dbContext.Produtos.Add(produto);
 
-        // Criar item de estoque
         var itemEstoque = new ItemEstoque
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ProdutoId = produto.Id,
-            QuantidadeAtual = new Quantidade(10),
-            QuantidadeInicial = new Quantidade(10),
-            CustoUnitario = new Dinheiro(50m),
-            PrecoVendaSugerido = new Dinheiro(75m),
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
             EntradaEm = DateTime.UtcNow,
             Status = StatusItemEstoque.Ok,
             CriadoEm = DateTime.UtcNow,
@@ -488,34 +467,32 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetVendasPorCanalAsync_DeveRetornarVendasPorCanalCorretas()
     {
-        var dbContext = fixture.CreateDbContext();
+        await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
 
-        // Criar venda
         var venda = new Venda
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
-            Canal = CanalVenda.Online,
+            Canal = CanalVenda.LojaPropria,
             Natureza = NaturezaMovimentacaoEstoque.Venda,
             DataVenda = DateTime.UtcNow,
-            ValorTotal = new Dinheiro(100m),
+            ValorTotal = Dinheiro.FromDecimal(100m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.Vendas.Add(venda);
 
-        // Criar item venda
         var itemVenda = new ItemVenda
         {
             Id = Guid.NewGuid(),
             VendaId = venda.Id,
-            ItemEstoqueId = Guid.NewGuid(), // dummy
-            ProdutoId = Guid.NewGuid(), // dummy
-            Quantidade = new Quantidade(1),
-            PrecoUnitario = new Dinheiro(100m),
-            PrecoTotal = new Dinheiro(100m),
+            ItemEstoqueId = Guid.NewGuid(),
+            ProdutoId = Guid.NewGuid(),
+            Quantidade = Quantidade.From(1),
+            PrecoUnitario = Dinheiro.FromDecimal(100m),
+            PrecoTotal = Dinheiro.FromDecimal(100m),
             CriadoEm = DateTime.UtcNow
         };
         dbContext.ItensVenda.Add(itemVenda);
