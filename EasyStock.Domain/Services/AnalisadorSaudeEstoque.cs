@@ -41,8 +41,8 @@ namespace EasyStock.Domain.Services
                     var dias = validade.DiasAteVencimento(hoje);
                     if (dias < 0)
                     {
-                        // Item já vencido: alerta crítico pois não pode ser vendido
-                        sinais.Add(new SinalSaude(produtoNome, TipoAlertaEstoque.EstoqueCritico, "Produto vencido."));
+                        // Produto já vencido — usa ProdutoParado pois não há tipo específico para vencimento no enum
+                        sinais.Add(new SinalSaude(produtoNome, TipoAlertaEstoque.ProdutoParado, "Produto vencido."));
                     }
                     else if (dias <= diasProximoVencimento)
                     {
