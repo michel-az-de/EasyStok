@@ -142,7 +142,7 @@ static async Task<string> ResolveDatabaseProviderAsync(
         return "sqlite";
     }
 
-    if (normalized is "auto" or "")
+    if (normalized is "auto")
     {
         if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
             await IsPostgresAvailableAsync(postgresConnectionString, logger))

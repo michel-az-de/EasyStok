@@ -67,7 +67,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
         }
 
-        // Health check registrado como singleton pois IServiceScopeFactory é singleton
+        // Health check registered as singleton because it has no per-request state
         services.AddSingleton<SqliteDatabaseHealthCheck>();
 
         // Inicializa o schema do SQLite na subida da aplicacao
