@@ -1,0 +1,190 @@
+@model SaidaFormViewModel
+@{
+    ViewBag.Title = "Nova Saída";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Nova Saída</h1>
+        <p class="text-sm text-gray-500 mt-1">Registre uma saída ou venda de produto</p>
+    </div>
+    <a asp-action="Historico" asp-controller="Saidas"
+       class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+        Ver histórico →
+    </a>
+</div>
+
+<div class="ws max-w-2xl" x-data="saidaForm()">
+    <form asp-action="Criar" asp-controller="Saidas" method="post">
+        @Html.AntiForgeryToken()
+
+        <!-- Produto -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Produto *</label>
+            <div class="relative">
+                <input type="text" placeholder="Buscar produto..." x-model="busca"
+                       @@input="buscarProduto()" @@focus="showResults = true"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                <input type="hidden" name="ProdutoId" x-model="produtoId" />
+
+                <div x-show="showResults && resultados.length > 0"
+                     class="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
+                     x-cloak>
+                    <template x-for="p in resultados" :key="p.id">
+                        <button type="button"
+                                @@click="selecionarProduto(p)"
+                                class="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex items-center gap-2">
+                            <span x-text="p.nome" class="font-medium"></span>
+                            <span x-text="p.sku" class="text-gray-400 text-xs"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Variação (se houver produto selecionado com variações) -->
+        <div class="mb-4" x-show="variacoes.length > 0" x-cloak>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Variação</label>
+            <select name="VarId" x-model="varId"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                <option value="">Sem variação</option>
+                <template x-for="v in variacoes" :key="v.id">
+                    <option :value="v.id" x-text="v.nome"></option>
+                </template>
+            </select>
+        </div>
+
+        <!-- Natureza e Quantidade -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Natureza *</label>
+                <select asp-for="Natureza"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                    <option value="venda">Venda</option>
+                    <option value="perda">Perda</option>
+                    <option value="doacao">Doação</option>
+                    <option value="uso_interno">Uso Interno</option>
+                    <option value="devolucao">Devolução</option>
+                    <option value="ajuste">Ajuste</option>
+                </select>
+                <span asp-validation-for="Natureza" class="text-red-600 text-xs"></span>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
+                <input asp-for="Qty" type="number" min="1"
+                       x-model.number="qty"
+                       @@input="calcularTotal()"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
+                <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
+            </div>
+        </div>
+
+        <!-- Valor e Data -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Valor Unitário (R$)</label>
+                <input asp-for="Valor" type="number" step="0.01" min="0"
+                       x-model.number="valorUnit"
+                       @@input="calcularTotal()"
+                       placeholder="0,00"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data da Venda *</label>
+                <input asp-for="DtVenda" type="date"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
+                <span asp-validation-for="DtVenda" class="text-red-600 text-xs"></span>
+            </div>
+        </div>
+
+        <!-- Total calculado -->
+        <div class="mb-4 p-3 bg-indigo-50 rounded-lg" x-show="total > 0" x-cloak>
+            <span class="text-sm text-indigo-700 font-medium">
+                Total: R$ <span x-text="total.toFixed(2).replace('.', ',')"></span>
+            </span>
+        </div>
+
+        <!-- Campos extras (colapsável) -->
+        <div x-data="{ open: false }">
+            <button type="button" @@click="open = !open"
+                    class="text-sm text-indigo-600 hover:text-indigo-700 mb-3 flex items-center gap-1">
+                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-90': open }"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                Campos extras (NF, Canal, etc.)
+            </button>
+            <div x-show="open" x-collapse>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nota Fiscal</label>
+                        <input asp-for="NotaFiscal" type="text"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Canal de Venda</label>
+                        <input asp-for="Canal" type="text" placeholder="Ex: ML, Shopee..."
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descrição / Observação</label>
+                    <textarea asp-for="Descricao" rows="2"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <a asp-action="Historico" asp-controller="Saidas"
+               class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancelar
+            </a>
+            <button type="submit"
+                    class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                Registrar Saída
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+function saidaForm() {
+    return {
+        busca: '',
+        resultados: [],
+        showResults: false,
+        produtoId: '',
+        variacoes: [],
+        varId: '',
+        qty: 1,
+        valorUnit: 0,
+        total: 0,
+        _debounce: null,
+
+        buscarProduto() {
+            clearTimeout(this._debounce);
+            this._debounce = setTimeout(async () => {
+                if (this.busca.length < 2) { this.resultados = []; return; }
+                const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
+                this.resultados = await res.json();
+            }, 300);
+        },
+
+        selecionarProduto(p) {
+            this.produtoId = p.id;
+            this.busca = p.nome;
+            this.variacoes = p.variacoes || [];
+            this.showResults = false;
+            this.resultados = [];
+        },
+
+        calcularTotal() {
+            this.total = (this.qty || 0) * (this.valorUnit || 0);
+        }
+    };
+}
+</script>
+}

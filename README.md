@@ -236,14 +236,12 @@ EasyStok/
 
 ### Com PostgreSQL
 
-**1. Clone o repositório**
-```bash
+**1. Clone o repositório**```bash
 git clone https://github.com/michel-az-de/EasyStok.git
 cd EasyStok
 ```
 
-**2. Configure a connection string** em `EasyStock.Api/appsettings.json`:
-```json
+**2. Configure a connection string** em `EasyStock.Api/appsettings.json`:```json
 {
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=EasyStockDb;Username=postgres;Password=postgres"

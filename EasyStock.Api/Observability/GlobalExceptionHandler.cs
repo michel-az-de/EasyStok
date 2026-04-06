@@ -1,13 +1,13 @@
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
-using Serilog;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Api.Observability;
 
-public class GlobalExceptionHandler : IExceptionHandler
+public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -16,9 +16,9 @@ public class GlobalExceptionHandler : IExceptionHandler
         var (statusCode, code, title, detail, logAsError) = MapException(exception);
 
         if (logAsError)
-            Log.Error(exception, "Erro inesperado na API. CorrelationId: {CorrelationId}", correlationId);
+            logger.LogError(exception, "Erro inesperado na API. CorrelationId: {CorrelationId}", correlationId);
         else
-            Log.Warning(exception, "Erro tratado na API. CorrelationId: {CorrelationId}", correlationId);
+            logger.LogWarning(exception, "Erro tratado na API. CorrelationId: {CorrelationId}", correlationId);
 
         var envelope = new ApiErrorResponse(new ApiError(code, title, detail, correlationId));
 
@@ -32,7 +32,7 @@ public class GlobalExceptionHandler : IExceptionHandler
     private static (int StatusCode, string Code, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
         exception switch
         {
-            // Exce��es espec�ficas que N�O herdam de RegraDeDominioVioladaException
+            // Excecoes especificas que NAO herdam de RegraDeDominioVioladaException
             UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
                 "VALIDATION_ERROR",
@@ -68,7 +68,7 @@ public class GlobalExceptionHandler : IExceptionHandler
                 ex.Message,
                 false),
 
-            // Exce��es de infraestrutura
+            // Excecoes de infraestrutura
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "CONCURRENCY_CONFLICT",
@@ -76,7 +76,7 @@ public class GlobalExceptionHandler : IExceptionHandler
                 "Os dados foram alterados por outro processo. Recarregue as informacoes e tente novamente.",
                 false),
 
-            // Exce��es de dom�nio (todas herdam de RegraDeDominioVioladaException - case gen�rico)
+            // Excecoes de dominio (todas herdam de RegraDeDominioVioladaException - case generico)
             RegraDeDominioVioladaException ex => (
                 StatusCodes.Status409Conflict,
                 "BUSINESS_RULE_VIOLATION",

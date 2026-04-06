@@ -1,0 +1,183 @@
+@model DashboardViewModel
+@using System.Globalization
+@{
+    var ptBR = new CultureInfo("pt-BR");
+    var hora = DateTime.Now.Hour;
+    var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+    var saudacaoIcon = hora < 12 ? "☀️" : hora < 18 ? "🌤️" : "🌙";
+    var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
+}
+
+<!-- Saudação -->
+<div class="pg-hd mb-6">
+    <h1>@saudacaoIcon @saudacao, @primeiroNome!</h1>
+    <p>Aqui está um resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="ws">
+        <div class="kpi-lbl">Total de produtos</div>
+        <div class="kpi-val text-slate-900">@Model.TotalProdutos</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Entradas do mês</div>
+        <div class="kpi-val text-emerald-600">@Model.EntradasMes</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Vendas do mês</div>
+        <div class="kpi-val text-indigo-600">@Model.VendasMes</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Receita do mês</div>
+        <div class="kpi-val text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
+    </div>
+</div>
+
+<!-- Attention Tiles -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <a href="/estoque?status=critico" class="ws flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
+        <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-xl">🚨</div>
+        <div>
+            <div class="kpi-val text-red-600">@Model.EstoqueCritico</div>
+            <div class="kpi-lbl">Estoque crítico</div>
+        </div>
+    </a>
+    <a href="/estoque?status=vencimento" class="ws flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
+        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
+        <div>
+            <div class="kpi-val text-amber-600">@Model.ProximosVencimento</div>
+            <div class="kpi-lbl">Próx. vencimento</div>
+        </div>
+    </a>
+    <a href="/estoque?status=parado" class="ws flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
+        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
+        <div>
+            <div class="kpi-val text-blue-600">@Model.ProdutosParados</div>
+            <div class="kpi-lbl">Parados &gt;30d</div>
+        </div>
+    </a>
+    <a href="/entradas/reposicao" class="ws flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
+        <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">💡</div>
+        <div>
+            <div class="kpi-val text-emerald-600">@Model.SugestoesReposicao</div>
+            <div class="kpi-lbl">Sugestões reposição</div>
+        </div>
+    </a>
+</div>
+
+<!-- Conteúdo principal + Gráfico -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Movimentações recentes -->
+    <div class="lg:col-span-2 ws">
+        <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
+        @if (Model.MovimentacoesRecentes.Any())
+        {
+            <table class="tbl-full">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Tipo</th>
+                        <th class="text-right">Qtd</th>
+                        <th class="text-right">Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.MovimentacoesRecentes)
+                    {
+                        <tr>
+                            <td class="font-medium">@m.ProdutoNome</td>
+                            <td>
+                                @{
+                                    var badgeClass = m.Tipo switch
+                                    {
+                                        "Entrada" => "badge-ok",
+                                        "Saida" or "Saída" => "badge-warn",
+                                        _ => "badge-slow"
+                                    };
+                                }
+                                <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
+                            </td>
+                            <td class="text-right font-mono">@m.Qty</td>
+                            <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center py-8 text-slate-400">
+                <div class="text-4xl mb-2">📋</div>
+                <p class="text-sm">Nenhuma movimentação recente</p>
+            </div>
+        }
+    </div>
+
+    <!-- Gráfico receita -->
+    <div class="ws">
+        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 30 dias</h2>
+        <canvas id="grafico-receita" height="200"></canvas>
+    </div>
+</div>
+
+<!-- Ações rápidas -->
+<div class="ws">
+    <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        @{
+            var acoes = new[]
+            {
+                new { Icon = "📥", Label = "Nova entrada", Href = "/entradas/nova" },
+                new { Icon = "📤", Label = "Nova saída", Href = "#" },
+                new { Icon = "🔄", Label = "Repor estoque", Href = "/entradas/reposicao" },
+                new { Icon = "📦", Label = "Ver estoque", Href = "/estoque" },
+                new { Icon = "🤖", Label = "Gerar anúncio", Href = "#" },
+                new { Icon = "📊", Label = "Movimentações", Href = "#" },
+            };
+        }
+        @foreach (var acao in acoes)
+        {
+            <a href="@acao.Href"
+               class="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
+                <span class="text-2xl">@acao.Icon</span>
+                <span class="text-xs font-semibold text-slate-600">@acao.Label</span>
+            </a>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const ctx = document.getElementById('grafico-receita');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels)),
+                    datasets: [{
+                        label: 'Receita',
+                        data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados)),
+                        borderColor: '#6366F1',
+                        backgroundColor: 'rgba(99,102,241,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            ticks: {
+                                callback: v => 'R$ ' + v.toLocaleString('pt-BR')
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+}

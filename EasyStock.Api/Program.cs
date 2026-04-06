@@ -319,7 +319,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Background Services
-builder.Services.AddHostedService<AnalisadorEstoqueBackgroundService>();
+builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 
 // Exception Handler
 builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalExceptionHandler>();

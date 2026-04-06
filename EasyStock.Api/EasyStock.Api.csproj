@@ -48,11 +48,4 @@
     <ProjectReference Include="..\EasyStock.Infra.Async\EasyStock.Infra.Async.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="BackgroundServices\AlertasEstoqueJob.cs" />
-    <Compile Remove="BackgroundServices\ProcessarRecebimentoJob.cs" />
-    <Compile Remove="BackgroundServices\RecalcularVelocidadesJob.cs" />
-    <Compile Remove="BackgroundServices\RelatorioMensalJob.cs" />
-  </ItemGroup>
-
 </Project>

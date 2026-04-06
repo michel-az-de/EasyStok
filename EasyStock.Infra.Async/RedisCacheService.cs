@@ -59,9 +59,9 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
     {
         ValidarChave(key);
 
-        // Otimizado: usa GetStringAsync em vez de GetAsync para evitar download desnecessário de bytes
-        var json = await cache.GetStringAsync(key);
-        return !string.IsNullOrEmpty(json);
+        // A existência da chave não depende do conteúdo serializado.
+        var cachedValue = await cache.GetAsync(key);
+        return cachedValue is not null;
     }
 
     public async Task<long> IncrementAsync(string key, long value = 1)
@@ -83,8 +83,9 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
             var current = (await GetAsync<long?>(key)) ?? 0L;
             var newValue = checked(current + value); // Previne overflow
 
-            // Define TTL padrão de 24h para counters se não especificado
-            await SetAsync(key, newValue, TimeSpan.FromHours(24));
+            // Não força TTL implícito durante incremento para evitar alteração inesperada
+            // no ciclo de vida da chave.
+            await SetAsync(key, newValue);
 
             return newValue;
         }
