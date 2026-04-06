@@ -8,7 +8,7 @@ public class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
 
     public ItemEstoqueVencidoSpecification(DateTime dataReferencia)
     {
-        _dataReferencia = dataReferencia;
+        _dataReferencia = dataReferencia.Date;
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)

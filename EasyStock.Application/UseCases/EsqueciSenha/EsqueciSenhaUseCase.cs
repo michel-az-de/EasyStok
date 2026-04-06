@@ -49,7 +49,7 @@ public sealed class EsqueciSenhaUseCase(
         await unitOfWork.CommitAsync();
 
         // TODO: Enviar email com token
-        logger.LogInformation("Token de reset gerado para usuario {UsuarioId}: {Token}", usuario.Id, token);
+        logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
 
         return new EsqueciSenhaResult(true);
     }

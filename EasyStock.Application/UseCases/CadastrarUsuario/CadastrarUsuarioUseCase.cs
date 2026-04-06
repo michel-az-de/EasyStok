@@ -45,4 +45,4 @@ public sealed class CadastrarUsuarioUseCase(
         logger.LogInformation("Usuario cadastrado com sucesso: {UsuarioId}", usuario.Id);
         return new CadastrarUsuarioResult(usuario.Id);
     }
-}}
+}

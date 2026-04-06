@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
@@ -44,7 +45,7 @@ public class AuthController(
             new AutenticarUsuarioCommand(request.Email, request.Senha, request.EmpresaId));
         var token = jwtService.GerarToken(resultado);
         var refreshTokenValue = jwtService.GerarRefreshToken();
-        var refreshTokenHash = BCrypt.Net.BCrypt.HashPassword(refreshTokenValue);
+        var refreshTokenHash = TokenHashHelper.ComputeSha256(refreshTokenValue);
         var expiraEm = DateTime.UtcNow.AddDays(7);
 
         var refreshToken = RefreshTokenEntity.Criar(

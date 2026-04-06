@@ -16,7 +16,7 @@ public sealed class LogoutUseCase(
     {
         logger.LogInformation("Iniciando logout");
 
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(command.RefreshToken);
+        var tokenHash = TokenHashHelper.ComputeSha256(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
         if (refreshToken == null || !refreshToken.EstaValido())
         {

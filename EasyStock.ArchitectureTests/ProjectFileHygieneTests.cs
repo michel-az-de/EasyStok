@@ -21,7 +21,7 @@ public class ProjectFileHygieneTests
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
 
-        while (current is not null && !current.GetFiles("EasyStok.sln").Any())
+        while (current is not null && !current.GetFiles("*.sln").Any())
             current = current.Parent;
 
         return current ?? throw new InvalidOperationException("Nao foi possivel localizar a raiz da solucao.");
