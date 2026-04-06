@@ -21,10 +21,16 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
         WriteIndented = false
     };
 
-    public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null)
+    /// <summary>Valida que a chave de cache não é nula ou vazia.</summary>
+    private static void ValidarChave(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            throw new ArgumentException("A chave não pode ser nula ou vazia.", nameof(key));
+    }
+
+    public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null)
+    {
+        ValidarChave(key);
 
         var json = JsonSerializer.Serialize(value, JsonOptions);
         var options = ttl.HasValue
@@ -36,8 +42,7 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task<T?> GetAsync<T>(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        ValidarChave(key);
 
         var json = await cache.GetStringAsync(key);
         return json is null ? default : JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -45,16 +50,14 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task RemoveAsync(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        ValidarChave(key);
 
         await cache.RemoveAsync(key);
     }
 
     public async Task<bool> ExistsAsync(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        ValidarChave(key);
 
         // Otimizado: usa GetStringAsync em vez de GetAsync para evitar download desnecessário de bytes
         var json = await cache.GetStringAsync(key);
@@ -63,8 +66,7 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task<long> IncrementAsync(string key, long value = 1)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        ValidarChave(key);
 
         // ⚠️ LIMITAÇÃO CRÍTICA: IDistributedCache não suporta operações atômicas nativas
         // Esta implementação NÃO é thread-safe e pode causar race conditions em ambientes concorrentes
@@ -94,8 +96,7 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 
     public async Task SetExpiryAsync(string key, TimeSpan ttl)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new ArgumentException("Key cannot be null or empty", nameof(key));
+        ValidarChave(key);
 
         if (ttl <= TimeSpan.Zero)
             throw new ArgumentException("TTL must be positive", nameof(ttl));

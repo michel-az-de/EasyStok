@@ -6,8 +6,8 @@ using System.Net.Sockets;
 namespace EasyStock.Infra.Async;
 
 /// <summary>
-/// Implementa��o SMTP do servi�o de email.
-/// Suporte a templates b�sicos, anexos e retry autom�tico em falhas transientes.
+/// Implementação SMTP do serviço de email.
+/// Suporte a templates básicos, anexos e retry automático em falhas transientes.
 /// </summary>
 public sealed class SmtpEmailService : IEmailService, IDisposable
 {
@@ -100,7 +100,7 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        // Implementa��o b�sica - em produ��o usar template engine como Razor ou Handlebars
+        // Implementação básica - em produção usar template engine como Razor ou Handlebars
         var body = $"Template: {templateName}\n\nModel: {System.Text.Json.JsonSerializer.Serialize(model)}";
         return SendAsync(to, subject, body, isHtml);
     }
