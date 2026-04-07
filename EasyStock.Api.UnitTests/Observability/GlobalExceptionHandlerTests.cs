@@ -1,23 +1,21 @@
 using System.Text.Json;
-using EasyStock.Api.Http;
 using EasyStock.Api.Observability;
-using FluentAssertions;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace EasyStock.Api.UnitTests.Observability;
 
 public class GlobalExceptionHandlerTests
 {
-    // ── Estrutura do envelope de erro ────────────────────────────────────────
-
     [Fact]
     public async Task Deve_retornar_400_com_envelope_error_para_erro_de_validacao()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/estoque/entrada", "corr-123");
 
         var handled = await handler.TryHandleAsync(
@@ -39,7 +37,7 @@ public class GlobalExceptionHandlerTests
     [Fact]
     public async Task Deve_retornar_409_para_conflito_de_concorrencia()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/estoque/saida", "corr-409");
 
         var handled = await handler.TryHandleAsync(
@@ -59,7 +57,7 @@ public class GlobalExceptionHandlerTests
     [Fact]
     public async Task Deve_retornar_401_para_credenciais_invalidas()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/auth/login", "corr-401");
 
         var handled = await handler.TryHandleAsync(
@@ -78,7 +76,7 @@ public class GlobalExceptionHandlerTests
     [Fact]
     public async Task Deve_retornar_402_para_plano_limite_atingido()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/ia/anuncio", "corr-402");
 
         var handled = await handler.TryHandleAsync(
@@ -97,7 +95,7 @@ public class GlobalExceptionHandlerTests
     [Fact]
     public async Task Deve_retornar_500_para_excecao_desconhecida()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/qualquer", "corr-500");
 
         var handled = await handler.TryHandleAsync(
@@ -116,7 +114,7 @@ public class GlobalExceptionHandlerTests
     [Fact]
     public async Task Envelope_NaoDeveTerPropriedadesLegadas_TitleDetailStatus()
     {
-        var handler = new GlobalExceptionHandler();
+        var handler = CriarHandler();
         var context = CriarHttpContext("/api/teste", "corr-x");
 
         await handler.TryHandleAsync(
@@ -125,11 +123,13 @@ public class GlobalExceptionHandlerTests
             CancellationToken.None);
 
         var payload = await LerRespostaAsync(context);
-        // Deve ter "error" na raiz, nao "title" / "detail" / "status" (ProblemDetails legado)
         payload.RootElement.TryGetProperty("error", out _).Should().BeTrue();
         payload.RootElement.TryGetProperty("title", out _).Should().BeFalse();
         payload.RootElement.TryGetProperty("status", out _).Should().BeFalse();
     }
+
+    private static GlobalExceptionHandler CriarHandler() =>
+        new(NullLogger<GlobalExceptionHandler>.Instance);
 
     private static DefaultHttpContext CriarHttpContext(string path, string correlationId)
     {

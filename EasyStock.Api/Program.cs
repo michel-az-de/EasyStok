@@ -8,6 +8,8 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Sqlite.DependencyInjection;
+using EasyStock.Infra.Sqlite.HealthChecks;
 using EasyStock.Infra.Async.DependencyInjection;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -72,35 +74,132 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Database
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "PostgreSql";
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "Auto";
 var postgresConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection");
 var mongoDatabaseName = builder.Configuration["Database:MongoDatabase"] ?? "EasyStockDbMongo";
+var sqliteConnectionString = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=easystock.db";
 
-switch (databaseProvider.Trim().ToLowerInvariant())
+var resolvedProvider = await ResolveDatabaseProviderAsync(
+    databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
+
+switch (resolvedProvider)
 {
     case "mongodb":
-    case "mongo":
-        if (string.IsNullOrWhiteSpace(mongoConnectionString))
-            throw new InvalidOperationException("Connection string 'MongoConnection' nao configurada.");
-
-        builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString, mongoDatabaseName, builder.Configuration);
+        builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString!, mongoDatabaseName, builder.Configuration);
         builder.Services.AddHealthChecks()
             .AddCheck<MongoDatabaseHealthCheck>("MongoDB");
         break;
 
-    case "postgres":
     case "postgresql":
-        if (string.IsNullOrWhiteSpace(postgresConnectionString))
-            throw new InvalidOperationException("Connection string 'DefaultConnection' nao configurada.");
-
-        builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString, builder.Configuration);
+        builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString, name: "PostgreSQL");
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL");
+        break;
+
+    case "sqlite":
+        builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
+        builder.Services.AddHealthChecks()
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite");
         break;
 
     default:
         throw new InvalidOperationException($"Database:Provider '{databaseProvider}' nao suportado.");
+}
+
+static async Task<string> ResolveDatabaseProviderAsync(
+    string configuredProvider,
+    string? postgresConnectionString,
+    string? mongoConnectionString,
+    Serilog.ILogger logger)
+{
+    var normalized = configuredProvider.Trim().ToLowerInvariant();
+
+    if (normalized is "sqlite")
+        return "sqlite";
+
+    if (normalized is "postgres" or "postgresql")
+    {
+        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
+            await IsPostgresAvailableAsync(postgresConnectionString, logger))
+            return "postgresql";
+
+        logger.Warning(
+            "PostgreSQL nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            !string.IsNullOrWhiteSpace(postgresConnectionString));
+        return "sqlite";
+    }
+
+    if (normalized is "mongodb" or "mongo")
+    {
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            await IsMongoAvailableAsync(mongoConnectionString, logger))
+            return "mongodb";
+
+        logger.Warning(
+            "MongoDB nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            !string.IsNullOrWhiteSpace(mongoConnectionString));
+        return "sqlite";
+    }
+
+    if (normalized is "auto")
+    {
+        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
+            await IsPostgresAvailableAsync(postgresConnectionString, logger))
+        {
+            logger.Information("Auto-deteccao: usando PostgreSQL.");
+            return "postgresql";
+        }
+
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            await IsMongoAvailableAsync(mongoConnectionString, logger))
+        {
+            logger.Information("Auto-deteccao: usando MongoDB.");
+            return "mongodb";
+        }
+
+        logger.Warning("Auto-deteccao: nenhum banco externo disponivel. Usando SQLite.");
+        return "sqlite";
+    }
+
+    throw new InvalidOperationException($"Database:Provider '{configuredProvider}' nao suportado.");
+}
+
+static async Task<bool> IsPostgresAvailableAsync(string connectionString, Serilog.ILogger logger)
+{
+    try
+    {
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Timeout = 3,
+            CommandTimeout = 3
+        };
+        await using var conn = new Npgsql.NpgsqlConnection(builder.ToString());
+        await conn.OpenAsync();
+        return true;
+    }
+    catch (Exception ex)
+    {
+        logger.Debug(ex, "PostgreSQL indisponivel.");
+        return false;
+    }
+}
+
+static async Task<bool> IsMongoAvailableAsync(string connectionString, Serilog.ILogger logger)
+{
+    try
+    {
+        var settings = MongoDB.Driver.MongoClientSettings.FromConnectionString(connectionString);
+        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(3);
+        var client = new MongoDB.Driver.MongoClient(settings);
+        await client.ListDatabaseNamesAsync();
+        return true;
+    }
+    catch (Exception ex)
+    {
+        logger.Debug(ex, "MongoDB indisponivel.");
+        return false;
+    }
 }
 
 // Application
@@ -220,7 +319,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Background Services
-builder.Services.AddHostedService<AnalisadorEstoqueBackgroundService>();
+builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 
 // Exception Handler
 builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalExceptionHandler>();

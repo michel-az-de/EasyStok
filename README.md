@@ -7,6 +7,18 @@
 ![PostgreSQL](https://img.shields.io/badge/DB-PostgreSQL-blue)
 ![MongoDB](https://img.shields.io/badge/DB-MongoDB-green)
 ![Redis](https://img.shields.io/badge/Cache-Redis-red)
+![Lines of Code](https://img.shields.io/badge/Linhas%20de%20Código-15.991-informational)
+![Test Coverage](https://img.shields.io/badge/Cobertura%20de%20Testes-52%25-yellowgreen)
+
+---
+
+## 📄 Documentos Complementares
+
+| Documento | Descrição |
+|-----------|-----------|
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | Métricas, status detalhado, pendências e estimativas de esforço |
+| [`LLM_PROMPTS.md`](LLM_PROMPTS.md) | Catálogo de features pendentes com prompts prontos para LLMs |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Diagrama de arquitetura em ASCII |
 
 ---
 
@@ -224,14 +236,12 @@ EasyStok/
 
 ### Com PostgreSQL
 
-**1. Clone o repositório**
-```bash
+**1. Clone o repositório**```bash
 git clone https://github.com/michel-az-de/EasyStok.git
 cd EasyStok
 ```
 
-**2. Configure a connection string** em `EasyStock.Api/appsettings.json`:
-```json
+**2. Configure a connection string** em `EasyStock.Api/appsettings.json`:```json
 {
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=EasyStockDb;Username=postgres;Password=postgres"
@@ -979,6 +989,8 @@ chore:    Mudanças de build, CI, dependências
 | `EasyStock.Benchmarks/ProdutoRepositoryBenchmarks.cs` | Benchmark de performance de repositório |
 | `.github/workflows/ci.yml` | Pipeline CI/CD (build + testes + benchmarks) |
 | `ARCHITECTURE.md` | Diagrama de arquitetura em ASCII |
+| `PROJECT_STATUS.md` | Métricas, status, pendências e estimativas de esforço |
+| `LLM_PROMPTS.md` | Catálogo de features com prompts prontos para LLMs |
 
 ---
 

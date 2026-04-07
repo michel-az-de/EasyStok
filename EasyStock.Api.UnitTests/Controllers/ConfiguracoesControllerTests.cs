@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.ConfiguracoesLoja;
@@ -52,7 +53,7 @@ public class ConfiguracoesControllerTests
             null));
 
         result.Should().BeOfType<OkObjectResult>();
-        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ConfiguracaoLojaResult>().Subject;
+        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ConfiguracaoLojaResult>>().Subject.Data;
         payload.DiasAlertaValidade.Should().Be(7);
         payload.QuantidadeMinimaPadrao.Should().Be(9);
         payload.NotificarParado.Should().BeFalse();
@@ -72,7 +73,7 @@ public class ConfiguracoesControllerTests
         var result = await _controller.Reset(new ResetarConfiguracaoLojaCommand(empresaId, lojaId));
 
         result.Should().BeOfType<OkObjectResult>();
-        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ConfiguracaoLojaResult>().Subject;
+        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ConfiguracaoLojaResult>>().Subject.Data;
         payload.DiasAlertaValidade.Should().Be(15);
         payload.DiasAlertaParado.Should().Be(30);
         payload.QuantidadeMinimaPadrao.Should().Be(5);

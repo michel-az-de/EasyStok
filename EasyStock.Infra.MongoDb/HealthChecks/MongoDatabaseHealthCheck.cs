@@ -11,7 +11,7 @@ public sealed class MongoDatabaseHealthCheck(IMongoClient mongoClient, string da
         try
         {
             await mongoClient.GetDatabase(databaseName)
-                .RunCommandAsync((Command<BsonDocument>)"{ ping: 1 }", cancellationToken: cancellationToken);
+                .RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 
             return HealthCheckResult.Healthy("MongoDB respondeu ao ping.");
         }

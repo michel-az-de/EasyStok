@@ -1,39 +1,47 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Domain.Enums;
 
 namespace EasyStock.Domain.Services
 {
+    /// <summary>
+    /// Analisa a saúde do estoque e emite sinais de alerta para o operador.
+    /// </summary>
     public sealed class AnalisadorSaudeEstoque
     {
-        // Representa um sinal simples de sa�de do estoque
+        /// <summary>Representa um sinal simples de saúde do estoque.</summary>
         public record SinalSaude(string ProdutoNome, TipoAlertaEstoque TipoAlerta, string Mensagem);
 
-        // Analisa itens em estoque e retorna sinais (alertas) sutis �teis ao operador.
-        public IEnumerable<SinalSaude> Analisar(IEnumerable<(string produtoNome, Quantidade quantidade, Validade? validade)> itens,
-            int limiteEstoqueBaixo, int diasProximoVencimento)
+        /// <summary>
+        /// Analisa a lista de itens e retorna os alertas aplicáveis com base nos limiares fornecidos.
+        /// </summary>
+        public IEnumerable<SinalSaude> Analisar(
+            IEnumerable<(string produtoNome, Quantidade quantidade, Validade? validade)> itens,
+            int limiteEstoqueBaixo,
+            int diasProximoVencimento)
         {
             if (itens == null) throw new ArgumentNullException(nameof(itens));
             if (limiteEstoqueBaixo < 0) throw new ArgumentOutOfRangeException(nameof(limiteEstoqueBaixo));
             if (diasProximoVencimento < 0) throw new ArgumentOutOfRangeException(nameof(diasProximoVencimento));
 
-            var now = DateTime.UtcNow.Date;
+            var hoje = DateTime.UtcNow.Date;
             var sinais = new List<SinalSaude>();
 
             foreach (var (produtoNome, quantidade, validade) in itens)
             {
                 if (quantidade.Value <= limiteEstoqueBaixo)
                 {
-                    sinais.Add(new SinalSaude(produtoNome, TipoAlertaEstoque.EstoqueBaixo, $"Quantidade atual ({quantidade.Value}) abaixo do limite ({limiteEstoqueBaixo})."));
+                    sinais.Add(new SinalSaude(
+                        produtoNome,
+                        TipoAlertaEstoque.EstoqueBaixo,
+                        $"Quantidade atual ({quantidade.Value}) abaixo do limite ({limiteEstoqueBaixo})."));
                 }
 
                 if (validade is not null)
                 {
-                    var dias = validade.DiasAteVencimento(now);
+                    var dias = validade.DiasAteVencimento(hoje);
                     if (dias < 0)
                     {
+                        // Produto já vencido — usa ProdutoParado pois não há tipo específico para vencimento no enum
                         sinais.Add(new SinalSaude(produtoNome, TipoAlertaEstoque.ProdutoParado, "Produto vencido."));
                     }
                     else if (dias <= diasProximoVencimento)
