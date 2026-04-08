@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Api.BackgroundServices;
+namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>
 /// Job legado de processamento de recebimentos.

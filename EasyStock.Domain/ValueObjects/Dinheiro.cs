@@ -13,7 +13,7 @@ namespace EasyStock.Domain.ValueObjects
 
         public static Dinheiro FromDecimal(decimal valor)
         {
-            if (valor < 0) throw new ArgumentOutOfRangeException(nameof(valor), "Valor monetário não pode ser negativo.");
+            if (valor < 0) throw new ArgumentOutOfRangeException(nameof(valor), "Valor monetÃ¡rio nÃ£o pode ser negativo.");
             return new Dinheiro(valor);
         }
 
@@ -23,7 +23,7 @@ namespace EasyStock.Domain.ValueObjects
         public Dinheiro Subtract(Dinheiro other)
         {
             var result = Valor - other.Valor;
-            if (result < 0) throw new InvalidOperationException("Operação resultaria em valor monetário negativo.");
+            if (result < 0) throw new InvalidOperationException("OperaÃ§Ã£o resultaria em valor monetÃ¡rio negativo.");
             return FromDecimal(result);
         }
 

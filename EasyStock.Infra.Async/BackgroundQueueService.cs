@@ -5,9 +5,9 @@ using System.Text.Json;
 namespace EasyStock.Infra.Async;
 
 /// <summary>
-/// Implementação em memória do serviço de fila.
+/// ImplementaÃ§Ã£o em memÃ³ria do serviÃ§o de fila.
 /// Usa ConcurrentQueue para thread-safety e processamento sequencial.
-/// Ideal para desenvolvimento/testes; para produção usar Redis Queue ou similar.
+/// Ideal para desenvolvimento/testes; para produÃ§Ã£o usar Redis Queue ou similar.
 /// </summary>
 public sealed class BackgroundQueueService : IQueueService, IDisposable
 {

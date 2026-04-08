@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 

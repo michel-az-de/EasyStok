@@ -2,7 +2,7 @@ using System;
 
 namespace EasyStock.Domain.Exceptions
 {
-    public class ProdutoInativoException(Guid produtoId) : RegraDeDominioVioladaException($"OperaÁ„o inv·lida: o produto '{produtoId}' est· inativo.")
+    public class ProdutoInativoException(Guid produtoId) : RegraDeDominioVioladaException($"Opera√ß√£o inv√°lida: o produto '{produtoId}' est√° inativo.")
     {
     }
 }
