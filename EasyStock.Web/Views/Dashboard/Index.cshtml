@@ -47,21 +47,21 @@
         <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
         <div>
             <div class="kpi-val text-amber-600">@Model.ProximosVencimento</div>
-            <div class="kpi-lbl">Próx. vencimento</div>
+            <div class="kpi-lbl">Próx. ao vencimento</div>
         </div>
     </a>
     <a href="/estoque?status=parado" class="ws flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
         <div>
             <div class="kpi-val text-blue-600">@Model.ProdutosParados</div>
-            <div class="kpi-lbl">Parados &gt;30d</div>
+            <div class="kpi-lbl">Parados +30 dias</div>
         </div>
     </a>
     <a href="/entradas/reposicao" class="ws flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">💡</div>
         <div>
             <div class="kpi-val text-emerald-600">@Model.SugestoesReposicao</div>
-            <div class="kpi-lbl">Sugestões reposição</div>
+            <div class="kpi-lbl">Sugestões de reposição</div>
         </div>
     </a>
 </div>
