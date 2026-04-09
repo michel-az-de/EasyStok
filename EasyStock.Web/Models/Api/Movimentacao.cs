@@ -27,8 +27,3 @@ public record QuantidadeDto
 {
     public int Value { get; init; }
 }
-
-public record DinheiroDto
-{
-    public decimal Valor { get; init; }
-}

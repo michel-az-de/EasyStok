@@ -20,25 +20,7 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         };
 
         if (result.Success)
-        {
             vm.Items = result.Data!;
-            vm.TotalPedidosAbertos = 0; // loaded separately via badge
-        }
-
-        return View(vm);
-    }
-
-    [HttpGet("/fornecedores/pedidos")]
-    public async Task<IActionResult> PedidosAbertos()
-    {
-        ViewBag.Title = "Pedidos em Aberto";
-        ViewBag.ActiveMenuItem = "Fornecedores";
-
-        var result = await svc.ListarPedidosAbertosAsync();
-        var vm = new PedidosAbertosViewModel();
-
-        if (result.Success)
-            vm.Pedidos = result.Data!;
 
         return View(vm);
     }
@@ -52,14 +34,20 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         var result = await svc.ObterAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
-        var pedidosResult = await svc.ListarPedidosAbertosAsync();
-        var vm = new FornecedorDetailViewModel
+        var vm = new FornecedorDetailViewModel { Fornecedor = result.Data! };
+
+        var historicoResult = await svc.ObterHistoricoAsync(id);
+        if (historicoResult.Success)
+            vm.Historico = historicoResult.Data!;
+
+        var estatisticasResult = await svc.ObterEstatisticasAsync(id);
+        if (estatisticasResult.Success)
         {
-            Fornecedor = result.Data!,
-            PedidosAbertos = pedidosResult.Success
-                ? pedidosResult.Data!.Where(p => p.FornId == id).ToList()
-                : []
-        };
+            var stats = estatisticasResult.Data!;
+            vm.TotalGasto = stats.TotalGasto;
+            vm.LeadRealMedio = stats.LeadTimeRealMedioDias;
+            vm.QuantidadePedidos = stats.QuantidadePedidos;
+        }
 
         return View(vm);
     }
@@ -67,14 +55,14 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
     [HttpPost("/fornecedores")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(
-        string nome, string? cnpj, string? resp, string? email, string? tel,
-        int lead, string pgto, string tipo, string cats, string? site,
-        string? min, string? frete, string? obs)
+        string nome, string? documento, string? contato, string? email, string? telefone,
+        int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
+        string? pedidoMinimo, string? fretePadrao, string? observacoes)
     {
-        var result = await svc.CriarAsync(new
-        {
-            nome, cnpj, resp, email, tel, lead, pgto, tipo, cats, site, min, frete, obs
-        });
+        var result = await svc.CriarAsync(
+            nome, documento, contato, email, telefone,
+            leadTimeEstimadoDias, tipo, categoria, siteUrl,
+            pedidoMinimo, fretePadrao, observacoes);
 
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
@@ -85,14 +73,14 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
     [HttpPost("/fornecedores/{id}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Editar(string id,
-        string nome, string? cnpj, string? resp, string? email, string? tel,
-        int lead, string pgto, string tipo, string cats, string? site,
-        string? min, string? frete, string? obs)
+        string nome, string? documento, string? contato, string? email, string? telefone,
+        int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
+        string? pedidoMinimo, string? fretePadrao, string? observacoes)
     {
-        var result = await svc.EditarAsync(id, new
-        {
-            nome, cnpj, resp, email, tel, lead, pgto, tipo, cats, site, min, frete, obs
-        });
+        var result = await svc.EditarAsync(id,
+            nome, documento, contato, email, telefone,
+            leadTimeEstimadoDias, tipo, categoria, siteUrl,
+            pedidoMinimo, fretePadrao, observacoes);
 
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
@@ -107,49 +95,7 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         var result = await svc.ExcluirAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
-        Toast("success", "Fornecedor excluído com sucesso!");
+        Toast("success", "Fornecedor desativado com sucesso!");
         return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost("/fornecedores/{fornId}/pedidos")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CriarPedido(string fornId,
-        string? obs, DateOnly? dtPrevista, List<string> produtoIds,
-        List<int> qtys, List<decimal> custos)
-    {
-        var itens = produtoIds.Select((pid, i) => new
-        {
-            produtoId = pid,
-            qty = i < qtys.Count ? qtys[i] : 0,
-            custo = i < custos.Count ? custos[i] : 0m
-        }).ToList();
-
-        var result = await svc.CriarPedidoAsync(fornId, new { obs, dtPrevista, itens });
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id = fornId });
-
-        Toast("success", "Pedido criado com sucesso!");
-        return RedirectToAction(nameof(PedidosAbertos));
-    }
-
-    [HttpPost("/fornecedores/{fornId}/pedidos/{pedId}/receber")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReceberPedido(string fornId, string pedId, string? obs)
-    {
-        var result = await svc.ReceberPedidoAsync(fornId, pedId, new { obs });
-        if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
-
-        Toast("success", "Pedido recebido com sucesso!");
-        return RedirectToAction(nameof(PedidosAbertos));
-    }
-
-    [HttpPost("/fornecedores/{fornId}/pedidos/{pedId}/cancelar")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CancelarPedido(string fornId, string pedId)
-    {
-        var result = await svc.CancelarPedidoAsync(fornId, pedId);
-        if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
-
-        Toast("success", "Pedido cancelado.");
-        return RedirectToAction(nameof(PedidosAbertos));
     }
 }
