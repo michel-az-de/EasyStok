@@ -98,4 +98,12 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         Toast("success", "Fornecedor desativado com sucesso!");
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpGet("/fornecedores/pedidos-abertos")]
+    public IActionResult PedidosAbertos()
+    {
+        ViewBag.Title = "Pedidos em Aberto";
+        ViewBag.ActiveMenuItem = "Fornecedores";
+        return View(new Models.ViewModels.Fornecedores.PedidosAbertosViewModel());
+    }
 }
