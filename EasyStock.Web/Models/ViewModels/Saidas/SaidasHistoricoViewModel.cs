@@ -5,7 +5,7 @@ namespace EasyStock.Web.Models.ViewModels.Saidas;
 
 public class SaidasHistoricoViewModel
 {
-    public List<Saida> Itens { get; set; } = [];
+    public List<Movimentacao> Itens { get; set; } = [];
     public PaginationViewModel Paginacao { get; set; } = new();
 
     // KPI chips

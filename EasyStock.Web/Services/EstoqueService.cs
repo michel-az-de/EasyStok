@@ -4,19 +4,33 @@ namespace EasyStock.Web.Services;
 
 public class EstoqueService(ApiClient api)
 {
-    public Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
+    public async Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
         int page = 1, string? status = null, string? categoria = null, string? search = null)
     {
-        var qs = $"estoque?page={page}&pageSize=20";
-        if (!string.IsNullOrEmpty(status) && status != "todos") qs += $"&status={Uri.EscapeDataString(status)}";
-        if (!string.IsNullOrEmpty(categoria)) qs += $"&categoria={Uri.EscapeDataString(categoria)}";
-        if (!string.IsNullOrEmpty(search)) qs += $"&termo={Uri.EscapeDataString(search)}";
-        return api.GetAsync<PagedResult<EstoqueSku>>(qs);
+        // When a search term is supplied, use the dedicated full-text search endpoint.
+        // The regular GetAll endpoint does not support status/categoria/termo filters.
+        if (!string.IsNullOrEmpty(search))
+        {
+            var buscarQs = $"estoque/buscar?termo={Uri.EscapeDataString(search)}&limite=100";
+            var buscarResult = await api.GetAsync<List<EstoqueSku>>(buscarQs);
+            if (!buscarResult.Success)
+                return ApiResult<PagedResult<EstoqueSku>>.Fail(
+                    buscarResult.ErrorCode!, buscarResult.ErrorMessage!, buscarResult.HttpStatus);
+
+            var items = buscarResult.Data ?? [];
+            return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
+            {
+                Data = items,
+                Meta = new Meta(items.Count, 1, 1, items.Count)
+            });
+        }
+
+        return await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize=20");
     }
 
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>
         api.GetAsync<EstoqueSku>($"estoque/{id}");
 
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
-        api.GetAsync<PagedResult<EstoqueSku>>("estoque?status=critico&pageSize=20");
+        api.GetAsync<PagedResult<EstoqueSku>>("estoque?pageSize=20");
 }

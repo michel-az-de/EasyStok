@@ -96,17 +96,17 @@
                     <tr>
                         <td>
                             <div class="font-medium text-gray-900">@(s.Produto?.Nome ?? s.ProdutoId)</div>
-                            @if (s.Variacao != null)
+                            @if (s.ProdutoVariacao != null)
                             {
-                                <div class="text-xs text-gray-500">@s.Variacao.Nome</div>
+                                <div class="text-xs text-gray-500">@s.ProdutoVariacao.Nome</div>
                             }
                         </td>
                         <td>
                             @{
-                                var naturezaColor = s.Natureza switch {
+                                var naturezaColor = s.Natureza?.ToLower() switch {
                                     "venda" => "bg-green-100 text-green-700",
                                     "perda" => "bg-red-100 text-red-700",
-                                    "doacao" => "bg-blue-100 text-blue-700",
+                                    "devolucao" or "devolução" => "bg-blue-100 text-blue-700",
                                     _ => "bg-gray-100 text-gray-700"
                                 };
                             }
@@ -116,17 +116,17 @@
                         </td>
                         <td class="font-medium">@s.Qty</td>
                         <td>
-                            @if (s.Valor.HasValue)
+                            @if (s.Custo.HasValue)
                             {
-                                <span>R$ @s.Valor.Value.ToString("N2")</span>
+                                <span>R$ @s.Custo.Value.ToString("N2")</span>
                             }
                             else
                             {
                                 <span class="text-gray-400">—</span>
                             }
                         </td>
-                        <td class="text-gray-600">@s.DtVenda.ToString("dd/MM/yyyy")</td>
-                        <td class="text-gray-500 text-sm">@(s.Canal ?? "—")</td>
+                        <td class="text-gray-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
+                        <td class="text-gray-500 text-sm">@(s.Descricao ?? "—")</td>
                         <td>
                             <form asp-action="Estornar" asp-controller="Saidas"
                                   asp-route-id="@s.Id" method="post"

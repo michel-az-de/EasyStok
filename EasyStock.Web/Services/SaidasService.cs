@@ -5,41 +5,71 @@ namespace EasyStock.Web.Services;
 
 public class SaidasService(ApiClient api)
 {
-    public Task<ApiResult<PagedResult<Saida>>> ListarAsync(
+    public Task<ApiResult<PagedResult<Movimentacao>>> ListarAsync(
         int page = 1, string? natureza = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        var qs = $"estoque/saida?page={page}&pageSize=20";
-        if (!string.IsNullOrEmpty(natureza)) qs += $"&natureza={Uri.EscapeDataString(natureza)}";
+        var qs = $"movimentacoes?page={page}&pageSize=20&tipo=Saida";
+        if (!string.IsNullOrEmpty(natureza)) qs += $"&natureza={Uri.EscapeDataString(MapNatureza(natureza))}";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
-        return api.GetAsync<PagedResult<Saida>>(qs);
+        return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
     public Task<ApiResult<object>> CriarAsync(SaidaFormViewModel vm) =>
         api.PostAsync<object>("estoque/saida", new
         {
-            produtoId = vm.ProdutoId,
-            varId = vm.VarId,
-            natureza = vm.Natureza,
-            qty = vm.Qty,
-            valor = vm.Valor,
-            dtVenda = vm.DtVenda,
-            dtSaida = vm.DtSaida,
-            dtEnvio = vm.DtEnvio,
+            itens = new[]
+            {
+                new
+                {
+                    produtoId = Guid.TryParse(vm.ProdutoId, out var pid) ? pid : Guid.Empty,
+                    produtoVariacaoId = Guid.TryParse(vm.VarId, out var vid) ? vid : (Guid?)null,
+                    quantidade = vm.Qty,
+                    valorVendaUnitario = vm.Valor ?? 0m,
+                    descricao = vm.Descricao
+                }
+            },
+            dataVenda = vm.DtVenda.ToDateTime(TimeOnly.MinValue),
+            dataSaida = (vm.DtSaida ?? vm.DtVenda).ToDateTime(TimeOnly.MinValue),
+            dataEnvio = vm.DtEnvio.HasValue ? vm.DtEnvio.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
             notaFiscal = vm.NotaFiscal,
-            canal = vm.Canal,
-            descricao = vm.Descricao
+            natureza = MapNatureza(vm.Natureza),
+            canal = MapCanal(vm.Canal),
+            observacoes = vm.Descricao
         });
 
-    public Task<ApiResult<object>> ResumoAsync(string? periodoInicio = null, string? periodoFim = null)
-    {
-        var qs = "estoque/saida/resumo";
-        var sep = "?";
-        if (!string.IsNullOrEmpty(periodoInicio)) { qs += $"{sep}de={Uri.EscapeDataString(periodoInicio)}"; sep = "&"; }
-        if (!string.IsNullOrEmpty(periodoFim)) qs += $"{sep}ate={Uri.EscapeDataString(periodoFim)}";
-        return api.GetAsync<object>(qs);
-    }
-
+    // EstornarAsync: no reversal endpoint exists in the API.
+    // Returns a graceful failure so the controller shows an informative error toast.
     public Task<ApiResult<bool>> EstornarAsync(string id) =>
-        api.DeleteAsync($"estoque/saida/{id}");
+        Task.FromResult(ApiResult<bool>.Fail("NOT_SUPPORTED", "Estorno não disponível no momento."));
+
+    // Maps lowercase UI natureza values to PascalCase API enum names.
+    private static string MapNatureza(string? natureza) => natureza?.ToLowerInvariant() switch
+    {
+        "venda" => "Venda",
+        "perda" => "Perda",
+        "doacao" or "doação" => "Ajuste",   // no Doacao enum; Ajuste is the closest for a free exit
+        "uso_interno" => "UsoInterno",
+        "devolucao" or "devolução" => "Devolucao",
+        "ajuste" => "Ajuste",
+        "prejuizo" or "prejuízo" => "Prejuizo",
+        _ => "Venda"
+    };
+
+    // Maps free-text canal values to CanalVenda enum names.
+    private static string MapCanal(string? canal)
+    {
+        var c = canal?.ToLowerInvariant() ?? string.Empty;
+        if (c.Contains("ml") || c.Contains("mercadolivre") || c.Contains("mercado livre"))
+            return "MercadoLivre";
+        if (c.Contains("shopee"))
+            return "Shopee";
+        if (c.Contains("whatsapp") || c.Contains("whats"))
+            return "WhatsApp";
+        if (c.Contains("instagram") || c.Contains("insta"))
+            return "Instagram";
+        if (c.Contains("loja") || c.Contains("proprio") || c.Contains("próprio"))
+            return "LojaPropria";
+        return "Outro";
+    }
 }
