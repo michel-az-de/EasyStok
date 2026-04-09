@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: easystock-config
+  namespace: easystock
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  Database__Provider: "PostgreSql"
+  Jwt__Issuer: "EasyStock"
+  Jwt__Audience: "EasyStock"
+  Jwt__ExpirationMinutes: "60"
+  Anthropic__Enabled: "false"
+  FileStorage__Provider: "Local"
+  EasyStock__LimiteEstoqueBaixoDefault: "5"
+  EasyStock__DiasAlertaVencimento: "30"
+  EasyStock__DiasItemParado: "90"

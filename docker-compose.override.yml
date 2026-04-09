@@ -1,0 +1,29 @@
+version: "3.9"
+
+# ─── Override para desenvolvimento local ─────────────────────────────────────
+# Uso: docker compose --profile local up
+# Isso sobe o postgres-local e aponta a API para ele.
+#
+# Para usar o Azure PostgreSQL (sem perfil local):
+#   docker compose up api
+#
+# Para usar o banco local:
+#   docker compose --profile local up
+
+services:
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # Sobrescreve para usar o banco local quando o perfil "local" esta ativo
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres-local;Port=5432;Database=easystock;
+        Username=postgres;Password=postgres;
+        SSL Mode=Disable
+      Jwt__SecretKey: "EasyStock-Local-Dev-SuperSecretKey-32+"
+    depends_on:
+      postgres-local:
+        condition: service_healthy
+    profiles: ["local"]
+
+  postgres-local:
+    profiles: ["local"]
