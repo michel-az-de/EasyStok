@@ -3,7 +3,6 @@ using BenchmarkDotNet.Running;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 
 BenchmarkRunner.Run<ProdutoRepositoryBenchmarks>();
 
@@ -21,8 +20,7 @@ public class ProdutoRepositoryBenchmarks
             .Options;
 
         var context = new EasyStockDbContext(options);
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        _repository = new ProdutoRepository(context, cache);
+        _repository = new ProdutoRepository(context);
 
         // Seed data
         for (int i = 0; i < 1000; i++)

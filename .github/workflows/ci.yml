@@ -10,17 +10,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
     - uses: actions/checkout@v4
 
@@ -38,7 +27,9 @@ jobs:
     - name: Run tests
       run: dotnet test --no-build --verbosity normal -p:UseSharedCompilation=false
       env:
-        ConnectionStrings__DefaultConnection: Host=localhost;Database=easystock_test;Username=postgres;Password=postgres
+        ConnectionStrings__DefaultConnection: ${{ secrets.AZURE_PG_CONNECTION_STRING }}
+        Database__Provider: PostgreSQL
+        Jwt__SecretKey: ${{ secrets.JWT_SECRET_KEY }}
 
     - name: Run benchmarks
       run: dotnet run --project EasyStock.Benchmarks --configuration Release

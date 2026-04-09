@@ -6,6 +6,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public interface IMovimentacaoEstoqueRepository
     {
         Task InsertAsync(MovimentacaoEstoque movimentacao);
+        Task InsertRangeAsync(IEnumerable<MovimentacaoEstoque> movimentacoes);
         Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(
             Guid empresaId,
             DateTime? de = null,
