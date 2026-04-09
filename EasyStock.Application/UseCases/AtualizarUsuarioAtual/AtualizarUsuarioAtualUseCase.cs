@@ -29,7 +29,6 @@ public sealed class AtualizarUsuarioAtualUseCase(
             throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
         }
 
-        // Verificar se email ja existe (se mudou)
         if (!string.Equals(usuario.Email, command.Email, StringComparison.OrdinalIgnoreCase))
         {
             var existente = await usuarioRepository.GetByEmailAsync(command.Email);

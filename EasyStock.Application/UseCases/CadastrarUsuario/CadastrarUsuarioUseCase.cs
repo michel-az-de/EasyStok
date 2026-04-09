@@ -16,7 +16,6 @@ public sealed class CadastrarUsuarioUseCase(
     {
         logger.LogInformation("Iniciando cadastro de usuario com email {Email}", command.Email);
 
-        // Verificar se email ja existe
         var usuarioExistente = await usuarioRepository.GetByEmailAsync(command.Email);
         if (usuarioExistente != null)
         {
@@ -24,13 +23,11 @@ public sealed class CadastrarUsuarioUseCase(
             throw new RegraDeDominioVioladaException("Email ja cadastrado.");
         }
 
-        // Criar usuario
         var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.Senha);
         var usuario = Usuario.Criar(command.Nome, command.Email, senhaHash);
 
         await usuarioRepository.AddAsync(usuario);
 
-        // Auditar
         var auditLog = AuditLog.Criar(
             usuario.Id,
             "register",

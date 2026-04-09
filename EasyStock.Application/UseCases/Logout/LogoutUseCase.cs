@@ -23,11 +23,9 @@ public sealed class LogoutUseCase(
             return new LogoutResult(false);
         }
 
-        // Revogar token
         refreshToken.Revogar();
         await refreshTokenRepository.UpdateAsync(refreshToken);
 
-        // Auditar
         var auditLog = AuditLog.Criar(
             refreshToken.UsuarioId,
             "logout",

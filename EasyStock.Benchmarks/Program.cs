@@ -5,9 +5,6 @@ using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
-// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
-
 BenchmarkRunner.Run<ProdutoRepositoryBenchmarks>();
 
 [MemoryDiagnoser]

@@ -42,11 +42,7 @@ public class AuthControllerTests
 
         _unitOfWork.CommitAsync().Returns(1);
 
-        // Build substitute repositories for other use cases
         var usuarioRepo2 = Substitute.For<IUsuarioRepository>();
-        var assinaturaRepo = Substitute.For<IAssinaturaEmpresaRepository>();
-        var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
-        var usuarioPerfilRepo = Substitute.For<IUsuarioPerfilRepository>();
         var unitOfWork2 = Substitute.For<IUnitOfWork>();
         var refreshTokenRepo2 = Substitute.For<IRefreshTokenRepository>();
         var auditLogRepo2 = Substitute.For<IAuditLogRepository>();

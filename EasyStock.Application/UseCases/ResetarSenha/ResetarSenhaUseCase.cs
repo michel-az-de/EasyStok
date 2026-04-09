@@ -31,17 +31,14 @@ public sealed class ResetarSenhaUseCase(
             throw new RegraDeDominioVioladaException("Usuario invalido.");
         }
 
-        // Atualizar senha
         usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(command.NovaSenha);
         usuario.AlteradoEm = DateTime.UtcNow;
         usuario.ResetarTentativasFalha();
         await usuarioRepository.UpdateAsync(usuario);
 
-        // Marcar token como usado
         resetToken.MarcarComoUsado();
         await resetTokenRepository.UpdateAsync(resetToken);
 
-        // Auditar
         var auditLog = AuditLog.Criar(
             usuario.Id,
             "reset-password",

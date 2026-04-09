@@ -13,7 +13,14 @@
       "Bash(ls -la \"C:\\\\rep\\\\EasyStok\\\\EasyStock.Application.Tests\\\\UseCases\"\" 2>/dev/null || echo \"Diretório não encontrado \")",
       "Bash(grep -v \"^$\")",
       "Bash(grep -E \"\\\\.cs$\")",
-      "Bash(grep -E \"\\\\.\\(cs\\)$\")"
+      "Bash(grep -E \"\\\\.\\(cs\\)$\")",
+      "Bash(dotnet restore:*)",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)",
+      "Bash(winget list:*)",
+      "Bash(cat k8s/*.yaml)",
+      "Bash(cat EasyStock.Benchmarks/*.csproj)",
+      "Bash(dotnet sln:*)"
     ]
   }
 }
