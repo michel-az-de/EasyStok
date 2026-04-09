@@ -9,7 +9,7 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
     public Task<ApiResult<List<Fornecedor>>> ListarAsync(string? status = null, string? search = null)
     {
-        var qs = $"fornecedores?empresaId={GetEmpresaId()}";
+        var qs = $"fornecedores?empresaId={GetEmpresaId()}&page=1&pageSize=200";
         if (status == "ativo") qs += "&ativo=true";
         else if (status == "inativo") qs += "&ativo=false";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
@@ -50,4 +50,7 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
     public Task<ApiResult<FornecedorEstatisticas>> ObterEstatisticasAsync(string id) =>
         api.GetAsync<FornecedorEstatisticas>($"fornecedores/{id}/estatisticas?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<List<PedidoAberto>>> ListarPedidosAbertosAsync() =>
+        api.GetAsync<List<PedidoAberto>>($"fornecedores/pedidos-abertos?empresaId={GetEmpresaId()}");
 }

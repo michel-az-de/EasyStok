@@ -32,9 +32,7 @@ public class ApiResponseEnvelopeTests
     public void EasyStockControllerBase_DataPaged_DeveCalcularPagesCorretamente()
     {
         // Testa directamente o calculo de paginas
-        var items = Enumerable.Range(1, 5).ToList();
         var total = 105;
-        var page = 1;
         var limit = 20;
 
         var pages = limit > 0 ? (int)Math.Ceiling((double)total / limit) : 0;

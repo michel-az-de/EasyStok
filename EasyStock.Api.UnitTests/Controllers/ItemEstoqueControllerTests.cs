@@ -1,5 +1,6 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
@@ -26,6 +27,7 @@ public class ItemEstoqueControllerTests
     private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
     private readonly IItemVendaRepository _itemVendaRepository = Substitute.For<IItemVendaRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly ILogger<RegistrarEntradaEstoqueUseCase> _registrarEntradaLogger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
     private readonly ILogger<RegistrarSaidaEstoqueUseCase> _registrarSaidaLogger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
     private readonly RegistrarEntradaEstoqueUseCase _registrarEntradaUseCase;
@@ -65,7 +67,8 @@ public class ItemEstoqueControllerTests
             _registrarEntradaUseCase,
             _registrarSaidaUseCase,
             _reporEstoqueUseCase,
-            _buscarUseCase);
+            _buscarUseCase,
+            _currentUser);
     }
 
     [Fact]

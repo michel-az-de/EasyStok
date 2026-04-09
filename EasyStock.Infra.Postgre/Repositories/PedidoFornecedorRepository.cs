@@ -52,6 +52,15 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
             x.FornecedorId == fornecedorId &&
             (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito));
 
+    public async Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosAbertosComFornecedorAsync(Guid empresaId) =>
+        await dbContext.PedidosFornecedor
+            .AsNoTracking()
+            .Include(x => x.Fornecedor)
+            .Where(x => x.EmpresaId == empresaId &&
+                        (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito))
+            .OrderByDescending(x => x.DataPedido)
+            .ToListAsync();
+
     public async Task<(int QuantidadePedidos, decimal TotalGasto, decimal? LeadTimeRealMedioDias, decimal FrequenciaPedidosPorMes)> GetEstatisticasAsync(Guid empresaId, Guid fornecedorId)
     {
         var pedidos = await dbContext.PedidosFornecedor

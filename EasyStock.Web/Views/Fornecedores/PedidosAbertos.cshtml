@@ -11,17 +11,100 @@
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-gray-900">Pedidos em Aberto</h1>
+    @if (Model.TotalPedidos > 0)
+    {
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+            @Model.TotalPedidos
+        </span>
+    }
 </div>
 
-<div class="ws text-center py-16 text-gray-400">
-    <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-    </svg>
-    <p class="text-sm font-medium text-gray-500 mb-1">Funcionalidade não disponível</p>
-    <p class="text-xs text-gray-400">O histórico de pedidos por fornecedor está disponível na página de detalhe de cada fornecedor.</p>
-    <a asp-action="Index" asp-controller="Fornecedores"
-       class="mt-4 inline-block px-4 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">
-        Ver Fornecedores
-    </a>
-</div>
+@if (Model.TotalPedidos > 0)
+{
+    <!-- Resumo -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div class="ws">
+            <div class="text-sm text-gray-500">Total de pedidos</div>
+            <div class="text-2xl font-bold text-gray-900">@Model.TotalPedidos</div>
+        </div>
+        <div class="ws">
+            <div class="text-sm text-gray-500">Valor total estimado</div>
+            <div class="text-2xl font-bold text-gray-900">R$ @Model.ValorTotal.ToString("N2")</div>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="ws">
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Fornecedor</th>
+                    <th>Data Pedido</th>
+                    <th>Previsao Entrega</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Canal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ped in Model.Pedidos)
+                {
+                    <tr>
+                        <td>
+                            <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
+                               class="font-medium text-indigo-600 hover:text-indigo-700">
+                                @ped.FornecedorNome
+                            </a>
+                        </td>
+                        <td class="text-gray-600">@ped.DataPedido.ToString("dd/MM/yyyy")</td>
+                        <td class="text-gray-600">
+                            @if (ped.PrevisaoEntrega.HasValue)
+                            {
+                                var previsao = ped.PrevisaoEntrega.Value;
+                                var atrasado = previsao.Date < DateTime.Today && ped.Status != 3;
+                                <span class="@(atrasado ? "text-red-600 font-medium" : "")">
+                                    @previsao.ToString("dd/MM/yyyy")
+                                    @if (atrasado)
+                                    {
+                                        <span class="text-xs ml-1">(atrasado)</span>
+                                    }
+                                </span>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                        <td class="text-gray-600">R$ @((ped.ValorEstimado ?? 0).ToString("N2"))</td>
+                        <td>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @ped.StatusCssClass">
+                                @ped.StatusLabel
+                            </span>
+                        </td>
+                        <td class="text-gray-500 text-sm">@(ped.Canal ?? "—")</td>
+                        <td>
+                            <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
+                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="ws text-center py-16 text-gray-400">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-sm font-medium text-gray-500 mb-1">Nenhum pedido em aberto</p>
+        <p class="text-xs text-gray-400">Todos os pedidos foram recebidos ou cancelados.</p>
+        <a asp-action="Index" asp-controller="Fornecedores"
+           class="mt-4 inline-block px-4 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">
+            Ver Fornecedores
+        </a>
+    </div>
+}

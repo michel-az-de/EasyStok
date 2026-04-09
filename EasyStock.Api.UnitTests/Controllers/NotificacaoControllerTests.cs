@@ -1,5 +1,6 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -13,11 +14,12 @@ public class NotificacaoControllerTests
 {
     private readonly INotificacaoRepository _notificacaoRepository = Substitute.For<INotificacaoRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly NotificacaoController _controller;
 
     public NotificacaoControllerTests()
     {
-        _controller = new NotificacaoController(_notificacaoRepository, _unitOfWork);
+        _controller = new NotificacaoController(_notificacaoRepository, _unitOfWork, _currentUser);
     }
 
     [Fact]

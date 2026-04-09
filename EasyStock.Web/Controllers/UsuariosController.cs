@@ -22,11 +22,11 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
                 Id = u.UsuarioId.ToString(),
                 Nome = u.Nome,
                 Email = u.Email,
-                Role = string.Empty
+                Role = u.Nivel
             }).ToList();
 
-            vm.TotalAdmins = 0;
-            vm.TotalColaboradores = vm.Usuarios.Count;
+            vm.TotalAdmins = result.Data!.Count(u => u.Nivel is "Admin" or "SuperAdmin");
+            vm.TotalColaboradores = result.Data!.Count(u => u.Nivel is not "Admin" and not "SuperAdmin");
         }
 
         return View(vm);
@@ -49,7 +49,7 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
             return RedirectToAction(nameof(Index));
         }
 
-        var result = await svc.CriarAsync(empresaId, vm.Nome, vm.Email, vm.Senha);
+        var result = await svc.CriarAsync(empresaId, vm.Nome, vm.Email, vm.Senha, vm.PerfilId, vm.LojaId);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         Toast("success", $"Usuário {vm.Nome} criado com sucesso!");

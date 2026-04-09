@@ -29,6 +29,7 @@ async function buscarProduto(q) {
         if (!r.ok) return [];
         return await r.json();
     } catch {
+        window.showToast('Erro ao buscar produtos.', 'error');
         return [];
     }
 }

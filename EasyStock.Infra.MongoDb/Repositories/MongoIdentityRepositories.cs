@@ -138,6 +138,31 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
                                                       x.FornecedorId == fornecedorId &&
                                                       (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito));
 
+    public async Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosAbertosComFornecedorAsync(Guid empresaId)
+    {
+        var pedidos = await Collection.Find(x => x.EmpresaId == empresaId &&
+                                                  (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito))
+            .SortByDescending(x => x.DataPedido)
+            .ToListAsync();
+
+        if (pedidos.Count == 0)
+            return pedidos;
+
+        var fornecedorIds = pedidos.Select(p => p.FornecedorId).Distinct().ToList();
+        var fornecedores = await Context.GetCollection<Fornecedor>(MongoCollectionNames.Fornecedores)
+            .Find(f => fornecedorIds.Contains(f.Id))
+            .ToListAsync();
+        var fornecedorMap = fornecedores.ToDictionary(f => f.Id);
+
+        foreach (var pedido in pedidos)
+        {
+            if (fornecedorMap.TryGetValue(pedido.FornecedorId, out var fornecedor))
+                pedido.Fornecedor = fornecedor;
+        }
+
+        return pedidos;
+    }
+
     public async Task<(int QuantidadePedidos, decimal TotalGasto, decimal? LeadTimeRealMedioDias, decimal FrequenciaPedidosPorMes)> GetEstatisticasAsync(Guid empresaId, Guid fornecedorId)
     {
         var pedidos = await Collection.Find(x => x.EmpresaId == empresaId && x.FornecedorId == fornecedorId).ToListAsync();

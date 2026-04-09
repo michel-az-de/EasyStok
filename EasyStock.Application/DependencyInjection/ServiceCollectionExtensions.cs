@@ -71,6 +71,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ObterFornecedorDetalheUseCase>();
         services.AddScoped<ObterHistoricoFornecedorUseCase>();
         services.AddScoped<ObterEstatisticasFornecedorUseCase>();
+        services.AddScoped<ListarPedidosAbertosUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

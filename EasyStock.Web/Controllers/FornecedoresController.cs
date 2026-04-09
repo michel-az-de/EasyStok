@@ -100,10 +100,16 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
     }
 
     [HttpGet("/fornecedores/pedidos-abertos")]
-    public IActionResult PedidosAbertos()
+    public async Task<IActionResult> PedidosAbertos()
     {
         ViewBag.Title = "Pedidos em Aberto";
         ViewBag.ActiveMenuItem = "Fornecedores";
-        return View(new Models.ViewModels.Fornecedores.PedidosAbertosViewModel());
+
+        var vm = new PedidosAbertosViewModel();
+        var result = await svc.ListarPedidosAbertosAsync();
+        if (result.Success)
+            vm.Pedidos = result.Data!;
+
+        return View(vm);
     }
 }

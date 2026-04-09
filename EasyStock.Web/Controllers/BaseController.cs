@@ -24,6 +24,14 @@ public abstract class BaseController(SessionService session) : Controller
 
     public override void OnActionExecuting(ActionExecutingContext context)
     {
+        var token = session.GetToken();
+        if (string.IsNullOrEmpty(token))
+        {
+            TempData["Toast"] = "warning|Sessão expirada. Faça login novamente.";
+            context.Result = RedirectToAction("Login", "Auth");
+            return;
+        }
+
         ViewBag.UsuarioNome = session.GetUsuarioNome();
         ViewBag.LojaAtualId = session.GetLojaId();
         ViewBag.LojaAtualNome = session.GetLojaNome();

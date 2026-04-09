@@ -9,7 +9,7 @@ BenchmarkRunner.Run<ProdutoRepositoryBenchmarks>();
 [MemoryDiagnoser]
 public class ProdutoRepositoryBenchmarks
 {
-    private ProdutoRepository _repository;
+    private ProdutoRepository _repository = null!;
     private Guid _empresaId = Guid.NewGuid();
 
     [GlobalSetup]
