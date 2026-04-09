@@ -15,8 +15,7 @@ public class MovimentacoesViewModel
 public class MovimentacaoItem
 {
     public string Tipo { get; set; } = string.Empty;
-    public string ProdutoNome { get; set; } = string.Empty;
-    public string? VariacaoNome { get; set; }
+    public string Resumo { get; set; } = string.Empty;
     public int Qty { get; set; }
     public decimal? Valor { get; set; }
     public DateOnly Data { get; set; }

@@ -54,7 +54,7 @@
             <thead>
                 <tr>
                     <th>Tipo</th>
-                    <th>Produto</th>
+                    <th>Resumo</th>
                     <th>Qtd</th>
                     <th>Valor</th>
                     <th>Data</th>
@@ -73,11 +73,7 @@
                             <span class="text-sm text-gray-600 ml-1 capitalize">@m.Tipo</span>
                         </td>
                         <td>
-                            <div class="font-medium text-gray-900 text-sm">@m.ProdutoNome</div>
-                            @if (!string.IsNullOrEmpty(m.VariacaoNome))
-                            {
-                                <div class="text-xs text-gray-400">@m.VariacaoNome</div>
-                            }
+                            <div class="font-medium text-gray-900 text-sm">@m.Resumo</div>
                         </td>
                         <td class="font-medium">@m.Qty</td>
                         <td>

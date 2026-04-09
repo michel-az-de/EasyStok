@@ -74,19 +74,14 @@
                     {
                         <tr>
                             <td>
-                                <div class="font-medium text-sm">@(s.Produto?.Nome ?? s.ProdutoId)</div>
-                                @if (s.Variacao != null)
-                                {
-                                    <div class="text-xs text-gray-400">@s.Variacao.Nome</div>
-                                }
+                                <div class="font-medium text-sm">@(s.NomeProduto ?? s.CodigoInterno ?? s.ProdutoId)</div>
                             </td>
-                            <td class="text-red-600 font-medium">@s.Qty</td>
-                            <td class="text-gray-500">@s.Sku</td>
+                            <td class="text-red-600 font-medium">@s.QuantidadeAtual</td>
+                            <td class="text-gray-500">@s.QuantidadeMinima</td>
                             <td>
-                                @if (s.Validade.HasValue)
+                                @if (s.DiasAteRuptura.HasValue)
                                 {
-                                    var dias = s.Validade.Value.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
-                                    <span class="badge-critical">@dias d</span>
+                                    <span class="badge-critical">@s.DiasAteRuptura d</span>
                                 }
                             </td>
                         </tr>
