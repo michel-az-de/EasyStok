@@ -8,13 +8,13 @@ namespace EasyStock.Domain.ValueObjects
 
         private Validade(DateTime dataValidade)
         {
-            // Normalize to date only (sem tempo) para comparações domain-friendly
+            // Normalize to date only (sem tempo) para comparaÃ§Ãµes domain-friendly
             DataValidade = dataValidade.Date;
         }
 
         public static Validade From(DateTime dataValidade)
         {
-            // Considerar validade no passado ainda é válido para representar um lote vencido; permitir.
+            // Considerar validade no passado ainda Ã© vÃ¡lido para representar um lote vencido; permitir.
             return new Validade(dataValidade);
         }
 
@@ -32,7 +32,7 @@ namespace EasyStock.Domain.ValueObjects
 
         public bool EstaProntoParaVencerEm(int dias, DateTime? referencia = null)
         {
-            if (dias < 0) throw new ArgumentOutOfRangeException(nameof(dias), "Dias não pode ser negativo.");
+            if (dias < 0) throw new ArgumentOutOfRangeException(nameof(dias), "Dias nÃ£o pode ser negativo.");
             return DiasAteVencimento(referencia) <= dias;
         }
 

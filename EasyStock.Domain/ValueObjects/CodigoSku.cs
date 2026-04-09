@@ -13,13 +13,13 @@ namespace EasyStock.Domain.ValueObjects
 
         public static CodigoSku From(string value)
         {
-            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("SKU È obrigatÛrio.", nameof(value));
+            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("SKU √© obrigat√≥rio.", nameof(value));
             var normalized = value.Trim();
             if (normalized.Length > 100) throw new ArgumentException("SKU muito longo.", nameof(value));
             foreach (var ch in normalized)
             {
                 if (!char.IsLetterOrDigit(ch) && ch != '-' && ch != '_')
-                    throw new ArgumentException("SKU contÈm caracteres inv·lidos. Apenas letras, dÌgitos, '-' e '_' s„o permitidos.", nameof(value));
+                    throw new ArgumentException("SKU cont√©m caracteres inv√°lidos. Apenas letras, d√≠gitos, '-' e '_' s√£o permitidos.", nameof(value));
             }
             return new CodigoSku(normalized.ToUpperInvariant());
         }

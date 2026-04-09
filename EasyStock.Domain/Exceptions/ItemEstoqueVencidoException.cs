@@ -2,7 +2,7 @@ using System;
 
 namespace EasyStock.Domain.Exceptions
 {
-    public class ItemEstoqueVencidoException(Guid itemEstoqueId, DateTime dataValidade) : RegraDeDominioVioladaException($"OperaÁ„o inv·lida: item de estoque '{itemEstoqueId}' est· vencido em {dataValidade:yyyy-MM-dd}.")
+    public class ItemEstoqueVencidoException(Guid itemEstoqueId, DateTime dataValidade) : RegraDeDominioVioladaException($"Opera√ß√£o inv√°lida: item de estoque '{itemEstoqueId}' est√° vencido em {dataValidade:yyyy-MM-dd}.")
     {
     }
 }

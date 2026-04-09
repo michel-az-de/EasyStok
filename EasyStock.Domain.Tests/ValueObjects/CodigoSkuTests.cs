@@ -55,7 +55,7 @@ public class CodigoSkuTests
 
         // Assert
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*SKU È obrigatÛrio.*");
+            .WithMessage("*SKU √© obrigat√≥rio.*");
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class CodigoSkuTests
 
         // Assert
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*SKU È obrigatÛrio.*");
+            .WithMessage("*SKU √© obrigat√≥rio.*");
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class CodigoSkuTests
 
         // Assert
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*SKU contÈm caracteres inv·lidos.*");
+            .WithMessage("*SKU cont√©m caracteres inv√°lidos.*");
     }
 
     [Fact]

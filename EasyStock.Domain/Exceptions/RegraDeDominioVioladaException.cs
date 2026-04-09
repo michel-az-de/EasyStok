@@ -5,7 +5,7 @@ namespace EasyStock.Domain.Exceptions
     public class RegraDeDominioVioladaException : Exception
     {
         public RegraDeDominioVioladaException()
-        : base("Violação de regra de domínio.")
+        : base("ViolaÃ§Ã£o de regra de domÃ­nio.")
         {
         }
 

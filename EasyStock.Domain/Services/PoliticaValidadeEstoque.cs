@@ -5,7 +5,7 @@ namespace EasyStock.Domain.Services
 {
     public sealed class PoliticaValidadeEstoque
     {
-        // Decide ações operacionais simples baseadas na validade
+        // Decide aÃ§Ãµes operacionais simples baseadas na validade
         public enum AcaoValidade
         {
             Nenhuma,

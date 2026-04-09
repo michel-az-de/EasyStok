@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         else
         {
             services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
+            services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
         }
 
         return services;

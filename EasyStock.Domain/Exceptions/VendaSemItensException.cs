@@ -2,7 +2,7 @@ using System;
 
 namespace EasyStock.Domain.Exceptions
 {
-    public class VendaSemItensException(Guid vendaId) : RegraDeDominioVioladaException($"Não é possível concluir a venda '{vendaId}': venda sem itens.")
+    public class VendaSemItensException(Guid vendaId) : RegraDeDominioVioladaException($"NÃ£o Ã© possÃ­vel concluir a venda '{vendaId}': venda sem itens.")
     {
     }
 }

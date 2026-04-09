@@ -14,10 +14,10 @@ public class MetricsService
     {
         var meter = meterFactory.Create("EasyStock.Api");
         _entradasEstoqueCounter = meter.CreateCounter<long>("entradas_estoque_total", description: "Total de entradas de estoque registradas");
-        _saidasEstoqueCounter = meter.CreateCounter<long>("saidas_estoque_total", description: "Total de saídas de estoque registradas");
-        _reposicoesEstoqueCounter = meter.CreateCounter<long>("reposicoes_estoque_total", description: "Total de reposições de estoque registradas");
+        _saidasEstoqueCounter = meter.CreateCounter<long>("saidas_estoque_total", description: "Total de saÃ­das de estoque registradas");
+        _reposicoesEstoqueCounter = meter.CreateCounter<long>("reposicoes_estoque_total", description: "Total de reposiÃ§Ãµes de estoque registradas");
         _vendasCounter = meter.CreateCounter<long>("vendas_total", description: "Total de vendas registradas");
-        _falhasOperacaoCounter = meter.CreateCounter<long>("falhas_operacao_total", description: "Total de falhas em operações");
+        _falhasOperacaoCounter = meter.CreateCounter<long>("falhas_operacao_total", description: "Total de falhas em operaÃ§Ãµes");
     }
 
     public void IncrementEntradasEstoque() => _entradasEstoqueCounter.Add(1);
