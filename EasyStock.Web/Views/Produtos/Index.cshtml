@@ -129,8 +129,16 @@
     {
         <div class="text-center py-12 text-slate-400">
             <div class="text-5xl mb-3">📦</div>
-            <p class="font-semibold text-slate-600">Nenhum produto encontrado</p>
-            <p class="text-sm mt-1">Tente ajustar os filtros ou <a href="/produtos/novo" class="text-indigo-600 hover:underline">cadastre um novo produto</a>.</p>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
+            {
+                <p class="font-semibold text-slate-600">Nenhum produto corresponde à busca</p>
+                <p class="text-sm mt-1">Tente outros termos ou <a href="/produtos" class="text-indigo-600 hover:underline">limpe os filtros</a> para ver todos os produtos.</p>
+            }
+            else
+            {
+                <p class="font-semibold text-slate-600">Seu catálogo ainda está vazio</p>
+                <p class="text-sm mt-1">Comece <a href="/produtos/novo" class="text-indigo-600 hover:underline">cadastrando o primeiro produto</a> para controlar seu estoque.</p>
+            }
         </div>
     }
 </div>

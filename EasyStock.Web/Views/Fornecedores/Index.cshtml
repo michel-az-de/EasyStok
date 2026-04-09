@@ -44,8 +44,18 @@
 <div class="ws">
     @if (!Model.Items.Any())
     {
-        <div class="text-center py-12 text-gray-400">
-            <p class="text-sm">Nenhum fornecedor cadastrado</p>
+        <div class="text-center py-16 text-gray-400">
+            <div class="text-5xl mb-3">🏭</div>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FiltroStatus))
+            {
+                <p class="font-semibold text-gray-600">Nenhum fornecedor encontrado para essa busca</p>
+                <p class="text-sm mt-1">Tente outros termos ou <a href="@Url.Action("Index", "Fornecedores")" class="text-indigo-600 hover:underline">limpe os filtros</a> para ver todos os fornecedores.</p>
+            }
+            else
+            {
+                <p class="font-semibold text-gray-600">Nenhum fornecedor cadastrado ainda</p>
+                <p class="text-sm mt-1">Adicione seu primeiro fornecedor para começar a registrar pedidos de compra.</p>
+            }
         </div>
     }
     else
