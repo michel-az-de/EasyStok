@@ -9,6 +9,7 @@ public class SessionService(IHttpContextAccessor acc)
     public string? GetLojaId() => Session.GetString("loja_atual_id");
     public string? GetLojaNome() => Session.GetString("loja_atual_nome");
     public string? GetLojaEmoji() => Session.GetString("loja_atual_emoji");
+    public string? GetEmpresaId() => Session.GetString("empresa_atual_id");
     public string? GetUsuarioId() => Session.GetString("usuario_id");
     public string? GetUsuarioNome() => Session.GetString("usuario_nome");
     public string? GetUsuarioRole() => Session.GetString("usuario_role");
@@ -27,11 +28,13 @@ public class SessionService(IHttpContextAccessor acc)
         Session.SetString("usuario_role", role);
     }
 
-    public void SetLoja(string id, string nome, string? emoji)
+    public void SetLoja(string id, string nome, string? emoji, string? empresaId = null)
     {
         Session.SetString("loja_atual_id", id);
         Session.SetString("loja_atual_nome", nome);
         Session.SetString("loja_atual_emoji", emoji ?? "🏪");
+        if (!string.IsNullOrEmpty(empresaId))
+            Session.SetString("empresa_atual_id", empresaId);
     }
 
     public void Clear()
