@@ -23,7 +23,6 @@ public sealed class RefreshTokenUseCase(
     {
         logger.LogInformation("Iniciando refresh token");
 
-        // Verificar se refresh token existe e e valido
         var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
         if (refreshToken == null || !refreshToken.EstaValido())
@@ -32,7 +31,6 @@ public sealed class RefreshTokenUseCase(
             throw new CredenciaisInvalidasException("Refresh token invalido.");
         }
 
-        // Obter usuario
         var usuario = await usuarioRepository.GetByIdAsync(refreshToken.UsuarioId);
         if (usuario == null || !usuario.Ativo)
         {
@@ -40,23 +38,20 @@ public sealed class RefreshTokenUseCase(
             throw new CredenciaisInvalidasException("Usuario inativo.");
         }
 
-        // Revogar token antigo
         refreshToken.Revogar();
         await refreshTokenRepository.UpdateAsync(refreshToken);
 
-        // Criar novo refresh token
         var novoRefreshTokenValue = Guid.NewGuid().ToString();
         var novoTokenHash = TokenHashHelper.ComputeSha256Hash(novoRefreshTokenValue);
-        var expiraEm = DateTime.UtcNow.AddDays(7); // 7 dias
+        var expiraEm = DateTime.UtcNow.AddDays(7);
         var novoRefreshToken = RefreshTokenEntity.Criar(
             usuario.Id,
             novoTokenHash,
             expiraEm,
-            null, // IP
-            null); // UserAgent
+            null,
+            null);
         await refreshTokenRepository.AddAsync(novoRefreshToken);
 
-        // Gerar novo access token
         var nivel = NivelAcesso.Visualizador;
         IReadOnlyCollection<Permissao> permissoes = [];
         if (usuario.Perfis is not null && usuario.Perfis.Any())
@@ -78,7 +73,6 @@ public sealed class RefreshTokenUseCase(
             permissoes);
         var accessToken = jwtTokenService.GerarToken(autenticarResult);
 
-        // Auditar
         var auditLog = AuditLogEntity.Criar(
             usuario.Id,
             "refresh",

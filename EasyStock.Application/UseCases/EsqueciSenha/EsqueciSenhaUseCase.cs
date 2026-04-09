@@ -27,9 +27,8 @@ public sealed class EsqueciSenhaUseCase(
             return new EsqueciSenhaResult(true);
         }
 
-        // Gerar token
         var token = Guid.NewGuid().ToString();
-        var expiraEm = DateTime.UtcNow.AddHours(1); // 1 hora
+        var expiraEm = DateTime.UtcNow.AddHours(1);
         var resetToken = ResetToken.Criar(
             usuario.Id,
             token,
@@ -38,7 +37,6 @@ public sealed class EsqueciSenhaUseCase(
             null);
         await resetTokenRepository.AddAsync(resetToken);
 
-        // Auditar
         var auditLog = AuditLog.Criar(
             usuario.Id,
             "forgot-password",

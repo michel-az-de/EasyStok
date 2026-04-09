@@ -29,13 +29,11 @@ public sealed class AlterarSenhaUseCase(
             throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
         }
 
-        // Verificar senha atual
         if (!BCrypt.Net.BCrypt.Verify(command.SenhaAtual, usuario.SenhaHash))
         {
             throw new CredenciaisInvalidasException("Senha atual incorreta.");
         }
 
-        // Atualizar senha
         usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(command.NovaSenha);
         usuario.AlteradoEm = DateTime.UtcNow;
 

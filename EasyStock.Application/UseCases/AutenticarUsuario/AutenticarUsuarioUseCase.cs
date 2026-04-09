@@ -33,7 +33,6 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             if (usuario is null || !usuario.Ativo)
                 throw new CredenciaisInvalidasException();
 
-            // Verificar lockout
             if (usuario.EstaBloqueado())
             {
                 logger.LogWarning("Tentativa de login para usuario bloqueado: {Email}", command.Email);
@@ -53,7 +52,6 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 throw new CredenciaisInvalidasException();
             }
 
-            // Resetar tentativas em login bem-sucedido
             usuario.ResetarTentativasFalha();
 
             if (command.EmpresaId.HasValue)

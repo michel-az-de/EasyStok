@@ -5,7 +5,7 @@ using Testcontainers.MongoDb;
 
 namespace EasyStock.Api.IntegrationTests;
 
-public class UnitTest1 : IAsyncLifetime
+public class MongoDbHealthCheckTests : IAsyncLifetime
 {
     private MongoDbContainer? _container;
     private bool _isAvailable;
