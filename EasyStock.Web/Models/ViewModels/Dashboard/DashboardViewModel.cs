@@ -3,8 +3,8 @@ namespace EasyStock.Web.Models.ViewModels.Dashboard;
 public class DashboardViewModel
 {
     public int TotalProdutos { get; set; }
-    public int EntradasMes { get; set; }
-    public int VendasMes { get; set; }
+    public int QuantidadeTotalEmEstoque { get; set; }
+    public decimal ValorEstoque { get; set; }
     public decimal ReceitaMes { get; set; }
 
     public int EstoqueCritico { get; set; }
@@ -19,8 +19,9 @@ public class DashboardViewModel
 
 public class MovimentacaoRecente
 {
-    public string ProdutoNome { get; set; } = string.Empty;
     public string Tipo { get; set; } = string.Empty;
+    public int TotalMovimentacoes { get; set; }
     public int Qty { get; set; }
+    public decimal? Valor { get; set; }
     public DateOnly Data { get; set; }
 }

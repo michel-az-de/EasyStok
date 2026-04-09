@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Analytics;
 using EasyStock.Web.Services;
@@ -16,33 +15,37 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
 
         var vm = new AnalyticsViewModel();
 
-        var (dashResult, reposResult, alertasResult) = (
-            await svc.DashboardAsync(),
-            await svc.ReposicaoAsync(),
-            await svc.AlertasAsync()
+        var (dashTask, reposTask, alertasTask, receitaTask) = (
+            svc.DashboardAsync(),
+            svc.ReposicaoAsync(),
+            svc.AlertasAsync(),
+            svc.ReceitaAsync()
         );
+        var (dashResult, reposResult, alertasResult, receitaResult) =
+            (await dashTask, await reposTask, await alertasTask, await receitaTask);
 
-        if (dashResult.Success && dashResult.Data is JsonElement dash)
+        if (dashResult.Success && dashResult.Data is { } dash)
         {
-            if (dash.TryGetProperty("receitaEstimadaPeriodo", out var r)) vm.ReceitaTotal = r.GetDecimal();
-            if (dash.TryGetProperty("quantidadeTotalEmEstoque", out var te)) vm.TotalEstoque = te.GetInt32();
-            if (dash.TryGetProperty("valorTotalEstoque", out var ve)) vm.ValorEstoque = ve.GetDecimal();
+            vm.ReceitaEstimadaPeriodo = dash.ReceitaEstimadaPeriodo;
+            vm.TotalEstoque = dash.QuantidadeTotalEmEstoque;
+            vm.ValorEstoque = dash.ValorTotalEstoque;
+            vm.MediaVendasDiaria = dash.MediaVendasDiaria;
 
-            // Derive projections from dashboard summary fields
-            if (dash.TryGetProperty("mediaVendasDiaria", out var mvd))
-            {
-                var media = mvd.GetDecimal();
-                vm.ProjUnidadesDia = media;
-                vm.ProjUnidades7d = media * 7;
-                vm.VelMedia = media;
-            }
-            if (dash.TryGetProperty("projecaoVendasPeriodo", out var pvp))
-            {
-                var proj = pvp.GetDecimal();
-                vm.UnidadesVendidas = proj;
-                vm.ProjUnidades30d = proj;
-            }
-            if (dash.TryGetProperty("receitaEstimadaPeriodo", out var rep)) vm.ProjReceita30d = rep.GetDecimal();
+            vm.ProjUnidadesDia = dash.MediaVendasDiaria;
+            vm.ProjUnidades7d = dash.MediaVendasDiaria * 7;
+            vm.ProjUnidades30d = dash.MediaVendasDiaria * 30;
+            vm.ProjReceita30d = dash.ReceitaEstimadaPeriodo;
+        }
+
+        if (receitaResult.Success && receitaResult.Data is { } receita && receita.Count > 0)
+        {
+            var ultimo = receita.OrderByDescending(r => r.Ano).ThenByDescending(r => r.Mes).First();
+            vm.UnidadesVendidasMes = ultimo.TotalItensVendidos;
+            vm.ReceitaMes = ultimo.ReceitaBruta;
+
+            var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
+            vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
+            vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
         }
 
         if (reposResult.Success)
