@@ -26,6 +26,13 @@ public class EntradasController(EntradasService svc, SessionService session) : B
             return View("Nova", vm);
         }
 
+        if (!ValidarProdutoId(vm))
+        {
+            ViewBag.Title = "Nova Entrada";
+            ViewBag.ActiveMenuItem = "Entradas";
+            return View("Nova", vm);
+        }
+
         var result = await svc.CriarEntradaAsync(vm);
         if (HasError(result))
         {
@@ -51,6 +58,13 @@ public class EntradasController(EntradasService svc, SessionService session) : B
     public async Task<IActionResult> SalvarReposicao(EntradaFormViewModel vm)
     {
         if (!ModelState.IsValid)
+        {
+            ViewBag.Title = "Reposição Rápida";
+            ViewBag.ActiveMenuItem = "Entradas";
+            return View("Reposicao", vm);
+        }
+
+        if (!ValidarProdutoId(vm))
         {
             ViewBag.Title = "Reposição Rápida";
             ViewBag.ActiveMenuItem = "Entradas";
@@ -94,5 +108,13 @@ public class EntradasController(EntradasService svc, SessionService session) : B
             }
         };
         return View(vm);
+    }
+
+    private bool ValidarProdutoId(EntradaFormViewModel vm)
+    {
+        if (!string.IsNullOrEmpty(vm.ProdutoId) && Guid.TryParse(vm.ProdutoId, out _))
+            return true;
+        ModelState.AddModelError("ProdutoId", "Selecione um produto válido.");
+        return false;
     }
 }

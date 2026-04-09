@@ -72,7 +72,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
 
         // Compute KPIs
         vm.TotalUnidades = vm.Itens.Sum(s => s.Qty);
-        vm.ReceitaTotal = vm.Itens.Where(s => s.Custo.HasValue).Sum(s => s.Custo!.Value);
+        vm.ReceitaTotal = vm.Itens.Where(s => s.ValorTotal is not null).Sum(s => s.ValorTotal!.Valor);
         vm.TotalVendas = vm.Itens.Count(s => s.Natureza.Equals("Venda", StringComparison.OrdinalIgnoreCase));
         vm.TotalPerdas = vm.Itens.Count(s => s.Natureza.Equals("Perda", StringComparison.OrdinalIgnoreCase));
 

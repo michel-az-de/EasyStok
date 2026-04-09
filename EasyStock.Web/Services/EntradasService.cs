@@ -3,8 +3,11 @@ using EasyStock.Web.Models.ViewModels.Entradas;
 
 namespace EasyStock.Web.Services;
 
-public class EntradasService(ApiClient api)
+public class EntradasService(ApiClient api, SessionService session)
 {
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+
     public Task<ApiResult<PagedResult<Movimentacao>>> HistoricoAsync(
         int page = 1, string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
     {
@@ -24,17 +27,28 @@ public class EntradasService(ApiClient api)
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
-    public Task<ApiResult<object>> CriarEntradaAsync(EntradaFormViewModel vm) =>
-        api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Compra"));
+    public async Task<ApiResult<object>> CriarEntradaAsync(EntradaFormViewModel vm)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
+        return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Compra", empresaId));
+    }
 
     // Reposição rápida: the UI selects by ProdutoId; the API's reposicao endpoint requires an
     // existing ItemEstoqueId. We instead call the entrada endpoint with Natureza=Reposicao so
     // the contract is satisfied without requiring ItemEstoqueId on the form.
-    public Task<ApiResult<object>> ReposicaoAsync(EntradaFormViewModel vm) =>
-        api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Reposicao"));
-
-    private static object BuildEntradaBody(EntradaFormViewModel vm, string natureza) => new
+    public async Task<ApiResult<object>> ReposicaoAsync(EntradaFormViewModel vm)
     {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
+        return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Reposicao", empresaId));
+    }
+
+    private static object BuildEntradaBody(EntradaFormViewModel vm, string natureza, Guid empresaId) => new
+    {
+        empresaId,
         produtoId = Guid.TryParse(vm.ProdutoId, out var pid) ? pid : Guid.Empty,
         produtoVariacaoId = Guid.TryParse(vm.VarId, out var vid) ? vid : (Guid?)null,
         quantidade = vm.Qty,
