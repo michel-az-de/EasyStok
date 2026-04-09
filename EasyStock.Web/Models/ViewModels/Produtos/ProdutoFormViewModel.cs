@@ -18,6 +18,10 @@ public class ProdutoFormViewModel
 
     public string? Marca { get; set; }
 
+    public string? CodigoBarras { get; set; }
+
+    public bool ControlaValidade { get; set; }
+
     public decimal? PrecoReferencia { get; set; }
 
     public decimal? CustoReferencia { get; set; }
