@@ -7,17 +7,17 @@ public class AnalyticsViewModel
     public decimal ReceitaTotal { get; set; }
     public int TotalEstoque { get; set; }
     public decimal ValorEstoque { get; set; }
-    public int UnidadesVendidas { get; set; }
+    public decimal UnidadesVendidas { get; set; }
     public decimal VelMedia { get; set; }
 
-    // Projeções
+    // Projeções (derivadas do resumo do dashboard)
     public decimal ProjUnidadesDia { get; set; }
     public decimal ProjUnidades7d { get; set; }
     public decimal ProjUnidades30d { get; set; }
     public decimal ProjReceita30d { get; set; }
 
     // Listas
-    public List<EstoqueSku> ItensReposicaoUrgente { get; set; } = [];
+    public List<ReposicaoSugerida> ItensReposicaoUrgente { get; set; } = [];
     public List<ProdutoSazonalidade> BoardSazonalidade { get; set; } = [];
     public List<AlertaItem> Alertas { get; set; } = [];
 }
