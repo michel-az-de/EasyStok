@@ -8,15 +8,17 @@ public class UsuariosService(ApiClient api)
         api.GetAsync<List<Usuario>>("usuarios");
 
     public Task<ApiResult<object>> CriarAsync(string empresaId, string nome, string email, string senha) =>
-        api.PostAsync<object>("usuarios", new
-        {
-            empresaId = Guid.TryParse(empresaId, out var eid) ? eid : Guid.Empty,
-            nome,
-            email,
-            senha,
-            perfilId = (Guid?)null,
-            lojaId = (Guid?)null
-        });
+        Guid.TryParse(empresaId, out var eid) && eid != Guid.Empty
+            ? api.PostAsync<object>("usuarios", new
+            {
+                empresaId = eid,
+                nome,
+                email,
+                senha,
+                perfilId = (Guid?)null,
+                lojaId = (Guid?)null
+            })
+            : Task.FromResult(ApiResult<object>.Fail("EMPRESA_NAO_IDENTIFICADA", "Não foi possível identificar a empresa do usuário atual."));
 
     public Task<ApiResult<object>> EditarAsync(string id, string nome) =>
         Guid.TryParse(id, out var uid)

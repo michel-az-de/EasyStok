@@ -43,7 +43,13 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
             return RedirectToAction(nameof(Index));
         }
 
-        var empresaId = ExtractEmpresaId(session.GetToken()) ?? session.GetLojaId() ?? string.Empty;
+        var empresaId = ExtractEmpresaId(session.GetToken()) ?? session.GetLojaId();
+        if (string.IsNullOrEmpty(empresaId))
+        {
+            Toast("error", "Não foi possível identificar a empresa. Faça login novamente.");
+            return RedirectToAction(nameof(Index));
+        }
+
         var result = await svc.CriarAsync(empresaId, vm.Nome, vm.Email, vm.Senha);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
