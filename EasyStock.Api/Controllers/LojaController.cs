@@ -15,7 +15,7 @@ namespace EasyStock.Api.Controllers;
 [SwaggerTag("Stores / Lojas")]
 [ApiController]
 [Route("api/lojas")]
-[Authorize(Policy = "Gerente")]
+[Authorize]
 public class LojaController(
     CriarLojaUseCase criarUseCase,
     AtualizarLojaUseCase atualizarUseCase,
@@ -29,10 +29,10 @@ public class LojaController(
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
 
-        var lojas = await listarUseCase.ExecuteAsync(new ListarLojasQuery(empresaId));
+        var lojas = await listarUseCase.ExecuteAsync(new ListarLojasQuery(resolvedEmpresaId));
         return DataOk(lojas);
     }
 
@@ -40,6 +40,7 @@ public class LojaController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Gerente")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CriarLojaCommand command)
     {
@@ -55,6 +56,7 @@ public class LojaController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarLojaCommand command)
     {
@@ -73,6 +75,7 @@ public class LojaController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {

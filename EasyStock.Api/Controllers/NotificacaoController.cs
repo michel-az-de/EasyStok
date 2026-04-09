@@ -13,7 +13,8 @@ namespace EasyStock.Api.Controllers;
 [Route("api/notificacoes")]
 public class NotificacaoController(
     INotificacaoRepository notificacaoRepository,
-    IUnitOfWork unitOfWork) : EasyStockControllerBase
+    IUnitOfWork unitOfWork,
+    EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List notifications (paginated)", Description = "Filter by read status and alert type.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -26,7 +27,10 @@ public class NotificacaoController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(empresaId, lida, tipo, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -36,7 +40,10 @@ public class NotificacaoController(
     [HttpGet("badge")]
     public async Task<IActionResult> GetBadge([FromQuery] Guid empresaId)
     {
-        var count = await notificacaoRepository.CountNaoLidasAsync(empresaId);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var count = await notificacaoRepository.CountNaoLidasAsync(resolvedEmpresaId);
         return DataOk(new { count });
     }
 
@@ -50,6 +57,8 @@ public class NotificacaoController(
     {
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
         if (notificacao == null) return DataNotFound();
+        if (!TryResolveEmpresaId(currentUser, notificacao.EmpresaId, out _, out var error))
+            return error!;
 
         notificacao.MarcarComoLida();
         await notificacaoRepository.UpdateAsync(notificacao);
@@ -65,7 +74,10 @@ public class NotificacaoController(
     [HttpPost("marcar-todas")]
     public async Task<IActionResult> MarcarTodasLidas([FromQuery] Guid empresaId)
     {
-        await notificacaoRepository.MarcarTodasComoLidasAsync(empresaId);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await notificacaoRepository.MarcarTodasComoLidasAsync(resolvedEmpresaId);
         await unitOfWork.CommitAsync();
         return NoContent();
     }
@@ -79,6 +91,8 @@ public class NotificacaoController(
     {
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
         if (notificacao == null) return DataNotFound();
+        if (!TryResolveEmpresaId(currentUser, notificacao.EmpresaId, out _, out var error))
+            return error!;
 
         await notificacaoRepository.DeleteAsync(id);
         await unitOfWork.CommitAsync();

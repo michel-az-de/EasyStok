@@ -12,7 +12,9 @@ namespace EasyStock.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/movimentacoes")]
-public class MovimentacaoController(IMovimentacaoEstoqueRepository movimentacaoRepository) : EasyStockControllerBase
+public class MovimentacaoController(
+    IMovimentacaoEstoqueRepository movimentacaoRepository,
+    EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List stock movements (paginated)", Description = "Filter by date range and movement type (ENTRADA/SAIDA).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -26,8 +28,11 @@ public class MovimentacaoController(IMovimentacaoEstoqueRepository movimentacaoR
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
-            empresaId, de, ate, tipo, page, pageSize);
+            resolvedEmpresaId, de, ate, tipo, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 

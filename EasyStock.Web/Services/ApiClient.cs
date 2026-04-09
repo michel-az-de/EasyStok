@@ -160,10 +160,11 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
-                // Unwrap { data: T } envelope if present
-                JsonElement dataEl = root.TryGetProperty("data", out var d) ? d : root;
+                JsonElement payload = IsPagedResultType(typeof(T))
+                    ? root
+                    : root.TryGetProperty("data", out var d) ? d : root;
 
-                var data = dataEl.Deserialize<T>(JsonOpts);
+                var data = payload.Deserialize<T>(JsonOpts);
                 return data is null
                     ? ApiResult<T>.Fail("EMPTY_RESPONSE", "Resposta vazia do servidor.", status)
                     : ApiResult<T>.Ok(data) with { HttpStatus = status };
@@ -222,4 +223,6 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             return ApiResult<T>.Fail("API_ERROR", "Erro na requisição.", status);
         }
     }
+    private static bool IsPagedResultType(Type type) =>
+        type.IsGenericType && type.GetGenericTypeDefinition() == typeof(PagedResult<>);
 }

@@ -28,6 +28,11 @@ public class SessionService(IHttpContextAccessor acc)
         Session.SetString("usuario_role", role);
     }
 
+    public void SetEmpresaId(string empresaId)
+    {
+        Session.SetString("empresa_atual_id", empresaId);
+    }
+
     public void SetLoja(string id, string nome, string? emoji, string? empresaId = null)
     {
         Session.SetString("loja_atual_id", id);

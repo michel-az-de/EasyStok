@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyStock.Web.Models.ViewModels.Usuarios;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -43,7 +42,7 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
             return RedirectToAction(nameof(Index));
         }
 
-        var empresaId = ExtractEmpresaId(session.GetToken()) ?? session.GetLojaId();
+        var empresaId = session.GetEmpresaId();
         if (string.IsNullOrEmpty(empresaId))
         {
             Toast("error", "Não foi possível identificar a empresa. Faça login novamente.");
@@ -85,32 +84,4 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>Decodes the JWT payload to extract the empresaId claim, without signature verification.</summary>
-    private static string? ExtractEmpresaId(string? token)
-    {
-        if (string.IsNullOrEmpty(token)) return null;
-        var parts = token.Split('.');
-        if (parts.Length < 2) return null;
-
-        var payload = parts[1];
-        switch (payload.Length % 4)
-        {
-            case 2: payload += "=="; break;
-            case 3: payload += "="; break;
-        }
-        payload = payload.Replace('-', '+').Replace('_', '/');
-
-        try
-        {
-            var bytes = Convert.FromBase64String(payload);
-            using var doc = JsonDocument.Parse(bytes);
-            return doc.RootElement.TryGetProperty("empresaId", out var v) && v.ValueKind == JsonValueKind.String
-                ? v.GetString()
-                : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
 }

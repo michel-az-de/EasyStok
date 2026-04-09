@@ -361,7 +361,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 var app = builder.Build();
 
 // Migration automática e seed de dados (somente PostgreSQL)
-if (databaseProvider.Trim().ToLowerInvariant() is "postgres" or "postgresql")
+if (resolvedProvider is "postgresql")
 {
     try
     {

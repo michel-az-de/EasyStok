@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace EasyStock.Web.Services;
 
@@ -14,36 +15,29 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
         var isAuthRoute = request.RequestUri?.PathAndQuery.Contains("/auth/", StringComparison.OrdinalIgnoreCase) == true;
         var token = session.GetToken();
         var lojaId = session.GetLojaId();
+        var empresaId = session.GetEmpresaId();
+        HttpRequestMessage? retryRequest = null;
 
-        // Inject Bearer token + X-Loja-ID for authenticated requests
         if (!isAuthRoute && !string.IsNullOrEmpty(token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            retryRequest = await CloneRequestAsync(request, ct);
 
             if (!string.IsNullOrEmpty(lojaId))
             {
                 request.Headers.TryAddWithoutValidation("X-Loja-ID", lojaId);
+                retryRequest!.Headers.TryAddWithoutValidation("X-Loja-ID", lojaId);
+            }
 
-                // Inject empresaId as query param from session (empresa context, not loja)
-                var empresaId = session.GetEmpresaId();
-                if (!string.IsNullOrEmpty(empresaId))
-                {
-                    var uri = request.RequestUri!;
-                    var uriBuilder = new UriBuilder(uri);
-                    var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
-                    if (string.IsNullOrEmpty(query["empresaId"]))
-                    {
-                        query["empresaId"] = empresaId;
-                        uriBuilder.Query = query.ToString();
-                        request.RequestUri = uriBuilder.Uri;
-                    }
-                }
+            if (!string.IsNullOrEmpty(empresaId))
+            {
+                request.RequestUri = AddQueryString(request.RequestUri, "empresaId", empresaId);
+                retryRequest!.RequestUri = AddQueryString(retryRequest.RequestUri, "empresaId", empresaId);
             }
         }
 
         var response = await base.SendAsync(request, ct);
 
-        // Attempt token refresh on 401
         if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute && !_isRefreshing)
         {
             var refreshToken = session.GetRefreshToken();
@@ -53,12 +47,11 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
                 try
                 {
                     var newToken = await TryRefreshAsync(refreshToken, ct);
-                    if (newToken != null)
+                    if (newToken != null && retryRequest is not null)
                     {
-                        // Retry original request with new token
-                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+                        retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
                         response.Dispose();
-                        response = await base.SendAsync(request, ct);
+                        response = await base.SendAsync(retryRequest, ct);
                     }
                     else
                     {
@@ -117,5 +110,42 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
             log.LogError(ex, "Exception during token refresh");
             return null;
         }
+    }
+
+    private static Uri? AddQueryString(Uri? uri, string key, string value)
+    {
+        if (uri is null) return null;
+
+        var updated = QueryHelpers.AddQueryString(uri.ToString(), key, value);
+        return new Uri(updated, uri.IsAbsoluteUri ? UriKind.Absolute : UriKind.Relative);
+    }
+
+    private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri)
+        {
+            Version = request.Version
+        };
+
+        foreach (var header in request.Headers)
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+        if (request.Content is not null)
+        {
+            var ms = new MemoryStream();
+            await request.Content.CopyToAsync(ms, ct);
+            ms.Position = 0;
+
+            var content = new StreamContent(ms);
+            foreach (var header in request.Content.Headers)
+                content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+            clone.Content = content;
+        }
+
+        foreach (var option in request.Options)
+            clone.Options.Set(new HttpRequestOptionsKey<object?>(option.Key), option.Value);
+
+        return clone;
     }
 }

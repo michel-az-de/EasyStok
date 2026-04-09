@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Http;
@@ -31,6 +33,48 @@ public abstract class EasyStockControllerBase : ControllerBase
     /// <summary>404 with { error: { code: NOT_FOUND, ... } }</summary>
     protected IActionResult DataNotFound(string message = "Recurso nao encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));
+
+    protected bool TryResolveEmpresaId(
+        ICurrentUserAccessor currentUser,
+        Guid? requestedEmpresaId,
+        out Guid empresaId,
+        out IActionResult? error)
+    {
+        error = null;
+        empresaId = requestedEmpresaId.GetValueOrDefault();
+
+        if (currentUser.Nivel == NivelAcesso.SuperAdmin)
+        {
+            if (empresaId == Guid.Empty)
+            {
+                error = DataBadRequest("EmpresaId e obrigatorio.");
+                return false;
+            }
+
+            return true;
+        }
+
+        if (currentUser.EmpresaId != Guid.Empty)
+        {
+            if (requestedEmpresaId.HasValue && requestedEmpresaId.Value != Guid.Empty && requestedEmpresaId.Value != currentUser.EmpresaId)
+            {
+                error = Forbid();
+                empresaId = Guid.Empty;
+                return false;
+            }
+
+            empresaId = currentUser.EmpresaId;
+            return true;
+        }
+
+        if (empresaId == Guid.Empty)
+        {
+            error = DataBadRequest("EmpresaId e obrigatorio.");
+            return false;
+        }
+
+        return true;
+    }
 
     // ── Sorting helpers ──────────────────────────────────────────────────────
 

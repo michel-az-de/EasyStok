@@ -19,7 +19,8 @@ namespace EasyStock.Api.Controllers;
 public class AnalyticsController(
     IAnalyticsRepository analyticsRepository,
     IConfiguracaoLojaRepository configuracaoLojaRepository,
-    IOptions<EasyStockConfiguracoes> config) : EasyStockControllerBase
+    IOptions<EasyStockConfiguracoes> config,
+    EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     private readonly EasyStockConfiguracoes _config = config.Value;
 
@@ -28,7 +29,12 @@ public class AnalyticsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard([FromQuery] Guid empresaId, [FromQuery] int periodo = 30)
-        => DataOk(await analyticsRepository.GetDashboardResumoAsync(empresaId, periodo));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await analyticsRepository.GetDashboardResumoAsync(resolvedEmpresaId, periodo));
+    }
 
     [SwaggerOperation(Summary = "Get stock rupture projections (paginated)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -40,7 +46,10 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (items, totalCount) = await analyticsRepository.GetProjecaoRupturaAsync(empresaId, diasHistorico, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (items, totalCount) = await analyticsRepository.GetProjecaoRupturaAsync(resolvedEmpresaId, diasHistorico, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -54,7 +63,10 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (items, totalCount) = await analyticsRepository.GetSugestaoReposicaoDetalhadaAsync(empresaId, diasHistorico, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (items, totalCount) = await analyticsRepository.GetSugestaoReposicaoDetalhadaAsync(resolvedEmpresaId, diasHistorico, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -63,7 +75,12 @@ public class AnalyticsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("sazonalidade")]
     public async Task<IActionResult> Sazonalidade([FromQuery] Guid empresaId, [FromQuery] Guid produtoId, [FromQuery] int meses = 12)
-        => DataOk(await analyticsRepository.GetSazonalidadeAsync(empresaId, produtoId, meses));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await analyticsRepository.GetSazonalidadeAsync(resolvedEmpresaId, produtoId, meses));
+    }
 
     [SwaggerOperation(Summary = "Get stock alerts (paginated)", Description = "Returns low-stock and expiry alerts within a time window.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -76,8 +93,11 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var diasEfetivos = dias ?? await ObterDiasAlertaValidadeAsync(lojaId);
-        var (items, totalCount) = await analyticsRepository.GetAlertasValidadeAsync(empresaId, diasEfetivos, page, pageSize);
+        var (items, totalCount) = await analyticsRepository.GetAlertasValidadeAsync(resolvedEmpresaId, diasEfetivos, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -86,7 +106,12 @@ public class AnalyticsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("receita")]
     public async Task<IActionResult> Receita([FromQuery] Guid empresaId, [FromQuery] int meses = 12)
-        => DataOk(await analyticsRepository.GetReceitaPorPeriodoAsync(empresaId, meses));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await analyticsRepository.GetReceitaPorPeriodoAsync(resolvedEmpresaId, meses));
+    }
 
     [SwaggerOperation(Summary = "Get product margin analysis (paginated)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -98,7 +123,10 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await analyticsRepository.GetMargemPorProdutoAsync(empresaId, dias, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await analyticsRepository.GetMargemPorProdutoAsync(resolvedEmpresaId, dias, page, pageSize);
         return DataPaged(result, result.Count, page, pageSize);
     }
 
@@ -113,9 +141,12 @@ public class AnalyticsController(
         [FromQuery] TipoMovimentacaoEstoque? tipo,
         [FromQuery] int diasPadrao = 30)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var dataAte = ate ?? DateTime.UtcNow;
         var dataDe = de ?? dataAte.AddDays(-diasPadrao);
-        return DataOk(await analyticsRepository.GetMovimentacoesResumoAsync(empresaId, dataDe, dataAte, tipo));
+        return DataOk(await analyticsRepository.GetMovimentacoesResumoAsync(resolvedEmpresaId, dataDe, dataAte, tipo));
     }
 
     [SwaggerOperation(Summary = "Get items near expiry (paginated)")]
@@ -129,8 +160,11 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var diasEfetivos = dias ?? await ObterDiasAlertaValidadeAsync(lojaId);
-        var (items, totalCount) = await analyticsRepository.GetAlertasValidadeAsync(empresaId, diasEfetivos, page, pageSize);
+        var (items, totalCount) = await analyticsRepository.GetAlertasValidadeAsync(resolvedEmpresaId, diasEfetivos, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -145,8 +179,11 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var diasEfetivos = diasSemMovimento ?? await ObterDiasAlertaParadoAsync(lojaId);
-        var (items, totalCount) = await analyticsRepository.GetItensParadosDetalhadosAsync(empresaId, diasEfetivos, page, pageSize);
+        var (items, totalCount) = await analyticsRepository.GetItensParadosDetalhadosAsync(resolvedEmpresaId, diasEfetivos, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -160,9 +197,12 @@ public class AnalyticsController(
         [FromQuery] DateTime? ate,
         [FromQuery] int diasPadrao = 30)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var dataAte = ate ?? DateTime.UtcNow;
         var dataDe = de ?? dataAte.AddDays(-diasPadrao);
-        return DataOk(await analyticsRepository.GetVendasPorCanalAsync(empresaId, dataDe, dataAte));
+        return DataOk(await analyticsRepository.GetVendasPorCanalAsync(resolvedEmpresaId, dataDe, dataAte));
     }
 
     private async Task<int> ObterDiasAlertaValidadeAsync(Guid? lojaId)

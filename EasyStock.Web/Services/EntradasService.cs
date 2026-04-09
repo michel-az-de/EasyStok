@@ -6,7 +6,7 @@ namespace EasyStock.Web.Services;
 public class EntradasService(ApiClient api, SessionService session)
 {
     private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<PagedResult<Movimentacao>>> HistoricoAsync(
         int page = 1, string? tipo = null, string? periodoInicio = null, string? periodoFim = null)

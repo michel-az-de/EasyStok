@@ -54,10 +54,12 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.ResetarTentativasFalha();
 
-            if (command.EmpresaId.HasValue)
+            var empresaId = command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario);
+
+            if (empresaId.HasValue)
             {
                 var linkEmpresa = usuario.Empresas?.FirstOrDefault(
-                    e => e.EmpresaId == command.EmpresaId.Value && e.Ativo);
+                    e => e.EmpresaId == empresaId.Value && e.Ativo);
 
                 if (linkEmpresa is null)
                     throw new CredenciaisInvalidasException();
@@ -66,10 +68,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             var nivel = NivelAcesso.Visualizador;
             IReadOnlyCollection<Permissao> permissoes = [];
 
-            if (command.EmpresaId.HasValue && usuario.Perfis is not null)
+            if (empresaId.HasValue && usuario.Perfis is not null)
             {
                 var perfilDaEmpresa = usuario.Perfis
-                    .Where(p => p.EmpresaId == command.EmpresaId.Value)
+                    .Where(p => p.EmpresaId == empresaId.Value)
                     .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
                     .FirstOrDefault();
 
@@ -91,11 +93,22 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             return new AutenticarUsuarioResult(
                 UsuarioId: usuario.Id,
-                EmpresaId: command.EmpresaId,
+                EmpresaId: empresaId,
                 Nome: usuario.Nome,
                 Email: usuario.Email,
                 Nivel: nivel,
                 Permissoes: permissoes);
+        }
+
+        private static Guid? ResolveEmpresaIdPadrao(Domain.Entities.Usuario usuario)
+        {
+            var empresasAtivas = usuario.Empresas?
+                .Where(e => e.Ativo)
+                .Select(e => e.EmpresaId)
+                .Distinct()
+                .ToArray() ?? [];
+
+            return empresasAtivas.Length == 1 ? empresasAtivas[0] : null;
         }
     }
 }

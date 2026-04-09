@@ -5,7 +5,7 @@ namespace EasyStock.Web.Services;
 public class UsuariosService(ApiClient api, SessionService session)
 {
     private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<Usuario>>> ListarAsync() =>
         api.GetAsync<List<Usuario>>($"usuarios?empresaId={GetEmpresaId()}");

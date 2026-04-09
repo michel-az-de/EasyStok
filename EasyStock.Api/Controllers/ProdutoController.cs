@@ -21,7 +21,8 @@ public class ProdutoController(
     CadastrarProdutoUseCase cadastrarProdutoUseCase,
     GerenciarProdutoUseCase gerenciarProdutoUseCase,
     GerenciarVariacaoProdutoUseCase gerenciarVariacaoProdutoUseCase,
-    GerenciarUploadsUseCase gerenciarUploadsUseCase) : EasyStockControllerBase
+    GerenciarUploadsUseCase gerenciarUploadsUseCase,
+    EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List products (paginated)", Description = "Returns a paginated list of products for the given company. Supports sorting by nome, marca, status.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -34,8 +35,11 @@ public class ProdutoController(
         [FromQuery] string? sort = "nome",
         [FromQuery] string? order = "asc")
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         var (produtos, totalCount) = await produtoRepository.GetProdutosPaginadosAsync(
-            empresaId, page, pageSize, sort, NormaliseOrder(order));
+            resolvedEmpresaId, page, pageSize, sort, NormaliseOrder(order));
         return DataPaged(produtos, totalCount, page, pageSize);
     }
 
@@ -46,9 +50,12 @@ public class ProdutoController(
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         try
         {
-            return DataOk(await gerenciarProdutoUseCase.ObterDetalheAsync(empresaId, id));
+            return DataOk(await gerenciarProdutoUseCase.ObterDetalheAsync(resolvedEmpresaId, id));
         }
         catch (UseCaseValidationException)
         {
@@ -61,7 +68,12 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] Guid empresaId, [FromQuery] string termo)
-        => DataOk(await produtoRepository.SearchAsync(empresaId, termo));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await produtoRepository.SearchAsync(resolvedEmpresaId, termo));
+    }
 
     [SwaggerOperation(Summary = "Create new product")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -70,7 +82,10 @@ public class ProdutoController(
     [HttpPost]
     public async Task<IActionResult> Create(CadastrarProdutoCommand command)
     {
-        var result = await cadastrarProdutoUseCase.ExecuteAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await cadastrarProdutoUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId });
         return DataCreated($"/api/produtos/{result.ProdutoId}", result);
     }
 
@@ -85,7 +100,10 @@ public class ProdutoController(
         if (id != command.ProdutoId)
             return DataBadRequest("O id da rota nao corresponde ao ProdutoId informado.");
 
-        await gerenciarProdutoUseCase.AtualizarAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarProdutoUseCase.AtualizarAsync(command with { EmpresaId = resolvedEmpresaId });
         return NoContent();
     }
 
@@ -98,7 +116,10 @@ public class ProdutoController(
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {
-        await gerenciarProdutoUseCase.RemoverAsync(empresaId, id);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarProdutoUseCase.RemoverAsync(resolvedEmpresaId, id);
         return NoContent();
     }
 
@@ -108,7 +129,12 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("{id}/historico")]
     public async Task<IActionResult> GetHistorico(Guid id, [FromQuery] Guid empresaId)
-        => DataOk(await gerenciarProdutoUseCase.ObterHistoricoAsync(empresaId, id));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await gerenciarProdutoUseCase.ObterHistoricoAsync(resolvedEmpresaId, id));
+    }
 
     [SwaggerOperation(Summary = "Get product statistics", Description = "Returns sales velocity, average margin, days without movement.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -116,7 +142,12 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("{id}/estatisticas")]
     public async Task<IActionResult> GetEstatisticas(Guid id, [FromQuery] Guid empresaId)
-        => DataOk(await gerenciarProdutoUseCase.ObterEstatisticasAsync(empresaId, id));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await gerenciarProdutoUseCase.ObterEstatisticasAsync(resolvedEmpresaId, id));
+    }
 
     [SwaggerOperation(Summary = "Create product variant (Gerente only)")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -129,7 +160,10 @@ public class ProdutoController(
         if (id != command.ProdutoId)
             return DataBadRequest("O id da rota nao corresponde ao ProdutoId informado.");
 
-        var result = await gerenciarVariacaoProdutoUseCase.CriarAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await gerenciarVariacaoProdutoUseCase.CriarAsync(command with { EmpresaId = resolvedEmpresaId });
         return DataCreated($"/api/produtos/{id}", result);
     }
 
@@ -145,7 +179,10 @@ public class ProdutoController(
         if (id != command.ProdutoId || vid != command.VariacaoId)
             return DataBadRequest("Os ids da rota nao correspondem aos dados informados.");
 
-        await gerenciarVariacaoProdutoUseCase.AtualizarAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarVariacaoProdutoUseCase.AtualizarAsync(command with { EmpresaId = resolvedEmpresaId });
         return NoContent();
     }
 
@@ -158,7 +195,10 @@ public class ProdutoController(
     [HttpDelete("{id}/variacoes/{vid}")]
     public async Task<IActionResult> DeleteVariacao(Guid id, Guid vid, [FromQuery] Guid empresaId)
     {
-        await gerenciarVariacaoProdutoUseCase.RemoverAsync(empresaId, id, vid);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarVariacaoProdutoUseCase.RemoverAsync(resolvedEmpresaId, id, vid);
         return NoContent();
     }
 
@@ -173,11 +213,14 @@ public class ProdutoController(
         if (file is null || file.Length == 0)
             return DataBadRequest("Arquivo nao informado.");
 
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
         await using var memoryStream = new MemoryStream();
         await file.CopyToAsync(memoryStream, cancellationToken);
 
         var result = await gerenciarUploadsUseCase.UploadFotoProdutoAsync(
-            empresaId, id, file.FileName, file.ContentType, memoryStream.ToArray(), cancellationToken);
+            resolvedEmpresaId, id, file.FileName, file.ContentType, memoryStream.ToArray(), cancellationToken);
 
         return DataOk(result);
     }
@@ -191,7 +234,10 @@ public class ProdutoController(
     [HttpDelete("{id}/fotos/{fotoId}")]
     public async Task<IActionResult> DeleteFoto(Guid id, Guid fotoId, [FromQuery] Guid empresaId, CancellationToken cancellationToken)
     {
-        await gerenciarUploadsUseCase.RemoverFotoProdutoAsync(empresaId, id, fotoId, cancellationToken);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarUploadsUseCase.RemoverFotoProdutoAsync(resolvedEmpresaId, id, fotoId, cancellationToken);
         return NoContent();
     }
 }

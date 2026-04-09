@@ -20,7 +20,8 @@ public class ItemEstoqueController(
     RegistrarEntradaEstoqueUseCase registrarEntradaUseCase,
     RegistrarSaidaEstoqueUseCase registrarSaidaUseCase,
     ReporEstoqueUseCase reporEstoqueUseCase,
-    BuscarEstoqueInteligenteUseCase buscarUseCase) : EasyStockControllerBase
+    BuscarEstoqueInteligenteUseCase buscarUseCase,
+    EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List stock items (paginated)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -31,7 +32,10 @@ public class ItemEstoqueController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, page, pageSize);
         return DataPaged(itens, totalCount, page, pageSize);
     }
 
@@ -43,7 +47,12 @@ public class ItemEstoqueController(
         [FromQuery] Guid empresaId,
         [FromQuery] string termo,
         [FromQuery] int limite = 50)
-        => DataOk(await buscarUseCase.ExecuteAsync(new BuscarEstoqueInteligenteQuery(empresaId, termo, limite)));
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await buscarUseCase.ExecuteAsync(new BuscarEstoqueInteligenteQuery(resolvedEmpresaId, termo, limite)));
+    }
 
     [SwaggerOperation(Summary = "Get stock item details")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -52,7 +61,10 @@ public class ItemEstoqueController(
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
     {
-        var item = await itemEstoqueRepository.GetByIdAsync(empresaId, id);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var item = await itemEstoqueRepository.GetByIdAsync(resolvedEmpresaId, id);
         return item is null ? DataNotFound() : DataOk(item);
     }
 
@@ -63,7 +75,10 @@ public class ItemEstoqueController(
     [HttpPost("entrada")]
     public async Task<IActionResult> RegistrarEntrada(RegistrarEntradaEstoqueCommand command)
     {
-        var result = await registrarEntradaUseCase.ExecuteAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await registrarEntradaUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId });
         return DataCreated($"/api/estoque/{result.ItemEstoqueId}", result);
     }
 
@@ -73,7 +88,12 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("saida")]
     public async Task<IActionResult> RegistrarSaida(RegistrarSaidaEstoqueCommand command)
-        => DataOk(await registrarSaidaUseCase.ExecuteAsync(command));
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await registrarSaidaUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
+    }
 
     [SwaggerOperation(Summary = "Get stock item replenishment data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -82,7 +102,10 @@ public class ItemEstoqueController(
     [HttpGet("{id}/para-reposicao")]
     public async Task<IActionResult> ParaReposicao(Guid id, [FromQuery] Guid empresaId)
     {
-        var item = await itemEstoqueRepository.GetItemComProdutoAsync(empresaId, id);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var item = await itemEstoqueRepository.GetItemComProdutoAsync(resolvedEmpresaId, id);
         return item is null ? DataNotFound() : DataOk(item);
     }
 
@@ -92,5 +115,10 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("reposicao")]
     public async Task<IActionResult> ReporEstoque(ReporEstoqueCommand command)
-        => DataOk(await reporEstoqueUseCase.ExecuteAsync(command));
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        return DataOk(await reporEstoqueUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
+    }
 }

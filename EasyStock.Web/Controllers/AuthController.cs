@@ -47,25 +47,38 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
         session.SetTokens(token, refreshToken ?? string.Empty);
 
-        // Extract user info
+        var empresaId = ExtractClaim(token, "empresaId");
+        if (!string.IsNullOrEmpty(empresaId))
+            session.SetEmpresaId(empresaId);
+
         var usuario = data.TryGetProperty("usuario", out var u) ? u : data;
+        var nivel = GetString(usuario, "nivel") ?? GetString(usuario, "role") ?? "Operador";
         session.SetUsuario(
             GetString(usuario, "id") ?? string.Empty,
             GetString(usuario, "nome") ?? vm.Email,
-            GetString(usuario, "role") ?? "Operador"
+            nivel
         );
 
-        // Sign in with cookie
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, GetString(usuario, "nome") ?? vm.Email),
             new(ClaimTypes.Email, vm.Email),
-            new(ClaimTypes.Role, GetString(usuario, "role") ?? "Operador")
+            new(ClaimTypes.Role, nivel)
         };
+        if (!string.IsNullOrEmpty(empresaId))
+            claims.Add(new Claim("empresaId", empresaId));
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 
-        // Load lojas
+        if (string.IsNullOrEmpty(empresaId))
+        {
+            session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            ModelState.AddModelError(string.Empty, "Nao foi possivel identificar a empresa deste usuario. Se houver mais de uma empresa vinculada, o login precisa ser ajustado antes de continuar.");
+            return View(vm);
+        }
+
         var lojasResult = await api.GetAsync<List<Loja>>("lojas");
         if (lojasResult.Success && lojasResult.Data is { Count: > 0 } lojas)
         {
@@ -109,7 +122,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await api.PostAsync<object>("auth/logout", new { });
+        await api.PostAsync<object>("auth/logout", new { refreshToken = session.GetRefreshToken() ?? string.Empty });
         session.Clear();
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction(nameof(Login));
@@ -117,4 +130,32 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private static string? ExtractClaim(string token, string claimType)
+    {
+        var parts = token.Split('.');
+        if (parts.Length < 2) return null;
+
+        var payload = parts[1];
+        switch (payload.Length % 4)
+        {
+            case 2: payload += "=="; break;
+            case 3: payload += "="; break;
+        }
+
+        payload = payload.Replace('-', '+').Replace('_', '/');
+
+        try
+        {
+            var bytes = Convert.FromBase64String(payload);
+            using var doc = JsonDocument.Parse(bytes);
+            return doc.RootElement.TryGetProperty(claimType, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
