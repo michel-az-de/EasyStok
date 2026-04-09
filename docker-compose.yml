@@ -26,18 +26,15 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       Database__Provider: PostgreSql
-      ConnectionStrings__DefaultConnection: >-
-        Host=pg-easystock.postgres.database.azure.com;Port=5432;Database=easystock;
-        Username=adm_eabefe80;Password=RTNjezbZnmrI1S%*fCdC;
-        SSL Mode=Require;Trust Server Certificate=true
-      ConnectionStrings__Redis: "localhost:6379"
+      ConnectionStrings__DefaultConnection: ${AZURE_PG_CONNECTION:?AZURE_PG_CONNECTION obrigatoria — defina no arquivo .env}
+      ConnectionStrings__Redis: ${REDIS_CONNECTION:-localhost:6379}
       Jwt__Issuer: ${JWT_ISSUER:-EasyStock}
       Jwt__Audience: ${JWT_AUDIENCE:-EasyStock}
-      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY obrigatoria}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY obrigatoria — defina no arquivo .env}
       Jwt__ExpirationMinutes: "60"
       Anthropic__Enabled: "false"
       FileStorage__Provider: Local
-      OpenTelemetry__OtlpEndpoint: "http://localhost:4317"
+      OpenTelemetry__OtlpEndpoint: ${OTLP_ENDPOINT:-http://localhost:4317}
     volumes:
       - uploads-data:/app/uploaded-files
     networks:
