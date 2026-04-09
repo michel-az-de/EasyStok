@@ -219,9 +219,12 @@
                             class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                         ← Voltar
                     </button>
-                    <button type="submit"
+                    <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+                            :disabled="loading"
+                            :class="{ 'opacity-50 cursor-not-allowed': loading }"
                             class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                        Confirmar entrada ✓
+                        <span x-show="!loading">Confirmar entrada ✓</span>
+                        <span x-show="loading" x-cloak>Registrando...</span>
                     </button>
                 </div>
             </div>

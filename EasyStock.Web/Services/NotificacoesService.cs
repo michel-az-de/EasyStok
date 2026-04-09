@@ -6,10 +6,9 @@ public class NotificacoesService(ApiClient api)
 {
     public Task<ApiResult<List<Notificacao>>> ListarAsync(bool? lida = null, string? tipo = null)
     {
-        var qs = "notificacoes";
-        var sep = "?";
-        if (lida.HasValue) { qs += $"{sep}lida={lida.Value.ToString().ToLower()}"; sep = "&"; }
-        if (!string.IsNullOrEmpty(tipo)) qs += $"{sep}tipo={Uri.EscapeDataString(tipo)}";
+        var qs = "notificacoes?page=1&pageSize=200";
+        if (lida.HasValue) qs += $"&lida={lida.Value.ToString().ToLower()}";
+        if (!string.IsNullOrEmpty(tipo)) qs += $"&tipo={Uri.EscapeDataString(tipo)}";
         return api.GetAsync<List<Notificacao>>(qs);
     }
 

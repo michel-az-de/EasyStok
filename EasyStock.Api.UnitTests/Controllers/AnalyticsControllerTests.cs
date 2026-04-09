@@ -1,6 +1,7 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -15,6 +16,7 @@ public class AnalyticsControllerTests
 {
     private readonly IAnalyticsRepository _repo = Substitute.For<IAnalyticsRepository>();
     private readonly IConfiguracaoLojaRepository _configuracaoLojaRepository = Substitute.For<IConfiguracaoLojaRepository>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly AnalyticsController _controller;
 
     public AnalyticsControllerTests()
@@ -24,7 +26,7 @@ public class AnalyticsControllerTests
             DiasAlertaVencimento = 30,
             DiasItemParado = 90
         });
-        _controller = new AnalyticsController(_repo, _configuracaoLojaRepository, config);
+        _controller = new AnalyticsController(_repo, _configuracaoLojaRepository, config, _currentUser);
     }
 
     // helpers

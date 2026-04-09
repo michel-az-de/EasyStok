@@ -8,8 +8,10 @@ public record ProdutoDetalhe
     public string Nome { get; init; } = string.Empty;
     public string? DescricaoBase { get; init; }
     public string? Marca { get; init; }
+    public int Tipo { get; init; }
     public string? SkuBase { get; init; }
     public string? CodigoBarras { get; init; }
+    public bool ControlaValidade { get; init; }
     public int Status { get; init; }
     public decimal? CustoReferencia { get; init; }
     public decimal? PrecoReferencia { get; init; }

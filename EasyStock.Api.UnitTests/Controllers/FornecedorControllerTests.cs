@@ -35,9 +35,10 @@ public class FornecedorControllerTests
         var detalhe = new ObterFornecedorDetalheUseCase(_fornecedorRepository);
         var historico = new ObterHistoricoFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var estatisticas = new ObterEstatisticasFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
+        var pedidosAbertos = new ListarPedidosAbertosUseCase(_pedidoFornecedorRepository);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new FornecedorController(criar, atualizar, desativar, listar, detalhe, historico, estatisticas, _currentUser);
+        _controller = new FornecedorController(criar, atualizar, desativar, listar, detalhe, historico, estatisticas, pedidosAbertos, _currentUser);
     }
 
     [Fact]

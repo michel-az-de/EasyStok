@@ -8,9 +8,9 @@ public class UsuariosService(ApiClient api, SessionService session)
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<Usuario>>> ListarAsync() =>
-        api.GetAsync<List<Usuario>>($"usuarios?empresaId={GetEmpresaId()}");
+        api.GetAsync<List<Usuario>>($"usuarios?empresaId={GetEmpresaId()}&page=1&pageSize=200");
 
-    public Task<ApiResult<object>> CriarAsync(string empresaId, string nome, string email, string senha) =>
+    public Task<ApiResult<object>> CriarAsync(string empresaId, string nome, string email, string senha, Guid? perfilId = null, Guid? lojaId = null) =>
         Guid.TryParse(empresaId, out var eid) && eid != Guid.Empty
             ? api.PostAsync<object>("usuarios", new
             {
@@ -18,8 +18,8 @@ public class UsuariosService(ApiClient api, SessionService session)
                 nome,
                 email,
                 senha,
-                perfilId = (Guid?)null,
-                lojaId = (Guid?)null
+                perfilId,
+                lojaId
             })
             : Task.FromResult(ApiResult<object>.Fail("EMPRESA_NAO_IDENTIFICADA", "Não foi possível identificar a empresa do usuário atual."));
 

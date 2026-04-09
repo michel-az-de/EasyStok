@@ -1,5 +1,6 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
@@ -31,6 +32,7 @@ public class ProdutoControllerTests
     private readonly IFileStorage _fileStorage = Substitute.For<IFileStorage>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<CadastrarProdutoUseCase> _logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly CadastrarProdutoUseCase _cadastrarProdutoUseCase;
     private readonly ProdutoController _controller;
 
@@ -67,7 +69,7 @@ public class ProdutoControllerTests
             _lojaRepository,
             _unitOfWork);
 
-        _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase);
+        _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase, _currentUser);
     }
 
     [Fact]

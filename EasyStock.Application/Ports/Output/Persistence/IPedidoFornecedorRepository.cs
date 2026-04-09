@@ -12,4 +12,5 @@ public interface IPedidoFornecedorRepository
     Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosRecebidosNoPeriodoAsync(Guid empresaId, DateTime de, DateTime ate);
     Task<int> CountPedidosAbertosOuEmTransitoAsync(Guid empresaId, Guid fornecedorId);
     Task<(int QuantidadePedidos, decimal TotalGasto, decimal? LeadTimeRealMedioDias, decimal FrequenciaPedidosPorMes)> GetEstatisticasAsync(Guid empresaId, Guid fornecedorId);
+    Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosAbertosComFornecedorAsync(Guid empresaId);
 }

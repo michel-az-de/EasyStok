@@ -25,6 +25,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.Usuarios
                 .AsNoTracking()
+                .Include(u => u.Perfis!.Where(p => p.EmpresaId == empresaId))
+                    .ThenInclude(up => up.Perfil)
                 .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId));
 
             var total = await query.CountAsync();

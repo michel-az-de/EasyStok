@@ -116,7 +116,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             PrecoReferencia = p.PrecoReferencia,
             CustoReferencia = p.CustoReferencia,
             Status = p.Status,
-            // Tipo e ControlaValidade não retornam no GET /api/produtos/{id} — defaultam para 0/false
+            Tipo = p.Tipo,
+            ControlaValidade = p.ControlaValidade,
             Variacoes = p.Variacoes.Select(v => v.Nome).ToList()
         };
         await LoadCategoriasAsync();

@@ -70,7 +70,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         // Estoque
         var estoquePipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument("EmpresaId", empresaId)),
+            new BsonDocument("$match", new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard))),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", BsonNull.Value },
@@ -96,13 +96,13 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var valorVenda = estoqueData?["ValorVenda"].ToDecimal() ?? 0m;
         var alertasEstoqueBaixo = estoqueData?["AlertasEstoqueBaixo"].ToInt32() ?? 0;
 
-        var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", new BsonDocument("EmpresaId", empresaId)).ToListAsync().ContinueWith(t => t.Result.Count);
+        var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard))).ToListAsync().ContinueWith(t => t.Result.Count);
 
         // Alertas vencimento
         var cutoffValidade = DateTime.UtcNow.AddDays(30);
         var alertasVencimento = await ItensEstoque.CountDocumentsAsync(new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoffValidade) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
         });
@@ -111,7 +111,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var cutoffParado = DateTime.UtcNow.AddDays(-90);
         var alertasParados = await ItensEstoque.CountDocumentsAsync(new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) },
             { "$or", new BsonArray {
                 new BsonDocument("UltimaMovimentacaoEm", BsonNull.Value),
@@ -124,7 +124,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "Tipo", TipoMovimentacaoEstoque.Saida },
                 { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
             }),
@@ -174,7 +174,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "DataVenda", new BsonDocument("$gte", de) }
             }),
             new BsonDocument("$unwind", "$ItensVenda"),
@@ -221,7 +221,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "Tipo", TipoMovimentacaoEstoque.Saida },
                 { "DataMovimentacao", new BsonDocument("$gte", de) },
                 { "ValorUnitario", new BsonDocument("$ne", BsonNull.Value) }
@@ -297,7 +297,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
         var match = new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
         };
         if (tipo.HasValue)
@@ -354,7 +354,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoff) },
                 { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
             }),
@@ -384,7 +384,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var raw = await ItensEstoque.Aggregate<BsonDocument>(pipeline).ToListAsync();
         var totalCount = await ItensEstoque.CountDocumentsAsync(new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoff) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
         });
@@ -418,7 +418,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
         var match = new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) },
             { "$or", new BsonArray {
                 new BsonDocument("UltimaMovimentacaoEm", BsonNull.Value),
@@ -484,8 +484,8 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
-                { "ProdutoId", produtoId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+                { "ProdutoId", new BsonBinaryData(produtoId, GuidRepresentation.Standard) },
                 { "Tipo", TipoMovimentacaoEstoque.Saida },
                 { "DataMovimentacao", new BsonDocument("$gte", de) }
             }),
@@ -541,7 +541,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "Tipo", TipoMovimentacaoEstoque.Saida },
                 { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
             }),
@@ -557,7 +557,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
         var match = new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "$expr", new BsonDocument("$lt", new BsonArray { "$QuantidadeAtual.Value", "$QuantidadeMinima" }) }
         };
 
@@ -633,7 +633,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "Tipo", TipoMovimentacaoEstoque.Saida },
                 { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
             }),
@@ -649,7 +649,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
         var match = new BsonDocument
         {
-            { "EmpresaId", empresaId },
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
         };
 
@@ -716,7 +716,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         {
             new BsonDocument("$match", new BsonDocument
             {
-                { "EmpresaId", empresaId },
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
                 { "DataVenda", new BsonDocument("$gte", de).Add("$lte", ate) }
             }),
             new BsonDocument("$unwind", "$ItensVenda"),

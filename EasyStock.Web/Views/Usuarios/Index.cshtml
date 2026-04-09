@@ -46,8 +46,23 @@
                         <td class="text-gray-500 text-sm">@u.Email</td>
                         <td>
                             <div x-show="!editando">
-                                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                    Usuário
+                                @{
+                                    var badgeClass = u.Role switch
+                                    {
+                                        "SuperAdmin" or "Admin" => "bg-indigo-100 text-indigo-700",
+                                        "Gerente" => "bg-amber-100 text-amber-700",
+                                        _ => "bg-gray-100 text-gray-600"
+                                    };
+                                    var roleLabel = u.Role switch
+                                    {
+                                        "SuperAdmin" => "Super Admin",
+                                        "Admin" => "Administrador",
+                                        "Gerente" => "Gerente",
+                                        _ => "Operador"
+                                    };
+                                }
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @badgeClass">
+                                    @roleLabel
                                 </span>
                             </div>
                             <form asp-action="Editar" asp-controller="Usuarios"

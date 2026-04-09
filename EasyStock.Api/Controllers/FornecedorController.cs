@@ -26,6 +26,7 @@ public class FornecedorController(
     ObterFornecedorDetalheUseCase obterDetalheUseCase,
     ObterHistoricoFornecedorUseCase obterHistoricoUseCase,
     ObterEstatisticasFornecedorUseCase obterEstatisticasUseCase,
+    ListarPedidosAbertosUseCase listarPedidosAbertosUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List suppliers (paginated)", Description = "Supports filtering by active status and text search. Requires Operador role.")]
@@ -48,6 +49,19 @@ public class FornecedorController(
         var (fornecedores, total) = await listarUseCase.ExecuteAsync(
             new ListarFornecedoresQuery(empresaId, page, pageSize, ativo, search, sort, NormaliseOrder(order)));
         return DataPaged(fornecedores, total, page, pageSize);
+    }
+
+    [SwaggerOperation(Summary = "List open purchase orders across all suppliers (Operador only)", Description = "Returns all pedidos with status Aberto or EmTransito, including supplier name.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("pedidos-abertos")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> GetPedidosAbertos([FromQuery] Guid empresaId)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
+        return DataOk(await listarPedidosAbertosUseCase.ExecuteAsync(new ListarPedidosAbertosQuery(empresaId)));
     }
 
     [SwaggerOperation(Summary = "Get supplier details (Operador only)")]

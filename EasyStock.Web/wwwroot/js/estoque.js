@@ -25,7 +25,7 @@ async function fetchCategorias() {
             `<a href="/estoque?categoria=${encodeURIComponent(cat)}" class="ni-sub">${cat}</a>`
         ).join('');
         nav.innerHTML = html;
-    } catch { /* silently ignore */ }
+    } catch { window.showToast('Erro ao carregar categorias.', 'error'); }
 }
 
 async function fetchNotifBadge() {
@@ -47,5 +47,5 @@ async function fetchNotifBadge() {
                 b.classList.remove('hidden');
             });
         }
-    } catch { /* endpoint can be absent in dev */ }
+    } catch { window.showToast('Erro ao carregar notificações.', 'error'); }
 }
