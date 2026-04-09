@@ -18,5 +18,3 @@ public record SkuBaseDto
 {
     public string Value { get; init; } = string.Empty;
 }
-
-

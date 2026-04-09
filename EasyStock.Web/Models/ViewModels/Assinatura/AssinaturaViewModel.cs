@@ -2,23 +2,19 @@ namespace EasyStock.Web.Models.ViewModels.Assinatura;
 
 public class AssinaturaViewModel
 {
-    public EasyStock.Web.Models.Api.Assinatura? PlanoAtual { get; set; }
     public List<PlanoInfo> Planos { get; set; } = [];
-    public List<FaturaInfo> Faturas { get; set; } = [];
 }
 
 public class PlanoInfo
 {
+    public Guid Id { get; set; }
     public string Nome { get; set; } = string.Empty;
-    public decimal Preco { get; set; }
-    public List<string> Features { get; set; } = [];
-    public bool Recomendado { get; set; }
-}
+    public string? Descricao { get; set; }
+    public int LimiteLojas { get; set; }
+    public int LimiteUsuarios { get; set; }
+    public int LimiteProdutos { get; set; }
+    public decimal PrecoMensal { get; set; }
 
-public class FaturaInfo
-{
-    public DateOnly Data { get; set; }
-    public string Descricao { get; set; } = string.Empty;
-    public decimal Valor { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public static string FormatarLimite(int valor) =>
+        valor == -1 ? "Ilimitado" : valor.ToString("N0");
 }

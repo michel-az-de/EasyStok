@@ -35,9 +35,14 @@ public class ProdutosService(ApiClient api, SessionService session)
             marca = vm.Marca,
             tipo = vm.Tipo,
             skuBase = vm.SkuBase,
-            controlaValidade = false,
+            codigoBarras = vm.CodigoBarras,
+            controlaValidade = vm.ControlaValidade,
             custoReferencia = vm.CustoReferencia,
-            precoReferencia = vm.PrecoReferencia
+            precoReferencia = vm.PrecoReferencia,
+            variacoes = vm.Variacoes
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => new { nome = v.Trim(), ativa = true })
+                .ToArray()
         });
 
     public Task<ApiResult<object>> EditarAsync(string id, ProdutoFormViewModel vm) =>
@@ -51,7 +56,8 @@ public class ProdutosService(ApiClient api, SessionService session)
             marca = vm.Marca,
             tipo = vm.Tipo,
             skuBase = vm.SkuBase,
-            controlaValidade = false,
+            codigoBarras = vm.CodigoBarras,
+            controlaValidade = vm.ControlaValidade,
             custoReferencia = vm.CustoReferencia,
             precoReferencia = vm.PrecoReferencia,
             status = vm.Status
@@ -71,12 +77,13 @@ public class ProdutosService(ApiClient api, SessionService session)
         return await api.PostMultipartAsync<object>($"produtos/{id}/fotos", form);
     }
 
-    public Task<ApiResult<object>> AdicionarVariacaoAsync(string id, string nome) =>
+    public Task<ApiResult<object>> AdicionarVariacaoAsync(string id, string nome, string? sku = null) =>
         api.PostAsync<object>($"produtos/{id}/variacoes", new
         {
             empresaId = GetEmpresaId(),
             produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
             nome,
+            sku,
             ativa = true
         });
 

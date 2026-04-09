@@ -2,43 +2,52 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class FornecedoresService(ApiClient api)
+public class FornecedoresService(ApiClient api, SessionService session)
 {
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+
     public Task<ApiResult<List<Fornecedor>>> ListarAsync(string? status = null, string? search = null)
     {
-        var qs = "fornecedores";
-        var sep = "?";
-        if (!string.IsNullOrEmpty(status)) { qs += $"{sep}status={Uri.EscapeDataString(status)}"; sep = "&"; }
-        if (!string.IsNullOrEmpty(search)) qs += $"{sep}search={Uri.EscapeDataString(search)}";
+        var qs = $"fornecedores?empresaId={GetEmpresaId()}";
+        if (status == "ativo") qs += "&ativo=true";
+        else if (status == "inativo") qs += "&ativo=false";
+        if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
         return api.GetAsync<List<Fornecedor>>(qs);
     }
 
     public Task<ApiResult<Fornecedor>> ObterAsync(string id) =>
-        api.GetAsync<Fornecedor>($"fornecedores/{id}");
+        api.GetAsync<Fornecedor>($"fornecedores/{id}?empresaId={GetEmpresaId()}");
 
-    public Task<ApiResult<Fornecedor>> CriarAsync(object body) =>
-        api.PostAsync<Fornecedor>("fornecedores", body);
+    public Task<ApiResult<Fornecedor>> CriarAsync(
+        string nome, string? documento, string? contato, string? email, string? telefone,
+        int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
+        string? pedidoMinimo, string? fretePadrao, string? observacoes) =>
+        api.PostAsync<Fornecedor>("fornecedores", new
+        {
+            empresaId = GetEmpresaId(),
+            nome, documento, contato, email, telefone, leadTimeEstimadoDias,
+            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
+        });
 
-    public Task<ApiResult<object>> EditarAsync(string id, object body) =>
-        api.PatchAsync<object>($"fornecedores/{id}", body);
+    public Task<ApiResult<object>> EditarAsync(string id,
+        string nome, string? documento, string? contato, string? email, string? telefone,
+        int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
+        string? pedidoMinimo, string? fretePadrao, string? observacoes) =>
+        api.PatchAsync<object>($"fornecedores/{id}", new
+        {
+            fornecedorId = Guid.TryParse(id, out var fid) ? fid : Guid.Empty,
+            empresaId = GetEmpresaId(),
+            nome, documento, contato, email, telefone, leadTimeEstimadoDias,
+            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
+        });
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
-        api.DeleteAsync($"fornecedores/{id}");
+        api.DeleteAsync($"fornecedores/{id}?empresaId={GetEmpresaId()}");
 
-    public Task<ApiResult<List<PedidoFornecedor>>> ListarPedidosAbertosAsync()
-    {
-        return api.GetAsync<List<PedidoFornecedor>>("fornecedores/pedidos?status=aberto,em_transito");
-    }
+    public Task<ApiResult<List<FornecedorHistoricoItem>>> ObterHistoricoAsync(string id) =>
+        api.GetAsync<List<FornecedorHistoricoItem>>($"fornecedores/{id}/historico?empresaId={GetEmpresaId()}");
 
-    public Task<ApiResult<object>> CriarPedidoAsync(string fornId, object body) =>
-        api.PostAsync<object>($"fornecedores/{fornId}/pedidos", body);
-
-    public Task<ApiResult<object>> AlterarStatusPedidoAsync(string fornId, string pedId, string novoStatus) =>
-        api.PatchAsync<object>($"fornecedores/{fornId}/pedidos/{pedId}/status", new { status = novoStatus });
-
-    public Task<ApiResult<object>> ReceberPedidoAsync(string fornId, string pedId, object body) =>
-        api.PostAsync<object>($"fornecedores/{fornId}/pedidos/{pedId}/receber", body);
-
-    public Task<ApiResult<bool>> CancelarPedidoAsync(string fornId, string pedId) =>
-        api.DeleteAsync($"fornecedores/{fornId}/pedidos/{pedId}");
+    public Task<ApiResult<FornecedorEstatisticas>> ObterEstatisticasAsync(string id) =>
+        api.GetAsync<FornecedorEstatisticas>($"fornecedores/{id}/estatisticas?empresaId={GetEmpresaId()}");
 }
