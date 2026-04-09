@@ -45,7 +45,9 @@
     @if (!Model.Items.Any())
     {
         <div class="text-center py-12 text-gray-400">
-            <p class="text-sm">Nenhum fornecedor cadastrado</p>
+            <div class="text-4xl mb-2">🤝</div>
+            <p class="text-sm font-medium text-gray-500">Nenhum fornecedor cadastrado</p>
+            <p class="text-xs mt-1">Cadastre seu primeiro fornecedor para gerenciar pedidos e prazos.</p>
         </div>
     }
     else
@@ -55,7 +57,7 @@
                 <tr>
                     <th>Nome</th>
                     <th>Tipo</th>
-                    <th>Lead (dias)</th>
+                    <th>Prazo (dias)</th>
                     <th>Categorias</th>
                     <th>Status</th>
                     <th></th>
@@ -131,7 +133,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead Time (dias)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prazo de entrega (dias)</label>
                     <input type="number" name="lead" value="7" min="0"
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>

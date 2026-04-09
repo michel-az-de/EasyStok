@@ -54,7 +54,7 @@
         <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
         <div>
             <div class="kpi-val text-blue-600">@Model.ProdutosParados</div>
-            <div class="kpi-lbl">Parados &gt;30d</div>
+            <div class="kpi-lbl">Parados há +30 dias</div>
         </div>
     </a>
     <a href="/entradas/reposicao" class="ws flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
@@ -129,11 +129,11 @@
             var acoes = new[]
             {
                 new { Icon = "📥", Label = "Nova entrada", Href = "/entradas/nova" },
-                new { Icon = "📤", Label = "Nova saída", Href = "#" },
+                new { Icon = "📤", Label = "Nova saída", Href = "/saidas/nova" },
                 new { Icon = "🔄", Label = "Repor estoque", Href = "/entradas/reposicao" },
                 new { Icon = "📦", Label = "Ver estoque", Href = "/estoque" },
-                new { Icon = "🤖", Label = "Gerar anúncio", Href = "#" },
-                new { Icon = "📊", Label = "Movimentações", Href = "#" },
+                new { Icon = "🤖", Label = "Gerar anúncio", Href = "/anuncios" },
+                new { Icon = "📊", Label = "Movimentações", Href = "/analytics/movimentacoes" },
             };
         }
         @foreach (var acao in acoes)

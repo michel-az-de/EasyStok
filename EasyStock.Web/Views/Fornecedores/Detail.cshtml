@@ -47,7 +47,7 @@
                         <div><dt class="text-gray-500">Telefone</dt><dd class="font-medium">@Model.Fornecedor.Tel</dd></div>
                     }
                     <div><dt class="text-gray-500">Tipo</dt><dd class="font-medium capitalize">@Model.Fornecedor.Tipo</dd></div>
-                    <div><dt class="text-gray-500">Lead Time</dt><dd class="font-medium">@Model.Fornecedor.Lead dias</dd></div>
+                    <div><dt class="text-gray-500">Prazo de entrega</dt><dd class="font-medium">@Model.Fornecedor.Lead dias</dd></div>
                     <div><dt class="text-gray-500">Pagamento</dt><dd class="font-medium">@Model.Fornecedor.Pgto</dd></div>
                     <div><dt class="text-gray-500">Categorias</dt><dd class="font-medium">@Model.Fornecedor.Cats</dd></div>
                 </dl>
@@ -68,7 +68,7 @@
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Lead Time (dias)</label>
+                        <label class="block text-xs text-gray-500 mb-1">Prazo de entrega (dias)</label>
                         <input type="number" name="lead" value="@Model.Fornecedor.Lead"
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
@@ -95,7 +95,7 @@
                     <span class="font-semibold text-gray-900">R$ @Model.TotalGasto.ToString("N2")</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Lead médio real</span>
+                    <span class="text-gray-500">Prazo médio real</span>
                     <span class="font-semibold text-gray-900">@Model.LeadRealMedio dias</span>
                 </div>
                 <div class="flex justify-between">
@@ -206,7 +206,9 @@
         @if (!Model.PedidosAbertos.Any() && !Model.Historico.Any())
         {
             <div class="ws text-center py-12 text-gray-400">
-                <p class="text-sm">Nenhum pedido registrado</p>
+                <div class="text-4xl mb-2">📋</div>
+                <p class="text-sm font-medium text-gray-500">Nenhum pedido registrado</p>
+                <p class="text-xs mt-1">Os pedidos feitos a este fornecedor aparecerão aqui.</p>
             </div>
         }
     </div>
