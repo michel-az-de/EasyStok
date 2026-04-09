@@ -11,22 +11,22 @@ namespace EasyStock.Infra.Postgre.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_qtd ON itens_estoque (empresaid, quantidade_atual);");
+                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_qtd ON itens_estoque (\"EmpresaId\", \"QuantidadeAtual\");");
 
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_validade ON itens_estoque (empresaid, validade_em);");
+                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_validade ON itens_estoque (\"EmpresaId\", \"ValidadeEm\");");
 
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_ultima_mov ON itens_estoque (empresaid, ultima_movimentacao_em);");
+                "CREATE INDEX IF NOT EXISTS idx_itens_estoque_empresa_ultima_mov ON itens_estoque (\"EmpresaId\", \"UltimaMovimentacaoEm\");");
 
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_produtos_empresa_nome ON produtos (empresaid, nome);");
+                "CREATE INDEX IF NOT EXISTS idx_produtos_empresa_nome ON produtos (\"EmpresaId\", \"Nome\");");
 
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_movimentacoes_empresa_produto ON movimentacoes_estoque (empresaid, produto_id, data_movimentacao);");
+                "CREATE INDEX IF NOT EXISTS idx_movimentacoes_empresa_produto ON movimentacoes_estoque (\"EmpresaId\", \"ProdutoId\", \"DataMovimentacao\");");
 
             migrationBuilder.Sql(
-                "CREATE INDEX IF NOT EXISTS idx_vendas_empresa_data ON vendas (empresaid, data_venda);");
+                "CREATE INDEX IF NOT EXISTS idx_vendas_empresa_data ON vendas (\"EmpresaId\", \"DataVenda\");");
         }
 
         /// <inheritdoc />
