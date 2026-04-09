@@ -2,10 +2,13 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class UsuariosService(ApiClient api)
+public class UsuariosService(ApiClient api, SessionService session)
 {
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+
     public Task<ApiResult<List<Usuario>>> ListarAsync() =>
-        api.GetAsync<List<Usuario>>("usuarios");
+        api.GetAsync<List<Usuario>>($"usuarios?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<object>> CriarAsync(string empresaId, string nome, string email, string senha) =>
         Guid.TryParse(empresaId, out var eid) && eid != Guid.Empty
@@ -26,5 +29,5 @@ public class UsuariosService(ApiClient api)
             : Task.FromResult(ApiResult<object>.Fail("INVALID_ID", "Id de usuário inválido."));
 
     public Task<ApiResult<bool>> RemoverAsync(string id) =>
-        api.DeleteAsync($"usuarios/{id}");
+        api.DeleteAsync($"usuarios/{id}?empresaId={GetEmpresaId()}");
 }
