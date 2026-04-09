@@ -13,10 +13,13 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
 
-        var result = await svc.ListarAsync(page, 20);
+        var result = await svc.ListarAsync(page, 21); // fetch 21 to detect whether a next page exists
         if (HasError(result)) return View(new ProdutosListViewModel());
 
         var items = result.Data!;
+        var hasMore = items.Count > 20;
+        if (hasMore) items = items.Take(20).ToList();
+
         var vm = new ProdutosListViewModel
         {
             Produtos = items,
@@ -26,7 +29,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             Paginacao = new PaginationViewModel
             {
                 Page = page,
-                Pages = items.Count == 20 ? page + 1 : page,
+                Pages = hasMore ? page + 1 : page,
                 Total = items.Count,
                 Limit = 20
             }
