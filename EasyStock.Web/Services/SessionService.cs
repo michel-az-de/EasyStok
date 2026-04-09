@@ -12,6 +12,7 @@ public class SessionService(IHttpContextAccessor acc)
     public string? GetUsuarioId() => Session.GetString("usuario_id");
     public string? GetUsuarioNome() => Session.GetString("usuario_nome");
     public string? GetUsuarioRole() => Session.GetString("usuario_role");
+    public string? GetEmpresaId() => Session.GetString("empresa_id");
     public bool IsLoggedIn() => !string.IsNullOrEmpty(GetToken());
 
     public void SetTokens(string accessToken, string refreshToken)
@@ -32,6 +33,11 @@ public class SessionService(IHttpContextAccessor acc)
         Session.SetString("loja_atual_id", id);
         Session.SetString("loja_atual_nome", nome);
         Session.SetString("loja_atual_emoji", emoji ?? "🏪");
+    }
+
+    public void SetEmpresaId(string empresaId)
+    {
+        Session.SetString("empresa_id", empresaId);
     }
 
     public void Clear()

@@ -72,6 +72,8 @@ public class AuthController(ApiClient api, SessionService session) : Controller
             if (lojas.Count == 1)
             {
                 session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji);
+                if (!string.IsNullOrEmpty(lojas[0].EmpresaId))
+                    session.SetEmpresaId(lojas[0].EmpresaId!);
                 return Redirect(returnUrl ?? "/dashboard");
             }
 
@@ -99,9 +101,11 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
     [HttpPost("/auth/selecionar-loja")]
     [ValidateAntiForgeryToken]
-    public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji)
+    public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji, string? lojaEmpresaId)
     {
         session.SetLoja(lojaId, lojaNome, lojaEmoji);
+        if (!string.IsNullOrEmpty(lojaEmpresaId))
+            session.SetEmpresaId(lojaEmpresaId);
         return RedirectToAction("Index", "Dashboard");
     }
 

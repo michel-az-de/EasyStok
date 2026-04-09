@@ -30,7 +30,8 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
                 var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
                 if (string.IsNullOrEmpty(query["empresaId"]))
                 {
-                    query["empresaId"] = lojaId;
+                    var empresaId = session.GetEmpresaId();
+                    query["empresaId"] = !string.IsNullOrEmpty(empresaId) ? empresaId : lojaId;
                     uriBuilder.Query = query.ToString();
                     request.RequestUri = uriBuilder.Uri;
                 }
