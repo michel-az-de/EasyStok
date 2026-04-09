@@ -5,7 +5,7 @@
 
 <div class="pg-hd mb-6">
     <h1>Histórico de Movimentações</h1>
-    <p>@Model.Paginacao.Total movimentação(ões) encontrada(s)</p>
+    <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "movimentação encontrada" : "movimentações encontradas")</p>
 </div>
 
 <!-- Filtros -->

@@ -120,7 +120,8 @@
         {
             <div class="text-center py-8 text-slate-400">
                 <div class="text-4xl mb-2">📋</div>
-                <p class="text-sm">Nenhuma movimentação recente</p>
+                <p class="text-sm font-semibold text-slate-500">Nenhuma movimentação ainda</p>
+                <p class="text-xs mt-1">Registre sua primeira <a href="/entradas/nova" class="text-indigo-600 hover:underline">entrada de estoque</a> para começar.</p>
             </div>
         }
     </div>
@@ -140,11 +141,11 @@
             var acoes = new[]
             {
                 new { Icon = "📥", Label = "Nova entrada", Href = "/entradas/nova" },
-                new { Icon = "📤", Label = "Nova saída", Href = "#" },
+                new { Icon = "📤", Label = "Nova saída", Href = "/saidas/nova" },
                 new { Icon = "🔄", Label = "Repor estoque", Href = "/entradas/reposicao" },
                 new { Icon = "📦", Label = "Ver estoque", Href = "/estoque" },
-                new { Icon = "🤖", Label = "Gerar anúncio", Href = "#" },
-                new { Icon = "📊", Label = "Movimentações", Href = "#" },
+                new { Icon = "🤖", Label = "Gerar anúncio", Href = "/anuncios" },
+                new { Icon = "📊", Label = "Movimentações", Href = "/analytics/movimentacoes" },
             };
         }
         @foreach (var acao in acoes)
