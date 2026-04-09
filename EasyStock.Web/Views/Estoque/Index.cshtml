@@ -6,7 +6,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total item(s) no estoque</p>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item no estoque" : "itens no estoque")</p>
     </div>
     <a href="/entradas/nova"
        class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
@@ -215,7 +215,8 @@
         {
             <div class="text-center py-12 text-slate-400">
                 <div class="text-5xl mb-3">📦</div>
-                <p class="font-semibold text-slate-600">Nenhum item de estoque encontrado</p>
+                <p class="font-semibold text-slate-600">Nenhum item encontrado</p>
+                <p class="text-sm mt-1">Tente ajustar os filtros ou <a href="/entradas/nova" class="text-indigo-600 hover:underline">registre uma nova entrada</a>.</p>
             </div>
         }
     </div>

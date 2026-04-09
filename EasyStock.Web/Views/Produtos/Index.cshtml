@@ -7,7 +7,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Produtos</h1>
-        <p>@Model.Paginacao.Total produto(s) listado(s)</p>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "produto listado" : "produtos listados")</p>
     </div>
     <a href="/produtos/novo"
        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
