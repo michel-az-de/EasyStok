@@ -9,10 +9,14 @@ namespace EasyStock.Infra.Async;
 /// Usa ConcurrentQueue para thread-safety e processamento sequencial.
 /// Ideal para desenvolvimento/testes; para produção usar Redis Queue ou similar.
 /// </summary>
+/// <remarks>
+/// <c>ProcessQueueAsync</c> drena todas as mensagens presentes no momento da chamada e retorna
+/// quando a fila fica vazia. Para processamento contínuo em produção, utilize um
+/// <c>BackgroundService</c> que invoque este método em loop com um intervalo de polling.
+/// </remarks>
 public sealed class BackgroundQueueService : IQueueService, IDisposable
 {
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _queues = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _processingTokens = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public Task EnqueueAsync<T>(string queueName, T message)
@@ -23,43 +27,29 @@ public sealed class BackgroundQueueService : IQueueService, IDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Processa todas as mensagens atualmente enfileiradas e retorna quando a fila fica vazia
+    /// ou quando o <paramref name="cancellationToken"/> é solicitado.
+    /// </summary>
     public async Task ProcessQueueAsync<T>(string queueName, Func<T, Task> processor, CancellationToken cancellationToken)
     {
-        var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _processingTokens[queueName] = tokenSource;
+        var queue = _queues.GetOrAdd(queueName, _ => new ConcurrentQueue<string>());
 
-        try
+        while (!cancellationToken.IsCancellationRequested && queue.TryDequeue(out var json))
         {
-            var queue = _queues.GetOrAdd(queueName, _ => new ConcurrentQueue<string>());
-
-            while (!tokenSource.Token.IsCancellationRequested)
+            try
             {
-                if (queue.TryDequeue(out var json))
+                var message = JsonSerializer.Deserialize<T>(json, JsonOptions);
+                if (message is not null)
                 {
-                    try
-                    {
-                        var message = JsonSerializer.Deserialize<T>(json, JsonOptions);
-                        if (message is not null)
-                        {
-                            await processor(message);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Log error and continue processing
-                        Console.Error.WriteLine($"Erro processando mensagem da fila {queueName}: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    // Wait a bit before checking again
-                    await Task.Delay(1000, tokenSource.Token);
+                    await processor(message);
                 }
             }
-        }
-        finally
-        {
-            _processingTokens.TryRemove(queueName, out _);
+            catch (Exception ex)
+            {
+                // Log error and continue processing remaining messages
+                Console.Error.WriteLine($"Erro processando mensagem da fila {queueName}: {ex.Message}");
+            }
         }
     }
 
@@ -83,12 +73,6 @@ public sealed class BackgroundQueueService : IQueueService, IDisposable
 
     public void Dispose()
     {
-        foreach (var tokenSource in _processingTokens.Values)
-        {
-            tokenSource.Cancel();
-            tokenSource.Dispose();
-        }
-        _processingTokens.Clear();
         _queues.Clear();
     }
 }
