@@ -73,7 +73,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (produtoId.HasValue)
                 query = query.Where(m => m.ProdutoId == produtoId.Value);
 
-            var totalSaidas = await query.SumAsync(m => (int?)m.Quantidade.Value) ?? 0;
+            var totalSaidas = await query.SumAsync(m => m.Quantidade.Value);
             var dias = Math.Max(1, (ate - de).Days);
             return (decimal)totalSaidas / dias;
         }

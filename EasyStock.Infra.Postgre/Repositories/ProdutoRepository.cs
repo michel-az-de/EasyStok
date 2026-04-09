@@ -55,7 +55,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (EF.Functions.ILike(p.Nome, pattern) ||
                      (p.Marca != null && EF.Functions.ILike(p.Marca, pattern)) ||
                      (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
-                     EF.Functions.ILike(EF.Property<string?>(p, nameof(Produto.SkuBase))!, pattern) ||
+                     (p.SkuBase != null && EF.Functions.ILike(p.SkuBase.Value, pattern)) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
                 .Take(maxResults)
                 .ToListAsync();
