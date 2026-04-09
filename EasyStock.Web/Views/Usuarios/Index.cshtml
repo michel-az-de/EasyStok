@@ -14,7 +14,7 @@
     <button type="button"
             x-data @@click="$dispatch('open-modal', 'convidar')"
             class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-        + Convidar Usuário
+        + Criar Usuário
     </button>
 </div>
 
@@ -34,29 +34,21 @@
             <tbody>
                 @foreach (var u in Model.Usuarios)
                 {
-                    var roleColor = u.Role switch {
-                        "Owner" => "bg-purple-100 text-purple-700",
-                        "Admin" => "bg-blue-100 text-blue-700",
-                        _ => "bg-gray-100 text-gray-600"
-                    };
-                    <tr x-data="{ editando: false, confirm: false, roleEdit: '@u.Role' }">
+                    <tr x-data="{ editando: false, confirm: false, nomeEdit: '@u.Nome' }">
                         <td class="font-medium text-gray-900">@u.Nome</td>
                         <td class="text-gray-500 text-sm">@u.Email</td>
                         <td>
                             <div x-show="!editando">
-                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @roleColor">
-                                    @u.Role
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                    Usuário
                                 </span>
                             </div>
                             <form asp-action="Editar" asp-controller="Usuarios"
                                   asp-route-id="@u.Id" method="post"
                                   x-show="editando" x-cloak class="flex gap-2 items-center">
                                 @Html.AntiForgeryToken()
-                                <select name="role" x-model="roleEdit"
-                                        class="border border-gray-300 rounded px-2 py-1 text-xs">
-                                    <option value="Operador">Operador</option>
-                                    <option value="Admin">Admin</option>
-                                </select>
+                                <input type="text" name="nome" x-model="nomeEdit"
+                                       class="border border-gray-300 rounded px-2 py-1 text-xs" required />
                                 <button type="submit"
                                         class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
                                     Salvar
@@ -65,7 +57,7 @@
                         </td>
                         <td>
                             <div class="flex items-center gap-3">
-                                @if (u.Role != "Owner")
+                                @if (true)
                                 {
                                     <button type="button" @@click="editando = !editando"
                                             class="text-xs text-indigo-600 hover:text-indigo-700">
@@ -115,7 +107,7 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
      @@click.self="open = false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Convidar Usuário</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Criar Usuário</h2>
         <form asp-action="Convidar" asp-controller="Usuarios" method="post">
             @Html.AntiForgeryToken()
             <div class="space-y-3 mb-4">
@@ -130,12 +122,9 @@
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Função</label>
-                    <select name="Role"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                        <option value="Operador">Operador</option>
-                        <option value="Admin">Admin</option>
-                    </select>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                    <input type="password" name="Senha" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
             </div>
             <div class="flex justify-end gap-3">
@@ -145,7 +134,7 @@
                 </button>
                 <button type="submit"
                         class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                    Enviar Convite
+                    Criar Usuário
                 </button>
             </div>
         </form>

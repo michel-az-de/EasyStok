@@ -1,3 +1,3 @@
 namespace EasyStock.Web.Models.Api;
 
-public record Usuario(string Id, string Nome, string Email, string Role);
+public record Usuario(Guid UsuarioId, string Nome, string Email, bool Ativo, DateTime? UltimoAcessoEm, DateTime CriadoEm);

@@ -52,6 +52,25 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         }
     }
 
+    public async Task<ApiResult<T>> PutAsync<T>(string path, object body)
+    {
+        try
+        {
+            var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
+            var response = await http.PutAsync(path, content);
+            return await ParseResponse<T>(response);
+        }
+        catch (TaskCanceledException)
+        {
+            return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
+        }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Network error on PUT {Path}", path);
+            return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
+        }
+    }
+
     public async Task<ApiResult<T>> PatchAsync<T>(string path, object body)
     {
         try

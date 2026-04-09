@@ -23,6 +23,5 @@ public class ConvidarUsuarioViewModel
 {
     public string Nome { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public string Role { get; set; } = "Operador";
-    public List<string> LojaIds { get; set; } = [];
+    public string Senha { get; set; } = string.Empty;
 }
