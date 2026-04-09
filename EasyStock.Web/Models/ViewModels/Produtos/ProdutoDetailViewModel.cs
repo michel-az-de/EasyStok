@@ -5,5 +5,4 @@ namespace EasyStock.Web.Models.ViewModels.Produtos;
 public class ProdutoDetailViewModel
 {
     public required ProdutoDetalhe Produto { get; set; }
-    public List<EstoqueSku> EstoqueSkus { get; set; } = [];
 }

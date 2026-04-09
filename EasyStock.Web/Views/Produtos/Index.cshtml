@@ -88,7 +88,7 @@
         </table>
 
         <!-- Paginação -->
-        @if (Model.Paginacao.Pages > 1)
+        @if (Model.Paginacao.Pages > 1 && string.IsNullOrEmpty(Model.Search))
         {
             <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                 <span class="text-sm text-slate-500">

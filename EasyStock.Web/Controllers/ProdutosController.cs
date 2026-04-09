@@ -1,3 +1,4 @@
+using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Produtos;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -13,12 +14,23 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
 
-        var result = await svc.ListarAsync(page, 21); // fetch 21 to detect whether a next page exists
-        if (HasError(result)) return View(new ProdutosListViewModel());
+        List<ProdutoResumo> items;
+        bool hasMore = false;
 
-        var items = result.Data!;
-        var hasMore = items.Count > 20;
-        if (hasMore) items = items.Take(20).ToList();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchResult = await svc.BuscarAsync(search.Trim(), 100);
+            if (HasError(searchResult)) return View(new ProdutosListViewModel());
+            items = searchResult.Data!;
+        }
+        else
+        {
+            var result = await svc.ListarAsync(page, 21);
+            if (HasError(result)) return View(new ProdutosListViewModel());
+            items = result.Data!;
+            hasMore = items.Count > 20;
+            if (hasMore) items = items.Take(20).ToList();
+        }
 
         var vm = new ProdutosListViewModel
         {
@@ -78,16 +90,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             return View("Form", vm);
         }
 
-        var produtoId = result.Data?.ProdutoId;
-        if (produtoId.HasValue && produtoId != Guid.Empty && vm.Variacoes.Count > 0)
-        {
-            var produtoIdStr = produtoId.Value.ToString();
-            foreach (var varNome in vm.Variacoes.Where(v => !string.IsNullOrWhiteSpace(v)))
-                await svc.AdicionarVariacaoAsync(produtoIdStr, varNome);
-        }
-
         Toast("success", "Produto criado com sucesso!");
-        return RedirectToAction(nameof(Detail), new { id = produtoId });
+        return RedirectToAction(nameof(Detail), new { id = result.Data?.ProdutoId });
     }
 
     [HttpGet("/produtos/{id}/editar")]
@@ -105,12 +109,14 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             Id = p.ProdutoId.ToString(),
             Nome = p.Nome,
             SkuBase = p.SkuBase,
+            CodigoBarras = p.CodigoBarras,
             CategoriaId = p.CategoriaId,
             DescricaoBase = p.DescricaoBase,
             Marca = p.Marca,
             PrecoReferencia = p.PrecoReferencia,
             CustoReferencia = p.CustoReferencia,
             Status = p.Status,
+            // Tipo e ControlaValidade não retornam no GET /api/produtos/{id} — defaultam para 0/false
             Variacoes = p.Variacoes.Select(v => v.Nome).ToList()
         };
         await LoadCategoriasAsync();
@@ -177,9 +183,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
     [HttpPost("/produtos/{id}/variacoes")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AdicionarVariacao(string id, string nome)
+    public async Task<IActionResult> AdicionarVariacao(string id, string nome, string? sku = null)
     {
-        var result = await svc.AdicionarVariacaoAsync(id, nome);
+        var result = await svc.AdicionarVariacaoAsync(id, nome, sku);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", "Variação adicionada!");
@@ -195,6 +201,14 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         Toast("success", "Variação removida!");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpGet("/produtos/{id}/historico-json")]
+    public async Task<IActionResult> HistoricoJson(string id)
+    {
+        var result = await svc.HistoricoAsync(id);
+        if (!result.Success) return Json(Array.Empty<object>());
+        return Json(result.Data);
     }
 
     [HttpGet("/produtos/buscar")]

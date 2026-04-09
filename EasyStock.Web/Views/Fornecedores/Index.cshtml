@@ -7,10 +7,6 @@
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Fornecedores</h1>
     <div class="flex gap-3">
-        <a asp-action="PedidosAbertos" asp-controller="Fornecedores"
-           class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-            Pedidos em Aberto
-        </a>
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-fornecedor')"
                 class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
@@ -73,8 +69,8 @@
                             }
                         </td>
                         <td class="text-gray-600 text-sm capitalize">@f.Tipo</td>
-                        <td class="text-gray-600">@f.Lead</td>
-                        <td class="text-gray-500 text-sm">@f.Cats</td>
+                        <td class="text-gray-600">@(f.LeadTimeEstimadoDias?.ToString() ?? "—")</td>
+                        <td class="text-gray-500 text-sm">@f.Categoria</td>
                         <td>
                             <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600")">
                                 @f.Status
@@ -108,11 +104,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">CNPJ/CPF</label>
-                    <input type="text" name="cnpj" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <input type="text" name="documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
-                    <input type="text" name="resp" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <input type="text" name="contato" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -120,7 +116,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                    <input type="text" name="tel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <input type="text" name="telefone" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
@@ -132,27 +128,17 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Lead Time (dias)</label>
-                    <input type="number" name="lead" value="7" min="0"
+                    <input type="number" name="leadTimeEstimadoDias" value="7" min="0"
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Pagamento *</label>
-                    <select name="pgto" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                        <option value="a_vista">À vista</option>
-                        <option value="30d">30 dias</option>
-                        <option value="60d">60 dias</option>
-                        <option value="boleto">Boleto</option>
-                        <option value="pix">PIX</option>
-                    </select>
                 </div>
                 <div class="col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Categorias</label>
-                    <input type="text" name="cats" placeholder="Ex: eletrônicos, roupas..."
+                    <input type="text" name="categoria" placeholder="Ex: eletrônicos, roupas..."
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div class="col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                    <textarea name="obs" rows="2"
+                    <textarea name="observacoes" rows="2"
                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
                 </div>
             </div>
