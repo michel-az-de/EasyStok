@@ -15,10 +15,10 @@ public class AnunciosController(
         ViewBag.Title = "Anúncios IA";
         ViewBag.ActiveMenuItem = "Anuncios";
 
-        var result = await produtosSvc.ListarAsync(1, 50, null, "ativo", null);
+        var result = await produtosSvc.ListarAsync(1, 50);
         var vm = new AnunciosViewModel
         {
-            Produtos = result.Success ? result.Data!.Data : []
+            Produtos = result.Success ? result.Data! : []
         };
 
         return View(vm);

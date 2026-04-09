@@ -13,22 +13,25 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
 
-        var result = await svc.ListarAsync(page, 20, categoria, status, search);
+        var result = await svc.ListarAsync(page, 21); // fetch 21 to detect whether a next page exists
         if (HasError(result)) return View(new ProdutosListViewModel());
 
-        var paged = result.Data!;
+        var items = result.Data!;
+        var hasMore = items.Count > 20;
+        if (hasMore) items = items.Take(20).ToList();
+
         var vm = new ProdutosListViewModel
         {
-            Produtos = paged.Data,
+            Produtos = items,
             Search = search,
             Categoria = categoria,
             Status = status,
             Paginacao = new PaginationViewModel
             {
-                Page = paged.Meta.Page,
-                Pages = paged.Meta.Pages,
-                Total = paged.Meta.Total,
-                Limit = paged.Meta.Limit
+                Page = page,
+                Pages = hasMore ? page + 1 : page,
+                Total = items.Count,
+                Limit = 20
             }
         };
         return View(vm);
@@ -48,10 +51,11 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     }
 
     [HttpGet("/produtos/novo")]
-    public IActionResult Novo()
+    public async Task<IActionResult> Novo()
     {
         ViewBag.Title = "Novo Produto";
         ViewBag.ActiveMenuItem = "Produtos";
+        await LoadCategoriasAsync();
         return View("Form", new ProdutoFormViewModel());
     }
 
@@ -63,25 +67,27 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         {
             ViewBag.Title = "Novo Produto";
             ViewBag.ActiveMenuItem = "Produtos";
+            await LoadCategoriasAsync();
             return View("Form", vm);
         }
 
         var result = await svc.CriarAsync(vm);
-        if (HasError(result)) return View("Form", vm);
-
-        // Add variações after creation
-        if (vm.Variacoes.Count > 0)
+        if (HasError(result))
         {
-            var produtoId = result.Data?.Id;
-            if (!string.IsNullOrEmpty(produtoId))
-            {
-                foreach (var varNome in vm.Variacoes.Where(v => !string.IsNullOrWhiteSpace(v)))
-                    await svc.AdicionarVariacaoAsync(produtoId, varNome);
-            }
+            await LoadCategoriasAsync();
+            return View("Form", vm);
+        }
+
+        var produtoId = result.Data?.ProdutoId;
+        if (produtoId.HasValue && produtoId != Guid.Empty && vm.Variacoes.Count > 0)
+        {
+            var produtoIdStr = produtoId.Value.ToString();
+            foreach (var varNome in vm.Variacoes.Where(v => !string.IsNullOrWhiteSpace(v)))
+                await svc.AdicionarVariacaoAsync(produtoIdStr, varNome);
         }
 
         Toast("success", "Produto criado com sucesso!");
-        return RedirectToAction(nameof(Detail), new { id = result.Data?.Id });
+        return RedirectToAction(nameof(Detail), new { id = produtoId });
     }
 
     [HttpGet("/produtos/{id}/editar")]
@@ -96,18 +102,18 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var p = result.Data!;
         var vm = new ProdutoFormViewModel
         {
-            Id = p.Id,
+            Id = p.ProdutoId.ToString(),
             Nome = p.Nome,
-            Sku = p.Sku,
-            Categoria = p.Categoria,
-            Subcategoria = p.Subcategoria,
-            Preco = p.Preco,
-            Custo = p.Custo,
-            Peso = p.Peso,
-            Descricao = p.Descricao,
-            Emoji = p.Emoji,
+            SkuBase = p.SkuBase,
+            CategoriaId = p.CategoriaId,
+            DescricaoBase = p.DescricaoBase,
+            Marca = p.Marca,
+            PrecoReferencia = p.PrecoReferencia,
+            CustoReferencia = p.CustoReferencia,
+            Status = p.Status,
             Variacoes = p.Variacoes.Select(v => v.Nome).ToList()
         };
+        await LoadCategoriasAsync();
         return View("Form", vm);
     }
 
@@ -119,12 +125,17 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         {
             ViewBag.Title = "Editar Produto";
             ViewBag.ActiveMenuItem = "Produtos";
+            await LoadCategoriasAsync();
             return View("Form", vm);
         }
 
         vm.Id = id;
         var result = await svc.EditarAsync(id, vm);
-        if (HasError(result)) return View("Form", vm);
+        if (HasError(result))
+        {
+            await LoadCategoriasAsync();
+            return View("Form", vm);
+        }
 
         Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
@@ -189,14 +200,23 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     [HttpGet("/produtos/buscar")]
     public async Task<IActionResult> Buscar(string? q, int limit = 10)
     {
-        var result = await svc.ListarAsync(1, Math.Min(limit, 100), null, null, q);
+        if (string.IsNullOrWhiteSpace(q)) return Json(Array.Empty<object>());
+
+        var result = await svc.BuscarAsync(q, Math.Min(limit, 100));
         if (!result.Success) return Json(Array.Empty<object>());
-        var items = result.Data!.Data.Select(p => new {
-            id = p.Id, nome = p.Nome, sku = p.Sku,
-            foto = p.Fotos.FirstOrDefault(),
-            emoji = p.Emoji,
-            categoria = p.Categoria
+
+        var items = result.Data!.Select(p => new {
+            id = p.Id,
+            nome = p.Nome,
+            sku = p.SkuBase?.Value,
+            categoriaId = p.CategoriaId
         });
         return Json(items);
+    }
+
+    private async Task LoadCategoriasAsync()
+    {
+        var cats = await svc.ListarCategoriasAsync();
+        ViewBag.Categorias = cats.Success ? cats.Data : [];
     }
 }
