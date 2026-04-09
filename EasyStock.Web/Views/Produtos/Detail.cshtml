@@ -110,6 +110,13 @@
                             <dd class="text-sm">@p.Marca</dd>
                         </div>
                     }
+                    @if (!string.IsNullOrEmpty(p.CodigoBarras))
+                    {
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-slate-500">Cod. Barras</dt>
+                            <dd class="text-sm font-mono">@p.CodigoBarras</dd>
+                        </div>
+                    }
                 </dl>
                 @if (!string.IsNullOrEmpty(p.DescricaoBase))
                 {
@@ -131,7 +138,20 @@
                         @foreach (var v in p.Variacoes)
                         {
                             <div class="flex items-center justify-between py-2 border-b border-slate-50">
-                                <span class="text-sm text-slate-700">@v.Nome</span>
+                                <div>
+                                    <span class="text-sm text-slate-700 font-medium">@v.Nome</span>
+                                    @if (!string.IsNullOrEmpty(v.Sku))
+                                    {
+                                        <span class="text-xs text-slate-400 font-mono ml-2">@v.Sku</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(v.Cor) || !string.IsNullOrEmpty(v.Tamanho))
+                                    {
+                                        <span class="text-xs text-slate-400 ml-2">
+                                            @(string.Join(" / ", new[] { v.Cor, v.Tamanho }.Where(x => !string.IsNullOrEmpty(x))))
+                                        </span>
+                                    }
+                                    <span class="text-xs ml-2 @(v.QuantidadeEmEstoque == 0 ? "text-red-500" : "text-slate-500")">(@v.QuantidadeEmEstoque un.)</span>
+                                </div>
                                 <form asp-action="RemoverVariacao" asp-controller="Produtos"
                                       asp-route-id="@p.ProdutoId" asp-route-vid="@v.VariacaoId" method="post">
                                     @Html.AntiForgeryToken()
@@ -149,8 +169,10 @@
                 <!-- Add variação -->
                 <form asp-action="AdicionarVariacao" asp-controller="Produtos" asp-route-id="@p.ProdutoId" method="post" class="mt-4 flex gap-2">
                     @Html.AntiForgeryToken()
-                    <input type="text" name="nome" placeholder="Nova variação (ex: M, Azul...)"
+                    <input type="text" name="nome" placeholder="Nova variação (ex: M, Azul...)" required
                            class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    <input type="text" name="sku" placeholder="SKU (opcional)"
+                           class="w-32 px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     <button type="submit" class="px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
                         Adicionar
                     </button>
@@ -176,61 +198,40 @@
     <!-- Tab: Estoque por variação -->
     <div x-show="tab === 'estoque'">
         <div class="ws">
-            @if (Model.EstoqueSkus.Any())
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-slate-800">Estoque total</h3>
+                <span class="text-lg font-bold @(p.QuantidadeTotalEstoque == 0 ? "text-red-600" : "text-slate-900")">@p.QuantidadeTotalEstoque un.</span>
+            </div>
+            @if (p.Variacoes.Any())
             {
                 <table class="tbl-full">
                     <thead>
                         <tr>
+                            <th>Variacao</th>
                             <th>SKU</th>
-                            <th>Variação</th>
                             <th class="text-center">Qtd</th>
-                            <th>Lote</th>
-                            <th>Validade</th>
                             <th class="text-center">Status</th>
+                            <th>Ultima entrada</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var sku in Model.EstoqueSkus)
+                        @foreach (var v in p.Variacoes)
                         {
-                            var diasParaVencer = sku.Validade.HasValue
-                                ? (sku.Validade.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days
-                                : (int?)null;
                             <tr>
-                                <td class="font-mono text-xs">@sku.Sku</td>
-                                <td>@(sku.Variacao?.Nome ?? "-")</td>
+                                <td class="font-medium">@v.Nome</td>
+                                <td class="font-mono text-xs text-slate-500">@(v.Sku ?? "-")</td>
                                 <td class="text-center">
-                                    <span class="font-bold @(sku.Qty == 0 ? "text-red-600" : sku.Qty < 5 ? "text-amber-600" : "text-slate-900")">
-                                        @sku.Qty
+                                    <span class="font-bold @(v.QuantidadeEmEstoque == 0 ? "text-red-600" : v.QuantidadeEmEstoque < 5 ? "text-amber-600" : "text-slate-900")">
+                                        @v.QuantidadeEmEstoque
                                     </span>
                                 </td>
-                                <td class="text-slate-500">@(sku.Lote ?? "-")</td>
-                                <td>
-                                    @if (sku.Validade.HasValue)
-                                    {
-                                        <span class="@(diasParaVencer <= 7 ? "text-red-600 font-semibold" : "text-slate-600")">
-                                            @sku.Validade.Value.ToString("dd/MM/yyyy")
-                                            @if (diasParaVencer <= 7)
-                                            {
-                                                <span class="badge badge-critical ml-1 px-1.5 py-0.5 rounded text-xs">@diasParaVencer d</span>
-                                            }
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-slate-400">—</span>
-                                    }
-                                </td>
                                 <td class="text-center">
-                                    @{
-                                        var sClass = sku.Status?.ToLower() switch
-                                        {
-                                            "ok" or "normal" => "badge-ok",
-                                            "critico" or "crítico" => "badge-critical",
-                                            "parado" => "badge-slow",
-                                            _ => "badge-warn"
-                                        };
-                                    }
-                                    <span class="badge @sClass px-2 py-0.5 rounded-full text-xs font-semibold">@sku.Status</span>
+                                    <span class="badge @(v.Ativa ? "badge-ok" : "badge-warn") px-2 py-0.5 rounded-full text-xs font-semibold">
+                                        @(v.Ativa ? "Ativa" : "Inativa")
+                                    </span>
+                                </td>
+                                <td class="text-sm text-slate-500">
+                                    @(v.UltimaEntradaEm?.ToString("dd/MM/yyyy") ?? "-")
                                 </td>
                             </tr>
                         }
@@ -239,17 +240,17 @@
             }
             else
             {
-                <p class="text-center py-8 text-slate-400 text-sm">Nenhum item de estoque encontrado para este produto.</p>
+                <p class="text-center py-8 text-slate-400 text-sm">Nenhuma variacao cadastrada. Adicione variacoes na aba Informacoes.</p>
             }
         </div>
     </div>
 
     <!-- Tab: Histórico -->
-    <div x-show="tab === 'historico'" x-init="tab === 'historico' && loadHistorico()">
+    <div x-show="tab === 'historico'" x-effect="if (tab === 'historico') loadHistorico()">
         <div class="ws" id="historico-container">
             <div class="text-center py-8 text-slate-400">
                 <div class="text-3xl mb-2">⏳</div>
-                <p class="text-sm">Carregando histórico...</p>
+                <p class="text-sm">Carregando historico...</p>
             </div>
         </div>
     </div>
@@ -262,12 +263,45 @@
             if (container.dataset.loaded) return;
             container.dataset.loaded = '1';
             try {
-                const r = await fetch('/api-proxy/produtos/@p.ProdutoId/historico');
+                const r = await fetch('/produtos/@p.ProdutoId/historico-json');
                 if (!r.ok) throw new Error();
-                const data = await r.json();
-                container.innerHTML = '<p class="text-sm text-slate-600">Histórico carregado. ' + JSON.stringify(data).substring(0, 100) + '...</p>';
+                const items = await r.json();
+                if (!Array.isArray(items) || items.length === 0) {
+                    container.textContent = '';
+                    const msg = document.createElement('p');
+                    msg.className = 'text-center py-8 text-slate-400 text-sm';
+                    msg.textContent = 'Nenhum registro de historico encontrado.';
+                    container.appendChild(msg);
+                    return;
+                }
+                const table = document.createElement('table');
+                table.className = 'tbl-full';
+                const thead = table.createTHead();
+                const hr = thead.insertRow();
+                ['Data', 'Tipo', 'Qtd', 'Valor', 'Obs'].forEach(h => {
+                    const th = document.createElement('th');
+                    th.textContent = h;
+                    hr.appendChild(th);
+                });
+                const tbody = table.createTBody();
+                items.forEach(item => {
+                    const row = tbody.insertRow();
+                    const date = item.dataMovimentacao ? new Date(item.dataMovimentacao).toLocaleDateString('pt-BR') : '-';
+                    [date, item.natureza ?? '-', item.quantidade ?? 0, item.valorTotal != null ? `R$ ${Number(item.valorTotal).toFixed(2)}` : '-', item.observacoes ?? '-']
+                        .forEach(val => {
+                            const td = row.insertCell();
+                            td.className = 'text-sm';
+                            td.textContent = String(val);
+                        });
+                });
+                container.textContent = '';
+                container.appendChild(table);
             } catch {
-                container.innerHTML = '<p class="text-center py-8 text-slate-400 text-sm">Não foi possível carregar o histórico.</p>';
+                container.textContent = '';
+                const msg = document.createElement('p');
+                msg.className = 'text-center py-8 text-slate-400 text-sm';
+                msg.textContent = 'Nao foi possivel carregar o historico.';
+                container.appendChild(msg);
             }
         }
     </script>
