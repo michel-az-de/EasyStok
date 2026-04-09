@@ -83,8 +83,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
                 vm.Itens.Add(new MovimentacaoItem
                 {
                     Tipo = m.Tipo,
-                    ProdutoNome = $"{m.TotalMovimentacoes} movimentação(ões)",
-                    VariacaoNome = null,
+                    Resumo = $"{m.TotalMovimentacoes} movimentação(ões)",
                     Qty = m.QuantidadeTotal,
                     Valor = m.ValorTotal > 0 ? m.ValorTotal : null,
                     Data = new DateOnly(m.Ano, m.Mes, m.Dia)
