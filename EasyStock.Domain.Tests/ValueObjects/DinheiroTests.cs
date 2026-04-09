@@ -42,7 +42,7 @@ public class DinheiroTests
 
         // Assert
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage("*Valor monet·rio n„o pode ser negativo.*");
+            .WithMessage("*Valor monet√°rio n√£o pode ser negativo.*");
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class DinheiroTests
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("OperaÁ„o resultaria em valor monet·rio negativo.");
+            .WithMessage("Opera√ß√£o resultaria em valor monet√°rio negativo.");
     }
 
     [Fact]

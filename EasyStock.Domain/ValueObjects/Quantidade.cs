@@ -13,7 +13,7 @@ namespace EasyStock.Domain.ValueObjects
 
         public static Quantidade From(int value)
         {
-            if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "Quantidade não pode ser negativa.");
+            if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "Quantidade nÃ£o pode ser negativa.");
             return new Quantidade(value);
         }
 
@@ -22,7 +22,7 @@ namespace EasyStock.Domain.ValueObjects
         public Quantidade Subtract(Quantidade other)
         {
             var result = Value - other.Value;
-            if (result < 0) throw new InvalidOperationException("Resultado da subtração resultaria em quantidade negativa.");
+            if (result < 0) throw new InvalidOperationException("Resultado da subtraÃ§Ã£o resultaria em quantidade negativa.");
             return From(result);
         }
 

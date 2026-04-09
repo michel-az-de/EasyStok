@@ -15,6 +15,8 @@ namespace EasyStock.Infra.Postgre.Services
     {
         private const string ApiUrl = "https://api.anthropic.com/v1/messages";
         private const string ModelId = "claude-haiku-4-5-20251001";
+        private const string AnthropicApiVersion = "2023-06-01";
+        private const int MaxTokens = 1024;
 
         public async Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null)
         {
@@ -22,7 +24,7 @@ namespace EasyStock.Infra.Postgre.Services
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 logger.LogWarning("Anthropic:ApiKey nao configurado. Usando descricao existente como fallback.");
-                return itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
+                return ObterDescricaoFallback(produto, itemEstoque);
             }
 
             try
@@ -33,13 +35,13 @@ namespace EasyStock.Infra.Postgre.Services
                 var requestBody = new
                 {
                     model = ModelId,
-                    max_tokens = 1024,
+                    max_tokens = MaxTokens,
                     messages = new[] { new { role = "user", content = prompt } }
                 };
 
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, ApiUrl);
                 httpRequest.Headers.Add("x-api-key", apiKey);
-                httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+                httpRequest.Headers.Add("anthropic-version", AnthropicApiVersion);
                 httpRequest.Content = JsonContent.Create(requestBody);
 
                 var response = await client.SendAsync(httpRequest);
@@ -57,9 +59,19 @@ namespace EasyStock.Infra.Postgre.Services
             catch (Exception ex)
             {
                 logger.LogError(ex, "Erro ao gerar descricao via Anthropic API. Usando fallback para produto {ProdutoId}.", produto.Id);
-                return itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
+                return ObterDescricaoFallback(produto, itemEstoque);
             }
         }
+
+        /// <summary>
+        /// Retorna a melhor descrição disponível localmente, sem chamar a API.
+        /// Prioridade: DescricaoAnuncio do item → SugestaoDescricaoAnuncio → DescricaoBase → Nome do produto.
+        /// </summary>
+        private static string ObterDescricaoFallback(Produto produto, ItemEstoque? itemEstoque) =>
+            itemEstoque?.DescricaoAnuncio
+            ?? produto.SugestaoDescricaoAnuncio
+            ?? produto.DescricaoBase
+            ?? produto.Nome;
 
         private static string ConstruirPrompt(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoes)
         {

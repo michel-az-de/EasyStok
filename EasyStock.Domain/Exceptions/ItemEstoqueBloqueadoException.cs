@@ -2,7 +2,7 @@ using System;
 
 namespace EasyStock.Domain.Exceptions
 {
-    public class ItemEstoqueBloqueadoException(Guid itemEstoqueId) : RegraDeDominioVioladaException($"OperaÁ„o inv·lida: item de estoque '{itemEstoqueId}' est· bloqueado.")
+    public class ItemEstoqueBloqueadoException(Guid itemEstoqueId) : RegraDeDominioVioladaException($"Opera√ß√£o inv√°lida: item de estoque '{itemEstoqueId}' est√° bloqueado.")
     {
     }
 }

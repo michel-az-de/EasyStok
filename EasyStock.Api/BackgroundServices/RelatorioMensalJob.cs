@@ -5,8 +5,8 @@ using EasyStock.Domain.Entities;
 namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>
-/// Job para gerar relat髍ios mensais automaticamente.
-/// Executa no primeiro dia de cada m阺 para enviar resumos por email.
+/// Job para gerar relat贸rios mensais automaticamente.
+/// Executa no primeiro dia de cada m锚s para gerar resumos consolidados.
 /// </summary>
 public sealed class RelatorioMensalJob(
     IServiceProvider serviceProvider,
@@ -14,19 +14,19 @@ public sealed class RelatorioMensalJob(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Job de relat髍io mensal iniciado");
+        logger.LogInformation("Job de relat贸rio mensal iniciado");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var now = DateTime.UtcNow;
-                var nextRun = new DateTime(now.Year, now.Month, 1).AddMonths(1); // Primeiro dia do pr髕imo m阺
+                var nextRun = new DateTime(now.Year, now.Month, 1).AddMonths(1);
                 var delay = nextRun - now;
 
                 if (delay > TimeSpan.Zero)
                 {
-                    logger.LogInformation("Pr髕imo relat髍io mensal em {Delay}", delay);
+                    logger.LogInformation("Pr贸ximo relat贸rio mensal em {Delay}", delay);
                     await Task.Delay(delay, stoppingToken);
                 }
 
@@ -34,8 +34,8 @@ public sealed class RelatorioMensalJob(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Erro na gera玢o de relat髍ios mensais");
-                await Task.Delay(TimeSpan.FromHours(1), stoppingToken); // Retry em 1 hora
+                logger.LogError(ex, "Erro na gera莽茫o de relat贸rios mensais");
+                await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
             }
         }
     }
@@ -45,20 +45,18 @@ public sealed class RelatorioMensalJob(
         using var scope = serviceProvider.CreateScope();
         var analyticsRepo = scope.ServiceProvider.GetRequiredService<IAnalyticsRepository>();
         var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
-        var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
         var storageService = scope.ServiceProvider.GetRequiredService<IStorageService>();
 
         var empresas = await empresaRepo.GetAllAsync();
-        foreach (var empresa in empresas.Where(e => e.Ativa && !string.IsNullOrEmpty(e.Email)))
+        foreach (var empresa in empresas)
         {
-            await GerarRelatorioEmpresaAsync(empresa, analyticsRepo, emailService, storageService, cancellationToken);
+            await GerarRelatorioEmpresaAsync(empresa, analyticsRepo, storageService, cancellationToken);
         }
     }
 
     private async Task GerarRelatorioEmpresaAsync(
         Empresa empresa,
         IAnalyticsRepository analyticsRepo,
-        IEmailService emailService,
         IStorageService storageService,
         CancellationToken cancellationToken)
     {
@@ -68,31 +66,21 @@ public sealed class RelatorioMensalJob(
             var ano = mesAnterior.Year;
             var mes = mesAnterior.Month;
 
-            // Obter dados do m阺 anterior
             var receita = await analyticsRepo.GetReceitaPorPeriodoAsync(empresa.Id, 1);
             var margem = await analyticsRepo.GetMargemPorProdutoAsync(empresa.Id, 30, 1, 50);
             var dashboard = await analyticsRepo.GetDashboardResumoAsync(empresa.Id, 30);
 
-            // Gerar relat髍io em HTML
             var htmlReport = GerarHtmlRelatorio(empresa, dashboard, receita.FirstOrDefault(), margem, ano, mes);
 
-            // Salvar relat髍io no storage
             var fileName = $"relatorio-{empresa.Id}-{ano}-{mes:00}.html";
             await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(htmlReport));
             var fileUrl = await storageService.UploadAsync("relatorios", fileName, stream, "text/html");
 
-            // Enviar por email
-            await emailService.SendAsync(
-                empresa.Email!,
-                $"Relat髍io Mensal - {mesAnterior:MMMM yyyy}",
-                $"Segue o relat髍io mensal da sua empresa.<br><br><a href='{fileUrl}'>Download do Relat髍io</a>",
-                isHtml: true);
-
-            logger.LogInformation("Relat髍io mensal enviado para empresa {EmpresaId}", empresa.Id);
+            logger.LogInformation("Relat贸rio mensal gerado para empresa {EmpresaId}: {FileUrl}", empresa.Id, fileUrl);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Erro ao gerar relat髍io para empresa {EmpresaId}", empresa.Id);
+            logger.LogError(ex, "Erro ao gerar relat贸rio para empresa {EmpresaId}", empresa.Id);
         }
     }
 
@@ -108,7 +96,7 @@ public sealed class RelatorioMensalJob(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Relat髍io Mensal - {empresa.Nome}</title>
+    <title>Relat贸rio Mensal - {empresa.Nome}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .header {{ background: #f0f0f0; padding: 20px; border-radius: 5px; }}
@@ -121,33 +109,33 @@ public sealed class RelatorioMensalJob(
 </head>
 <body>
     <div class='header'>
-        <h1>Relat髍io Mensal - {empresa.Nome}</h1>
-        <p>Per韔do: {ano}/{mes:00}</p>
+        <h1>Relat贸rio Mensal - {empresa.Nome}</h1>
+        <p>Per铆odo: {ano}/{mes:00}</p>
     </div>
 
     <h2>Resumo Geral</h2>
     <div class='metric'><strong>Total de SKUs:</strong> {dashboard.TotalSkus}</div>
     <div class='metric'><strong>Quantidade em Estoque:</strong> {dashboard.QuantidadeTotalEmEstoque}</div>
     <div class='metric'><strong>Valor Total do Estoque:</strong> R$ {dashboard.ValorTotalEstoque:F2}</div>
-    <div class='metric'><strong>M閐ia Vendas Di醨ias:</strong> {dashboard.MediaVendasDiaria} unidades</div>
+    <div class='metric'><strong>M茅dia Vendas Di谩rias:</strong> {dashboard.MediaVendasDiaria} unidades</div>
     <div class='metric'><strong>Receita Estimada (30 dias):</strong> R$ {dashboard.ReceitaEstimadaPeriodo:F2}</div>
     <div class='metric'><strong>Alertas Ativos:</strong> {dashboard.AlertasEstoqueBaixo + dashboard.AlertasVencimento + dashboard.AlertasItensParados}</div>
 
-    <h2>Receita do M阺</h2>
+    <h2>Receita do M锚s</h2>
     {(receita != null ? $@"
     <div class='metric'><strong>Receita Bruta:</strong> R$ {receita.ReceitaBruta:F2}</div>
     <div class='metric'><strong>Total de Vendas:</strong> {receita.TotalVendas}</div>
     <div class='metric'><strong>Total de Itens Vendidos:</strong> {receita.TotalItensVendidos}</div>
-    <div class='metric'><strong>Ticket M閐io:</strong> R$ {receita.TicketMedio:F2}</div>
-    " : "<p>Sem dados de receita para o per韔do.</p>")}
+    <div class='metric'><strong>Ticket M茅dio:</strong> R$ {receita.TicketMedio:F2}</div>
+    " : "<p>Sem dados de receita para o per铆odo.</p>")}
 
     <h2>Top 5 Produtos por Margem</h2>
     <table>
         <thead>
             <tr>
                 <th>Produto</th>
-                <th>Custo M閐io</th>
-                <th>Pre鏾 M閐io</th>
+                <th>Custo M茅dio</th>
+                <th>Pre莽o M茅dio</th>
                 <th>Margem (%)</th>
                 <th>Qtd Vendida</th>
             </tr>

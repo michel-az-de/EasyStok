@@ -5,18 +5,18 @@ using EasyStock.Domain.Entities;
 namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>
-/// Job para recalcular velocidades de saída dos itens de estoque.
-/// Executa periodicamente para manter as métricas de velocidade atualizadas.
+/// Job para recalcular velocidades de saÃ­da dos itens de estoque.
+/// Executa periodicamente para manter as mÃ©tricas de velocidade atualizadas.
 /// </summary>
 public sealed class RecalcularVelocidadesJob(
     IServiceProvider serviceProvider,
     ILogger<RecalcularVelocidadesJob> logger) : BackgroundService
 {
-    private readonly TimeSpan _interval = TimeSpan.FromHours(6); // Executa a cada 6 horas
+    private readonly TimeSpan _interval = TimeSpan.FromHours(6);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Job de recálculo de velocidades iniciado");
+        logger.LogInformation("Job de recÃ¡lculo de velocidades iniciado");
 
         using var timer = new PeriodicTimer(_interval);
 
@@ -28,7 +28,7 @@ public sealed class RecalcularVelocidadesJob(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Erro no recálculo de velocidades");
+                logger.LogError(ex, "Erro no recÃ¡lculo de velocidades");
             }
         }
     }
@@ -41,7 +41,7 @@ public sealed class RecalcularVelocidadesJob(
         var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
 
         var empresas = await empresaRepo.GetAllAsync();
-        foreach (var empresa in empresas.Where(e => e.Ativa))
+        foreach (var empresa in empresas)
         {
             await ProcessarEmpresaAsync(empresa, itemEstoqueRepo, movimentacaoRepo, cancellationToken);
         }
@@ -53,27 +53,23 @@ public sealed class RecalcularVelocidadesJob(
         IMovimentacaoEstoqueRepository movimentacaoRepo,
         CancellationToken cancellationToken)
     {
-        // Obter todos os itens de estoque da empresa
         var (itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, 1, 1000);
 
         foreach (var item in itens)
         {
             try
             {
-                // Calcular velocidade baseada nos últimos 30 dias
                 var de = DateTime.UtcNow.AddDays(-30);
                 var ate = DateTime.UtcNow;
-
                 var velocidade = await movimentacaoRepo.GetTaxaSaidaDiariaAsync(empresa.Id, item.ProdutoId, de, ate);
 
-                // Atualizar velocidade no item
                 item.AtualizarVelocidadeSaida(velocidade, DateTime.UtcNow);
-
-                // Persistir mudança
                 await itemEstoqueRepo.UpdateAsync(item);
 
-                logger.LogDebug("Velocidade atualizada para item {ItemId}: {Velocidade} unidades/dia",
-                    item.Id, velocidade);
+                logger.LogDebug(
+                    "Velocidade atualizada para item {ItemId}: {Velocidade} unidades/dia",
+                    item.Id,
+                    velocidade);
             }
             catch (Exception ex)
             {

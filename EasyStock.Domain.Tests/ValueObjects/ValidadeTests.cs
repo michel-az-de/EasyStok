@@ -102,7 +102,7 @@ public class ValidadeTests
 
         // Assert
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage("*Dias n„o pode ser negativo.*");
+            .WithMessage("*Dias n√£o pode ser negativo.*");
     }
 
     [Fact]

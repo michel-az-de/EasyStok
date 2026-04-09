@@ -8,19 +8,19 @@ public class CadastrarProdutoCommandValidator : AbstractValidator<CadastrarProdu
     public CadastrarProdutoCommandValidator()
     {
         RuleFor(x => x.EmpresaId)
-            .NotEmpty().WithMessage("EmpresaId é obrigatório.");
+            .NotEmpty().WithMessage("EmpresaId Ã© obrigatÃ³rio.");
 
         RuleFor(x => x.CategoriaId)
-            .NotEmpty().WithMessage("CategoriaId é obrigatório.");
+            .NotEmpty().WithMessage("CategoriaId Ã© obrigatÃ³rio.");
 
         RuleFor(x => x.Nome)
-            .NotEmpty().WithMessage("Nome é obrigatório.")
-            .MaximumLength(200).WithMessage("Nome deve ter no máximo 200 caracteres.");
+            .NotEmpty().WithMessage("Nome Ã© obrigatÃ³rio.")
+            .MaximumLength(200).WithMessage("Nome deve ter no mÃ¡ximo 200 caracteres.");
 
         RuleFor(x => x.Tipo)
-            .IsInEnum().WithMessage("Tipo deve ser um valor válido.");
+            .IsInEnum().WithMessage("Tipo deve ser um valor vÃ¡lido.");
 
         RuleFor(x => x.PrecoReferencia)
-            .GreaterThan(0).When(x => x.PrecoReferencia.HasValue).WithMessage("Preço de referência deve ser maior que zero.");
+            .GreaterThan(0).When(x => x.PrecoReferencia.HasValue).WithMessage("PreÃ§o de referÃªncia deve ser maior que zero.");
     }
 }

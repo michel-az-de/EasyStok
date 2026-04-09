@@ -15,10 +15,14 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IWebH
         var targetDirectory = Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(targetDirectory);
 
-        var filePath = Path.Combine(targetDirectory, request.FileName);
+        var safeFileName = Path.GetFileName(request.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            throw new ArgumentException("O nome do arquivo nao pode ser vazio.", nameof(request));
+
+        var filePath = Path.Combine(targetDirectory, safeFileName);
         await File.WriteAllBytesAsync(filePath, request.Content, cancellationToken);
 
-        var storageKey = $"{relativePath}/{request.FileName}".Trim('/');
+        var storageKey = $"{relativePath}/{safeFileName}".Trim('/');
         var publicBaseUrl = _options.PublicBaseUrl.TrimEnd('/');
         var url = $"{publicBaseUrl}/{storageKey}".Replace("\\", "/");
 

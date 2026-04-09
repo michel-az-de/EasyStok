@@ -1,0 +1,132 @@
+@model ConfiguracoesViewModel
+@{
+    ViewBag.Title = "Configurações";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Configurações</h1>
+</div>
+
+<form asp-action="Salvar" asp-controller="Configuracoes" method="post" class="max-w-2xl space-y-6">
+    @Html.AntiForgeryToken()
+
+    <!-- Alertas de Estoque -->
+    <div class="ws">
+        <h2 class="font-semibold text-gray-900 mb-4">Alertas de Estoque</h2>
+        <div class="space-y-4">
+            <div class="flex items-start gap-4">
+                <div class="flex-1">
+                    <label asp-for="DiasAlertaValidade"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        Alertar produtos perto da validade (dias)
+                    </label>
+                    <p class="text-xs text-gray-500 mb-2">
+                        Produtos com validade em menos de X dias serão destacados.
+                    </p>
+                </div>
+                <input asp-for="DiasAlertaValidade" type="number" min="1" max="365"
+                       class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center
+                              focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div class="flex items-start gap-4">
+                <div class="flex-1">
+                    <label asp-for="DiasAlertaParado"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        Alertar produtos parados (dias sem movimentação)
+                    </label>
+                    <p class="text-xs text-gray-500 mb-2">
+                        Produtos sem saída há mais de X dias serão marcados como "parados".
+                    </p>
+                </div>
+                <input asp-for="DiasAlertaParado" type="number" min="1" max="365"
+                       class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center
+                              focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div class="flex items-start gap-4">
+                <div class="flex-1">
+                    <label asp-for="QtyMinPadrao"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        Quantidade mínima padrão para reposição
+                    </label>
+                    <p class="text-xs text-gray-500 mb-2">
+                        Usado quando o produto não tem estoque mínimo definido.
+                    </p>
+                </div>
+                <input asp-for="QtyMinPadrao" type="number" min="0" max="9999"
+                       class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center
+                              focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificações -->
+    <div class="ws" x-data="{}">
+        <h2 class="font-semibold text-gray-900 mb-4">Notificações Push</h2>
+        <div class="space-y-3">
+            @{
+                var toggles = new[]
+                {
+                    (asp: "NotifEstoqueCritico", label: "Estoque crítico", desc: "Quando um produto atingir o estoque mínimo"),
+                    (asp: "NotifValidade", label: "Validade próxima", desc: "Quando produtos estiverem próximos do vencimento"),
+                    (asp: "NotifParado", label: "Produto parado", desc: "Quando um produto ficar sem movimentação"),
+                    (asp: "NotifReposicao", label: "Sugestão de reposição", desc: "Recomendações automáticas de recompra")
+                };
+            }
+            @foreach (var t in toggles)
+            {
+                <div class="flex items-center justify-between py-2">
+                    <div>
+                        <div class="text-sm font-medium text-gray-700">@t.label</div>
+                        <div class="text-xs text-gray-500">@t.desc</div>
+                    </div>
+                    @{
+                        var propVal = t.asp switch {
+                            "NotifEstoqueCritico" => Model.NotifEstoqueCritico,
+                            "NotifValidade" => Model.NotifValidade,
+                            "NotifParado" => Model.NotifParado,
+                            "NotifReposicao" => Model.NotifReposicao,
+                            _ => false
+                        };
+                    }
+                    <div x-data="{ on: @propVal.ToString().ToLower() }" class="relative">
+                        <input type="hidden" name="@t.asp" :value="on ? 'true' : 'false'" />
+                        <button type="button" @@click="on = !on"
+                                :class="on ? 'bg-indigo-600' : 'bg-gray-200'"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+                            <span :class="on ? 'translate-x-6' : 'translate-x-1'"
+                                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"></span>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Operacional -->
+    <div class="ws" x-data="{ fifo: @Model.Fifo.ToString().ToLower() }">
+        <h2 class="font-semibold text-gray-900 mb-4">Operacional</h2>
+        <div class="flex items-center justify-between py-2">
+            <div>
+                <div class="text-sm font-medium text-gray-700">Método FIFO (Primeiro a Entrar, Primeiro a Sair)</div>
+                <div class="text-xs text-gray-500">Prioriza o consumo de lotes mais antigos nas saídas</div>
+            </div>
+            <div class="relative">
+                <input type="hidden" name="Fifo" :value="fifo ? 'true' : 'false'" />
+                <button type="button" @@click="fifo = !fifo"
+                        :class="fifo ? 'bg-indigo-600' : 'bg-gray-200'"
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+                    <span :class="fifo ? 'translate-x-6' : 'translate-x-1'"
+                          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-end">
+        <button type="submit"
+                class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 text-sm">
+            Salvar Configurações
+        </button>
+    </div>
+</form>

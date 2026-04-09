@@ -10,6 +10,8 @@ using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Sqlite.DependencyInjection;
+using EasyStock.Infra.Sqlite.HealthChecks;
 using EasyStock.Infra.Async.DependencyInjection;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -26,6 +28,7 @@ using OpenTelemetry.Resources;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.FileProviders;
+using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,60 +48,161 @@ builder.Services.AddControllers();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddEndpointsApiExplorer();
 
-// Swagger com suporte a JWT Bearer
+// Swagger com suporte a JWT Bearer, dois idiomas e exemplos
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EasyStock API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header. Formato: 'Bearer {token}'",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
-    });
+    // ── Two language documents ────────────────────────────────────────────
+    c.SwaggerDoc("v1-ptbr", SwaggerConfiguration.InfoPortuguese);
+    c.SwaggerDoc("v1-en",   SwaggerConfiguration.InfoEnglish);
+
+    // ── Security ──────────────────────────────────────────────────────────
+    c.AddSecurityDefinition("Bearer", SwaggerConfiguration.BearerScheme);
+    c.AddSecurityRequirement(SwaggerConfiguration.BearerRequirement);
+
+    // ── Annotations ───────────────────────────────────────────────────────
+    c.EnableAnnotations();
+
+    // ── XML comments ──────────────────────────────────────────────────────
+    SwaggerXmlExtensions.IncludeXmlComments(c);
+
+    // ── Schema & operation filters ────────────────────────────────────────
+    c.SchemaFilter<SchemaExamplesFilter>();
+    c.OperationFilter<GetOperationExamplesFilter>();
+
+    // ── Use fully-qualified names to avoid schema conflicts ───────────────
+    c.CustomSchemaIds(type => type.FullName?.Replace('+', '.'));
+
+    // ── Order operations alphabetically by path ───────────────────────────
+    c.OrderActionsBy(api => $"{api.GroupName}_{api.RelativePath}");
 });
 
 // Database
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "PostgreSql";
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "Auto";
 var postgresConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection");
 var mongoDatabaseName = builder.Configuration["Database:MongoDatabase"] ?? "EasyStockDbMongo";
+var sqliteConnectionString = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=easystock.db";
 
-switch (databaseProvider.Trim().ToLowerInvariant())
+var resolvedProvider = await ResolveDatabaseProviderAsync(
+    databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
+
+switch (resolvedProvider)
 {
     case "mongodb":
-    case "mongo":
-        if (string.IsNullOrWhiteSpace(mongoConnectionString))
-            throw new InvalidOperationException("Connection string 'MongoConnection' nao configurada.");
-
-        builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString, mongoDatabaseName, builder.Configuration);
+        builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString!, mongoDatabaseName, builder.Configuration);
         builder.Services.AddHealthChecks()
             .AddCheck<MongoDatabaseHealthCheck>("MongoDB");
         break;
 
-    case "postgres":
     case "postgresql":
-        if (string.IsNullOrWhiteSpace(postgresConnectionString))
-            throw new InvalidOperationException("Connection string 'DefaultConnection' nao configurada.");
-
-        builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString, builder.Configuration);
+        builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString, name: "PostgreSQL");
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL");
+        break;
+
+    case "sqlite":
+        builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
+        builder.Services.AddHealthChecks()
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite");
         break;
 
     default:
         throw new InvalidOperationException($"Database:Provider '{databaseProvider}' nao suportado.");
+}
+
+static async Task<string> ResolveDatabaseProviderAsync(
+    string configuredProvider,
+    string? postgresConnectionString,
+    string? mongoConnectionString,
+    Serilog.ILogger logger)
+{
+    var normalized = configuredProvider.Trim().ToLowerInvariant();
+
+    if (normalized is "sqlite")
+        return "sqlite";
+
+    if (normalized is "postgres" or "postgresql")
+    {
+        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
+            await IsPostgresAvailableAsync(postgresConnectionString, logger))
+            return "postgresql";
+
+        logger.Warning(
+            "PostgreSQL nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            !string.IsNullOrWhiteSpace(postgresConnectionString));
+        return "sqlite";
+    }
+
+    if (normalized is "mongodb" or "mongo")
+    {
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            await IsMongoAvailableAsync(mongoConnectionString, logger))
+            return "mongodb";
+
+        logger.Warning(
+            "MongoDB nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            !string.IsNullOrWhiteSpace(mongoConnectionString));
+        return "sqlite";
+    }
+
+    if (normalized is "auto")
+    {
+        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
+            await IsPostgresAvailableAsync(postgresConnectionString, logger))
+        {
+            logger.Information("Auto-deteccao: usando PostgreSQL.");
+            return "postgresql";
+        }
+
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            await IsMongoAvailableAsync(mongoConnectionString, logger))
+        {
+            logger.Information("Auto-deteccao: usando MongoDB.");
+            return "mongodb";
+        }
+
+        logger.Warning("Auto-deteccao: nenhum banco externo disponivel. Usando SQLite.");
+        return "sqlite";
+    }
+
+    throw new InvalidOperationException($"Database:Provider '{configuredProvider}' nao suportado.");
+}
+
+static async Task<bool> IsPostgresAvailableAsync(string connectionString, Serilog.ILogger logger)
+{
+    try
+    {
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Timeout = 3,
+            CommandTimeout = 3
+        };
+        await using var conn = new Npgsql.NpgsqlConnection(builder.ToString());
+        await conn.OpenAsync();
+        return true;
+    }
+    catch (Exception ex)
+    {
+        logger.Debug(ex, "PostgreSQL indisponivel.");
+        return false;
+    }
+}
+
+static async Task<bool> IsMongoAvailableAsync(string connectionString, Serilog.ILogger logger)
+{
+    try
+    {
+        var settings = MongoDB.Driver.MongoClientSettings.FromConnectionString(connectionString);
+        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(3);
+        var client = new MongoDB.Driver.MongoClient(settings);
+        await client.ListDatabaseNamesAsync();
+        return true;
+    }
+    catch (Exception ex)
+    {
+        logger.Debug(ex, "MongoDB indisponivel.");
+        return false;
+    }
 }
 
 // Application
@@ -192,10 +296,35 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 20;
     });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = ((int)retryAfter.TotalSeconds).ToString();
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = ((int)retryAfter.TotalSeconds).ToString();
+        }
+        else
+        {
+            context.HttpContext.Response.Headers["Retry-After"] = "60";
+            context.HttpContext.Response.Headers["X-RateLimit-Reset"] = "60";
+        }
+
+        context.HttpContext.Response.ContentType = "application/json";
+        var correlationId = context.HttpContext.Items["CorrelationId"] as string ?? context.HttpContext.TraceIdentifier;
+        var envelope = new EasyStock.Api.Http.ApiErrorResponse(
+            new EasyStock.Api.Http.ApiError(
+                "RATE_LIMIT_EXCEEDED",
+                "Muitas requisicoes",
+                "Limite de requisicoes atingido. Tente novamente mais tarde.",
+                correlationId));
+        await context.HttpContext.Response.WriteAsJsonAsync(envelope, cancellationToken);
+    };
 });
 
 // Background Services
-builder.Services.AddHostedService<AnalisadorEstoqueBackgroundService>();
+builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 
 // Exception Handler
 builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalExceptionHandler>();
@@ -278,10 +407,38 @@ app.UseSerilogRequestLogging(options =>
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        // ── Two language documents ────────────────────────────────────────
+        c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
+        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+
+        // ── Custom route ──────────────────────────────────────────────────
+        c.RoutePrefix = "swagger";
+
+        // ── UI Behaviour ──────────────────────────────────────────────────
+        c.DocumentTitle        = "EasyStock API Docs";
+        c.DefaultModelsExpandDepth(1);       // show models collapsed by default
+        c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
+        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+        c.EnableFilter();
+        c.EnablePersistAuthorization();
+        c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
+        c.ShowExtensions();
+        c.ShowCommonExtensions();
+
+        // ── Custom assets ─────────────────────────────────────────────────
+        c.InjectStylesheet("/swagger-ui/custom.css");
+        c.InjectJavascript("/swagger-ui/custom.js");
+    });
 }
 
 app.UseHttpsRedirection();
+
+// Serve custom Swagger UI assets (CSS/JS) from wwwroot/swagger-ui
+app.UseStaticFiles(); // serves wwwroot by default
 if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
 {
     var localStorage = app.Services.GetRequiredService<IFileStorage>() as LocalFileStorage;

@@ -1,10 +1,12 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.ConfiguracoesLoja;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Controllers;
@@ -20,8 +22,10 @@ public class ConfiguracoesControllerTests
     public ConfiguracoesControllerTests()
     {
         var obter = new ObterConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository);
-        var atualizar = new AtualizarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork);
-        var resetar = new ResetarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork);
+        var atualizarLogger = Substitute.For<ILogger<AtualizarConfiguracaoLojaUseCase>>();
+        var resetarLogger = Substitute.For<ILogger<ResetarConfiguracaoLojaUseCase>>();
+        var atualizar = new AtualizarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork, atualizarLogger);
+        var resetar = new ResetarConfiguracaoLojaUseCase(_lojaRepository, _configuracaoLojaRepository, _unitOfWork, resetarLogger);
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _controller = new ConfiguracoesController(obter, atualizar, resetar, _currentUser);
     }
@@ -49,7 +53,7 @@ public class ConfiguracoesControllerTests
             null));
 
         result.Should().BeOfType<OkObjectResult>();
-        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ConfiguracaoLojaResult>().Subject;
+        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ConfiguracaoLojaResult>>().Subject.Data;
         payload.DiasAlertaValidade.Should().Be(7);
         payload.QuantidadeMinimaPadrao.Should().Be(9);
         payload.NotificarParado.Should().BeFalse();
@@ -69,7 +73,7 @@ public class ConfiguracoesControllerTests
         var result = await _controller.Reset(new ResetarConfiguracaoLojaCommand(empresaId, lojaId));
 
         result.Should().BeOfType<OkObjectResult>();
-        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ConfiguracaoLojaResult>().Subject;
+        var payload = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ConfiguracaoLojaResult>>().Subject.Data;
         payload.DiasAlertaValidade.Should().Be(15);
         payload.DiasAlertaParado.Should().Be(30);
         payload.QuantidadeMinimaPadrao.Should().Be(5);

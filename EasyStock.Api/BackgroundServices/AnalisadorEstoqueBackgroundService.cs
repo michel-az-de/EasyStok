@@ -10,6 +10,8 @@ namespace EasyStock.Api.BackgroundServices
         : BackgroundService
     {
         private readonly TimeSpan _intervalo = TimeSpan.FromMinutes(60);
+        private readonly TimeSpan _retryDelay = TimeSpan.FromMinutes(5);
+        private const int MaxRetries = 3;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -17,16 +19,40 @@ namespace EasyStock.Api.BackgroundServices
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                await ExecutarComRetryAsync(stoppingToken);
+                await Task.Delay(_intervalo, stoppingToken);
+            }
+        }
+
+        private async Task ExecutarComRetryAsync(CancellationToken ct)
+        {
+            for (var tentativa = 1; tentativa <= MaxRetries; tentativa++)
+            {
                 try
                 {
-                    await AnalisarAsync(stoppingToken);
+                    await AnalisarAsync(ct);
+                    return;
                 }
-                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    logger.LogError(ex, "Erro durante analise de estoque no background service.");
+                    return;
                 }
+                catch (Exception ex)
+                {
+                    if (tentativa == MaxRetries)
+                    {
+                        logger.LogError(ex,
+                            "Analise de estoque falhou apos {MaxRetries} tentativas. Evento descartado (dead-letter). Proxima execucao em {Intervalo} minutos.",
+                            MaxRetries, _intervalo.TotalMinutes);
+                        return;
+                    }
 
-                await Task.Delay(_intervalo, stoppingToken);
+                    logger.LogWarning(ex,
+                        "Erro na tentativa {Tentativa}/{MaxRetries} da analise de estoque. Aguardando {RetryDelay} minutos para nova tentativa.",
+                        tentativa, MaxRetries, _retryDelay.TotalMinutes);
+
+                    await Task.Delay(_retryDelay, ct);
+                }
             }
         }
 

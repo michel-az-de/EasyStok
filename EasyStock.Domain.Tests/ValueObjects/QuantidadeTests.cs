@@ -29,7 +29,7 @@ public class QuantidadeTests
 
         // Assert
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage("*Quantidade não pode ser negativa.*");
+            .WithMessage("*Quantidade nÃ£o pode ser negativa.*");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class QuantidadeTests
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Resultado da subtração resultaria em quantidade negativa.");
+            .WithMessage("Resultado da subtraÃ§Ã£o resultaria em quantidade negativa.");
     }
 
     [Fact]

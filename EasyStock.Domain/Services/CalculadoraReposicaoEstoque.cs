@@ -1,13 +1,17 @@
-using System;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Services
 {
+    /// <summary>
+    /// Calcula a quantidade sugerida de reposi√ß√£o com base no consumo m√©dio di√°rio,
+    /// tempo de reposi√ß√£o (lead time) e dias de estoque de seguran√ßa.
+    /// </summary>
     public sealed class CalculadoraReposicaoEstoque
     {
-        // Calcula a quantidade sugerida de reposiÁ„o considerando consumo mÈdio di·rio,
-        // tempo de reposiÁ„o (lead time) e dias de estoque de seguranÁa.
-        // Retorna Quantidade.Zero se n„o for necess·rio repor.
+        /// <summary>
+        /// Retorna a quantidade a repor arredondada para o m√∫ltiplo do tamanho do lote.
+        /// Retorna <see cref="Quantidade.Zero"/> quando o estoque atual j√° √© suficiente.
+        /// </summary>
         public Quantidade CalcularQuantidadeReposicao(
             Quantidade quantidadeAtual,
             int consumoMedioDiario,
@@ -26,7 +30,7 @@ namespace EasyStock.Domain.Services
 
             if (necessario <= 0) return Quantidade.Zero;
 
-            // Ajustar para o m˙ltiplo do tamanho do lote (arredonda para cima)
+            // Arredonda para cima at√© o pr√≥ximo m√∫ltiplo do tamanho do lote
             var unidades = ((necessario + tamanhoLote - 1) / tamanhoLote) * tamanhoLote;
 
             return Quantidade.From(unidades);

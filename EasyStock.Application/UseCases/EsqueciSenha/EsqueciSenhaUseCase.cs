@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -11,7 +12,8 @@ public sealed class EsqueciSenhaUseCase(
     IResetTokenRepository resetTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    ILogger<EsqueciSenhaUseCase> logger) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
+    ILogger<EsqueciSenhaUseCase> logger,
+    IEmailService? emailService = null) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
 {
     public async Task<EsqueciSenhaResult> ExecuteAsync(EsqueciSenhaCommand command)
     {
@@ -48,8 +50,30 @@ public sealed class EsqueciSenhaUseCase(
 
         await unitOfWork.CommitAsync();
 
-        // TODO: Enviar email com token
-        logger.LogInformation("Token de reset gerado para usuario {UsuarioId}: {Token}", usuario.Id, token);
+        if (emailService is not null)
+        {
+            try
+            {
+                var subject = "Recuperação de senha - EasyStock";
+                var body = $"Olá {usuario.Nome},\n\n" +
+                           $"Recebemos uma solicitação para redefinir a senha da sua conta.\n\n" +
+                           $"Use o token abaixo para criar uma nova senha (válido por 1 hora):\n\n" +
+                           $"{token}\n\n" +
+                           $"Se você não solicitou a redefinição de senha, ignore este e-mail.\n\n" +
+                           $"Equipe EasyStock";
+
+                await emailService.SendAsync(usuario.Email, subject, body);
+                logger.LogInformation("E-mail de recuperacao de senha enviado para {Email}", usuario.Email);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha ao enviar e-mail de recuperacao de senha para {Email}. Token gerado normalmente.", usuario.Email);
+            }
+        }
+        else
+        {
+        logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
+        }
 
         return new EsqueciSenhaResult(true);
     }

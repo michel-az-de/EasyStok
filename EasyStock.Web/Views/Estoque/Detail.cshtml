@@ -1,0 +1,111 @@
+@model EstoqueDetailViewModel
+@using System.Globalization
+@{
+    var ptBR = new CultureInfo("pt-BR");
+    var item = Model.Item;
+    var diasParaVencer = item.Validade.HasValue
+        ? (item.Validade.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days
+        : (int?)null;
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a href="/estoque" class="text-slate-400 hover:text-slate-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <div class="pg-hd">
+        <h1>@(Model.Produto?.Nome ?? item.Sku)</h1>
+        <p>Variação: @(Model.Variacao?.Nome ?? "Padrão") · SKU: @item.Sku</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Dados principais -->
+    <div class="lg:col-span-2 space-y-4">
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Situação do estoque</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-slate-50 rounded-xl">
+                    <div class="kpi-val @(item.Qty == 0 ? "text-red-600" : item.Qty < 5 ? "text-amber-600" : "text-emerald-600")">@item.Qty</div>
+                    <div class="kpi-lbl">Quantidade</div>
+                </div>
+                <div class="text-center p-4 bg-slate-50 rounded-xl">
+                    <div class="kpi-val text-slate-700">@item.Stopped</div>
+                    <div class="kpi-lbl">Dias parado</div>
+                </div>
+                <div class="text-center p-4 bg-slate-50 rounded-xl">
+                    <div class="kpi-val text-slate-700">@item.Vel.ToString("F1")</div>
+                    <div class="kpi-lbl">Rotatividade</div>
+                </div>
+                <div class="text-center p-4 bg-slate-50 rounded-xl">
+                    @{
+                        var sClass = item.Status?.ToLower() switch
+                        {
+                            "ok" or "normal" => "badge-ok",
+                            "critico" or "crítico" => "badge-critical",
+                            "parado" => "badge-slow",
+                            _ => "badge-warn"
+                        };
+                    }
+                    <span class="badge @sClass px-3 py-1 rounded-full font-semibold text-sm">@item.Status</span>
+                    <div class="kpi-lbl mt-1">Status</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Detalhes do lote</h3>
+            <dl class="space-y-3">
+                <div class="flex justify-between">
+                    <dt class="text-sm text-slate-500">Data de entrada</dt>
+                    <dd class="text-sm font-semibold">@item.EntryDate.ToString("dd/MM/yyyy")</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-sm text-slate-500">Última movimentação</dt>
+                    <dd class="text-sm font-semibold">@item.LastMov.ToString("dd/MM/yyyy HH:mm")</dd>
+                </div>
+                @if (!string.IsNullOrEmpty(item.Lote))
+                {
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-slate-500">Lote</dt>
+                        <dd class="text-sm font-semibold font-mono">@item.Lote</dd>
+                    </div>
+                }
+                @if (item.Validade.HasValue)
+                {
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-slate-500">Validade</dt>
+                        <dd class="text-sm font-semibold @(diasParaVencer <= 7 ? "text-red-600" : "")">
+                            @item.Validade.Value.ToString("dd/MM/yyyy")
+                            @if (diasParaVencer <= 7)
+                            {
+                                <span class="ml-2 badge badge-critical px-2 py-0.5 rounded text-xs">@diasParaVencer dias</span>
+                            }
+                        </dd>
+                    </div>
+                }
+            </dl>
+        </div>
+    </div>
+
+    <!-- Ações -->
+    <div class="space-y-4">
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Ações</h3>
+            <div class="space-y-2">
+                <a href="/entradas/nova"
+                   class="flex items-center gap-2 w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Registrar entrada
+                </a>
+                <a href="/estoque"
+                   class="flex items-center gap-2 w-full px-4 py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                    Voltar ao estoque
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

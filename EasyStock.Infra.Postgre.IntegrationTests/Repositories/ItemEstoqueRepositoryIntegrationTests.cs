@@ -177,7 +177,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaB.Id,
-                ProdutoId = Guid.NewGuid(), // Produto B, mas n„o importa
+                ProdutoId = Guid.NewGuid(), // Produto B, mas n√£o importa
                 QuantidadeAtual = Quantidade.From(20),
                 Status = StatusItemEstoque.Ativo,
                 EntradaEm = DateTime.UtcNow,
