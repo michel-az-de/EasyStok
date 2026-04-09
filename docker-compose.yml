@@ -1,0 +1,72 @@
+version: "3.9"
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  easystock-net:
+    driver: bridge
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+  uploads-data:
+
+# ─── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ── API EasyStock ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: easystock-api:latest
+    container_name: easystock-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      Database__Provider: PostgreSql
+      ConnectionStrings__DefaultConnection: >-
+        Host=pg-easystock.postgres.database.azure.com;Port=5432;Database=easystock;
+        Username=adm_eabefe80;Password=RTNjezbZnmrI1S%*fCdC;
+        SSL Mode=Require;Trust Server Certificate=true
+      ConnectionStrings__Redis: "localhost:6379"
+      Jwt__Issuer: ${JWT_ISSUER:-EasyStock}
+      Jwt__Audience: ${JWT_AUDIENCE:-EasyStock}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY obrigatoria}
+      Jwt__ExpirationMinutes: "60"
+      Anthropic__Enabled: "false"
+      FileStorage__Provider: Local
+      OpenTelemetry__OtlpEndpoint: "http://localhost:4317"
+    volumes:
+      - uploads-data:/app/uploaded-files
+    networks:
+      - easystock-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ── PostgreSQL local (desenvolvimento offline) ────────────────────────────────
+  postgres-local:
+    image: postgres:17-alpine
+    container_name: easystock-postgres
+    restart: unless-stopped
+    profiles: ["local"]
+    environment:
+      POSTGRES_DB: easystock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - easystock-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d easystock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

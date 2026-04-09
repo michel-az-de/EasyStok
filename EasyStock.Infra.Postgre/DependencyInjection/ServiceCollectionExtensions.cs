@@ -18,7 +18,15 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             string connectionString,
             IConfiguration configuration)
         {
-            services.AddDbContext<EasyStockDbContext>(options => options.UseNpgsql(connectionString));
+            services.AddDbContext<EasyStockDbContext>(options =>
+                options.UseNpgsql(connectionString, npgsql =>
+                {
+                    npgsql.MigrationsAssembly("EasyStock.Infra.Postgre");
+                    npgsql.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null);
+                }));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();

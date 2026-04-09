@@ -1,5 +1,6 @@
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
+using EasyStock.Api.Data;
 using EasyStock.Api.Services;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output.Storage;
@@ -7,6 +8,7 @@ using EasyStock.Application.Validators;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
+using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Sqlite.DependencyInjection;
 using EasyStock.Infra.Sqlite.HealthChecks;
@@ -15,6 +17,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -228,8 +231,10 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.MetricsService>();
 builder.Services.AddProblemDetails();
 
 // Authentication / Authorization
-var jwtKey = builder.Configuration["Jwt:SecretKey"]
-    ?? throw new InvalidOperationException("Jwt:SecretKey nao configurado.");
+var jwtKey = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException(
+        "Jwt:SecretKey nao configurado. Defina a variavel de ambiente 'Jwt__SecretKey' ou configure appsettings.Development.json.");
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
@@ -354,6 +359,24 @@ builder.Services.AddStackExchangeRedisCache(options =>
 builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
 
 var app = builder.Build();
+
+// Migration automática e seed de dados (somente PostgreSQL)
+if (databaseProvider.Trim().ToLowerInvariant() is "postgres" or "postgresql")
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await db.Database.MigrateAsync();
+        app.Logger.LogInformation("Migrations aplicadas com sucesso.");
+
+        await SeedData.ExecutarAsync(scope.ServiceProvider, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Erro durante migration/seed. A aplicacao continuara mas pode estar incompleta.");
+    }
+}
 
 // Middleware for Correlation ID
 app.Use(async (context, next) =>

@@ -1,0 +1,201 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+variables:
+  buildConfiguration: Release
+  dotnetVersion: "9.x"
+  imageName: "easystock-api"
+  # Definir no grupo de variáveis do Azure DevOps:
+  #   acrName        — nome do Azure Container Registry (sem .azurecr.io)
+  #   aksResourceGroup — resource group do AKS
+  #   aksClusterName   — nome do cluster AKS
+  #   jwtSecretKey     — segredo JWT (variável protegida)
+  #   azureSubscription — nome da service connection
+
+stages:
+  # ─── Stage: Build ────────────────────────────────────────────────────────────
+  - stage: Build
+    displayName: "Build, Test & Push"
+    jobs:
+      - job: BuildAndTest
+        displayName: "Build & Unit/Integration Tests"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: UseDotNet@2
+            displayName: "Instalar .NET $(dotnetVersion)"
+            inputs:
+              packageType: sdk
+              version: $(dotnetVersion)
+
+          - task: DotNetCoreCLI@2
+            displayName: "Restore"
+            inputs:
+              command: restore
+              projects: "**/*.csproj"
+
+          - task: DotNetCoreCLI@2
+            displayName: "Build"
+            inputs:
+              command: build
+              projects: "**/*.csproj"
+              arguments: "--configuration $(buildConfiguration) --no-restore"
+
+          - task: DotNetCoreCLI@2
+            displayName: "Testes Unitarios e de Dominio"
+            inputs:
+              command: test
+              projects: |
+                EasyStock.Domain.Tests/EasyStock.Domain.Tests.csproj
+                EasyStock.Application.Tests/EasyStock.Application.Tests.csproj
+                EasyStock.Api.UnitTests/EasyStock.Api.UnitTests.csproj
+              arguments: >-
+                --configuration $(buildConfiguration)
+                --no-build
+                --logger trx
+                --collect:"XPlat Code Coverage"
+              publishTestResults: true
+
+          - task: DotNetCoreCLI@2
+            displayName: "Testes de Integracao (requerem Docker)"
+            inputs:
+              command: test
+              projects: |
+                EasyStock.Infra.Postgre.IntegrationTests/EasyStock.Infra.Postgre.IntegrationTests.csproj
+                EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
+              arguments: >-
+                --configuration $(buildConfiguration)
+                --no-build
+                --logger trx
+              publishTestResults: true
+            env:
+              DOCKER_HOST: unix:///var/run/docker.sock
+
+          - task: PublishCodeCoverageResults@2
+            displayName: "Publicar Cobertura de Codigo"
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: "$(Agent.TempDirectory)/**/coverage.cobertura.xml"
+
+      - job: DockerBuildAndPush
+        displayName: "Docker Build & Push to ACR"
+        dependsOn: BuildAndTest
+        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: AzureCLI@2
+            displayName: "Login no ACR"
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr login --name $(acrName)
+
+          - task: Docker@2
+            displayName: "Build imagem API"
+            inputs:
+              command: build
+              dockerfile: Dockerfile
+              buildContext: .
+              repository: "$(acrName).azurecr.io/$(imageName)"
+              tags: |
+                latest
+                $(Build.BuildId)
+                $(Build.SourceVersion)
+
+          - task: Docker@2
+            displayName: "Push imagem API para ACR"
+            inputs:
+              command: push
+              repository: "$(acrName).azurecr.io/$(imageName)"
+              tags: |
+                latest
+                $(Build.BuildId)
+
+  # ─── Stage: Deploy ───────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: "Deploy para AKS"
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToAKS
+        displayName: "Deploy EasyStock API no AKS"
+        environment: "production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: "Obter credenciais AKS"
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az aks get-credentials \
+                        --resource-group $(aksResourceGroup) \
+                        --name $(aksClusterName) \
+                        --overwrite-existing
+
+                - task: KubernetesManifest@1
+                  displayName: "Aplicar Namespace"
+                  inputs:
+                    action: deploy
+                    kubernetesServiceConnection: ""
+                    namespace: easystock
+                    manifests: k8s/namespace.yaml
+
+                - task: KubernetesManifest@1
+                  displayName: "Aplicar ConfigMap"
+                  inputs:
+                    action: deploy
+                    namespace: easystock
+                    manifests: k8s/configmap.yaml
+
+                - task: KubernetesManifest@1
+                  displayName: "Criar/Atualizar Secret"
+                  inputs:
+                    action: createSecret
+                    namespace: easystock
+                    secretType: generic
+                    secretName: easystock-secrets
+                    secretArguments: >-
+                      --from-literal=ConnectionStrings__DefaultConnection="$(azurePgConnectionString)"
+                      --from-literal=Jwt__SecretKey="$(jwtSecretKey)"
+
+                - task: KubernetesManifest@1
+                  displayName: "Deploy API"
+                  inputs:
+                    action: deploy
+                    namespace: easystock
+                    manifests: |
+                      k8s/api-deployment.yaml
+                      k8s/api-service.yaml
+                      k8s/ingress.yaml
+                      k8s/hpa.yaml
+                    containers: |
+                      $(acrName).azurecr.io/$(imageName):$(Build.BuildId)
+
+                - task: AzureCLI@2
+                  displayName: "Verificar rollout"
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      kubectl rollout status deployment/easystock-api \
+                        -n easystock \
+                        --timeout=5m
