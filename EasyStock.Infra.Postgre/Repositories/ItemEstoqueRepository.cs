@@ -13,6 +13,7 @@ namespace EasyStock.Infra.Postgre.Repositories
     public sealed class ItemEstoqueRepository(EasyStockDbContext dbContext)
         : IItemEstoqueRepository
     {
+        private const decimal FallbackMargemPrecoSugerido = 1.3m;
         public Task<ItemEstoque?> GetByIdAsync(Guid id) =>
             dbContext.ItensEstoque.FirstOrDefaultAsync(i => i.Id == id);
 
@@ -21,7 +22,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.EmpresaId == empresaId && i.Id == id);
 
-        public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo)
+        public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -38,6 +39,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (i.Cor != null && EF.Functions.ILike(i.Cor, pattern)) ||
                      (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern)) ||
                      (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern))))
+                .Take(maxResults)
                 .ToListAsync();
         }
 
@@ -147,7 +149,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     ValorTotal = i.CustoUnitario.Valor * i.QuantidadeAtual.Value,
                     PrecoReferencia = i.PrecoVendaSugerido != null
                         ? i.PrecoVendaSugerido.Valor
-                        : i.CustoUnitario.Valor * 1.3m
+                        : i.CustoUnitario.Valor * FallbackMargemPrecoSugerido
                 })
                 .ToListAsync();
 

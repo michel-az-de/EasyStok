@@ -12,6 +12,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Intelligence / Inteligência")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/inteligencia")]
 [EnableRateLimiting("ai")]

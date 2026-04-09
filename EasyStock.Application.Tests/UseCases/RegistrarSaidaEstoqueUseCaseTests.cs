@@ -97,8 +97,8 @@ public class RegistrarSaidaEstoqueUseCaseTests
             i.Id == loteNovo.Id &&
             i.QuantidadeAtual.Value == 3));
 
-        await itemVendaRepository.Received(2).InsertAsync(Arg.Any<ItemVenda>());
-        await movimentacaoRepository.Received(2).InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        await itemVendaRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<ItemVenda>>(x => x.Count() == 2));
+        await movimentacaoRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<MovimentacaoEstoque>>(x => x.Count() == 2));
         await unitOfWork.Received(1).CommitAsync();
     }
 
@@ -187,10 +187,10 @@ public class RegistrarSaidaEstoqueUseCaseTests
             v.Id == result.VendaId &&
             v.Natureza == NaturezaMovimentacaoEstoque.Venda));
 
-        await itemVendaRepository.Received(2).InsertAsync(Arg.Any<ItemVenda>());
+        await itemVendaRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<ItemVenda>>(x => x.Count() == 2));
 
-        await movimentacaoRepository.Received(2).InsertAsync(Arg.Is<MovimentacaoEstoque>(m =>
-            m.Tipo == TipoMovimentacaoEstoque.Saida));
+        await movimentacaoRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<MovimentacaoEstoque>>(x =>
+            x.All(m => m.Tipo == TipoMovimentacaoEstoque.Saida) && x.Count() == 2));
 
         await unitOfWork.Received(1).CommitAsync();
     }

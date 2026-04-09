@@ -13,6 +13,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Analytics")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/analytics")]
 [EnableRateLimiting("geral")]

@@ -201,10 +201,8 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 throw new VendaSemItensException(venda.Id);
 
             await vendaRepository.InsertAsync(venda);
-            foreach (var itemVenda in itensVenda)
-                await itemVendaRepository.InsertAsync(itemVenda);
-            foreach (var movimentacao in movimentacoes)
-                await movimentacaoEstoqueRepository.InsertAsync(movimentacao);
+            await itemVendaRepository.InsertRangeAsync(itensVenda);
+            await movimentacaoEstoqueRepository.InsertRangeAsync(movimentacoes);
             await unitOfWork.CommitAsync();
 
             logger.LogWarning("AUDIT: Sa�da de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",

@@ -34,7 +34,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo)
+        public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -50,6 +50,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (v.DescricaoComercial != null && EF.Functions.ILike(v.DescricaoComercial, pattern)) ||
                      EF.Functions.ILike(EF.Property<string?>(v, nameof(ProdutoVariacao.Sku))!, pattern) ||
                     (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
+                .Take(maxResults)
                 .ToListAsync();
         }
 

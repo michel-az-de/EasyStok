@@ -42,7 +42,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo)
+        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -57,13 +57,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
                      EF.Functions.ILike(EF.Property<string?>(p, nameof(Produto.SkuBase))!, pattern) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
+                .Take(maxResults)
                 .ToListAsync();
         }
 
         public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
             Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
         {
-            var cacheKey = $"produtos_paginados_{empresaId}_{page}_{pageSize}_{sort}_{order}";
+            var versao = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
+            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sort}_{order}";
 
             if (cache is not null)
             {
@@ -108,13 +110,28 @@ namespace EasyStock.Infra.Postgre.Repositories
             return result;
         }
 
-        public Task InsertAsync(Produto produto) =>
-            dbContext.Produtos.AddAsync(produto).AsTask();
+        public async Task InsertAsync(Produto produto)
+        {
+            await dbContext.Produtos.AddAsync(produto);
+            await InvalidarCacheAsync(produto.EmpresaId);
+        }
 
-        public Task UpdateAsync(Produto produto)
+        public async Task UpdateAsync(Produto produto)
         {
             dbContext.Produtos.Update(produto);
-            return Task.CompletedTask;
+            await InvalidarCacheAsync(produto.EmpresaId);
         }
+
+        private async Task InvalidarCacheAsync(Guid empresaId)
+        {
+            if (cache is null) return;
+            var novaVersao = DateTime.UtcNow.Ticks.ToString();
+            await cache.SetStringAsync(VersaoKey(empresaId), novaVersao, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = CacheDuration
+            });
+        }
+
+        private static string VersaoKey(Guid empresaId) => $"produtos_versao_{empresaId}";
     }
 }

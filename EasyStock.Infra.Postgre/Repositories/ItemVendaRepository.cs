@@ -9,5 +9,11 @@ namespace EasyStock.Infra.Postgre.Repositories
     {
         public Task InsertAsync(ItemVenda itemVenda) =>
             dbContext.ItensVenda.AddAsync(itemVenda).AsTask();
+
+        public Task InsertRangeAsync(IEnumerable<ItemVenda> itens)
+        {
+            dbContext.ItensVenda.AddRange(itens);
+            return Task.CompletedTask;
+        }
     }
 }
