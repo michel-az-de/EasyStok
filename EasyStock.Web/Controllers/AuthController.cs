@@ -104,8 +104,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji, string? lojaEmpresaId)
     {
         session.SetLoja(lojaId, lojaNome, lojaEmoji);
-        if (!string.IsNullOrEmpty(lojaEmpresaId))
-            session.SetEmpresaId(lojaEmpresaId);
+        session.SetEmpresaId(lojaEmpresaId ?? string.Empty);
         return RedirectToAction("Index", "Dashboard");
     }
 
