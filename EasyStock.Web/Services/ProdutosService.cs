@@ -6,7 +6,7 @@ namespace EasyStock.Web.Services;
 public class ProdutosService(ApiClient api, SessionService session)
 {
     private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(
         int page = 1, int limit = 20)

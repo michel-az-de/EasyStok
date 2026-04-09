@@ -24,15 +24,19 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
             {
                 request.Headers.TryAddWithoutValidation("X-Loja-ID", lojaId);
 
-                // Also inject empresaId as query param for compatibility
-                var uri = request.RequestUri!;
-                var uriBuilder = new UriBuilder(uri);
-                var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
-                if (string.IsNullOrEmpty(query["empresaId"]))
+                // Inject empresaId as query param from session (empresa context, not loja)
+                var empresaId = session.GetEmpresaId();
+                if (!string.IsNullOrEmpty(empresaId))
                 {
-                    query["empresaId"] = lojaId;
-                    uriBuilder.Query = query.ToString();
-                    request.RequestUri = uriBuilder.Uri;
+                    var uri = request.RequestUri!;
+                    var uriBuilder = new UriBuilder(uri);
+                    var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
+                    if (string.IsNullOrEmpty(query["empresaId"]))
+                    {
+                        query["empresaId"] = empresaId;
+                        uriBuilder.Query = query.ToString();
+                        request.RequestUri = uriBuilder.Uri;
+                    }
                 }
             }
         }
