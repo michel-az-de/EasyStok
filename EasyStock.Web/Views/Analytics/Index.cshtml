@@ -2,6 +2,7 @@
 @{
     ViewBag.Title = "Analytics";
     Layout = "_Layout";
+    var ptBR = new System.Globalization.CultureInfo("pt-BR");
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -12,29 +13,30 @@
     </a>
 </div>
 
-<!-- KPIs -->
+<!-- KPIs do estoque atual -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="ws">
-        <div class="kpi-lbl">Receita Total</div>
-        <div class="kpi-val text-green-600">R$ @Model.ReceitaTotal.ToString("N2")</div>
+        <div class="kpi-lbl">Receita est. (período)</div>
+        <div class="kpi-val text-green-600">R$ @Model.ReceitaEstimadaPeriodo.ToString("N2")</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">Unidades Vendidas</div>
-        <div class="kpi-val">@Model.UnidadesVendidas</div>
+        <div class="kpi-lbl">Unid. vendidas (último mês)</div>
+        <div class="kpi-val">@Model.UnidadesVendidasMes</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">Valor em Estoque</div>
+        <div class="kpi-lbl">Valor em estoque</div>
         <div class="kpi-val text-blue-600">R$ @Model.ValorEstoque.ToString("N2")</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">SKUs em Estoque</div>
+        <div class="kpi-lbl">Itens em estoque</div>
         <div class="kpi-val">@Model.TotalEstoque</div>
     </div>
 </div>
 
-<!-- Projeções -->
+<!-- Projeções derivadas da velocidade média diária -->
 <div class="ws mb-6">
-    <h2 class="font-semibold text-gray-900 mb-4">Projeções de Demanda</h2>
+    <h2 class="font-semibold text-gray-900 mb-1">Projeções de Demanda</h2>
+    <p class="text-xs text-gray-400 mb-4">Baseadas na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="text-center p-3 bg-gray-50 rounded-lg">
             <div class="text-xl font-bold text-gray-900">@Model.ProjUnidadesDia.ToString("N0")</div>
@@ -123,25 +125,45 @@
     </div>
 </div>
 
-<!-- Gráfico sazonalidade -->
-@if (Model.BoardSazonalidade.Any())
+<!-- Gráfico receita mensal -->
+@if (Model.GraficoLabels.Any())
 {
     <div class="ws mb-6">
-        <h2 class="font-semibold text-gray-900 mb-4">Sazonalidade de Produtos</h2>
-        <div class="space-y-2">
-            @foreach (var item in Model.BoardSazonalidade.Take(10))
-            {
-                <div class="flex items-center gap-3">
-                    <div class="w-48 truncate text-sm text-gray-700">
-                        @if (!string.IsNullOrEmpty(item.Emoji)) { @(item.Emoji + " ") }
-                        @item.Nome
-                    </div>
-                    <div class="flex-1 bg-gray-100 rounded-full h-3">
-                        <div class="bg-indigo-500 h-3 rounded-full" style="width: @(item.Pct)%"></div>
-                    </div>
-                    <div class="text-sm text-gray-500 w-16 text-right">@item.Vel.ToString("N1")/dia</div>
-                </div>
-            }
-        </div>
+        <h2 class="font-semibold text-gray-900 mb-4">Receita Bruta — últimos meses</h2>
+        <canvas id="grafico-receita-analytics" height="120"></canvas>
     </div>
+}
+
+@section Scripts {
+    @if (Model.GraficoLabels.Any())
+    {
+        <script>
+            const ctx = document.getElementById('grafico-receita-analytics');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels)),
+                        datasets: [{
+                            label: 'Receita Bruta',
+                            data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados)),
+                            backgroundColor: 'rgba(99,102,241,0.7)',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                ticks: {
+                                    callback: v => 'R$ ' + v.toLocaleString('pt-BR')
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        </script>
+    }
 }

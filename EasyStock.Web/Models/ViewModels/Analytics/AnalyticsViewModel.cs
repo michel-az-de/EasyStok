@@ -4,23 +4,29 @@ namespace EasyStock.Web.Models.ViewModels.Analytics;
 
 public class AnalyticsViewModel
 {
-    public decimal ReceitaTotal { get; set; }
+    // KPIs do período (vindos do dashboard summary)
+    public decimal ReceitaEstimadaPeriodo { get; set; }
     public int TotalEstoque { get; set; }
     public decimal ValorEstoque { get; set; }
-    public decimal UnidadesVendidas { get; set; }
-    public decimal VelMedia { get; set; }
+    public decimal MediaVendasDiaria { get; set; }
 
-    // Projeções (derivadas do resumo do dashboard)
+    // Dados reais do último mês (vindos do endpoint receita)
+    public int UnidadesVendidasMes { get; set; }
+    public decimal ReceitaMes { get; set; }
+
+    // Projeções derivadas da velocidade média diária
     public decimal ProjUnidadesDia { get; set; }
     public decimal ProjUnidades7d { get; set; }
     public decimal ProjUnidades30d { get; set; }
     public decimal ProjReceita30d { get; set; }
 
+    // Gráfico de receita mensal
+    public List<string> GraficoLabels { get; set; } = [];
+    public List<decimal> GraficoDados { get; set; } = [];
+
     // Listas
     public List<ReposicaoSugerida> ItensReposicaoUrgente { get; set; } = [];
-    public List<ProdutoSazonalidade> BoardSazonalidade { get; set; } = [];
     public List<AlertaItem> Alertas { get; set; } = [];
 }
 
-public record ProdutoSazonalidade(string ProdutoId, string Nome, string? Emoji, decimal Vel, int Pct);
 public record AlertaItem(string Tipo, string Titulo, string Mensagem, string? ReferenciaId);

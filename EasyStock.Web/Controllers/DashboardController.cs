@@ -1,4 +1,4 @@
-using System.Text.Json;
+using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Dashboard;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -16,24 +16,53 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
 
         var vm = new DashboardViewModel();
 
-        // Load dashboard data — best-effort, show empty state on failure
-        var dashResult = await api.GetAsync<JsonElement>("analytics/dashboard");
-        if (dashResult.Success)
+        // Load all dashboard data in parallel — best-effort, show empty state on failure
+        var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
+        var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
+        var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
+        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>("analytics/receita?meses=6");
+
+        var (dashResult, reposResult, movsResult, receitaResult) = (
+            await dashTask, await reposTask, await movsTask, await receitaTask
+        );
+
+        if (dashResult.Success && dashResult.Data is { } d)
         {
-            var d = dashResult.Data;
-            vm.TotalProdutos = GetInt(d, "totalSkus");
-            vm.ReceitaMes = GetDecimal(d, "receitaEstimadaPeriodo");
-            vm.EstoqueCritico = GetInt(d, "alertasEstoqueBaixo");
-            vm.ProximosVencimento = GetInt(d, "alertasVencimento");
-            vm.ProdutosParados = GetInt(d, "alertasItensParados");
+            vm.TotalProdutos = d.TotalSkus;
+            vm.QuantidadeTotalEmEstoque = d.QuantidadeTotalEmEstoque;
+            vm.ValorEstoque = d.ValorTotalEstoque;
+            vm.ReceitaMes = d.ReceitaEstimadaPeriodo;
+            vm.EstoqueCritico = d.AlertasEstoqueBaixo;
+            vm.ProximosVencimento = d.AlertasVencimento;
+            vm.ProdutosParados = d.AlertasItensParados;
+        }
+
+        if (reposResult.Success && reposResult.Data is { } repos)
+            vm.SugestoesReposicao = repos.Count;
+
+        if (movsResult.Success && movsResult.Data is { } movs)
+        {
+            foreach (var m in movs.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes).ThenByDescending(x => x.Dia).Take(10))
+            {
+                vm.MovimentacoesRecentes.Add(new MovimentacaoRecente
+                {
+                    Tipo = m.Tipo,
+                    TotalMovimentacoes = m.TotalMovimentacoes,
+                    Qty = m.QuantidadeTotal,
+                    Valor = m.ValorTotal > 0 ? m.ValorTotal : null,
+                    Data = new DateOnly(m.Ano, m.Mes, m.Dia)
+                });
+            }
+        }
+
+        if (receitaResult.Success && receitaResult.Data is { } receita)
+        {
+            var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
+            vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
+            vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
         }
 
         return View(vm);
     }
-
-    private static int GetInt(JsonElement el, string prop) =>
-        el.TryGetProperty(prop, out var v) && v.TryGetInt32(out var i) ? i : 0;
-
-    private static decimal GetDecimal(JsonElement el, string prop) =>
-        el.TryGetProperty(prop, out var v) && v.TryGetDecimal(out var d) ? d : 0m;
 }
+

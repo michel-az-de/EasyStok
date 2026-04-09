@@ -17,19 +17,19 @@
 <!-- KPI Cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="ws">
-        <div class="kpi-lbl">Total de produtos</div>
+        <div class="kpi-lbl">Total de SKUs</div>
         <div class="kpi-val text-slate-900">@Model.TotalProdutos</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">Entradas do mês</div>
-        <div class="kpi-val text-emerald-600">@Model.EntradasMes</div>
+        <div class="kpi-lbl">Itens em estoque</div>
+        <div class="kpi-val text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">Vendas do mês</div>
-        <div class="kpi-val text-indigo-600">@Model.VendasMes</div>
+        <div class="kpi-lbl">Valor em estoque</div>
+        <div class="kpi-val text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
     </div>
     <div class="ws">
-        <div class="kpi-lbl">Receita do mês</div>
+        <div class="kpi-lbl">Receita estimada</div>
         <div class="kpi-val text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
     </div>
 </div>
@@ -76,9 +76,10 @@
             <table class="tbl-full">
                 <thead>
                     <tr>
-                        <th>Produto</th>
                         <th>Tipo</th>
+                        <th class="text-right">Movimentações</th>
                         <th class="text-right">Qtd</th>
+                        <th class="text-right">Valor</th>
                         <th class="text-right">Data</th>
                     </tr>
                 </thead>
@@ -86,7 +87,6 @@
                     @foreach (var m in Model.MovimentacoesRecentes)
                     {
                         <tr>
-                            <td class="font-medium">@m.ProdutoNome</td>
                             <td>
                                 @{
                                     var badgeClass = m.Tipo switch
@@ -98,7 +98,18 @@
                                 }
                                 <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
                             </td>
+                            <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
                             <td class="text-right font-mono">@m.Qty</td>
+                            <td class="text-right text-slate-500">
+                                @if (m.Valor.HasValue)
+                                {
+                                    @m.Valor.Value.ToString("C", ptBR)
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
                             <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
                         </tr>
                     }
@@ -116,7 +127,7 @@
 
     <!-- Gráfico receita -->
     <div class="ws">
-        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 30 dias</h2>
+        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 6 meses</h2>
         <canvas id="grafico-receita" height="200"></canvas>
     </div>
 </div>
