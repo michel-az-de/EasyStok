@@ -19,11 +19,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -108,11 +113,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -174,6 +184,39 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Receita",
+            Tipo = TipoProduto.Fisico,
+            SkuBase = CodigoSku.From("SKU-REC"),
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+        dbContext.Produtos.Add(produto);
+
+        var itemEstoque = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            EntradaEm = DateTime.UtcNow,
+            Status = StatusItemEstoque.Ok,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+        dbContext.ItensEstoque.Add(itemEstoque);
 
         var venda = new Venda
         {
@@ -191,8 +234,8 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         {
             Id = Guid.NewGuid(),
             VendaId = venda.Id,
-            ItemEstoqueId = Guid.NewGuid(),
-            ProdutoId = Guid.NewGuid(),
+            ItemEstoqueId = itemEstoque.Id,
+            ProdutoId = produto.Id,
             Quantidade = Quantidade.From(1),
             PrecoUnitario = Dinheiro.FromDecimal(100m),
             PrecoTotal = Dinheiro.FromDecimal(100m),
@@ -217,11 +260,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -280,11 +328,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -328,11 +381,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -376,11 +434,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -424,11 +487,16 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
         {
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
+            CategoriaId = categoriaId,
             Nome = "Produto Teste",
             Tipo = TipoProduto.Fisico,
             SkuBase = CodigoSku.From("SKU123"),
@@ -471,6 +539,39 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Canal",
+            Tipo = TipoProduto.Fisico,
+            SkuBase = CodigoSku.From("SKU-CANAL"),
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+        dbContext.Produtos.Add(produto);
+
+        var itemEstoque = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            EntradaEm = DateTime.UtcNow,
+            Status = StatusItemEstoque.Ok,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+        dbContext.ItensEstoque.Add(itemEstoque);
 
         var venda = new Venda
         {
@@ -488,8 +589,8 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         {
             Id = Guid.NewGuid(),
             VendaId = venda.Id,
-            ItemEstoqueId = Guid.NewGuid(),
-            ProdutoId = Guid.NewGuid(),
+            ItemEstoqueId = itemEstoque.Id,
+            ProdutoId = produto.Id,
             Quantidade = Quantidade.From(1),
             PrecoUnitario = Dinheiro.FromDecimal(100m),
             PrecoTotal = Dinheiro.FromDecimal(100m),
