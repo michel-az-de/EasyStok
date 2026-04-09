@@ -9,22 +9,24 @@ public class ProdutoFormViewModel
     [Required(ErrorMessage = "Nome é obrigatório")]
     public string Nome { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "SKU é obrigatório")]
-    public string Sku { get; set; } = string.Empty;
+    public string? SkuBase { get; set; }
 
     [Required(ErrorMessage = "Categoria é obrigatória")]
-    public string Categoria { get; set; } = string.Empty;
+    public Guid CategoriaId { get; set; }
 
-    public string? Subcategoria { get; set; }
+    public string? DescricaoBase { get; set; }
 
-    [Required(ErrorMessage = "Preço é obrigatório")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "Preço deve ser maior que zero")]
-    public decimal Preco { get; set; }
+    public string? Marca { get; set; }
 
-    public decimal? Custo { get; set; }
-    public int? Peso { get; set; }
-    public string? Descricao { get; set; }
-    public string? Emoji { get; set; }
+    public decimal? PrecoReferencia { get; set; }
+
+    public decimal? CustoReferencia { get; set; }
+
+    // TipoProduto: 0 = Fisico, 1 = Alimento, 2 = Servico
+    public int Tipo { get; set; } = 0;
+
+    // StatusProduto: 0 = Ativo, 1 = Inativo (only used on edit)
+    public int Status { get; set; } = 0;
 
     // Variações — enviadas como lista de nomes
     public List<string> Variacoes { get; set; } = [];

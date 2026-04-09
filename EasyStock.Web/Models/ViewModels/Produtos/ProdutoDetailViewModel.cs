@@ -4,6 +4,6 @@ namespace EasyStock.Web.Models.ViewModels.Produtos;
 
 public class ProdutoDetailViewModel
 {
-    public required Produto Produto { get; set; }
+    public required ProdutoDetalhe Produto { get; set; }
     public List<EstoqueSku> EstoqueSkus { get; set; } = [];
 }

@@ -4,7 +4,7 @@ namespace EasyStock.Web.Models.ViewModels.Anuncios;
 
 public class AnunciosViewModel
 {
-    public List<Produto> Produtos { get; set; } = [];
+    public List<ProdutoResumo> Produtos { get; set; } = [];
 }
 
 public class GerarAnuncioRequest

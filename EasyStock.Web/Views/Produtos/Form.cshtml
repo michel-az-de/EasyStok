@@ -1,6 +1,8 @@
 @model ProdutoFormViewModel
+@using EasyStock.Web.Models.Api
 @{
     var isEdit = !string.IsNullOrEmpty(Model.Id);
+    var categorias = ViewBag.Categorias as List<CategoriaApi> ?? [];
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -26,6 +28,7 @@
     @if (isEdit)
     {
         <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Status" />
     }
 
     <!-- Coluna principal -->
@@ -40,49 +43,53 @@
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
                 <div>
-                    <label asp-for="Sku" class="block text-sm font-semibold text-slate-700 mb-1.5">SKU *</label>
-                    <input asp-for="Sku" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <span asp-validation-for="Sku" class="text-red-500 text-xs mt-1 block"></span>
+                    <label asp-for="SkuBase" class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
+                    <input asp-for="SkuBase" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
-                    <label asp-for="Emoji" class="block text-sm font-semibold text-slate-700 mb-1.5">Emoji</label>
-                    <input asp-for="Emoji" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="📦" />
+                    <label asp-for="Marca" class="block text-sm font-semibold text-slate-700 mb-1.5">Marca</label>
+                    <input asp-for="Marca" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
-                <div>
-                    <label asp-for="Categoria" class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
-                    <input asp-for="Categoria" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <span asp-validation-for="Categoria" class="text-red-500 text-xs mt-1 block"></span>
-                </div>
-                <div>
-                    <label asp-for="Subcategoria" class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
-                    <input asp-for="Subcategoria" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                <div class="col-span-2">
+                    <label asp-for="CategoriaId" class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
+                    @if (categorias.Any())
+                    {
+                        <select asp-for="CategoriaId"
+                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            <option value="">Selecione uma categoria</option>
+                            @foreach (var cat in categorias)
+                            {
+                                <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input asp-for="CategoriaId" placeholder="ID da categoria (GUID)"
+                               class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    }
+                    <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
             </div>
 
             <div class="mt-4">
-                <label asp-for="Descricao" class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
-                <textarea asp-for="Descricao" rows="3"
+                <label asp-for="DescricaoBase" class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
+                <textarea asp-for="DescricaoBase" rows="3"
                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
             </div>
         </div>
 
         <div class="ws">
-            <h3 class="font-bold text-slate-800 mb-4">Preços &amp; medidas</h3>
-            <div class="grid grid-cols-3 gap-4">
+            <h3 class="font-bold text-slate-800 mb-4">Preços</h3>
+            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label asp-for="Preco" class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda *</label>
-                    <input asp-for="Preco" type="number" step="0.01" min="0.01"
-                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <span asp-validation-for="Preco" class="text-red-500 text-xs mt-1 block"></span>
-                </div>
-                <div>
-                    <label asp-for="Custo" class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
-                    <input asp-for="Custo" type="number" step="0.01" min="0"
+                    <label asp-for="PrecoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
+                    <input asp-for="PrecoReferencia" type="number" step="0.01" min="0"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
-                    <label asp-for="Peso" class="block text-sm font-semibold text-slate-700 mb-1.5">Peso (g)</label>
-                    <input asp-for="Peso" type="number" min="0"
+                    <label asp-for="CustoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
+                    <input asp-for="CustoReferencia" type="number" step="0.01" min="0"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
             </div>

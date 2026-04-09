@@ -3,49 +3,58 @@ using EasyStock.Web.Models.ViewModels.Produtos;
 
 namespace EasyStock.Web.Services;
 
-public class ProdutosService(ApiClient api)
+public class ProdutosService(ApiClient api, SessionService session)
 {
-    public Task<ApiResult<PagedResult<Produto>>> ListarAsync(
-        int page = 1, int limit = 20,
-        string? categoria = null, string? status = null, string? search = null)
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+
+    public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(
+        int page = 1, int limit = 20)
     {
         var qs = $"produtos?page={page}&pageSize={limit}";
-        if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
-        if (!string.IsNullOrEmpty(categoria)) qs += $"&categoria={Uri.EscapeDataString(categoria)}";
-        if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
-        return api.GetAsync<PagedResult<Produto>>(qs);
+        return api.GetAsync<List<ProdutoResumo>>(qs);
     }
 
-    public Task<ApiResult<Produto>> ObterAsync(string id) =>
-        api.GetAsync<Produto>($"produtos/{id}");
+    public Task<ApiResult<List<ProdutoResumo>>> BuscarAsync(string termo, int limite = 10) =>
+        api.GetAsync<List<ProdutoResumo>>(
+            $"produtos/search?termo={Uri.EscapeDataString(termo)}&limite={limite}");
 
-    public Task<ApiResult<Produto>> CriarAsync(ProdutoFormViewModel vm) =>
-        api.PostAsync<Produto>("produtos", new
+    public Task<ApiResult<ProdutoDetalhe>> ObterAsync(string id) =>
+        api.GetAsync<ProdutoDetalhe>($"produtos/{id}");
+
+    public Task<ApiResult<List<CategoriaApi>>> ListarCategoriasAsync() =>
+        api.GetAsync<List<CategoriaApi>>("categorias");
+
+    public Task<ApiResult<CadastrarProdutoApiResult>> CriarAsync(ProdutoFormViewModel vm) =>
+        api.PostAsync<CadastrarProdutoApiResult>("produtos", new
         {
+            empresaId = GetEmpresaId(),
+            categoriaId = vm.CategoriaId,
             nome = vm.Nome,
-            sku = vm.Sku,
-            categoria = vm.Categoria,
-            subcategoria = vm.Subcategoria,
-            preco = vm.Preco,
-            custo = vm.Custo,
-            peso = vm.Peso,
-            descricao = vm.Descricao,
-            emoji = vm.Emoji
+            descricaoBase = vm.DescricaoBase,
+            marca = vm.Marca,
+            tipo = vm.Tipo,
+            skuBase = vm.SkuBase,
+            controlaValidade = false,
+            custoReferencia = vm.CustoReferencia,
+            precoReferencia = vm.PrecoReferencia
         });
 
     public Task<ApiResult<object>> EditarAsync(string id, ProdutoFormViewModel vm) =>
         api.PatchAsync<object>($"produtos/{id}", new
         {
-            produtoId = id,
+            empresaId = GetEmpresaId(),
+            produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
+            categoriaId = vm.CategoriaId,
             nome = vm.Nome,
-            sku = vm.Sku,
-            categoria = vm.Categoria,
-            subcategoria = vm.Subcategoria,
-            preco = vm.Preco,
-            custo = vm.Custo,
-            peso = vm.Peso,
-            descricao = vm.Descricao,
-            emoji = vm.Emoji
+            descricaoBase = vm.DescricaoBase,
+            marca = vm.Marca,
+            tipo = vm.Tipo,
+            skuBase = vm.SkuBase,
+            controlaValidade = false,
+            custoReferencia = vm.CustoReferencia,
+            precoReferencia = vm.PrecoReferencia,
+            status = vm.Status
         });
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
@@ -63,7 +72,13 @@ public class ProdutosService(ApiClient api)
     }
 
     public Task<ApiResult<object>> AdicionarVariacaoAsync(string id, string nome) =>
-        api.PostAsync<object>($"produtos/{id}/variacoes", new { produtoId = id, nome });
+        api.PostAsync<object>($"produtos/{id}/variacoes", new
+        {
+            empresaId = GetEmpresaId(),
+            produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
+            nome,
+            ativa = true
+        });
 
     public Task<ApiResult<bool>> RemoverVariacaoAsync(string id, string vid) =>
         api.DeleteAsync($"produtos/{id}/variacoes/{vid}");
