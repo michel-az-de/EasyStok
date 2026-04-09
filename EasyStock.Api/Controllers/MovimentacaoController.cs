@@ -10,6 +10,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Stock Movements / Movimentações")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/movimentacoes")]
 public class MovimentacaoController(IMovimentacaoEstoqueRepository movimentacaoRepository) : EasyStockControllerBase

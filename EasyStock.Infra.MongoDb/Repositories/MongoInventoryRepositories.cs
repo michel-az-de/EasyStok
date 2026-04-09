@@ -20,7 +20,7 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
     public async Task<ItemEstoque?> GetByIdAsync(Guid empresaId, Guid id) =>
         await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo)
+    public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
@@ -39,7 +39,7 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
                 Builders<ItemEstoque>.Filter.Regex(x => x.Tamanho, regex),
                 Builders<ItemEstoque>.Filter.Regex(x => x.DescricaoAnuncio, regex)));
 
-        return await Collection.Find(filter).Limit(100).ToListAsync();
+        return await Collection.Find(filter).Limit(maxResults).ToListAsync();
     }
 
     public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20, Guid? lojaId = null) =>
@@ -183,6 +183,12 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
     public Task InsertAsync(MovimentacaoEstoque movimentacao)
     {
         EnqueueInsert(Collection, movimentacao);
+        return Task.CompletedTask;
+    }
+
+    public Task InsertRangeAsync(IEnumerable<MovimentacaoEstoque> movimentacoes)
+    {
+        foreach (var m in movimentacoes) EnqueueInsert(Collection, m);
         return Task.CompletedTask;
     }
 
@@ -335,6 +341,12 @@ public sealed class ItemVendaRepository(MongoEasyStockContext context, MongoUnit
     {
         itemVenda.Produto = null;
         EnqueueInsert(Collection, itemVenda);
+        return Task.CompletedTask;
+    }
+
+    public Task InsertRangeAsync(IEnumerable<ItemVenda> itens)
+    {
+        foreach (var iv in itens) { iv.Produto = null; EnqueueInsert(Collection, iv); }
         return Task.CompletedTask;
     }
 }

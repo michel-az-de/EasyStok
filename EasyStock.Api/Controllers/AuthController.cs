@@ -1,6 +1,7 @@
 using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
+using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
@@ -43,6 +44,7 @@ public class AuthController(
 {
     [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [EnableRateLimiting("ai")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {

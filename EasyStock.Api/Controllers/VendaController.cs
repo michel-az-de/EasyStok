@@ -9,6 +9,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Sales / Vendas")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/vendas")]
 public class VendaController(IVendaRepository vendaRepository) : EasyStockControllerBase

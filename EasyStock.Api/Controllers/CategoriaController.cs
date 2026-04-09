@@ -9,6 +9,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Categories / Categorias")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/categorias")]
 public class CategoriaController(GerenciarCategoriaUseCase useCase) : EasyStockControllerBase

@@ -13,6 +13,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Inventory / Estoque")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/estoque")]
 public class ItemEstoqueController(

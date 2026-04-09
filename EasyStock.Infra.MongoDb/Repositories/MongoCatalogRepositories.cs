@@ -99,7 +99,7 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         return Collection.Find(filter).AnyAsync();
     }
 
-    public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo)
+    public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
@@ -117,7 +117,7 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
                 Builders<Produto>.Filter.Regex("SkuBase", regex),
                 Builders<Produto>.Filter.Regex(x => x.CodigoBarras, regex)));
 
-        return await Collection.Find(filter).ToListAsync();
+        return await Collection.Find(filter).Limit(maxResults).ToListAsync();
     }
 
     public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
@@ -186,7 +186,7 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
         return Collection.Find(filter).AnyAsync();
     }
 
-    public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo)
+    public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
     {
         if (string.IsNullOrWhiteSpace(termo))
             return [];
@@ -205,7 +205,7 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
                 Builders<ProdutoVariacao>.Filter.Regex("Sku", regex),
                 Builders<ProdutoVariacao>.Filter.Regex(x => x.CodigoBarras, regex)));
 
-        return await Collection.Find(filter).ToListAsync();
+        return await Collection.Find(filter).Limit(maxResults).ToListAsync();
     }
 
     public Task InsertAsync(ProdutoVariacao variacao)

@@ -9,6 +9,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Notifications / Notificações")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/notificacoes")]
 public class NotificacaoController(

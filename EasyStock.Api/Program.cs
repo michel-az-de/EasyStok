@@ -273,8 +273,11 @@ builder.Services.AddCors(options =>
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
         if (allowedOrigins is { Length: > 0 })
             policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
-        else
+        else if (builder.Environment.IsDevelopment())
             policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        else
+            throw new InvalidOperationException(
+                "Cors:AllowedOrigins e obrigatorio em producao. Configure a secao 'Cors:AllowedOrigins' no appsettings ou via variavel de ambiente.");
     });
 });
 
@@ -332,22 +335,28 @@ builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalException
 // OpenTelemetry
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
-        })
-        .AddConsoleExporter())
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
-        })
-        .AddConsoleExporter());
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
+            });
+        if (builder.Environment.IsDevelopment())
+            tracing.AddConsoleExporter();
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
+            });
+        if (builder.Environment.IsDevelopment())
+            metrics.AddConsoleExporter();
+    });
 
 builder.Services.AddMemoryCache();
 
@@ -361,7 +370,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 var app = builder.Build();
 
 // Migration automática e seed de dados (somente PostgreSQL)
-if (databaseProvider.Trim().ToLowerInvariant() is "postgres" or "postgresql")
+if (resolvedProvider is "postgresql")
 {
     try
     {

@@ -14,6 +14,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Products / Produtos")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/produtos")]
 public class ProdutoController(
