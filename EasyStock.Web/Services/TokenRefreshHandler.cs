@@ -14,23 +14,25 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
         var isAuthRoute = request.RequestUri?.PathAndQuery.Contains("/auth/", StringComparison.OrdinalIgnoreCase) == true;
         var token = session.GetToken();
         var lojaId = session.GetLojaId();
+        var empresaId = session.GetEmpresaId();
 
-        // Inject Bearer token + X-Loja-ID for authenticated requests
+        // Inject Bearer token, X-Loja-ID and empresaId for authenticated requests
         if (!isAuthRoute && !string.IsNullOrEmpty(token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             if (!string.IsNullOrEmpty(lojaId))
-            {
                 request.Headers.TryAddWithoutValidation("X-Loja-ID", lojaId);
 
-                // Also inject empresaId as query param for compatibility
+            if (!string.IsNullOrEmpty(empresaId))
+            {
+                // Inject empresaId as query param for API endpoints that require it
                 var uri = request.RequestUri!;
                 var uriBuilder = new UriBuilder(uri);
                 var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
                 if (string.IsNullOrEmpty(query["empresaId"]))
                 {
-                    query["empresaId"] = lojaId;
+                    query["empresaId"] = empresaId;
                     uriBuilder.Query = query.ToString();
                     request.RequestUri = uriBuilder.Uri;
                 }

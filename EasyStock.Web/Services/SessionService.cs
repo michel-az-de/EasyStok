@@ -6,6 +6,7 @@ public class SessionService(IHttpContextAccessor acc)
 
     public string? GetToken() => Session.GetString("access_token");
     public string? GetRefreshToken() => Session.GetString("refresh_token");
+    public string? GetEmpresaId() => Session.GetString("empresa_id");
     public string? GetLojaId() => Session.GetString("loja_atual_id");
     public string? GetLojaNome() => Session.GetString("loja_atual_nome");
     public string? GetLojaEmoji() => Session.GetString("loja_atual_emoji");
@@ -26,6 +27,8 @@ public class SessionService(IHttpContextAccessor acc)
         Session.SetString("usuario_nome", nome);
         Session.SetString("usuario_role", role);
     }
+
+    public void SetEmpresaId(string id) => Session.SetString("empresa_id", id);
 
     public void SetLoja(string id, string nome, string? emoji)
     {

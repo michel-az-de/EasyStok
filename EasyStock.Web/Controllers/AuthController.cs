@@ -47,12 +47,13 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
         session.SetTokens(token, refreshToken ?? string.Empty);
 
-        // Extract user info
+        // Extract user info — API returns "nivel" (not "role")
         var usuario = data.TryGetProperty("usuario", out var u) ? u : data;
+        var nivel = GetString(usuario, "nivel") ?? "Operador";
         session.SetUsuario(
             GetString(usuario, "id") ?? string.Empty,
             GetString(usuario, "nome") ?? vm.Email,
-            GetString(usuario, "role") ?? "Operador"
+            nivel
         );
 
         // Sign in with cookie
@@ -60,7 +61,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         {
             new(ClaimTypes.Name, GetString(usuario, "nome") ?? vm.Email),
             new(ClaimTypes.Email, vm.Email),
-            new(ClaimTypes.Role, GetString(usuario, "role") ?? "Operador")
+            new(ClaimTypes.Role, nivel)
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
@@ -71,6 +72,8 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         {
             if (lojas.Count == 1)
             {
+                if (!string.IsNullOrEmpty(lojas[0].EmpresaId))
+                    session.SetEmpresaId(lojas[0].EmpresaId!);
                 session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji);
                 return Redirect(returnUrl ?? "/dashboard");
             }
@@ -99,8 +102,10 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
     [HttpPost("/auth/selecionar-loja")]
     [ValidateAntiForgeryToken]
-    public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji)
+    public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji, string? empresaId)
     {
+        if (!string.IsNullOrEmpty(empresaId))
+            session.SetEmpresaId(empresaId);
         session.SetLoja(lojaId, lojaNome, lojaEmoji);
         return RedirectToAction("Index", "Dashboard");
     }

@@ -18,8 +18,3 @@ public record SkuBaseDto
 {
     public string Value { get; init; } = string.Empty;
 }
-
-public record DinheiroDto
-{
-    public decimal Valor { get; init; }
-}

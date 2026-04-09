@@ -25,6 +25,7 @@ public abstract class BaseController(SessionService session) : Controller
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         ViewBag.UsuarioNome = session.GetUsuarioNome();
+        ViewBag.EmpresaId = session.GetEmpresaId();
         ViewBag.LojaAtualId = session.GetLojaId();
         ViewBag.LojaAtualNome = session.GetLojaNome();
         ViewBag.LojaAtualEmoji = session.GetLojaEmoji() ?? "🏪";
