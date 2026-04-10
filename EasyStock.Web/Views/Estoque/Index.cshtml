@@ -110,6 +110,7 @@
     <div class="ws">
         @if (Model.Itens.Any())
         {
+            <div class="overflow-x-auto">
             <table class="tbl-full">
                 <thead>
                     <tr>
@@ -199,6 +200,7 @@
                     }
                 </tbody>
             </table>
+            </div>
 
             <!-- Paginação -->
             @if (Model.Paginacao.Pages > 1)
