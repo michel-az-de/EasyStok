@@ -282,16 +282,23 @@
                     this.produtoId = p.id;
                     this.produtoNome = p.nome;
                     this.produtoSku = p.sku;
-                    this.produtoEmoji = '📦';
+                    this.produtoEmoji = p.emoji || '📦';
+                    this.variacoes = [];
+                    this.estoqueAtual = 0;
+                    this.varId = '';
                     try {
                         const dr = await fetch('/estoque/produto-detalhe/' + p.id);
                         if (dr.ok) {
                             const d = await dr.json();
-                            this.estoqueAtual = d.estoqueTotal || 0;
                             this.variacoes = d.variacoes || [];
+                            this.estoqueAtual = d.estoqueTotal || 0;
                             this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
                         }
-                    } catch { /* keep defaults */ }
+                    } catch {
+                        this.variacoes = [];
+                        this.estoqueAtual = 0;
+                        this.varId = '';
+                    }
                     this.step = 2;
                 },
 

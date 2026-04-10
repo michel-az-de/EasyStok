@@ -136,7 +136,7 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
             estoqueTotal = p.QuantidadeTotalEstoque,
             variacoes = p.Variacoes
                 .Where(v => v.Ativa)
-                .Select(v => new { id = v.VariacaoId, nome = v.Nome })
+                .Select(v => new { id = v.VariacaoId, nome = v.Nome, quantidadeEmEstoque = v.QuantidadeEmEstoque })
         });
     }
 }

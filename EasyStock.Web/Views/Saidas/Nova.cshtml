@@ -46,7 +46,7 @@
         <!-- Variação (se houver produto selecionado com variações) -->
         <div class="mb-4" x-show="variacoes.length > 0" x-cloak>
             <label class="block text-sm font-medium text-gray-700 mb-1">Variação</label>
-            <select name="VarId" x-model="varId"
+            <select name="VarId" x-model="varId" @@change="atualizarEstoqueVariacao()"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
                 <option value="">Sem variação</option>
                 <template x-for="v in variacoes" :key="v.id">
@@ -197,12 +197,26 @@ function saidaForm() {
 
                 const d = await dr.json();
                 this.variacoes = d.variacoes || [];
-                this.estoqueAtual = d.estoqueTotal || 0;
-                this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                // Use variation-specific stock if available, otherwise fall back to estoqueTotal
+                if (this.variacoes.length > 0) {
+                    this.varId = this.variacoes[0].id;
+                    this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque ?? d.estoqueTotal ?? 0;
+                } else {
+                    this.varId = '';
+                    this.estoqueAtual = d.estoqueTotal || 0;
+                }
             } catch {
                 this.variacoes = [];
                 this.estoqueAtual = 0;
                 this.varId = '';
+            }
+        },
+
+        atualizarEstoqueVariacao() {
+            if (!this.varId || this.variacoes.length === 0) return;
+            const v = this.variacoes.find(x => x.id === this.varId);
+            if (v && v.quantidadeEmEstoque !== undefined) {
+                this.estoqueAtual = v.quantidadeEmEstoque;
             }
         },
 
