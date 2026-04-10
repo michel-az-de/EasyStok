@@ -33,14 +33,19 @@ public class FornecedoresService(ApiClient api, SessionService session)
     public Task<ApiResult<object>> EditarAsync(string id,
         string nome, string? documento, string? contato, string? email, string? telefone,
         int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
-        string? pedidoMinimo, string? fretePadrao, string? observacoes) =>
-        api.PatchAsync<object>($"fornecedores/{id}", new
+        string? pedidoMinimo, string? fretePadrao, string? observacoes)
+    {
+        if (!Guid.TryParse(id, out var fid))
+            return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(id)));
+
+        return api.PatchAsync<object>($"fornecedores/{id}", new
         {
-            fornecedorId = Guid.TryParse(id, out var fid) ? fid : Guid.Empty,
+            fornecedorId = fid,
             empresaId = GetEmpresaId(),
             nome, documento, contato, email, telefone, leadTimeEstimadoDias,
             tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
         });
+    }
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
         api.DeleteAsync($"fornecedores/{id}?empresaId={GetEmpresaId()}");
@@ -56,17 +61,22 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
     public Task<ApiResult<object>> CriarPedidoAsync(
         string fornecedorId, DateOnly dataPedido, DateOnly? previsaoEntrega,
-        decimal? valorEstimado, string? canal, string? observacoes) =>
-        api.PostAsync<object>("fornecedores/pedidos", new
+        decimal? valorEstimado, string? canal, string? observacoes)
+    {
+        if (!Guid.TryParse(fornecedorId, out var fid))
+            return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(fornecedorId)));
+
+        return api.PostAsync<object>("fornecedores/pedidos", new
         {
             empresaId = GetEmpresaId(),
-            fornecedorId = Guid.TryParse(fornecedorId, out var fid) ? fid : Guid.Empty,
+            fornecedorId = fid,
             dataPedido = dataPedido.ToDateTime(TimeOnly.MinValue),
             previsaoEntrega = previsaoEntrega.HasValue ? previsaoEntrega.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
             valorEstimado,
             canal,
             observacoes
         });
+    }
 
     public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId, string? tracking) =>
         api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/receber", new
