@@ -264,7 +264,28 @@ dotnet ef database update \
 dotnet run --project EasyStock.Api/EasyStock.Api.csproj
 ```
 
-**5. Acesse**
+**5. Seed demo "Casa da Baba" (automática no PostgreSQL)**
+
+- Ao iniciar a API com PostgreSQL, o sistema aplica migrations e executa o seed idempotente da empresa **Casa da Baba**.
+- O seed usa lock transacional (`pg_advisory_xact_lock`) para evitar duplicação quando múltiplos containers sobem em paralelo.
+- Para forçar reaplicação segura, basta subir novamente a API (os dados são atualizados/reutilizados, sem duplicação caótica).
+
+**Credenciais demo criadas**
+
+| Perfil | Email | Senha |
+|---|---|---|
+| Admin | `admin@casadababa.demo` | `admin123` |
+| Gerente | `gerente@casadababa.demo` | `gerente123` |
+| Operador Centro | `operador.centro@casadababa.demo` | `operador123` |
+| Operador Mercadão | `operador.mercadao@casadababa.demo` | `operador123` |
+
+**Empresa e lojas criadas**
+- Empresa: **Casa da Baba** (`48.735.219/0001-62`)
+- Lojas:
+  - **Casa da Baba | Centro**
+  - **Casa da Baba | Mercadão**
+
+**6. Acesse**
 - Swagger UI: `https://localhost:5001/swagger`
 - Health Check: `https://localhost:5001/health`
 
