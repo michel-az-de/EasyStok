@@ -29,6 +29,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
+                .Include(m => m.Produto)
+                .Include(m => m.ProdutoVariacao)
                 .Where(m => m.EmpresaId == empresaId);
 
             if (de.HasValue)

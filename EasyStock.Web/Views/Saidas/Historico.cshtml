@@ -46,11 +46,15 @@
 
 <!-- Filtros -->
 <form method="get" class="ws mb-6">
+    @if (!string.IsNullOrEmpty(Model.FiltroNatureza))
+    {
+        <input type="hidden" name="natureza" value="@Model.FiltroNatureza" />
+    }
     <div class="flex flex-wrap gap-3 items-end">
         <!-- Pill filters por natureza -->
         <div class="flex gap-2 flex-wrap">
             @{
-                var naturezas = new[] { ("", "Todas"), ("venda", "Vendas"), ("perda", "Perdas"), ("doacao", "Doações"), ("uso_interno", "Uso Interno") };
+                var naturezas = new[] { ("", "Todas"), ("venda", "Vendas"), ("perda", "Perdas"), ("prejuizo", "Prejuízos"), ("doacao", "Doações"), ("uso_interno", "Uso Interno") };
             }
             @foreach (var (val, label) in naturezas)
             {
@@ -119,6 +123,7 @@
                                 var naturezaColor = s.Natureza?.ToLower() switch {
                                     "venda" => "badge-ok",
                                     "perda" => "badge-critical",
+                                    "prejuizo" or "prejuízo" => "badge-critical",
                                     "devolucao" or "devolução" => "badge-slow",
                                     _ => "badge-warn"
                                 };
