@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -126,8 +127,8 @@ public class EntradasController(EntradasService svc, SessionService session) : B
                 Csv(m.Produto?.Nome),
                 Csv(m.ProdutoVariacao?.Nome),
                 m.Qty,
-                m.Custo?.ToString("F2") ?? "",
-                m.ValorTotal?.Valor.ToString("F2") ?? "",
+                m.Custo?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+                m.ValorTotal?.Valor.ToString("F2", CultureInfo.InvariantCulture) ?? "",
                 Csv(m.Natureza),
                 Csv(m.DocumentoReferencia),
                 Csv(m.Descricao)));
