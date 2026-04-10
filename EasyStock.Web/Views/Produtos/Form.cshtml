@@ -384,10 +384,22 @@
                     peso = e.Peso, largura = e.Largura, altura = e.Altura,
                     comprimento = e.Comprimento, padrao = e.Padrao
                 }))),
+                preco: 0,
+                custo: 0,
+                syncMargem() {
+                    this.preco = parseFloat(this.$refs?.preco?.value) || 0;
+                    this.custo = parseFloat(this.$refs?.custo?.value) || 0;
+                },
+                init() {
+                    this.syncMargem();
+
+                    this.$nextTick(() => {
+                        this.$refs?.preco?.addEventListener('input', () => this.syncMargem());
+                        this.$refs?.custo?.addEventListener('input', () => this.syncMargem());
+                    });
+                },
                 get margemCalc() {
-                    const preco = parseFloat(this.$refs?.preco?.value) || 0;
-                    const custo = parseFloat(this.$refs?.custo?.value) || 0;
-                    if (preco > 0 && custo > 0) return (((preco - custo) / preco) * 100).toFixed(1);
+                    if (this.preco > 0 && this.custo > 0) return (((this.preco - this.custo) / this.preco) * 100).toFixed(1);
                     return '';
                 }
             };
