@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class EntradasController(EntradasService svc, SessionService session) : BaseController(session)
+public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, SessionService session) : BaseController(session)
 {
     [HttpGet("/entradas/nova")]
     public IActionResult Nova()
@@ -48,16 +48,35 @@ public class EntradasController(EntradasService svc, SessionService session) : B
     }
 
     [HttpGet("/entradas/reposicao")]
-    public IActionResult Reposicao()
+    public async Task<IActionResult> Reposicao(string? itemId = null)
     {
         ViewBag.Title = "Reposição Rápida";
         ViewBag.ActiveMenuItem = "Entradas";
-        return View(new EntradaFormViewModel());
+
+        var vm = new ReposicaoFormViewModel();
+
+        if (!string.IsNullOrEmpty(itemId))
+        {
+            var result = await estoqueSvc.ObterAsync(itemId);
+            if (result.Success && result.Data is not null)
+            {
+                var item = result.Data;
+                vm.ItemEstoqueId = item.Id;
+                vm.ProdutoId = item.ProdutoId;
+                vm.ProdutoNome = item.Produto?.Nome;
+                vm.VariacaoNome = item.Variacao?.Nome;
+                vm.EstoqueAtual = item.Qty;
+                vm.Custo = item.CustoUnitario?.Valor;
+                vm.Preco = item.PrecoVendaSugerido?.Valor;
+            }
+        }
+
+        return View(vm);
     }
 
     [HttpPost("/entradas/reposicao")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SalvarReposicao(EntradaFormViewModel vm)
+    public async Task<IActionResult> SalvarReposicao(ReposicaoFormViewModel vm)
     {
         if (!ModelState.IsValid)
         {
@@ -66,8 +85,9 @@ public class EntradasController(EntradasService svc, SessionService session) : B
             return View("Reposicao", vm);
         }
 
-        if (!ValidarProdutoId(vm))
+        if (string.IsNullOrEmpty(vm.ItemEstoqueId) || !Guid.TryParse(vm.ItemEstoqueId, out _))
         {
+            ModelState.AddModelError("ItemEstoqueId", "Selecione um item de estoque válido.");
             ViewBag.Title = "Reposição Rápida";
             ViewBag.ActiveMenuItem = "Entradas";
             return View("Reposicao", vm);

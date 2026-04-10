@@ -14,6 +14,8 @@ public record EstoqueSku
     public decimal Vel { get; init; }
     public int Stopped { get; init; }
     public required string Status { get; init; }
+    public DinheiroDto? CustoUnitario { get; init; }
+    public DinheiroDto? PrecoVendaSugerido { get; init; }
     public Produto? Produto { get; init; }
     public Variacao? Variacao { get; init; }
 }

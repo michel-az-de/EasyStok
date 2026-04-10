@@ -258,7 +258,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             id = p.Id,
             nome = p.Nome,
             sku = p.SkuBase?.Value,
-            categoriaId = p.CategoriaId
+            categoriaId = p.CategoriaId,
+            custoReferencia = p.CustoReferencia?.Valor,
+            precoReferencia = p.PrecoReferencia?.Valor
         });
         return Json(items);
     }

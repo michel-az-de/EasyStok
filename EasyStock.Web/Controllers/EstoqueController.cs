@@ -134,9 +134,21 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
             nome = p.Nome,
             sku = p.SkuBase,
             estoqueTotal = p.QuantidadeTotalEstoque,
+            custoReferencia = p.CustoReferencia,
+            precoReferencia = p.PrecoReferencia,
+            controlaValidade = p.ControlaValidade,
+            margemEstimada = p.MargemEstimada,
             variacoes = p.Variacoes
                 .Where(v => v.Ativa)
                 .Select(v => new { id = v.VariacaoId, nome = v.Nome, quantidadeEmEstoque = v.QuantidadeEmEstoque })
         });
+    }
+
+    [HttpGet("/estoque/itens-por-produto/{produtoId}")]
+    public async Task<IActionResult> ItensPorProduto(string produtoId)
+    {
+        var result = await svc.ObterItensPorProdutoAsync(produtoId);
+        if (!result.Success) return Json(Array.Empty<object>());
+        return Json(result.Data);
     }
 }
