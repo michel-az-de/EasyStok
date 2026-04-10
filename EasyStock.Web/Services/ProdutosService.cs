@@ -8,12 +8,8 @@ public class ProdutosService(ApiClient api, SessionService session)
     private Guid GetEmpresaId() =>
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(
-        int page = 1, int limit = 20)
-    {
-        var qs = $"produtos?page={page}&pageSize={limit}";
-        return api.GetAsync<List<ProdutoResumo>>(qs);
-    }
+    public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(int page = 1, int limit = 20) =>
+        api.GetAsync<List<ProdutoResumo>>($"produtos?page={page}&pageSize={limit}");
 
     public Task<ApiResult<List<ProdutoResumo>>> BuscarAsync(string termo, int limite = 10) =>
         api.GetAsync<List<ProdutoResumo>>(
@@ -43,10 +39,10 @@ public class ProdutosService(ApiClient api, SessionService session)
             margemEstimada = vm.MargemEstimada,
             dimensoes = HasDimensoes(vm) ? new
             {
-                peso = vm.DimensoesPeso ?? 0,
-                largura = vm.DimensoesLargura ?? 0,
-                altura = vm.DimensoesAltura ?? 0,
-                comprimento = vm.DimensoesComprimento ?? 0
+                peso = vm.DimensoesPeso ?? 0m,
+                largura = vm.DimensoesLargura ?? 0m,
+                altura = vm.DimensoesAltura ?? 0m,
+                comprimento = vm.DimensoesComprimento ?? 0m
             } : null,
             caracteristicas = vm.Caracteristicas
                 .Where(c => !string.IsNullOrWhiteSpace(c.Nome))
@@ -66,10 +62,10 @@ public class ProdutosService(ApiClient api, SessionService session)
                     descricao = e.Descricao,
                     dimensoes = HasEmbalagemDimensoes(e) ? new
                     {
-                        peso = e.Peso ?? 0,
-                        largura = e.Largura ?? 0,
-                        altura = e.Altura ?? 0,
-                        comprimento = e.Comprimento ?? 0
+                        peso = e.Peso ?? 0m,
+                        largura = e.Largura ?? 0m,
+                        altura = e.Altura ?? 0m,
+                        comprimento = e.Comprimento ?? 0m
                     } : (object?)null,
                     padrao = e.Padrao
                 }).ToArray(),
