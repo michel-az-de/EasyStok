@@ -104,6 +104,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         var p = result.Data!;
+        var embPadrao = p.Embalagens.FirstOrDefault(e => e.Padrao) ?? p.Embalagens.FirstOrDefault();
         var vm = new ProdutoFormViewModel
         {
             Id = p.ProdutoId.ToString(),
@@ -111,13 +112,25 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             SkuBase = p.SkuBase,
             CodigoBarras = p.CodigoBarras,
             CategoriaId = p.CategoriaId,
+            SubcategoriaId = p.SubcategoriaId,
             DescricaoBase = p.DescricaoBase,
             Marca = p.Marca,
             PrecoReferencia = p.PrecoReferencia,
             CustoReferencia = p.CustoReferencia,
+            MargemEstimada = p.MargemEstimada,
             Status = p.Status,
             Tipo = p.Tipo,
             ControlaValidade = p.ControlaValidade,
+            DimensoesPeso = p.Dimensoes?.Peso,
+            DimensoesLargura = p.Dimensoes?.Largura,
+            DimensoesAltura = p.Dimensoes?.Altura,
+            DimensoesComprimento = p.Dimensoes?.Comprimento,
+            EmbalagemNome = embPadrao?.Nome,
+            EmbalagemDescricao = embPadrao?.Descricao,
+            EmbalagemPeso = embPadrao?.Dimensoes?.Peso,
+            EmbalagemLargura = embPadrao?.Dimensoes?.Largura,
+            EmbalagemAltura = embPadrao?.Dimensoes?.Altura,
+            EmbalagemComprimento = embPadrao?.Dimensoes?.Comprimento,
             Variacoes = p.Variacoes.Select(v => v.Nome).ToList()
         };
         await LoadCategoriasAsync();
