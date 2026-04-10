@@ -39,6 +39,16 @@ builder.Services.AddHttpClient<ApiClient>(client =>
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 }).AddHttpMessageHandler<TokenRefreshHandler>();
 
+// 5b. HttpClient for diagnostics (no TokenRefreshHandler - works without auth)
+builder.Services.AddHttpClient<DiagnosticoWebService>(client =>
+{
+    var baseUrl = config["ApiSettings:BaseUrl"]!;
+    // Ensure base URL ends with /
+    if (!baseUrl.EndsWith('/')) baseUrl += "/";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 // 6. Domain services
 builder.Services.AddScoped<ProdutosService>();
 builder.Services.AddScoped<EstoqueService>();
