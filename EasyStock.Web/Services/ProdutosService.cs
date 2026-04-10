@@ -30,6 +30,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         {
             empresaId = GetEmpresaId(),
             categoriaId = vm.CategoriaId,
+            subcategoriaId = vm.SubcategoriaId,
             nome = vm.Nome,
             descricaoBase = vm.DescricaoBase,
             marca = vm.Marca,
@@ -92,6 +93,7 @@ public class ProdutosService(ApiClient api, SessionService session)
             empresaId = GetEmpresaId(),
             produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
             categoriaId = vm.CategoriaId,
+            subcategoriaId = vm.SubcategoriaId,
             nome = vm.Nome,
             descricaoBase = vm.DescricaoBase,
             marca = vm.Marca,
@@ -134,14 +136,6 @@ public class ProdutosService(ApiClient api, SessionService session)
                         comprimento = e.Comprimento ?? 0
                     } : (object?)null,
                     padrao = e.Padrao
-                }).ToArray(),
-            variacoes = vm.VariacoesRich?
-                .Where(v => !string.IsNullOrWhiteSpace(v.Nome))
-                .Select(v => new
-                {
-                    id = v.Id,
-                    nome = v.Nome.Trim(),
-                    sku = v.Sku
                 }).ToArray()
         });
 

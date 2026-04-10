@@ -83,7 +83,7 @@ public class GerenciarProdutoUseCaseTests
         _embalagemRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { embExistente });
 
         var command = new AtualizarProdutoCommand(
-            empresaId, produtoId, categoriaId, "Produto Atualizado",
+            empresaId, produtoId, categoriaId, null, "Produto Atualizado",
             null, null, TipoProduto.Fisico, null, null, false, null,
             null, null, null, null, StatusProduto.Ativo,
             new[] { new ProdutoCaracteristicaInput("Material", "Algodao", null, null, 0) },
@@ -109,6 +109,14 @@ public class GerenciarProdutoUseCaseTests
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
 
+        var carac = new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Material", Descricao = "Algodao", OrdemExibicao = 0 };
+        var emb = new ProdutoEmbalagem
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
+            Nome = "Caixa", Padrao = true,
+            Dimensoes = Dimensoes.From(0.5m, 35m, 25m, 45m)
+        };
+
         _produtoRepository.GetDetalheAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
@@ -119,24 +127,12 @@ public class GerenciarProdutoUseCaseTests
             Dimensoes = Dimensoes.From(1.5m, 30m, 20m, 40m),
             CustoReferencia = Dinheiro.FromDecimal(50m),
             PrecoReferencia = Dinheiro.FromDecimal(100m),
-            MargemEstimada = 50m
+            MargemEstimada = 50m,
+            Caracteristicas = new[] { carac },
+            Embalagens = new[] { emb }
         });
         _itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId).Returns([]);
         _variacaoRepository.GetByProdutoAsync(empresaId, produtoId).Returns([]);
-
-        _caracteristicaRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
-        {
-            new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Material", Descricao = "Algodao", OrdemExibicao = 0 }
-        });
-        _embalagemRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
-        {
-            new ProdutoEmbalagem
-            {
-                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
-                Nome = "Caixa", Padrao = true,
-                Dimensoes = Dimensoes.From(0.5m, 35m, 25m, 45m)
-            }
-        });
 
         var result = await useCase.ObterDetalheAsync(empresaId, produtoId);
 
@@ -179,7 +175,7 @@ public class GerenciarProdutoUseCaseTests
         });
 
         var command = new AtualizarProdutoCommand(
-            empresaId, produtoId, categoriaId, "Produto",
+            empresaId, produtoId, categoriaId, null, "Produto",
             null, null, TipoProduto.Fisico, null, null, false, null,
             null, null, null, null, StatusProduto.Ativo,
             null,

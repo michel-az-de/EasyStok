@@ -111,6 +111,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             SkuBase = p.SkuBase,
             CodigoBarras = p.CodigoBarras,
             CategoriaId = p.CategoriaId,
+            SubcategoriaId = p.SubcategoriaId,
             DescricaoBase = p.DescricaoBase,
             Marca = p.Marca,
             PrecoReferencia = p.PrecoReferencia,

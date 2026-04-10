@@ -14,6 +14,8 @@ public class ProdutoFormViewModel
     [Required(ErrorMessage = "Categoria é obrigatória")]
     public Guid CategoriaId { get; set; }
 
+    public Guid? SubcategoriaId { get; set; }
+
     public string? DescricaoBase { get; set; }
 
     public string? Marca { get; set; }

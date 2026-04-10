@@ -39,6 +39,7 @@ public class CadastrarProdutoUseCaseTests
         var command = new CadastrarProdutoCommand(
             empresaId,
             categoriaId,
+            null,
             "Galaxy Buds FE",
             "Fone bluetooth",
             "Samsung",
@@ -106,6 +107,7 @@ public class CadastrarProdutoUseCaseTests
         var command = new CadastrarProdutoCommand(
             empresaId,
             categoriaId,
+            null,
             "Galaxy Buds FE",
             null,
             null,

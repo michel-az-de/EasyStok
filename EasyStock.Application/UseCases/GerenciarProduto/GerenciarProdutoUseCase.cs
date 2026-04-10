@@ -13,6 +13,7 @@ public sealed record AtualizarProdutoCommand(
     [property: Required] Guid EmpresaId,
     [property: Required] Guid ProdutoId,
     [property: Required] Guid CategoriaId,
+    Guid? SubcategoriaId,
     [property: Required] string Nome,
     string? DescricaoBase,
     string? Marca,
@@ -33,6 +34,7 @@ public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
     Guid EmpresaId,
     Guid CategoriaId,
+    Guid? SubcategoriaId,
     string Nome,
     string? DescricaoBase,
     string? Marca,
@@ -44,13 +46,19 @@ public sealed record ProdutoDetalheResult(
     decimal? CustoReferencia,
     decimal? PrecoReferencia,
     decimal? MargemEstimada,
+    DimensoesDetalheResult? Dimensoes,
     int QuantidadeTotalEstoque,
     DateTime? UltimaEntradaEm,
     IReadOnlyCollection<ProdutoFotoResult> Fotos,
     IReadOnlyCollection<ProdutoVariacaoDetalheResult> Variacoes,
-    DimensoesInput? Dimensoes,
     IReadOnlyCollection<ProdutoCaracteristicaDetalheResult> Caracteristicas,
     IReadOnlyCollection<ProdutoEmbalagemDetalheResult> Embalagens);
+
+public sealed record DimensoesDetalheResult(
+    decimal Peso,
+    decimal Largura,
+    decimal Altura,
+    decimal Comprimento);
 
 public sealed record ProdutoVariacaoDetalheResult(
     Guid VariacaoId,
@@ -58,8 +66,8 @@ public sealed record ProdutoVariacaoDetalheResult(
     string? Cor,
     string? Tamanho,
     string? DescricaoComercial,
-    string? CodigoBarras,
     string? Sku,
+    string? CodigoBarras,
     bool Ativa,
     int QuantidadeEmEstoque,
     DateTime? UltimaEntradaEm);
@@ -70,13 +78,14 @@ public sealed record ProdutoCaracteristicaDetalheResult(
     string? Descricao,
     int? QuantidadeReferencia,
     string? VariacaoPadrao,
+    Guid? VariacaoId,
     int OrdemExibicao);
 
 public sealed record ProdutoEmbalagemDetalheResult(
     Guid EmbalagemId,
     string Nome,
     string? Descricao,
-    DimensoesInput? Dimensoes,
+    DimensoesDetalheResult? Dimensoes,
     bool Padrao);
 
 public sealed record ProdutoHistoricoItemResult(
@@ -144,6 +153,16 @@ public sealed class GerenciarProdutoUseCase(
         if (categoria.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("A categoria informada nao pertence a empresa.");
 
+        if (command.SubcategoriaId.HasValue)
+        {
+            var subcategoria = await categoriaRepository.GetByIdAsync(command.SubcategoriaId.Value)
+                ?? throw new UseCaseValidationException("Subcategoria nao encontrada.");
+            if (subcategoria.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("A subcategoria informada nao pertence a empresa.");
+            if (subcategoria.CategoriaPaiId != command.CategoriaId)
+                throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
+        }
+
         if (!string.IsNullOrWhiteSpace(command.SkuBase))
         {
             var skuBase = command.SkuBase.Trim();
@@ -161,6 +180,7 @@ public sealed class GerenciarProdutoUseCase(
         }
 
         produto.CategoriaId = command.CategoriaId;
+        produto.SubcategoriaId = command.SubcategoriaId;
         produto.Nome = command.Nome.Trim();
         produto.DescricaoBase = Normalizar(command.DescricaoBase);
         produto.Marca = Normalizar(command.Marca);
@@ -262,8 +282,6 @@ public sealed class GerenciarProdutoUseCase(
 
         var itens = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
         var variacoes = await produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
-        var caracteristicas = await caracteristicaRepository.GetByProdutoAsync(empresaId, produtoId);
-        var embalagens = await embalagemRepository.GetByProdutoAsync(empresaId, produtoId);
         var fotos = DesserializarFotos(produto.FotosJson);
 
         var variacoesResult = variacoes
@@ -276,36 +294,32 @@ public sealed class GerenciarProdutoUseCase(
                     variacao.Cor,
                     variacao.Tamanho,
                     variacao.DescricaoComercial,
-                    variacao.CodigoBarras,
                     variacao.Sku?.Value,
+                    variacao.CodigoBarras,
                     variacao.Ativa,
                     itensDaVariacao.Sum(i => i.QuantidadeAtual.Value),
                     itensDaVariacao.OrderByDescending(i => i.EntradaEm).Select(i => (DateTime?)i.EntradaEm).FirstOrDefault());
             })
             .ToArray();
 
-        var caracteristicasResult = caracteristicas
+        var caracteristicasResult = (produto.Caracteristicas ?? [])
+            .OrderBy(c => c.OrdemExibicao)
             .Select(c => new ProdutoCaracteristicaDetalheResult(
-                c.Id, c.Nome, c.Descricao, c.QuantidadeReferencia, c.VariacaoPadrao, c.OrdemExibicao))
+                c.Id, c.Nome, c.Descricao, c.QuantidadeReferencia, c.VariacaoPadrao, c.VariacaoId, c.OrdemExibicao))
             .ToArray();
 
-        var embalagensResult = embalagens
+        var embalagensResult = (produto.Embalagens ?? [])
             .Select(e => new ProdutoEmbalagemDetalheResult(
                 e.Id, e.Nome, e.Descricao,
-                e.Dimensoes is not null
-                    ? new DimensoesInput(e.Dimensoes.Peso, e.Dimensoes.Largura, e.Dimensoes.Altura, e.Dimensoes.Comprimento)
-                    : null,
+                e.Dimensoes is null ? null : new DimensoesDetalheResult(e.Dimensoes.Peso, e.Dimensoes.Largura, e.Dimensoes.Altura, e.Dimensoes.Comprimento),
                 e.Padrao))
             .ToArray();
-
-        var dimensoesResult = produto.Dimensoes is not null
-            ? new DimensoesInput(produto.Dimensoes.Peso, produto.Dimensoes.Largura, produto.Dimensoes.Altura, produto.Dimensoes.Comprimento)
-            : null;
 
         return new ProdutoDetalheResult(
             produto.Id,
             produto.EmpresaId,
             produto.CategoriaId,
+            produto.SubcategoriaId,
             produto.Nome,
             produto.DescricaoBase,
             produto.Marca,
@@ -317,11 +331,11 @@ public sealed class GerenciarProdutoUseCase(
             produto.CustoReferencia?.Valor,
             produto.PrecoReferencia?.Valor,
             produto.MargemEstimada,
+            produto.Dimensoes is null ? null : new DimensoesDetalheResult(produto.Dimensoes.Peso, produto.Dimensoes.Largura, produto.Dimensoes.Altura, produto.Dimensoes.Comprimento),
             itens.Sum(i => i.QuantidadeAtual.Value),
             itens.OrderByDescending(i => i.EntradaEm).Select(i => (DateTime?)i.EntradaEm).FirstOrDefault(),
             fotos.Select(f => new ProdutoFotoResult(f.FotoId, f.Url, f.CriadoEm)).ToArray(),
             variacoesResult,
-            dimensoesResult,
             caracteristicasResult,
             embalagensResult);
     }

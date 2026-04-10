@@ -6,6 +6,7 @@
     var categorias = ViewBag.Categorias as List<CategoriaApi> ?? [];
     var roots = categorias.Where(c => c.CategoriaPaiId == null).ToList();
     var children = categorias.Where(c => c.CategoriaPaiId != null).ToLookup(c => c.CategoriaPaiId);
+    var subcatJson = JsonSerializer.Serialize(categorias.Where(c => c.CategoriaPaiId != null).Select(c => new { id = c.Id, nome = c.Nome, categoriaPaiId = c.CategoriaPaiId }));
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -72,6 +73,8 @@
                     @if (categorias.Any())
                     {
                         <select asp-for="CategoriaId"
+                                x-model="categoriaId"
+                                @@change="subcategoriaId = null"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione uma categoria</option>
                             @foreach (var cat in roots)
@@ -93,6 +96,17 @@
                                class="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     }
                     <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
+                </div>
+                <div x-show="subcategorias.length > 0">
+                    <label asp-for="SubcategoriaId" class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
+                    <select asp-for="SubcategoriaId"
+                            x-model="subcategoriaId"
+                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">Nenhuma</option>
+                        <template x-for="sub in subcategorias" :key="sub.id">
+                            <option :value="sub.id" x-text="sub.nome"></option>
+                        </template>
+                    </select>
                 </div>
                 <div class="col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -368,7 +382,10 @@
 @section Scripts {
     <script>
         function produtoForm() {
+            const todasSubcats = @Html.Raw(subcatJson);
             return {
+                categoriaId: '@Model.CategoriaId',
+                subcategoriaId: '@(Model.SubcategoriaId?.ToString() ?? "")',
                 variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
                     nome = v.Nome ?? "", cor = v.Cor ?? "", tamanho = v.Tamanho ?? "",
                     descricaoComercial = v.DescricaoComercial ?? "", sku = v.Sku ?? "",
@@ -384,6 +401,10 @@
                     peso = e.Peso, largura = e.Largura, altura = e.Altura,
                     comprimento = e.Comprimento, padrao = e.Padrao
                 }))),
+                get subcategorias() {
+                    if (!this.categoriaId) return [];
+                    return todasSubcats.filter(s => s.categoriaPaiId === this.categoriaId);
+                },
                 preco: 0,
                 custo: 0,
                 syncMargem() {
