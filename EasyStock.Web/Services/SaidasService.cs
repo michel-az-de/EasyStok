@@ -20,12 +20,12 @@ public class SaidasService(ApiClient api, SessionService session)
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
-    public async Task<ApiResult<object>> CriarAsync(SaidaFormViewModel vm)
+    public Task<ApiResult<object>> CriarAsync(SaidaFormViewModel vm)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
-            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
-        return await api.PostAsync<object>("estoque/saida", new
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+        return api.PostAsync<object>("estoque/saida", new
         {
             empresaId,
             itens = new[]
@@ -47,6 +47,14 @@ public class SaidasService(ApiClient api, SessionService session)
             canal = MapCanal(vm.Canal),
             observacoes = vm.Descricao
         });
+    }
+
+    public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? periodoInicio = null, string? periodoFim = null)
+    {
+        var qs = "movimentacoes?page=1&pageSize=1000&tipo=Saida";
+        if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
+        if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
+        return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
     // EstornarAsync: no reversal endpoint exists in the API.

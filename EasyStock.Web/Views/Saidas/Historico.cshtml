@@ -5,30 +5,42 @@
 }
 
 <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Histórico de Saídas</h1>
-    <a asp-action="Nova" asp-controller="Saidas"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-        + Nova Saída
-    </a>
+    <div class="pg-hd">
+        <h1>Histórico de Saídas</h1>
+        <p>@Model.TotalRegistros @(Model.TotalRegistros == 1 ? "saída registrada" : "saídas registradas")</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="/saidas/exportar-csv?periodoInicio=@Model.PeriodoInicio&periodoFim=@Model.PeriodoFim"
+           class="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-300 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Exportar CSV
+        </a>
+        <a asp-action="Nova" asp-controller="Saidas"
+           class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            + Nova Saída
+        </a>
+    </div>
 </div>
 
 <!-- KPI chips -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="ws text-center">
-        <div class="text-2xl font-bold text-gray-900">@Model.TotalRegistros</div>
-        <div class="text-xs text-gray-500 mt-1">Total de registros</div>
+        <div class="text-2xl font-bold text-slate-900">@Model.TotalRegistros</div>
+        <div class="text-xs text-slate-500 mt-1">Total de registros</div>
     </div>
     <div class="ws text-center">
         <div class="text-2xl font-bold text-blue-600">@Model.TotalUnidades</div>
-        <div class="text-xs text-gray-500 mt-1">Unidades saídas</div>
+        <div class="text-xs text-slate-500 mt-1">Unidades saídas</div>
     </div>
     <div class="ws text-center">
         <div class="text-2xl font-bold text-green-600">R$ @Model.ReceitaTotal.ToString("N2")</div>
-        <div class="text-xs text-gray-500 mt-1">Receita total</div>
+        <div class="text-xs text-slate-500 mt-1">Receita total</div>
     </div>
     <div class="ws text-center">
         <div class="text-2xl font-bold text-red-500">@Model.TotalPerdas</div>
-        <div class="text-xs text-gray-500 mt-1">Perdas / Ajustes</div>
+        <div class="text-xs text-slate-500 mt-1">Perdas / Ajustes</div>
     </div>
 </div>
 
@@ -44,7 +56,7 @@
             {
                 var isActive = Model.FiltroNatureza == val || (val == "" && Model.FiltroNatureza == null);
                 <a href="@Url.Action("Historico", "Saidas", new { natureza = val == "" ? null : val, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                   class="px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50")">
+                   class="px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
                     @label
                 </a>
             }
@@ -52,12 +64,12 @@
         <!-- Date range -->
         <div class="flex gap-2 items-center ml-auto">
             <input type="date" name="de" value="@Model.PeriodoInicio"
-                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
-            <span class="text-gray-400 text-sm">a</span>
+                   class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+            <span class="text-slate-400 text-sm">a</span>
             <input type="date" name="ate" value="@Model.PeriodoFim"
-                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+                   class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
             <button type="submit"
-                    class="px-4 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm hover:bg-gray-200">
+                    class="px-4 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
                 Filtrar
             </button>
         </div>
@@ -68,7 +80,7 @@
 <div class="ws">
     @if (!Model.Itens.Any())
     {
-        <div class="text-center py-12 text-gray-400">
+        <div class="text-center py-12 text-slate-400">
             <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -78,6 +90,7 @@
     }
     else
     {
+        <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
                 <tr>
@@ -86,7 +99,7 @@
                     <th>Qtd</th>
                     <th>Valor</th>
                     <th>Data</th>
-                    <th>Canal</th>
+                    <th>Descrição</th>
                     <th></th>
                 </tr>
             </thead>
@@ -95,22 +108,22 @@
                 {
                     <tr>
                         <td>
-                            <div class="font-medium text-gray-900">@(s.Produto?.Nome ?? s.ProdutoId)</div>
+                            <div class="font-medium text-slate-900">@(s.Produto?.Nome ?? s.ProdutoId)</div>
                             @if (s.ProdutoVariacao != null)
                             {
-                                <div class="text-xs text-gray-500">@s.ProdutoVariacao.Nome</div>
+                                <div class="text-xs text-slate-500">@s.ProdutoVariacao.Nome</div>
                             }
                         </td>
                         <td>
                             @{
                                 var naturezaColor = s.Natureza?.ToLower() switch {
-                                    "venda" => "bg-green-100 text-green-700",
-                                    "perda" => "bg-red-100 text-red-700",
-                                    "devolucao" or "devolução" => "bg-blue-100 text-blue-700",
-                                    _ => "bg-gray-100 text-gray-700"
+                                    "venda" => "badge-ok",
+                                    "perda" => "badge-critical",
+                                    "devolucao" or "devolução" => "badge-slow",
+                                    _ => "badge-warn"
                                 };
                             }
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @naturezaColor">
+                            <span class="badge @naturezaColor">
                                 @s.Natureza
                             </span>
                         </td>
@@ -122,44 +135,22 @@
                             }
                             else
                             {
-                                <span class="text-gray-400">—</span>
+                                <span class="text-slate-400">—</span>
                             }
                         </td>
-                        <td class="text-gray-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
-                        <td class="text-gray-500 text-sm">@(s.Descricao ?? "—")</td>
+                        <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
+                        <td class="text-slate-500 text-sm">@(s.Descricao ?? "—")</td>
                         <td>
-                            <form asp-action="Estornar" asp-controller="Saidas"
-                                  asp-route-id="@s.Id" method="post"
-                                  x-data="{ confirm: false }">
-                                @Html.AntiForgeryToken()
-                                <button type="button" @@click="confirm = true"
-                                        class="text-xs text-red-600 hover:text-red-700">Estornar</button>
-                                <div x-show="confirm" x-cloak
-                                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                     @@click.self="confirm = false">
-                                    <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                                        <h3 class="font-semibold text-gray-900 mb-2">Confirmar estorno</h3>
-                                        <p class="text-sm text-gray-600 mb-4">
-                                            Isso reverterá a saída e adicionará o estoque de volta.
-                                        </p>
-                                        <div class="flex justify-end gap-3">
-                                            <button type="button" @@click="confirm = false"
-                                                    class="px-3 py-1.5 text-sm text-gray-700 border rounded-lg hover:bg-gray-50">
-                                                Cancelar
-                                            </button>
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                                Confirmar Estorno
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
+                            <span class="text-xs text-slate-400 cursor-not-allowed"
+                                  title="Estorno não disponível no momento">
+                                Estornar
+                            </span>
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
+        </div>
 
         <!-- Paginação -->
         @if (Model.Paginacao.Pages > 1)
@@ -168,7 +159,7 @@
                 @for (int p = 1; p <= Model.Paginacao.Pages; p++)
                 {
                     <a href="@Url.Action("Historico", "Saidas", new { page = p, natureza = Model.FiltroNatureza, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50")">
+                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
                         @p
                     </a>
                 }

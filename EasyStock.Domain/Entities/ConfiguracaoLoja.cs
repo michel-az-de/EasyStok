@@ -1,19 +1,21 @@
+using EasyStock.Domain.Defaults;
+
 namespace EasyStock.Domain.Entities;
 
 public class ConfiguracaoLoja
 {
     public Guid Id { get; set; }
     public Guid LojaId { get; set; }
-    public int DiasAlertaValidade { get; set; } = 15;
-    public int DiasAlertaParado { get; set; } = 30;
-    public int QuantidadeMinimaPadrao { get; set; } = 5;
+    public int DiasAlertaValidade { get; set; } = OperacionalDefaults.DiasAlertaValidade;
+    public int DiasAlertaParado { get; set; } = OperacionalDefaults.DiasAlertaParado;
+    public int QuantidadeMinimaPadrao { get; set; } = OperacionalDefaults.QuantidadeMinima;
     public bool NotificarEstoqueCritico { get; set; } = true;
     public bool NotificarValidade { get; set; } = true;
     public bool NotificarParado { get; set; } = true;
     public bool NotificarReposicao { get; set; } = true;
     public bool FifoAtivo { get; set; } = true;
-    public string Moeda { get; set; } = "BRL";
-    public string Timezone { get; set; } = "America/Sao_Paulo";
+    public string Moeda { get; set; } = OperacionalDefaults.Moeda;
+    public string Timezone { get; set; } = OperacionalDefaults.Timezone;
     public DateTime CriadoEm { get; set; }
     public DateTime AlteradoEm { get; set; }
 
@@ -58,16 +60,16 @@ public class ConfiguracaoLoja
 
     public void ResetarPadrao()
     {
-        DiasAlertaValidade = 15;
-        DiasAlertaParado = 30;
-        QuantidadeMinimaPadrao = 5;
+        DiasAlertaValidade = OperacionalDefaults.DiasAlertaValidade;
+        DiasAlertaParado = OperacionalDefaults.DiasAlertaParado;
+        QuantidadeMinimaPadrao = OperacionalDefaults.QuantidadeMinima;
         NotificarEstoqueCritico = true;
         NotificarValidade = true;
         NotificarParado = true;
         NotificarReposicao = true;
         FifoAtivo = true;
-        Moeda = "BRL";
-        Timezone = "America/Sao_Paulo";
+        Moeda = OperacionalDefaults.Moeda;
+        Timezone = OperacionalDefaults.Timezone;
         AlteradoEm = DateTime.UtcNow;
     }
 }

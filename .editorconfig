@@ -1,10 +1,27 @@
-﻿root = true
+root = true
+
+# Encoding convention:
+#   - Most files: UTF-8 without BOM (charset = utf-8), LF or CRLF per type
+#   - C# source and project files: UTF-8 with BOM (charset = utf-8-bom), CRLF
+#     This matches the default output of Visual Studio and dotnet-ef migrations.
+#   - Web/config files (JSON, YAML, Markdown): UTF-8 without BOM, LF
+# See also: .gitattributes for git-level eol normalization.
 
 [*]
 charset = utf-8
 end_of_line = crlf
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+# C# sources and project files are generated/managed by Visual Studio with UTF-8 BOM
+[*.{cs,csproj,sln}]
+charset = utf-8-bom
+end_of_line = crlf
+
+# Markup and data formats: no BOM, LF line endings
+[*.{md,json,yml,yaml}]
+charset = utf-8
+end_of_line = lf
 
 [*.md]
 trim_trailing_whitespace = false

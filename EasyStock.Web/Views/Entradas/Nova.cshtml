@@ -1,7 +1,4 @@
 @model EntradaFormViewModel
-@{
-    var csrfToken = Html.AntiForgeryToken();
-}
 
 <div class="flex items-center gap-3 mb-6">
     <a href="/estoque" class="text-slate-400 hover:text-slate-600 transition-colors">
@@ -96,6 +93,16 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 ws space-y-4">
                     <h3 class="font-bold text-slate-800 mb-2">Detalhes da entrada</h3>
+
+                    <div x-show="variacoes.length > 1" class="mb-4">
+                        <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Variação</label>
+                        <select x-model="varId"
+                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            <template x-for="v in variacoes" :key="v.id">
+                                <option :value="v.id" x-text="v.nome"></option>
+                            </template>
+                        </select>
+                    </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="col-span-2">
@@ -248,6 +255,7 @@
                 produtoSku: '',
                 produtoEmoji: '',
                 estoqueAtual: 0,
+                variacoes: [],
                 varId: '',
                 qty: 1,
                 custo: null,
@@ -256,7 +264,7 @@
                 lote: '',
                 validade: '',
                 observacoes: '',
-                data: new Date().toISOString().split('T')[0],
+                data: new Date().toLocaleDateString('en-CA'),
                 total: 0,
 
                 async buscarProduto() {
@@ -270,13 +278,27 @@
                     }
                 },
 
-                selecionarProduto(p) {
+                async selecionarProduto(p) {
                     this.produtoId = p.id;
                     this.produtoNome = p.nome;
                     this.produtoSku = p.sku;
                     this.produtoEmoji = p.emoji || '📦';
-                    this.estoqueAtual = p.estoqueTotal || 0;
-                    this.varId = p.variacoes && p.variacoes.length > 0 ? p.variacoes[0].id : '';
+                    this.variacoes = [];
+                    this.estoqueAtual = 0;
+                    this.varId = '';
+                    try {
+                        const dr = await fetch('/estoque/produto-detalhe/' + p.id);
+                        if (dr.ok) {
+                            const d = await dr.json();
+                            this.variacoes = d.variacoes || [];
+                            this.estoqueAtual = d.estoqueTotal || 0;
+                            this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                        }
+                    } catch {
+                        this.variacoes = [];
+                        this.estoqueAtual = 0;
+                        this.varId = '';
+                    }
                     this.step = 2;
                 },
 

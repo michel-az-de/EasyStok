@@ -37,7 +37,6 @@
                     class="px-4 py-2 text-sm font-semibold border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                 Excluir
             </button>
-            <!-- Modal backdrop -->
             <div x-show="open" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" x-transition>
                 <div @@click.stop class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
                     <h3 class="font-bold text-slate-900 text-lg mb-2">Excluir produto?</h3>
@@ -98,10 +97,17 @@
                         {
                             var margem = (p.PrecoReferencia!.Value - p.CustoReferencia.Value) / p.PrecoReferencia.Value * 100;
                             <div class="flex justify-between">
-                                <dt class="text-sm text-slate-500">Margem</dt>
+                                <dt class="text-sm text-slate-500">Margem calculada</dt>
                                 <dd class="text-sm font-semibold text-emerald-600">@margem.ToString("F1")%</dd>
                             </div>
                         }
+                    }
+                    @if (p.MargemEstimada.HasValue)
+                    {
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-slate-500">Margem estimada</dt>
+                            <dd class="text-sm font-semibold text-emerald-600">@p.MargemEstimada.Value.ToString("F1")%</dd>
+                        </div>
                     }
                     @if (!string.IsNullOrEmpty(p.Marca))
                     {
@@ -115,6 +121,17 @@
                         <div class="flex justify-between">
                             <dt class="text-sm text-slate-500">Cod. Barras</dt>
                             <dd class="text-sm font-mono">@p.CodigoBarras</dd>
+                        </div>
+                    }
+                    @if (p.Dimensoes != null)
+                    {
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-slate-500">Peso</dt>
+                            <dd class="text-sm font-mono">@($"{p.Dimensoes.Peso:F3} kg")</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-slate-500">Dimensões (L x A x C)</dt>
+                            <dd class="text-sm font-mono">@($"{p.Dimensoes.Largura:F1} x {p.Dimensoes.Altura:F1} x {p.Dimensoes.Comprimento:F1} cm")</dd>
                         </div>
                     }
                 </dl>
@@ -149,6 +166,14 @@
                                         <span class="text-xs text-slate-400 ml-2">
                                             @(string.Join(" / ", new[] { v.Cor, v.Tamanho }.Where(x => !string.IsNullOrEmpty(x))))
                                         </span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(v.DescricaoComercial))
+                                    {
+                                        <span class="text-xs text-slate-400 ml-2">- @v.DescricaoComercial</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(v.CodigoBarras))
+                                    {
+                                        <span class="text-xs text-slate-300 font-mono ml-2">@v.CodigoBarras</span>
                                     }
                                     <span class="text-xs ml-2 @(v.QuantidadeEmEstoque == 0 ? "text-red-500" : "text-slate-500")">(@v.QuantidadeEmEstoque un.)</span>
                                 </div>
@@ -193,6 +218,86 @@
                 </div>
             </div>
         </div>
+
+        <!-- Caracteristicas -->
+        @if (p.Caracteristicas.Any())
+        {
+            <div class="ws mt-6">
+                <h3 class="font-bold text-slate-800 mb-4">Características (@p.Caracteristicas.Count)</h3>
+                <div class="overflow-x-auto">
+                    <table class="tbl-full">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Descrição</th>
+                                <th class="text-center">Quantidade</th>
+                                <th>Variação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in p.Caracteristicas.OrderBy(x => x.OrdemExibicao))
+                            {
+                                <tr>
+                                    <td class="font-medium">@c.Nome</td>
+                                    <td class="text-sm text-slate-500">@(c.Descricao ?? "-")</td>
+                                    <td class="text-center text-sm">@(c.QuantidadeReferencia?.ToString() ?? "-")</td>
+                                    <td class="text-sm text-slate-500">@(c.VariacaoPadrao ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Embalagens -->
+        @if (p.Embalagens.Any())
+        {
+            <div class="ws mt-6">
+                <h3 class="font-bold text-slate-800 mb-4">Embalagens (@p.Embalagens.Count)</h3>
+                <div class="overflow-x-auto">
+                    <table class="tbl-full">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Descrição</th>
+                                <th>Dimensões</th>
+                                <th class="text-center">Padrão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in p.Embalagens)
+                            {
+                                <tr>
+                                    <td class="font-medium">@e.Nome</td>
+                                    <td class="text-sm text-slate-500">@(e.Descricao ?? "-")</td>
+                                    <td class="text-sm font-mono text-slate-500">
+                                        @if (e.Dimensoes != null)
+                                        {
+                                            @($"{e.Dimensoes.Peso:F3}kg | {e.Dimensoes.Largura:F1} x {e.Dimensoes.Altura:F1} x {e.Dimensoes.Comprimento:F1} cm")
+                                        }
+                                        else
+                                        {
+                                            <text>-</text>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (e.Padrao)
+                                        {
+                                            <span class="badge badge-ok px-2 py-0.5 rounded-full text-xs font-semibold">Sim</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-sm text-slate-400">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
     </div>
 
     <!-- Tab: Estoque por variação -->
@@ -204,21 +309,30 @@
             </div>
             @if (p.Variacoes.Any())
             {
+                <div class="overflow-x-auto">
                 <table class="tbl-full">
                     <thead>
                         <tr>
-                            <th>Variacao</th>
+                            <th>Variação</th>
                             <th>SKU</th>
                             <th class="text-center">Qtd</th>
                             <th class="text-center">Status</th>
-                            <th>Ultima entrada</th>
+                            <th>Última entrada</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var v in p.Variacoes)
                         {
                             <tr>
-                                <td class="font-medium">@v.Nome</td>
+                                <td>
+                                    <span class="font-medium">@v.Nome</span>
+                                    @if (!string.IsNullOrEmpty(v.Cor) || !string.IsNullOrEmpty(v.Tamanho))
+                                    {
+                                        <span class="text-xs text-slate-400 ml-1">
+                                            (@(string.Join(" / ", new[] { v.Cor, v.Tamanho }.Where(x => !string.IsNullOrEmpty(x)))))
+                                        </span>
+                                    }
+                                </td>
                                 <td class="font-mono text-xs text-slate-500">@(v.Sku ?? "-")</td>
                                 <td class="text-center">
                                     <span class="font-bold @(v.QuantidadeEmEstoque == 0 ? "text-red-600" : v.QuantidadeEmEstoque < 5 ? "text-amber-600" : "text-slate-900")">
@@ -237,10 +351,11 @@
                         }
                     </tbody>
                 </table>
+                </div>
             }
             else
             {
-                <p class="text-center py-8 text-slate-400 text-sm">Nenhuma variacao cadastrada. Adicione variacoes na aba Informacoes.</p>
+                <p class="text-center py-8 text-slate-400 text-sm">Nenhuma variação cadastrada. Adicione variações na aba Informações.</p>
             }
         </div>
     </div>
@@ -294,8 +409,11 @@
                             td.textContent = String(val);
                         });
                 });
+                const wrapper = document.createElement('div');
+                wrapper.className = 'overflow-x-auto';
+                wrapper.appendChild(table);
                 container.textContent = '';
-                container.appendChild(table);
+                container.appendChild(wrapper);
             } catch {
                 container.textContent = '';
                 const msg = document.createElement('p');

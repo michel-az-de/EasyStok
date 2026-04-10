@@ -43,7 +43,7 @@
             <div class="kpi-lbl">Estoque crítico</div>
         </div>
     </a>
-    <a href="/estoque?status=vencimento" class="ws flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
+    <a href="/estoque?status=atencao" class="ws flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
         <div>
             <div class="kpi-val text-amber-600">@Model.ProximosVencimento</div>
@@ -73,48 +73,50 @@
         <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
         @if (Model.MovimentacoesRecentes.Any())
         {
-            <table class="tbl-full">
-                <thead>
-                    <tr>
-                        <th>Tipo</th>
-                        <th class="text-right">Movimentações</th>
-                        <th class="text-right">Qtd</th>
-                        <th class="text-right">Valor</th>
-                        <th class="text-right">Data</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var m in Model.MovimentacoesRecentes)
-                    {
+            <div class="overflow-x-auto">
+                <table class="tbl-full">
+                    <thead>
                         <tr>
-                            <td>
-                                @{
-                                    var badgeClass = m.Tipo switch
-                                    {
-                                        "Entrada" => "badge-ok",
-                                        "Saida" or "Saída" => "badge-warn",
-                                        _ => "badge-slow"
-                                    };
-                                }
-                                <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
-                            </td>
-                            <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
-                            <td class="text-right font-mono">@m.Qty</td>
-                            <td class="text-right text-slate-500">
-                                @if (m.Valor.HasValue)
-                                {
-                                    @m.Valor.Value.ToString("C", ptBR)
-                                }
-                                else
-                                {
-                                    <span>—</span>
-                                }
-                            </td>
-                            <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                            <th>Tipo</th>
+                            <th class="text-right">Movimentações</th>
+                            <th class="text-right">Qtd</th>
+                            <th class="text-right">Valor</th>
+                            <th class="text-right">Data</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.MovimentacoesRecentes)
+                        {
+                            <tr>
+                                <td>
+                                    @{
+                                        var badgeClass = m.Tipo switch
+                                        {
+                                            "Entrada" => "badge-ok",
+                                            "Saida" or "Saída" => "badge-warn",
+                                            _ => "badge-slow"
+                                        };
+                                    }
+                                    <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
+                                </td>
+                                <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
+                                <td class="text-right font-mono">@m.Qty</td>
+                                <td class="text-right text-slate-500">
+                                    @if (m.Valor.HasValue)
+                                    {
+                                        @m.Valor.Value.ToString("C", ptBR)
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                                <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
         else
         {
@@ -129,7 +131,18 @@
     <!-- Gráfico receita -->
     <div class="ws">
         <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 6 meses</h2>
-        <canvas id="grafico-receita" height="200"></canvas>
+        @if (Model.GraficoLabels.Any())
+        {
+            <canvas id="grafico-receita" height="200"></canvas>
+        }
+        else
+        {
+            <div class="flex flex-col items-center justify-center h-40 text-slate-400">
+                <div class="text-3xl mb-2">📈</div>
+                <p class="text-sm font-semibold text-slate-500">Sem dados de receita</p>
+                <p class="text-xs mt-1">Registre saídas para visualizar o gráfico.</p>
+            </div>
+        }
     </div>
 </div>
 
@@ -160,6 +173,8 @@
 </div>
 
 @section Scripts {
+    @if (Model.GraficoLabels.Any())
+    {
     <script>
         const ctx = document.getElementById('grafico-receita');
         if (ctx) {
@@ -192,4 +207,5 @@
             });
         }
     </script>
+    }
 }

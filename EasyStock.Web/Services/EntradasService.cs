@@ -46,6 +46,15 @@ public class EntradasService(ApiClient api, SessionService session)
         return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Reposicao", empresaId));
     }
 
+    public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
+    {
+        var tipoFilter = string.IsNullOrEmpty(tipo) ? "Entrada" : tipo;
+        var qs = $"movimentacoes?page=1&pageSize=1000&tipo={Uri.EscapeDataString(tipoFilter)}";
+        if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
+        if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
+        return api.GetAsync<PagedResult<Movimentacao>>(qs);
+    }
+
     private static object BuildEntradaBody(EntradaFormViewModel vm, string natureza, Guid empresaId) => new
     {
         empresaId,

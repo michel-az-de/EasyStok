@@ -110,6 +110,51 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (result.Success)
             vm.Pedidos = result.Data!;
 
+        var fornResult = await svc.ListarAsync();
+        if (fornResult.Success)
+            vm.Fornecedores = fornResult.Data!;
+
         return View(vm);
+    }
+
+    [HttpPost("/fornecedores/pedidos")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarPedido(
+        string fornecedorId, DateOnly dataPedido, DateOnly? previsaoEntrega,
+        decimal? valorEstimado, string? canal, string? observacoes)
+    {
+        if (string.IsNullOrWhiteSpace(fornecedorId))
+        {
+            Toast("error", "Selecione um fornecedor.");
+            return RedirectToAction(nameof(PedidosAbertos));
+        }
+
+        var result = await svc.CriarPedidoAsync(fornecedorId, dataPedido, previsaoEntrega, valorEstimado, canal, observacoes);
+        if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
+
+        Toast("success", "Pedido criado com sucesso!");
+        return RedirectToAction(nameof(PedidosAbertos));
+    }
+
+    [HttpPost("/fornecedores/pedidos/{id}/receber")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReceberPedido(string id, string? tracking)
+    {
+        var result = await svc.ReceberPedidoAsync(id, tracking);
+        if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
+
+        Toast("success", "Pedido marcado como recebido!");
+        return RedirectToAction(nameof(PedidosAbertos));
+    }
+
+    [HttpPost("/fornecedores/pedidos/{id}/cancelar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelarPedido(string id)
+    {
+        var result = await svc.CancelarPedidoAsync(id);
+        if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
+
+        Toast("success", "Pedido cancelado.");
+        return RedirectToAction(nameof(PedidosAbertos));
     }
 }

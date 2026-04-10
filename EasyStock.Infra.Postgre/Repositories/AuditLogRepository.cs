@@ -9,9 +9,10 @@ public class AuditLogRepository(EasyStockDbContext context) : IAuditLogRepositor
 {
     private readonly EasyStockDbContext _context = context;
 
-    public async Task AddAsync(AuditLog auditLog)
+    public Task AddAsync(AuditLog auditLog)
     {
-        await _context.AuditLogs.AddAsync(auditLog);
+        _context.AuditLogs.Add(auditLog);
+        return Task.CompletedTask;
     }
 
     public async Task<IEnumerable<AuditLog>> GetByUsuarioIdAsync(Guid usuarioId, int page, int pageSize) =>

@@ -49,7 +49,10 @@
         {
             <div class="bg-white rounded-xl border border-slate-200 p-8 text-center">
                 <p class="text-slate-500">Nenhuma loja encontrada para este usuário.</p>
-                <a href="/auth/logout" class="text-indigo-600 text-sm font-semibold mt-2 inline-block hover:underline">Fazer logout</a>
+                <form asp-action="Logout" asp-controller="Auth" method="post" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="text-indigo-600 text-sm font-semibold hover:underline">Fazer logout</button>
+                </form>
             </div>
         }
     </div>

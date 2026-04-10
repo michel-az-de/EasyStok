@@ -7,9 +7,6 @@ using System.Text.Json;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
-    // Proposed PostgreSQL index for performance:
-    // CREATE INDEX idx_produtos_empresa_nome ON produtos (empresaid, nome);
-
     public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
         : IProdutoRepository
     {

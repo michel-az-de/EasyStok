@@ -1,3 +1,4 @@
+using System.Text;
 using EasyStock.Web.Models.ViewModels.Saidas;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -79,6 +80,32 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         return View(vm);
     }
 
+    [HttpGet("/saidas/exportar-csv")]
+    public async Task<IActionResult> ExportarCsv(string? periodoInicio = null, string? periodoFim = null)
+    {
+        var result = await svc.ExportarAsync(periodoInicio, periodoFim);
+        if (!result.Success) return BadRequest();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Data,Produto,Variação,Quantidade,Valor Unitário,Total,Natureza,Documento,Descrição");
+        foreach (var m in result.Data!.Data)
+        {
+            sb.AppendLine(string.Join(",",
+                m.Data.ToString("yyyy-MM-dd"),
+                Csv(m.Produto?.Nome),
+                Csv(m.ProdutoVariacao?.Nome),
+                m.Qty,
+                m.ValorUnitario?.Valor.ToString("F2") ?? "",
+                m.ValorTotal?.Valor.ToString("F2") ?? "",
+                Csv(m.Natureza),
+                Csv(m.DocumentoReferencia),
+                Csv(m.Descricao)));
+        }
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"saidas-{DateTime.Now:yyyyMMdd}.csv");
+    }
+
     [HttpPost("/saidas/{id}/estornar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Estornar(string id)
@@ -89,4 +116,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         Toast("success", "Saída estornada com sucesso!");
         return RedirectToAction(nameof(Historico));
     }
+
+    private static string Csv(string? value) =>
+        value is null ? "" : $"\"{value.Replace("\"", "\"\"")}\"";
 }

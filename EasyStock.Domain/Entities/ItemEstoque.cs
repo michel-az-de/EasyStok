@@ -1,3 +1,4 @@
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
@@ -6,9 +7,6 @@ namespace EasyStock.Domain.Entities
 {
     public class ItemEstoque
     {
-        // Valor padrão de quantidade mínima ao registrar uma entrada de estoque
-        private const int QuantidadeMinimaDefault = 5;
-
         // Limiar de quantidade abaixo do qual o item é considerado crítico
         private const int LimiarQuantidadeCritica = 2;
         public Guid Id { get; set; }
@@ -34,7 +32,7 @@ namespace EasyStock.Domain.Entities
 
         public Quantidade QuantidadeInicial { get; set; } = null!;
         public Quantidade QuantidadeAtual { get; set; } = null!;
-        public int QuantidadeMinima { get; set; } = QuantidadeMinimaDefault;
+        public int QuantidadeMinima { get; set; } = OperacionalDefaults.QuantidadeMinima;
         public decimal VelocidadeSaidaDiaria { get; set; }
         public int DiasSemMovimentacao { get; set; }
         public int? PrevisaoZeramentoDias { get; set; }
@@ -99,7 +97,7 @@ namespace EasyStock.Domain.Entities
                 FornecedorNome = NormalizarTexto(fornecedorNome),
                 QuantidadeInicial = quantidade,
                 QuantidadeAtual = quantidade,
-                QuantidadeMinima = QuantidadeMinimaDefault,
+                QuantidadeMinima = OperacionalDefaults.QuantidadeMinima,
                 VelocidadeSaidaDiaria = 0m,
                 DiasSemMovimentacao = 0,
                 PrevisaoZeramentoDias = null,
@@ -188,7 +186,7 @@ namespace EasyStock.Domain.Entities
         public void RecalcularStatus(DateTime dataReferencia) =>
             RecalcularIndicadores(dataReferencia);
 
-        public void RecalcularIndicadores(DateTime dataReferencia, int diasAlertaParado = 30)
+        public void RecalcularIndicadores(DateTime dataReferencia, int diasAlertaParado = OperacionalDefaults.DiasAlertaParado)
         {
             if (ValidadeEm?.EstaVencido(dataReferencia) == true)
             {
