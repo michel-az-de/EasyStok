@@ -34,6 +34,8 @@
 </div>
 
 <!-- Projeções derivadas da velocidade média diária -->
+@if (Model.MediaVendasDiaria > 0)
+{
 <div class="ws mb-6">
     <h2 class="font-semibold text-gray-900 mb-1">Projeções de Demanda</h2>
     <p class="text-xs text-gray-400 mb-4">Baseado na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
@@ -56,6 +58,18 @@
         </div>
     </div>
 </div>
+}
+else
+{
+<div class="ws mb-6">
+    <h2 class="font-semibold text-gray-900 mb-1">Projeções de Demanda</h2>
+    <div class="flex flex-col items-center justify-center py-8 text-gray-400">
+        <div class="text-3xl mb-2">📊</div>
+        <p class="text-sm font-semibold text-gray-500">Dados insuficientes para projeção</p>
+        <p class="text-xs mt-1">Registre saídas para habilitar as projeções de demanda.</p>
+    </div>
+</div>
+}
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Reposição urgente -->

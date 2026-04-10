@@ -65,10 +65,9 @@
             <tbody>
                 @foreach (var m in Model.Itens)
                 {
-                    var tipoIcon = m.Tipo.Contains("entrada") || m.Tipo == "entrada"
-                        ? "↑" : "↓";
-                    var tipoColor = m.Tipo.Contains("entrada") || m.Tipo == "entrada"
-                        ? "text-green-600" : "text-red-500";
+                    var isEntrada = m.Tipo.Contains("entrada", StringComparison.OrdinalIgnoreCase);
+                    var tipoIcon = isEntrada ? "↑" : "↓";
+                    var tipoColor = isEntrada ? "text-green-600" : "text-red-500";
                     <tr>
                         <td>
                             <span class="font-medium @tipoColor">@tipoIcon</span>
