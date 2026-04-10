@@ -186,15 +186,24 @@ function saidaForm() {
             this.busca = p.nome;
             this.showResults = false;
             this.resultados = [];
+            this.variacoes = [];
+            this.estoqueAtual = 0;
+            this.varId = '';
             try {
                 const dr = await fetch('/estoque/produto-detalhe/' + p.id);
-                if (dr.ok) {
-                    const d = await dr.json();
-                    this.variacoes = d.variacoes || [];
-                    this.estoqueAtual = d.estoqueTotal || 0;
-                    this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                if (!dr.ok) {
+                    return;
                 }
-            } catch { this.variacoes = []; }
+
+                const d = await dr.json();
+                this.variacoes = d.variacoes || [];
+                this.estoqueAtual = d.estoqueTotal || 0;
+                this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+            } catch {
+                this.variacoes = [];
+                this.estoqueAtual = 0;
+                this.varId = '';
+            }
         },
 
         calcularTotal() {
