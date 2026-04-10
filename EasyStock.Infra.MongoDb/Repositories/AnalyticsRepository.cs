@@ -45,16 +45,48 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         });
     }
 
-    private static readonly TimeSpan DashboardTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan ReceitaTtl = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan MargemTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DashboardTtl    = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ReceitaTtl      = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan MargemTtl       = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan MovimentacaoTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan ValidadeTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan ParadosTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan ValidadeTtl     = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ParadosTtl      = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan SazonalidadeTtl = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan ReposicaoTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan ProjecaoTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan CanalTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan ReposicaoTtl    = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ProjecaoTtl     = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan CanalTtl        = TimeSpan.FromMinutes(10);
+
+    // Dashboard alert thresholds (independent of per-store configuration)
+    private const int DashboardDiasAlertaVencimento = 30;
+    private const int DashboardDiasAlertaParado     = 90;
+
+    private static (DateTime De, DateTime Ate) BuildPeriodo(int dias)
+    {
+        var ate = DateTime.UtcNow;
+        return (ate.AddDays(-dias), ate);
+    }
+
+    private async Task<Dictionary<Guid, decimal>> GetTaxasSaidaAsync(
+        Guid empresaId, DateTime de, DateTime ate, int dias)
+    {
+        var taxasPipeline = new[]
+        {
+            new BsonDocument("$match", new BsonDocument
+            {
+                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+                { "Tipo", TipoMovimentacaoEstoque.Saida },
+                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
+            }),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$ProdutoId" },
+                { "Total", new BsonDocument("$sum", "$Quantidade.Value") }
+            })
+        };
+
+        var taxasRaw = await MovimentacoesEstoque.Aggregate<BsonDocument>(taxasPipeline).ToListAsync();
+        return taxasRaw.ToDictionary(x => x["_id"].AsGuid, x => (decimal)x["Total"].ToInt32() / dias);
+    }
 
     // Dashboard
 
@@ -64,8 +96,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var cached = await GetCachedAsync<DashboardResumo>(cacheKey);
         if (cached is not null) return cached;
 
-        var ate = DateTime.UtcNow;
-        var de = ate.AddDays(-periodoDias);
+        var (de, ate) = BuildPeriodo(periodoDias);
 
         // Estoque
         var estoquePipeline = new[]
@@ -99,7 +130,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard))).ToListAsync().ContinueWith(t => t.Result.Count);
 
         // Alertas vencimento
-        var cutoffValidade = DateTime.UtcNow.AddDays(30);
+        var cutoffValidade = DateTime.UtcNow.AddDays(DashboardDiasAlertaVencimento);
         var alertasVencimento = await ItensEstoque.CountDocumentsAsync(new BsonDocument
         {
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
@@ -108,7 +139,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         });
 
         // Alertas parados
-        var cutoffParado = DateTime.UtcNow.AddDays(-90);
+        var cutoffParado = DateTime.UtcNow.AddDays(-DashboardDiasAlertaParado);
         var alertasParados = await ItensEstoque.CountDocumentsAsync(new BsonDocument
         {
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
@@ -532,28 +563,10 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var cached = await GetCachedAsync<(List<ReposicaoSugerida>, int)>(cacheKey);
         if (cached != default) return cached;
 
-        var de = DateTime.UtcNow.AddDays(-diasHistorico);
-        var ate = DateTime.UtcNow;
+        var (de, ate) = BuildPeriodo(diasHistorico);
         var dias = Math.Max(1, diasHistorico);
 
-        // Taxa de saida por produto
-        var taxasPipeline = new[]
-        {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
-            new BsonDocument("$group", new BsonDocument
-            {
-                { "_id", "$ProdutoId" },
-                { "Total", new BsonDocument("$sum", "$Quantidade.Value") }
-            })
-        };
-
-        var taxasRaw = await MovimentacoesEstoque.Aggregate<BsonDocument>(taxasPipeline).ToListAsync();
-        var taxas = taxasRaw.ToDictionary(x => x["_id"].AsGuid, x => (decimal)x["Total"].ToInt32() / dias);
+        var taxas = await GetTaxasSaidaAsync(empresaId, de, ate, dias);
 
         var match = new BsonDocument
         {
@@ -625,27 +638,10 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var cached = await GetCachedAsync<(List<ProjecaoRuptura>, int)>(cacheKey);
         if (cached != default) return cached;
 
-        var de = DateTime.UtcNow.AddDays(-diasHistorico);
-        var ate = DateTime.UtcNow;
+        var (de, ate) = BuildPeriodo(diasHistorico);
         var dias = Math.Max(1, diasHistorico);
 
-        var taxasPipeline = new[]
-        {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
-            new BsonDocument("$group", new BsonDocument
-            {
-                { "_id", "$ProdutoId" },
-                { "Total", new BsonDocument("$sum", "$Quantidade.Value") }
-            })
-        };
-
-        var taxasRaw = await MovimentacoesEstoque.Aggregate<BsonDocument>(taxasPipeline).ToListAsync();
-        var taxas = taxasRaw.ToDictionary(x => x["_id"].AsGuid, x => (decimal)x["Total"].ToInt32() / dias);
+        var taxas = await GetTaxasSaidaAsync(empresaId, de, ate, dias);
 
         var match = new BsonDocument
         {

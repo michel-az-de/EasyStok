@@ -1,3 +1,4 @@
+using EasyStock.Domain.Defaults;
 using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
@@ -129,7 +130,7 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             {
                 item.LojaId = command.LojaId.Value;
                 item.QuantidadeMinima = configuracaoLoja?.QuantidadeMinimaPadrao ?? item.QuantidadeMinima;
-                item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? 30);
+                item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? OperacionalDefaults.DiasAlertaParado);
             }
 
             var movimentacao = MovimentacaoEstoque.CriarEntrada(

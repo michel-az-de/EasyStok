@@ -127,6 +127,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     Descricao = caracteristica.Descricao?.Trim(),
                     QuantidadeReferencia = caracteristica.QuantidadeReferencia,
                     VariacaoPadrao = caracteristica.VariacaoPadrao?.Trim(),
+                    VariacaoId = caracteristica.VariacaoId,
                     OrdemExibicao = caracteristica.OrdemExibicao,
                     CriadoEm = agora,
                     AlteradoEm = agora

@@ -104,6 +104,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         var p = result.Data!;
+        var embPadrao = p.Embalagens.FirstOrDefault(e => e.Padrao) ?? p.Embalagens.FirstOrDefault();
         var vm = new ProdutoFormViewModel
         {
             Id = p.ProdutoId.ToString(),

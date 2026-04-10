@@ -24,6 +24,9 @@
 
 @{
     var formAction = isEdit ? Url.Action("Atualizar", "Produtos", new { id = Model.Id }) : Url.Action("Criar", "Produtos");
+    var subcatJson = System.Text.Json.JsonSerializer.Serialize(
+        categorias.Where(c => c.CategoriaPaiId != null)
+            .Select(c => new { id = c.Id, nome = c.Nome, categoriaPaiId = c.CategoriaPaiId }));
 }
 <form action="@formAction" method="post" enctype="multipart/form-data"
       x-data="produtoForm()"
@@ -68,9 +71,9 @@
                         <option value="2">Serviço</option>
                     </select>
                 </div>
-                <div class="col-span-2">
+                <div>
                     <label asp-for="CategoriaId" class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
-                    @if (categorias.Any())
+                    @if (categoriasPai.Any())
                     {
                         <select asp-for="CategoriaId"
                                 x-model="categoriaId"

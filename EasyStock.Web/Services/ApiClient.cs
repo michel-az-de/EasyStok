@@ -134,16 +134,21 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
     {
         try
         {
-            var json = JsonSerializer.Serialize(body, JsonOpts);
-            var request = new HttpRequestMessage(HttpMethod.Post, path)
+            using var request = new HttpRequestMessage(HttpMethod.Post, path)
             {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
+                Content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json")
             };
             var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
-                return ApiResult<Stream>.Fail("HTTP_ERROR", $"Erro HTTP {(int)response.StatusCode}.");
+            {
+                var errorResult = await ParseErrorResponse<Stream>(response);
+                response.Dispose();
+                return errorResult;
+            }
             var stream = await response.Content.ReadAsStreamAsync();
-            return ApiResult<Stream>.Ok(stream);
+            // ResponseStream disposes the HttpResponseMessage when the stream is closed,
+            // preventing socket exhaustion on SSE/streaming connections.
+            return ApiResult<Stream>.Ok(new ResponseStream(stream, response));
         }
         catch (TaskCanceledException)
         {
@@ -153,6 +158,41 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         {
             log.LogError(ex, "Network error on POST stream {Path}", path);
             return ApiResult<Stream>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
+        }
+    }
+
+    /// <summary>
+    /// Wraps a response body <see cref="Stream"/> and disposes the owning
+    /// <see cref="HttpResponseMessage"/> when the stream itself is disposed,
+    /// ensuring the underlying socket is released after streaming (SSE) responses.
+    /// </summary>
+    private sealed class ResponseStream(Stream inner, HttpResponseMessage response) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => inner.CanWrite;
+        public override long Length => inner.Length;
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+
+        public override void Flush() => inner.Flush();
+        public override Task FlushAsync(CancellationToken ct) => inner.FlushAsync(ct);
+
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) => inner.ReadAsync(buffer, offset, count, ct);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default) => inner.ReadAsync(buffer, ct);
+
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => inner.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+                response.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 
