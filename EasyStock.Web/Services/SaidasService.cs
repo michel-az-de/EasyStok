@@ -20,12 +20,12 @@ public class SaidasService(ApiClient api, SessionService session)
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
-    public async Task<ApiResult<object>> CriarAsync(SaidaFormViewModel vm)
+    public Task<ApiResult<object>> CriarAsync(SaidaFormViewModel vm)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
-            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
-        return await api.PostAsync<object>("estoque/saida", new
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+        return api.PostAsync<object>("estoque/saida", new
         {
             empresaId,
             itens = new[]
