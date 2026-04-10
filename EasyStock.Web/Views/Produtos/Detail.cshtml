@@ -204,6 +204,7 @@
             </div>
             @if (p.Variacoes.Any())
             {
+                <div class="overflow-x-auto">
                 <table class="tbl-full">
                     <thead>
                         <tr>
@@ -237,6 +238,7 @@
                         }
                     </tbody>
                 </table>
+                </div>
             }
             else
             {
@@ -294,8 +296,11 @@
                             td.textContent = String(val);
                         });
                 });
+                const wrapper = document.createElement('div');
+                wrapper.className = 'overflow-x-auto';
+                wrapper.appendChild(table);
                 container.textContent = '';
-                container.appendChild(table);
+                container.appendChild(wrapper);
             } catch {
                 container.textContent = '';
                 const msg = document.createElement('p');

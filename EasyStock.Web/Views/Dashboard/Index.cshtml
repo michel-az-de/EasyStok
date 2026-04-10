@@ -73,48 +73,50 @@
         <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
         @if (Model.MovimentacoesRecentes.Any())
         {
-            <table class="tbl-full">
-                <thead>
-                    <tr>
-                        <th>Tipo</th>
-                        <th class="text-right">Movimentações</th>
-                        <th class="text-right">Qtd</th>
-                        <th class="text-right">Valor</th>
-                        <th class="text-right">Data</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var m in Model.MovimentacoesRecentes)
-                    {
+            <div class="overflow-x-auto">
+                <table class="tbl-full">
+                    <thead>
                         <tr>
-                            <td>
-                                @{
-                                    var badgeClass = m.Tipo switch
-                                    {
-                                        "Entrada" => "badge-ok",
-                                        "Saida" or "Saída" => "badge-warn",
-                                        _ => "badge-slow"
-                                    };
-                                }
-                                <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
-                            </td>
-                            <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
-                            <td class="text-right font-mono">@m.Qty</td>
-                            <td class="text-right text-slate-500">
-                                @if (m.Valor.HasValue)
-                                {
-                                    @m.Valor.Value.ToString("C", ptBR)
-                                }
-                                else
-                                {
-                                    <span>—</span>
-                                }
-                            </td>
-                            <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                            <th>Tipo</th>
+                            <th class="text-right">Movimentações</th>
+                            <th class="text-right">Qtd</th>
+                            <th class="text-right">Valor</th>
+                            <th class="text-right">Data</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.MovimentacoesRecentes)
+                        {
+                            <tr>
+                                <td>
+                                    @{
+                                        var badgeClass = m.Tipo switch
+                                        {
+                                            "Entrada" => "badge-ok",
+                                            "Saida" or "Saída" => "badge-warn",
+                                            _ => "badge-slow"
+                                        };
+                                    }
+                                    <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
+                                </td>
+                                <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
+                                <td class="text-right font-mono">@m.Qty</td>
+                                <td class="text-right text-slate-500">
+                                    @if (m.Valor.HasValue)
+                                    {
+                                        @m.Valor.Value.ToString("C", ptBR)
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                                <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
         else
         {

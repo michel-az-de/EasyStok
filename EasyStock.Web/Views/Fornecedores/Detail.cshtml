@@ -5,13 +5,13 @@
 }
 
 <div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Fornecedores" class="text-gray-400 hover:text-gray-600">
+    <a asp-action="Index" asp-controller="Fornecedores" class="text-slate-400 hover:text-slate-600">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
     </a>
-    <h1 class="text-2xl font-bold text-gray-900">@Model.Fornecedor.Nome</h1>
-    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(Model.Fornecedor.Ativo ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600")">
+    <h1 class="text-2xl font-bold text-slate-900">@Model.Fornecedor.Nome</h1>
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(Model.Fornecedor.Ativo ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
         @Model.Fornecedor.Status
     </span>
 </div>
@@ -21,7 +21,7 @@
     <div class="lg:col-span-1 space-y-4">
         <div class="ws" x-data="{ editando: false }">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-semibold text-gray-900">Dados Cadastrais</h2>
+                <h2 class="font-semibold text-slate-900">Dados Cadastrais</h2>
                 <button type="button" @@click="editando = !editando"
                         class="text-sm text-indigo-600 hover:text-indigo-700">
                     <span x-text="editando ? 'Cancelar' : 'Editar'"></span>
@@ -32,31 +32,31 @@
                 <dl class="space-y-3 text-sm">
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Documento))
                     {
-                        <div><dt class="text-gray-500">CNPJ/CPF</dt><dd class="font-medium">@Model.Fornecedor.Documento</dd></div>
+                        <div><dt class="text-slate-500">CNPJ/CPF</dt><dd class="font-medium">@Model.Fornecedor.Documento</dd></div>
                     }
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Contato))
                     {
-                        <div><dt class="text-gray-500">Responsável</dt><dd class="font-medium">@Model.Fornecedor.Contato</dd></div>
+                        <div><dt class="text-slate-500">Responsável</dt><dd class="font-medium">@Model.Fornecedor.Contato</dd></div>
                     }
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Email))
                     {
-                        <div><dt class="text-gray-500">Email</dt><dd class="font-medium">@Model.Fornecedor.Email</dd></div>
+                        <div><dt class="text-slate-500">Email</dt><dd class="font-medium">@Model.Fornecedor.Email</dd></div>
                     }
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Telefone))
                     {
-                        <div><dt class="text-gray-500">Telefone</dt><dd class="font-medium">@Model.Fornecedor.Telefone</dd></div>
+                        <div><dt class="text-slate-500">Telefone</dt><dd class="font-medium">@Model.Fornecedor.Telefone</dd></div>
                     }
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Tipo))
                     {
-                        <div><dt class="text-gray-500">Tipo</dt><dd class="font-medium capitalize">@Model.Fornecedor.Tipo</dd></div>
+                        <div><dt class="text-slate-500">Tipo</dt><dd class="font-medium capitalize">@Model.Fornecedor.Tipo</dd></div>
                     }
                     @if (Model.Fornecedor.LeadTimeEstimadoDias.HasValue)
                     {
-                        <div><dt class="text-gray-500">Lead Time</dt><dd class="font-medium">@Model.Fornecedor.LeadTimeEstimadoDias dias</dd></div>
+                        <div><dt class="text-slate-500">Lead Time</dt><dd class="font-medium">@Model.Fornecedor.LeadTimeEstimadoDias dias</dd></div>
                     }
                     @if (!string.IsNullOrEmpty(Model.Fornecedor.Categoria))
                     {
-                        <div><dt class="text-gray-500">Categorias</dt><dd class="font-medium">@Model.Fornecedor.Categoria</dd></div>
+                        <div><dt class="text-slate-500">Categorias</dt><dd class="font-medium">@Model.Fornecedor.Categoria</dd></div>
                     }
                 </dl>
             </div>
@@ -66,33 +66,33 @@
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Nome *</label>
+                        <label class="block text-xs text-slate-500 mb-1">Nome *</label>
                         <input type="text" name="nome" value="@Model.Fornecedor.Nome" required aria-required="true"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">CNPJ/CPF</label>
+                        <label class="block text-xs text-slate-500 mb-1">CNPJ/CPF</label>
                         <input type="text" name="documento" value="@Model.Fornecedor.Documento"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Responsável</label>
+                        <label class="block text-xs text-slate-500 mb-1">Responsável</label>
                         <input type="text" name="contato" value="@Model.Fornecedor.Contato"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Email</label>
+                        <label class="block text-xs text-slate-500 mb-1">Email</label>
                         <input type="email" name="email" value="@Model.Fornecedor.Email"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Telefone</label>
+                        <label class="block text-xs text-slate-500 mb-1">Telefone</label>
                         <input type="text" name="telefone" value="@Model.Fornecedor.Telefone"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Tipo</label>
-                        <select name="tipo" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                        <label class="block text-xs text-slate-500 mb-1">Tipo</label>
+                        <select name="tipo" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
                             <option value="" selected="@(string.IsNullOrEmpty(Model.Fornecedor.Tipo))">Selecione...</option>
                             @{
                                 var tipoOpts = new[] { "nacional", "importado", "dropshipping" };
@@ -104,34 +104,34 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Lead Time (dias)</label>
+                        <label class="block text-xs text-slate-500 mb-1">Lead Time (dias)</label>
                         <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Categorias</label>
+                        <label class="block text-xs text-slate-500 mb-1">Categorias</label>
                         <input type="text" name="categoria" value="@Model.Fornecedor.Categoria"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Site</label>
+                        <label class="block text-xs text-slate-500 mb-1">Site</label>
                         <input type="url" name="siteUrl" value="@Model.Fornecedor.SiteUrl" placeholder="https://"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Pedido Mínimo</label>
+                        <label class="block text-xs text-slate-500 mb-1">Pedido Mínimo</label>
                         <input type="text" name="pedidoMinimo" value="@Model.Fornecedor.PedidoMinimo"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Frete Padrão</label>
+                        <label class="block text-xs text-slate-500 mb-1">Frete Padrão</label>
                         <input type="text" name="fretePadrao" value="@Model.Fornecedor.FretePadrao"
-                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Observações</label>
+                        <label class="block text-xs text-slate-500 mb-1">Observações</label>
                         <textarea name="observacoes" rows="2"
-                                  class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">@Model.Fornecedor.Observacoes</textarea>
+                                  class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@Model.Fornecedor.Observacoes</textarea>
                     </div>
                     <button type="submit"
                             class="w-full py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
@@ -143,27 +143,27 @@
 
         <!-- KPIs -->
         <div class="ws">
-            <h2 class="font-semibold text-gray-900 mb-3">Resumo</h2>
+            <h2 class="font-semibold text-slate-900 mb-3">Resumo</h2>
             @if (Model.QuantidadePedidos == 0)
             {
-                <p class="text-sm text-gray-400 text-center py-4">Nenhum pedido registrado ainda.</p>
+                <p class="text-sm text-slate-400 text-center py-4">Nenhum pedido registrado ainda.</p>
             }
             else
             {
                 <div class="space-y-2 text-sm">
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Total gasto</span>
-                        <span class="font-semibold text-gray-900">R$ @Model.TotalGasto.ToString("N2")</span>
+                        <span class="text-slate-500">Total gasto</span>
+                        <span class="font-semibold text-slate-900">R$ @Model.TotalGasto.ToString("N2")</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Lead médio real</span>
-                        <span class="font-semibold text-gray-900">
+                        <span class="text-slate-500">Lead médio real</span>
+                        <span class="font-semibold text-slate-900">
                             @(Model.LeadRealMedio.HasValue ? $"{Model.LeadRealMedio:N0} dias" : "—")
                         </span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Total de pedidos</span>
-                        <span class="font-semibold text-gray-900">@Model.QuantidadePedidos</span>
+                        <span class="text-slate-500">Total de pedidos</span>
+                        <span class="font-semibold text-slate-900">@Model.QuantidadePedidos</span>
                     </div>
                 </div>
             }
@@ -179,11 +179,11 @@
                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                  @@click.self="confirm = false">
                 <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                    <h3 class="font-semibold text-gray-900 mb-2">Confirmar desativação</h3>
-                    <p class="text-sm text-gray-600 mb-4">O fornecedor será marcado como inativo.</p>
+                    <h3 class="font-semibold text-slate-900 mb-2">Confirmar desativação</h3>
+                    <p class="text-sm text-slate-600 mb-4">O fornecedor será marcado como inativo.</p>
                     <div class="flex justify-end gap-3">
                         <button type="button" @@click="confirm = false"
-                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">Cancelar</button>
                         <form asp-action="Excluir" asp-controller="Fornecedores"
                               asp-route-id="@Model.Fornecedor.Id" method="post">
                             @Html.AntiForgeryToken()
@@ -203,7 +203,8 @@
         @if (Model.Historico.Any())
         {
             <div class="ws">
-                <h2 class="font-semibold text-gray-900 mb-4">Histórico de Pedidos</h2>
+                <h2 class="font-semibold text-slate-900 mb-4">Histórico de Pedidos</h2>
+                <div class="overflow-x-auto">
                 <table class="tbl-full">
                     <thead>
                         <tr><th>Data</th><th>Previsão</th><th>Valor</th><th>Status</th><th>Obs</th></tr>
@@ -219,19 +220,20 @@
                                     <span class="px-2 py-0.5 rounded-full text-xs font-medium @ped.StatusCssClass">
                                         @ped.StatusLabel
                                     </span>
-                                </td>                                <td class="text-gray-500 text-sm">@(ped.Observacoes ?? "—")</td>
+                                </td>                                <td class="text-slate-500 text-sm">@(ped.Observacoes ?? "—")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
+                </div>
             </div>
         }
         else
         {
-            <div class="ws text-center py-12 text-gray-400">
+            <div class="ws text-center py-12 text-slate-400">
                 <div class="text-4xl mb-3">📦</div>
-                <p class="text-sm font-medium text-gray-500">Nenhum pedido registrado</p>
-                <p class="text-xs mt-1 text-gray-400">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
+                <p class="text-sm font-medium text-slate-500">Nenhum pedido registrado</p>
+                <p class="text-xs mt-1 text-slate-400">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
             </div>
         }
     </div>

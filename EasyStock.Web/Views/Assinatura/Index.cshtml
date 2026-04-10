@@ -4,7 +4,7 @@
     Layout = "_Layout";
 }
 
-<h1 class="text-2xl font-bold text-gray-900 mb-6">Planos Disponíveis</h1>
+<h1 class="text-2xl font-bold text-slate-900 mb-6">Planos Disponíveis</h1>
 
 @if (Model.Planos.Any())
 {
@@ -12,29 +12,29 @@
         @foreach (var plano in Model.Planos)
         {
             <div class="ws">
-                <h3 class="font-bold text-gray-900 text-lg">@plano.Nome</h3>
+                <h3 class="font-bold text-slate-900 text-lg">@plano.Nome</h3>
                 @if (!string.IsNullOrWhiteSpace(plano.Descricao))
                 {
-                    <p class="text-sm text-gray-500 mt-1">@plano.Descricao</p>
+                    <p class="text-sm text-slate-500 mt-1">@plano.Descricao</p>
                 }
                 <p class="text-2xl font-bold text-indigo-600 my-3">
                     R$ @plano.PrecoMensal.ToString("N2")
-                    <span class="text-sm font-normal text-gray-500">/mês</span>
+                    <span class="text-sm font-normal text-slate-500">/mês</span>
                 </p>
                 <ul class="space-y-2">
-                    <li class="flex items-center gap-2 text-sm text-gray-600">
+                    <li class="flex items-center gap-2 text-sm text-slate-600">
                         <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
                         <span><strong>@PlanoInfo.FormatarLimite(plano.LimiteLojas)</strong> lojas</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-gray-600">
+                    <li class="flex items-center gap-2 text-sm text-slate-600">
                         <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         <span><strong>@PlanoInfo.FormatarLimite(plano.LimiteUsuarios)</strong> usuários</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-gray-600">
+                    <li class="flex items-center gap-2 text-sm text-slate-600">
                         <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
@@ -45,11 +45,11 @@
         }
     </div>
 
-    <p class="text-sm text-gray-500">Para alterar seu plano, entre em contato com o suporte.</p>
+    <p class="text-sm text-slate-500">Para alterar seu plano, entre em contato com o suporte.</p>
 }
 else
 {
     <div class="ws">
-        <p class="text-gray-500">Nenhum plano disponível no momento.</p>
+        <p class="text-slate-500">Nenhum plano disponível no momento.</p>
     </div>
 }

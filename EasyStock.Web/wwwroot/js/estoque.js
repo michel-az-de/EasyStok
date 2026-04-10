@@ -21,10 +21,14 @@ async function fetchCategorias() {
         const categorias = [...new Set(produtos.map(p => p.categoria).filter(Boolean))].sort();
         if (categorias.length === 0) return;
 
-        const html = categorias.map(cat =>
-            `<a href="/estoque?categoria=${encodeURIComponent(cat)}" class="ni-sub">${cat}</a>`
-        ).join('');
-        nav.innerHTML = html;
+        nav.innerHTML = '';
+        categorias.forEach(cat => {
+            const a = document.createElement('a');
+            a.href = '/estoque?categoria=' + encodeURIComponent(cat);
+            a.className = 'ni-sub';
+            a.textContent = cat;
+            nav.appendChild(a);
+        });
     } catch { /* silent: operação em background, falha não-crítica */ }
 }
 

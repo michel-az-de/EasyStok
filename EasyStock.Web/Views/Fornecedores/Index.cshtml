@@ -5,7 +5,7 @@
 }
 
 <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Fornecedores</h1>
+    <h1 class="text-2xl font-bold text-slate-900">Fornecedores</h1>
     <div class="flex gap-3">
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-fornecedor')"
@@ -19,18 +19,18 @@
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 flex-wrap">
         <input type="text" name="search" value="@Model.Search" placeholder="Buscar fornecedor..."
-               class="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48" />
+               class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48" />
         <div class="flex gap-2">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("ativo", "Ativos"), ("inativo", "Inativos") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Fornecedores", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50")">
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
                     @label
                 </a>
             }
         </div>
-        <button type="submit" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm hover:bg-gray-200">
+        <button type="submit" class="px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
             Buscar
         </button>
     </form>
@@ -40,9 +40,9 @@
 <div class="ws">
     @if (!Model.Items.Any())
     {
-        <div class="text-center py-12 text-gray-400">
+        <div class="text-center py-12 text-slate-400">
             <div class="text-5xl mb-3">🏭</div>
-            <p class="font-semibold text-gray-600">Nenhum fornecedor cadastrado</p>
+            <p class="font-semibold text-slate-600">Nenhum fornecedor cadastrado</p>
             <p class="text-sm mt-1">Adicione seu primeiro fornecedor para organizar suas compras.</p>
             <button type="button" x-data
                     @@click="$dispatch('open-modal', 'novo-fornecedor')"
@@ -53,6 +53,7 @@
     }
     else
     {
+        <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
                 <tr>
@@ -69,17 +70,17 @@
                 {
                     <tr>
                         <td>
-                            <div class="font-medium text-gray-900">@f.Nome</div>
+                            <div class="font-medium text-slate-900">@f.Nome</div>
                             @if (!string.IsNullOrEmpty(f.Email))
                             {
-                                <div class="text-xs text-gray-500">@f.Email</div>
+                                <div class="text-xs text-slate-500">@f.Email</div>
                             }
                         </td>
-                        <td class="text-gray-600 text-sm capitalize">@f.Tipo</td>
-                        <td class="text-gray-600">@(f.LeadTimeEstimadoDias?.ToString() ?? "—")</td>
-                        <td class="text-gray-500 text-sm">@f.Categoria</td>
+                        <td class="text-slate-600 text-sm capitalize">@f.Tipo</td>
+                        <td class="text-slate-600">@(f.LeadTimeEstimadoDias?.ToString() ?? "—")</td>
+                        <td class="text-slate-500 text-sm">@f.Categoria</td>
                         <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600")">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
                                 @f.Status
                             </span>
                         </td>
@@ -91,6 +92,7 @@
                 }
             </tbody>
         </table>
+        </div>
     }
 </div>
 
@@ -100,58 +102,58 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
      @@click.self="open = false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 overflow-y-auto max-h-screen">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Novo Fornecedor</h2>
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Fornecedor</h2>
         <form asp-action="Criar" asp-controller="Fornecedores" method="post">
             @Html.AntiForgeryToken()
             <div class="grid grid-cols-2 gap-3 mb-3">
                 <div class="col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
                     <input type="text" name="nome" required
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">CNPJ/CPF</label>
-                    <input type="text" name="documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <label class="block text-sm font-medium text-slate-700 mb-1">CNPJ/CPF</label>
+                    <input type="text" name="documento" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
-                    <input type="text" name="contato" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
+                    <input type="text" name="contato" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input type="email" name="email" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                    <input type="text" name="telefone" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                    <input type="text" name="telefone" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                    <select name="tipo" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
+                    <select name="tipo" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
                         <option value="nacional">Nacional</option>
                         <option value="importado">Importado</option>
                         <option value="dropshipping">Dropshipping</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead Time (dias)</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Lead Time (dias)</label>
                     <input type="number" name="leadTimeEstimadoDias" value="7" min="0"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div class="col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Categorias</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Categorias</label>
                     <input type="text" name="categoria" placeholder="Ex: eletrônicos, roupas..."
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div class="col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
                     <textarea name="observacoes" rows="2"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
                 </div>
             </div>
             <div class="flex justify-end gap-3 pt-3 border-t">
                 <button type="button" @@click="open = false"
-                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                     Cancelar
                 </button>
                 <button type="submit"

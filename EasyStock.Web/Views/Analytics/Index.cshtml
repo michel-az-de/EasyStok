@@ -6,7 +6,7 @@
 }
 
 <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Analytics</h1>
+    <h1 class="text-2xl font-bold text-slate-900">Analytics</h1>
     <a asp-action="Movimentacoes" asp-controller="Analytics"
        class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
         Ver movimentações →
@@ -37,24 +37,24 @@
 @if (Model.MediaVendasDiaria > 0)
 {
 <div class="ws mb-6">
-    <h2 class="font-semibold text-gray-900 mb-1">Projeções de Demanda</h2>
-    <p class="text-xs text-gray-400 mb-4">Baseado na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
+    <h2 class="font-semibold text-slate-900 mb-1">Projeções de Demanda</h2>
+    <p class="text-xs text-slate-400 mb-4">Baseado na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="text-center p-3 bg-gray-50 rounded-lg">
-            <div class="text-xl font-bold text-gray-900">@Model.ProjUnidadesDia.ToString("N0")</div>
-            <div class="text-xs text-gray-500 mt-1">unidades/dia</div>
+        <div class="text-center p-3 bg-slate-50 rounded-lg">
+            <div class="text-xl font-bold text-slate-900">@Model.ProjUnidadesDia.ToString("N0")</div>
+            <div class="text-xs text-slate-500 mt-1">unidades/dia</div>
         </div>
-        <div class="text-center p-3 bg-gray-50 rounded-lg">
-            <div class="text-xl font-bold text-gray-900">@Model.ProjUnidades7d.ToString("N0")</div>
-            <div class="text-xs text-gray-500 mt-1">próximos 7 dias</div>
+        <div class="text-center p-3 bg-slate-50 rounded-lg">
+            <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades7d.ToString("N0")</div>
+            <div class="text-xs text-slate-500 mt-1">próximos 7 dias</div>
         </div>
-        <div class="text-center p-3 bg-gray-50 rounded-lg">
-            <div class="text-xl font-bold text-gray-900">@Model.ProjUnidades30d.ToString("N0")</div>
-            <div class="text-xs text-gray-500 mt-1">próximos 30 dias</div>
+        <div class="text-center p-3 bg-slate-50 rounded-lg">
+            <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades30d.ToString("N0")</div>
+            <div class="text-xs text-slate-500 mt-1">próximos 30 dias</div>
         </div>
         <div class="text-center p-3 bg-indigo-50 rounded-lg">
             <div class="text-xl font-bold text-indigo-600">R$ @Model.ProjReceita30d.ToString("N2")</div>
-            <div class="text-xs text-gray-500 mt-1">receita proj. 30d</div>
+            <div class="text-xs text-slate-500 mt-1">receita proj. 30d</div>
         </div>
     </div>
 </div>
@@ -62,10 +62,10 @@
 else
 {
 <div class="ws mb-6">
-    <h2 class="font-semibold text-gray-900 mb-1">Projeções de Demanda</h2>
-    <div class="flex flex-col items-center justify-center py-8 text-gray-400">
+    <h2 class="font-semibold text-slate-900 mb-1">Projeções de Demanda</h2>
+    <div class="flex flex-col items-center justify-center py-8 text-slate-400">
         <div class="text-3xl mb-2">📊</div>
-        <p class="text-sm font-semibold text-gray-500">Dados insuficientes para projeção</p>
+        <p class="text-sm font-semibold text-slate-500">Dados insuficientes para projeção</p>
         <p class="text-xs mt-1">Registre saídas para habilitar as projeções de demanda.</p>
     </div>
 </div>
@@ -74,13 +74,14 @@ else
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Reposição urgente -->
     <div class="ws">
-        <h2 class="font-semibold text-gray-900 mb-4">Reposição Urgente</h2>
+        <h2 class="font-semibold text-slate-900 mb-4">Reposição Urgente</h2>
         @if (!Model.ItensReposicaoUrgente.Any())
         {
-            <p class="text-sm text-gray-400 text-center py-6">Nenhum item crítico</p>
+            <p class="text-sm text-slate-400 text-center py-6">Nenhum item crítico</p>
         }
         else
         {
+            <div class="overflow-x-auto">
             <table class="tbl-full">
                 <thead>
                     <tr><th>Produto</th><th>Estoque</th><th>Mín.</th><th>Dias</th></tr>
@@ -93,7 +94,7 @@ else
                                 <div class="font-medium text-sm">@(s.NomeProduto ?? s.CodigoInterno ?? s.ProdutoId)</div>
                             </td>
                             <td class="text-red-600 font-medium">@s.QuantidadeAtual</td>
-                            <td class="text-gray-500">@s.QuantidadeMinima</td>
+                            <td class="text-slate-500">@s.QuantidadeMinima</td>
                             <td>
                                 @if (s.DiasAteRuptura.HasValue)
                                 {
@@ -104,15 +105,16 @@ else
                     }
                 </tbody>
             </table>
+            </div>
         }
     </div>
 
     <!-- Alertas -->
     <div class="ws">
-        <h2 class="font-semibold text-gray-900 mb-4">Alertas Ativos</h2>
+        <h2 class="font-semibold text-slate-900 mb-4">Alertas Ativos</h2>
         @if (!Model.Alertas.Any())
         {
-            <p class="text-sm text-gray-400 text-center py-6">Sem alertas</p>
+            <p class="text-sm text-slate-400 text-center py-6">Sem alertas</p>
         }
         else
         {
@@ -131,7 +133,7 @@ else
                     };
                     <div class="border rounded-lg p-3 @alertColor">
                         <div class="font-medium text-sm @titleColor">@a.Titulo</div>
-                        <div class="text-xs text-gray-600 mt-0.5">@a.Mensagem</div>
+                        <div class="text-xs text-slate-600 mt-0.5">@a.Mensagem</div>
                     </div>
                 }
             </div>
@@ -143,7 +145,7 @@ else
 @if (Model.GraficoLabels.Any())
 {
     <div class="ws mb-6">
-        <h2 class="font-semibold text-gray-900 mb-4">Receita Bruta — últimos meses</h2>
+        <h2 class="font-semibold text-slate-900 mb-4">Receita Bruta — últimos meses</h2>
         <canvas id="grafico-receita-analytics" height="120"></canvas>
     </div>
 }
