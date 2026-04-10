@@ -145,6 +145,7 @@ public class ProdutoControllerTests
         var command = new CadastrarProdutoCommand(
             empresaId,
             categoriaId,
+            null,
             "Produto",
             null,
             null,
