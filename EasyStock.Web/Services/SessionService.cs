@@ -46,4 +46,13 @@ public class SessionService(IHttpContextAccessor acc)
     {
         Session.Clear();
     }
+
+    /// <summary>
+    /// Marks the current HTTP request as having an expired/invalid auth token.
+    /// Used by <see cref="TokenRefreshHandler"/> to signal mid-request auth failure.
+    /// </summary>
+    public void SetExpired() => acc.HttpContext?.Items.TryAdd("AuthExpired", true);
+
+    /// <summary>Returns true when the auth token expired during the current request.</summary>
+    public bool IsExpired() => acc.HttpContext?.Items.ContainsKey("AuthExpired") == true;
 }

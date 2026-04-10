@@ -57,6 +57,7 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
                     {
                         log.LogWarning("Token refresh failed — clearing session");
                         session.Clear();
+                        session.SetExpired();
                     }
                 }
                 finally
@@ -67,6 +68,7 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
             else
             {
                 session.Clear();
+                session.SetExpired();
             }
         }
 

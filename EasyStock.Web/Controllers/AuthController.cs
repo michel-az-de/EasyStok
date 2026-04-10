@@ -31,7 +31,10 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         var result = await api.PostAsync<JsonElement>("auth/login", new { email = vm.Email, senha = vm.Senha });
         if (!result.Success)
         {
-            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Credenciais inválidas.");
+            var msg = result.ErrorCode == "AUTH_TOKEN_EXPIRED"
+                ? "E-mail ou senha incorretos."
+                : result.ErrorMessage ?? "Credenciais inválidas.";
+            ModelState.AddModelError(string.Empty, msg);
             return View(vm);
         }
 

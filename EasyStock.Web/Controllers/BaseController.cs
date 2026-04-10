@@ -28,7 +28,8 @@ public abstract class BaseController(SessionService session) : Controller
         if (string.IsNullOrEmpty(token))
         {
             TempData["Toast"] = "warning|Sessão expirada. Faça login novamente.";
-            context.Result = RedirectToAction("Login", "Auth");
+            var returnUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            context.Result = RedirectToAction("Login", "Auth", new { returnUrl });
             return;
         }
 
@@ -38,5 +39,18 @@ public abstract class BaseController(SessionService session) : Controller
         ViewBag.LojaAtualEmoji = session.GetLojaEmoji() ?? "🏪";
         ViewBag.Role = session.GetUsuarioRole();
         base.OnActionExecuting(context);
+    }
+
+    public override void OnActionExecuted(ActionExecutedContext context)
+    {
+        // If a token expired mid-request (refresh failed), redirect cleanly to login.
+        if (session.IsExpired())
+        {
+            TempData["Toast"] = "warning|Sessão expirada. Faça login novamente.";
+            var returnUrl = HttpContext.Request.Path + HttpContext.Request.QueryString;
+            context.Result = RedirectToAction("Login", "Auth", new { returnUrl });
+        }
+
+        base.OnActionExecuted(context);
     }
 }

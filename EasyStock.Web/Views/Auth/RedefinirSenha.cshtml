@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/app.css" />
 </head>
-<body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
+<body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen" data-toast="@TempData["Toast"]">
     <div class="w-full max-w-sm mx-auto px-4">
         <div class="text-center mb-8">
             <div class="inline-flex items-center gap-2 mb-2">
@@ -65,5 +65,6 @@
             &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
         </p>
     </div>
+    <script src="~/js/toast.js"></script>
 </body>
 </html>
