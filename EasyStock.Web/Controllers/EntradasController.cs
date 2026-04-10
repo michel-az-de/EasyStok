@@ -113,9 +113,9 @@ public class EntradasController(EntradasService svc, SessionService session) : B
     }
 
     [HttpGet("/entradas/exportar-csv")]
-    public async Task<IActionResult> ExportarCsv(string? periodoInicio = null, string? periodoFim = null)
+    public async Task<IActionResult> ExportarCsv(string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        var result = await svc.ExportarAsync(periodoInicio, periodoFim);
+        var result = await svc.ExportarAsync(tipo, periodoInicio, periodoFim);
         if (!result.Success) return BadRequest();
 
         var sb = new StringBuilder();
