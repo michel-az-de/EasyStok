@@ -157,12 +157,19 @@
                     if (r && r.ok) this.resultados = await r.json();
                 },
 
-                selecionar(p) {
+                async selecionar(p) {
                     this.produtoId = p.id;
                     this.produtoNome = p.nome;
                     this.produtoSku = p.sku;
                     this.produtoEmoji = p.emoji || '📦';
-                    this.varId = p.variacoes && p.variacoes.length > 0 ? p.variacoes[0].id : '';
+                    this.varId = '';
+                    try {
+                        const dr = await fetch('/estoque/produto-detalhe/' + p.id);
+                        if (dr.ok) {
+                            const d = await dr.json();
+                            this.varId = d.variacoes && d.variacoes.length > 0 ? d.variacoes[0].id : '';
+                        }
+                    } catch { this.varId = ''; }
                     this.step = 2;
                 }
             };

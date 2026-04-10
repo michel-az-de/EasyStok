@@ -110,6 +110,7 @@
     <div class="ws">
         @if (Model.Itens.Any())
         {
+            <div class="overflow-x-auto">
             <table class="tbl-full">
                 <thead>
                     <tr>
@@ -199,6 +200,7 @@
                     }
                 </tbody>
             </table>
+            </div>
 
             <!-- Paginação -->
             @if (Model.Paginacao.Pages > 1)
@@ -257,6 +259,10 @@
 
                 async confirmarSaida() {
                     if (!this.qty || this.qty < 1) return;
+                    if (this.qty > this.qtyDisponivel) {
+                        window.showToast('Quantidade excede o estoque disponível (' + this.qtyDisponivel + ').', 'error');
+                        return;
+                    }
                     this.loading = true;
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
                     try {

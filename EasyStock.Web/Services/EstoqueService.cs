@@ -31,6 +31,9 @@ public class EstoqueService(ApiClient api)
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>
         api.GetAsync<EstoqueSku>($"estoque/{id}");
 
+    public Task<ApiResult<ProdutoDetalhe>> ObterProdutoDetalheAsync(string id) =>
+        api.GetAsync<ProdutoDetalhe>($"produtos/{id}");
+
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
         api.GetAsync<PagedResult<EstoqueSku>>("estoque?pageSize=20");
 

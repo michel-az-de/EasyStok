@@ -10,8 +10,7 @@ public class EntradaFormViewModel
     public string? ProdutoEmoji { get; set; }
     public int EstoqueAtual { get; set; }
 
-    [Required(ErrorMessage = "Variação é obrigatória")]
-    public string VarId { get; set; } = string.Empty;
+    public string? VarId { get; set; }
 
     [Required(ErrorMessage = "Quantidade é obrigatória")]
     [Range(1, int.MaxValue, ErrorMessage = "Quantidade deve ser maior que zero")]
