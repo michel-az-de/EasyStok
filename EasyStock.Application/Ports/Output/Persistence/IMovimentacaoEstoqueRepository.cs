@@ -12,6 +12,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
             DateTime? de = null,
             DateTime? ate = null,
             TipoMovimentacaoEstoque? tipo = null,
+            NaturezaMovimentacaoEstoque? natureza = null,
             int page = 1,
             int pageSize = 20);
         Task<IEnumerable<MovimentacaoEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);

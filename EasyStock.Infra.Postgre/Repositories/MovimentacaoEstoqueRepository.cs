@@ -23,6 +23,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             DateTime? de = null,
             DateTime? ate = null,
             TipoMovimentacaoEstoque? tipo = null,
+            NaturezaMovimentacaoEstoque? natureza = null,
             int page = 1,
             int pageSize = 20)
         {
@@ -36,6 +37,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(m => m.DataMovimentacao <= ate.Value);
             if (tipo.HasValue)
                 query = query.Where(m => m.Tipo == tipo.Value);
+            if (natureza.HasValue)
+                query = query.Where(m => m.Natureza == natureza.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query

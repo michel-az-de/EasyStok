@@ -26,6 +26,7 @@ public class MovimentacaoController(
         [FromQuery] DateTime? de,
         [FromQuery] DateTime? ate,
         [FromQuery] TipoMovimentacaoEstoque? tipo,
+        [FromQuery] NaturezaMovimentacaoEstoque? natureza,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
@@ -33,7 +34,7 @@ public class MovimentacaoController(
             return error!;
 
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
-            resolvedEmpresaId, de, ate, tipo, page, pageSize);
+            resolvedEmpresaId, de, ate, tipo, natureza, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 

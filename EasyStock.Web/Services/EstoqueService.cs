@@ -69,6 +69,9 @@ public class EstoqueService(ApiClient api)
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>
         api.GetAsync<EstoqueSku>($"estoque/{id}");
 
+    public Task<ApiResult<List<EstoqueSku>>> ObterItensPorProdutoAsync(string produtoId) =>
+        api.GetAsync<List<EstoqueSku>>($"estoque/por-produto/{produtoId}");
+
     public Task<ApiResult<ProdutoDetalhe>> ObterProdutoDetalheAsync(string id) =>
         api.GetAsync<ProdutoDetalhe>($"produtos/{id}");
 
