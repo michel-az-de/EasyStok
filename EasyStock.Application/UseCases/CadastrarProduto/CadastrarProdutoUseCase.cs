@@ -65,6 +65,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 if (subcategoria.CategoriaPaiId != command.CategoriaId)
                     throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
             }
+
             if (!string.IsNullOrWhiteSpace(command.SkuBase))
             {
                 var skuBase = command.SkuBase.Trim();

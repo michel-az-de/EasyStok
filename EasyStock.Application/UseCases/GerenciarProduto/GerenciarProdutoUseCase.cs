@@ -26,7 +26,9 @@ public sealed record AtualizarProdutoCommand(
     decimal? PrecoReferencia,
     decimal? MargemEstimada,
     string? AtributosJson,
-    StatusProduto Status);
+    StatusProduto Status,
+    IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
+    IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens);
 
 public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
@@ -58,6 +60,18 @@ public sealed record DimensoesDetalheResult(
     decimal Altura,
     decimal Comprimento);
 
+public sealed record ProdutoVariacaoDetalheResult(
+    Guid VariacaoId,
+    string Nome,
+    string? Cor,
+    string? Tamanho,
+    string? DescricaoComercial,
+    string? Sku,
+    string? CodigoBarras,
+    bool Ativa,
+    int QuantidadeEmEstoque,
+    DateTime? UltimaEntradaEm);
+
 public sealed record ProdutoCaracteristicaDetalheResult(
     Guid CaracteristicaId,
     string Nome,
@@ -73,18 +87,6 @@ public sealed record ProdutoEmbalagemDetalheResult(
     string? Descricao,
     DimensoesDetalheResult? Dimensoes,
     bool Padrao);
-
-public sealed record ProdutoVariacaoDetalheResult(
-    Guid VariacaoId,
-    string Nome,
-    string? Cor,
-    string? Tamanho,
-    string? DescricaoComercial,
-    string? Sku,
-    string? CodigoBarras,
-    bool Ativa,
-    int QuantidadeEmEstoque,
-    DateTime? UltimaEntradaEm);
 
 public sealed record ProdutoHistoricoItemResult(
     Guid MovimentacaoId,
@@ -128,6 +130,8 @@ public sealed class GerenciarProdutoUseCase(
     IProdutoRepository produtoRepository,
     ICategoriaRepository categoriaRepository,
     IProdutoVariacaoRepository produtoVariacaoRepository,
+    IProdutoCaracteristicaRepository caracteristicaRepository,
+    IProdutoEmbalagemRepository embalagemRepository,
     IItemEstoqueRepository itemEstoqueRepository,
     IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
     IUnitOfWork unitOfWork,
@@ -192,6 +196,61 @@ public sealed class GerenciarProdutoUseCase(
         produto.AlteradoEm = DateTime.UtcNow;
 
         await produtoRepository.UpdateAsync(produto);
+
+        // Replace caracteristicas (delete all + re-insert)
+        if (command.Caracteristicas is not null)
+        {
+            var existentes = await caracteristicaRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+            foreach (var existente in existentes)
+                await caracteristicaRepository.DeleteAsync(existente.Id);
+
+            var agora = DateTime.UtcNow;
+            foreach (var input in command.Caracteristicas)
+            {
+                await caracteristicaRepository.InsertAsync(new ProdutoCaracteristica
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = command.ProdutoId,
+                    Nome = input.Nome.Trim(),
+                    Descricao = input.Descricao?.Trim(),
+                    QuantidadeReferencia = input.QuantidadeReferencia,
+                    VariacaoPadrao = input.VariacaoPadrao?.Trim(),
+                    OrdemExibicao = input.OrdemExibicao,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                });
+            }
+        }
+
+        // Replace embalagens (delete all + re-insert)
+        if (command.Embalagens is not null)
+        {
+            if (command.Embalagens.Count(e => e.Padrao) > 1)
+                throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
+
+            var existentes = await embalagemRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+            foreach (var existente in existentes)
+                await embalagemRepository.DeleteAsync(existente.Id);
+
+            var agora = DateTime.UtcNow;
+            foreach (var input in command.Embalagens)
+            {
+                await embalagemRepository.InsertAsync(new ProdutoEmbalagem
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = command.ProdutoId,
+                    Nome = input.Nome.Trim(),
+                    Descricao = input.Descricao?.Trim(),
+                    Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
+                    Padrao = input.Padrao,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                });
+            }
+        }
+
         await unitOfWork.CommitAsync();
 
         if (cacheService is not null)

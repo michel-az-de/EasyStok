@@ -36,20 +36,49 @@ public class ProdutoFormViewModel
     // StatusProduto: 0 = Ativo, 1 = Inativo (only used on edit)
     public int Status { get; set; } = 0;
 
-    // Dimensões do produto
+    // Dimensoes
     public decimal? DimensoesPeso { get; set; }
     public decimal? DimensoesLargura { get; set; }
     public decimal? DimensoesAltura { get; set; }
     public decimal? DimensoesComprimento { get; set; }
 
-    // Variações — enviadas como lista de nomes
-    public List<string> Variacoes { get; set; } = [];
+    // Variacoes ricas
+    public List<VariacaoFormItem> VariacoesRich { get; set; } = [];
 
-    // Embalagem principal (padrao = true)
-    public string? EmbalagemNome { get; set; }
-    public string? EmbalagemDescricao { get; set; }
-    public decimal? EmbalagemPeso { get; set; }
-    public decimal? EmbalagemLargura { get; set; }
-    public decimal? EmbalagemAltura { get; set; }
-    public decimal? EmbalagemComprimento { get; set; }
+    // Caracteristicas
+    public List<CaracteristicaFormItem> Caracteristicas { get; set; } = [];
+
+    // Embalagens
+    public List<EmbalagemFormItem> Embalagens { get; set; } = [];
+}
+
+public class VariacaoFormItem
+{
+    public string Nome { get; set; } = string.Empty;
+    public string? Cor { get; set; }
+    public string? Tamanho { get; set; }
+    public string? DescricaoComercial { get; set; }
+    public string? Sku { get; set; }
+    public string? CodigoBarras { get; set; }
+    public bool Ativa { get; set; } = true;
+}
+
+public class CaracteristicaFormItem
+{
+    public string Nome { get; set; } = string.Empty;
+    public string? Descricao { get; set; }
+    public int? QuantidadeReferencia { get; set; }
+    public string? VariacaoPadrao { get; set; }
+    public int OrdemExibicao { get; set; }
+}
+
+public class EmbalagemFormItem
+{
+    public string Nome { get; set; } = string.Empty;
+    public string? Descricao { get; set; }
+    public decimal? Peso { get; set; }
+    public decimal? Largura { get; set; }
+    public decimal? Altura { get; set; }
+    public decimal? Comprimento { get; set; }
+    public bool Padrao { get; set; }
 }
