@@ -85,7 +85,7 @@ public class FornecedorController(
     [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> ReceberPedido(Guid id, [FromBody] ReceberPedidoBody body)
     {
-        var empresaId = currentUser.EmpresaId != Guid.Empty ? currentUser.EmpresaId : body.EmpresaId;
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var empresaId, out var err)) return err!;
         await receberPedidoUseCase.ExecuteAsync(new ReceberPedidoFornecedorCommand(id, empresaId, body.DataRecebimento, body.Tracking));
         return DataOk(true);
     }
@@ -96,7 +96,7 @@ public class FornecedorController(
     [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> CancelarPedido(Guid id, [FromBody] CancelarPedidoBody body)
     {
-        var empresaId = currentUser.EmpresaId != Guid.Empty ? currentUser.EmpresaId : body.EmpresaId;
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var empresaId, out var err)) return err!;
         await cancelarPedidoUseCase.ExecuteAsync(new CancelarPedidoFornecedorCommand(id, empresaId));
         return DataOk(true);
     }
