@@ -49,6 +49,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             builder.HasOne(p => p.Empresa).WithMany(e => e.Produtos).HasForeignKey(p => p.EmpresaId);
             builder.HasOne(p => p.Categoria).WithMany(c => c.Produtos).HasForeignKey(p => p.CategoriaId);
+            builder.HasOne(p => p.Subcategoria).WithMany().HasForeignKey(p => p.SubcategoriaId).IsRequired(false);
             builder.HasMany(p => p.Caracteristicas).WithOne(c => c.Produto).HasForeignKey(c => c.ProdutoId);
             builder.HasMany(p => p.Embalagens).WithOne(e => e.Produto).HasForeignKey(e => e.ProdutoId);
             builder.HasMany(p => p.Variacoes).WithOne(v => v.Produto).HasForeignKey(v => v.ProdutoId);

@@ -32,8 +32,11 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
 
+        public Guid? SubcategoriaId { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Categoria? Categoria { get; set; }
+        public Categoria? Subcategoria { get; set; }
         public ICollection<ProdutoCaracteristica>? Caracteristicas { get; set; }
         public ICollection<ProdutoEmbalagem>? Embalagens { get; set; }
         public ICollection<ProdutoVariacao>? Variacoes { get; set; }

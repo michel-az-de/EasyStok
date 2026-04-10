@@ -39,6 +39,7 @@ public class CadastrarProdutoUseCaseTests
         var command = new CadastrarProdutoCommand(
             empresaId,
             categoriaId,
+            null,
             "Galaxy Buds FE",
             "Fone bluetooth",
             "Samsung",
@@ -106,6 +107,7 @@ public class CadastrarProdutoUseCaseTests
         var command = new CadastrarProdutoCommand(
             empresaId,
             categoriaId,
+            null,
             "Galaxy Buds FE",
             null,
             null,
@@ -127,5 +129,114 @@ public class CadastrarProdutoUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*SKU duplicado*");
+    }
+
+    [Fact]
+    public async Task Deve_cadastrar_produto_com_subcategoria_valida()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+
+        var useCase = new CadastrarProdutoUseCase(
+            produtoRepository, categoriaRepository, caracteristicaRepository,
+            embalagemRepository, variacaoRepository, unitOfWork, logger);
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var subcategoriaId = Guid.NewGuid();
+
+        categoriaRepository.GetByIdAsync(categoriaId)
+            .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
+        categoriaRepository.GetByIdAsync(subcategoriaId)
+            .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = categoriaId });
+
+        var command = new CadastrarProdutoCommand(
+            empresaId, categoriaId, subcategoriaId, "Galaxy Buds",
+            null, null, TipoProduto.Fisico, null, null, false,
+            null, null, null, null, null, null, null, null, null);
+
+        var result = await useCase.ExecuteAsync(command);
+
+        await produtoRepository.Received(1).InsertAsync(Arg.Is<Produto>(p =>
+            p.SubcategoriaId == subcategoriaId));
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Deve_falhar_quando_subcategoria_nao_pertence_a_categoria_informada()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+
+        var useCase = new CadastrarProdutoUseCase(
+            produtoRepository, categoriaRepository, caracteristicaRepository,
+            embalagemRepository, variacaoRepository, unitOfWork, logger);
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var outraCategoriaId = Guid.NewGuid();
+        var subcategoriaId = Guid.NewGuid();
+
+        categoriaRepository.GetByIdAsync(categoriaId)
+            .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
+        // subcategoria pertence a outra categoria
+        categoriaRepository.GetByIdAsync(subcategoriaId)
+            .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = outraCategoriaId });
+
+        var command = new CadastrarProdutoCommand(
+            empresaId, categoriaId, subcategoriaId, "Galaxy Buds",
+            null, null, TipoProduto.Fisico, null, null, false,
+            null, null, null, null, null, null, null, null, null);
+
+        var act = () => useCase.ExecuteAsync(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*subcategoria nao pertence a categoria*");
+    }
+
+    [Fact]
+    public async Task Deve_cadastrar_caracteristica_com_variacao_id()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+
+        var useCase = new CadastrarProdutoUseCase(
+            produtoRepository, categoriaRepository, caracteristicaRepository,
+            embalagemRepository, variacaoRepository, unitOfWork, logger);
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var variacaoId = Guid.NewGuid();
+
+        categoriaRepository.GetByIdAsync(categoriaId)
+            .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Roupas" });
+
+        var command = new CadastrarProdutoCommand(
+            empresaId, categoriaId, null, "Camiseta",
+            null, null, TipoProduto.Fisico, null, null, false,
+            null, null, null, null, null, null,
+            [new ProdutoCaracteristicaInput("Cor", "Cor da variacao", null, "Azul", 1, variacaoId)],
+            null, null);
+
+        var result = await useCase.ExecuteAsync(command);
+
+        await caracteristicaRepository.Received(1).InsertAsync(Arg.Is<ProdutoCaracteristica>(c =>
+            c.ProdutoId == result.ProdutoId &&
+            c.VariacaoId == variacaoId));
     }
 }

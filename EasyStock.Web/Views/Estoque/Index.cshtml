@@ -210,12 +210,12 @@
                     <div class="flex gap-2">
                         @if (Model.Paginacao.HasPrevious)
                         {
-                            <a href="?page=@(Model.Paginacao.Page - 1)&status=@Model.StatusFiltro&search=@Model.Search"
+                            <a href="?page=@(Model.Paginacao.Page - 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
                                class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">← Anterior</a>
                         }
                         @if (Model.Paginacao.HasNext)
                         {
-                            <a href="?page=@(Model.Paginacao.Page + 1)&status=@Model.StatusFiltro&search=@Model.Search"
+                            <a href="?page=@(Model.Paginacao.Page + 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
                                class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Próximo →</a>
                         }
                     </div>
