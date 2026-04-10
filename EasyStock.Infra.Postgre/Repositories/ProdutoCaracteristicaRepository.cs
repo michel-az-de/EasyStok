@@ -24,11 +24,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task DeleteAsync(Guid id)
+        public Task DeleteAsync(Guid id)
         {
-            var entity = await dbContext.ProdutosCaracteristica.FindAsync(id);
-            if (entity is not null)
-                dbContext.ProdutosCaracteristica.Remove(entity);
+            dbContext.ProdutosCaracteristica.Remove(new ProdutoCaracteristica { Id = id });
+            return Task.CompletedTask;
         }
     }
 }
