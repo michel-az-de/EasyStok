@@ -11,6 +11,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
     public sealed record CadastrarProdutoCommand(
         [property: Required] Guid EmpresaId,
         [property: Required] Guid CategoriaId,
+        Guid? SubcategoriaId,
         [property: Required][property: MinLength(1)][property: MaxLength(180)] string Nome,
         string? DescricaoBase,
         string? Marca,
@@ -55,6 +56,15 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             if (categoria.EmpresaId != command.EmpresaId)
                 throw new UseCaseValidationException("A categoria informada nao pertence a empresa.");
 
+            if (command.SubcategoriaId.HasValue)
+            {
+                var subcategoria = await categoriaRepository.GetByIdAsync(command.SubcategoriaId.Value)
+                    ?? throw new UseCaseValidationException("Subcategoria nao encontrada.");
+                if (subcategoria.EmpresaId != command.EmpresaId)
+                    throw new UseCaseValidationException("A subcategoria informada nao pertence a empresa.");
+                if (subcategoria.CategoriaPaiId != command.CategoriaId)
+                    throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
+            }
             if (!string.IsNullOrWhiteSpace(command.SkuBase))
             {
                 var skuBase = command.SkuBase.Trim();
@@ -83,6 +93,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 Id = Guid.NewGuid(),
                 EmpresaId = command.EmpresaId,
                 CategoriaId = command.CategoriaId,
+                SubcategoriaId = command.SubcategoriaId,
                 Nome = command.Nome.Trim(),
                 DescricaoBase = command.DescricaoBase?.Trim(),
                 Marca = command.Marca?.Trim(),
@@ -115,6 +126,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     Descricao = caracteristica.Descricao?.Trim(),
                     QuantidadeReferencia = caracteristica.QuantidadeReferencia,
                     VariacaoPadrao = caracteristica.VariacaoPadrao?.Trim(),
+                    VariacaoId = caracteristica.VariacaoId,
                     OrdemExibicao = caracteristica.OrdemExibicao,
                     CriadoEm = agora,
                     AlteradoEm = agora

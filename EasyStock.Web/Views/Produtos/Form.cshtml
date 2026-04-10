@@ -3,6 +3,7 @@
 @{
     var isEdit = !string.IsNullOrEmpty(Model.Id);
     var categorias = ViewBag.Categorias as List<CategoriaApi> ?? [];
+    var categoriasPai = categorias.Where(c => c.CategoriaPaiId == null).ToList();
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -20,6 +21,9 @@
 
 @{
     var formAction = isEdit ? Url.Action("Atualizar", "Produtos", new { id = Model.Id }) : Url.Action("Criar", "Produtos");
+    var subcatJson = System.Text.Json.JsonSerializer.Serialize(
+        categorias.Where(c => c.CategoriaPaiId != null)
+            .Select(c => new { id = c.Id, nome = c.Nome, categoriaPaiId = c.CategoriaPaiId }));
 }
 <form action="@formAction" method="post" enctype="multipart/form-data"
       x-data="produtoForm()"
@@ -64,16 +68,18 @@
                         <option value="2">Serviço</option>
                     </select>
                 </div>
-                <div class="col-span-2">
+                <div>
                     <label asp-for="CategoriaId" class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
-                    @if (categorias.Any())
+                    @if (categoriasPai.Any())
                     {
                         <select asp-for="CategoriaId"
+                                x-model="categoriaId"
+                                @@change="subcategoriaId = null"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione uma categoria</option>
-                            @foreach (var cat in categorias)
+                            @foreach (var cat in categoriasPai)
                             {
-                                <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
+                                <option value="@cat.Id">@cat.Nome</option>
                             }
                         </select>
                     }
@@ -86,6 +92,17 @@
                                class="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     }
                     <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
+                </div>
+                <div x-show="subcategorias.length > 0">
+                    <label asp-for="SubcategoriaId" class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
+                    <select asp-for="SubcategoriaId"
+                            x-model="subcategoriaId"
+                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">Nenhuma</option>
+                        <template x-for="sub in subcategorias" :key="sub.id">
+                            <option :value="sub.id" x-text="sub.nome"></option>
+                        </template>
+                    </select>
                 </div>
                 <div class="col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -104,7 +121,7 @@
 
         <div class="ws">
             <h3 class="font-bold text-slate-800 mb-4">Preços</h3>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label asp-for="PrecoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
                     <input asp-for="PrecoReferencia" type="number" step="0.01" min="0"
@@ -113,6 +130,77 @@
                 <div>
                     <label asp-for="CustoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
                     <input asp-for="CustoReferencia" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="MargemEstimada" class="block text-sm font-semibold text-slate-700 mb-1.5">Margem estimada (%)</label>
+                    <input asp-for="MargemEstimada" type="number" step="0.01"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Dimensões -->
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Dimensões do produto</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label asp-for="DimensoesPeso" class="block text-sm font-semibold text-slate-700 mb-1.5">Peso (kg)</label>
+                    <input asp-for="DimensoesPeso" type="number" step="0.001" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesLargura" class="block text-sm font-semibold text-slate-700 mb-1.5">Largura (cm)</label>
+                    <input asp-for="DimensoesLargura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesAltura" class="block text-sm font-semibold text-slate-700 mb-1.5">Altura (cm)</label>
+                    <input asp-for="DimensoesAltura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesComprimento" class="block text-sm font-semibold text-slate-700 mb-1.5">Comprimento (cm)</label>
+                    <input asp-for="DimensoesComprimento" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Embalagem -->
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Embalagem padrão</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label asp-for="EmbalagemNome" class="block text-sm font-semibold text-slate-700 mb-1.5">Nome da embalagem</label>
+                    <input asp-for="EmbalagemNome" placeholder="Ex: Caixa, Saco, Envelope..."
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="EmbalagemDescricao" class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
+                    <input asp-for="EmbalagemDescricao"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                <div>
+                    <label asp-for="EmbalagemPeso" class="block text-sm font-semibold text-slate-700 mb-1.5">Peso (kg)</label>
+                    <input asp-for="EmbalagemPeso" type="number" step="0.001" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="EmbalagemLargura" class="block text-sm font-semibold text-slate-700 mb-1.5">Largura (cm)</label>
+                    <input asp-for="EmbalagemLargura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="EmbalagemAltura" class="block text-sm font-semibold text-slate-700 mb-1.5">Altura (cm)</label>
+                    <input asp-for="EmbalagemAltura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="EmbalagemComprimento" class="block text-sm font-semibold text-slate-700 mb-1.5">Comprimento (cm)</label>
+                    <input asp-for="EmbalagemComprimento" type="number" step="0.01" min="0"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
             </div>
@@ -168,8 +256,15 @@
 @section Scripts {
     <script>
         function produtoForm() {
+            const todasSubcats = @Html.Raw(subcatJson);
             return {
-                variacoes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Variacoes))
+                categoriaId: '@Model.CategoriaId',
+                subcategoriaId: '@(Model.SubcategoriaId?.ToString() ?? "")',
+                variacoes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Variacoes)),
+                get subcategorias() {
+                    if (!this.categoriaId) return [];
+                    return todasSubcats.filter(s => s.categoriaPaiId === this.categoriaId);
+                }
             };
         }
     </script>
