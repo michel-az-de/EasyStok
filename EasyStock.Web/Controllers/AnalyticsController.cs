@@ -69,7 +69,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
         int page = 1, string? tipo = null, string? de = null, string? ate = null)
     {
         ViewBag.Title = "Movimentações";
-        ViewBag.ActiveMenuItem = "Analytics";
+        ViewBag.ActiveMenuItem = "Movimentacoes";
 
         var result = await svc.MovimentacoesAsync(tipo, de, ate);
         var vm = new MovimentacoesViewModel
