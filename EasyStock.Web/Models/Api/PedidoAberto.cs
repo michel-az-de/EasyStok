@@ -15,10 +15,10 @@ public record PedidoAberto
 
     public string StatusLabel => Status switch
     {
-        1 => "aberto",
-        2 => "em transito",
-        3 => "recebido",
-        4 => "cancelado",
+        1 => "Aberto",
+        2 => "Em Trânsito",
+        3 => "Recebido",
+        4 => "Cancelado",
         _ => Status.ToString()
     };
 

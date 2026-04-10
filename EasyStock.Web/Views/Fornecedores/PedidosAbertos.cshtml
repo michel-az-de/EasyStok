@@ -56,7 +56,7 @@
             <tbody>
                 @foreach (var ped in Model.Pedidos)
                 {
-                    <tr x-data="{ confirmCancel: false }">
+                    <tr x-data="{ confirmCancel: false, confirmReceber: false, tracking: '' }">
                         <td>
                             <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
                                class="font-medium text-indigo-600 hover:text-indigo-700">
@@ -93,14 +93,10 @@
                             <div class="flex items-center gap-2">
                                 @if (ped.Status == 1 || ped.Status == 2)
                                 {
-                                    <form asp-action="ReceberPedido" asp-controller="Fornecedores"
-                                          asp-route-id="@ped.PedidoId" method="post">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit"
-                                                class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
-                                            Recebido
-                                        </button>
-                                    </form>
+                                    <button type="button" @@click="confirmReceber = true"
+                                            class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                                        Recebido
+                                    </button>
                                     <button type="button" @@click="confirmCancel = true"
                                             class="text-xs text-red-500 hover:text-red-700">
                                         Cancelar
@@ -108,6 +104,34 @@
                                 }
                                 <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
                                    class="text-xs text-indigo-600 hover:text-indigo-700">Ver</a>
+                            </div>
+
+                            <!-- Modal confirmar recebimento -->
+                            <div x-show="confirmReceber" x-cloak
+                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                                 @@click.self="confirmReceber = false">
+                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
+                                    <h3 class="font-semibold text-gray-900 mb-2">Confirmar recebimento</h3>
+                                    <p class="text-sm text-gray-600 mb-3">
+                                        Pedido de <strong>@ped.FornecedorNome</strong>
+                                    </p>
+                                    <label class="block text-xs text-gray-500 mb-1">Código de rastreio (opcional)</label>
+                                    <input type="text" x-model="tracking" placeholder="Ex: BR123456789"
+                                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4" />
+                                    <div class="flex justify-end gap-3">
+                                        <button type="button" @@click="confirmReceber = false"
+                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">Voltar</button>
+                                        <form asp-action="ReceberPedido" asp-controller="Fornecedores"
+                                              asp-route-id="@ped.PedidoId" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="tracking" :value="tracking" />
+                                            <button type="submit"
+                                                    class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">
+                                                Confirmar recebimento
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Confirmar cancelamento -->
