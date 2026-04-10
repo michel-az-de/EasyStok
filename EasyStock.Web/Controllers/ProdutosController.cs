@@ -115,10 +115,42 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             Marca = p.Marca,
             PrecoReferencia = p.PrecoReferencia,
             CustoReferencia = p.CustoReferencia,
+            MargemEstimada = p.MargemEstimada,
             Status = p.Status,
             Tipo = p.Tipo,
             ControlaValidade = p.ControlaValidade,
-            Variacoes = p.Variacoes.Select(v => v.Nome).ToList()
+            DimensoesPeso = p.Dimensoes?.Peso,
+            DimensoesLargura = p.Dimensoes?.Largura,
+            DimensoesAltura = p.Dimensoes?.Altura,
+            DimensoesComprimento = p.Dimensoes?.Comprimento,
+            VariacoesRich = p.Variacoes.Select(v => new VariacaoFormItem
+            {
+                Nome = v.Nome,
+                Cor = v.Cor,
+                Tamanho = v.Tamanho,
+                DescricaoComercial = v.DescricaoComercial,
+                Sku = v.Sku,
+                CodigoBarras = v.CodigoBarras,
+                Ativa = v.Ativa
+            }).ToList(),
+            Caracteristicas = p.Caracteristicas.Select(c => new CaracteristicaFormItem
+            {
+                Nome = c.Nome,
+                Descricao = c.Descricao,
+                QuantidadeReferencia = c.QuantidadeReferencia,
+                VariacaoPadrao = c.VariacaoPadrao,
+                OrdemExibicao = c.OrdemExibicao
+            }).ToList(),
+            Embalagens = p.Embalagens.Select(e => new EmbalagemFormItem
+            {
+                Nome = e.Nome,
+                Descricao = e.Descricao,
+                Peso = e.Dimensoes?.Peso,
+                Largura = e.Dimensoes?.Largura,
+                Altura = e.Dimensoes?.Altura,
+                Comprimento = e.Dimensoes?.Comprimento,
+                Padrao = e.Padrao
+            }).ToList()
         };
         await LoadCategoriasAsync();
         return View("Form", vm);

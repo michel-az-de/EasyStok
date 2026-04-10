@@ -39,10 +39,51 @@ public class ProdutosService(ApiClient api, SessionService session)
             controlaValidade = vm.ControlaValidade,
             custoReferencia = vm.CustoReferencia,
             precoReferencia = vm.PrecoReferencia,
-            variacoes = vm.Variacoes
-                .Where(v => !string.IsNullOrWhiteSpace(v))
-                .Select(v => new { nome = v.Trim(), ativa = true })
-                .ToArray()
+            margemEstimada = vm.MargemEstimada,
+            dimensoes = HasDimensoes(vm) ? new
+            {
+                peso = vm.DimensoesPeso ?? 0,
+                largura = vm.DimensoesLargura ?? 0,
+                altura = vm.DimensoesAltura ?? 0,
+                comprimento = vm.DimensoesComprimento ?? 0
+            } : null,
+            caracteristicas = vm.Caracteristicas
+                .Where(c => !string.IsNullOrWhiteSpace(c.Nome))
+                .Select((c, i) => new
+                {
+                    nome = c.Nome.Trim(),
+                    descricao = c.Descricao,
+                    quantidadeReferencia = c.QuantidadeReferencia,
+                    variacaoPadrao = c.VariacaoPadrao,
+                    ordemExibicao = i
+                }).ToArray(),
+            embalagens = vm.Embalagens
+                .Where(e => !string.IsNullOrWhiteSpace(e.Nome))
+                .Select(e => new
+                {
+                    nome = e.Nome.Trim(),
+                    descricao = e.Descricao,
+                    dimensoes = HasEmbalagemDimensoes(e) ? new
+                    {
+                        peso = e.Peso ?? 0,
+                        largura = e.Largura ?? 0,
+                        altura = e.Altura ?? 0,
+                        comprimento = e.Comprimento ?? 0
+                    } : (object?)null,
+                    padrao = e.Padrao
+                }).ToArray(),
+            variacoes = vm.VariacoesRich
+                .Where(v => !string.IsNullOrWhiteSpace(v.Nome))
+                .Select(v => new
+                {
+                    nome = v.Nome.Trim(),
+                    cor = v.Cor,
+                    tamanho = v.Tamanho,
+                    descricaoComercial = v.DescricaoComercial,
+                    sku = v.Sku,
+                    codigoBarras = v.CodigoBarras,
+                    ativa = v.Ativa
+                }).ToArray()
         });
 
     public Task<ApiResult<object>> EditarAsync(string id, ProdutoFormViewModel vm) =>
@@ -60,7 +101,40 @@ public class ProdutosService(ApiClient api, SessionService session)
             controlaValidade = vm.ControlaValidade,
             custoReferencia = vm.CustoReferencia,
             precoReferencia = vm.PrecoReferencia,
-            status = vm.Status
+            margemEstimada = vm.MargemEstimada,
+            status = vm.Status,
+            dimensoes = HasDimensoes(vm) ? new
+            {
+                peso = vm.DimensoesPeso ?? 0,
+                largura = vm.DimensoesLargura ?? 0,
+                altura = vm.DimensoesAltura ?? 0,
+                comprimento = vm.DimensoesComprimento ?? 0
+            } : null,
+            caracteristicas = vm.Caracteristicas
+                .Where(c => !string.IsNullOrWhiteSpace(c.Nome))
+                .Select((c, i) => new
+                {
+                    nome = c.Nome.Trim(),
+                    descricao = c.Descricao,
+                    quantidadeReferencia = c.QuantidadeReferencia,
+                    variacaoPadrao = c.VariacaoPadrao,
+                    ordemExibicao = i
+                }).ToArray(),
+            embalagens = vm.Embalagens
+                .Where(e => !string.IsNullOrWhiteSpace(e.Nome))
+                .Select(e => new
+                {
+                    nome = e.Nome.Trim(),
+                    descricao = e.Descricao,
+                    dimensoes = HasEmbalagemDimensoes(e) ? new
+                    {
+                        peso = e.Peso ?? 0,
+                        largura = e.Largura ?? 0,
+                        altura = e.Altura ?? 0,
+                        comprimento = e.Comprimento ?? 0
+                    } : (object?)null,
+                    padrao = e.Padrao
+                }).ToArray()
         });
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
@@ -89,4 +163,11 @@ public class ProdutosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> RemoverVariacaoAsync(string id, string vid) =>
         api.DeleteAsync($"produtos/{id}/variacoes/{vid}");
+
+    private static bool HasDimensoes(ProdutoFormViewModel vm) =>
+        vm.DimensoesPeso.HasValue || vm.DimensoesLargura.HasValue ||
+        vm.DimensoesAltura.HasValue || vm.DimensoesComprimento.HasValue;
+
+    private static bool HasEmbalagemDimensoes(EmbalagemFormItem e) =>
+        e.Peso.HasValue || e.Largura.HasValue || e.Altura.HasValue || e.Comprimento.HasValue;
 }

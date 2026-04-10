@@ -1,8 +1,11 @@
 @model ProdutoFormViewModel
 @using EasyStock.Web.Models.Api
+@using System.Text.Json
 @{
     var isEdit = !string.IsNullOrEmpty(Model.Id);
     var categorias = ViewBag.Categorias as List<CategoriaApi> ?? [];
+    var roots = categorias.Where(c => c.CategoriaPaiId == null).ToList();
+    var children = categorias.Where(c => c.CategoriaPaiId != null).ToLookup(c => c.CategoriaPaiId);
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -23,7 +26,6 @@
 }
 <form action="@formAction" method="post" enctype="multipart/form-data"
       x-data="produtoForm()"
-      @@submit="variacoes = variacoes.filter(v => v.trim())"
       class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     @Html.AntiForgeryToken()
     @if (isEdit)
@@ -34,9 +36,10 @@
 
     <!-- Coluna principal -->
     <div class="lg:col-span-2 space-y-4">
+
+        <!-- Informacoes basicas -->
         <div class="ws">
             <h3 class="font-bold text-slate-800 mb-4">Informações básicas</h3>
-
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2">
                     <label asp-for="Nome" class="block text-sm font-semibold text-slate-700 mb-1.5">Nome *</label>
@@ -71,9 +74,13 @@
                         <select asp-for="CategoriaId"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione uma categoria</option>
-                            @foreach (var cat in categorias)
+                            @foreach (var cat in roots)
                             {
                                 <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
+                                @foreach (var sub in children[cat.Id])
+                                {
+                                    <option value="@sub.Id" selected="@(Model.CategoriaId == sub.Id)">&nbsp;&nbsp;-- @sub.Nome</option>
+                                }
                             }
                         </select>
                     }
@@ -94,7 +101,6 @@
                     </label>
                 </div>
             </div>
-
             <div class="mt-4">
                 <label asp-for="DescricaoBase" class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
                 <textarea asp-for="DescricaoBase" rows="3"
@@ -102,46 +108,240 @@
             </div>
         </div>
 
+        <!-- Precos e Margem -->
         <div class="ws">
             <h3 class="font-bold text-slate-800 mb-4">Preços</h3>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label asp-for="PrecoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
                     <input asp-for="PrecoReferencia" type="number" step="0.01" min="0"
+                           x-ref="preco"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
                     <label asp-for="CustoReferencia" class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
                     <input asp-for="CustoReferencia" type="number" step="0.01" min="0"
+                           x-ref="custo"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="MargemEstimada" class="block text-sm font-semibold text-slate-700 mb-1.5">Margem (%)</label>
+                    <input asp-for="MargemEstimada" type="number" step="0.01"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    <template x-if="margemCalc !== ''">
+                        <span class="text-xs text-emerald-600 mt-1 block" x-text="'Calculada: ' + margemCalc + '%'"></span>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dimensoes -->
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Dimensões e peso</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                    <label asp-for="DimensoesPeso" class="block text-sm font-semibold text-slate-700 mb-1.5">Peso (kg)</label>
+                    <input asp-for="DimensoesPeso" type="number" step="0.001" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesLargura" class="block text-sm font-semibold text-slate-700 mb-1.5">Largura (cm)</label>
+                    <input asp-for="DimensoesLargura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesAltura" class="block text-sm font-semibold text-slate-700 mb-1.5">Altura (cm)</label>
+                    <input asp-for="DimensoesAltura" type="number" step="0.01" min="0"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label asp-for="DimensoesComprimento" class="block text-sm font-semibold text-slate-700 mb-1.5">Comprimento (cm)</label>
+                    <input asp-for="DimensoesComprimento" type="number" step="0.01" min="0"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
             </div>
         </div>
 
-        <!-- Variações -->
+        <!-- Variacoes -->
         <div class="ws">
             <h3 class="font-bold text-slate-800 mb-4">Variações</h3>
-            <div class="space-y-2 mb-3">
+            <div class="space-y-3 mb-3">
                 <template x-for="(v, i) in variacoes" :key="i">
-                    <div class="flex items-center gap-2">
-                        <input type="text" :name="'Variacoes[' + i + ']'" x-model="variacoes[i]"
-                               placeholder="Nome da variação (ex: P, M, G, Azul...)"
-                               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                        <button type="button" @@click="variacoes.splice(i, 1)"
-                                class="text-red-500 hover:text-red-700 p-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                    <div class="border border-slate-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-slate-500" x-text="'Variação ' + (i+1)"></span>
+                            <button type="button" @@click="variacoes.splice(i, 1)"
+                                    class="text-red-500 hover:text-red-700 text-xs font-semibold">Remover</button>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome"
+                                       placeholder="Ex: P, M, G, Azul..."
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Cor</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor"
+                                       placeholder="Ex: Azul, Vermelho..."
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Tamanho</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho"
+                                       placeholder="Ex: P, M, G, 42..."
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">SKU</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].Sku'" x-model="v.sku"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Cod. Barras</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Desc. comercial</label>
+                                <input type="text" :name="'VariacoesRich[' + i + '].DescricaoComercial'" x-model="v.descricaoComercial"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" :name="'VariacoesRich[' + i + '].Ativa'" x-model="v.ativa" value="true"
+                                       class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
+                                <span class="text-xs text-slate-600">Ativa</span>
+                            </label>
+                        </div>
                     </div>
                 </template>
             </div>
-            <button type="button" @@click="variacoes.push('')"
+            <button type="button" @@click="variacoes.push({nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
                     class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 Adicionar variação
+            </button>
+        </div>
+
+        <!-- Caracteristicas -->
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Características</h3>
+            <div class="space-y-3 mb-3">
+                <template x-for="(c, i) in caracteristicas" :key="i">
+                    <div class="border border-slate-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-slate-500" x-text="'Característica ' + (i+1)"></span>
+                            <button type="button" @@click="caracteristicas.splice(i, 1)"
+                                    class="text-red-500 hover:text-red-700 text-xs font-semibold">Remover</button>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                <input type="text" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome"
+                                       placeholder="Ex: Material, Voltagem..."
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Quantidade</label>
+                                <input type="number" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia"
+                                       min="0"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Variação</label>
+                                <input type="text" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
+                                       placeholder="Variação relacionada"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div class="col-span-2 sm:col-span-4">
+                                <label class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                <input type="text" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                        </div>
+                        <input type="hidden" :name="'Caracteristicas[' + i + '].OrdemExibicao'" :value="i" />
+                    </div>
+                </template>
+            </div>
+            <button type="button" @@click="caracteristicas.push({nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
+                    class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Adicionar característica
+            </button>
+        </div>
+
+        <!-- Embalagens -->
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Embalagens</h3>
+            <div class="space-y-3 mb-3">
+                <template x-for="(e, i) in embalagens" :key="i">
+                    <div class="border border-slate-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-slate-500" x-text="'Embalagem ' + (i+1)"></span>
+                            <button type="button" @@click="embalagens.splice(i, 1)"
+                                    class="text-red-500 hover:text-red-700 text-xs font-semibold">Remover</button>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                <input type="text" :name="'Embalagens[' + i + '].Nome'" x-model="e.nome"
+                                       placeholder="Ex: Caixa individual, Fardo..."
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="flex items-center gap-2 cursor-pointer mt-5">
+                                    <input type="checkbox" :name="'Embalagens[' + i + '].Padrao'" x-model="e.padrao" value="true"
+                                           class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
+                                    <span class="text-xs text-slate-600">Padrão</span>
+                                </label>
+                            </div>
+                            <div class="col-span-2 sm:col-span-3">
+                                <label class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                <input type="text" :name="'Embalagens[' + i + '].Descricao'" x-model="e.descricao"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Peso (kg)</label>
+                                <input type="number" :name="'Embalagens[' + i + '].Peso'" x-model.number="e.peso"
+                                       step="0.001" min="0"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Largura (cm)</label>
+                                <input type="number" :name="'Embalagens[' + i + '].Largura'" x-model.number="e.largura"
+                                       step="0.01" min="0"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Altura (cm)</label>
+                                <input type="number" :name="'Embalagens[' + i + '].Altura'" x-model.number="e.altura"
+                                       step="0.01" min="0"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Comprimento (cm)</label>
+                                <input type="number" :name="'Embalagens[' + i + '].Comprimento'" x-model.number="e.comprimento"
+                                       step="0.01" min="0"
+                                       class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button type="button" @@click="embalagens.push({nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
+                    class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Adicionar embalagem
             </button>
         </div>
     </div>
@@ -169,7 +369,27 @@
     <script>
         function produtoForm() {
             return {
-                variacoes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Variacoes))
+                variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
+                    nome = v.Nome ?? "", cor = v.Cor ?? "", tamanho = v.Tamanho ?? "",
+                    descricaoComercial = v.DescricaoComercial ?? "", sku = v.Sku ?? "",
+                    codigoBarras = v.CodigoBarras ?? "", ativa = v.Ativa
+                }))),
+                caracteristicas: @Html.Raw(JsonSerializer.Serialize(Model.Caracteristicas.Select(c => new {
+                    nome = c.Nome ?? "", descricao = c.Descricao ?? "",
+                    quantidadeReferencia = c.QuantidadeReferencia,
+                    variacaoPadrao = c.VariacaoPadrao ?? "", ordemExibicao = c.OrdemExibicao
+                }))),
+                embalagens: @Html.Raw(JsonSerializer.Serialize(Model.Embalagens.Select(e => new {
+                    nome = e.Nome ?? "", descricao = e.Descricao ?? "",
+                    peso = e.Peso, largura = e.Largura, altura = e.Altura,
+                    comprimento = e.Comprimento, padrao = e.Padrao
+                }))),
+                get margemCalc() {
+                    const preco = parseFloat(this.$refs?.preco?.value) || 0;
+                    const custo = parseFloat(this.$refs?.custo?.value) || 0;
+                    if (preco > 0 && custo > 0) return (((preco - custo) / preco) * 100).toFixed(1);
+                    return '';
+                }
             };
         }
     </script>

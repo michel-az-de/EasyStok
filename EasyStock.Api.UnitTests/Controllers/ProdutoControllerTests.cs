@@ -51,6 +51,8 @@ public class ProdutoControllerTests
             _produtoRepository,
             _categoriaRepository,
             _produtoVariacaoRepository,
+            _produtoCaracteristicaRepository,
+            _produtoEmbalagemRepository,
             _itemEstoqueRepository,
             _movimentacaoEstoqueRepository,
             _unitOfWork);
@@ -102,6 +104,8 @@ public class ProdutoControllerTests
         _produtoRepository.GetDetalheAsync(empresaId, produto.Id).Returns(produto);
         _produtoVariacaoRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
         _itemEstoqueRepository.GetByProdutoAsync(empresaId, produto.Id).Returns([]);
+        _produtoCaracteristicaRepository.GetByProdutoAsync(empresaId, produto.Id).Returns(Enumerable.Empty<ProdutoCaracteristica>());
+        _produtoEmbalagemRepository.GetByProdutoAsync(empresaId, produto.Id).Returns(Enumerable.Empty<ProdutoEmbalagem>());
 
         var result = await _controller.GetById(produto.Id, empresaId);
 

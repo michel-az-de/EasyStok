@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 using NSubstitute;
 
@@ -10,40 +11,187 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class GerenciarProdutoUseCaseTests
 {
+    private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
+    private readonly ICategoriaRepository _categoriaRepository = Substitute.For<ICategoriaRepository>();
+    private readonly IProdutoVariacaoRepository _variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IProdutoCaracteristicaRepository _caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+    private readonly IProdutoEmbalagemRepository _embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+    private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
+    private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+
+    private GerenciarProdutoUseCase CriarUseCase() => new(
+        _produtoRepository,
+        _categoriaRepository,
+        _variacaoRepository,
+        _caracteristicaRepository,
+        _embalagemRepository,
+        _itemEstoqueRepository,
+        _movimentacaoRepository,
+        _unitOfWork);
+
     [Fact]
     public async Task Deve_falhar_ao_remover_produto_com_estoque()
     {
-        var produtoRepository = Substitute.For<IProdutoRepository>();
-        var categoriaRepository = Substitute.For<ICategoriaRepository>();
-        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
-        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
-
-        var useCase = new GerenciarProdutoUseCase(
-            produtoRepository,
-            categoriaRepository,
-            variacaoRepository,
-            itemEstoqueRepository,
-            movimentacaoRepository,
-            unitOfWork);
-
+        var useCase = CriarUseCase();
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
 
-        produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
             Nome = "Produto",
             Status = StatusProduto.Ativo
         });
-        itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produtoId).Returns(true);
+        _itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produtoId).Returns(true);
 
         var act = () => useCase.RemoverAsync(empresaId, produtoId);
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*estoque disponivel*");
-        await produtoRepository.DidNotReceive().UpdateAsync(Arg.Any<Produto>());
+        await _produtoRepository.DidNotReceive().UpdateAsync(Arg.Any<Produto>());
+    }
+
+    [Fact]
+    public async Task Deve_atualizar_produto_com_caracteristicas_e_embalagens()
+    {
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Original",
+            Status = StatusProduto.Ativo
+        });
+        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var caracExistente = new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Antiga" };
+        _caracteristicaRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { caracExistente });
+
+        var embExistente = new ProdutoEmbalagem { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Antiga" };
+        _embalagemRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { embExistente });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, "Produto Atualizado",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, null, StatusProduto.Ativo,
+            new[] { new ProdutoCaracteristicaInput("Material", "Algodao", null, null, 0) },
+            new[] { new ProdutoEmbalagemInput("Caixa", null, null, true) });
+
+        await useCase.AtualizarAsync(command);
+
+        // Old ones deleted
+        await _caracteristicaRepository.Received(1).DeleteAsync(caracExistente.Id);
+        await _embalagemRepository.Received(1).DeleteAsync(embExistente.Id);
+
+        // New ones inserted
+        await _caracteristicaRepository.Received(1).InsertAsync(Arg.Is<ProdutoCaracteristica>(c => c.Nome == "Material"));
+        await _embalagemRepository.Received(1).InsertAsync(Arg.Is<ProdutoEmbalagem>(e => e.Nome == "Caixa" && e.Padrao));
+
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Deve_retornar_detalhe_com_caracteristicas_embalagens_e_dimensoes()
+    {
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        _produtoRepository.GetDetalheAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = Guid.NewGuid(),
+            Nome = "Produto Completo",
+            Status = StatusProduto.Ativo,
+            Dimensoes = Dimensoes.From(1.5m, 30m, 20m, 40m),
+            CustoReferencia = Dinheiro.FromDecimal(50m),
+            PrecoReferencia = Dinheiro.FromDecimal(100m),
+            MargemEstimada = 50m
+        });
+        _itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId).Returns([]);
+        _variacaoRepository.GetByProdutoAsync(empresaId, produtoId).Returns([]);
+
+        _caracteristicaRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Material", Descricao = "Algodao", OrdemExibicao = 0 }
+        });
+        _embalagemRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ProdutoEmbalagem
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
+                Nome = "Caixa", Padrao = true,
+                Dimensoes = Dimensoes.From(0.5m, 35m, 25m, 45m)
+            }
+        });
+
+        var result = await useCase.ObterDetalheAsync(empresaId, produtoId);
+
+        result.Dimensoes.Should().NotBeNull();
+        result.Dimensoes!.Peso.Should().Be(1.5m);
+        result.Dimensoes.Largura.Should().Be(30m);
+        result.Dimensoes.Altura.Should().Be(20m);
+        result.Dimensoes.Comprimento.Should().Be(40m);
+
+        result.Caracteristicas.Should().HaveCount(1);
+        result.Caracteristicas.First().Nome.Should().Be("Material");
+
+        result.Embalagens.Should().HaveCount(1);
+        result.Embalagens.First().Nome.Should().Be("Caixa");
+        result.Embalagens.First().Padrao.Should().BeTrue();
+        result.Embalagens.First().Dimensoes.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Deve_falhar_quando_mais_de_uma_embalagem_padrao_no_update()
+    {
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto",
+            Status = StatusProduto.Ativo
+        });
+        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, "Produto",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, null, StatusProduto.Ativo,
+            null,
+            new[]
+            {
+                new ProdutoEmbalagemInput("Caixa 1", null, null, true),
+                new ProdutoEmbalagemInput("Caixa 2", null, null, true)
+            });
+
+        var act = () => useCase.AtualizarAsync(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*embalagem*padrao*");
     }
 }
