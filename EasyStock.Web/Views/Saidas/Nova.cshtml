@@ -77,6 +77,9 @@
                        @@input="calcularTotal()"
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
                 <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
+                <p class="text-xs text-gray-500 mt-1" x-show="estoqueAtual > 0">
+                    Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
+                </p>
             </div>
         </div>
 
@@ -141,7 +144,8 @@
                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
                 Cancelar
             </a>
-            <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+            <button type="submit" x-data="{ loading: false }"
+                    @@click="if (estoqueAtual > 0 && qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
                     :disabled="loading"
                     :class="{ 'opacity-50 cursor-not-allowed': loading }"
                     class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
@@ -162,6 +166,7 @@ function saidaForm() {
         produtoId: '',
         variacoes: [],
         varId: '',
+        estoqueAtual: 0,
         qty: 1,
         valorUnit: 0,
         total: 0,
@@ -176,12 +181,20 @@ function saidaForm() {
             }, 300);
         },
 
-        selecionarProduto(p) {
+        async selecionarProduto(p) {
             this.produtoId = p.id;
             this.busca = p.nome;
-            this.variacoes = p.variacoes || [];
             this.showResults = false;
             this.resultados = [];
+            try {
+                const dr = await fetch('/estoque/produto-detalhe/' + p.id);
+                if (dr.ok) {
+                    const d = await dr.json();
+                    this.variacoes = d.variacoes || [];
+                    this.estoqueAtual = d.estoqueTotal || 0;
+                    this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                }
+            } catch { this.variacoes = []; }
         },
 
         calcularTotal() {

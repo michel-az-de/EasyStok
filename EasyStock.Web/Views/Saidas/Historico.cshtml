@@ -128,33 +128,10 @@
                         <td class="text-gray-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
                         <td class="text-gray-500 text-sm">@(s.Descricao ?? "—")</td>
                         <td>
-                            <form asp-action="Estornar" asp-controller="Saidas"
-                                  asp-route-id="@s.Id" method="post"
-                                  x-data="{ confirm: false }">
-                                @Html.AntiForgeryToken()
-                                <button type="button" @@click="confirm = true"
-                                        class="text-xs text-red-600 hover:text-red-700">Estornar</button>
-                                <div x-show="confirm" x-cloak
-                                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                     @@click.self="confirm = false">
-                                    <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                                        <h3 class="font-semibold text-gray-900 mb-2">Confirmar estorno</h3>
-                                        <p class="text-sm text-gray-600 mb-4">
-                                            Isso reverterá a saída e adicionará o estoque de volta.
-                                        </p>
-                                        <div class="flex justify-end gap-3">
-                                            <button type="button" @@click="confirm = false"
-                                                    class="px-3 py-1.5 text-sm text-gray-700 border rounded-lg hover:bg-gray-50">
-                                                Cancelar
-                                            </button>
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                                Confirmar Estorno
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
+                            <span class="text-xs text-gray-400 cursor-not-allowed"
+                                  title="Estorno não disponível no momento">
+                                Estornar
+                            </span>
                         </td>
                     </tr>
                 }
