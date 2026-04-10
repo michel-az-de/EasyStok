@@ -149,7 +149,7 @@
                 resultados: [],
                 produtoId: '', produtoNome: '', produtoSku: '', produtoEmoji: '📦',
                 varId: '', qty: 1, custo: null, preco: null, lote: '', validade: '',
-                data: new Date().toISOString().split('T')[0],
+                data: new Date().toLocaleDateString('en-CA'),
 
                 async buscar() {
                     if (this.buscaTerm.length < 2) { this.resultados = []; return; }

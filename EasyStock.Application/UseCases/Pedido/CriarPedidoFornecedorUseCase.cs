@@ -1,0 +1,79 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using Microsoft.Extensions.Logging;
+
+namespace EasyStock.Application.UseCases.Pedido;
+
+public sealed record CriarPedidoFornecedorCommand(
+    Guid EmpresaId,
+    Guid FornecedorId,
+    DateTime DataPedido,
+    DateTime? PrevisaoEntrega,
+    decimal? ValorEstimado,
+    string? Canal,
+    string? Observacoes);
+
+public sealed record CriarPedidoFornecedorResult(Guid PedidoId);
+
+public class CriarPedidoFornecedorUseCase(
+    IPedidoFornecedorRepository pedidoRepository,
+    IUnitOfWork unitOfWork,
+    ILogger<CriarPedidoFornecedorUseCase> logger)
+{
+    public async Task<CriarPedidoFornecedorResult> ExecuteAsync(CriarPedidoFornecedorCommand command)
+    {
+        ValidateCommand(command);
+
+        var pedido = new PedidoFornecedor
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = command.EmpresaId,
+            FornecedorId = command.FornecedorId,
+            DataPedido = command.DataPedido,
+            PrevisaoEntrega = command.PrevisaoEntrega,
+            ValorEstimado = command.ValorEstimado,
+            Status = StatusPedidoFornecedor.Aberto,
+            Canal = command.Canal,
+            Observacoes = command.Observacoes,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+
+        await pedidoRepository.AddAsync(pedido);
+        await unitOfWork.CommitAsync();
+
+        logger.LogInformation("Pedido {PedidoId} criado para fornecedor {FornecedorId}.", pedido.Id, pedido.FornecedorId);
+        return new CriarPedidoFornecedorResult(pedido.Id);
+    }
+
+    private static void ValidateCommand(CriarPedidoFornecedorCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (command.EmpresaId == Guid.Empty)
+        {
+            throw new ArgumentException("EmpresaId deve ser informado e diferente de Guid.Empty.", nameof(command.EmpresaId));
+        }
+
+        if (command.FornecedorId == Guid.Empty)
+        {
+            throw new ArgumentException("FornecedorId deve ser informado e diferente de Guid.Empty.", nameof(command.FornecedorId));
+        }
+
+        if (command.DataPedido == default)
+        {
+            throw new ArgumentException("DataPedido deve ser uma data válida.", nameof(command.DataPedido));
+        }
+
+        if (command.PrevisaoEntrega.HasValue && command.PrevisaoEntrega.Value < command.DataPedido)
+        {
+            throw new ArgumentException("PrevisaoEntrega não pode ser anterior à DataPedido.", nameof(command.PrevisaoEntrega));
+        }
+
+        if (command.ValorEstimado.HasValue && command.ValorEstimado.Value < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(command.ValorEstimado), command.ValorEstimado, "ValorEstimado não pode ser negativo.");
+        }
+    }
+}

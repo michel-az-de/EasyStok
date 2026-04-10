@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -110,6 +112,32 @@ public class EntradasController(EntradasService svc, SessionService session) : B
         return View(vm);
     }
 
+    [HttpGet("/entradas/exportar-csv")]
+    public async Task<IActionResult> ExportarCsv(string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
+    {
+        var result = await svc.ExportarAsync(tipo, periodoInicio, periodoFim);
+        if (!result.Success) return BadRequest();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Data,Produto,Variação,Quantidade,Custo Unitário,Total,Natureza,Documento,Descrição");
+        foreach (var m in result.Data!.Data)
+        {
+            sb.AppendLine(string.Join(",",
+                m.Data.ToString("yyyy-MM-dd"),
+                Csv(m.Produto?.Nome),
+                Csv(m.ProdutoVariacao?.Nome),
+                m.Qty,
+                m.Custo?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+                m.ValorTotal?.Valor.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+                Csv(m.Natureza),
+                Csv(m.DocumentoReferencia),
+                Csv(m.Descricao)));
+        }
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"entradas-{DateTime.Now:yyyyMMdd}.csv");
+    }
+
     private bool ValidarProdutoId(EntradaFormViewModel vm)
     {
         if (!string.IsNullOrEmpty(vm.ProdutoId) && Guid.TryParse(vm.ProdutoId, out _))
@@ -117,4 +145,7 @@ public class EntradasController(EntradasService svc, SessionService session) : B
         ModelState.AddModelError("ProdutoId", "Selecione um produto válido.");
         return false;
     }
+
+    private static string Csv(string? value) =>
+        value is null ? "" : $"\"{value.Replace("\"", "\"\"")}\"";
 }

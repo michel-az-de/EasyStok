@@ -49,6 +49,14 @@ public class SaidasService(ApiClient api, SessionService session)
         });
     }
 
+    public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? periodoInicio = null, string? periodoFim = null)
+    {
+        var qs = "movimentacoes?page=1&pageSize=1000&tipo=Saida";
+        if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
+        if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
+        return api.GetAsync<PagedResult<Movimentacao>>(qs);
+    }
+
     // EstornarAsync: no reversal endpoint exists in the API.
     // Returns a graceful failure so the controller shows an informative error toast.
     public Task<ApiResult<bool>> EstornarAsync(string id) =>

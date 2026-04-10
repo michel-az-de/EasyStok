@@ -6,10 +6,19 @@
 
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Histórico de Saídas</h1>
-    <a asp-action="Nova" asp-controller="Saidas"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-        + Nova Saída
-    </a>
+    <div class="flex items-center gap-2">
+        <a href="/saidas/exportar-csv?periodoInicio=@Model.PeriodoInicio&periodoFim=@Model.PeriodoFim"
+           class="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-300 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Exportar CSV
+        </a>
+        <a asp-action="Nova" asp-controller="Saidas"
+           class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            + Nova Saída
+        </a>
+    </div>
 </div>
 
 <!-- KPI chips -->
@@ -86,8 +95,7 @@
                     <th>Qtd</th>
                     <th>Valor</th>
                     <th>Data</th>
-                    <th>Canal</th>
-                    <th></th>
+                    <th>Descrição</th>
                 </tr>
             </thead>
             <tbody>
@@ -127,12 +135,7 @@
                         </td>
                         <td class="text-gray-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
                         <td class="text-gray-500 text-sm">@(s.Descricao ?? "—")</td>
-                        <td>
-                            <span class="text-xs text-gray-400 cursor-not-allowed"
-                                  title="Estorno não disponível no momento">
-                                Estornar
-                            </span>
-                        </td>
+
                     </tr>
                 }
             </tbody>

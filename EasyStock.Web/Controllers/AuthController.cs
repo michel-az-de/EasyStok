@@ -85,14 +85,14 @@ public class AuthController(ApiClient api, SessionService session) : Controller
             if (lojas.Count == 1)
             {
                 session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji, lojas[0].EmpresaId);
-                return Redirect(returnUrl ?? "/dashboard");
+                return SafeRedirect(returnUrl);
             }
 
             TempData["Lojas"] = JsonSerializer.Serialize(lojas);
             return RedirectToAction(nameof(SelecionarLoja));
         }
 
-        return Redirect(returnUrl ?? "/dashboard");
+        return SafeRedirect(returnUrl);
     }
 
     [HttpGet("/auth/selecionar-loja")]
@@ -118,6 +118,93 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return RedirectToAction("Index", "Dashboard");
     }
 
+    [HttpGet("/auth/registrar")]
+    public IActionResult Registrar()
+    {
+        if (session.IsLoggedIn())
+            return RedirectToAction("Index", "Dashboard");
+        return View(new RegisterViewModel());
+    }
+
+    [HttpPost("/auth/registrar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Registrar(RegisterViewModel vm)
+    {
+        if (!ModelState.IsValid) return View(vm);
+
+        var result = await api.PostAsync<object>("empresas/registrar", new
+        {
+            nomeEmpresa = vm.NomeEmpresa,
+            documento = vm.Documento,
+            nomeAdmin = vm.NomeAdmin,
+            emailAdmin = vm.Email,
+            senhaAdmin = vm.Senha
+        });
+
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Não foi possível criar a conta.");
+            return View(vm);
+        }
+
+        TempData["Toast"] = "success|Conta criada com sucesso! Faça login para continuar.";
+        return RedirectToAction(nameof(Login));
+    }
+
+    [HttpGet("/auth/esqueci-senha")]
+    public IActionResult EsqueciSenha()
+    {
+        if (session.IsLoggedIn())
+            return RedirectToAction("Index", "Dashboard");
+        return View();
+    }
+
+    [HttpPost("/auth/esqueci-senha")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EsqueciSenha(ForgotPasswordViewModel vm)
+    {
+        if (!ModelState.IsValid) return View(vm);
+
+        var baseUrl = GetConfiguredPublicBaseUrl();
+        if (baseUrl is null)
+        {
+            ModelState.AddModelError(string.Empty, "A URL pública da aplicação não está configurada corretamente.");
+            return View(vm);
+        }
+
+        await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email, baseUrl });
+
+        // Always show success to avoid revealing if email exists
+        ViewBag.Sent = true;
+        return View(new ForgotPasswordViewModel());
+    }
+
+    [HttpGet("/auth/redefinir-senha")]
+    public IActionResult RedefinirSenha(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction(nameof(EsqueciSenha));
+
+        return View(new ResetPasswordViewModel { Token = token });
+    }
+
+    [HttpPost("/auth/redefinir-senha")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RedefinirSenha(ResetPasswordViewModel vm)
+    {
+        if (!ModelState.IsValid) return View(vm);
+
+        var result = await api.PostAsync<object>("auth/reset-password", new { token = vm.Token, novaSenha = vm.NovaSenha });
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Token inválido ou expirado.");
+            return View(vm);
+        }
+
+        TempData["Toast"] = "success|Senha redefinida com sucesso! Faça login com a nova senha.";
+        return RedirectToAction(nameof(Login));
+    }
+
     [HttpPost("/auth/logout")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -128,8 +215,28 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return RedirectToAction(nameof(Login));
     }
 
+    private IActionResult SafeRedirect(string? returnUrl) =>
+        !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? Redirect(returnUrl)
+            : RedirectToAction("Index", "Dashboard");
+
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private static string? GetConfiguredPublicBaseUrl()
+    {
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL");
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+            return null;
+
+        if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var uri))
+            return null;
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            return null;
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
 
     private static string? ExtractClaim(string token, string claimType)
     {

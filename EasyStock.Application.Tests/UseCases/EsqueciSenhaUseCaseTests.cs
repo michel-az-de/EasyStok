@@ -106,6 +106,21 @@ public class EsqueciSenhaUseCaseTests
     }
 
     [Fact]
+    public async Task DeveIncluirLinkNoEmail_QuandoBaseUrlFornecida()
+    {
+        var usuario = CriarUsuario("link@empresa.com");
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        var useCase = CriarUseCase(comEmail: true);
+        await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, "https://app.easystock.com"));
+
+        await _emailService.Received(1).SendAsync(
+            usuario.Email,
+            Arg.Any<string>(),
+            Arg.Is<string>(b => b.Contains("https://app.easystock.com/auth/redefinir-senha?token=")));
+    }
+
+    [Fact]
     public async Task DeveAuditar_QuandoTokenGeradoComSucesso()
     {
         var usuario = CriarUsuario();

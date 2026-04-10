@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
+using EasyStock.Application.UseCases.Pedido;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -36,9 +37,12 @@ public class FornecedorControllerTests
         var historico = new ObterHistoricoFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var estatisticas = new ObterEstatisticasFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var pedidosAbertos = new ListarPedidosAbertosUseCase(_pedidoFornecedorRepository);
+        var criarPedido = new CriarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CriarPedidoFornecedorUseCase>>());
+        var receberPedido = new ReceberPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<ReceberPedidoFornecedorUseCase>>());
+        var cancelarPedido = new CancelarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CancelarPedidoFornecedorUseCase>>());
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new FornecedorController(criar, atualizar, desativar, listar, detalhe, historico, estatisticas, pedidosAbertos, _currentUser);
+        _controller = new FornecedorController(criar, atualizar, desativar, listar, detalhe, historico, estatisticas, pedidosAbertos, criarPedido, receberPedido, cancelarPedido, _currentUser);
     }
 
     [Fact]

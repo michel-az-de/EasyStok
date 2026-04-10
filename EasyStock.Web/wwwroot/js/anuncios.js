@@ -12,13 +12,19 @@ function anuncioForm() {
         gerando: false,
         _debounce: null,
 
+        init() {
+            window.addEventListener('anuncio-finalizado', () => {
+                this.gerando = false;
+            });
+        },
+
         buscarProduto() {
             clearTimeout(this._debounce);
             this._debounce = setTimeout(async () => {
                 if (this.busca.length < 2) { this.resultados = []; return; }
                 try {
                     const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
-                    this.resultados = await res.json();
+                    this.resultados = res.ok ? await res.json() : [];
                 } catch (e) {
                     this.resultados = [];
                 }
@@ -124,6 +130,7 @@ function anuncioResultado() {
                             }
                             read();
                         }).catch(() => {
+                            this.resultado = 'Erro ao ler resposta do servidor. Tente novamente.';
                             this.gerando = false;
                             window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                         });
