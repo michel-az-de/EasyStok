@@ -23,6 +23,8 @@ public class CriarPedidoFornecedorUseCase(
 {
     public async Task<CriarPedidoFornecedorResult> ExecuteAsync(CriarPedidoFornecedorCommand command)
     {
+        ValidateCommand(command);
+
         var pedido = new PedidoFornecedor
         {
             Id = Guid.NewGuid(),
@@ -43,5 +45,35 @@ public class CriarPedidoFornecedorUseCase(
 
         logger.LogInformation("Pedido {PedidoId} criado para fornecedor {FornecedorId}.", pedido.Id, pedido.FornecedorId);
         return new CriarPedidoFornecedorResult(pedido.Id);
+    }
+
+    private static void ValidateCommand(CriarPedidoFornecedorCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (command.EmpresaId == Guid.Empty)
+        {
+            throw new ArgumentException("EmpresaId deve ser informado e diferente de Guid.Empty.", nameof(command.EmpresaId));
+        }
+
+        if (command.FornecedorId == Guid.Empty)
+        {
+            throw new ArgumentException("FornecedorId deve ser informado e diferente de Guid.Empty.", nameof(command.FornecedorId));
+        }
+
+        if (command.DataPedido == default)
+        {
+            throw new ArgumentException("DataPedido deve ser uma data válida.", nameof(command.DataPedido));
+        }
+
+        if (command.PrevisaoEntrega.HasValue && command.PrevisaoEntrega.Value < command.DataPedido)
+        {
+            throw new ArgumentException("PrevisaoEntrega não pode ser anterior à DataPedido.", nameof(command.PrevisaoEntrega));
+        }
+
+        if (command.ValorEstimado.HasValue && command.ValorEstimado.Value < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(command.ValorEstimado), command.ValorEstimado, "ValorEstimado não pode ser negativo.");
+        }
     }
 }
