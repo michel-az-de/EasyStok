@@ -165,7 +165,13 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = GetConfiguredPublicBaseUrl();
+        if (baseUrl is null)
+        {
+            ModelState.AddModelError(string.Empty, "A URL pública da aplicação não está configurada corretamente.");
+            return View(vm);
+        }
+
         await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email, baseUrl });
 
         // Always show success to avoid revealing if email exists
@@ -216,6 +222,21 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private static string? GetConfiguredPublicBaseUrl()
+    {
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL");
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+            return null;
+
+        if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var uri))
+            return null;
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            return null;
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
 
     private static string? ExtractClaim(string token, string claimType)
     {
