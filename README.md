@@ -266,9 +266,9 @@ dotnet run --project EasyStock.Api/EasyStock.Api.csproj
 
 **5. Seed demo "Casa da Baba" (automática no PostgreSQL)**
 
-- Ao iniciar a API com PostgreSQL, o sistema aplica migrations e executa o seed idempotente da empresa **Casa da Baba**.
+- Ao iniciar a API com PostgreSQL, o sistema aplica migrações e executa o seed idempotente da empresa **Casa da Baba**.
 - O seed usa lock transacional (`pg_advisory_xact_lock`) para evitar duplicação quando múltiplos containers sobem em paralelo.
-- Para forçar reaplicação segura, basta subir novamente a API (os dados são atualizados/reutilizados, sem duplicação caótica).
+- Para forçar reaplicação segura, basta subir novamente a API (os dados são atualizados/reutilizados, sem duplicar de forma caótica).
 
 **Credenciais demo criadas**
 

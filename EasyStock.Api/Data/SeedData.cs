@@ -41,10 +41,10 @@ public static class SeedData
         var perfilGerente = await UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestao operacional e analytics", NivelAcesso.Gerente, agora);
         var perfilOperador = await UpsertPerfilAsync(context, empresa.Id, "Operador", "Operacao diaria de estoque e vendas", NivelAcesso.Operador, agora);
 
-        var usuarioAdmin = await UpsertUsuarioAsync(context, "Admin Casa da Baba", "admin@casadababa.demo", "admin123");
-        var usuarioGerente = await UpsertUsuarioAsync(context, "Gerente Casa da Baba", "gerente@casadababa.demo", "gerente123");
-        var usuarioOperadorCentro = await UpsertUsuarioAsync(context, "Operador Centro", "operador.centro@casadababa.demo", "operador123");
-        var usuarioOperadorMercadao = await UpsertUsuarioAsync(context, "Operador Mercadao", "operador.mercadao@casadababa.demo", "operador123");
+        var usuarioAdmin = await UpsertUsuarioAsync(context, "Admin Casa da Baba", "admin@casadababa.demo", "admin123", agora);
+        var usuarioGerente = await UpsertUsuarioAsync(context, "Gerente Casa da Baba", "gerente@casadababa.demo", "gerente123", agora);
+        var usuarioOperadorCentro = await UpsertUsuarioAsync(context, "Operador Centro", "operador.centro@casadababa.demo", "operador123", agora);
+        var usuarioOperadorMercadao = await UpsertUsuarioAsync(context, "Operador Mercadao", "operador.mercadao@casadababa.demo", "operador123", agora);
 
         await EnsureUsuarioEmpresaAsync(context, usuarioAdmin.Id, empresa.Id, agora);
         await EnsureUsuarioEmpresaAsync(context, usuarioGerente.Id, empresa.Id, agora);
@@ -165,37 +165,37 @@ public static class SeedData
         {
             ["centro-talharim-l1"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornFarinha.Id, fornFarinha.Nome, produtos["talharim500"],
                 null, "CDB-CEN-TALH-001", "LOT-TALH-20260409-A", 42, 6.20m, 14.90m, agora.AddDays(-1), agora.AddDays(7),
-                "Lote de alto giro para varejo diario", 2.8m),
+                "Lote de alto giro para varejo diario", 2.8m, agora),
             ["centro-talharim-l2"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornFarinha.Id, fornFarinha.Nome, produtos["talharim1kg"],
                 null, "CDB-CEN-TALH-002", "LOT-TALH-20260407-B", 18, 11.80m, 26.90m, agora.AddDays(-3), agora.AddDays(8),
-                "Pacotes 1kg para pedidos de restaurante", 1.4m),
+                "Pacotes 1kg para pedidos de restaurante", 1.4m, agora),
             ["centro-ravioli-carne"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornCarnes.Id, fornCarnes.Nome, produtos["ravioliCarne"],
                 null, "CDB-CEN-RAVI-001", "LOT-RAVI-20260408-A", 22, 9.10m, 22.50m, agora.AddDays(-2), agora.AddDays(5),
-                "Lote regular com reposicao semanal", 1.7m),
+                "Lote regular com reposicao semanal", 1.7m, agora),
             ["centro-ravioli-ricota"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornLaticinios.Id, fornLaticinios.Nome, produtos["ravioliRicota"],
                 null, "CDB-CEN-RAVI-002", "LOT-RAVI-20260406-C", 6, 8.70m, 21.90m, agora.AddDays(-4), agora.AddDays(2),
-                "Lote proximo da validade para campanha de giro", 0.9m),
+                "Lote proximo da validade para campanha de giro", 0.9m, agora),
             ["centro-nhoque"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornFarinha.Id, fornFarinha.Nome, produtos["nhoque500"],
                 null, "CDB-CEN-NHOQ-001", "LOT-NHOQ-20260409-A", 30, 6.00m, 15.50m, agora.AddDays(-1), agora.AddDays(6),
-                "Produto com giro elevado nas sextas e sabados", 3.2m),
+                "Produto com giro elevado nas sextas e sabados", 3.2m, agora),
             ["centro-bolonhesa"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornCarnes.Id, fornCarnes.Nome, produtos["bolonhesa300"],
                 variacaoMolhoPicante, "CDB-CEN-MBOL-001", "LOT-MBOL-20260405-A", 15, 4.90m, 12.90m, agora.AddDays(-5), agora.AddDays(20),
-                "Molho para kits promocionais", 1.2m),
+                "Molho para kits promocionais", 1.2m, agora),
             ["merc-talharim"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["talharim500"],
                 variacaoTalharimIntegral, "CDB-MER-TALH-001", "LOT-TALH-20260408-M1", 14, 6.40m, 15.40m, agora.AddDays(-2), agora.AddDays(7),
-                "Lote de talharim integral para publico fitness", 1.8m),
+                "Lote de talharim integral para publico fitness", 1.8m, agora),
             ["merc-nhoque"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["nhoque500"],
                 null, "CDB-MER-NHOQ-001", "LOT-NHOQ-20260407-M1", 10, 6.10m, 16.20m, agora.AddDays(-3), agora.AddDays(5),
-                "Giro alto no horario de almoco", 2.4m),
+                "Giro alto no horario de almoco", 2.4m, agora),
             ["merc-lasanha"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["lasanha500"],
                 null, "CDB-MER-LASA-001", "LOT-LASA-20260225-M1", 20, 5.40m, 13.90m, agora.AddDays(-45), agora.AddDays(10),
-                "Item parado para acao de desconto", 0.2m),
+                "Item parado para acao de desconto", 0.2m, agora),
             ["merc-branco"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornLaticinios.Id, fornLaticinios.Nome, produtos["branco300"],
                 null, "CDB-MER-MBRA-001", "LOT-MBRA-20260404-M1", 11, 4.40m, 11.90m, agora.AddDays(-6), agora.AddDays(18),
-                "Molho branco com giro estavel", 1.0m),
+                "Molho branco com giro estavel", 1.0m, agora),
             ["merc-pesto"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornHortifruti.Id, fornHortifruti.Nome, produtos["pesto200"],
                 null, "CDB-MER-MPES-001", "LOT-MPES-20260402-M1", 2, 5.20m, 14.90m, agora.AddDays(-8), agora.AddDays(4),
-                "Estoque critico aguardando reposicao", 0.8m)
+                "Estoque critico aguardando reposicao", 0.8m, agora)
         };
 
         await context.SaveChangesAsync();
@@ -400,7 +400,7 @@ public static class SeedData
         return perfil;
     }
 
-    private static async Task<Usuario> UpsertUsuarioAsync(EasyStockDbContext context, string nome, string email, string senhaPlana)
+    private static async Task<Usuario> UpsertUsuarioAsync(EasyStockDbContext context, string nome, string email, string senhaPlana, DateTime agora)
     {
         var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
         if (usuario is null)
@@ -414,7 +414,7 @@ public static class SeedData
             usuario.Ativo = true;
             if (!BCrypt.Net.BCrypt.Verify(senhaPlana, usuario.SenhaHash))
                 usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(senhaPlana);
-            usuario.AlteradoEm = DateTime.UtcNow;
+            usuario.AlteradoEm = agora;
         }
 
         return usuario;
@@ -697,7 +697,8 @@ public static class SeedData
         DateTime entradaEm,
         DateTime? validadeEm,
         string observacoes,
-        decimal velocidadeSaidaDiaria)
+        decimal velocidadeSaidaDiaria,
+        DateTime agora)
     {
         var item = await context.ItensEstoque.FirstOrDefaultAsync(i => i.EmpresaId == empresaId && i.CodigoInterno == codigoInterno);
         var criadoAgora = false;
@@ -731,8 +732,8 @@ public static class SeedData
 
         item.LojaId = lojaId;
         item.FornecedorId = fornecedorId;
-        item.AtualizarVelocidadeSaida(velocidadeSaidaDiaria, DateTime.UtcNow);
-        item.RecalcularIndicadores(DateTime.UtcNow);
+        item.AtualizarVelocidadeSaida(velocidadeSaidaDiaria, agora);
+        item.RecalcularIndicadores(agora);
 
         return new ItemSeedContext(item, criadoAgora);
     }
