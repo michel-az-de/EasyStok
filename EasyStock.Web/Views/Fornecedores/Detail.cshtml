@@ -67,7 +67,7 @@
                 <div class="space-y-3">
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Nome *</label>
-                        <input type="text" name="nome" value="@Model.Fornecedor.Nome" required
+                        <input type="text" name="nome" value="@Model.Fornecedor.Nome" required aria-required="true"
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
@@ -105,7 +105,7 @@
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Lead Time (dias)</label>
-                        <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias" min="0"
+                        <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias"
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
