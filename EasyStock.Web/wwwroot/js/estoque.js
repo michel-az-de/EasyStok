@@ -14,19 +14,18 @@ async function fetchCategorias() {
     if (!nav) return;
 
     try {
-        const r = await fetch('/produtos/buscar?q=&limit=100');
+        const r = await fetch('/categorias/listar');
         if (!r.ok) return;
-        const produtos = await r.json();
+        const categorias = await r.json();
 
-        const categorias = [...new Set(produtos.map(p => p.categoria).filter(Boolean))].sort();
-        if (categorias.length === 0) return;
+        if (!Array.isArray(categorias) || categorias.length === 0) return;
 
         nav.innerHTML = '';
         categorias.forEach(cat => {
             const a = document.createElement('a');
-            a.href = '/estoque?categoria=' + encodeURIComponent(cat);
+            a.href = '/estoque?categoria=' + encodeURIComponent(cat.id);
             a.className = 'ni-sub';
-            a.textContent = cat;
+            a.textContent = cat.nome;
             nav.appendChild(a);
         });
     } catch { /* silent: operação em background, falha não-crítica */ }

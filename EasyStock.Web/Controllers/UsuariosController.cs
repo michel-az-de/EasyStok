@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class UsuariosController(UsuariosService svc, SessionService session) : BaseController(session)
+public class UsuariosController(UsuariosService svc, LojasService lojasSvc, SessionService session) : BaseController(session)
 {
     [HttpGet("/usuarios")]
     public async Task<IActionResult> Index()
@@ -13,7 +13,16 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
         ViewBag.ActiveMenuItem = "Usuarios";
 
         var result = await svc.ListarAsync();
+        var lojasResult = await lojasSvc.ListarAsync();
         var vm = new UsuariosViewModel();
+
+        if (lojasResult.Success && lojasResult.Data is not null)
+        {
+            vm.Lojas = lojasResult.Data
+                .Where(l => l.Ativa)
+                .Select(l => new Models.Api.Loja(l.Id.ToString(), l.EmpresaId.ToString(), l.Nome, null, "", ""))
+                .ToList();
+        }
 
         if (result.Success)
         {
@@ -84,4 +93,14 @@ public class UsuariosController(UsuariosService svc, SessionService session) : B
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost("/usuarios/{id}/perfil")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtribuirPerfil(string id, Guid perfilId, Guid? lojaId)
+    {
+        var result = await svc.AtribuirPerfilAsync(id, perfilId, lojaId);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Perfil atualizado!");
+        return RedirectToAction(nameof(Index));
+    }
 }

@@ -17,15 +17,53 @@ public class EstoqueService(ApiClient api)
                 return ApiResult<PagedResult<EstoqueSku>>.Fail(
                     buscarResult.ErrorCode!, buscarResult.ErrorMessage!, buscarResult.HttpStatus);
 
-            var items = buscarResult.Data ?? [];
+            var searchItems = buscarResult.Data ?? [];
             return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
             {
-                Data = items,
-                Meta = new Meta(items.Count, 1, 1, items.Count)
+                Data = searchItems,
+                Meta = new Meta(searchItems.Count, 1, 1, searchItems.Count)
             });
         }
 
-        return await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize=20");
+        var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize=200");
+        if (!result.Success || result.Data is null)
+            return result;
+
+        var items = result.Data.Data;
+
+        // Client-side status filter (API doesn't support it natively)
+        if (!string.IsNullOrEmpty(status))
+        {
+            items = status.ToLower() switch
+            {
+                "ok" or "normal" => items.Where(i => i.Status is "ok" or "OK" or "Normal" or "normal").ToList(),
+                "atencao" => items.Where(i => i.Status is "atencao" or "Atenção" or "atenção" or "Atencao").ToList(),
+                "critico" => items.Where(i => i.Status is "critico" or "Crítico" or "crítico" or "Critico").ToList(),
+                "parado" => items.Where(i => i.Status is "parado" or "Parado").ToList(),
+                _ => items
+            };
+        }
+
+        // Client-side category filter
+        if (!string.IsNullOrEmpty(categoria))
+        {
+            items = items.Where(i =>
+                i.Produto?.Categoria != null &&
+                (i.Produto.Categoria.Equals(categoria, StringComparison.OrdinalIgnoreCase) ||
+                 i.ProdutoId == categoria)).ToList();
+        }
+
+        // Re-paginate filtered results
+        const int pageSize = 20;
+        var total = items.Count;
+        var pages = (int)Math.Ceiling(total / (double)pageSize);
+        var pagedItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
+        {
+            Data = pagedItems,
+            Meta = new Meta(total, page, pages, pageSize)
+        });
     }
 
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>

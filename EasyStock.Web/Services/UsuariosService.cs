@@ -30,4 +30,14 @@ public class UsuariosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> RemoverAsync(string id) =>
         api.DeleteAsync($"usuarios/{id}?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> AtribuirPerfilAsync(string userId, Guid perfilId, Guid? lojaId) =>
+        Guid.TryParse(userId, out _)
+            ? api.PutAsync<object>($"usuarios/{userId}/perfis", new
+            {
+                empresaId = GetEmpresaId(),
+                perfilId,
+                lojaId
+            })
+            : Task.FromResult(ApiResult<object>.Fail("INVALID_ID", "Id de usuário inválido."));
 }
