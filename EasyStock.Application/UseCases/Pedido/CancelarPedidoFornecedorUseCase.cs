@@ -1,0 +1,37 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
+using Microsoft.Extensions.Logging;
+
+namespace EasyStock.Application.UseCases.Pedido;
+
+public sealed record CancelarPedidoFornecedorCommand(Guid PedidoId, Guid EmpresaId);
+
+public class CancelarPedidoFornecedorUseCase(
+    IPedidoFornecedorRepository pedidoRepository,
+    IUnitOfWork unitOfWork,
+    ILogger<CancelarPedidoFornecedorUseCase> logger)
+{
+    public async Task ExecuteAsync(CancelarPedidoFornecedorCommand command)
+    {
+        var pedido = await pedidoRepository.GetByIdAsync(command.PedidoId)
+            ?? throw new RegraDeDominioVioladaException("Pedido não encontrado.");
+
+        if (pedido.EmpresaId != command.EmpresaId)
+            throw new RegraDeDominioVioladaException("Pedido não pertence a esta empresa.");
+
+        if (pedido.Status == StatusPedidoFornecedor.Recebido)
+            throw new RegraDeDominioVioladaException("Pedido já recebido não pode ser cancelado.");
+
+        if (pedido.Status == StatusPedidoFornecedor.Cancelado)
+            throw new RegraDeDominioVioladaException("Pedido já está cancelado.");
+
+        pedido.Status = StatusPedidoFornecedor.Cancelado;
+        pedido.AlteradoEm = DateTime.UtcNow;
+
+        await pedidoRepository.UpdateAsync(pedido);
+        await unitOfWork.CommitAsync();
+
+        logger.LogInformation("Pedido {PedidoId} cancelado.", pedido.Id);
+    }
+}

@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
+using EasyStock.Application.UseCases.Pedido;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -27,6 +28,9 @@ public class FornecedorController(
     ObterHistoricoFornecedorUseCase obterHistoricoUseCase,
     ObterEstatisticasFornecedorUseCase obterEstatisticasUseCase,
     ListarPedidosAbertosUseCase listarPedidosAbertosUseCase,
+    CriarPedidoFornecedorUseCase criarPedidoUseCase,
+    ReceberPedidoFornecedorUseCase receberPedidoUseCase,
+    CancelarPedidoFornecedorUseCase cancelarPedidoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List suppliers (paginated)", Description = "Supports filtering by active status and text search. Requires Operador role.")]
@@ -62,6 +66,39 @@ public class FornecedorController(
             return Forbid();
 
         return DataOk(await listarPedidosAbertosUseCase.ExecuteAsync(new ListarPedidosAbertosQuery(empresaId)));
+    }
+
+    [SwaggerOperation(Summary = "Create a purchase order for a supplier (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [HttpPost("pedidos")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> CriarPedido([FromBody] CriarPedidoFornecedorCommand command)
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var empresaId, out var err)) return err!;
+        var result = await criarPedidoUseCase.ExecuteAsync(command with { EmpresaId = empresaId });
+        return DataCreated($"api/fornecedores/pedidos/{result.PedidoId}", result);
+    }
+
+    [SwaggerOperation(Summary = "Mark a purchase order as received (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpPatch("pedidos/{id}/receber")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> ReceberPedido(Guid id, [FromBody] ReceberPedidoBody body)
+    {
+        var empresaId = currentUser.EmpresaId != Guid.Empty ? currentUser.EmpresaId : body.EmpresaId;
+        await receberPedidoUseCase.ExecuteAsync(new ReceberPedidoFornecedorCommand(id, empresaId, body.DataRecebimento, body.Tracking));
+        return DataOk(true);
+    }
+
+    [SwaggerOperation(Summary = "Cancel a purchase order (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpPatch("pedidos/{id}/cancelar")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> CancelarPedido(Guid id, [FromBody] CancelarPedidoBody body)
+    {
+        var empresaId = currentUser.EmpresaId != Guid.Empty ? currentUser.EmpresaId : body.EmpresaId;
+        await cancelarPedidoUseCase.ExecuteAsync(new CancelarPedidoFornecedorCommand(id, empresaId));
+        return DataOk(true);
     }
 
     [SwaggerOperation(Summary = "Get supplier details (Operador only)")]
@@ -157,3 +194,6 @@ public class FornecedorController(
         return NoContent();
     }
 }
+
+public sealed record ReceberPedidoBody(Guid EmpresaId, DateTime? DataRecebimento, string? Tracking);
+public sealed record CancelarPedidoBody(Guid EmpresaId);

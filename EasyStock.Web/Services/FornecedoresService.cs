@@ -53,4 +53,32 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
     public Task<ApiResult<List<PedidoAberto>>> ListarPedidosAbertosAsync() =>
         api.GetAsync<List<PedidoAberto>>($"fornecedores/pedidos-abertos?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> CriarPedidoAsync(
+        string fornecedorId, DateOnly dataPedido, DateOnly? previsaoEntrega,
+        decimal? valorEstimado, string? canal, string? observacoes) =>
+        api.PostAsync<object>("fornecedores/pedidos", new
+        {
+            empresaId = GetEmpresaId(),
+            fornecedorId = Guid.TryParse(fornecedorId, out var fid) ? fid : Guid.Empty,
+            dataPedido = dataPedido.ToDateTime(TimeOnly.MinValue),
+            previsaoEntrega = previsaoEntrega.HasValue ? previsaoEntrega.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+            valorEstimado,
+            canal,
+            observacoes
+        });
+
+    public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId, string? tracking) =>
+        api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/receber", new
+        {
+            empresaId = GetEmpresaId(),
+            dataRecebimento = DateTime.UtcNow,
+            tracking
+        });
+
+    public Task<ApiResult<object>> CancelarPedidoAsync(string pedidoId) =>
+        api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/cancelar", new
+        {
+            empresaId = GetEmpresaId()
+        });
 }

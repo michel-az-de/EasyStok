@@ -35,6 +35,7 @@ using EasyStock.Application.UseCases.ListarUsuarios;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Application.UseCases.Pedido;
 using EasyStock.Application.UseCases.ReporEstoque;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -72,6 +73,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ObterHistoricoFornecedorUseCase>();
         services.AddScoped<ObterEstatisticasFornecedorUseCase>();
         services.AddScoped<ListarPedidosAbertosUseCase>();
+        services.AddScoped<CriarPedidoFornecedorUseCase>();
+        services.AddScoped<ReceberPedidoFornecedorUseCase>();
+        services.AddScoped<CancelarPedidoFornecedorUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

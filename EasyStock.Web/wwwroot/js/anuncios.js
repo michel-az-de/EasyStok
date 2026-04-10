@@ -124,6 +124,7 @@ function anuncioResultado() {
                             }
                             read();
                         }).catch(() => {
+                            this.resultado = 'Erro ao ler resposta do servidor. Tente novamente.';
                             this.gerando = false;
                             window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                         });
