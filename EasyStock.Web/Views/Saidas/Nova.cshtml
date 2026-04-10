@@ -145,7 +145,7 @@
                 Cancelar
             </a>
             <button type="submit" x-data="{ loading: false }"
-                    @@click="if (estoqueAtual > 0 && qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
+                    @@click="if (estoqueAtual === 0 && qty > 0) { $event.preventDefault(); window.showToast('Não há estoque disponível para este produto.', 'error'); return; } if (qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
                     :disabled="loading"
                     :class="{ 'opacity-50 cursor-not-allowed': loading }"
                     class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
