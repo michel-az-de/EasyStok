@@ -66,8 +66,18 @@
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Nome</label>
-                        <input type="text" name="nome" value="@Model.Fornecedor.Nome"
+                        <label class="block text-xs text-gray-500 mb-1">Nome *</label>
+                        <input type="text" name="nome" value="@Model.Fornecedor.Nome" required
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">CNPJ/CPF</label>
+                        <input type="text" name="documento" value="@Model.Fornecedor.Documento"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Responsável</label>
+                        <input type="text" name="contato" value="@Model.Fornecedor.Contato"
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
@@ -76,19 +86,53 @@
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1">Lead Time (dias)</label>
-                        <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias"
+                        <label class="block text-xs text-gray-500 mb-1">Telefone</label>
+                        <input type="text" name="telefone" value="@Model.Fornecedor.Telefone"
                                class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
                     </div>
-                    <input type="hidden" name="documento" value="@Model.Fornecedor.Documento" />
-                    <input type="hidden" name="contato" value="@Model.Fornecedor.Contato" />
-                    <input type="hidden" name="telefone" value="@Model.Fornecedor.Telefone" />
-                    <input type="hidden" name="tipo" value="@Model.Fornecedor.Tipo" />
-                    <input type="hidden" name="categoria" value="@Model.Fornecedor.Categoria" />
-                    <input type="hidden" name="siteUrl" value="@Model.Fornecedor.SiteUrl" />
-                    <input type="hidden" name="pedidoMinimo" value="@Model.Fornecedor.PedidoMinimo" />
-                    <input type="hidden" name="fretePadrao" value="@Model.Fornecedor.FretePadrao" />
-                    <input type="hidden" name="observacoes" value="@Model.Fornecedor.Observacoes" />
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Tipo</label>
+                        <select name="tipo" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                            <option value="" selected="@(string.IsNullOrEmpty(Model.Fornecedor.Tipo))">Selecione...</option>
+                            @{
+                                var tipoOpts = new[] { "nacional", "importado", "dropshipping" };
+                                foreach (var opt in tipoOpts)
+                                {
+                                    <option value="@opt" selected="@(Model.Fornecedor.Tipo == opt)">@opt</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Lead Time (dias)</label>
+                        <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias" min="0"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Categorias</label>
+                        <input type="text" name="categoria" value="@Model.Fornecedor.Categoria"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Site</label>
+                        <input type="url" name="siteUrl" value="@Model.Fornecedor.SiteUrl" placeholder="https://"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Pedido Mínimo</label>
+                        <input type="text" name="pedidoMinimo" value="@Model.Fornecedor.PedidoMinimo"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Frete Padrão</label>
+                        <input type="text" name="fretePadrao" value="@Model.Fornecedor.FretePadrao"
+                               class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Observações</label>
+                        <textarea name="observacoes" rows="2"
+                                  class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">@Model.Fornecedor.Observacoes</textarea>
+                    </div>
                     <button type="submit"
                             class="w-full py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
                         Salvar
@@ -100,22 +144,29 @@
         <!-- KPIs -->
         <div class="ws">
             <h2 class="font-semibold text-gray-900 mb-3">Resumo</h2>
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Total gasto</span>
-                    <span class="font-semibold text-gray-900">R$ @Model.TotalGasto.ToString("N2")</span>
+            @if (Model.QuantidadePedidos == 0)
+            {
+                <p class="text-sm text-gray-400 text-center py-4">Nenhum pedido registrado ainda.</p>
+            }
+            else
+            {
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Total gasto</span>
+                        <span class="font-semibold text-gray-900">R$ @Model.TotalGasto.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Lead médio real</span>
+                        <span class="font-semibold text-gray-900">
+                            @(Model.LeadRealMedio.HasValue ? $"{Model.LeadRealMedio:N0} dias" : "—")
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Total de pedidos</span>
+                        <span class="font-semibold text-gray-900">@Model.QuantidadePedidos</span>
+                    </div>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Lead médio real</span>
-                    <span class="font-semibold text-gray-900">
-                        @(Model.LeadRealMedio.HasValue ? $"{Model.LeadRealMedio:N0} dias" : "—")
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Total de pedidos</span>
-                    <span class="font-semibold text-gray-900">@Model.QuantidadePedidos</span>
-                </div>
-            </div>
+            }
         </div>
 
         <!-- Excluir -->
@@ -178,7 +229,9 @@
         else
         {
             <div class="ws text-center py-12 text-gray-400">
-                <p class="text-sm">Nenhum pedido registrado</p>
+                <div class="text-4xl mb-3">📦</div>
+                <p class="text-sm font-medium text-gray-500">Nenhum pedido registrado</p>
+                <p class="text-xs mt-1 text-gray-400">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
             </div>
         }
     </div>
