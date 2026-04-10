@@ -34,6 +34,35 @@ public class EstoqueService(ApiClient api)
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
         api.GetAsync<PagedResult<EstoqueSku>>("estoque?pageSize=20");
 
-    public Task<ApiResult<PagedResult<EstoqueSku>>> ExportarAsync() =>
-        api.GetAsync<PagedResult<EstoqueSku>>("estoque?page=1&pageSize=1000");
+    public async Task<ApiResult<PagedResult<EstoqueSku>>> ExportarAsync()
+    {
+        const int pageSize = 1000;
+        var page = 1;
+        var items = new List<EstoqueSku>();
+
+        while (true)
+        {
+            var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize={pageSize}");
+            if (!result.Success)
+                return ApiResult<PagedResult<EstoqueSku>>.Fail(
+                    result.ErrorCode!, result.ErrorMessage!, result.HttpStatus);
+
+            var currentItems = result.Data?.Data ?? [];
+            if (currentItems.Count == 0)
+                break;
+
+            items.AddRange(currentItems);
+
+            if (currentItems.Count < pageSize)
+                break;
+
+            page++;
+        }
+
+        return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
+        {
+            Data = items,
+            Meta = new Meta(items.Count, 1, 1, items.Count)
+        });
+    }
 }
