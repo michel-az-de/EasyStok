@@ -172,7 +172,7 @@ function saidaForm() {
             this._debounce = setTimeout(async () => {
                 if (this.busca.length < 2) { this.resultados = []; return; }
                 const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
-                this.resultados = await res.json();
+                this.resultados = res.ok ? await res.json() : [];
             }, 300);
         },
 

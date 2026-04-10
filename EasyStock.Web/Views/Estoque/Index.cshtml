@@ -242,7 +242,7 @@
                 natureza: 'venda',
                 qty: 1,
                 valor: null,
-                data: new Date().toISOString().split('T')[0],
+                data: new Date().toLocaleDateString('en-CA'),
                 loading: false,
 
                 openModal(id, nome, qty) {

@@ -85,14 +85,14 @@ public class AuthController(ApiClient api, SessionService session) : Controller
             if (lojas.Count == 1)
             {
                 session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji, lojas[0].EmpresaId);
-                return Redirect(returnUrl ?? "/dashboard");
+                return SafeRedirect(returnUrl);
             }
 
             TempData["Lojas"] = JsonSerializer.Serialize(lojas);
             return RedirectToAction(nameof(SelecionarLoja));
         }
 
-        return Redirect(returnUrl ?? "/dashboard");
+        return SafeRedirect(returnUrl);
     }
 
     [HttpGet("/auth/selecionar-loja")]
@@ -165,7 +165,8 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email });
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email, baseUrl });
 
         // Always show success to avoid revealing if email exists
         ViewBag.Sent = true;
@@ -207,6 +208,11 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction(nameof(Login));
     }
+
+    private IActionResult SafeRedirect(string? returnUrl) =>
+        !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? Redirect(returnUrl)
+            : RedirectToAction("Index", "Dashboard");
 
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

@@ -52,11 +52,17 @@ public sealed class EsqueciSenhaUseCase(
         {
             try
             {
+                var resetLink = !string.IsNullOrEmpty(command.BaseUrl)
+                    ? $"{command.BaseUrl.TrimEnd('/')}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
+                    : token;
+
+                var hasLink = !string.IsNullOrEmpty(command.BaseUrl);
                 var subject = "Recuperação de senha - EasyStock";
                 var body = $"Olá {usuario.Nome},\n\n" +
                            $"Recebemos uma solicitação para redefinir a senha da sua conta.\n\n" +
-                           $"Use o token abaixo para criar uma nova senha (válido por 1 hora):\n\n" +
-                           $"{token}\n\n" +
+                           (hasLink
+                               ? $"Clique no link abaixo para criar uma nova senha (válido por 1 hora):\n\n{resetLink}\n\n"
+                               : $"Use o token abaixo para criar uma nova senha (válido por 1 hora):\n\n{token}\n\n") +
                            $"Se você não solicitou a redefinição de senha, ignore este e-mail.\n\n" +
                            $"Equipe EasyStock";
 
@@ -70,7 +76,7 @@ public sealed class EsqueciSenhaUseCase(
         }
         else
         {
-        logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
+            logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
         }
 
         return new EsqueciSenhaResult(true);
