@@ -1,0 +1,303 @@
+@model EasyStock.Web.Models.ViewModels.Inteligencia.InteligenciaViewModel
+@{
+    ViewBag.Title = "Inteligência Operacional";
+    Layout = "_Layout";
+    var ptBR = new System.Globalization.CultureInfo("pt-BR");
+
+    string ItemLabel(EasyStock.Web.Models.Api.ItemEstoqueInteligenciaApi item) =>
+        !string.IsNullOrEmpty(item.CodigoInterno) ? item.CodigoInterno : item.ProdutoId.ToString("N")[..8].ToUpper();
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Inteligência Operacional</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Visão consolidada de alertas, parados, validade e projeções.</p>
+    </div>
+    <a href="/analytics" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+        Ver Analytics →
+    </a>
+</div>
+
+@if (Model.BoardLoadFailed)
+{
+    <div class="border border-yellow-300 bg-yellow-50 rounded-lg px-4 py-3 mb-6 text-sm text-yellow-700">
+        ⚠️ Não foi possível carregar os KPIs do board. Os demais dados ainda estão disponíveis.
+    </div>
+}
+
+<!-- KPIs -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="ws">
+        <div class="kpi-lbl">Itens em estoque</div>
+        <div class="kpi-val">@Model.QuantidadeEmEstoque</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Valor total em estoque</div>
+        <div class="kpi-val text-blue-600">R$ @Model.ValorTotalEstoque.ToString("N2", ptBR)</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Saída média/dia</div>
+        <div class="kpi-val">@Model.MediaVendasDiaria.ToString("N1", ptBR) un.</div>
+    </div>
+    <div class="ws">
+        <div class="kpi-lbl">Receita proj. 30 dias</div>
+        <div class="kpi-val text-green-600">R$ @Model.ProjecaoReceitaPeriodo.ToString("N2", ptBR)</div>
+    </div>
+</div>
+
+<!-- Projeção de Ruptura -->
+<div class="ws mb-6">
+    <h2 class="font-semibold text-slate-900 mb-4">⚡ Projeção de Ruptura — Top 5</h2>
+    @if (!Model.ProjecaoRuptura.Any())
+    {
+        <div class="flex flex-col items-center justify-center py-8 text-slate-400">
+            <div class="text-3xl mb-2">✅</div>
+            <p class="text-sm font-semibold text-slate-500">Nenhuma ruptura projetada</p>
+            <p class="text-xs mt-1">Todos os itens com cobertura suficiente no período.</p>
+        </div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Produto / Código</th>
+                    <th>Qtd atual</th>
+                    <th>Saída/dia</th>
+                    <th>Dias até ruptura</th>
+                    <th>Data estimada</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.ProjecaoRuptura)
+                {
+                    var dias = r.DiasAteRuptura;
+                    var rowClass = dias.HasValue && dias.Value <= 7 ? "bg-red-50" :
+                                  dias.HasValue && dias.Value <= 30 ? "bg-amber-50" : "";
+                    <tr class="@rowClass">
+                        <td class="font-medium text-sm">@(r.CodigoInterno ?? r.ProdutoId.ToString("N")[..8].ToUpper())</td>
+                        <td>@r.QuantidadeAtual.ToString("N0", ptBR)</td>
+                        <td class="text-slate-500">@r.TaxaSaidaDiaria.ToString("N2", ptBR)</td>
+                        <td>
+                            @if (!dias.HasValue)
+                            {
+                                <span class="text-slate-400">—</span>
+                            }
+                            else if (dias.Value <= 7)
+                            {
+                                <span class="badge-critical">@dias.Value d</span>
+                            }
+                            else if (dias.Value <= 30)
+                            {
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">@dias.Value d</span>
+                            }
+                            else
+                            {
+                                <span class="text-slate-700">@dias.Value d</span>
+                            }
+                        </td>
+                        <td class="text-slate-500 text-sm">
+                            @(r.DataEstimadaRuptura.HasValue ? r.DataEstimadaRuptura.Value.ToString("dd/MM/yyyy") : "—")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
+
+<!-- Estoque Baixo + Próximos ao Vencimento -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="ws">
+        <h2 class="font-semibold text-slate-900 mb-4">🔴 Estoque Baixo</h2>
+        @if (!Model.EstoqueBaixo.Any())
+        {
+            <div class="flex flex-col items-center justify-center py-8 text-slate-400">
+                <div class="text-3xl mb-2">✅</div>
+                <p class="text-sm">Nenhum item com estoque crítico</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr><th>Produto</th><th>Atual</th><th>Mínimo</th><th>Déficit</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.EstoqueBaixo)
+                    {
+                        var atual = (int)item.QuantidadeAtual.Value;
+                        var deficit = item.QuantidadeMinima - atual;
+                        <tr>
+                            <td class="font-medium text-sm">@ItemLabel(item)</td>
+                            <td class="text-red-600 font-medium">@atual</td>
+                            <td class="text-slate-500">@item.QuantidadeMinima</td>
+                            <td>
+                                @if (deficit > 0)
+                                {
+                                    <span class="badge-critical">-@deficit</span>
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400">ok</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </div>
+
+    <div class="ws">
+        <h2 class="font-semibold text-slate-900 mb-4">🗓️ Próximos ao Vencimento</h2>
+        @if (!Model.ProximoVencimento.Any())
+        {
+            <div class="flex flex-col items-center justify-center py-8 text-slate-400">
+                <div class="text-3xl mb-2">✅</div>
+                <p class="text-sm">Nenhum item vencendo nos próximos 30 dias</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr><th>Produto</th><th>Vence em</th><th>Qtd</th><th>Valor em risco</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.ProximoVencimento)
+                    {
+                        var vence = item.ValidadeEm?.DataValidade;
+                        var diasVenc = vence.HasValue ? (int)(vence.Value - DateTime.Today).TotalDays : (int?)null;
+                        var valorRisco = item.QuantidadeAtual.Value * item.CustoUnitario.Valor;
+                        <tr>
+                            <td class="font-medium text-sm">@ItemLabel(item)</td>
+                            <td>
+                                @if (diasVenc.HasValue)
+                                {
+                                    if (diasVenc.Value <= 7)
+                                    {
+                                        <span class="badge-critical">@diasVenc.Value d</span>
+                                    }
+                                    else if (diasVenc.Value <= 15)
+                                    {
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">@diasVenc.Value d</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-600">@diasVenc.Value d</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400">—</span>
+                                }
+                            </td>
+                            <td class="text-slate-700">@item.QuantidadeAtual.Value.ToString("N0", ptBR)</td>
+                            <td class="text-orange-600 font-medium">R$ @valorRisco.ToString("N2", ptBR)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Itens Parados + Sugestão de Reposição -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="ws">
+        <h2 class="font-semibold text-slate-900 mb-4">😴 Itens Parados</h2>
+        @if (!Model.ItensParados.Any())
+        {
+            <div class="flex flex-col items-center justify-center py-8 text-slate-400">
+                <div class="text-3xl mb-2">✅</div>
+                <p class="text-sm">Nenhum item parado há mais de 60 dias</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr><th>Produto</th><th>Dias parado</th><th>Qtd</th><th>Custo imob.</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.ItensParados)
+                    {
+                        var custoImob = item.QuantidadeAtual.Value * item.CustoUnitario.Valor;
+                        <tr>
+                            <td class="font-medium text-sm">@ItemLabel(item)</td>
+                            <td>
+                                @if (item.DiasSemMovimentacao >= 90)
+                                {
+                                    <span class="badge-critical">@item.DiasSemMovimentacao d</span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">@item.DiasSemMovimentacao d</span>
+                                }
+                            </td>
+                            <td class="text-slate-700">@item.QuantidadeAtual.Value.ToString("N0", ptBR)</td>
+                            <td class="text-slate-500">R$ @custoImob.ToString("N2", ptBR)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </div>
+
+    <div class="ws">
+        <h2 class="font-semibold text-slate-900 mb-4">🔄 Sugestão de Reposição</h2>
+        @if (!Model.SugestoesReposicao.Any())
+        {
+            <div class="flex flex-col items-center justify-center py-8 text-slate-400">
+                <div class="text-3xl mb-2">✅</div>
+                <p class="text-sm">Nenhuma reposição urgente identificada</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr><th>Produto</th><th>Atual</th><th>Saída/dia</th><th>Dias p/ ruptura</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.SugestoesReposicao)
+                    {
+                        <tr>
+                            <td class="font-medium text-sm">@ItemLabel(item)</td>
+                            <td class="text-red-600 font-medium">@item.QuantidadeAtual.Value.ToString("N0", ptBR)</td>
+                            <td class="text-slate-500">@item.VelocidadeSaidaDiaria.ToString("N2", ptBR)</td>
+                            <td>
+                                @if (item.PrevisaoZeramentoDias.HasValue)
+                                {
+                                    if (item.PrevisaoZeramentoDias.Value <= 7)
+                                    {
+                                        <span class="badge-critical">@item.PrevisaoZeramentoDias.Value d</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">@item.PrevisaoZeramentoDias.Value d</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </div>
+</div>

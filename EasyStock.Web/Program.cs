@@ -56,6 +56,7 @@ builder.Services.AddScoped<EntradasService>();
 builder.Services.AddScoped<SaidasService>();
 builder.Services.AddScoped<FornecedoresService>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<InteligenciaService>();
 builder.Services.AddScoped<NotificacoesService>();
 builder.Services.AddScoped<UsuariosService>();
 builder.Services.AddScoped<AssinaturaService>();
