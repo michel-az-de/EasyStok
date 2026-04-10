@@ -1,3 +1,4 @@
+using System.Text;
 using EasyStock.Web.Models.ViewModels.Estoque;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -33,6 +34,35 @@ public class EstoqueController(EstoqueService svc, SessionService session) : Bas
         };
         return View(vm);
     }
+
+    [HttpGet("/estoque/exportar-csv")]
+    public async Task<IActionResult> ExportarCsv()
+    {
+        var result = await svc.ExportarAsync();
+        if (!result.Success) return BadRequest();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("SKU,Produto,Variação,Quantidade,Status,Validade,Lote,Última Movimentação");
+        foreach (var item in result.Data!.Data)
+        {
+            sb.AppendLine(string.Join(",",
+                Csv(item.Sku),
+                Csv(item.Produto?.Nome),
+                Csv(item.Variacao?.Nome),
+                item.Qty,
+                Csv(item.Status),
+                item.Validade?.ToString("yyyy-MM-dd") ?? "",
+                Csv(item.Lote),
+                item.LastMov.ToString("yyyy-MM-dd")));
+        }
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"estoque-{DateTime.Now:yyyyMMdd}.csv");
+    }
+
+    private static string Csv(string? value) =>
+        value is null ? "" : $"\"{value.Replace("\"", "\"\"")}\"";
+
 
     [HttpGet("/estoque/{id}")]
     public async Task<IActionResult> Detail(string id)

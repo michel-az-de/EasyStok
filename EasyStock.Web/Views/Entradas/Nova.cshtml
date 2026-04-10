@@ -1,7 +1,4 @@
 @model EntradaFormViewModel
-@{
-    var csrfToken = Html.AntiForgeryToken();
-}
 
 <div class="flex items-center gap-3 mb-6">
     <a href="/estoque" class="text-slate-400 hover:text-slate-600 transition-colors">
@@ -256,7 +253,7 @@
                 lote: '',
                 validade: '',
                 observacoes: '',
-                data: new Date().toISOString().split('T')[0],
+                data: new Date().toLocaleDateString('en-CA'),
                 total: 0,
 
                 async buscarProduto() {
