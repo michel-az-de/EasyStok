@@ -1,18 +1,35 @@
 namespace EasyStock.Web.Services;
 
-public class AnunciosService(ApiClient api)
+public class AnunciosService(ApiClient api, SessionService session)
 {
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
+
     public async Task<(bool Success, Stream? Stream, string? Error)> GerarStreamAsync(
         string produtoId, string canal, string tom, string foco, string? varId, string? contexto)
     {
-        var qs = $"anuncios/gerar?produtoId={Uri.EscapeDataString(produtoId)}" +
-                 $"&canal={Uri.EscapeDataString(canal)}" +
-                 $"&tom={Uri.EscapeDataString(tom)}" +
-                 $"&foco={Uri.EscapeDataString(foco)}";
-        if (!string.IsNullOrEmpty(varId)) qs += $"&varId={Uri.EscapeDataString(varId)}";
-        if (!string.IsNullOrEmpty(contexto)) qs += $"&contexto={Uri.EscapeDataString(contexto)}";
+        if (!Guid.TryParse(produtoId, out var prodGuid))
+            return (false, null, "Produto inválido. Selecione um produto da lista.");
 
-        var result = await api.GetStreamAsync(qs);
+        // Constrói instruções complementares a partir dos parâmetros de configuração da UI
+        var instrucoes = new List<string>
+        {
+            $"Canal: {canal}",
+            $"Tom: {tom}",
+            $"Foco: {foco}"
+        };
+        if (!string.IsNullOrWhiteSpace(contexto))
+            instrucoes.Add(contexto);
+
+        var body = new
+        {
+            empresaId = GetEmpresaId(),
+            produtoId = prodGuid,
+            produtoVariacaoId = Guid.TryParse(varId, out var varGuid) ? (Guid?)varGuid : null,
+            instrucoesComplementares = string.Join(". ", instrucoes)
+        };
+
+        var result = await api.PostStreamAsync("ia/anuncio", body);
         return result.Success
             ? (true, result.Data, null)
             : (false, null, result.ErrorMessage ?? "Erro ao gerar anúncio.");

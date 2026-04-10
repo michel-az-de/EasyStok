@@ -130,6 +130,31 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         }
     }
 
+    public async Task<ApiResult<Stream>> PostStreamAsync(string path, object body)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, path)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json")
+            };
+            var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+                return ApiResult<Stream>.Fail("HTTP_ERROR", $"Erro HTTP {(int)response.StatusCode}.");
+            var stream = await response.Content.ReadAsStreamAsync();
+            return ApiResult<Stream>.Ok(stream);
+        }
+        catch (TaskCanceledException)
+        {
+            return ApiResult<Stream>.Fail("TIMEOUT", "Servidor não respondeu.");
+        }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Network error on POST stream {Path}", path);
+            return ApiResult<Stream>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
+        }
+    }
+
     public async Task<ApiResult<T>> PostMultipartAsync<T>(string path, MultipartFormDataContent form)
     {
         try
