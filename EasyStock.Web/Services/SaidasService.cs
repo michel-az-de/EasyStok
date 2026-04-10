@@ -11,12 +11,11 @@ public class SaidasService(ApiClient api, SessionService session)
     public Task<ApiResult<PagedResult<Movimentacao>>> ListarAsync(
         int page = 1, string? natureza = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        // The /movimentacoes endpoint only supports tipo, de and ate filters.
-        // Natureza filtering is not available in the API; the parameter is retained
-        // for API-level compatibility once/if the endpoint adds it.
         var qs = $"movimentacoes?page={page}&pageSize=20&tipo=Saida";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
+        var naturezaApi = MapNatureza(natureza);
+        if (!string.IsNullOrEmpty(natureza)) qs += $"&natureza={Uri.EscapeDataString(naturezaApi)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 

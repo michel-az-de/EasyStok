@@ -75,7 +75,9 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         vm.TotalUnidades = vm.Itens.Sum(s => s.Qty);
         vm.ReceitaTotal = vm.Itens.Where(s => s.ValorTotal is not null).Sum(s => s.ValorTotal!.Valor);
         vm.TotalVendas = vm.Itens.Count(s => s.Natureza.Equals("Venda", StringComparison.OrdinalIgnoreCase));
-        vm.TotalPerdas = vm.Itens.Count(s => s.Natureza.Equals("Perda", StringComparison.OrdinalIgnoreCase));
+        vm.TotalPerdas = vm.Itens.Count(s =>
+            s.Natureza.Equals("Perda", StringComparison.OrdinalIgnoreCase) ||
+            s.Natureza.Equals("Prejuizo", StringComparison.OrdinalIgnoreCase));
 
         return View(vm);
     }

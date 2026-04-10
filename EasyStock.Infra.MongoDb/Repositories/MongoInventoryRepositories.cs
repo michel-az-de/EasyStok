@@ -192,7 +192,7 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
         return Task.CompletedTask;
     }
 
-    public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, int page = 1, int pageSize = 20)
+    public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, NaturezaMovimentacaoEstoque? natureza = null, int page = 1, int pageSize = 20)
     {
         var filter = Builders<MovimentacaoEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
 
@@ -202,6 +202,8 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
             filter &= Builders<MovimentacaoEstoque>.Filter.Lte(x => x.DataMovimentacao, ate.Value);
         if (tipo.HasValue)
             filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Tipo, tipo.Value);
+        if (natureza.HasValue)
+            filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Natureza, natureza.Value);
 
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)

@@ -63,6 +63,7 @@
                         class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                     <option value="venda">Venda</option>
                     <option value="perda">Perda</option>
+                    <option value="prejuizo">Prejuízo</option>
                     <option value="doacao">Doação</option>
                     <option value="uso_interno">Uso Interno</option>
                     <option value="devolucao">Devolução</option>
@@ -119,6 +120,19 @@
                 Campos extras (NF, Canal, etc.)
             </button>
             <div x-show="open" x-collapse>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Data da Saída</label>
+                        <input asp-for="DtSaida" type="date"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                        <p class="text-xs text-slate-400 mt-0.5">Se diferente da data de venda</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Data de Envio</label>
+                        <input asp-for="DtEnvio" type="date"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                </div>
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nota Fiscal</label>
