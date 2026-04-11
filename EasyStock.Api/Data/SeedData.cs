@@ -28,23 +28,23 @@ public static class SeedData
         await UpsertAssinaturaAsync(context, empresa.Id, plano.Id, agora);
 
         var lojaCentro = await UpsertLojaAsync(context, empresa.Id, "Casa da Baba | Centro",
-            "Unidade de producao e varejo de massas frescas", "(11) 3228-1101",
-            "Rua Conselheiro Crispiniano, 141 - Centro, Sao Paulo/SP", agora);
+            "Unidade de produção e varejo de massas frescas", "(11) 3228-1101",
+            "Rua Conselheiro Crispiniano, 141 - Centro, São Paulo/SP", agora);
         var lojaMercadao = await UpsertLojaAsync(context, empresa.Id, "Casa da Baba | Mercadao",
-            "Ponto de distribuicao local com alto giro diario", "(11) 3326-4510",
-            "Rua da Cantareira, 306 - Box 18, Centro Historico, Sao Paulo/SP", agora);
+            "Ponto de distribuição local com alto giro diário", "(11) 3326-4510",
+            "Rua da Cantareira, 306 - Box 18, Centro Histórico, São Paulo/SP", agora);
 
         await EnsureConfiguracaoLojaAsync(context, lojaCentro.Id);
         await EnsureConfiguracaoLojaAsync(context, lojaMercadao.Id);
 
         var perfilAdmin = await UpsertPerfilAsync(context, empresa.Id, "Admin", "Administrador com acesso total", NivelAcesso.Admin, agora);
-        var perfilGerente = await UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestao operacional e analytics", NivelAcesso.Gerente, agora);
-        var perfilOperador = await UpsertPerfilAsync(context, empresa.Id, "Operador", "Operacao diaria de estoque e vendas", NivelAcesso.Operador, agora);
+        var perfilGerente = await UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestão operacional e analytics", NivelAcesso.Gerente, agora);
+        var perfilOperador = await UpsertPerfilAsync(context, empresa.Id, "Operador", "Operação diária de estoque e vendas", NivelAcesso.Operador, agora);
 
         var usuarioAdmin = await UpsertUsuarioAsync(context, "Admin Casa da Baba", "admin@casadababa.demo", "admin123", agora);
         var usuarioGerente = await UpsertUsuarioAsync(context, "Gerente Casa da Baba", "gerente@casadababa.demo", "gerente123", agora);
         var usuarioOperadorCentro = await UpsertUsuarioAsync(context, "Operador Centro", "operador.centro@casadababa.demo", "operador123", agora);
-        var usuarioOperadorMercadao = await UpsertUsuarioAsync(context, "Operador Mercadao", "operador.mercadao@casadababa.demo", "operador123", agora);
+        var usuarioOperadorMercadao = await UpsertUsuarioAsync(context, "Operador Mercadão", "operador.mercadao@casadababa.demo", "operador123", agora);
 
         await EnsureUsuarioEmpresaAsync(context, usuarioAdmin.Id, empresa.Id, agora);
         await EnsureUsuarioEmpresaAsync(context, usuarioGerente.Id, empresa.Id, agora);
@@ -59,13 +59,13 @@ public static class SeedData
 
         var catMassas = await UpsertCategoriaAsync(context, empresa.Id, "Massas Frescas", "Massas artesanais refrigeradas de alta rotatividade", null, agora);
         var catMolhos = await UpsertCategoriaAsync(context, empresa.Id, "Molhos", "Molhos artesanais para acompanhar massas", null, agora);
-        var catRecheiosBases = await UpsertCategoriaAsync(context, empresa.Id, "Recheios e Bases", "Bases frescas para producao interna", null, agora);
+        var catRecheiosBases = await UpsertCategoriaAsync(context, empresa.Id, "Recheios e Bases", "Bases frescas para produção interna", null, agora);
         var catEmbalagens = await UpsertCategoriaAsync(context, empresa.Id, "Embalagens", "Materiais para fracionamento e venda", null, agora);
-        var catIngredientes = await UpsertCategoriaAsync(context, empresa.Id, "Ingredientes", "Insumos para producao diaria", null, agora);
+        var catIngredientes = await UpsertCategoriaAsync(context, empresa.Id, "Ingredientes", "Insumos para produção diária", null, agora);
 
         var subTalharim = await UpsertCategoriaAsync(context, empresa.Id, "Talharim", "Linha de talharim fresco", catMassas.Id, agora);
         var subRavioli = await UpsertCategoriaAsync(context, empresa.Id, "Ravioli", "Massas recheadas artesanais", catMassas.Id, agora);
-        var subNhoque = await UpsertCategoriaAsync(context, empresa.Id, "Nhoque", "Nhoque fresco de preparo rapido", catMassas.Id, agora);
+        var subNhoque = await UpsertCategoriaAsync(context, empresa.Id, "Nhoque", "Nhoque fresco de preparo rápido", catMassas.Id, agora);
         var subLasanha = await UpsertCategoriaAsync(context, empresa.Id, "Lasanha", "Folhas frescas para montagem de lasanha", catMassas.Id, agora);
         var subVermelho = await UpsertCategoriaAsync(context, empresa.Id, "Vermelho", "Molhos a base de tomate", catMolhos.Id, agora);
         var subBranco = await UpsertCategoriaAsync(context, empresa.Id, "Branco", "Molhos cremosos", catMolhos.Id, agora);
@@ -82,19 +82,19 @@ public static class SeedData
         var fornLaticinios = await UpsertFornecedorAsync(context, empresa.Id, "Laticinios Serra Alta",
             "07.843.117/0001-90", "pedidos@serraalta.com.br", "(11) 3891-6120", "Ricardo Moreira",
             "Queijos e derivados", "Nacional", 3, "https://serraalta.com.br",
-            "R$ 400,00", "FOB", "Ricota, creme de leite fresco e parmesao ralado");
+            "R$ 400,00", "FOB", "Ricota, creme de leite fresco e parmesão ralado");
         var fornCarnes = await UpsertFornecedorAsync(context, empresa.Id, "Frigorifico Bela Arte",
             "12.776.100/0001-32", "atendimento@belaartefrigorifico.com.br", "(11) 4227-9000", "Fernanda Lopes",
             "Carnes e recheios", "Nacional", 4, "https://belaartefrigorifico.com.br",
-            "R$ 700,00", "CIF", "Cortes bovinos e suinos para recheios e molho bolonhesa");
+            "R$ 700,00", "CIF", "Cortes bovinos e suínos para recheios e molho bolonhesa");
         var fornEmbalagens = await UpsertFornecedorAsync(context, empresa.Id, "PackFresh Embalagens",
             "58.190.334/0001-18", "vendas@packfresh.com.br", "(11) 4125-4477", "Guilherme Neri",
-            "Embalagens alimenticias", "Nacional", 6, "https://packfresh.com.br",
-            "R$ 500,00", "CIF", "Bandejas PET, selos termicos e potes para molhos");
+            "Embalagens alimentícias", "Nacional", 6, "https://packfresh.com.br",
+            "R$ 500,00", "CIF", "Bandejas PET, selos térmicos e potes para molhos");
         var fornHortifruti = await UpsertFornecedorAsync(context, empresa.Id, "HortiVerde Premium",
             "44.920.701/0001-73", "pedidos@hortiverde.com.br", "(11) 3822-9191", "Patricia Campos",
             "Hortifruti", "Nacional", 1, "https://hortiverde.com.br",
-            "R$ 250,00", "FOB", "Espinafre, manjericao, tomate italiano e ervas frescas");
+            "R$ 250,00", "FOB", "Espinafre, manjericão, tomate italiano e ervas frescas");
 
         var produtos = new Dictionary<string, Produto>
         {
@@ -104,7 +104,7 @@ public static class SeedData
                 "Casa da Baba", TipoProduto.Alimento, true, 6.20m, 14.90m, "7891000100011", "CDB-TALH-500", 58.35m, agora)),
             ["talharim1kg"] = await UpsertProdutoAsync(context, new ProdutoSeed(
                 empresa.Id, catMassas.Id, subTalharim.Id, "Talharim fresco 1kg",
-                "Versao familiar do talharim fresco, ideal para restaurantes e consumo de fim de semana.",
+                "Versão familiar do talharim fresco, ideal para restaurantes e consumo de fim de semana.",
                 "Casa da Baba", TipoProduto.Alimento, true, 11.80m, 26.90m, "7891000100012", "CDB-TALH-1KG", 56.07m, agora)),
             ["ravioliCarne"] = await UpsertProdutoAsync(context, new ProdutoSeed(
                 empresa.Id, catMassas.Id, subRavioli.Id, "Ravioli de carne 400g",
@@ -132,31 +132,31 @@ public static class SeedData
                 "Casa da Baba", TipoProduto.Alimento, true, 4.40m, 11.90m, "7891000100018", "CDB-MOL-BRA-300", 63.03m, agora)),
             ["pesto200"] = await UpsertProdutoAsync(context, new ProdutoSeed(
                 empresa.Id, catMolhos.Id, subPesto.Id, "Molho pesto 200ml",
-                "Pesto fresco com manjericao, azeite extra virgem e castanhas.",
+                "Pesto fresco com manjericão, azeite extra virgem e castanhas.",
                 "Casa da Baba", TipoProduto.Alimento, true, 5.20m, 14.90m, "7891000100019", "CDB-MOL-PES-200", 65.10m, agora))
         };
 
         var variacaoTalharimIntegral = await UpsertVariacaoAsync(context, empresa.Id, produtos["talharim500"].Id,
-            "Integral 500g", null, "500g", "Talharim integral de fermentacao lenta", "CDB-TALH-500-INT", "7891000101011", agora);
+            "Integral 500g", null, "500g", "Talharim integral de fermentação lenta", "CDB-TALH-500-INT", "7891000101011", agora);
         var variacaoRavioliFamilia = await UpsertVariacaoAsync(context, empresa.Id, produtos["ravioliCarne"].Id,
-            "Porcao familia 1kg", null, "1kg", "Ravioli de carne para refeicoes em familia", "CDB-RAVI-CAR-1KG", "7891000102013", agora);
+            "Porcao familia 1kg", null, "1kg", "Ravioli de carne para refeições em família", "CDB-RAVI-CAR-1KG", "7891000102013", agora);
         var variacaoMolhoPicante = await UpsertVariacaoAsync(context, empresa.Id, produtos["bolonhesa300"].Id,
             "Picante 300ml", null, "300ml", "Molho bolonhesa com pimenta calabresa", "CDB-MOL-BOL-300-PIC", "7891000103017", agora);
 
         foreach (var produto in produtos.Values)
         {
             await UpsertCaracteristicaAsync(context, empresa.Id, produto.Id, "Conservacao", "Manter refrigerado entre 1°C e 5°C", null, 1, agora);
-            await UpsertCaracteristicaAsync(context, empresa.Id, produto.Id, "Origem", "Producao artesanal local - Casa da Baba", null, 2, agora);
+            await UpsertCaracteristicaAsync(context, empresa.Id, produto.Id, "Origem", "Produção artesanal local - Casa da Baba", null, 2, agora);
         }
 
         await UpsertCaracteristicaAsync(context, empresa.Id, produtos["talharim500"].Id, "Tipo de massa", "Farinha tipo 00 + ovos caipira", variacaoTalharimIntegral.Id, 3, agora);
-        await UpsertCaracteristicaAsync(context, empresa.Id, produtos["ravioliCarne"].Id, "Porcionamento", "Versao padrao 400g ou familiar 1kg", variacaoRavioliFamilia.Id, 3, agora);
+        await UpsertCaracteristicaAsync(context, empresa.Id, produtos["ravioliCarne"].Id, "Porcionamento", "Versão padrão 400g ou familiar 1kg", variacaoRavioliFamilia.Id, 3, agora);
         await UpsertCaracteristicaAsync(context, empresa.Id, produtos["bolonhesa300"].Id, "Perfil de sabor", "Tradicional ou picante", variacaoMolhoPicante.Id, 3, agora);
 
         foreach (var produto in produtos.Values)
         {
-            await UpsertEmbalagemAsync(context, empresa.Id, produto.Id, "Bandeja PET selada", "Embalagem primaria com filme termoencolhivel", true, agora);
-            await UpsertEmbalagemAsync(context, empresa.Id, produto.Id, "Caixa master transporte", "Caixa de papelao ondulado para distribuicao", false, agora);
+            await UpsertEmbalagemAsync(context, empresa.Id, produto.Id, "Bandeja PET selada", "Embalagem primária com filme termoencolhível", true, agora);
+            await UpsertEmbalagemAsync(context, empresa.Id, produto.Id, "Caixa master transporte", "Caixa de papelão ondulado para distribuição", false, agora);
         }
 
         await context.SaveChangesAsync();
@@ -171,31 +171,31 @@ public static class SeedData
                 "Pacotes 1kg para pedidos de restaurante", 1.4m, agora),
             ["centro-ravioli-carne"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornCarnes.Id, fornCarnes.Nome, produtos["ravioliCarne"],
                 null, "CDB-CEN-RAVI-001", "LOT-RAVI-20260408-A", 22, 9.10m, 22.50m, agora.AddDays(-2), agora.AddDays(5),
-                "Lote regular com reposicao semanal", 1.7m, agora),
+                "Lote regular com reposição semanal", 1.7m, agora),
             ["centro-ravioli-ricota"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornLaticinios.Id, fornLaticinios.Nome, produtos["ravioliRicota"],
                 null, "CDB-CEN-RAVI-002", "LOT-RAVI-20260406-C", 6, 8.70m, 21.90m, agora.AddDays(-4), agora.AddDays(2),
-                "Lote proximo da validade para campanha de giro", 0.9m, agora),
+                "Lote próximo da validade para campanha de giro", 0.9m, agora),
             ["centro-nhoque"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornFarinha.Id, fornFarinha.Nome, produtos["nhoque500"],
                 null, "CDB-CEN-NHOQ-001", "LOT-NHOQ-20260409-A", 30, 6.00m, 15.50m, agora.AddDays(-1), agora.AddDays(6),
-                "Produto com giro elevado nas sextas e sabados", 3.2m, agora),
+                "Produto com giro elevado nas sextas e sábados", 3.2m, agora),
             ["centro-bolonhesa"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaCentro.Id, fornCarnes.Id, fornCarnes.Nome, produtos["bolonhesa300"],
                 variacaoMolhoPicante, "CDB-CEN-MBOL-001", "LOT-MBOL-20260405-A", 15, 4.90m, 12.90m, agora.AddDays(-5), agora.AddDays(20),
                 "Molho para kits promocionais", 1.2m, agora),
             ["merc-talharim"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["talharim500"],
                 variacaoTalharimIntegral, "CDB-MER-TALH-001", "LOT-TALH-20260408-M1", 14, 6.40m, 15.40m, agora.AddDays(-2), agora.AddDays(7),
-                "Lote de talharim integral para publico fitness", 1.8m, agora),
+                "Lote de talharim integral para público fitness", 1.8m, agora),
             ["merc-nhoque"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["nhoque500"],
                 null, "CDB-MER-NHOQ-001", "LOT-NHOQ-20260407-M1", 10, 6.10m, 16.20m, agora.AddDays(-3), agora.AddDays(5),
-                "Giro alto no horario de almoco", 2.4m, agora),
+                "Giro alto no horário de almoço", 2.4m, agora),
             ["merc-lasanha"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornFarinha.Id, fornFarinha.Nome, produtos["lasanha500"],
                 null, "CDB-MER-LASA-001", "LOT-LASA-20260225-M1", 20, 5.40m, 13.90m, agora.AddDays(-45), agora.AddDays(10),
-                "Item parado para acao de desconto", 0.2m, agora),
+                "Item parado para ação de desconto", 0.2m, agora),
             ["merc-branco"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornLaticinios.Id, fornLaticinios.Nome, produtos["branco300"],
                 null, "CDB-MER-MBRA-001", "LOT-MBRA-20260404-M1", 11, 4.40m, 11.90m, agora.AddDays(-6), agora.AddDays(18),
-                "Molho branco com giro estavel", 1.0m, agora),
+                "Molho branco com giro estável", 1.0m, agora),
             ["merc-pesto"] = await EnsureItemEstoqueAsync(context, empresa.Id, lojaMercadao.Id, fornHortifruti.Id, fornHortifruti.Nome, produtos["pesto200"],
                 null, "CDB-MER-MPES-001", "LOT-MPES-20260402-M1", 2, 5.20m, 14.90m, agora.AddDays(-8), agora.AddDays(4),
-                "Estoque critico aguardando reposicao", 0.8m, agora)
+                "Estoque crítico aguardando reposição", 0.8m, agora)
         };
 
         await context.SaveChangesAsync();
@@ -219,27 +219,27 @@ public static class SeedData
         }
 
         await EnsureReposicaoAsync(context, empresa.Id, itens["centro-talharim-l1"].Item, Quantidade.From(16),
-            Dinheiro.FromDecimal(6.25m), agora.AddDays(-6), "Reposicao para semana de alto fluxo", "SEED-CDB-REP-001");
+            Dinheiro.FromDecimal(6.25m), agora.AddDays(-6), "Reposição para semana de alto fluxo", "SEED-CDB-REP-001");
         await EnsureReposicaoAsync(context, empresa.Id, itens["centro-nhoque"].Item, Quantidade.From(12),
-            Dinheiro.FromDecimal(6.10m), agora.AddDays(-5), "Reposicao extra para promocao de nhoque", "SEED-CDB-REP-002");
+            Dinheiro.FromDecimal(6.10m), agora.AddDays(-5), "Reposição extra para promoção de nhoque", "SEED-CDB-REP-002");
         await EnsureReposicaoAsync(context, empresa.Id, itens["merc-pesto"].Item, Quantidade.From(8),
-            Dinheiro.FromDecimal(5.30m), agora.AddDays(-3), "Reposicao emergencial de pesto", "SEED-CDB-REP-003");
+            Dinheiro.FromDecimal(5.30m), agora.AddDays(-3), "Reposição emergencial de pesto", "SEED-CDB-REP-003");
 
         await EnsureVendaAsync(context, empresa.Id, lojaCentro.Id, "NF-CDB-2026-0101", agora.AddDays(-13), "Venda balcão - combo massa + molho",
             new VendaLinha(itens["centro-talharim-l1"].Item, null, Quantidade.From(6), Dinheiro.FromDecimal(14.90m)),
             new VendaLinha(itens["centro-bolonhesa"].Item, variacaoMolhoPicante.Id, Quantidade.From(4), Dinheiro.FromDecimal(12.90m)));
-        await EnsureVendaAsync(context, empresa.Id, lojaMercadao.Id, "NF-CDB-2026-0102", agora.AddDays(-11), "Venda loja Mercadao",
+        await EnsureVendaAsync(context, empresa.Id, lojaMercadao.Id, "NF-CDB-2026-0102", agora.AddDays(-11), "Venda loja Mercadão",
             new VendaLinha(itens["merc-nhoque"].Item, null, Quantidade.From(5), Dinheiro.FromDecimal(16.20m)),
             new VendaLinha(itens["merc-branco"].Item, null, Quantidade.From(3), Dinheiro.FromDecimal(11.90m)));
-        await EnsureVendaAsync(context, empresa.Id, lojaCentro.Id, "NF-CDB-2026-0103", agora.AddDays(-8), "Venda rapida de hora do almoco",
+        await EnsureVendaAsync(context, empresa.Id, lojaCentro.Id, "NF-CDB-2026-0103", agora.AddDays(-8), "Venda rápida de hora do almoço",
             new VendaLinha(itens["centro-ravioli-carne"].Item, null, Quantidade.From(7), Dinheiro.FromDecimal(22.50m)));
         await EnsureVendaAsync(context, empresa.Id, lojaMercadao.Id, "NF-CDB-2026-0104", agora.AddDays(-6), "Venda promocional de sexta",
             new VendaLinha(itens["merc-talharim"].Item, variacaoTalharimIntegral.Id, Quantidade.From(6), Dinheiro.FromDecimal(15.40m)),
             new VendaLinha(itens["merc-pesto"].Item, null, Quantidade.From(4), Dinheiro.FromDecimal(14.90m)));
-        await EnsureVendaAsync(context, empresa.Id, lojaCentro.Id, "NF-CDB-2026-0105", agora.AddDays(-4), "Venda com foco em kits familia",
+        await EnsureVendaAsync(context, empresa.Id, lojaCentro.Id, "NF-CDB-2026-0105", agora.AddDays(-4), "Venda com foco em kits família",
             new VendaLinha(itens["centro-talharim-l2"].Item, null, Quantidade.From(5), Dinheiro.FromDecimal(26.90m)),
             new VendaLinha(itens["centro-ravioli-ricota"].Item, null, Quantidade.From(2), Dinheiro.FromDecimal(21.90m)));
-        await EnsureVendaAsync(context, empresa.Id, lojaMercadao.Id, "NF-CDB-2026-0106", agora.AddDays(-2), "Venda de alto giro no Mercadao",
+        await EnsureVendaAsync(context, empresa.Id, lojaMercadao.Id, "NF-CDB-2026-0106", agora.AddDays(-2), "Venda de alto giro no Mercadão",
             new VendaLinha(itens["merc-nhoque"].Item, null, Quantidade.From(4), Dinheiro.FromDecimal(16.20m)),
             new VendaLinha(itens["merc-branco"].Item, null, Quantidade.From(2), Dinheiro.FromDecimal(11.90m)));
 
@@ -248,7 +248,7 @@ public static class SeedData
             "Perda por dano de embalagem no refrigerador", "SEED-CDB-PER-001");
         await EnsureSaidaAvulsaAsync(context, empresa.Id, itens["merc-lasanha"].Item, Quantidade.From(2),
             Dinheiro.FromDecimal(5.40m), NaturezaMovimentacaoEstoque.Prejuizo, agora.AddDays(-1),
-            "Prejuizo por quebra de cadeia fria na madrugada", "SEED-CDB-PREJ-001");
+            "Prejuízo por quebra de cadeia fria na madrugada", "SEED-CDB-PREJ-001");
 
         foreach (var item in itens.Values.Select(x => x.Item))
             item.RecalcularIndicadores(agora);
@@ -256,19 +256,19 @@ public static class SeedData
         await context.SaveChangesAsync();
 
         await EnsureNotificacaoAsync(context, empresa.Id, TipoAlertaEstoque.EstoqueCritico,
-            "Molho pesto 200ml no Mercadao esta com estoque critico e precisa de reposicao imediata.", itens["merc-pesto"].Item.Id);
+            "Molho pesto 200ml no Mercadão está com estoque crítico e precisa de reposição imediata.", itens["merc-pesto"].Item.Id);
         await EnsureNotificacaoAsync(context, empresa.Id, TipoAlertaEstoque.ValidadeProxima,
             "Ravioli de ricota e espinafre 400g no Centro vence em 2 dias. Priorizar giro.", itens["centro-ravioli-ricota"].Item.Id);
         await EnsureNotificacaoAsync(context, empresa.Id, TipoAlertaEstoque.ProdutoParado,
-            "Massa para lasanha fresca 500g no Mercadao esta com baixo giro ha mais de 30 dias.", itens["merc-lasanha"].Item.Id);
+            "Massa para lasanha fresca 500g no Mercadão está com baixo giro há mais de 30 dias.", itens["merc-lasanha"].Item.Id);
         await EnsureNotificacaoAsync(context, empresa.Id, TipoAlertaEstoque.ReposicaoSugerida,
-            "Nhoque de batata 500g apresenta giro alto no Centro. Sugestao de reposicao para proximos 3 dias.", itens["centro-nhoque"].Item.Id);
+            "Nhoque de batata 500g apresenta giro alto no Centro. Sugestão de reposição para próximos 3 dias.", itens["centro-nhoque"].Item.Id);
 
         await context.SaveChangesAsync();
         await tx.CommitAsync();
 
         logger.LogInformation(
-            "Seed demo '{Empresa}' concluido: {Lojas} lojas, {Produtos} produtos, {Fornecedores} fornecedores e credenciais demo prontas.",
+            "Seed demo '{Empresa}' concluído: {Lojas} lojas, {Produtos} produtos, {Fornecedores} fornecedores e credenciais demo prontas.",
             empresa.Nome,
             2,
             produtos.Count,
@@ -289,7 +289,7 @@ public static class SeedData
             context.Planos.Add(plano);
         }
 
-        plano.Descricao = "Plano de demonstracao para operacao de massas frescas artesanais";
+        plano.Descricao = "Plano de demonstração para operação de massas frescas artesanais";
         plano.LimiteLojas = Plano.SemLimite;
         plano.LimiteUsuarios = Plano.SemLimite;
         plano.LimiteProdutos = Plano.SemLimite;

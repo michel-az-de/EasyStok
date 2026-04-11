@@ -34,9 +34,9 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         public async Task<CategoriaResult> CriarAsync(CriarCategoriaCommand command)
         {
             if (command.EmpresaId == Guid.Empty)
-                throw new UseCaseValidationException("EmpresaId e obrigatorio.");
+                throw new UseCaseValidationException("EmpresaId é obrigatório.");
             if (string.IsNullOrWhiteSpace(command.Nome))
-                throw new UseCaseValidationException("Nome da categoria e obrigatorio.");
+                throw new UseCaseValidationException("Nome da categoria é obrigatório.");
 
             if (command.CategoriaPaiId.HasValue)
             {
@@ -66,7 +66,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         public async Task<CategoriaResult> AtualizarAsync(AtualizarCategoriaCommand command)
         {
             if (string.IsNullOrWhiteSpace(command.Nome))
-                throw new UseCaseValidationException("Nome da categoria e obrigatorio.");
+                throw new UseCaseValidationException("Nome da categoria é obrigatório.");
 
             var categoria = await categoriaRepository.GetByIdAsync(command.Id);
             if (categoria == null || categoria.EmpresaId != command.EmpresaId)
@@ -108,7 +108,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         public async Task<IReadOnlyCollection<CategoriaResult>> ListarAsync(Guid empresaId)
         {
             if (empresaId == Guid.Empty)
-                throw new UseCaseValidationException("EmpresaId e obrigatorio.");
+                throw new UseCaseValidationException("EmpresaId é obrigatório.");
 
             var categorias = await categoriaRepository.GetByEmpresaAsync(empresaId);
             return categorias.Select(ToResult).ToArray();

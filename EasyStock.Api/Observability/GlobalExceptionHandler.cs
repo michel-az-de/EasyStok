@@ -32,25 +32,25 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     private static (int StatusCode, string Code, string Title, string Detail, bool LogAsError) MapException(Exception exception) =>
         exception switch
         {
-            // Excecoes especificas que NAO herdam de RegraDeDominioVioladaException
+            // Exceções específicas que NÃO herdam de RegraDeDominioVioladaException
             UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
                 "VALIDATION_ERROR",
-                "Requisicao invalida",
+                "Requisição inválida",
                 ex.Message,
                 false),
 
             QuantidadeInvalidaException ex => (
                 StatusCodes.Status400BadRequest,
                 "INVALID_QUANTITY",
-                "Quantidade invalida",
+                "Quantidade inválida",
                 ex.Message,
                 false),
 
             CredenciaisInvalidasException ex => (
                 StatusCodes.Status401Unauthorized,
                 "UNAUTHORIZED",
-                "Credenciais invalidas",
+                "Credenciais inválidas",
                 ex.Message,
                 false),
 
@@ -68,19 +68,19 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 ex.Message,
                 false),
 
-            // Excecoes de infraestrutura
+            // Exceções de infraestrutura
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "CONCURRENCY_CONFLICT",
-                "Conflito de concorrencia",
-                "Os dados foram alterados por outro processo. Recarregue as informacoes e tente novamente.",
+                "Conflito de concorrência",
+                "Os dados foram alterados por outro processo. Recarregue as informações e tente novamente.",
                 false),
 
-            // Excecoes de dominio (todas herdam de RegraDeDominioVioladaException - case generico)
+            // Exceções de domínio (todas herdam de RegraDeDominioVioladaException - case genérico)
             RegraDeDominioVioladaException ex => (
                 StatusCodes.Status409Conflict,
                 "BUSINESS_RULE_VIOLATION",
-                "Violacao de regra de negocio",
+                "Violação de regra de negócio",
                 ex.Message,
                 false),
 

@@ -20,7 +20,7 @@ public class GlobalExceptionHandlerTests
 
         var handled = await handler.TryHandleAsync(
             context,
-            new UseCaseValidationException("EmpresaId e obrigatorio."),
+            new UseCaseValidationException("EmpresaId é obrigatório."),
             CancellationToken.None);
 
         Assert.True(handled);
@@ -29,8 +29,8 @@ public class GlobalExceptionHandlerTests
         var payload = await LerRespostaAsync(context);
         var error = payload.RootElement.GetProperty("error");
         Assert.Equal("VALIDATION_ERROR", error.GetProperty("code").GetString());
-        Assert.Equal("Requisicao invalida", error.GetProperty("message").GetString());
-        Assert.Equal("EmpresaId e obrigatorio.", error.GetProperty("detail").GetString());
+        Assert.Equal("Requisição inválida", error.GetProperty("message").GetString());
+        Assert.Equal("EmpresaId é obrigatório.", error.GetProperty("detail").GetString());
         Assert.Equal("corr-123", error.GetProperty("correlationId").GetString());
     }
 

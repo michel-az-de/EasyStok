@@ -63,7 +63,7 @@ public class IaAnuncioController(
         catch (UseCaseValidationException ex)
         {
             var err = JsonSerializer.Serialize(new ApiErrorResponse(
-                new ApiError("VALIDATION_ERROR", "Requisicao invalida", ex.Message, null)));
+                new ApiError("VALIDATION_ERROR", "Requisição inválida", ex.Message, null)));
             await Response.WriteAsync($"event: erro\ndata: {err}\n\n", Encoding.UTF8, ct);
             await Response.Body.FlushAsync(ct);
         }

@@ -8,7 +8,7 @@ public class EsqueciSenhaCommandValidator : AbstractValidator<EsqueciSenhaComman
     public EsqueciSenhaCommandValidator()
     {
         RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email e obrigatorio.")
+            .NotEmpty().WithMessage("Email é obrigatório.")
             .EmailAddress().WithMessage("Email deve ser valido.");
     }
 }

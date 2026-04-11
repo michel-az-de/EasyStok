@@ -133,7 +133,7 @@ switch (resolvedProvider)
         break;
 
     default:
-        throw new InvalidOperationException($"Database:Provider '{databaseProvider}' nao suportado.");
+        throw new InvalidOperationException($"Database:Provider '{databaseProvider}' não suportado.");
 }
 
 static async Task<string> ResolveDatabaseProviderAsync(
@@ -154,7 +154,7 @@ static async Task<string> ResolveDatabaseProviderAsync(
             return "postgresql";
 
         logger.Warning(
-            "PostgreSQL nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            "PostgreSQL não disponível (connection string: {HasCs}). Usando SQLite como fallback.",
             !string.IsNullOrWhiteSpace(postgresConnectionString));
         return "sqlite";
     }
@@ -166,7 +166,7 @@ static async Task<string> ResolveDatabaseProviderAsync(
             return "mongodb";
 
         logger.Warning(
-            "MongoDB nao disponivel (connection string: {HasCs}). Usando SQLite como fallback.",
+            "MongoDB não disponível (connection string: {HasCs}). Usando SQLite como fallback.",
             !string.IsNullOrWhiteSpace(mongoConnectionString));
         return "sqlite";
     }
@@ -191,7 +191,7 @@ static async Task<string> ResolveDatabaseProviderAsync(
         return "sqlite";
     }
 
-    throw new InvalidOperationException($"Database:Provider '{configuredProvider}' nao suportado.");
+    throw new InvalidOperationException($"Database:Provider '{configuredProvider}' não suportado.");
 }
 
 static async Task<bool> IsPostgresAvailableAsync(string connectionString, Serilog.ILogger logger)
@@ -260,7 +260,7 @@ builder.Services.AddProblemDetails();
 var jwtKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtKey))
     throw new InvalidOperationException(
-        "Jwt:SecretKey nao configurado. Defina a variavel de ambiente 'Jwt__SecretKey' ou configure appsettings.Development.json.");
+        "Jwt:SecretKey não configurado. Defina a variavel de ambiente 'Jwt__SecretKey' ou configure appsettings.Development.json.");
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
@@ -303,7 +303,7 @@ builder.Services.AddCors(options =>
             policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
         else
             throw new InvalidOperationException(
-                "Cors:AllowedOrigins e obrigatorio em producao. Configure a secao 'Cors:AllowedOrigins' no appsettings ou via variavel de ambiente.");
+                "Cors:AllowedOrigins é obrigatório em produção. Configure a secao 'Cors:AllowedOrigins' no appsettings ou via variavel de ambiente.");
     });
 });
 

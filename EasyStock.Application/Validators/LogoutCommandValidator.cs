@@ -8,6 +8,6 @@ public class LogoutCommandValidator : AbstractValidator<LogoutCommand>
     public LogoutCommandValidator()
     {
         RuleFor(x => x.RefreshToken)
-            .NotEmpty().WithMessage("Refresh token e obrigatorio.");
+            .NotEmpty().WithMessage("Refresh token é obrigatório.");
     }
 }

@@ -37,7 +37,7 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
     {
         public async Task<IReadOnlyCollection<ResultadoBuscaInteligente>> ExecuteAsync(BuscarEstoqueInteligenteQuery query)
         {
-            if (query.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
+            if (query.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
             if (string.IsNullOrWhiteSpace(query.Termo)) return [];
 
             var termo = query.Termo.Trim();

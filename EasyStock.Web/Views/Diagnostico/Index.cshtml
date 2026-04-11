@@ -10,7 +10,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Diagnostico — EasyStock</title>
+    <title>Diagnóstico — EasyStock</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>body { font-family: 'Inter', sans-serif; }</style>
@@ -20,8 +20,8 @@
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-slate-800">Diagnostico EasyStock</h1>
-                <p class="text-sm text-slate-500 mt-1">Ultima verificacao: @ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</p>
+                <h1 class="text-2xl font-bold text-slate-800">Diagnóstico EasyStock</h1>
+                <p class="text-sm text-slate-500 mt-1">Última verificação: @ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</p>
             </div>
             <div class="flex gap-2">
                 <a href="/diagnostico" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
@@ -37,7 +37,7 @@
         @if (apiOk && Model is not null)
         {
             var statusColor = Model.Status switch { "ok" => "green", "degraded" => "yellow", _ => "red" };
-            var statusText = Model.Status switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Sistema com falhas criticas" };
+            var statusText = Model.Status switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Sistema com falhas críticas" };
             <div class="bg-@(statusColor)-50 border border-@(statusColor)-200 rounded-xl p-4 mb-6 flex items-center gap-3">
                 @if (statusColor == "green")
                 {
@@ -53,7 +53,7 @@
                 }
                 <div>
                     <p class="font-semibold">@statusText</p>
-                    <p class="text-sm text-slate-600">Ambiente: @Model.Ambiente | Uptime: @Model.Uptime | Versao: @Model.Versao</p>
+                    <p class="text-sm text-slate-600">Ambiente: @Model.Ambiente | Uptime: @Model.Uptime | Versão: @Model.Versao</p>
                 </div>
             </div>
         }
@@ -62,8 +62,8 @@
             <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
                 <div class="w-3 h-3 bg-red-500 rounded-full"></div>
                 <div>
-                    <p class="font-semibold text-red-800">API inacessivel</p>
-                    <p class="text-sm text-red-600">Nao foi possivel conectar na API. Verifique se o servico esta em execucao.</p>
+                    <p class="font-semibold text-red-800">API inacessível</p>
+                    <p class="text-sm text-red-600">Não foi possível conectar na API. Verifique se o serviço está em execução.</p>
                 </div>
             </div>
         }
@@ -101,7 +101,7 @@
                     }
                 </div>
                 <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Alcancavel</td><td class="py-1.5 font-medium">@(apiOk ? "Sim" : "Nao")</td></tr>
+                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Alcançável</td><td class="py-1.5 font-medium">@(apiOk ? "Sim" : "Não")</td></tr>
                     @if (Model is not null)
                     {
                         <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Ambiente</td><td class="py-1.5">@Model.Ambiente</td></tr>
@@ -139,8 +139,8 @@
                     <table class="w-full text-sm">
                         <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Provider</td><td class="py-1.5 font-medium">@Model.Banco.Provider</td></tr>
                         <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@Model.Banco.ProviderConfigurado</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Fallback</td><td class="py-1.5">@(Model.Banco.Fallback ? "Sim" : "Nao")</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Conexao</td><td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Fallback</td><td class="py-1.5">@(Model.Banco.Fallback ? "Sim" : "Não")</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Conexão</td><td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td></tr>
                         <tr><td class="py-1.5 text-slate-500">Migrations</td><td class="py-1.5">@(Model.Banco.MigrationsAplicadas == true ? "Aplicadas" : Model.Banco.MigrationsAplicadas == false ? "Falha" : "N/A")</td></tr>
                         @if (Model.Banco.Erro is not null)
                         {
@@ -173,8 +173,8 @@
                         }
                     </div>
                     <table class="w-full text-sm">
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Nao")</td></tr>
-                        <tr><td class="py-1.5 text-slate-500">Conexao</td><td class="py-1.5">@Model.Redis.Conexao</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Não")</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Conexão</td><td class="py-1.5">@Model.Redis.Conexao</td></tr>
                     </table>
                 </div>
 
@@ -210,7 +210,7 @@
                         </span>
                     </div>
                     <table class="w-full text-sm">
-                        <tr><td class="py-1.5 text-slate-500">Diretorio existe</td><td class="py-1.5">@(Model.Storage.DiretorioExiste == true ? "Sim" : Model.Storage.DiretorioExiste == false ? "Nao" : "N/A")</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Diretório existe</td><td class="py-1.5">@(Model.Storage.DiretorioExiste == true ? "Sim" : Model.Storage.DiretorioExiste == false ? "Não" : "N/A")</td></tr>
                     </table>
                 </div>
 
@@ -232,14 +232,14 @@
                         }
                     </div>
                     <table class="w-full text-sm">
-                        <tr><td class="py-1.5 text-slate-500">API Key presente</td><td class="py-1.5">@(Model.Ia.ApiKeyPresente ? "Sim" : "Nao")</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">API Key presente</td><td class="py-1.5">@(Model.Ia.ApiKeyPresente ? "Sim" : "Não")</td></tr>
                     </table>
                 </div>
 
                 <!-- Configuracoes -->
                 <div class="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">Configuracoes Criticas</h2>
+                        <h2 class="font-semibold text-slate-800">Configurações Críticas</h2>
                     </div>
                     <table class="w-full text-sm">
                         <tr class="border-b border-slate-100">

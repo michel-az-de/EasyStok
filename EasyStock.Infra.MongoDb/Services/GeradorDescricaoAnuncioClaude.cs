@@ -21,7 +21,7 @@ internal sealed class GeradorDescricaoAnuncioClaude(
         var apiKey = configuration["Anthropic:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            logger.LogWarning("Anthropic:ApiKey nao configurado. Usando fallback.");
+            logger.LogWarning("Anthropic:ApiKey não configurado. Usando fallback.");
             return itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
         }
 

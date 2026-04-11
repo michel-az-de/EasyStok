@@ -8,7 +8,7 @@ public class ResetarSenhaCommandValidator : AbstractValidator<ResetarSenhaComman
     public ResetarSenhaCommandValidator()
     {
         RuleFor(x => x.Token)
-            .NotEmpty().WithMessage("Token e obrigatorio.");
+            .NotEmpty().WithMessage("Token é obrigatório.");
 
         RuleFor(x => x.NovaSenha)
             .NotEmpty().WithMessage("Nova senha e obrigatoria.")

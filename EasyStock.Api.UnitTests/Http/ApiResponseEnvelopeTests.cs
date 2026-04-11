@@ -51,19 +51,19 @@ public class ApiResponseEnvelopeTests
     [Fact]
     public void ApiErrorResponse_DeveConterError_ComTodosCampos()
     {
-        var error = new ApiError("VALIDATION_ERROR", "Requisicao invalida", "EmpresaId e obrigatorio.", "corr-123");
+        var error = new ApiError("VALIDATION_ERROR", "Requisição inválida", "EmpresaId é obrigatório.", "corr-123");
         var envelope = new ApiErrorResponse(error);
 
         envelope.Error.Code.Should().Be("VALIDATION_ERROR");
-        envelope.Error.Message.Should().Be("Requisicao invalida");
-        envelope.Error.Detail.Should().Be("EmpresaId e obrigatorio.");
+        envelope.Error.Message.Should().Be("Requisição inválida");
+        envelope.Error.Detail.Should().Be("EmpresaId é obrigatório.");
         envelope.Error.CorrelationId.Should().Be("corr-123");
     }
 
     [Fact]
     public void ApiErrorResponse_DeveAceitarDetailNulo()
     {
-        var error = new ApiError("NOT_FOUND", "Recurso nao encontrado.", null, null);
+        var error = new ApiError("NOT_FOUND", "Recurso não encontrado.", null, null);
         var envelope = new ApiErrorResponse(error);
 
         envelope.Error.Detail.Should().BeNull();
