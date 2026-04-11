@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
-    // Proposed PostgreSQL indexes for performance:
-    // CREATE INDEX idx_itensestoque_empresa_quantidade ON itensestoque (empresaid, quantidadeatual);
-    // CREATE INDEX idx_itensestoque_empresa_validade ON itensestoque (empresaid, validadeem);
-    // CREATE INDEX idx_itensestoque_empresa_ultimamov ON itensestoque (empresaid, ultimamovimentacaoem);
-
     public sealed class ItemEstoqueRepository(EasyStockDbContext dbContext)
         : IItemEstoqueRepository
     {

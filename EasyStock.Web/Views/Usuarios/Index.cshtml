@@ -12,32 +12,27 @@
 }
 
 <div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900">Usuários</h1>
-        <p class="text-sm text-slate-500 mt-1">
-            @Model.TotalAdmins @(Model.TotalAdmins == 1 ? "administrador" : "administradores") · @Model.TotalColaboradores @(Model.TotalColaboradores == 1 ? "colaborador" : "colaboradores")
-        </p>
+    <div class="pg-hd">
+        <h1>Usuários</h1>
+        <p>@Model.TotalAdmins @(Model.TotalAdmins == 1 ? "administrador" : "administradores") · @Model.TotalColaboradores @(Model.TotalColaboradores == 1 ? "colaborador" : "colaboradores")</p>
     </div>
     <button type="button"
             x-data @@click="$dispatch('open-modal', 'convidar')"
             class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-        + Criar Usuário
+        + Novo Usuário
     </button>
 </div>
 
 <div class="ws">
     @if (!Model.Usuarios.Any())
     {
-        <div class="text-center py-12 text-slate-400">
-            <div class="text-5xl mb-3">👤</div>
-            <p class="font-semibold text-slate-600">Nenhum usuário cadastrado</p>
-            <p class="text-sm mt-1">Crie o primeiro usuário para dar acesso à equipe.</p>
-            <button type="button"
-                    x-data @@click="$dispatch('open-modal', 'convidar')"
-                    class="mt-4 inline-block px-4 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">
-                + Criar Usuário
-            </button>
-        </div>
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "👤" },
+            { "EmptyTitle", "Nenhum usuário cadastrado" },
+            { "EmptyDescription", "Crie o primeiro usuário para dar acesso à equipe." },
+            { "EmptyCta", "+ Novo Usuário" },
+            { "EmptyCtaModal", "convidar" }
+        })
     }
     else
     {
@@ -190,7 +185,7 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
      @@click.self="open = false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Criar Usuário</h2>
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Usuário</h2>
         <form asp-action="Convidar" asp-controller="Usuarios" method="post">
             @Html.AntiForgeryToken()
             <div class="space-y-3 mb-4">
@@ -243,9 +238,11 @@
                         class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                     Cancelar
                 </button>
-                <button type="submit"
+                <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+                        :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
                         class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                    Criar Usuário
+                    <span x-show="!loading">Novo Usuário</span>
+                    <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
                 </button>
             </div>
         </form>

@@ -39,6 +39,16 @@ builder.Services.AddHttpClient<ApiClient>(client =>
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 }).AddHttpMessageHandler<TokenRefreshHandler>();
 
+// 5b. HttpClient for diagnostics (no TokenRefreshHandler - works without auth)
+builder.Services.AddHttpClient<DiagnosticoWebService>(client =>
+{
+    var baseUrl = config["ApiSettings:BaseUrl"]!;
+    // Ensure base URL ends with /
+    if (!baseUrl.EndsWith('/')) baseUrl += "/";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 // 6. Domain services
 builder.Services.AddScoped<ProdutosService>();
 builder.Services.AddScoped<EstoqueService>();
@@ -46,6 +56,7 @@ builder.Services.AddScoped<EntradasService>();
 builder.Services.AddScoped<SaidasService>();
 builder.Services.AddScoped<FornecedoresService>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<InteligenciaService>();
 builder.Services.AddScoped<NotificacoesService>();
 builder.Services.AddScoped<UsuariosService>();
 builder.Services.AddScoped<AssinaturaService>();
@@ -53,6 +64,7 @@ builder.Services.AddScoped<ConfiguracoesService>();
 builder.Services.AddScoped<AnunciosService>();
 builder.Services.AddScoped<CategoriasService>();
 builder.Services.AddScoped<LojasService>();
+builder.Services.AddScoped<BuscaUnificadaService>();
 
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>

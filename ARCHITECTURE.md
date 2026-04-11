@@ -1,4 +1,4 @@
-﻿# Diagrama de Arquitetura - EasyStok
+# Diagrama de Arquitetura - EasyStok
 
 ## Visão Geral
 

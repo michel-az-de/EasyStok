@@ -44,11 +44,13 @@
 <div class="ws">
     @if (!Model.Itens.Any())
     {
-        <div class="text-center py-12 text-slate-400">
-            <div class="text-5xl mb-3">📋</div>
-            <p class="font-semibold text-slate-500">Nenhuma movimentação encontrada</p>
-            <p class="text-sm mt-1">Tente ajustar os filtros ou registre uma <a href="/entradas/nova" class="text-indigo-600 hover:underline">nova entrada</a>.</p>
-        </div>
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "📋" },
+            { "EmptyTitle", "Nenhuma movimentação encontrada" },
+            { "EmptyDescription", "Tente ajustar os filtros ou registre uma nova entrada." },
+            { "EmptyCta", "+ Nova Entrada" },
+            { "EmptyCtaHref", "/entradas/nova" }
+        })
     }
     else
     {

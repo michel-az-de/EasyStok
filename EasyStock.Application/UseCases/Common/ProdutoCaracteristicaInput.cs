@@ -5,5 +5,6 @@ namespace EasyStock.Application.UseCases.Common
         string? Descricao,
         int? QuantidadeReferencia,
         string? VariacaoPadrao,
-        int OrdemExibicao);
+        int OrdemExibicao,
+        Guid? VariacaoId = null);
 }

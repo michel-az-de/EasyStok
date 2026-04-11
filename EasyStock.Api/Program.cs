@@ -28,6 +28,10 @@ using OpenTelemetry.Resources;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.FileProviders;
+using System.Text.Json;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -70,6 +74,7 @@ builder.Services.AddSwaggerGen(c =>
     // ── Schema & operation filters ────────────────────────────────────────
     c.SchemaFilter<SchemaExamplesFilter>();
     c.OperationFilter<GetOperationExamplesFilter>();
+    c.DocumentFilter<TagDescriptionsDocumentFilter>();
 
     // ── Use fully-qualified names to avoid schema conflicts ───────────────
     c.CustomSchemaIds(type => type.FullName?.Replace('+', '.'));
@@ -88,24 +93,43 @@ var sqliteConnectionString = builder.Configuration.GetConnectionString("SqliteCo
 var resolvedProvider = await ResolveDatabaseProviderAsync(
     databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
 
+var isFallback = !string.Equals(databaseProvider.Trim(), resolvedProvider, StringComparison.OrdinalIgnoreCase)
+    && !(databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase) && resolvedProvider == "postgresql");
+
+var infraState = new ResolvedInfrastructureState
+{
+    DatabaseProvider = resolvedProvider,
+    ConfiguredProvider = databaseProvider,
+    IsFallback = isFallback,
+    StartupTime = DateTimeOffset.UtcNow,
+    Environment = builder.Environment.EnvironmentName
+};
+builder.Services.AddSingleton(infraState);
+
 switch (resolvedProvider)
 {
     case "mongodb":
         builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString!, mongoDatabaseName, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddCheck<MongoDatabaseHealthCheck>("MongoDB");
+            .AddCheck<MongoDatabaseHealthCheck>("MongoDB", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
     case "postgresql":
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL");
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
     case "sqlite":
         builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddCheck<SqliteDatabaseHealthCheck>("SQLite");
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
     default:
@@ -379,15 +403,40 @@ if (resolvedProvider is "postgresql")
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         await db.Database.MigrateAsync();
+        infraState.MigrationsApplied = true;
         app.Logger.LogInformation("Migrations aplicadas com sucesso.");
 
         await SeedData.ExecutarAsync(scope.ServiceProvider, app.Logger);
     }
     catch (Exception ex)
     {
+        infraState.MigrationsApplied = false;
+        infraState.MigrationError = ex.Message;
         app.Logger.LogError(ex, "Erro durante migration/seed. A aplicacao continuara mas pode estar incompleta.");
     }
 }
+
+// Startup hardening
+if (resolvedProvider is "sqlite" && !app.Environment.IsDevelopment())
+    app.Logger.LogWarning("ATENCAO: Banco SQLite em uso em ambiente {Env}. Isso pode indicar falha de conexao com banco principal.", app.Environment.EnvironmentName);
+
+if (jwtKey.Length < 32)
+    app.Logger.LogWarning("ATENCAO: Jwt:SecretKey tem menos de 32 caracteres. Recomendado usar chave mais longa.");
+
+Log.Information("""
+
+    ======================================
+      EasyStock API
+      Ambiente:     {Environment}
+      Banco:        {Provider} (configurado: {Configured})
+      Fallback:     {Fallback}
+      Raiz (/):     → redireciona para /swagger
+      Swagger:      /swagger
+      Diagnostico:  /diagnostico
+      Health:       /health, /health/live, /health/ready
+    ======================================
+    """,
+    app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
 // Middleware for Correlation ID
 app.Use(async (context, next) =>
@@ -414,37 +463,34 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Swagger disponivel em todos os ambientes para facilitar operacao
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        // ── Two language documents ────────────────────────────────────────
-        c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
-        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+    // ── Two language documents ────────────────────────────────────────
+    c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
+    c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
 
-        // ── Custom route ──────────────────────────────────────────────────
-        c.RoutePrefix = "swagger";
+    // ── Custom route ──────────────────────────────────────────────────
+    c.RoutePrefix = "swagger";
 
-        // ── UI Behaviour ──────────────────────────────────────────────────
-        c.DocumentTitle        = "EasyStock API Docs";
-        c.DefaultModelsExpandDepth(1);       // show models collapsed by default
-        c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
-        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
-        c.DisplayRequestDuration();
-        c.EnableDeepLinking();
-        c.EnableFilter();
-        c.EnablePersistAuthorization();
-        c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
-        c.ShowExtensions();
-        c.ShowCommonExtensions();
+    // ── UI Behaviour ──────────────────────────────────────────────────
+    c.DocumentTitle        = "EasyStock API Docs";
+    c.DefaultModelsExpandDepth(1);       // show models collapsed by default
+    c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
+    c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+    c.DisplayRequestDuration();
+    c.EnableDeepLinking();
+    c.EnableFilter();
+    c.EnablePersistAuthorization();
+    c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
+    c.ShowExtensions();
+    c.ShowCommonExtensions();
 
-        // ── Custom assets ─────────────────────────────────────────────────
-        c.InjectStylesheet("/swagger-ui/custom.css");
-        c.InjectJavascript("/swagger-ui/custom.js");
-    });
-}
+    // ── Custom assets ─────────────────────────────────────────────────
+    c.InjectStylesheet("/swagger-ui/custom.css");
+    c.InjectJavascript("/swagger-ui/custom.js");
+});
 
 app.UseHttpsRedirection();
 
@@ -471,10 +517,51 @@ app.UseAuthorization();
 app.UseExceptionHandler();
 app.MapControllers();
 
-// Health Check endpoint
-app.MapHealthChecks("/health");
+// Redirect root to Swagger UI for immediate discoverability
+app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
+   .ExcludeFromDescription();
+
+// Health Check endpoints
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // nenhum check - apenas verifica se o processo esta vivo
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
 
 app.Run();
+
+static Task WriteHealthCheckJsonResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json; charset=utf-8";
+    var result = new
+    {
+        status = report.Status.ToString(),
+        totalDuration = report.TotalDuration.TotalMilliseconds.ToString("0") + "ms",
+        checks = report.Entries.Select(e => new
+        {
+            name = e.Key,
+            status = e.Value.Status.ToString(),
+            description = e.Value.Description,
+            duration = e.Value.Duration.TotalMilliseconds.ToString("0") + "ms",
+            error = e.Value.Exception?.Message
+        })
+    };
+    return context.Response.WriteAsJsonAsync(result, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    });
+}
 
 public partial class Program
 {

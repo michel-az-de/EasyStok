@@ -11,17 +11,16 @@ public class EntradasService(ApiClient api, SessionService session)
     public Task<ApiResult<PagedResult<Movimentacao>>> HistoricoAsync(
         int page = 1, string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        // Map UI tipo filters to TipoMovimentacaoEstoque enum values recognised by the API.
-        // When no filter is selected we default to Entrada so the Entradas history
-        // only shows entry movements.
         var tipoApi = tipo?.ToLowerInvariant() switch
         {
             "saida" or "saída" => "Saida",
-            "reposicao" or "reposição" => "Entrada",  // reposições are stored as Entrada movements
+            "reposicao" or "reposição" => "Entrada",
             _ => "Entrada"
         };
 
         var qs = $"movimentacoes?page={page}&pageSize=20&tipo={Uri.EscapeDataString(tipoApi)}";
+        if (tipo?.ToLowerInvariant() is "reposicao" or "reposição")
+            qs += "&natureza=Reposicao";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
@@ -35,15 +34,25 @@ public class EntradasService(ApiClient api, SessionService session)
         return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Compra", empresaId));
     }
 
-    // Reposição rápida: the UI selects by ProdutoId; the API's reposicao endpoint requires an
-    // existing ItemEstoqueId. We instead call the entrada endpoint with Natureza=Reposicao so
-    // the contract is satisfied without requiring ItemEstoqueId on the form.
-    public async Task<ApiResult<object>> ReposicaoAsync(EntradaFormViewModel vm)
+    public async Task<ApiResult<object>> ReposicaoAsync(ReposicaoFormViewModel vm)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
             return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
-        return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Reposicao", empresaId));
+
+        return await api.PostAsync<object>("estoque/reposicao", new
+        {
+            empresaId,
+            itemEstoqueId = Guid.TryParse(vm.ItemEstoqueId, out var iid) ? iid : Guid.Empty,
+            quantidadeAdicional = vm.Qty,
+            novoCustoUnitario = vm.Custo,
+            novoPrecoVendaSugerido = vm.Preco,
+            dataReposicao = vm.Data.ToDateTime(TimeOnly.MinValue),
+            observacoes = vm.Observacoes,
+            novaValidade = vm.Validade.HasValue
+                ? vm.Validade.Value.ToDateTime(TimeOnly.MinValue)
+                : (DateTime?)null
+        });
     }
 
     public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? tipo = null, string? periodoInicio = null, string? periodoFim = null)

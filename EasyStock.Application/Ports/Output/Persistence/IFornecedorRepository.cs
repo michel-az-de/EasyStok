@@ -7,6 +7,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<Fornecedor?> GetByIdAsync(Guid id);
         Task<Fornecedor?> GetByIdAsync(Guid empresaId, Guid id);
         Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize, bool? ativo = null, string? search = null, string? sort = "nome", string? order = "asc");
+        Task<IEnumerable<Fornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
         Task AddAsync(Fornecedor fornecedor);
         Task UpdateAsync(Fornecedor fornecedor);
     }

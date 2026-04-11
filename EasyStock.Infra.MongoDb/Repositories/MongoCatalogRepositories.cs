@@ -226,9 +226,26 @@ public sealed class ProdutoCaracteristicaRepository(MongoEasyStockContext contex
 {
     private IMongoCollection<ProdutoCaracteristica> Collection => Context.GetCollection<ProdutoCaracteristica>(MongoCollectionNames.ProdutosCaracteristica);
 
+    public async Task<IEnumerable<ProdutoCaracteristica>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
+            .SortBy(x => x.OrdemExibicao)
+            .ToListAsync();
+
     public Task InsertAsync(ProdutoCaracteristica caracteristica)
     {
         EnqueueInsert(Collection, caracteristica);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(ProdutoCaracteristica caracteristica)
+    {
+        EnqueueReplace(Collection, caracteristica.Id, caracteristica);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
         return Task.CompletedTask;
     }
 }
@@ -238,9 +255,26 @@ public sealed class ProdutoEmbalagemRepository(MongoEasyStockContext context, Mo
 {
     private IMongoCollection<ProdutoEmbalagem> Collection => Context.GetCollection<ProdutoEmbalagem>(MongoCollectionNames.ProdutosEmbalagem);
 
+    public async Task<IEnumerable<ProdutoEmbalagem>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
+            .SortBy(x => x.Nome)
+            .ToListAsync();
+
     public Task InsertAsync(ProdutoEmbalagem embalagem)
     {
         EnqueueInsert(Collection, embalagem);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(ProdutoEmbalagem embalagem)
+    {
+        EnqueueReplace(Collection, embalagem.Id, embalagem);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
         return Task.CompletedTask;
     }
 }

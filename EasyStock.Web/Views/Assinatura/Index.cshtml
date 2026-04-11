@@ -4,7 +4,10 @@
     Layout = "_Layout";
 }
 
-<h1 class="text-2xl font-bold text-slate-900 mb-6">Planos Disponíveis</h1>
+<div class="pg-hd mb-6">
+    <h1>Planos Disponíveis</h1>
+    <p>Escolha o plano ideal para o seu negócio</p>
+</div>
 
 @if (Model.Planos.Any())
 {
@@ -45,7 +48,7 @@
         }
     </div>
 
-    <p class="text-sm text-slate-500">Para alterar seu plano, entre em contato com o suporte.</p>
+    <p class="text-sm text-slate-500">Para alterar seu plano, fale com o administrador da conta.</p>
 }
 else
 {

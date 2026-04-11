@@ -13,53 +13,200 @@
         </svg>
     </button>
 
-    <!-- Busca global -->
-    <div class="flex-1 max-w-md hidden sm:block" x-data="topbarSearch()" @@click.outside="results = []">
-        <div class="relative">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Busca global (trigger) -->
+    <div class="flex-1" x-data="buscaUnificada()" @@keydown.window.ctrl.k.prevent="abrir()" @@keydown.window.slash.prevent="if(!document.activeElement || document.activeElement.tagName === 'BODY') abrir()">
+        <!-- Trigger button -->
+        <button @@click="abrir()"
+                class="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-xs">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
             </svg>
-            <input type="text" placeholder="Buscar produto ou SKU..."
-                   x-model="query" @@input.debounce.300ms="search()"
-                   @@keydown.escape="results = []; query = ''"
-                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white" />
-            <!-- Dropdown resultados -->
-            <div x-show="results.length > 0" x-cloak
-                 class="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 max-h-80 overflow-y-auto">
-                <template x-for="item in results" :key="item.id">
-                    <a :href="'/produtos/' + item.id"
-                       class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
-                       @@click="results = []">
-                        <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-slate-900 truncate" x-text="item.nome"></div>
-                            <div class="text-xs text-slate-400" x-text="item.sku"></div>
+            <span class="flex-1 text-left truncate hidden sm:block">Buscar...</span>
+            <kbd class="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-slate-100 border border-slate-200 rounded text-slate-400">Ctrl K</kbd>
+        </button>
+
+        <!-- Command palette overlay -->
+        <div x-show="aberto" x-cloak
+             class="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh] px-4"
+             @@keydown.escape.window="fechar()">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="fechar()"></div>
+
+            <!-- Painel -->
+            <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+                 @@keydown.arrow-down.prevent="mover(1)" @@keydown.arrow-up.prevent="mover(-1)"
+                 @@keydown.enter.prevent="selecionar()">
+                <!-- Input -->
+                <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+                    <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
+                    </svg>
+                    <input type="text" placeholder="Buscar produto, SKU, código, fornecedor..."
+                           x-ref="input"
+                           x-model="query"
+                           @@input.debounce.300ms="buscar()"
+                           class="flex-1 text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none outline-none" />
+                    <div x-show="carregando" class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                    <kbd class="flex-shrink-0 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Esc</kbd>
+                </div>
+
+                <!-- Resultados -->
+                <div class="max-h-[60vh] overflow-y-auto py-1">
+                    <template x-if="results.length > 0">
+                        <div>
+                            <template x-for="(item, idx) in results" :key="item.id + '-' + item.tipo">
+                                <a :href="linkItem(item)"
+                                   :class="idx === activeIdx ? 'bg-indigo-50' : 'hover:bg-slate-50'"
+                                   class="flex items-start gap-3 px-4 py-2.5 transition-colors cursor-pointer group"
+                                   @@mouseenter="activeIdx = idx"
+                                   @@click="fechar()">
+                                    <!-- Badge tipo -->
+                                    <span :class="badgeClasse(item.tipo)"
+                                          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 mt-0.5"
+                                          x-text="badgeLabel(item.tipo)"></span>
+                                    <!-- Conteúdo -->
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-medium text-slate-900 truncate" x-text="item.titulo"></span>
+                                            <template x-if="item.sku">
+                                                <span class="text-xs text-slate-400 font-mono flex-shrink-0" x-text="item.sku"></span>
+                                            </template>
+                                        </div>
+                                        <div class="flex items-center gap-2 mt-0.5">
+                                            <span x-show="item.subtitulo" class="text-xs text-slate-500 truncate" x-text="item.subtitulo"></span>
+                                            <template x-if="item.quantidadeAtual !== null && item.quantidadeAtual !== undefined">
+                                                <span :class="statusClasse(item.status)"
+                                                      class="text-xs font-medium flex-shrink-0"
+                                                      x-text="item.quantidadeAtual + ' un.'"></span>
+                                            </template>
+                                            <span x-show="item.fornecedorNome" class="text-xs text-slate-400 flex-shrink-0" x-text="item.fornecedorNome"></span>
+                                        </div>
+                                    </div>
+                                    <!-- Ações rápidas para estoque -->
+                                    <template x-if="item.tipo === 'ItemEstoque'">
+                                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                            <a :href="'/entradas/nova?produtoId=' + item.produtoId"
+                                               @@click.stop
+                                               class="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors">
+                                                Entrada
+                                            </a>
+                                            <a :href="'/saidas/nova?produtoId=' + item.produtoId"
+                                               @@click.stop
+                                               class="text-xs px-2 py-1 bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                                                Saída
+                                            </a>
+                                        </div>
+                                    </template>
+                                </a>
+                            </template>
                         </div>
-                        <span class="text-xs text-slate-400 flex-shrink-0" x-text="item.categoria || ''"></span>
-                    </a>
-                </template>
-                <div x-show="noResults" class="px-4 py-3 text-sm text-slate-400 text-center">
-                    Nenhum produto encontrado.
+                    </template>
+
+                    <!-- Estado vazio -->
+                    <div x-show="semResultados && !carregando && query.length >= 2"
+                         class="px-4 py-8 text-center">
+                        <div class="text-slate-300 mb-2">
+                            <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
+                            </svg>
+                        </div>
+                        <p class="text-sm text-slate-400">Nenhum resultado para <strong x-text="query" class="text-slate-600"></strong></p>
+                        <p class="text-xs text-slate-300 mt-1">Tente por nome, SKU, código interno ou fornecedor</p>
+                    </div>
+
+                    <!-- Estado inicial -->
+                    <div x-show="results.length === 0 && !semResultados && !carregando"
+                         class="px-4 py-4 text-xs text-slate-400 text-center">
+                        Digite pelo menos 2 caracteres para buscar
+                    </div>
+                </div>
+
+                <!-- Rodapé dicas -->
+                <div class="border-t border-slate-100 px-4 py-2 flex items-center gap-4 text-xs text-slate-400">
+                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">↑↓</kbd> navegar</span>
+                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">Enter</kbd> abrir</span>
+                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">Esc</kbd> fechar</span>
                 </div>
             </div>
         </div>
     </div>
+
     <script>
-        function topbarSearch() {
+        function buscaUnificada() {
             return {
+                aberto: false,
                 query: '',
                 results: [],
-                noResults: false,
-                _timeout: null,
-                async search() {
+                semResultados: false,
+                carregando: false,
+                activeIdx: 0,
+
+                abrir() {
+                    this.aberto = true;
+                    this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
+                },
+                fechar() {
+                    this.aberto = false;
+                    this.query = '';
+                    this.results = [];
+                    this.semResultados = false;
+                    this.activeIdx = 0;
+                },
+                mover(dir) {
+                    if (this.results.length === 0) return;
+                    this.activeIdx = (this.activeIdx + dir + this.results.length) % this.results.length;
+                },
+                selecionar() {
+                    if (this.results.length === 0) return;
+                    const item = this.results[this.activeIdx];
+                    if (item) window.location.href = this.linkItem(item);
+                },
+                async buscar() {
                     const q = this.query.trim();
-                    if (q.length < 2) { this.results = []; this.noResults = false; return; }
+                    if (q.length < 2) { this.results = []; this.semResultados = false; return; }
+                    this.carregando = true;
                     try {
-                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(q) + '&limit=8');
+                        const r = await fetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
                         if (!r.ok) return;
                         const data = await r.json();
                         this.results = Array.isArray(data) ? data : [];
-                        this.noResults = this.results.length === 0;
-                    } catch { this.results = []; this.noResults = false; }
+                        this.semResultados = this.results.length === 0;
+                        this.activeIdx = 0;
+                    } catch {
+                        this.results = [];
+                    } finally {
+                        this.carregando = false;
+                    }
+                },
+                linkItem(item) {
+                    switch (item.tipo) {
+                        case 'Produto': return '/produtos/' + item.produtoId;
+                        case 'Variacao': return '/produtos/' + item.produtoId;
+                        case 'ItemEstoque': return '/estoque';
+                        case 'Fornecedor': return '/fornecedores/' + item.id;
+                        default: return '/produtos/' + item.produtoId;
+                    }
+                },
+                badgeLabel(tipo) {
+                    return { Produto: 'Produto', Variacao: 'Variação', ItemEstoque: 'Estoque', Fornecedor: 'Fornecedor' }[tipo] || tipo;
+                },
+                badgeClasse(tipo) {
+                    return {
+                        Produto: 'bg-indigo-100 text-indigo-700',
+                        Variacao: 'bg-violet-100 text-violet-700',
+                        ItemEstoque: 'bg-emerald-100 text-emerald-700',
+                        Fornecedor: 'bg-amber-100 text-amber-700'
+                    }[tipo] || 'bg-slate-100 text-slate-600';
+                },
+                statusClasse(status) {
+                    return {
+                        'Ok': 'text-emerald-600',
+                        'Warn': 'text-amber-600',
+                        'Critical': 'text-red-600',
+                        'Slow': 'text-slate-500',
+                        'Vencido': 'text-red-700',
+                        'Bloqueado': 'text-slate-400'
+                    }[status] || 'text-slate-500';
                 }
             };
         }
@@ -72,7 +219,7 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            Ação rápida
+            <span class="hidden sm:inline">Ação rápida</span>
         </button>
         <div x-show="open" @@click.outside="open = false"
              class="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">

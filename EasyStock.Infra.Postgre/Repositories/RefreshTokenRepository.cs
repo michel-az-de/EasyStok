@@ -15,9 +15,10 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
     public async Task<IEnumerable<RefreshToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId).ToListAsync();
 
-    public async Task AddAsync(RefreshToken refreshToken)
+    public Task AddAsync(RefreshToken refreshToken)
     {
-        await _context.RefreshTokens.AddAsync(refreshToken);
+        _context.RefreshTokens.Add(refreshToken);
+        return Task.CompletedTask;
     }
 
     public Task UpdateAsync(RefreshToken refreshToken)

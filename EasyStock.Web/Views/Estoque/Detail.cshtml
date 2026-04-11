@@ -94,18 +94,80 @@
         <div class="ws">
             <h3 class="font-bold text-slate-800 mb-4">Ações</h3>
             <div class="space-y-2">
+                <a href="/entradas/reposicao?itemId=@item.Id"
+                   class="flex items-center gap-2 w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Repor estoque
+                </a>
                 <a href="/entradas/nova"
                    class="flex items-center gap-2 w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    Registrar entrada
+                    Nova entrada
                 </a>
                 <a href="/estoque"
                    class="flex items-center gap-2 w-full px-4 py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                     Voltar ao estoque
                 </a>
             </div>
+        </div>
+
+        <div class="ws">
+            <h3 class="font-bold text-slate-800 mb-4">Financeiro</h3>
+            <dl class="space-y-3">
+                <div class="flex justify-between">
+                    <dt class="text-sm text-slate-500">Custo unitário</dt>
+                    <dd class="text-sm font-semibold">
+                        @if (item.CustoUnitario?.Valor > 0)
+                        {
+                            @item.CustoUnitario.Valor.ToString("C", ptBR)
+                        }
+                        else
+                        {
+                            <span class="text-slate-400">-</span>
+                        }
+                    </dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-sm text-slate-500">Preço sugerido</dt>
+                    <dd class="text-sm font-semibold">
+                        @if (item.PrecoVendaSugerido?.Valor > 0)
+                        {
+                            @item.PrecoVendaSugerido.Valor.ToString("C", ptBR)
+                        }
+                        else
+                        {
+                            <span class="text-slate-400">-</span>
+                        }
+                    </dd>
+                </div>
+                @if (item.CustoUnitario?.Valor > 0 && item.PrecoVendaSugerido?.Valor > 0)
+                {
+                    var margem = (item.PrecoVendaSugerido.Valor - item.CustoUnitario.Valor) / item.PrecoVendaSugerido.Valor * 100;
+                    <div class="flex justify-between border-t border-slate-100 pt-2">
+                        <dt class="text-sm text-slate-500">Margem</dt>
+                        <dd class="text-sm font-bold @(margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-amber-600" : "text-red-600")">
+                            @margem.ToString("F1")%
+                        </dd>
+                    </div>
+                }
+                <div class="flex justify-between border-t border-slate-100 pt-2">
+                    <dt class="text-sm text-slate-500">Valor total em estoque</dt>
+                    <dd class="text-sm font-bold text-indigo-600">
+                        @if (item.CustoUnitario?.Valor > 0)
+                        {
+                            @((item.CustoUnitario.Valor * item.Qty).ToString("C", ptBR))
+                        }
+                        else
+                        {
+                            <span class="text-slate-400">-</span>
+                        }
+                    </dd>
+                </div>
+            </dl>
         </div>
     </div>
 </div>
