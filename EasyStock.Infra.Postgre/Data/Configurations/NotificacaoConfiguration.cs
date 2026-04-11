@@ -1,4 +1,5 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,7 +16,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(n => n.TipoAlerta).HasConversion<string>().IsRequired().HasMaxLength(50);
             builder.Property(n => n.Titulo).HasMaxLength(120).HasDefaultValue(string.Empty);
             builder.Property(n => n.Mensagem).IsRequired().HasMaxLength(500);
-            builder.Property(n => n.Severidade).HasConversion<string>().HasMaxLength(20).HasDefaultValue("Media");
+            builder.Property(n => n.Severidade).HasConversion<string>().HasMaxLength(20).HasDefaultValue(SeveridadeNotificacao.Media);
             builder.Property(n => n.Lida).IsRequired();
             builder.Property(n => n.ReferenciaId);
             builder.Property(n => n.CriadaEm).IsRequired();

@@ -1,0 +1,300 @@
+@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojaDetalheViewModel
+@using System.Globalization
+@{
+    var ptBR = new CultureInfo("pt-BR");
+    var r = Model.Resumo;
+    var scoreColor = r.HealthClassificacao switch { "Excelente" => "text-emerald-600", "Bom" => "text-blue-600", "Atencao" => "text-amber-600", _ => "text-red-600" };
+    var scoreBg = r.HealthClassificacao switch { "Excelente" => "bg-emerald-500", "Bom" => "bg-blue-500", "Atencao" => "bg-amber-500", _ => "bg-red-500" };
+    var scoreBgLight = r.HealthClassificacao switch { "Excelente" => "bg-emerald-50", "Bom" => "bg-blue-50", "Atencao" => "bg-amber-50", _ => "bg-red-50" };
+}
+
+<!-- Header -->
+<div class="pg-hd mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div class="flex items-center gap-3">
+        <a href="/inteligencia-lojas?periodo=@Model.PeriodoDias" class="text-slate-400 hover:text-indigo-600 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <h1 class="flex items-center gap-2">
+                @r.NomeLoja
+                <span class="px-2.5 py-0.5 rounded-full text-sm font-bold text-white @scoreBg">@r.HealthScore.ToString("F0")</span>
+            </h1>
+            <p class="text-slate-500 text-sm">@r.HealthClassificacao &middot; Período de @Model.PeriodoDias dias</p>
+        </div>
+    </div>
+    <div x-data="{ open: false }" class="relative">
+        <button @@click="open = !open" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+            @Model.PeriodoDias dias
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div x-show="open" @@click.outside="open = false" class="absolute right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 w-32">
+            @foreach (var p in new[] { 7, 15, 30, 60 })
+            {
+                <a href="/inteligencia-lojas/@r.LojaId?periodo=@p" class="block px-3 py-1.5 text-sm hover:bg-slate-50 @(Model.PeriodoDias == p ? "font-semibold text-indigo-600" : "text-slate-700")">@p dias</a>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Health Score Breakdown -->
+<div class="ws mb-6">
+    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+        <!-- Big score -->
+        <div class="text-center lg:text-left">
+            <div class="text-5xl font-extrabold @scoreColor">@r.HealthScore.ToString("F0")</div>
+            <div class="text-sm text-slate-500 mt-1">de 100 — @r.HealthClassificacao</div>
+        </div>
+        <!-- 5 dimension bars -->
+        <div class="flex-1 w-full space-y-2">
+            @{
+                var dims = new (string Label, decimal Value, string Emoji)[]
+                {
+                    ("Saúde do Estoque", r.DimStockHealth, "📦"),
+                    ("Veloc. de Vendas", r.DimSalesVelocity, "📈"),
+                    ("Risco de Validade", r.DimExpiryRisk, "⏰"),
+                    ("Itens Ociosos", r.DimIdleRisk, "💤"),
+                    ("Reposição", r.DimReplenishmentUrgency, "🔄")
+                };
+            }
+            @foreach (var (label, value, emoji) in dims)
+            {
+                var dimColor = value >= 80 ? "bg-emerald-500" : value >= 60 ? "bg-blue-500" : value >= 40 ? "bg-amber-500" : "bg-red-500";
+                <div class="flex items-center gap-3">
+                    <span class="text-sm w-6 text-center">@emoji</span>
+                    <span class="text-xs text-slate-600 w-32 truncate">@label</span>
+                    <div class="flex-1 h-2 bg-slate-100 rounded-full">
+                        <div class="h-2 rounded-full @dimColor" style="width: @(Math.Max(3, (int)value))%"></div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-700 w-8 text-right">@value.ToString("F0")</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div class="ws text-center">
+        <div class="kpi-lbl">SKUs</div>
+        <div class="kpi-val text-slate-900">@r.TotalSkus</div>
+    </div>
+    <div class="ws text-center">
+        <div class="kpi-lbl">Qtd em estoque</div>
+        <div class="kpi-val text-emerald-600">@r.QuantidadeTotalEmEstoque</div>
+    </div>
+    <div class="ws text-center">
+        <div class="kpi-lbl">Valor estoque</div>
+        <div class="kpi-val text-indigo-600">@r.ValorTotalEstoque.ToString("C0", ptBR)</div>
+    </div>
+    <div class="ws text-center">
+        <div class="kpi-lbl">Receita período</div>
+        <div class="kpi-val text-emerald-700">@r.ReceitaPeriodo.ToString("C", ptBR)</div>
+    </div>
+    <div class="ws text-center">
+        <div class="kpi-lbl">Vendas/dia</div>
+        <div class="kpi-val text-blue-600">@r.MediaVendasDiaria.ToString("F1")</div>
+    </div>
+    <div class="ws text-center">
+        <div class="kpi-lbl">Última mov.</div>
+        @if (r.UltimaMovimentacao.HasValue)
+        {
+            var diasAtras = (int)(DateTime.UtcNow - r.UltimaMovimentacao.Value).TotalDays;
+            <div class="kpi-val @(diasAtras > 7 ? "text-amber-600" : "text-slate-700")">@(diasAtras == 0 ? "Hoje" : $"{diasAtras}d")</div>
+        }
+        else
+        {
+            <div class="kpi-val text-slate-400">—</div>
+        }
+    </div>
+</div>
+
+<!-- Alert Tiles -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="ws flex items-center gap-3">
+        <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-xl">🚨</div>
+        <div>
+            <div class="kpi-val @(r.AlertasEstoqueBaixo > 0 ? "text-red-600" : "text-emerald-600")">@r.AlertasEstoqueBaixo</div>
+            <div class="kpi-lbl">Estoque crítico</div>
+        </div>
+    </div>
+    <div class="ws flex items-center gap-3">
+        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
+        <div>
+            <div class="kpi-val @(r.AlertasVencimento > 0 ? "text-amber-600" : "text-emerald-600")">@r.AlertasVencimento</div>
+            <div class="kpi-lbl">Próx. vencimento</div>
+        </div>
+    </div>
+    <div class="ws flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
+        <div>
+            <div class="kpi-val @(r.AlertasItensParados > 0 ? "text-blue-600" : "text-emerald-600")">@r.AlertasItensParados</div>
+            <div class="kpi-lbl">Parados</div>
+        </div>
+    </div>
+    <div class="ws flex items-center gap-3">
+        <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-xl">📉</div>
+        <div>
+            <div class="kpi-val @(r.ItensAbaixoMinimo > 0 ? "text-orange-600" : "text-emerald-600")">@r.ItensAbaixoMinimo</div>
+            <div class="kpi-lbl">Abaixo do mínimo</div>
+        </div>
+    </div>
+</div>
+
+<!-- Top & Bottom Products -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Top Products -->
+    <div class="ws">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">Maior giro (Top @Model.TopProdutos.Count)</h2>
+        @if (Model.TopProdutos.Count == 0)
+        {
+            <p class="text-sm text-slate-400 py-4 text-center">Sem vendas no período.</p>
+        }
+        else
+        {
+            <div class="overflow-x-auto"><table class="tbl-full">
+                <thead><tr>
+                    <th>Produto</th>
+                    <th class="text-right">Qtd vendida</th>
+                    <th class="text-right">Receita</th>
+                    <th class="text-right">un/dia</th>
+                </tr></thead>
+                <tbody>
+                    @foreach (var p in Model.TopProdutos)
+                    {
+                        <tr>
+                            <td class="truncate max-w-[180px]">@p.NomeProduto</td>
+                            <td class="text-right">@p.QuantidadeVendida</td>
+                            <td class="text-right">@p.ReceitaGerada.ToString("C", ptBR)</td>
+                            <td class="text-right">@p.TaxaSaidaDiaria.ToString("F1")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </div>
+    <!-- Bottom Products -->
+    <div class="ws">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">Menor giro (Bottom @Model.BottomProdutos.Count)</h2>
+        @if (Model.BottomProdutos.Count == 0)
+        {
+            <p class="text-sm text-slate-400 py-4 text-center">Sem dados no período.</p>
+        }
+        else
+        {
+            <div class="overflow-x-auto"><table class="tbl-full">
+                <thead><tr>
+                    <th>Produto</th>
+                    <th class="text-right">Qtd vendida</th>
+                    <th class="text-right">Receita</th>
+                    <th class="text-right">un/dia</th>
+                </tr></thead>
+                <tbody>
+                    @foreach (var p in Model.BottomProdutos)
+                    {
+                        <tr>
+                            <td class="truncate max-w-[180px]">@p.NomeProduto</td>
+                            <td class="text-right">@p.QuantidadeVendida</td>
+                            <td class="text-right">@p.ReceitaGerada.ToString("C", ptBR)</td>
+                            <td class="text-right">@p.TaxaSaidaDiaria.ToString("F1")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </div>
+</div>
+
+<!-- Replenishment Suggestions -->
+@if (Model.Reposicoes.Count > 0)
+{
+    <div class="ws mb-6">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">Sugestões de Reposição</h2>
+        <div class="overflow-x-auto"><table class="tbl-full">
+            <thead><tr>
+                <th>Produto</th>
+                <th class="text-right">Atual</th>
+                <th class="text-right">Mínimo</th>
+                <th class="text-right">Sugerido</th>
+                <th class="text-right">Custo est.</th>
+                <th class="text-right">Ruptura em</th>
+            </tr></thead>
+            <tbody>
+                @foreach (var rep in Model.Reposicoes)
+                {
+                    var corRuptura = rep.DiasAteRuptura.HasValue && rep.DiasAteRuptura < 7 ? "text-red-600 font-semibold" :
+                        rep.DiasAteRuptura.HasValue && rep.DiasAteRuptura < 30 ? "text-amber-600" : "text-slate-600";
+                    <tr>
+                        <td class="truncate max-w-[180px]">@(rep.NomeProduto ?? rep.CodigoInterno ?? "—")</td>
+                        <td class="text-right">@rep.QuantidadeAtual</td>
+                        <td class="text-right">@rep.QuantidadeMinima</td>
+                        <td class="text-right font-semibold">@rep.QuantidadeSugeridaReposicao</td>
+                        <td class="text-right">@rep.CustoEstimadoReposicao.ToString("C", ptBR)</td>
+                        <td class="text-right @corRuptura">@(rep.DiasAteRuptura.HasValue ? $"{rep.DiasAteRuptura}d" : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    </div>
+}
+
+<!-- Expiry Alerts -->
+@if (Model.AlertasValidade.Count > 0)
+{
+    <div class="ws mb-6">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">Alertas de Validade</h2>
+        <div class="overflow-x-auto"><table class="tbl-full">
+            <thead><tr>
+                <th>Produto</th>
+                <th class="text-right">Qtd</th>
+                <th class="text-right">Vencimento</th>
+                <th class="text-right">Dias restantes</th>
+                <th class="text-right">Valor em risco</th>
+            </tr></thead>
+            <tbody>
+                @foreach (var a in Model.AlertasValidade)
+                {
+                    var corDias = a.DiasAteVencimento <= 3 ? "text-red-600 font-bold" : a.DiasAteVencimento <= 15 ? "text-amber-600 font-semibold" : "text-slate-600";
+                    <tr>
+                        <td class="truncate max-w-[180px]">@(a.NomeProduto ?? a.CodigoInterno ?? "—")</td>
+                        <td class="text-right">@a.QuantidadeAtual</td>
+                        <td class="text-right">@a.DataValidade.ToString("dd/MM/yyyy")</td>
+                        <td class="text-right @corDias">@(a.DiasAteVencimento == 0 ? "VENCIDO" : $"{a.DiasAteVencimento}d")</td>
+                        <td class="text-right text-red-600">@a.ValorEmRisco.ToString("C", ptBR)</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    </div>
+}
+
+<!-- Actionable Indicators for this store -->
+@if (Model.Indicadores.Count > 0)
+{
+    <div class="ws">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">Indicadores desta Loja</h2>
+        <div class="space-y-2">
+            @foreach (var ind in Model.Indicadores)
+            {
+                var (badgeBg, icon) = ind.Severidade switch
+                {
+                    "critico" => ("bg-red-100 text-red-700", "🚨"),
+                    "alto" => ("bg-orange-100 text-orange-700", "⚠️"),
+                    "medio" => ("bg-amber-100 text-amber-700", "💡"),
+                    "baixo" => ("bg-blue-100 text-blue-700", "ℹ️"),
+                    "positivo" => ("bg-emerald-100 text-emerald-700", "✅"),
+                    _ => ("bg-slate-100 text-slate-700", "📌")
+                };
+                <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
+                    <span class="text-lg">@icon</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <span class="text-sm font-semibold text-slate-800">@ind.Titulo</span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold @badgeBg">@ind.Severidade.ToUpper()</span>
+                        </div>
+                        <p class="text-xs text-slate-500">@ind.Descricao</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
