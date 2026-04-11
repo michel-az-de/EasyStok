@@ -1,0 +1,198 @@
+@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojasOverviewViewModel
+@using System.Globalization
+@{
+    var ptBR = new CultureInfo("pt-BR");
+}
+
+<!-- Header -->
+<div class="pg-hd mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+        <h1>Inteligência por Loja</h1>
+        <p class="text-slate-500 text-sm">Visão comparativa de saúde operacional e desempenho por unidade.</p>
+    </div>
+    <div x-data="{ open: false }" class="relative">
+        <button @@click="open = !open" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
+            Período: @Model.PeriodoDias dias
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div x-show="open" @@click.outside="open = false" class="absolute right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 w-32">
+            @foreach (var p in new[] { 7, 15, 30, 60 })
+            {
+                <a href="/inteligencia-lojas?periodo=@p" class="block px-3 py-1.5 text-sm hover:bg-slate-50 @(Model.PeriodoDias == p ? "font-semibold text-indigo-600" : "text-slate-700")">@p dias</a>
+            }
+        </div>
+    </div>
+</div>
+
+@if (Model.Lojas.Count == 0)
+{
+    <div class="ws text-center py-12">
+        <div class="text-4xl mb-3">🏪</div>
+        <h3 class="text-lg font-semibold text-slate-700 mb-1">Nenhuma loja encontrada</h3>
+        <p class="text-slate-500 text-sm">Cadastre lojas para visualizar a inteligência operacional.</p>
+        <a href="/lojas" class="mt-4 inline-block px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">Gerenciar Lojas</a>
+    </div>
+}
+else
+{
+    <!-- Summary Tiles -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        @if (Model.MelhorLoja != null)
+        {
+            <div class="ws">
+                <div class="kpi-lbl">Melhor loja</div>
+                <div class="text-lg font-bold text-emerald-600 truncate">@Model.MelhorLoja.NomeLoja</div>
+                <div class="text-sm text-slate-500">Score @Model.MelhorLoja.HealthScore.ToString("F0")/100</div>
+            </div>
+        }
+        @if (Model.PiorLoja != null)
+        {
+            var corPior = Model.PiorLoja.HealthScore >= 60 ? "text-blue-600" : Model.PiorLoja.HealthScore >= 40 ? "text-amber-600" : "text-red-600";
+            <div class="ws">
+                <div class="kpi-lbl">Loja com mais risco</div>
+                <div class="text-lg font-bold @corPior truncate">@Model.PiorLoja.NomeLoja</div>
+                <div class="text-sm text-slate-500">Score @Model.PiorLoja.HealthScore.ToString("F0")/100</div>
+            </div>
+        }
+        <div class="ws">
+            <div class="kpi-lbl">Saúde média</div>
+            @{
+                var corMedia = Model.MediaHealthScore >= 80 ? "text-emerald-600" : Model.MediaHealthScore >= 60 ? "text-blue-600" : Model.MediaHealthScore >= 40 ? "text-amber-600" : "text-red-600";
+            }
+            <div class="kpi-val @corMedia">@Model.MediaHealthScore.ToString("F0")</div>
+            <div class="text-sm text-slate-500">de 100</div>
+        </div>
+        <div class="ws">
+            <div class="kpi-lbl">Total de alertas</div>
+            <div class="kpi-val @(Model.TotalAlertas > 0 ? "text-red-600" : "text-emerald-600")">@Model.TotalAlertas</div>
+            <div class="text-sm text-slate-500">em todas as lojas</div>
+        </div>
+    </div>
+
+    <!-- Store Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+        @foreach (var loja in Model.Lojas)
+        {
+            var bgScore = loja.HealthClassificacao switch { "Excelente" => "bg-emerald-500", "Bom" => "bg-blue-500", "Atencao" => "bg-amber-500", _ => "bg-red-500" };
+            var textScore = loja.HealthClassificacao switch { "Excelente" => "text-emerald-700", "Bom" => "text-blue-700", "Atencao" => "text-amber-700", _ => "text-red-700" };
+            var bgLight = loja.HealthClassificacao switch { "Excelente" => "bg-emerald-50", "Bom" => "bg-blue-50", "Atencao" => "bg-amber-50", _ => "bg-red-50" };
+            var barWidth = Math.Max(5, (int)loja.HealthScore);
+            <a href="/inteligencia-lojas/@loja.LojaId?periodo=@Model.PeriodoDias" class="ws hover:border-indigo-300 transition-colors group block">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-slate-800 group-hover:text-indigo-700 truncate">@loja.NomeLoja</h3>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold text-white @bgScore">@loja.HealthScore.ToString("F0")</span>
+                </div>
+                <!-- Health bar -->
+                <div class="w-full h-2 bg-slate-100 rounded-full mb-3">
+                    <div class="h-2 rounded-full @bgScore" style="width: @(barWidth)%"></div>
+                </div>
+                <!-- Mini KPIs -->
+                <div class="grid grid-cols-3 gap-2 text-center mb-3">
+                    <div class="@bgLight rounded-lg py-1.5 px-1">
+                        <div class="text-xs text-slate-500">Receita</div>
+                        <div class="text-sm font-semibold @textScore">@loja.ReceitaPeriodo.ToString("C0", ptBR)</div>
+                    </div>
+                    <div class="@bgLight rounded-lg py-1.5 px-1">
+                        <div class="text-xs text-slate-500">Estoque</div>
+                        <div class="text-sm font-semibold @textScore">@loja.ValorEstoque.ToString("C0", ptBR)</div>
+                    </div>
+                    <div class="@bgLight rounded-lg py-1.5 px-1">
+                        <div class="text-xs text-slate-500">Alertas</div>
+                        <div class="text-sm font-semibold @(loja.AlertasTotal > 0 ? "text-red-600" : textScore)">@loja.AlertasTotal</div>
+                    </div>
+                </div>
+                <!-- Details row -->
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                    <span>@loja.TotalSkus SKUs &middot; @loja.MediaVendasDiaria.ToString("F1") un/dia</span>
+                    <span class="text-indigo-500 group-hover:text-indigo-700 font-medium">Ver detalhes &rarr;</span>
+                </div>
+            </a>
+        }
+    </div>
+
+    <!-- Comparison Chart -->
+    @if (Model.Lojas.Count > 1)
+    {
+        <div class="ws mb-6">
+            <h2 class="text-base font-semibold text-slate-800 mb-4">Comparativo de Saúde</h2>
+            <canvas id="healthChart" height="60"></canvas>
+        </div>
+    }
+
+    <!-- Actionable Indicators -->
+    @if (Model.Indicadores.Count > 0)
+    {
+        <div class="ws">
+            <h2 class="text-base font-semibold text-slate-800 mb-4">Indicadores de Ação</h2>
+            <div class="space-y-2">
+                @foreach (var ind in Model.Indicadores)
+                {
+                    var (badgeBg, badgeText, icon) = ind.Severidade switch
+                    {
+                        "critico" => ("bg-red-100 text-red-700", "text-red-700", "🚨"),
+                        "alto" => ("bg-orange-100 text-orange-700", "text-orange-700", "⚠️"),
+                        "medio" => ("bg-amber-100 text-amber-700", "text-amber-700", "💡"),
+                        "baixo" => ("bg-blue-100 text-blue-700", "text-blue-700", "ℹ️"),
+                        "positivo" => ("bg-emerald-100 text-emerald-700", "text-emerald-700", "✅"),
+                        _ => ("bg-slate-100 text-slate-700", "text-slate-700", "📌")
+                    };
+                    <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                        <span class="text-lg">@icon</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="text-sm font-semibold @badgeText">@ind.Titulo</span>
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold @badgeBg">@ind.Severidade.ToUpper()</span>
+                            </div>
+                            <p class="text-xs text-slate-500">@ind.Descricao</p>
+                        </div>
+                        @if (ind.LojaId.HasValue)
+                        {
+                            <a href="/inteligencia-lojas/@ind.LojaId?periodo=@Model.PeriodoDias" class="text-xs text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap self-center">Ver loja</a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@if (Model.Lojas.Count > 1)
+{
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var ctx = document.getElementById('healthChart');
+            if (!ctx) return;
+            var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Lojas.Select(l => l.NomeLoja).ToList()));
+            var scores = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Lojas.Select(l => l.HealthScore).ToList()));
+            var colors = scores.map(function (s) {
+                if (s >= 80) return '#10b981';
+                if (s >= 60) return '#3b82f6';
+                if (s >= 40) return '#f59e0b';
+                return '#ef4444';
+            });
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Health Score',
+                        data: scores,
+                        backgroundColor: colors,
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { min: 0, max: 100, ticks: { callback: function (v) { return v + '/100'; } } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        });
+    </script>
+}
