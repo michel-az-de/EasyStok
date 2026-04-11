@@ -50,7 +50,10 @@
         <!-- Pill filters por natureza -->
         <div class="flex gap-2 flex-wrap">
             @{
-                var naturezas = new[] { ("", "Todas"), ("venda", "Vendas"), ("perda", "Perdas"), ("doacao", "Doações"), ("uso_interno", "Uso Interno") };
+                var naturezas = new[] {
+                    ("", "Todas"), ("venda", "Vendas"), ("perda", "Perdas"), ("prejuizo", "Prejuízos"),
+                    ("doacao", "Doações"), ("uso_interno", "Uso Interno"), ("devolucao", "Devoluções"), ("ajuste", "Ajustes")
+                };
             }
             @foreach (var (val, label) in naturezas)
             {
@@ -99,6 +102,7 @@
                     <th>Qtd</th>
                     <th>Valor</th>
                     <th>Data</th>
+                    <th>Documento</th>
                     <th>Descrição</th>
                     <th></th>
                 </tr>
@@ -106,9 +110,11 @@
             <tbody>
                 @foreach (var s in Model.Itens)
                 {
-                    <tr>
+                    var isEstornada = s.EstornadaEm.HasValue;
+                    var isEstorno = s.Natureza?.Equals("Estorno", StringComparison.OrdinalIgnoreCase) == true;
+                    <tr class="@(isEstornada ? "opacity-50" : "")">
                         <td>
-                            <div class="font-medium text-slate-900">@(s.Produto?.Nome ?? s.ProdutoId)</div>
+                            <div class="font-medium text-slate-900 @(isEstornada ? "line-through" : "")">@(s.Produto?.Nome ?? s.ProdutoId)</div>
                             @if (s.ProdutoVariacao != null)
                             {
                                 <div class="text-xs text-slate-500">@s.ProdutoVariacao.Nome</div>
@@ -118,20 +124,35 @@
                             @{
                                 var naturezaColor = s.Natureza?.ToLower() switch {
                                     "venda" => "badge-ok",
-                                    "perda" => "badge-critical",
+                                    "perda" or "prejuizo" => "badge-critical",
                                     "devolucao" or "devolução" => "badge-slow",
+                                    "doacao" or "doação" => "badge-warn",
+                                    "usointerno" => "badge-warn",
+                                    "estorno" => "badge-slow",
+                                    "ajuste" => "badge-warn",
                                     _ => "badge-warn"
+                                };
+                                var naturezaLabel = s.Natureza?.ToLower() switch {
+                                    "usointerno" => "Uso Interno",
+                                    "devolucao" => "Devolução",
+                                    "doacao" => "Doação",
+                                    "prejuizo" => "Prejuízo",
+                                    _ => s.Natureza
                                 };
                             }
                             <span class="badge @naturezaColor">
-                                @s.Natureza
+                                @naturezaLabel
                             </span>
+                            @if (isEstornada)
+                            {
+                                <span class="badge badge-slow text-xs ml-1">Estornada</span>
+                            }
                         </td>
-                        <td class="font-medium">@s.Qty</td>
+                        <td class="font-medium @(isEstornada ? "line-through" : "")">@s.Qty</td>
                         <td>
                             @if (s.Custo.HasValue)
                             {
-                                <span>R$ @s.Custo.Value.ToString("N2")</span>
+                                <span class="@(isEstornada ? "line-through" : "")">R$ @s.Custo.Value.ToString("N2")</span>
                             }
                             else
                             {
@@ -139,12 +160,23 @@
                             }
                         </td>
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
+                        <td class="text-slate-500 text-sm">@(s.DocumentoReferencia ?? "—")</td>
                         <td class="text-slate-500 text-sm">@(s.Descricao ?? "—")</td>
                         <td>
-                            <span class="text-xs text-slate-400 cursor-not-allowed"
-                                  title="Estorno não disponível no momento">
-                                Estornar
-                            </span>
+                            @if (!isEstornada && !isEstorno)
+                            {
+                                <form asp-action="Estornar" asp-route-id="@s.Id" method="post"
+                                      onsubmit="return confirm('Confirma o estorno desta saída? O estoque será restaurado.');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium">
+                                        Estornar
+                                    </button>
+                                </form>
+                            }
+                            else if (isEstornada)
+                            {
+                                <span class="text-xs text-slate-400">Estornada em @s.EstornadaEm!.Value.ToString("dd/MM")</span>
+                            }
                         </td>
                     </tr>
                 }

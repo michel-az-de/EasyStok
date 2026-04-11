@@ -18,13 +18,65 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
+        public async Task<MovimentacaoEstoque?> GetByIdAsync(Guid id) =>
+            await dbContext.MovimentacoesEstoque
+                .Include(m => m.ItemEstoque)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+        public Task UpdateAsync(MovimentacaoEstoque movimentacao)
+        {
+            dbContext.MovimentacoesEstoque.Update(movimentacao);
+            return Task.CompletedTask;
+        }
+
         public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(
             Guid empresaId,
             DateTime? de = null,
             DateTime? ate = null,
             TipoMovimentacaoEstoque? tipo = null,
+            NaturezaMovimentacaoEstoque? natureza = null,
             int page = 1,
             int pageSize = 20)
+        {
+            var query = BuildFilteredQuery(empresaId, de, ate, tipo, natureza);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Include(m => m.Produto)
+                .Include(m => m.ProdutoVariacao)
+                .OrderByDescending(m => m.DataMovimentacao)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<KpisMovimentacao> GetKpisAsync(
+            Guid empresaId,
+            DateTime? de = null,
+            DateTime? ate = null,
+            TipoMovimentacaoEstoque? tipo = null,
+            NaturezaMovimentacaoEstoque? natureza = null)
+        {
+            var query = BuildFilteredQuery(empresaId, de, ate, tipo, natureza);
+
+            var totalUnidades = await query.SumAsync(m => m.Quantidade.Value);
+            var receitaTotal = await query
+                .Where(m => m.ValorTotal != null)
+                .SumAsync(m => m.ValorTotal!.Valor);
+            var totalVendas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+            var totalPerdas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda);
+
+            return new KpisMovimentacao(totalUnidades, receitaTotal, totalVendas, totalPerdas);
+        }
+
+        private IQueryable<MovimentacaoEstoque> BuildFilteredQuery(
+            Guid empresaId,
+            DateTime? de,
+            DateTime? ate,
+            TipoMovimentacaoEstoque? tipo,
+            NaturezaMovimentacaoEstoque? natureza)
         {
             var query = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
@@ -36,15 +88,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(m => m.DataMovimentacao <= ate.Value);
             if (tipo.HasValue)
                 query = query.Where(m => m.Tipo == tipo.Value);
+            if (natureza.HasValue)
+                query = query.Where(m => m.Natureza == natureza.Value);
 
-            var totalCount = await query.CountAsync();
-            var items = await query
-                .OrderByDescending(m => m.DataMovimentacao)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return (items, totalCount);
+            return query;
         }
 
         public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId) =>

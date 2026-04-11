@@ -11,6 +11,8 @@ namespace EasyStock.Domain.Enums
         Devolucao,
         UsoInterno,
         Vencimento,
-        Reposicao
+        Reposicao,
+        Doacao,
+        Estorno
     }
 }

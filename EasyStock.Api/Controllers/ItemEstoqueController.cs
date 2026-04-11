@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
 using Swashbuckle.AspNetCore.Annotations;
@@ -20,6 +21,7 @@ public class ItemEstoqueController(
     IItemEstoqueRepository itemEstoqueRepository,
     RegistrarEntradaEstoqueUseCase registrarEntradaUseCase,
     RegistrarSaidaEstoqueUseCase registrarSaidaUseCase,
+    EstornarSaidaUseCase estornarSaidaUseCase,
     ReporEstoqueUseCase reporEstoqueUseCase,
     BuscarEstoqueInteligenteUseCase buscarUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
@@ -121,5 +123,20 @@ public class ItemEstoqueController(
             return error!;
 
         return DataOk(await reporEstoqueUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
+    }
+
+    [SwaggerOperation(Summary = "Reverse a stock exit (estorno)", Description = "Creates a reversal entry restoring the stock quantity.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpPost("estorno/{movimentacaoId}")]
+    public async Task<IActionResult> Estornar(Guid movimentacaoId, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await estornarSaidaUseCase.ExecuteAsync(
+            new EstornarSaidaCommand(resolvedEmpresaId, movimentacaoId, null));
+        return DataOk(result);
     }
 }

@@ -179,6 +179,14 @@ namespace EasyStock.Domain.Entities
                 throw new EstoqueInsuficienteException(ProdutoId, 1, QuantidadeAtual.Value);
         }
 
+        public void RestaurarQuantidade(Quantidade quantidade, DateTime alteradoEm)
+        {
+            QuantidadeAtual = QuantidadeAtual.Add(quantidade);
+            UltimaMovimentacaoEm = alteradoEm;
+            AlteradoEm = alteradoEm;
+            RecalcularIndicadores(alteradoEm);
+        }
+
         public void AtualizarVelocidadeSaida(decimal velocidadeSaidaDiaria, DateTime dataReferencia)
         {
             VelocidadeSaidaDiaria = Math.Max(0m, decimal.Round(velocidadeSaidaDiaria, 2));
