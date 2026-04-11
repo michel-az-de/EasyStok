@@ -74,6 +74,7 @@ builder.Services.AddSwaggerGen(c =>
     // ── Schema & operation filters ────────────────────────────────────────
     c.SchemaFilter<SchemaExamplesFilter>();
     c.OperationFilter<GetOperationExamplesFilter>();
+    c.DocumentFilter<TagDescriptionsDocumentFilter>();
 
     // ── Use fully-qualified names to avoid schema conflicts ───────────────
     c.CustomSchemaIds(type => type.FullName?.Replace('+', '.'));
@@ -429,6 +430,7 @@ Log.Information("""
       Ambiente:     {Environment}
       Banco:        {Provider} (configurado: {Configured})
       Fallback:     {Fallback}
+      Raiz (/):     → redireciona para /swagger
       Swagger:      /swagger
       Diagnostico:  /diagnostico
       Health:       /health, /health/live, /health/ready
@@ -514,6 +516,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseExceptionHandler();
 app.MapControllers();
+
+// Redirect root to Swagger UI for immediate discoverability
+app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
+   .ExcludeFromDescription();
 
 // Health Check endpoints
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
