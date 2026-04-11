@@ -159,3 +159,48 @@
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Line clamp for preview text */
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Auto-calculated field highlight */
+.field-calculated {
+    border-color: #6ee7b7 !important;
+    background-color: rgba(209, 250, 229, 0.15);
+}
+
+/* Section header with icon */
+.section-hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.section-hd-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Preview card transition */
+.preview-card {
+    transition: box-shadow .2s;
+}
+.preview-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Drop zone active state */
+.drop-active {
+    border-color: #818CF8 !important;
+    background-color: rgba(238, 242, 255, 0.5);
+}
