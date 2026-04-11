@@ -243,7 +243,11 @@ builder.Services.Configure<EasyStockConfiguracoes>(
 builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection(ConfigurationKeys.SectionFileStorage));
 
 var fileStorageOptions = builder.Configuration.GetSection(ConfigurationKeys.SectionFileStorage).Get<FileStorageOptions>() ?? new FileStorageOptions();
-if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
+if (string.Equals(fileStorageOptions.Provider, "AzureFileShare", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IFileStorage, AzureFileShareStorage>();
+}
+else if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
 }

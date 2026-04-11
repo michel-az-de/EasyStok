@@ -27,9 +27,11 @@
 
 <form action="@formAction" method="post" enctype="multipart/form-data"
       x-data="produtoForm()"
-      @@submit.prevent="submitForm($event)"
+      @@submit="saving = true"
       class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
     @Html.AntiForgeryToken()
+    <input type="file" name="fotos" multiple accept="image/*"
+           x-ref="actualFileInput" class="hidden" aria-hidden="true">
     @if (isEdit)
     {
         <input type="hidden" name="Id" :value="productId" />
@@ -752,11 +754,18 @@
                         this.photoFiles.push(file);
                         this.photoPreviews.push(URL.createObjectURL(file));
                     }
+                    this._syncFileInput();
                 },
                 removePhoto(i) {
                     URL.revokeObjectURL(this.photoPreviews[i]);
                     this.photoFiles.splice(i, 1);
                     this.photoPreviews.splice(i, 1);
+                    this._syncFileInput();
+                },
+                _syncFileInput() {
+                    const dt = new DataTransfer();
+                    this.photoFiles.forEach(f => dt.items.add(f));
+                    this.$refs.actualFileInput.files = dt.files;
                 },
 
                 // ── AI ──
@@ -806,33 +815,6 @@
                     return Math.round(fields.filter(Boolean).length / fields.length * 100);
                 },
 
-                // ── Form submission ──
-                async submitForm(e) {
-                    this.saving = true;
-                    const form = e.target;
-                    const fd = new FormData(form);
-                    this.photoFiles.forEach(f => fd.append('fotos', f));
-
-                    try {
-                        const res = await fetch(form.action, {
-                            method: 'POST',
-                            body: fd,
-                            redirect: 'follow'
-                        });
-                        if (res.redirected) {
-                            window.location.href = res.url;
-                            return;
-                        }
-                        // Validation error — replace page content
-                        const html = await res.text();
-                        this.saving = false; // reset antes de substituir DOM
-                        document.open();
-                        document.write(html);
-                        document.close();
-                    } catch {
-                        this.saving = false;
-                    }
-                }
             };
         }
     </script>

@@ -2,6 +2,8 @@
 @{
     Layout = null;
     ViewBag.Title = "Login";
+    var sessionExpired = ViewBag.SessionExpired == true;
+    var apiUnavailable = ViewBag.ApiUnavailable == true;
 }
 <!DOCTYPE html>
 <html lang="pt-BR" class="h-full">
@@ -15,7 +17,8 @@
     <link rel="stylesheet" href="~/css/app.css" />
 </head>
 <body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
-    <div class="w-full max-w-sm mx-auto px-4">
+    <div class="w-full max-w-sm mx-auto px-4" x-data="loginForm()">
+
         <!-- Logo -->
         <div class="text-center mb-8">
             <div class="inline-flex items-center gap-2 mb-2">
@@ -25,6 +28,28 @@
             <p class="text-slate-500 text-sm">Gerencie seu estoque com inteligência</p>
         </div>
 
+        @* Banner: sessão expirada *@
+        @if (sessionExpired)
+        {
+            <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/>
+                </svg>
+                <span>Sua sessão expirou. Faça login novamente para continuar.</span>
+            </div>
+        }
+
+        @* Banner: API indisponível *@
+        @if (apiUnavailable)
+        {
+            <div class="bg-orange-50 border border-orange-200 text-orange-800 text-sm rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                </svg>
+                <span>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</span>
+            </div>
+        }
+
         <!-- Card -->
         <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
             <h1 class="text-xl font-bold text-slate-900 mb-1">Entrar</h1>
@@ -32,12 +57,16 @@
 
             @if (!ViewData.ModelState.IsValid)
             {
-                <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-                    @Html.ValidationSummary(false, "", new { @class = "" })
+                <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 flex items-start gap-2">
+                    <svg class="w-4 h-4 shrink-0 mt-0.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                    </svg>
+                    <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
                 </div>
             }
 
-            <form asp-action="Login" asp-controller="Auth" method="post">
+            <form asp-action="Login" asp-controller="Auth" method="post"
+                  @@submit.prevent="handleSubmit">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
 
@@ -45,7 +74,8 @@
                     <label asp-for="Email" class="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
                     <input asp-for="Email" type="email" autocomplete="email"
                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
-                           placeholder="seu@email.com" />
+                           placeholder="seu@email.com"
+                           :disabled="loading" />
                     <span asp-validation-for="Email" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
 
@@ -54,15 +84,40 @@
                         <label asp-for="Senha" class="block text-sm font-semibold text-slate-700">Senha</label>
                         <a href="/auth/esqueci-senha" class="text-xs text-indigo-600 hover:text-indigo-700">Esqueceu a senha?</a>
                     </div>
-                    <input asp-for="Senha" type="password" autocomplete="current-password"
-                           class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
-                           placeholder="Sua senha" />
+                    <div class="relative">
+                        <input asp-for="Senha" autocomplete="current-password"
+                               x-bind:type="showPass ? 'text' : 'password'"
+                               class="w-full px-4 py-2.5 pr-11 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
+                               placeholder="Sua senha"
+                               :disabled="loading" />
+                        <button type="button"
+                                @@click="showPass = !showPass"
+                                class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                                tabindex="-1"
+                                :aria-label="showPass ? 'Ocultar senha' : 'Mostrar senha'">
+                            <!-- Olho aberto -->
+                            <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            <!-- Olho fechado -->
+                            <svg x-show="showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                            </svg>
+                        </button>
+                    </div>
                     <span asp-validation-for="Senha" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
 
                 <button type="submit"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
-                    Entrar
+                        :disabled="loading"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
+                    <!-- Spinner (visível durante loading) -->
+                    <svg x-show="loading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" x-cloak>
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <span x-text="loading ? 'Entrando...' : 'Entrar'">Entrar</span>
                 </button>
             </form>
         </div>
@@ -76,6 +131,25 @@
             &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
         </p>
     </div>
+
     <script src="~/js/toast.js"></script>
+    <script>
+        function loginForm() {
+            return {
+                loading: false,
+                showPass: false,
+                handleSubmit(e) {
+                    if (this.loading) return;
+                    this.loading = true;
+                    // Submeter o formulário nativo
+                    e.target.submit();
+                }
+            };
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </body>
 </html>

@@ -18,6 +18,14 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     {
         if (session.IsLoggedIn())
             return RedirectToAction("Index", "Dashboard");
+
+        // Verifica se a sessão expirou (sinalizado pelo TokenRefreshHandler via cookie _se)
+        if (Request.Cookies.ContainsKey("_se"))
+        {
+            ViewBag.SessionExpired = true;
+            Response.Cookies.Delete("_se");
+        }
+
         ViewBag.ReturnUrl = returnUrl;
         return View();
     }
@@ -31,7 +39,9 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         var result = await api.PostAsync<JsonElement>("auth/login", new { email = vm.Email, senha = vm.Senha });
         if (!result.Success)
         {
-            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Credenciais inválidas.");
+            var errorMsg = ClassifyLoginError(result.ErrorMessage);
+            ModelState.AddModelError(string.Empty, errorMsg);
+            ViewBag.ApiUnavailable = IsApiUnavailableError(result.ErrorMessage);
             return View(vm);
         }
 
@@ -41,7 +51,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
 
         if (string.IsNullOrEmpty(token))
         {
-            ModelState.AddModelError(string.Empty, "Resposta inválida do servidor.");
+            ModelState.AddModelError(string.Empty, "Resposta inválida do servidor. Tente novamente.");
             return View(vm);
         }
 
@@ -75,7 +85,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         {
             session.Clear();
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            ModelState.AddModelError(string.Empty, "Nao foi possivel identificar a empresa deste usuario. Se houver mais de uma empresa vinculada, o login precisa ser ajustado antes de continuar.");
+            ModelState.AddModelError(string.Empty, "Não foi possível identificar a empresa associada a este usuário. Entre em contato com o suporte.");
             return View(vm);
         }
 
@@ -219,6 +229,39 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? Redirect(returnUrl)
             : RedirectToAction("Index", "Dashboard");
+
+    private static string ClassifyLoginError(string? errorMessage)
+    {
+        if (string.IsNullOrEmpty(errorMessage))
+            return "Credenciais inválidas. Verifique seu e-mail e senha.";
+
+        if (IsApiUnavailableError(errorMessage))
+            return "Serviço temporariamente indisponível. Tente novamente em alguns instantes.";
+
+        // Mensagens de credenciais inválidas (mantém genérico por segurança)
+        if (errorMessage.Contains("inválid", StringComparison.OrdinalIgnoreCase) ||
+            errorMessage.Contains("invalid", StringComparison.OrdinalIgnoreCase) ||
+            errorMessage.Contains("credenciais", StringComparison.OrdinalIgnoreCase) ||
+            errorMessage.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
+            errorMessage.Contains("senha", StringComparison.OrdinalIgnoreCase))
+            return "E-mail ou senha incorretos. Verifique suas credenciais.";
+
+        if (errorMessage.Contains("429") || errorMessage.Contains("muitas requisições", StringComparison.OrdinalIgnoreCase))
+            return "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.";
+
+        return "Não foi possível realizar o login. Tente novamente.";
+    }
+
+    private static bool IsApiUnavailableError(string? errorMessage)
+    {
+        if (string.IsNullOrEmpty(errorMessage)) return false;
+        return errorMessage.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("unreachable", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("não foi possível conectar", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("TaskCanceledException", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("HttpRequestException", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
