@@ -22,13 +22,18 @@ public class FornecedoresService(ApiClient api, SessionService session)
     public Task<ApiResult<Fornecedor>> CriarAsync(
         string nome, string? documento, string? contato, string? email, string? telefone,
         int? leadTimeEstimadoDias, string? tipo, string? categoria, string? siteUrl,
-        string? pedidoMinimo, string? fretePadrao, string? observacoes) =>
-        api.PostAsync<Fornecedor>("fornecedores", new
+        string? pedidoMinimo, string? fretePadrao, string? observacoes)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<Fornecedor>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+
+        return api.PostAsync<Fornecedor>("fornecedores", new
         {
-            empresaId = GetEmpresaId(),
-            nome, documento, contato, email, telefone, leadTimeEstimadoDias,
+            empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
             tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
         });
+    }
 
     public Task<ApiResult<object>> EditarAsync(string id,
         string nome, string? documento, string? contato, string? email, string? telefone,
@@ -38,17 +43,25 @@ public class FornecedoresService(ApiClient api, SessionService session)
         if (!Guid.TryParse(id, out var fid))
             return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(id)));
 
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+
         return api.PatchAsync<object>($"fornecedores/{id}", new
         {
             fornecedorId = fid,
-            empresaId = GetEmpresaId(),
-            nome, documento, contato, email, telefone, leadTimeEstimadoDias,
+            empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
             tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
         });
     }
 
-    public Task<ApiResult<bool>> ExcluirAsync(string id) =>
-        api.DeleteAsync($"fornecedores/{id}?empresaId={GetEmpresaId()}");
+    public Task<ApiResult<bool>> ExcluirAsync(string id)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<bool>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+        return api.DeleteAsync($"fornecedores/{id}?empresaId={empresaId}");
+    }
 
     public Task<ApiResult<List<FornecedorHistoricoItem>>> ObterHistoricoAsync(string id) =>
         api.GetAsync<List<FornecedorHistoricoItem>>($"fornecedores/{id}/historico?empresaId={GetEmpresaId()}");
@@ -66,9 +79,13 @@ public class FornecedoresService(ApiClient api, SessionService session)
         if (!Guid.TryParse(fornecedorId, out var fid))
             return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(fornecedorId)));
 
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+
         return api.PostAsync<object>("fornecedores/pedidos", new
         {
-            empresaId = GetEmpresaId(),
+            empresaId,
             fornecedorId = fid,
             dataPedido = dataPedido.ToDateTime(TimeOnly.MinValue),
             previsaoEntrega = previsaoEntrega.HasValue ? previsaoEntrega.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
@@ -78,17 +95,26 @@ public class FornecedoresService(ApiClient api, SessionService session)
         });
     }
 
-    public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId, string? tracking) =>
-        api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/receber", new
+    public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId, string? tracking)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+
+        return api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/receber", new
         {
-            empresaId = GetEmpresaId(),
+            empresaId,
             dataRecebimento = DateTime.UtcNow,
             tracking
         });
+    }
 
-    public Task<ApiResult<object>> CancelarPedidoAsync(string pedidoId) =>
-        api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/cancelar", new
-        {
-            empresaId = GetEmpresaId()
-        });
+    public Task<ApiResult<object>> CancelarPedidoAsync(string pedidoId)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+
+        return api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/cancelar", new { empresaId });
+    }
 }

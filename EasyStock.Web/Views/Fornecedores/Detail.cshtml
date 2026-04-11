@@ -133,9 +133,11 @@
                         <textarea name="observacoes" rows="2"
                                   class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@Model.Fornecedor.Observacoes</textarea>
                     </div>
-                    <button type="submit"
+                    <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+                            :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
                             class="w-full py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
-                        Salvar
+                        <span x-show="!loading">Salvar</span>
+                        <span x-show="loading" x-cloak class="flex items-center justify-center gap-2"><span class="spinner"></span> Salvando...</span>
                     </button>
                 </div>
             </form>
@@ -185,11 +187,13 @@
                         <button type="button" @@click="confirm = false"
                                 class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">Cancelar</button>
                         <form asp-action="Excluir" asp-controller="Fornecedores"
-                              asp-route-id="@Model.Fornecedor.Id" method="post">
+                              asp-route-id="@Model.Fornecedor.Id" method="post"
+                              x-data="{ loading: false }" @@submit="loading = true">
                             @Html.AntiForgeryToken()
-                            <button type="submit"
+                            <button type="submit" :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
                                     class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                Desativar
+                                <span x-show="!loading">Desativar</span>
+                                <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Desativando...</span>
                             </button>
                         </form>
                     </div>

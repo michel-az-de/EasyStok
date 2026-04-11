@@ -83,6 +83,27 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 var app = builder.Build();
 
+// Startup: verificar conectividade com a API (não-bloqueante)
+_ = Task.Run(async () =>
+{
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    var baseUrl = app.Configuration["ApiSettings:BaseUrl"];
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var diag = scope.ServiceProvider.GetRequiredService<DiagnosticoWebService>();
+        var reachable = await diag.PingApiAsync();
+        if (reachable)
+            logger.LogInformation("API conectada com sucesso — BaseUrl: {BaseUrl}", baseUrl);
+        else
+            logger.LogWarning("API NÃO acessível no startup — BaseUrl: {BaseUrl}. Verifique a configuração.", baseUrl);
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Falha ao verificar conectividade com API — BaseUrl: {BaseUrl}", baseUrl);
+    }
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/auth/login");

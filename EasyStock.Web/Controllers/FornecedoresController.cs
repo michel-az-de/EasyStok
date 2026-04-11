@@ -4,6 +4,22 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
+public class CriarFornecedorRequest
+{
+    public string Nome { get; set; } = "";
+    public string? Documento { get; set; }
+    public string? Contato { get; set; }
+    public string? Email { get; set; }
+    public string? Telefone { get; set; }
+    public int? LeadTimeEstimadoDias { get; set; }
+    public string? Tipo { get; set; }
+    public string? Categoria { get; set; }
+    public string? SiteUrl { get; set; }
+    public string? PedidoMinimo { get; set; }
+    public string? FretePadrao { get; set; }
+    public string? Observacoes { get; set; }
+}
+
 public class FornecedoresController(FornecedoresService svc, SessionService session) : BaseController(session)
 {
     [HttpGet("/fornecedores")]
@@ -68,6 +84,24 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
 
         Toast("success", "Fornecedor criado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id = result.Data!.Id });
+    }
+
+    [HttpPost("/fornecedores/json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarJson([FromBody] CriarFornecedorRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Nome))
+            return BadRequest(new { success = false, errorMessage = "Nome é obrigatório." });
+
+        var result = await svc.CriarAsync(
+            req.Nome, req.Documento, req.Contato, req.Email, req.Telefone,
+            req.LeadTimeEstimadoDias, req.Tipo, req.Categoria, req.SiteUrl,
+            req.PedidoMinimo, req.FretePadrao, req.Observacoes);
+
+        if (!result.Success)
+            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar fornecedor." });
+
+        return Ok(new { success = true, id = result.Data!.Id });
     }
 
     [HttpPost("/fornecedores/{id}")]
