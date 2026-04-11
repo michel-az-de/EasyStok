@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using EasyStock.Web.Models.Api;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EasyStock.Web.Models.ViewModels.Produtos;
 
@@ -50,6 +52,10 @@ public class ProdutoFormViewModel
 
     // Embalagens
     public List<EmbalagemFormItem> Embalagens { get; set; } = [];
+
+    // Fotos existentes (populated on edit, not bound from form)
+    [BindNever]
+    public List<ProdutoFotoDetalhe> ExistingPhotos { get; set; } = [];
 }
 
 public class VariacaoFormItem
