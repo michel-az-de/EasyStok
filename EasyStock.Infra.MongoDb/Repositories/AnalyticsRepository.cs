@@ -56,11 +56,47 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     private static readonly TimeSpan ProjecaoTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan CanalTtl = TimeSpan.FromMinutes(10);
 
+    // ── Helper: add LojaId filter to a BsonDocument match ──
+
+    private static void AddLojaIdFilter(BsonDocument match, Guid? lojaId)
+    {
+        if (lojaId.HasValue)
+            match.Add("LojaId", new BsonBinaryData(lojaId.Value, GuidRepresentation.Standard));
+    }
+
+    /// <summary>
+    /// For MovimentacoesEstoque queries that need lojaId filtering, we first resolve
+    /// the ItemEstoqueIds belonging to the given loja, then add an $in filter.
+    /// </summary>
+    private async Task<List<BsonValue>> GetItemEstoqueIdsForLojaAsync(Guid empresaId, Guid lojaId)
+    {
+        var filter = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "LojaId", new BsonBinaryData(lojaId, GuidRepresentation.Standard) }
+        };
+        var ids = await ItensEstoque.Find(filter)
+            .Project(new BsonDocument("_id", 1))
+            .ToListAsync();
+        return ids.Select(x => x["_id"]).ToList();
+    }
+
+    private async Task AddMovimentacaoLojaFilter(BsonDocument match, Guid empresaId, Guid? lojaId)
+    {
+        if (lojaId.HasValue)
+        {
+            var itemIds = await GetItemEstoqueIdsForLojaAsync(empresaId, lojaId.Value);
+            match.Add("ItemEstoqueId", new BsonDocument("$in", new BsonArray(itemIds)));
+        }
+    }
+
+    private static string LojaKeySuffix(Guid? lojaId) => lojaId.HasValue ? $":loja:{lojaId.Value}" : "";
+
     // Dashboard
 
-    public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30)
+    public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:dashboard:{empresaId}:{periodoDias}";
+        var cacheKey = $"analytics:dashboard:{empresaId}:{periodoDias}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<DashboardResumo>(cacheKey);
         if (cached is not null) return cached;
 
@@ -68,9 +104,12 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var de = ate.AddDays(-periodoDias);
 
         // Estoque
+        var estoqueMatch = new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard));
+        AddLojaIdFilter(estoqueMatch, lojaId);
+
         var estoquePipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard))),
+            new BsonDocument("$match", estoqueMatch),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", BsonNull.Value },
@@ -96,20 +135,24 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var valorVenda = estoqueData?["ValorVenda"].ToDecimal() ?? 0m;
         var alertasEstoqueBaixo = estoqueData?["AlertasEstoqueBaixo"].ToInt32() ?? 0;
 
-        var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard))).ToListAsync().ContinueWith(t => t.Result.Count);
+        var skuFilter = new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard));
+        AddLojaIdFilter(skuFilter, lojaId);
+        var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", skuFilter).ToListAsync().ContinueWith(t => t.Result.Count);
 
         // Alertas vencimento
         var cutoffValidade = DateTime.UtcNow.AddDays(30);
-        var alertasVencimento = await ItensEstoque.CountDocumentsAsync(new BsonDocument
+        var validadeFilter = new BsonDocument
         {
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoffValidade) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
-        });
+        };
+        AddLojaIdFilter(validadeFilter, lojaId);
+        var alertasVencimento = await ItensEstoque.CountDocumentsAsync(validadeFilter);
 
         // Alertas parados
         var cutoffParado = DateTime.UtcNow.AddDays(-90);
-        var alertasParados = await ItensEstoque.CountDocumentsAsync(new BsonDocument
+        var paradoFilter = new BsonDocument
         {
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) },
@@ -117,17 +160,22 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
                 new BsonDocument("UltimaMovimentacaoEm", BsonNull.Value),
                 new BsonDocument("UltimaMovimentacaoEm", new BsonDocument("$lt", cutoffParado))
             }}
-        });
+        };
+        AddLojaIdFilter(paradoFilter, lojaId);
+        var alertasParados = await ItensEstoque.CountDocumentsAsync(paradoFilter);
 
         // Vendas do periodo
+        var movMatch = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "Tipo", TipoMovimentacaoEstoque.Saida },
+            { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
+        };
+        await AddMovimentacaoLojaFilter(movMatch, empresaId, lojaId);
+
         var movPipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
+            new BsonDocument("$match", movMatch),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", BsonNull.Value },
@@ -162,21 +210,24 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     // Receita
 
-    public async Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12)
+    public async Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:receita:{empresaId}:{meses}";
+        var cacheKey = $"analytics:receita:{empresaId}:{meses}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<List<ReceitaPorPeriodo>>(cacheKey);
         if (cached is not null) return cached;
 
         var de = DateTime.UtcNow.AddMonths(-meses);
 
+        var match = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "DataVenda", new BsonDocument("$gte", de) }
+        };
+        AddLojaIdFilter(match, lojaId);
+
         var pipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "DataVenda", new BsonDocument("$gte", de) }
-            }),
+            new BsonDocument("$match", match),
             new BsonDocument("$unwind", "$ItensVenda"),
             new BsonDocument("$group", new BsonDocument
             {
@@ -209,23 +260,26 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     // Margem
 
-    public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20)
+    public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}";
+        var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<List<MargemPorProduto>>(cacheKey);
         if (cached is not null) return cached;
 
         var de = DateTime.UtcNow.AddDays(-dias);
 
+        var match = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "Tipo", TipoMovimentacaoEstoque.Saida },
+            { "DataMovimentacao", new BsonDocument("$gte", de) },
+            { "ValorUnitario", new BsonDocument("$ne", BsonNull.Value) }
+        };
+        await AddMovimentacaoLojaFilter(match, empresaId, lojaId);
+
         var pipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de) },
-                { "ValorUnitario", new BsonDocument("$ne", BsonNull.Value) }
-            }),
+            new BsonDocument("$match", match),
             new BsonDocument("$lookup", new BsonDocument
             {
                 { "from", "Produtos" },
@@ -289,9 +343,10 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         Guid empresaId,
         DateTime de,
         DateTime ate,
-        TipoMovimentacaoEstoque? tipo = null)
+        TipoMovimentacaoEstoque? tipo = null,
+        Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:movimentacoes:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{tipo}";
+        var cacheKey = $"analytics:movimentacoes:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{tipo}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<List<MovimentacaoResumo>>(cacheKey);
         if (cached is not null) return cached;
 
@@ -302,6 +357,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         };
         if (tipo.HasValue)
             match.Add("Tipo", tipo.Value);
+        await AddMovimentacaoLojaFilter(match, empresaId, lojaId);
 
         var pipeline = new[]
         {
@@ -341,23 +397,26 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     // Validade
 
     public async Task<(IReadOnlyList<ValidadeAlerta> Items, int TotalCount)> GetAlertasValidadeAsync(
-        Guid empresaId, int dias = 30, int page = 1, int pageSize = 20)
+        Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:validade:{empresaId}:{dias}:{page}:{pageSize}";
+        var cacheKey = $"analytics:validade:{empresaId}:{dias}:{page}:{pageSize}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<(List<ValidadeAlerta>, int)>(cacheKey);
         if (cached != default) return cached;
 
         var cutoff = DateTime.UtcNow.AddDays(dias);
         var hoje = DateTime.UtcNow.Date;
 
+        var match = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoff) },
+            { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
+        };
+        AddLojaIdFilter(match, lojaId);
+
         var pipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoff) },
-                { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
-            }),
+            new BsonDocument("$match", match),
             new BsonDocument("$lookup", new BsonDocument
             {
                 { "from", "Produtos" },
@@ -382,12 +441,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         };
 
         var raw = await ItensEstoque.Aggregate<BsonDocument>(pipeline).ToListAsync();
-        var totalCount = await ItensEstoque.CountDocumentsAsync(new BsonDocument
-        {
-            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-            { "ValidadeEm.DataValidade", new BsonDocument("$lte", cutoff) },
-            { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
-        });
+        var totalCount = await ItensEstoque.CountDocumentsAsync(match);
 
         var items = raw.Select(x => new ValidadeAlerta(
             ItemEstoqueId: x["Id"].AsGuid,
@@ -407,9 +461,9 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     // Parados
 
     public async Task<(IReadOnlyList<ItemParadoDetalhe> Items, int TotalCount)> GetItensParadosDetalhadosAsync(
-        Guid empresaId, int diasSemMovimento = 90, int page = 1, int pageSize = 20)
+        Guid empresaId, int diasSemMovimento = 90, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:parados:{empresaId}:{diasSemMovimento}:{page}:{pageSize}";
+        var cacheKey = $"analytics:parados:{empresaId}:{diasSemMovimento}:{page}:{pageSize}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<(List<ItemParadoDetalhe>, int)>(cacheKey);
         if (cached != default) return cached;
 
@@ -425,6 +479,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
                 new BsonDocument("UltimaMovimentacaoEm", new BsonDocument("$lt", cutoff))
             }}
         };
+        AddLojaIdFilter(match, lojaId);
 
         var pipeline = new[]
         {
@@ -472,23 +527,26 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     // Sazonalidade
 
-    public async Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12)
+    public async Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:sazonalidade:{empresaId}:{produtoId}:{meses}";
+        var cacheKey = $"analytics:sazonalidade:{empresaId}:{produtoId}:{meses}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<List<SazonalidadeMensal>>(cacheKey);
         if (cached is not null) return cached;
 
         var de = DateTime.UtcNow.AddMonths(-meses);
 
+        var match = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "ProdutoId", new BsonBinaryData(produtoId, GuidRepresentation.Standard) },
+            { "Tipo", TipoMovimentacaoEstoque.Saida },
+            { "DataMovimentacao", new BsonDocument("$gte", de) }
+        };
+        await AddMovimentacaoLojaFilter(match, empresaId, lojaId);
+
         var pipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "ProdutoId", new BsonBinaryData(produtoId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de) }
-            }),
+            new BsonDocument("$match", match),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", new BsonDocument
@@ -526,9 +584,9 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     // Reposicao sugerida
 
     public async Task<(IReadOnlyList<ReposicaoSugerida> Items, int TotalCount)> GetSugestaoReposicaoDetalhadaAsync(
-        Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20)
+        Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:reposicao:{empresaId}:{diasHistorico}:{page}:{pageSize}";
+        var cacheKey = $"analytics:reposicao:{empresaId}:{diasHistorico}:{page}:{pageSize}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<(List<ReposicaoSugerida>, int)>(cacheKey);
         if (cached != default) return cached;
 
@@ -537,14 +595,17 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var dias = Math.Max(1, diasHistorico);
 
         // Taxa de saida por produto
+        var taxasMatch = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "Tipo", TipoMovimentacaoEstoque.Saida },
+            { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
+        };
+        await AddMovimentacaoLojaFilter(taxasMatch, empresaId, lojaId);
+
         var taxasPipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
+            new BsonDocument("$match", taxasMatch),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", "$ProdutoId" },
@@ -560,6 +621,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "$expr", new BsonDocument("$lt", new BsonArray { "$QuantidadeAtual.Value", "$QuantidadeMinima" }) }
         };
+        AddLojaIdFilter(match, lojaId);
 
         var pipeline = new[]
         {
@@ -619,9 +681,9 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     // Projecao de ruptura
 
     public async Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
-        Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20)
+        Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:projecao:{empresaId}:{diasHistorico}:{page}:{pageSize}";
+        var cacheKey = $"analytics:projecao:{empresaId}:{diasHistorico}:{page}:{pageSize}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<(List<ProjecaoRuptura>, int)>(cacheKey);
         if (cached != default) return cached;
 
@@ -629,14 +691,17 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         var ate = DateTime.UtcNow;
         var dias = Math.Max(1, diasHistorico);
 
+        var taxasMatch = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "Tipo", TipoMovimentacaoEstoque.Saida },
+            { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
+        };
+        await AddMovimentacaoLojaFilter(taxasMatch, empresaId, lojaId);
+
         var taxasPipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "Tipo", TipoMovimentacaoEstoque.Saida },
-                { "DataMovimentacao", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
+            new BsonDocument("$match", taxasMatch),
             new BsonDocument("$group", new BsonDocument
             {
                 { "_id", "$ProdutoId" },
@@ -652,6 +717,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
             { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
             { "QuantidadeAtual.Value", new BsonDocument("$gt", 0) }
         };
+        AddLojaIdFilter(match, lojaId);
 
         var pipeline = new[]
         {
@@ -706,19 +772,22 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     // Vendas por canal
 
-    public async Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate)
+    public async Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:canal:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}";
+        var cacheKey = $"analytics:canal:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}{LojaKeySuffix(lojaId)}";
         var cached = await GetCachedAsync<List<VendaPorCanal>>(cacheKey);
         if (cached is not null) return cached;
 
+        var match = new BsonDocument
+        {
+            { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
+            { "DataVenda", new BsonDocument("$gte", de).Add("$lte", ate) }
+        };
+        AddLojaIdFilter(match, lojaId);
+
         var pipeline = new[]
         {
-            new BsonDocument("$match", new BsonDocument
-            {
-                { "EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard) },
-                { "DataVenda", new BsonDocument("$gte", de).Add("$lte", ate) }
-            }),
+            new BsonDocument("$match", match),
             new BsonDocument("$unwind", "$ItensVenda"),
             new BsonDocument("$group", new BsonDocument
             {
@@ -745,4 +814,18 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         await SetCachedAsync(cacheKey, result, CanalTtl);
         return result;
     }
+
+    // ── Store Intelligence (not implemented for MongoDB) ─────────────────
+
+    public Task<IReadOnlyList<LojaComparacao>> GetComparacaoLojasAsync(Guid empresaId, int periodoDias = 30)
+        => throw new NotImplementedException("Store intelligence not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<LojaResumoInteligencia?> GetResumoInteligenciaLojaAsync(Guid empresaId, Guid lojaId, int periodoDias = 30)
+        => throw new NotImplementedException("Store intelligence not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<IReadOnlyList<ProdutoTurnover>> GetTopProdutosPorLojaAsync(Guid empresaId, Guid lojaId, int periodoDias = 30, int top = 10, bool ascending = false)
+        => throw new NotImplementedException("Store intelligence not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<IReadOnlyList<IndicadorAcao>> GetIndicadoresAcaoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+        => throw new NotImplementedException("Store intelligence not yet implemented for MongoDB. Use PostgreSQL provider.");
 }

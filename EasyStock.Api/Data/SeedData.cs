@@ -498,6 +498,115 @@ public static class SeedData
         };
         context.MovimentacoesEstoque.Add(movTransferencia);
 
+        // ─── Vendas adicionais — Clube do Fone ───────────────────────────────
+        // Gerar vendas variadas nos últimos 30 dias para demonstrar giro real
+        var vendasFone = new (int diasAtras, Guid prodId, string nomeProd, Guid itemId, int qty, decimal preco)[]
+        {
+            (-25, prodZsnPro.Id, "KZ ZSN Pro X", itemZsnPro.Id, 3, 89.90m),
+            (-22, prodCaboPrata.Id, "Cabo KZ Prata", itemCaboPrata.Id, 4, 34.90m),
+            (-18, prodZs10.Id, "KZ ZS10 Pro", itemZs10.Id, 2, 129.90m),
+            (-15, prodZsnPro.Id, "KZ ZSN Pro X", itemZsnPro.Id, 1, 89.90m),
+            (-12, prodCaboPrata.Id, "Cabo KZ Prata", itemCaboPrata.Id, 3, 34.90m),
+            (-8, prodZs10.Id, "KZ ZS10 Pro", itemZs10.Id, 5, 129.90m),
+            (-5, prodZsnPro.Id, "KZ ZSN Pro X", itemZsnPro.Id, 2, 89.90m),
+            (-2, prodCaboPrata.Id, "Cabo KZ Prata", itemCaboPrata.Id, 2, 34.90m),
+        };
+
+        foreach (var (diasAtras, prodId, nomeProd, itemId, qty, preco) in vendasFone)
+        {
+            var vId = Guid.NewGuid();
+            var nfNum = $"NF-FONE-{Math.Abs(diasAtras):D3}";
+            var dataVenda = agora.AddDays(diasAtras);
+            var v = Venda.Criar(vId, empresa.Id, CanalVenda.LojaPropria,
+                NaturezaMovimentacaoEstoque.Venda, dataVenda, dataVenda, nfNum, "Venda presencial", dataVenda);
+            v.LojaId = lojaFone.Id;
+
+            var iv = new ItemVenda
+            {
+                Id = Guid.NewGuid(), VendaId = vId, ItemEstoqueId = itemId, ProdutoId = prodId,
+                DescricaoSnapshot = nomeProd, Quantidade = Quantidade.From(qty),
+                PrecoUnitario = Dinheiro.FromDecimal(preco), PrecoTotal = Dinheiro.FromDecimal(qty * preco),
+                CriadoEm = dataVenda
+            };
+            v.AdicionarItem(iv);
+            context.Vendas.Add(v);
+            context.ItensVenda.Add(iv);
+
+            // Registrar saída no estoque e movimentação
+            var item = itemId == itemZsnPro.Id ? itemZsnPro : itemId == itemZs10.Id ? itemZs10 : itemCaboPrata;
+            item.RegistrarSaida(Quantidade.From(qty), dataVenda, dataVenda);
+            context.MovimentacoesEstoque.Add(MovimentacaoEstoque.CriarSaida(
+                Guid.NewGuid(), empresa.Id, item, vId,
+                NaturezaMovimentacaoEstoque.Venda, Quantidade.From(qty),
+                Dinheiro.FromDecimal(preco), dataVenda, $"Venda {nfNum}", nfNum, dataVenda));
+        }
+
+        // ─── Vendas adicionais — Cantina da Thati ────────────────────────────
+        // Alimentos vendem em volume alto, preço baixo
+        var vendasCantina = new (int diasAtras, Guid prodId, string nomeProd, Guid itemId, int qty, decimal preco)[]
+        {
+            (-28, prodTalharim.Id, "Talharim 500g", itemTalharim.Id, 5, 12.90m),
+            (-26, prodRavioli.Id, "Ravioli 400g", itemRavioli.Id, 3, 18.90m),
+            (-24, prodMolho.Id, "Molho Bolonhesa", itemMolho.Id, 4, 9.90m),
+            (-22, prodTalharim.Id, "Talharim 500g", itemTalharim.Id, 6, 12.90m),
+            (-20, prodRavioli.Id, "Ravioli 400g", itemRavioli.Id, 4, 18.90m),
+            (-18, prodMolho.Id, "Molho Bolonhesa", itemMolho.Id, 3, 9.90m),
+            (-15, prodTalharim.Id, "Talharim 500g", itemTalharim.Id, 8, 12.90m),
+            (-13, prodRavioli.Id, "Ravioli 400g", itemRavioli.Id, 5, 18.90m),
+            (-10, prodMolho.Id, "Molho Bolonhesa", itemMolho.Id, 6, 9.90m),
+            (-8, prodTalharim.Id, "Talharim 500g", itemTalharim.Id, 4, 12.90m),
+            (-5, prodRavioli.Id, "Ravioli 400g", itemRavioli.Id, 3, 18.90m),
+            (-3, prodMolho.Id, "Molho Bolonhesa", itemMolho.Id, 5, 9.90m),
+            (-1, prodTalharim.Id, "Talharim 500g", itemTalharim.Id, 3, 12.90m),
+        };
+
+        foreach (var (diasAtras, prodId, nomeProd, itemId, qty, preco) in vendasCantina)
+        {
+            var vId = Guid.NewGuid();
+            var nfNum = $"NF-CANT-{Math.Abs(diasAtras):D3}";
+            var dataVenda = agora.AddDays(diasAtras);
+            var v = Venda.Criar(vId, empresa.Id, CanalVenda.LojaPropria,
+                NaturezaMovimentacaoEstoque.Venda, dataVenda, dataVenda, nfNum, "Venda balcao", dataVenda);
+            v.LojaId = lojaCantina.Id;
+
+            var iv = new ItemVenda
+            {
+                Id = Guid.NewGuid(), VendaId = vId, ItemEstoqueId = itemId, ProdutoId = prodId,
+                DescricaoSnapshot = nomeProd, Quantidade = Quantidade.From(qty),
+                PrecoUnitario = Dinheiro.FromDecimal(preco), PrecoTotal = Dinheiro.FromDecimal(qty * preco),
+                CriadoEm = dataVenda
+            };
+            v.AdicionarItem(iv);
+            context.Vendas.Add(v);
+            context.ItensVenda.Add(iv);
+
+            var item = itemId == itemTalharim.Id ? itemTalharim : itemId == itemRavioli.Id ? itemRavioli : itemMolho;
+            item.RegistrarSaida(Quantidade.From(qty), dataVenda, dataVenda);
+            context.MovimentacoesEstoque.Add(MovimentacaoEstoque.CriarSaida(
+                Guid.NewGuid(), empresa.Id, item, vId,
+                NaturezaMovimentacaoEstoque.Venda, Quantidade.From(qty),
+                Dinheiro.FromDecimal(preco), dataVenda, $"Venda {nfNum}", nfNum, dataVenda));
+        }
+
+        // ─── Produções adicionais Cantina (reposição de estoque) ─────────────
+        var entradaRavioli = MovimentacaoEstoque.CriarEntrada(
+            Guid.NewGuid(), empresa.Id, itemRavioli,
+            NaturezaMovimentacaoEstoque.Producao,
+            Quantidade.From(25), Dinheiro.FromDecimal(8.00m),
+            agora.AddDays(-14), "Producao semanal de ravioli", null, agora.AddDays(-14));
+        context.MovimentacoesEstoque.Add(entradaRavioli);
+        itemRavioli.RegistrarReposicao(Quantidade.From(25), agora.AddDays(-14),
+            null, null, null, "Producao semanal", null, null, null, null, agora.AddDays(-14));
+
+        var entradaMolho = MovimentacaoEstoque.CriarEntrada(
+            Guid.NewGuid(), empresa.Id, itemMolho,
+            NaturezaMovimentacaoEstoque.Producao,
+            Quantidade.From(30), Dinheiro.FromDecimal(4.50m),
+            agora.AddDays(-14), "Producao semanal de molho", null, agora.AddDays(-14));
+        context.MovimentacoesEstoque.Add(entradaMolho);
+        itemMolho.RegistrarReposicao(Quantidade.From(30), agora.AddDays(-14),
+            null, null, null, "Producao semanal", null, null, null, null, agora.AddDays(-14));
+
         // ─── Notificacoes ─────────────────────────────────────────────────────
         context.Notificacoes.AddRange(
             Notificacao.Criar(empresa.Id, TipoAlertaEstoque.EstoqueCritico,
