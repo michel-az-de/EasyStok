@@ -7,7 +7,6 @@ using EasyStock.Application.UseCases.DesativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Application.UseCases.Pedido;
-using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +18,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/fornecedores")]
 [Authorize]
+[ValidateEmpresaId]
 public class FornecedorController(
     CriarFornecedorUseCase criarUseCase,
     AtualizarFornecedorUseCase atualizarUseCase,
@@ -39,7 +39,7 @@ public class FornecedorController(
     [HttpGet]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> GetAll(
-        [FromQuery] Guid empresaId,
+        [FromQuery] Guid? empresaId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] bool? ativo = null,
@@ -47,12 +47,12 @@ public class FornecedorController(
         [FromQuery] string? sort = "nome",
         [FromQuery] string? order = "asc")
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        var (normPage, normSize) = NormalisePage(page, pageSize);
 
         var (fornecedores, total) = await listarUseCase.ExecuteAsync(
-            new ListarFornecedoresQuery(empresaId, page, pageSize, ativo, search, sort, NormaliseOrder(order)));
-        return DataPaged(fornecedores, total, page, pageSize);
+            new ListarFornecedoresQuery(resolvedEmpresaId, normPage, normSize, ativo, search, sort, NormaliseOrder(order)));
+        return DataPaged(fornecedores, total, normPage, normSize);
     }
 
     [SwaggerOperation(Summary = "List open purchase orders across all suppliers (Operador only)", Description = "Returns all pedidos with status Aberto or EmTransito, including supplier name.")]
@@ -60,12 +60,10 @@ public class FornecedorController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("pedidos-abertos")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> GetPedidosAbertos([FromQuery] Guid empresaId)
+    public async Task<IActionResult> GetPedidosAbertos([FromQuery] Guid? empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
-
-        return DataOk(await listarPedidosAbertosUseCase.ExecuteAsync(new ListarPedidosAbertosQuery(empresaId)));
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        return DataOk(await listarPedidosAbertosUseCase.ExecuteAsync(new ListarPedidosAbertosQuery(resolvedEmpresaId)));
     }
 
     [SwaggerOperation(Summary = "Create a purchase order for a supplier (Gerente only)")]
@@ -107,12 +105,10 @@ public class FornecedorController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("{id}")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
-
-        var fornecedor = await obterDetalheUseCase.ExecuteAsync(new ObterFornecedorDetalheQuery(empresaId, id));
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        var fornecedor = await obterDetalheUseCase.ExecuteAsync(new ObterFornecedorDetalheQuery(resolvedEmpresaId, id));
         return DataOk(fornecedor);
     }
 
@@ -122,12 +118,10 @@ public class FornecedorController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("{id}/historico")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> GetHistorico(Guid id, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> GetHistorico(Guid id, [FromQuery] Guid? empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
-
-        return DataOk(await obterHistoricoUseCase.ExecuteAsync(new ObterHistoricoFornecedorQuery(empresaId, id)));
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        return DataOk(await obterHistoricoUseCase.ExecuteAsync(new ObterHistoricoFornecedorQuery(resolvedEmpresaId, id)));
     }
 
     [SwaggerOperation(Summary = "Get supplier statistics (Operador only)", Description = "Returns average lead time, total purchases, on-time delivery rate.")]
@@ -136,12 +130,10 @@ public class FornecedorController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("{id}/estatisticas")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> GetEstatisticas(Guid id, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> GetEstatisticas(Guid id, [FromQuery] Guid? empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
-
-        return DataOk(await obterEstatisticasUseCase.ExecuteAsync(new ObterEstatisticasFornecedorQuery(empresaId, id)));
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        return DataOk(await obterEstatisticasUseCase.ExecuteAsync(new ObterEstatisticasFornecedorQuery(resolvedEmpresaId, id)));
     }
 
     [SwaggerOperation(Summary = "Create supplier (Gerente only)")]
@@ -152,10 +144,8 @@ public class FornecedorController(
     [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> Create([FromBody] CriarFornecedorCommand command)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
-            return Forbid();
-
-        var resultado = await criarUseCase.ExecuteAsync(command);
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var empresaId, out var err)) return err!;
+        var resultado = await criarUseCase.ExecuteAsync(command with { EmpresaId = empresaId });
         return DataCreated($"/api/fornecedores/{resultado.Id}", resultado);
     }
 
@@ -169,12 +159,11 @@ public class FornecedorController(
     [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> Update(Guid id, [FromBody] AtualizarFornecedorCommand command)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != command.EmpresaId)
-            return Forbid();
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var empresaId, out var err)) return err!;
         if (id != command.FornecedorId)
             return DataBadRequest("FornecedorId da rota difere do corpo.");
 
-        await atualizarUseCase.ExecuteAsync(command);
+        await atualizarUseCase.ExecuteAsync(command with { EmpresaId = empresaId });
         return NoContent();
     }
 
@@ -185,15 +174,13 @@ public class FornecedorController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpDelete("{id}")]
     [Authorize(Policy = "Admin")]
-    public async Task<IActionResult> Desativar(Guid id, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> Desativar(Guid id, [FromQuery] Guid? empresaId)
     {
-        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
-            return Forbid();
-
-        await desativarUseCase.ExecuteAsync(new DesativarFornecedorCommand(id, empresaId));
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        await desativarUseCase.ExecuteAsync(new DesativarFornecedorCommand(id, resolvedEmpresaId));
         return NoContent();
     }
 }
 
-public sealed record ReceberPedidoBody(Guid EmpresaId, DateTime? DataRecebimento, string? Tracking);
-public sealed record CancelarPedidoBody(Guid EmpresaId);
+public sealed record ReceberPedidoBody(Guid? EmpresaId, DateTime? DataRecebimento, string? Tracking);
+public sealed record CancelarPedidoBody(Guid? EmpresaId);
