@@ -910,16 +910,75 @@ public static class SeedData
             ProdutoId = item.ProdutoId,
             ProdutoVariacaoId = item.ProdutoVariacaoId,
             Tipo = TipoMovimentacaoEstoque.Saida,
-            Natureza = natureza,
-            Quantidade = quantidade,
-            ValorUnitario = valorUnitario,
-            ValorTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidade.Value),
-            DataMovimentacao = dataMovimentacao,
-            Descricao = descricao,
-            DocumentoReferencia = documento,
-            CriadoEm = dataMovimentacao
-        });
-    }
+            Natureza = NaturezaMovimentacaoEstoque.Ajuste,
+            Quantidade = Quantidade.From(5),
+            ValorUnitario = Dinheiro.FromDecimal(14.00m),
+            ValorTotal = Dinheiro.FromDecimal(70.00m),
+            DataMovimentacao = agora.AddDays(-5),
+            Descricao = "Transferencia de 5 cabos para exposicao da Cantina",
+            DocumentoReferencia = "TRANSF-2026-001",
+            CriadoEm = agora.AddDays(-5)
+        };
+        context.MovimentacoesEstoque.Add(movTransferencia);
+
+        // ─── Notificacoes ─────────────────────────────────────────────────────
+        var notifCritica1 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.EstoqueCritico,
+            "Estoque Critico",
+            "ZS10-PRO-001 com apenas 2 unidade(s) — minimo configurado: 5. Considere repor este item.",
+            SeveridadeNotificacao.Critica, itemZs10.Id);
+
+        var notifAlta1 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.EstoqueCritico,
+            "Estoque Critico",
+            "CABO-PRATA-001 com apenas 4 unidade(s) — minimo configurado: 5. Considere repor este item.",
+            SeveridadeNotificacao.Alta, itemCaboPrata.Id);
+
+        var notifVencido = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ProdutoVencido,
+            "Produto Vencido",
+            "MOLHO-BOL-001 venceu ha 2 dia(s). Retire do estoque ou descarte conforme procedimento.",
+            SeveridadeNotificacao.Critica, itemMolho.Id);
+
+        var notifValidade1 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ValidadeProxima,
+            "Validade Proxima",
+            "TALHARIM-001 vence em 3 dia(s) (14/04/2026). Estoque atual: 15 un. Priorize a venda ou rotatividade.",
+            SeveridadeNotificacao.Alta, itemTalharim.Id);
+
+        var notifValidade2 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ValidadeProxima,
+            "Validade Proxima",
+            "RAVIOLI-001 vence em 10 dia(s) (21/04/2026). Estoque atual: 12 un. Priorize a venda ou rotatividade.",
+            SeveridadeNotificacao.Media, itemRavioli.Id);
+
+        var notifParado1 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ProdutoParado,
+            "Produto Parado",
+            "ZSN-PRO-001 sem movimentacao ha 35 dias. Estoque atual: 30 un. Avalie promocao ou reposicionamento.",
+            SeveridadeNotificacao.Media, itemZsnPro.Id);
+
+        var notifParado2 = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ProdutoParado,
+            "Produto Parado",
+            "CABO-PRATA-001 sem movimentacao ha 45 dias. Estoque atual: 50 un. Avalie promocao ou reposicionamento.",
+            SeveridadeNotificacao.Media, itemCaboPrata.Id);
+
+        var notifReposicao = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ReposicaoSugerida,
+            "Reposicao Sugerida",
+            "ZS10-PRO-001 precisa de reposicao. Estoque atual: 2 un. Previsao de zeramento: 5 dia(s).",
+            SeveridadeNotificacao.Media, itemZs10.Id);
+
+        var notifPedidoAtrasado = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.PedidoAtrasado,
+            "Pedido Atrasado",
+            "Pedido com previsao em 05/04/2026 ainda nao foi recebido. Entre em contato com o fornecedor.",
+            SeveridadeNotificacao.Alta, null);
+
+        var notifPedidoRecebido = Notificacao.Criar(empresa.Id, TipoAlertaEstoque.PedidoRecebido,
+            "Pedido Recebido",
+            "Pedido confirmado em 10/04/2026 15:30. Confira os itens recebidos.",
+            SeveridadeNotificacao.Informativa, null);
+        notifPedidoRecebido.MarcarComoLida(); // ja lida para demo
+
+        context.Notificacoes.AddRange(
+            notifCritica1, notifAlta1, notifVencido,
+            notifValidade1, notifValidade2,
+            notifParado1, notifParado2,
+            notifReposicao, notifPedidoAtrasado, notifPedidoRecebido
+        );
 
     private static async Task EnsureNotificacaoAsync(
         EasyStockDbContext context,

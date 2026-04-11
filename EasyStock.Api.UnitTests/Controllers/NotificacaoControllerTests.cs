@@ -75,7 +75,7 @@ public class NotificacaoControllerTests
         {
             new() { Id = Guid.NewGuid(), EmpresaId = empresaId, Mensagem = "Estoque baixo", TipoAlerta = TipoAlertaEstoque.EstoqueBaixo }
         };
-        _notificacaoRepository.GetByEmpresaAsync(empresaId, null, null, 1, 20).Returns((notificacoes, 1));
+        _notificacaoRepository.GetByEmpresaAsync(empresaId, null, null, null, 1, 20).Returns((notificacoes, 1));
 
         var result = await _controller.GetAll(empresaId);
 
