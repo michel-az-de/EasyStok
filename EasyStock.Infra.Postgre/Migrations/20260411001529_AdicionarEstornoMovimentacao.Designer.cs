@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260411001529_AdicionarEstornoMovimentacao")]
+    partial class AdicionarEstornoMovimentacao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -923,9 +926,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<Guid?>("SubcategoriaId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("SugestaoDescricaoAnuncio")
                         .HasColumnType("text");
 
@@ -939,8 +939,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("CategoriaId");
 
                     b.HasIndex("EmpresaId");
-
-                    b.HasIndex("SubcategoriaId");
 
                     b.ToTable("produtos", (string)null);
                 });
@@ -977,9 +975,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int?>("QuantidadeReferencia")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("VariacaoId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("VariacaoPadrao")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -989,8 +984,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("EmpresaId");
 
                     b.HasIndex("ProdutoId");
-
-                    b.HasIndex("VariacaoId");
 
                     b.ToTable("produto_caracteristicas", (string)null);
                 });
@@ -1667,10 +1660,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStock.Domain.Entities.Categoria", "Subcategoria")
-                        .WithMany()
-                        .HasForeignKey("SubcategoriaId");
-
                     b.OwnsOne("EasyStock.Domain.ValueObjects.Dimensoes", "Dimensoes", b1 =>
                         {
                             b1.Property<Guid>("ProdutoId")
@@ -1705,8 +1694,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Dimensoes");
 
                     b.Navigation("Empresa");
-
-                    b.Navigation("Subcategoria");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoCaracteristica", b =>
@@ -1723,15 +1710,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStock.Domain.Entities.ProdutoVariacao", "Variacao")
-                        .WithMany()
-                        .HasForeignKey("VariacaoId");
-
                     b.Navigation("Empresa");
 
                     b.Navigation("Produto");
-
-                    b.Navigation("Variacao");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ProdutoEmbalagem", b =>

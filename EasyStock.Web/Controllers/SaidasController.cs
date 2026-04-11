@@ -47,6 +47,8 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         ViewBag.ActiveMenuItem = "Saidas";
 
         var result = await svc.ListarAsync(page, natureza, de, ate);
+        var kpisResult = await svc.ObterKpisAsync(natureza, de, ate);
+
         var vm = new SaidasHistoricoViewModel
         {
             FiltroNatureza = natureza,
@@ -71,13 +73,14 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
             Limit = paged.Meta.Limit
         };
 
-        // Compute KPIs
-        vm.TotalUnidades = vm.Itens.Sum(s => s.Qty);
-        vm.ReceitaTotal = vm.Itens.Where(s => s.ValorTotal is not null).Sum(s => s.ValorTotal!.Valor);
-        vm.TotalVendas = vm.Itens.Count(s => s.Natureza.Equals("Venda", StringComparison.OrdinalIgnoreCase));
-        vm.TotalPerdas = vm.Itens.Count(s =>
-            s.Natureza.Equals("Perda", StringComparison.OrdinalIgnoreCase) ||
-            s.Natureza.Equals("Prejuizo", StringComparison.OrdinalIgnoreCase));
+        // Server-side KPIs (across all records, not just current page)
+        if (kpisResult.Success && kpisResult.Data is not null)
+        {
+            vm.TotalUnidades = kpisResult.Data.TotalUnidades;
+            vm.ReceitaTotal = kpisResult.Data.ReceitaTotal;
+            vm.TotalVendas = kpisResult.Data.TotalVendas;
+            vm.TotalPerdas = kpisResult.Data.TotalPerdas;
+        }
 
         return View(vm);
     }
@@ -115,7 +118,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         var result = await svc.EstornarAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Historico));
 
-        Toast("success", "Saída estornada com sucesso!");
+        Toast("success", "Saída estornada com sucesso! O estoque foi restaurado.");
         return RedirectToAction(nameof(Historico));
     }
 

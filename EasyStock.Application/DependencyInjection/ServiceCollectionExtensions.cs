@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.EsqueciSenha;
+using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
@@ -85,6 +86,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GerenciarUploadsUseCase>();
         services.AddScoped<RegistrarEntradaEstoqueUseCase>();
         services.AddScoped<RegistrarSaidaEstoqueUseCase>();
+        services.AddScoped<EstornarSaidaUseCase>();
         services.AddScoped<ReporEstoqueUseCase>();
         services.AddScoped<BuscarEstoqueInteligenteUseCase>();
         services.AddScoped<GerarSugestaoDescricaoAnuncioUseCase>();

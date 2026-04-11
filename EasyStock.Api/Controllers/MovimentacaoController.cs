@@ -17,7 +17,7 @@ public class MovimentacaoController(
     IMovimentacaoEstoqueRepository movimentacaoRepository,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "List stock movements (paginated)", Description = "Filter by date range and movement type (ENTRADA/SAIDA).")]
+    [SwaggerOperation(Summary = "List stock movements (paginated)", Description = "Filter by date range, movement type (ENTRADA/SAIDA) and nature.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet]
@@ -36,6 +36,24 @@ public class MovimentacaoController(
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
             resolvedEmpresaId, de, ate, tipo, natureza, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
+    }
+
+    [SwaggerOperation(Summary = "Get KPI aggregates for movements", Description = "Returns server-side computed KPIs (total units, revenue, sales count, loss count).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("kpis")]
+    public async Task<IActionResult> GetKpis(
+        [FromQuery] Guid empresaId,
+        [FromQuery] DateTime? de,
+        [FromQuery] DateTime? ate,
+        [FromQuery] TipoMovimentacaoEstoque? tipo,
+        [FromQuery] NaturezaMovimentacaoEstoque? natureza)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var kpis = await movimentacaoRepository.GetKpisAsync(resolvedEmpresaId, de, ate, tipo, natureza);
+        return DataOk(kpis);
     }
 
     [SwaggerOperation(Summary = "List movements for a specific stock item")]
