@@ -11,6 +11,13 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        // Cliente desconectou — nao ha resposta a enviar
+        if (exception is OperationCanceledException or TaskCanceledException)
+        {
+            logger.LogDebug(exception, "Requisicao cancelada pelo cliente.");
+            return true;
+        }
+
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
 
         var (statusCode, code, title, detail, logAsError) = MapException(exception);
@@ -81,6 +88,49 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 StatusCodes.Status409Conflict,
                 "BUSINESS_RULE_VIOLATION",
                 "Violação de regra de negócio",
+                ex.Message,
+                false),
+
+            // Excecoes padrao .NET mapeadas para HTTP semantico
+            KeyNotFoundException ex => (
+                StatusCodes.Status404NotFound,
+                "NOT_FOUND",
+                "Recurso nao encontrado",
+                ex.Message,
+                false),
+
+            ArgumentNullException ex => (
+                StatusCodes.Status400BadRequest,
+                "BAD_REQUEST",
+                "Argumento invalido",
+                ex.Message,
+                false),
+
+            ArgumentException ex => (
+                StatusCodes.Status400BadRequest,
+                "BAD_REQUEST",
+                "Argumento invalido",
+                ex.Message,
+                false),
+
+            FormatException ex => (
+                StatusCodes.Status400BadRequest,
+                "BAD_REQUEST",
+                "Formato invalido",
+                ex.Message,
+                false),
+
+            InvalidOperationException ex => (
+                StatusCodes.Status409Conflict,
+                "INVALID_OPERATION",
+                "Operacao invalida",
+                ex.Message,
+                false),
+
+            NotSupportedException ex => (
+                StatusCodes.Status501NotImplemented,
+                "NOT_SUPPORTED",
+                "Operacao nao suportada",
                 ex.Message,
                 false),
 

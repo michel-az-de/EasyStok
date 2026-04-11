@@ -1,8 +1,10 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace EasyStock.Infra.Postgre.Repositories
@@ -10,10 +12,13 @@ namespace EasyStock.Infra.Postgre.Repositories
     // DTO intermediário para serialização de cache (value tuples não são suportados pelo System.Text.Json)
     internal sealed record PaginacaoCacheEntry(List<Produto> Produtos, int TotalCount);
 
-    public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
+    public sealed class ProdutoRepository(
+        EasyStockDbContext dbContext,
+        IDistributedCache? cache = null,
+        IOptions<CacheOptions>? cacheOptions = null)
         : IProdutoRepository
     {
-        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+        private CacheOptions Options => cacheOptions?.Value ?? new CacheOptions();
 
         public Task<Produto?> GetByIdAsync(Guid id) =>
             dbContext.Produtos.FirstOrDefaultAsync(p => p.Id == id);
@@ -103,7 +108,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 var serialized = JsonSerializer.Serialize(entry);
                 await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = CacheDuration
+                    AbsoluteExpirationRelativeToNow = Options.ProdutosPaginadosDuration
                 });
             }
 
@@ -128,7 +133,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var novaVersao = DateTime.UtcNow.Ticks.ToString();
             await cache.SetStringAsync(VersaoKey(empresaId), novaVersao, new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = CacheDuration
+                AbsoluteExpirationRelativeToNow = Options.ProdutosVersaoDuration
             });
         }
 

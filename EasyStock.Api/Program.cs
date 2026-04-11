@@ -84,11 +84,11 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Database
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "Auto";
-var postgresConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection");
-var mongoDatabaseName = builder.Configuration["Database:MongoDatabase"] ?? "EasyStockDbMongo";
-var sqliteConnectionString = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=easystock.db";
+var databaseProvider = builder.Configuration[ConfigurationKeys.DatabaseProvider] ?? "Auto";
+var postgresConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionDefault);
+var mongoConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionMongo);
+var mongoDatabaseName = builder.Configuration[ConfigurationKeys.DatabaseMongoDatabase] ?? "EasyStockDbMongo";
+var sqliteConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionSqlite) ?? "Data Source=easystock.db";
 
 var resolvedProvider = await ResolveDatabaseProviderAsync(
     databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
@@ -239,10 +239,10 @@ builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
 
 // Configuration
 builder.Services.Configure<EasyStockConfiguracoes>(
-    builder.Configuration.GetSection("EasyStock"));
-builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection("FileStorage"));
+    builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
+builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection(ConfigurationKeys.SectionFileStorage));
 
-var fileStorageOptions = builder.Configuration.GetSection("FileStorage").Get<FileStorageOptions>() ?? new FileStorageOptions();
+var fileStorageOptions = builder.Configuration.GetSection(ConfigurationKeys.SectionFileStorage).Get<FileStorageOptions>() ?? new FileStorageOptions();
 if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
@@ -257,7 +257,7 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.MetricsService>();
 builder.Services.AddProblemDetails();
 
 // Authentication / Authorization
-var jwtKey = builder.Configuration["Jwt:SecretKey"];
+var jwtKey = builder.Configuration[ConfigurationKeys.JwtSecretKey];
 if (string.IsNullOrWhiteSpace(jwtKey))
     throw new InvalidOperationException(
         "Jwt:SecretKey não configurado. Defina a variavel de ambiente 'Jwt__SecretKey' ou configure appsettings.Development.json.");
@@ -278,8 +278,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = builder.Configuration[ConfigurationKeys.JwtIssuer],
+            ValidAudience = builder.Configuration[ConfigurationKeys.JwtAudience],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
@@ -296,7 +296,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        var allowedOrigins = builder.Configuration.GetSection(ConfigurationKeys.CorsAllowedOrigins).Get<string[]>();
         if (allowedOrigins is { Length: > 0 })
             policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
         else if (builder.Environment.IsDevelopment())
@@ -367,7 +367,7 @@ builder.Services.AddOpenTelemetry()
             .AddHttpClientInstrumentation()
             .AddOtlpExporter(options =>
             {
-                options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
+                options.Endpoint = new Uri(builder.Configuration[ConfigurationKeys.OtlpEndpoint] ?? "http://localhost:4317");
             });
         if (builder.Environment.IsDevelopment())
             tracing.AddConsoleExporter();
@@ -378,7 +378,7 @@ builder.Services.AddOpenTelemetry()
             .AddRuntimeInstrumentation()
             .AddOtlpExporter(options =>
             {
-                options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OtlpEndpoint"] ?? "http://localhost:4317");
+                options.Endpoint = new Uri(builder.Configuration[ConfigurationKeys.OtlpEndpoint] ?? "http://localhost:4317");
             });
         if (builder.Environment.IsDevelopment())
             metrics.AddConsoleExporter();
@@ -388,7 +388,7 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+    options.Configuration = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionRedis) ?? "localhost:6379";
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
@@ -421,7 +421,13 @@ if (resolvedProvider is "sqlite" && !app.Environment.IsDevelopment())
     app.Logger.LogWarning("ATENCAO: Banco SQLite em uso em ambiente {Env}. Isso pode indicar falha de conexao com banco principal.", app.Environment.EnvironmentName);
 
 if (jwtKey.Length < 32)
-    app.Logger.LogWarning("ATENCAO: Jwt:SecretKey tem menos de 32 caracteres. Recomendado usar chave mais longa.");
+{
+    if (app.Environment.IsProduction())
+        throw new InvalidOperationException(
+            "Jwt:SecretKey tem menos de 32 caracteres. Em producao a chave deve ter pelo menos 32 caracteres para garantir seguranca.");
+    else
+        app.Logger.LogWarning("ATENCAO: Jwt:SecretKey tem menos de 32 caracteres. Recomendado usar chave mais longa.");
+}
 
 Log.Information("""
 
@@ -438,6 +444,9 @@ Log.Information("""
     """,
     app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
+// Security headers
+app.UseMiddleware<EasyStock.Api.Middleware.SecurityHeadersMiddleware>();
+
 // Middleware for Correlation ID
 app.Use(async (context, next) =>
 {
@@ -448,7 +457,11 @@ app.Use(async (context, next) =>
     }
     context.Items["CorrelationId"] = correlationId;
     context.Response.Headers["X-Correlation-Id"] = correlationId;
-    await next();
+
+    using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        await next();
+    }
 });
 
 // Serilog Request Logging
@@ -512,9 +525,9 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
 }
 app.UseCors();
 app.UseRateLimiter();
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseExceptionHandler();
 app.MapControllers();
 
 // Redirect root to Swagger UI for immediate discoverability

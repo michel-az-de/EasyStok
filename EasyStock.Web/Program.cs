@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net.Http.Headers;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -34,7 +34,9 @@ builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<TokenRefreshHandler>();
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    client.BaseAddress = new Uri(config["ApiSettings:BaseUrl"]!);
+    var baseUrl = config["ApiSettings:BaseUrl"]!;
+    if (!baseUrl.EndsWith('/')) baseUrl += "/";
+    client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(config.GetValue<int>("ApiSettings:TimeoutSeconds"));
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 }).AddHttpMessageHandler<TokenRefreshHandler>();
