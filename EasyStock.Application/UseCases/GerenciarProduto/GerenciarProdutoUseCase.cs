@@ -139,10 +139,10 @@ public sealed class GerenciarProdutoUseCase(
 {
     public async Task AtualizarAsync(AtualizarProdutoCommand command)
     {
-        if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
-        if (command.ProdutoId == Guid.Empty) throw new UseCaseValidationException("ProdutoId e obrigatorio.");
-        if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId e obrigatorio.");
-        if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto e obrigatorio.");
+        if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
+        if (command.ProdutoId == Guid.Empty) throw new UseCaseValidationException("ProdutoId é obrigatório.");
+        if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId é obrigatório.");
+        if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
 
         var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");

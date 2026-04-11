@@ -22,7 +22,7 @@ public class AtualizarLojaUseCase(
     public async Task ExecuteAsync(AtualizarLojaCommand command)
     {
         if (string.IsNullOrWhiteSpace(command.Nome))
-            throw new UseCaseValidationException("Nome da loja e obrigatorio.");
+            throw new UseCaseValidationException("Nome da loja é obrigatório.");
 
         var loja = await lojaRepository.GetByIdAsync(command.LojaId);
         if (loja is null || loja.EmpresaId != command.EmpresaId)

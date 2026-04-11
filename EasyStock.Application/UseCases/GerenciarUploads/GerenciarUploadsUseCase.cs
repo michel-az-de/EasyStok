@@ -139,7 +139,7 @@ public sealed class GerenciarUploadsUseCase(
             throw new UseCaseValidationException("Arquivo excede o tamanho permitido.");
 
         if (!AllowedImageTypes.Contains(contentType))
-            throw new UseCaseValidationException("Formato de arquivo nao suportado.");
+            throw new UseCaseValidationException("Formato de arquivo não suportado.");
 
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrWhiteSpace(extension))

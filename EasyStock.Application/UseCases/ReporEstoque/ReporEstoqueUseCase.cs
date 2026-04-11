@@ -37,7 +37,7 @@ namespace EasyStock.Application.UseCases.ReporEstoque
     {
         public async Task<ReporEstoqueResult> ExecuteAsync(ReporEstoqueCommand command)
         {
-            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
+            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
             if (command.QuantidadeAdicional <= 0) throw new QuantidadeInvalidaException(command.QuantidadeAdicional);
 
             var item = await itemEstoqueRepository.GetByIdAsync(command.ItemEstoqueId)

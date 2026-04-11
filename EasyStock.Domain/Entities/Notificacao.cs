@@ -54,14 +54,14 @@ namespace EasyStock.Domain.Entities
 
         private static string TituloParaTipo(TipoAlertaEstoque tipo) => tipo switch
         {
-            TipoAlertaEstoque.EstoqueCritico => "Estoque Critico",
+            TipoAlertaEstoque.EstoqueCritico => "Estoque Crítico",
             TipoAlertaEstoque.ProdutoParado => "Produto Parado",
-            TipoAlertaEstoque.ValidadeProxima => "Validade Proxima",
-            TipoAlertaEstoque.ReposicaoSugerida => "Reposicao Sugerida",
+            TipoAlertaEstoque.ValidadeProxima => "Validade Próxima",
+            TipoAlertaEstoque.ReposicaoSugerida => "Reposição Sugerida",
             TipoAlertaEstoque.PedidoAtrasado => "Pedido Atrasado",
             TipoAlertaEstoque.PedidoRecebido => "Pedido Recebido",
             TipoAlertaEstoque.ProdutoVencido => "Produto Vencido",
-            _ => "Notificacao"
+            _ => "Notificação"
         };
 
         private static SeveridadeNotificacao SeveridadePadrao(TipoAlertaEstoque tipo) => tipo switch

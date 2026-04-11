@@ -13,7 +13,7 @@ namespace EasyStock.Domain.ValueObjects
 
         public static CodigoLote From(string value)
         {
-            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("Codigo de lote e obrigatorio.", nameof(value));
+            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("Código de lote é obrigatório.", nameof(value));
 
             var normalized = value.Trim();
             if (normalized.Length > 100) throw new ArgumentException("Codigo de lote muito longo.", nameof(value));

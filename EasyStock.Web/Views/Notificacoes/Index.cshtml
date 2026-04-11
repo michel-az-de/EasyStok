@@ -1,6 +1,6 @@
 @model NotificacoesViewModel
 @{
-    ViewBag.Title = "Notificacoes";
+    ViewBag.Title = "Notificações";
     Layout = "_Layout";
 
     string SeveridadeBorder(string s) => s switch {
@@ -33,19 +33,19 @@
     string TempoRelativo(DateTimeOffset dt) {
         var diff = DateTimeOffset.UtcNow - dt;
         if (diff.TotalMinutes < 1) return "agora";
-        if (diff.TotalMinutes < 60) return $"ha {(int)diff.TotalMinutes}min";
-        if (diff.TotalHours < 24) return $"ha {(int)diff.TotalHours}h";
-        if (diff.TotalDays < 7) return $"ha {(int)diff.TotalDays}d";
+        if (diff.TotalMinutes < 60) return $"há {(int)diff.TotalMinutes}min";
+        if (diff.TotalHours < 24) return $"há {(int)diff.TotalHours}h";
+        if (diff.TotalDays < 7) return $"há {(int)diff.TotalDays}d";
         return dt.ToLocalTime().ToString("dd/MM/yyyy");
     }
 
     var tiposFiltro = new[] {
         ("", "Todos"),
-        ("EstoqueCritico", "Estoque Critico"),
+        ("EstoqueCritico", "Estoque Crítico"),
         ("ProdutoVencido", "Vencido"),
         ("ValidadeProxima", "Validade"),
         ("ProdutoParado", "Parado"),
-        ("ReposicaoSugerida", "Reposicao"),
+        ("ReposicaoSugerida", "Reposição"),
         ("PedidoAtrasado", "Ped. Atrasado"),
         ("PedidoRecebido", "Ped. Recebido")
     };
@@ -54,13 +54,13 @@
 <!-- Header -->
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div class="flex items-center gap-3 flex-wrap">
-        <h1 class="text-2xl font-bold text-slate-900">Notificacoes</h1>
+        <h1 class="text-2xl font-bold text-slate-900">Notificações</h1>
         @if (Model.Resumo != null)
         {
             @if (Model.Resumo.Criticas > 0)
             {
                 <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-bold">
-                    @Model.Resumo.Criticas critica@(Model.Resumo.Criticas > 1 ? "s" : "")
+                    @Model.Resumo.Criticas crítica@(Model.Resumo.Criticas > 1 ? "s" : "")
                 </span>
             }
             @if (Model.Resumo.Altas > 0)
@@ -72,7 +72,7 @@
             @if (Model.Resumo.TotalNaoLidas > 0)
             {
                 <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                    @Model.Resumo.TotalNaoLidas nao lida@(Model.Resumo.TotalNaoLidas > 1 ? "s" : "")
+                    @Model.Resumo.TotalNaoLidas não lida@(Model.Resumo.TotalNaoLidas > 1 ? "s" : "")
                 </span>
             }
         }
@@ -115,7 +115,7 @@
     </a>
     <a href="@(baseUrl + sep)lida=false"
        class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(filtroLida == "false" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
-        Nao lidas
+        Não lidas
     </a>
     <a href="@(baseUrl + sep)lida=true"
        class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(filtroLida == "true" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
@@ -130,7 +130,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p class="text-sm font-medium text-slate-500">Nenhuma notificacao encontrada</p>
+        <p class="text-sm font-medium text-slate-500">Nenhuma notificação encontrada</p>
         <p class="text-xs text-slate-400 mt-1">
             @if (!string.IsNullOrEmpty(Model.FiltroTipo) || filtroLida != null)
             {
@@ -138,7 +138,7 @@
             }
             else
             {
-                <span>As notificacoes serao geradas automaticamente com base no seu estoque.</span>
+                <span>As notificações serão geradas automaticamente com base no seu estoque.</span>
             }
         </p>
     </div>

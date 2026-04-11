@@ -8,11 +8,11 @@ public class CadastrarUsuarioCommandValidator : AbstractValidator<CadastrarUsuar
     public CadastrarUsuarioCommandValidator()
     {
         RuleFor(x => x.Nome)
-            .NotEmpty().WithMessage("Nome e obrigatorio.")
+            .NotEmpty().WithMessage("Nome é obrigatório.")
             .MaximumLength(150).WithMessage("Nome deve ter no maximo 150 caracteres.");
 
         RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email e obrigatorio.")
+            .NotEmpty().WithMessage("Email é obrigatório.")
             .EmailAddress().WithMessage("Email deve ser valido.")
             .MaximumLength(255).WithMessage("Email deve ter no maximo 255 caracteres.");
 

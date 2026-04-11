@@ -27,7 +27,7 @@ namespace EasyStock.Infra.MongoDb.Services
             var apiKey = configuration["Anthropic:ApiKey"];
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                logger.LogWarning("Anthropic:ApiKey nao configurado. Retornando fallback para produto {ProdutoId}.", produto.Id);
+                logger.LogWarning("Anthropic:ApiKey não configurado. Retornando fallback para produto {ProdutoId}.", produto.Id);
                 yield return itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
                 yield break;
             }

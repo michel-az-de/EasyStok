@@ -31,7 +31,7 @@ public abstract class EasyStockControllerBase : ControllerBase
         base.BadRequest(new ApiErrorResponse(new ApiError("BAD_REQUEST", message, detail, null)));
 
     /// <summary>404 with { error: { code: NOT_FOUND, ... } }</summary>
-    protected IActionResult DataNotFound(string message = "Recurso nao encontrado.", string? detail = null) =>
+    protected IActionResult DataNotFound(string message = "Recurso não encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));
 
     protected bool TryResolveEmpresaId(
@@ -47,7 +47,7 @@ public abstract class EasyStockControllerBase : ControllerBase
         {
             if (empresaId == Guid.Empty)
             {
-                error = DataBadRequest("EmpresaId e obrigatorio.");
+                error = DataBadRequest("EmpresaId é obrigatório.");
                 return false;
             }
 
@@ -69,7 +69,7 @@ public abstract class EasyStockControllerBase : ControllerBase
 
         if (empresaId == Guid.Empty)
         {
-            error = DataBadRequest("EmpresaId e obrigatorio.");
+            error = DataBadRequest("EmpresaId é obrigatório.");
             return false;
         }
 

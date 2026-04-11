@@ -26,7 +26,7 @@ public sealed class GeradorNotificacoesAutomaticas(
         }
 
         await unitOfWork.CommitAsync();
-        logger.LogInformation("Geracao automatica de notificacoes concluida para {TotalEmpresas} empresa(s).", empresas.Count());
+        logger.LogInformation("Geração automática de notificações concluída para {TotalEmpresas} empresa(s).", empresas.Count());
     }
 
     private async Task ProcessarEmpresaAsync(Empresa empresa, CancellationToken ct)
@@ -53,7 +53,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.EstoqueCritico,
-                            "Estoque Critico",
+                            "Estoque Crítico",
                             $"{codigo} com apenas {qty} unidade(s) — minimo configurado: {configuracaoLoja.QuantidadeMinimaPadrao}. Considere repor este item.",
                             severidade,
                             item.Id);
@@ -77,7 +77,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                                 empresa.Id,
                                 TipoAlertaEstoque.ProdutoVencido,
                                 "Produto Vencido",
-                                $"{codigoV} venceu ha {Math.Abs(diasRestantes)} dia(s). Retire do estoque ou descarte conforme procedimento.",
+                                $"{codigoV} venceu há {Math.Abs(diasRestantes)} dia(s). Retire do estoque ou descarte conforme procedimento.",
                                 SeveridadeNotificacao.Critica,
                                 item.Id);
                         }
@@ -88,7 +88,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.ValidadeProxima,
-                            "Validade Proxima",
+                            "Validade Próxima",
                             $"{codigo} vence em {diasRestantes} dia(s) ({dataValidade}). {qty_context(item)} Priorize a venda ou rotatividade.",
                             severidade,
                             item.Id);
@@ -108,7 +108,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                             empresa.Id,
                             TipoAlertaEstoque.ProdutoParado,
                             "Produto Parado",
-                            $"{codigo} sem movimentacao ha {dias} dias. {qty_context(item)} Avalie promocao ou reposicionamento.",
+                            $"{codigo} sem movimentação há {dias} dias. {qty_context(item)} Avalie promoção ou reposicionamento.",
                             SeveridadeNotificacao.Media,
                             item.Id);
                     },
@@ -126,8 +126,8 @@ public sealed class GeradorNotificacoesAutomaticas(
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.ReposicaoSugerida,
-                            "Reposicao Sugerida",
-                            $"{codigo} precisa de reposicao. {qty_context(item)} Previsao de zeramento: {previsao} dia(s).",
+                            "Reposição Sugerida",
+                            $"{codigo} precisa de reposição. {qty_context(item)} Previsão de zeramento: {previsao} dia(s).",
                             SeveridadeNotificacao.Media,
                             item.Id);
                     },
@@ -138,12 +138,12 @@ public sealed class GeradorNotificacoesAutomaticas(
         var pedidosAtrasados = await pedidoFornecedorRepository.GetPedidosAtrasadosAsync(empresa.Id, hoje);
         foreach (var pedido in pedidosAtrasados)
         {
-            var previsao = pedido.PrevisaoEntrega?.ToString("dd/MM/yyyy") ?? "nao informada";
+            var previsao = pedido.PrevisaoEntrega?.ToString("dd/MM/yyyy") ?? "não informada";
             await CriarSeNaoExisteNoDiaAsync(
                 empresa.Id,
                 TipoAlertaEstoque.PedidoAtrasado,
                 "Pedido Atrasado",
-                $"Pedido com previsao em {previsao} ainda nao foi recebido. Entre em contato com o fornecedor.",
+                $"Pedido com previsão em {previsao} ainda não foi recebido. Entre em contato com o fornecedor.",
                 SeveridadeNotificacao.Alta,
                 pedido.Id);
         }

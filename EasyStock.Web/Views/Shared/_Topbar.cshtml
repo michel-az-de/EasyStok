@@ -245,7 +245,7 @@
         </div>
     </div>
 
-    <!-- Notificacoes Dropdown -->
+    <!-- Notificações Dropdown -->
     <div x-data="notifDropdown()" class="relative">
         <button @@click="toggle()" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,13 +259,13 @@
             <!-- Header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                 <div class="flex items-center gap-2">
-                    <span class="font-semibold text-slate-900 text-sm">Notificacoes</span>
+                    <span class="font-semibold text-slate-900 text-sm">Notificações</span>
                     <template x-if="resumo && resumo.totalNaoLidas > 0">
                         <span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full text-xs font-medium" x-text="resumo.totalNaoLidas"></span>
                     </template>
                 </div>
                 <template x-if="resumo && resumo.criticas > 0">
-                    <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' critica' + (resumo.criticas > 1 ? 's' : '')"></span>
+                    <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' crítica' + (resumo.criticas > 1 ? 's' : '')"></span>
                 </template>
             </div>
 
@@ -279,7 +279,7 @@
                         <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        <p class="text-sm">Nenhuma notificacao pendente</p>
+                        <p class="text-sm">Nenhuma notificação pendente</p>
                     </div>
                 </template>
                 <template x-for="n in items" :key="n.id">
@@ -304,7 +304,7 @@
 
             <!-- Footer -->
             <a href="/notificacoes" class="block px-4 py-2.5 text-center text-sm text-indigo-600 font-medium hover:bg-indigo-50 border-t border-slate-100 rounded-b-xl transition-colors">
-                Ver todas as notificacoes
+                Ver todas as notificações
             </a>
         </div>
     </div>

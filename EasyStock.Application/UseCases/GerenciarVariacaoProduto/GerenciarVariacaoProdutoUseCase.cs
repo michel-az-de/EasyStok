@@ -138,8 +138,8 @@ public sealed class GerenciarVariacaoProdutoUseCase(
 
     private async Task<Produto> ValidarProdutoAtivoAsync(Guid empresaId, Guid produtoId)
     {
-        if (empresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
-        if (produtoId == Guid.Empty) throw new UseCaseValidationException("ProdutoId e obrigatorio.");
+        if (empresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
+        if (produtoId == Guid.Empty) throw new UseCaseValidationException("ProdutoId é obrigatório.");
 
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");

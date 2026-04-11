@@ -10,7 +10,7 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         PropertyNameCaseInsensitive = true
     };
 
-    public string ApiBaseUrl => configuration["ApiSettings:BaseUrl"] ?? "nao configurado";
+    public string ApiBaseUrl => configuration["ApiSettings:BaseUrl"] ?? "não configurado";
 
     public async Task<DiagnosticoApiResult?> ObterDiagnosticoAsync()
     {

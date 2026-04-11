@@ -15,7 +15,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
     public string GerarToken(AutenticarUsuarioResult resultado)
     {
         var secretKey = configuration["Jwt:SecretKey"]
-            ?? throw new InvalidOperationException("Jwt:SecretKey nao configurado.");
+            ?? throw new InvalidOperationException("Jwt:SecretKey não configurado.");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

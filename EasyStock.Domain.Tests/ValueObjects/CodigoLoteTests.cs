@@ -43,7 +43,7 @@ public class CodigoLoteTests
         Action act = () => CodigoLote.From(value);
 
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*Codigo de lote e obrigatorio.*");
+            .WithMessage("*Código de lote é obrigatório.*");
     }
 
     [Fact]
