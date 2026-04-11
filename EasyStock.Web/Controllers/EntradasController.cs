@@ -47,6 +47,26 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         return RedirectToAction("Index", "Estoque");
     }
 
+    [HttpPost("/entradas/nova/json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarJson([FromBody] EntradaFormViewModel vm)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            return BadRequest(new { success = false, errorMessage = string.Join(" ", errors) });
+        }
+
+        if (!ValidarProdutoId(vm))
+            return BadRequest(new { success = false, errorMessage = "Selecione um produto válido." });
+
+        var result = await svc.CriarEntradaAsync(vm);
+        if (!result.Success)
+            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao registrar entrada." });
+
+        return Ok(new { success = true });
+    }
+
     [HttpGet("/entradas/reposicao")]
     public async Task<IActionResult> Reposicao(string? itemId = null)
     {

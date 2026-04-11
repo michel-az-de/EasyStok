@@ -38,23 +38,8 @@
         </div>
     </div>
 
-    <form asp-action="Criar" asp-controller="Entradas" method="post" x-ref="mainForm">
+    <div>
         @Html.AntiForgeryToken()
-
-        <!-- Campos hidden para dados coletados nos passos -->
-        <input type="hidden" name="ProdutoId" x-model="produtoId" />
-        <input type="hidden" name="ProdutoNome" x-model="produtoNome" />
-        <input type="hidden" name="ProdutoSku" x-model="produtoSku" />
-        <input type="hidden" name="EstoqueAtual" x-model="estoqueAtual" />
-        <input type="hidden" name="VarId" x-model="varId" />
-        <input type="hidden" name="Qty" x-model="qty" />
-        <input type="hidden" name="Custo" x-model="custo" />
-        <input type="hidden" name="Preco" x-model="preco" />
-        <input type="hidden" name="FornecedorId" x-model="fornecedorId" />
-        <input type="hidden" name="Lote" x-model="lote" />
-        <input type="hidden" name="Validade" x-model="validade" />
-        <input type="hidden" name="Observacoes" x-model="observacoes" />
-        <input type="hidden" name="Data" x-model="data" />
 
         <!-- Passo 1: Selecionar produto -->
         <div x-show="step === 1">
@@ -63,7 +48,7 @@
                 <div class="relative mb-4">
                     <input type="text" x-model="buscaTerm"
                            @@input.debounce.300ms="buscarProduto()"
-                           placeholder="Buscar por nome ou SKU..."
+                           placeholder="Buscar por nome, marca ou SKU..."
                            class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     <div x-show="buscando" class="absolute right-3 top-3 text-slate-400 text-sm">Buscando...</div>
                 </div>
@@ -76,14 +61,18 @@
                                  x-text="p.emoji || '📦'"></div>
                             <div class="flex-1 min-w-0">
                                 <div class="font-semibold text-slate-900 truncate" x-text="p.nome"></div>
-                                <div class="text-xs text-slate-400 font-mono" x-text="p.sku"></div>
+                                <div class="text-xs font-mono" :class="p.sku ? 'text-slate-400' : 'text-slate-300'" x-text="p.sku || 'Sem SKU'"></div>
                             </div>
                         </button>
                     </template>
                 </div>
 
-                <div x-show="buscaTerm.length > 1 && !buscando && resultados.length === 0" class="text-center py-6 text-slate-400 text-sm">
-                    Nenhum produto encontrado
+                <div x-show="buscaTerm.length > 1 && !buscando && resultados.length === 0" class="text-center py-6">
+                    <p class="text-slate-400 text-sm mb-2">Nenhum produto encontrado</p>
+                    <p class="text-slate-400 text-xs mb-3">Verifique o termo de busca ou cadastre um novo produto.</p>
+                    <a href="/produtos/novo" class="inline-block px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors">
+                        + Cadastrar produto
+                    </a>
                 </div>
             </div>
         </div>
@@ -167,7 +156,7 @@
                         <span class="text-2xl" x-text="produtoEmoji || '📦'"></span>
                         <div>
                             <div class="font-semibold text-sm text-slate-900" x-text="produtoNome"></div>
-                            <div class="text-xs text-slate-400 font-mono" x-text="produtoSku"></div>
+                            <div class="text-xs font-mono" :class="produtoSku ? 'text-slate-400' : 'text-slate-300'" x-text="produtoSku || 'Sem SKU'"></div>
                         </div>
                     </div>
                     <div class="border-t border-slate-100 pt-3 space-y-2">
@@ -225,24 +214,25 @@
                     </div>
                 </dl>
 
+                <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" x-text="erroMsg"></div>
                 <div class="flex gap-3">
                     <button type="button" @@click="step = 2"
                             class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                         ← Voltar
                     </button>
-                    <button type="submit" x-data="{ loading: false }" @@click="loading = true"
-                            :disabled="loading"
-                            :class="{ 'opacity-50 cursor-not-allowed': loading }"
+                    <button type="button" @@click="submitEntrada()"
+                            :disabled="submitting"
+                            :class="{ 'opacity-50 cursor-not-allowed': submitting }"
                             class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                        <span x-show="!loading">Confirmar entrada ✓</span>
-                        <span x-show="loading" x-cloak>Registrando...</span>
+                        <span x-show="!submitting">Confirmar entrada</span>
+                        <span x-show="submitting" x-cloak class="flex items-center justify-center gap-2"><span class="spinner"></span> Registrando...</span>
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Passo 4: Confirmado (não é atingido via form submit, é alcançado após redirect com toast) -->
-    </form>
+    </div>
 </div>
 
 @section Scripts {
@@ -271,13 +261,23 @@
                 data: new Date().toLocaleDateString('en-CA'),
                 total: 0,
                 controlaValidade: false,
+                erroMsg: '',
+                submitting: false,
 
                 async buscarProduto() {
                     if (this.buscaTerm.length < 2) { this.resultados = []; return; }
                     this.buscando = true;
                     try {
                         const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm));
-                        if (r.ok) this.resultados = await r.json();
+                        if (r.ok) {
+                            this.resultados = await r.json();
+                        } else {
+                            this.resultados = [];
+                            window.showToast('Erro ao buscar produtos. Tente novamente.', 'error');
+                        }
+                    } catch {
+                        this.resultados = [];
+                        window.showToast('Não foi possível conectar ao servidor.', 'error');
                     } finally {
                         this.buscando = false;
                     }
@@ -291,9 +291,9 @@
                     this.variacoes = [];
                     this.estoqueAtual = 0;
                     this.varId = '';
-                    // Pre-fill from search results
                     this.custo = p.custoReferencia || null;
                     this.preco = p.precoReferencia || null;
+                    let detailOk = false;
                     try {
                         const dr = await fetch('/estoque/produto-detalhe/' + p.id);
                         if (dr.ok) {
@@ -301,22 +301,59 @@
                             this.variacoes = d.variacoes || [];
                             this.estoqueAtual = d.estoqueTotal || 0;
                             this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
-                            // Override with richer product detail data
                             if (d.custoReferencia) this.custo = d.custoReferencia;
                             if (d.precoReferencia) this.preco = d.precoReferencia;
                             this.controlaValidade = d.controlaValidade || false;
+                            detailOk = true;
+                        } else {
+                            window.showToast('Erro ao carregar detalhes do produto. Tente novamente.', 'error');
                         }
                     } catch {
-                        this.variacoes = [];
-                        this.estoqueAtual = 0;
-                        this.varId = '';
+                        window.showToast('Não foi possível conectar ao servidor.', 'error');
                     }
-                    this.calcularTotal();
-                    this.step = 2;
+                    if (detailOk) {
+                        this.calcularTotal();
+                        this.step = 2;
+                    }
                 },
 
                 calcularTotal() {
                     this.total = (this.qty || 0) * (this.custo || 0);
+                },
+
+                async submitEntrada() {
+                    this.submitting = true;
+                    this.erroMsg = '';
+                    try {
+                        const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                        const body = {
+                            produtoId: this.produtoId,
+                            varId: this.varId || null,
+                            qty: this.qty,
+                            custo: this.custo,
+                            preco: this.preco || null,
+                            fornecedorId: this.fornecedorId || null,
+                            lote: this.lote || null,
+                            validade: this.validade || null,
+                            observacoes: this.observacoes || null,
+                            data: this.data
+                        };
+                        const res = await fetch('/entradas/nova/json', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                            body: JSON.stringify(body)
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                            window.location.href = '/estoque';
+                        } else {
+                            this.erroMsg = data.errorMessage || 'Erro ao registrar entrada. Tente novamente.';
+                        }
+                    } catch {
+                        this.erroMsg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+                    } finally {
+                        this.submitting = false;
+                    }
                 }
             };
         }
