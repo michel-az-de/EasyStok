@@ -92,7 +92,7 @@
                     {
                         <select name="CategoriaId"
                                 x-model="categoriaId"
-                                @@change="subcategoriaId = null"
+                                @@change="categoriaId = $el.value.toLowerCase(); subcategoriaId = null"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione uma categoria</option>
                             @foreach (var cat in roots)
@@ -677,9 +677,9 @@
                 tipo: @Model.Tipo,
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
 
-                // ── Categories ──
-                categoriaId: '@Model.CategoriaId',
-                subcategoriaId: '@(Model.SubcategoriaId?.ToString() ?? "")',
+                // ── Categories ── (lowercase para garantir match exato com JSON serializado)
+                categoriaId: '@Model.CategoriaId'.toLowerCase(),
+                subcategoriaId: '@(Model.SubcategoriaId?.ToString() ?? "")'.toLowerCase(),
 
                 // ── Dynamic arrays ──
                 variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
@@ -729,11 +729,11 @@
                 // ── Categories ──
                 get subcategorias() {
                     if (!this.categoriaId) return [];
-                    return todasSubcats.filter(s => s.categoriaPaiId === this.categoriaId);
+                    return todasSubcats.filter(s => s.categoriaPaiId.toLowerCase() === this.categoriaId);
                 },
                 get categoriaNome() {
                     if (!this.categoriaId) return '';
-                    const cat = allCats.find(c => c.id === this.categoriaId);
+                    const cat = allCats.find(c => c.id.toLowerCase() === this.categoriaId);
                     return cat ? cat.nome : '';
                 },
 
@@ -825,6 +825,7 @@
                         }
                         // Validation error — replace page content
                         const html = await res.text();
+                        this.saving = false; // reset antes de substituir DOM
                         document.open();
                         document.write(html);
                         document.close();
