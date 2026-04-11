@@ -73,7 +73,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
     [HttpPost("/produtos/novo")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Criar(ProdutoFormViewModel vm)
+    public async Task<IActionResult> Criar(ProdutoFormViewModel vm, List<IFormFile> fotos)
     {
         if (!ModelState.IsValid)
         {
@@ -88,6 +88,13 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         {
             await LoadCategoriasAsync();
             return View("Form", vm);
+        }
+
+        var newId = result.Data?.ProdutoId.ToString();
+        if (newId != null)
+        {
+            foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
+                await svc.UploadFotoAsync(newId, foto);
         }
 
         Toast("success", "Produto criado com sucesso!");
@@ -152,7 +159,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
                 Altura = e.Dimensoes?.Altura,
                 Comprimento = e.Dimensoes?.Comprimento,
                 Padrao = e.Padrao
-            }).ToList()
+            }).ToList(),
+            ExistingPhotos = p.Fotos
         };
         await LoadCategoriasAsync();
         return View("Form", vm);
@@ -160,7 +168,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
     [HttpPost("/produtos/{id}/editar")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm)
+    public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm, List<IFormFile> fotos)
     {
         if (!ModelState.IsValid)
         {
@@ -177,6 +185,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
+
+        foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
+            await svc.UploadFotoAsync(id, foto);
 
         Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
