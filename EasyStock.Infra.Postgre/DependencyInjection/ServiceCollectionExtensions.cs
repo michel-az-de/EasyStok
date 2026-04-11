@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Events;
@@ -18,6 +19,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             string connectionString,
             IConfiguration configuration)
         {
+            services.Configure<CacheOptions>(configuration.GetSection("Cache"));
+
             services.AddDbContext<EasyStockDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
