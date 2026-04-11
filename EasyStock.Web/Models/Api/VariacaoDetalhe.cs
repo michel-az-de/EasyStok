@@ -6,6 +6,8 @@ public record VariacaoDetalhe
     public string Nome { get; init; } = string.Empty;
     public string? Cor { get; init; }
     public string? Tamanho { get; init; }
+    public string? DescricaoComercial { get; init; }
+    public string? CodigoBarras { get; init; }
     public string? Sku { get; init; }
     public bool Ativa { get; init; }
     public int QuantidadeEmEstoque { get; init; }

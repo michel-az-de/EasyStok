@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
 using Swashbuckle.AspNetCore.Annotations;
@@ -20,6 +21,7 @@ public class ItemEstoqueController(
     IItemEstoqueRepository itemEstoqueRepository,
     RegistrarEntradaEstoqueUseCase registrarEntradaUseCase,
     RegistrarSaidaEstoqueUseCase registrarSaidaUseCase,
+    EstornarSaidaUseCase estornarSaidaUseCase,
     ReporEstoqueUseCase reporEstoqueUseCase,
     BuscarEstoqueInteligenteUseCase buscarUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
@@ -36,8 +38,9 @@ public class ItemEstoqueController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, page, pageSize);
-        return DataPaged(itens, totalCount, page, pageSize);
+        var (p, ps) = NormalisePage(page, pageSize);
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps);
+        return DataPaged(itens, totalCount, p, ps);
     }
 
     [SwaggerOperation(Summary = "Smart inventory search", Description = "Full-text search across product name, SKU, barcode and internal code.")]
@@ -96,6 +99,19 @@ public class ItemEstoqueController(
         return DataOk(await registrarSaidaUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
     }
 
+    [SwaggerOperation(Summary = "Get stock items by product")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("por-produto/{produtoId}")]
+    public async Task<IActionResult> GetByProduto(Guid produtoId, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var items = await itemEstoqueRepository.GetByProdutoAsync(resolvedEmpresaId, produtoId);
+        return DataOk(items);
+    }
+
     [SwaggerOperation(Summary = "Get stock item replenishment data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -121,5 +137,20 @@ public class ItemEstoqueController(
             return error!;
 
         return DataOk(await reporEstoqueUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
+    }
+
+    [SwaggerOperation(Summary = "Reverse a stock exit (estorno)", Description = "Creates a reversal entry restoring the stock quantity.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpPost("estorno/{movimentacaoId}")]
+    public async Task<IActionResult> Estornar(Guid movimentacaoId, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await estornarSaidaUseCase.ExecuteAsync(
+            new EstornarSaidaCommand(resolvedEmpresaId, movimentacaoId, null));
+        return DataOk(result);
     }
 }

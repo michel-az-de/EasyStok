@@ -16,6 +16,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             Guid empresaId,
             bool? lida = null,
             TipoAlertaEstoque? tipo = null,
+            SeveridadeNotificacao? severidade = null,
             int page = 1,
             int pageSize = 20)
         {
@@ -27,15 +28,51 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(n => n.Lida == lida.Value);
             if (tipo.HasValue)
                 query = query.Where(n => n.TipoAlerta == tipo.Value);
+            if (severidade.HasValue)
+                query = query.Where(n => n.Severidade == severidade.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
-                .OrderByDescending(n => n.CriadaEm)
+                .OrderBy(n => n.Severidade)
+                .ThenByDescending(n => n.CriadaEm)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
             return (items, totalCount);
+        }
+
+        public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5)
+        {
+            return await dbContext.Notificacoes
+                .AsNoTracking()
+                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .OrderBy(n => n.Severidade)
+                .ThenByDescending(n => n.CriadaEm)
+                .Take(limit)
+                .ToListAsync();
+        }
+
+        public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId)
+        {
+            var naoLidas = await dbContext.Notificacoes
+                .AsNoTracking()
+                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .ToListAsync();
+
+            var porTipo = naoLidas
+                .GroupBy(n => n.TipoAlerta.ToString())
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            return new NotificacaoResumo
+            {
+                TotalNaoLidas = naoLidas.Count,
+                Criticas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Critica),
+                Altas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Alta),
+                Medias = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Media),
+                Informativas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Informativa),
+                PorTipo = porTipo
+            };
         }
 
         public Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>

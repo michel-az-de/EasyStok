@@ -40,10 +40,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Plano> Planos { get; set; } = null!;
         public DbSet<AssinaturaEmpresa> AssinaturasEmpresa { get; set; } = null!;
 
-        public async Task<int> CommitAsync()
-        {
-            return await base.SaveChangesAsync();
-        }
+        public Task<int> CommitAsync() => base.SaveChangesAsync();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

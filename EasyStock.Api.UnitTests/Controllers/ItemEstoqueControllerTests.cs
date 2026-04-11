@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -23,6 +24,7 @@ public class ItemEstoqueControllerTests
     private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
     private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
     private readonly IProdutoVariacaoRepository _produtoVariacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IFornecedorRepository _fornecedorRepository = Substitute.For<IFornecedorRepository>();
     private readonly IMovimentacaoEstoqueRepository _movimentacaoEstoqueRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
     private readonly IItemVendaRepository _itemVendaRepository = Substitute.For<IItemVendaRepository>();
@@ -30,8 +32,10 @@ public class ItemEstoqueControllerTests
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly ILogger<RegistrarEntradaEstoqueUseCase> _registrarEntradaLogger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
     private readonly ILogger<RegistrarSaidaEstoqueUseCase> _registrarSaidaLogger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+    private readonly ILogger<EstornarSaidaUseCase> _estornarSaidaLogger = Substitute.For<ILogger<EstornarSaidaUseCase>>();
     private readonly RegistrarEntradaEstoqueUseCase _registrarEntradaUseCase;
     private readonly RegistrarSaidaEstoqueUseCase _registrarSaidaUseCase;
+    private readonly EstornarSaidaUseCase _estornarSaidaUseCase;
     private readonly ReporEstoqueUseCase _reporEstoqueUseCase;
     private readonly BuscarEstoqueInteligenteUseCase _buscarUseCase;
     private readonly ItemEstoqueController _controller;
@@ -53,6 +57,11 @@ public class ItemEstoqueControllerTests
             _movimentacaoEstoqueRepository,
             _unitOfWork,
             _registrarSaidaLogger);
+        _estornarSaidaUseCase = new EstornarSaidaUseCase(
+            _movimentacaoEstoqueRepository,
+            _itemEstoqueRepository,
+            _unitOfWork,
+            _estornarSaidaLogger);
         _reporEstoqueUseCase = new ReporEstoqueUseCase(
             _produtoRepository,
             _itemEstoqueRepository,
@@ -61,11 +70,13 @@ public class ItemEstoqueControllerTests
         _buscarUseCase = new BuscarEstoqueInteligenteUseCase(
             _produtoRepository,
             _produtoVariacaoRepository,
-            _itemEstoqueRepository);
+            _itemEstoqueRepository,
+            _fornecedorRepository);
         _controller = new ItemEstoqueController(
             _itemEstoqueRepository,
             _registrarEntradaUseCase,
             _registrarSaidaUseCase,
+            _estornarSaidaUseCase,
             _reporEstoqueUseCase,
             _buscarUseCase,
             _currentUser);
@@ -198,7 +209,7 @@ public class ItemEstoqueControllerTests
             QuantidadeAtual = Quantidade.From(8),
             QuantidadeInicial = Quantidade.From(8),
             CustoUnitario = Dinheiro.FromDecimal(150m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-2),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-1)
         });
@@ -323,7 +334,7 @@ public class ItemEstoqueControllerTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(150m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-10),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-2)
         });

@@ -7,7 +7,9 @@ namespace EasyStock.Domain.Entities
         public Guid Id { get; set; }
         public Guid EmpresaId { get; set; }
         public TipoAlertaEstoque TipoAlerta { get; set; }
+        public string Titulo { get; set; } = string.Empty;
         public string Mensagem { get; set; } = null!;
+        public SeveridadeNotificacao Severidade { get; set; } = SeveridadeNotificacao.Media;
         public bool Lida { get; set; }
         public Guid? ReferenciaId { get; set; }
         public DateTime CriadaEm { get; set; }
@@ -15,17 +17,29 @@ namespace EasyStock.Domain.Entities
 
         public Empresa? Empresa { get; set; }
 
-        public static Notificacao Criar(Guid empresaId, TipoAlertaEstoque tipo, string mensagem, Guid? referenciaId = null) =>
+        public static Notificacao Criar(
+            Guid empresaId,
+            TipoAlertaEstoque tipo,
+            string titulo,
+            string mensagem,
+            SeveridadeNotificacao severidade,
+            Guid? referenciaId = null) =>
             new()
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaId,
                 TipoAlerta = tipo,
+                Titulo = titulo,
                 Mensagem = mensagem,
+                Severidade = severidade,
                 Lida = false,
                 ReferenciaId = referenciaId,
                 CriadaEm = DateTime.UtcNow
             };
+
+        /// <summary>Backward-compatible overload for callers that don't set titulo/severidade.</summary>
+        public static Notificacao Criar(Guid empresaId, TipoAlertaEstoque tipo, string mensagem, Guid? referenciaId = null) =>
+            Criar(empresaId, tipo, TituloParaTipo(tipo), mensagem, SeveridadePadrao(tipo), referenciaId);
 
         public void AtualizarMensagem(string mensagem)
         {
@@ -37,5 +51,29 @@ namespace EasyStock.Domain.Entities
             Lida = true;
             LidaEm = DateTime.UtcNow;
         }
+
+        private static string TituloParaTipo(TipoAlertaEstoque tipo) => tipo switch
+        {
+            TipoAlertaEstoque.EstoqueCritico => "Estoque Critico",
+            TipoAlertaEstoque.ProdutoParado => "Produto Parado",
+            TipoAlertaEstoque.ValidadeProxima => "Validade Proxima",
+            TipoAlertaEstoque.ReposicaoSugerida => "Reposicao Sugerida",
+            TipoAlertaEstoque.PedidoAtrasado => "Pedido Atrasado",
+            TipoAlertaEstoque.PedidoRecebido => "Pedido Recebido",
+            TipoAlertaEstoque.ProdutoVencido => "Produto Vencido",
+            _ => "Notificacao"
+        };
+
+        private static SeveridadeNotificacao SeveridadePadrao(TipoAlertaEstoque tipo) => tipo switch
+        {
+            TipoAlertaEstoque.EstoqueCritico => SeveridadeNotificacao.Alta,
+            TipoAlertaEstoque.ProdutoVencido => SeveridadeNotificacao.Critica,
+            TipoAlertaEstoque.ValidadeProxima => SeveridadeNotificacao.Media,
+            TipoAlertaEstoque.ProdutoParado => SeveridadeNotificacao.Media,
+            TipoAlertaEstoque.ReposicaoSugerida => SeveridadeNotificacao.Media,
+            TipoAlertaEstoque.PedidoAtrasado => SeveridadeNotificacao.Alta,
+            TipoAlertaEstoque.PedidoRecebido => SeveridadeNotificacao.Informativa,
+            _ => SeveridadeNotificacao.Media
+        };
     }
 }

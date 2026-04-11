@@ -1,12 +1,15 @@
 @model AnalyticsViewModel
 @{
-    ViewBag.Title = "Analytics";
+    ViewBag.Title = "Análises";
     Layout = "_Layout";
     var ptBR = new System.Globalization.CultureInfo("pt-BR");
 }
 
 <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-slate-900">Analytics</h1>
+    <div class="pg-hd">
+        <h1>Análises</h1>
+        <p>Visão geral do desempenho do seu estoque</p>
+    </div>
     <a asp-action="Movimentacoes" asp-controller="Analytics"
        class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
         Ver movimentações →
@@ -17,7 +20,7 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="ws">
         <div class="kpi-lbl">Receita est. (período)</div>
-        <div class="kpi-val text-green-600">R$ @Model.ReceitaEstimadaPeriodo.ToString("N2")</div>
+        <div class="kpi-val text-green-600">@Model.ReceitaEstimadaPeriodo.ToString("C", ptBR)</div>
     </div>
     <div class="ws">
         <div class="kpi-lbl">Unid. vendidas (último mês)</div>
@@ -25,7 +28,7 @@
     </div>
     <div class="ws">
         <div class="kpi-lbl">Valor em estoque</div>
-        <div class="kpi-val text-blue-600">R$ @Model.ValorEstoque.ToString("N2")</div>
+        <div class="kpi-val text-blue-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
     </div>
     <div class="ws">
         <div class="kpi-lbl">Itens em estoque</div>
@@ -40,20 +43,24 @@
     <h2 class="font-semibold text-slate-900 mb-1">Projeções de Demanda</h2>
     <p class="text-xs text-slate-400 mb-4">Baseado na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="text-center p-3 bg-slate-50 rounded-lg">
+        <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <div class="text-sm text-slate-400 mb-1">📈</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidadesDia.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">unidades/dia</div>
         </div>
-        <div class="text-center p-3 bg-slate-50 rounded-lg">
+        <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <div class="text-sm text-slate-400 mb-1">📅</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades7d.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">próximos 7 dias</div>
         </div>
-        <div class="text-center p-3 bg-slate-50 rounded-lg">
+        <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <div class="text-sm text-slate-400 mb-1">📆</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades30d.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">próximos 30 dias</div>
         </div>
-        <div class="text-center p-3 bg-indigo-50 rounded-lg">
-            <div class="text-xl font-bold text-indigo-600">R$ @Model.ProjReceita30d.ToString("N2")</div>
+        <div class="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+            <div class="text-sm text-slate-400 mb-1">💰</div>
+            <div class="text-xl font-bold text-indigo-600">@Model.ProjReceita30d.ToString("C", ptBR)</div>
             <div class="text-xs text-slate-500 mt-1">receita proj. 30d</div>
         </div>
     </div>
@@ -77,7 +84,10 @@ else
         <h2 class="font-semibold text-slate-900 mb-4">Reposição Urgente</h2>
         @if (!Model.ItensReposicaoUrgente.Any())
         {
-            <p class="text-sm text-slate-400 text-center py-6">Nenhum item crítico</p>
+            <div class="text-center py-6 text-slate-400">
+                <p class="font-semibold text-slate-500">Nenhum item crítico</p>
+                <p class="text-xs mt-1">Todos os produtos estão com estoque adequado.</p>
+            </div>
         }
         else
         {
@@ -114,7 +124,10 @@ else
         <h2 class="font-semibold text-slate-900 mb-4">Alertas Ativos</h2>
         @if (!Model.Alertas.Any())
         {
-            <p class="text-sm text-slate-400 text-center py-6">Sem alertas</p>
+            <div class="text-center py-6 text-slate-400">
+                <p class="font-semibold text-slate-500">Sem alertas ativos</p>
+                <p class="text-xs mt-1">Nenhum alerta no momento. Seu estoque está sob controle.</p>
+            </div>
         }
         else
         {

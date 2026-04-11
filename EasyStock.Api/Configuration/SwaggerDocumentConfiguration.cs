@@ -285,12 +285,9 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        if (context.ApiDescription.HttpMethod?.Equals("GET", StringComparison.OrdinalIgnoreCase) != true)
-            return;
-
         var path = context.ApiDescription.RelativePath ?? "";
 
-        // Add X-Correlation-Id header to all operations
+        // Add X-Correlation-Id header to ALL operations (GET, POST, PUT, PATCH, DELETE…)
         operation.Parameters ??= new List<OpenApiParameter>();
         if (!operation.Parameters.Any(p => p.Name == "X-Correlation-Id"))
         {
@@ -303,6 +300,10 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
                 Schema      = new OpenApiSchema { Type = "string", Format = "uuid" }
             });
         }
+
+        // Inject mock examples only for GET operations
+        if (context.ApiDescription.HttpMethod?.Equals("GET", StringComparison.OrdinalIgnoreCase) != true)
+            return;
 
         // Inject mock examples per well-known paths
         if (!operation.Responses.ContainsKey("200")) return;
@@ -419,5 +420,53 @@ public static class SwaggerXmlExtensions
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         if (File.Exists(xmlPath))
             options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
+}
+
+// ── Tag descriptions document filter ─────────────────────────────────────────
+
+/// <summary>
+/// Adds human-readable tag descriptions to the generated Swagger document
+/// so the Swagger UI shows a description below each controller group.
+/// </summary>
+public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
+{
+    private static readonly Dictionary<string, string> Descriptions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Auth"]           = "Autenticação e gerenciamento de sessão. Registro, login, refresh de token e perfil do usuário autenticado.",
+        ["Empresas"]       = "Registro e configuração de empresas (tenants). Cada recurso da API é vinculado a um `empresaId`.",
+        ["Usuarios"]       = "Gerenciamento de usuários: criação, atualização de perfil, desativação e listagem por empresa.",
+        ["Produtos"]       = "Catálogo de produtos com suporte a variações, embalagens, fotos e geração de anúncios via IA.",
+        ["ItemEstoque"]    = "Itens de estoque vinculados a produtos. Controle de quantidade atual, mínima e alertas de reposição.",
+        ["Movimentacao"]   = "Entradas e saídas de estoque. Registro de compras, ajustes e saídas com rastreabilidade.",
+        ["Fornecedor"]     = "Cadastro de fornecedores e configuração de lead time para cálculo de ponto de pedido.",
+        ["Categoria"]      = "Categorias de produtos para organização do catálogo.",
+        ["Analytics"]      = "Dashboard, projeções de demanda, análise de sazonalidade e relatórios de movimentação.",
+        ["Inteligencia"]   = "Alertas inteligentes de estoque baixo, validade próxima e sugestões de reposição.",
+        ["Notificacao"]    = "Gerenciamento de notificações do sistema: listagem, marcação como lida e contagem de não lidas.",
+        ["Configuracoes"]  = "Configurações por empresa: limites de estoque, preferências de alerta e parametrizações gerais.",
+        ["Loja"]           = "Configurações e dados da loja vinculada à empresa.",
+        ["Plano"]          = "Gerenciamento de planos e assinaturas.",
+        ["Uploads"]        = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
+        ["IaAnuncio"]      = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
+        ["Venda"]          = "Registro e consulta de vendas realizadas.",
+        ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
+    };
+
+    public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+    {
+        swaggerDoc.Tags ??= new List<OpenApiTag>();
+
+        foreach (var (name, description) in Descriptions)
+        {
+            if (!swaggerDoc.Tags.Any(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                swaggerDoc.Tags.Add(new OpenApiTag { Name = name, Description = description });
+            else
+            {
+                var existing = swaggerDoc.Tags.First(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (string.IsNullOrWhiteSpace(existing.Description))
+                    existing.Description = description;
+            }
+        }
     }
 }

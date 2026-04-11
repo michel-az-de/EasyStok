@@ -86,6 +86,23 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
         return Task.CompletedTask;
     }
 
+    public async Task<IEnumerable<Fornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+    {
+        termo = termo.Trim();
+        if (string.IsNullOrWhiteSpace(termo)) return [];
+
+        var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(termo), "i");
+        var filter = Builders<Fornecedor>.Filter.Eq(x => x.EmpresaId, empresaId)
+            & Builders<Fornecedor>.Filter.Eq(x => x.Ativo, true)
+            & Builders<Fornecedor>.Filter.Or(
+                Builders<Fornecedor>.Filter.Regex(x => x.Nome, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Documento, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Email, regex),
+                Builders<Fornecedor>.Filter.Regex(x => x.Contato, regex));
+
+        return await Collection.Find(filter).Limit(maxResults).ToListAsync();
+    }
+
     public Task UpdateAsync(Fornecedor fornecedor)
     {
         EnqueueReplace(Collection, fornecedor.Id, fornecedor);

@@ -25,11 +25,15 @@ namespace EasyStock.Domain.Entities
         public string? DocumentoReferencia { get; set; }
         public DateTime CriadoEm { get; set; }
 
+        public Guid? MovimentacaoEstornadaId { get; set; }
+        public DateTime? EstornadaEm { get; set; }
+
         public Empresa? Empresa { get; set; }
         public ItemEstoque? ItemEstoque { get; set; }
         public Produto? Produto { get; set; }
         public ProdutoVariacao? ProdutoVariacao { get; set; }
         public Venda? Venda { get; set; }
+        public MovimentacaoEstoque? MovimentacaoEstornada { get; set; }
 
         public static MovimentacaoEstoque CriarEntrada(
             Guid id,
@@ -88,6 +92,40 @@ namespace EasyStock.Domain.Entities
                 DataMovimentacao = dataMovimentacao,
                 Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim(),
                 DocumentoReferencia = string.IsNullOrWhiteSpace(documentoReferencia) ? null : documentoReferencia.Trim(),
+                CriadoEm = criadoEm
+            };
+
+        public void MarcarComoEstornada(DateTime estornadaEm)
+        {
+            if (EstornadaEm.HasValue)
+                throw new Exceptions.MovimentacaoJaEstornadaException(Id);
+
+            EstornadaEm = estornadaEm;
+        }
+
+        public static MovimentacaoEstoque CriarEstorno(
+            Guid id,
+            MovimentacaoEstoque original,
+            DateTime dataEstorno,
+            string? descricao,
+            DateTime criadoEm) =>
+            new()
+            {
+                Id = id,
+                EmpresaId = original.EmpresaId,
+                ItemEstoqueId = original.ItemEstoqueId,
+                ProdutoId = original.ProdutoId,
+                ProdutoVariacaoId = original.ProdutoVariacaoId,
+                VendaId = null,
+                Tipo = TipoMovimentacaoEstoque.Entrada,
+                Natureza = NaturezaMovimentacaoEstoque.Estorno,
+                Quantidade = original.Quantidade,
+                ValorUnitario = original.ValorUnitario,
+                ValorTotal = original.ValorTotal,
+                DataMovimentacao = dataEstorno,
+                Descricao = string.IsNullOrWhiteSpace(descricao) ? $"Estorno da movimentacao {original.Id}" : descricao.Trim(),
+                DocumentoReferencia = original.DocumentoReferencia,
+                MovimentacaoEstornadaId = original.Id,
                 CriadoEm = criadoEm
             };
     }

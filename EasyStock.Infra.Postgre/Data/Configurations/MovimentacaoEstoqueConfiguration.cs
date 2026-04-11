@@ -31,6 +31,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasOne(m => m.Produto).WithMany(p => p.Movimentacoes).HasForeignKey(m => m.ProdutoId);
             builder.HasOne(m => m.ProdutoVariacao).WithMany(v => v.Movimentacoes).HasForeignKey(m => m.ProdutoVariacaoId).IsRequired(false);
             builder.HasOne(m => m.Venda).WithMany(v => v.Movimentacoes).HasForeignKey(m => m.VendaId).IsRequired(false);
+
+            builder.Property(m => m.MovimentacaoEstornadaId);
+            builder.Property(m => m.EstornadaEm);
+            builder.HasOne(m => m.MovimentacaoEstornada).WithMany().HasForeignKey(m => m.MovimentacaoEstornadaId).IsRequired(false);
+            builder.HasIndex(m => m.MovimentacaoEstornadaId).HasFilter("\"MovimentacaoEstornadaId\" IS NOT NULL");
         }
     }
 }

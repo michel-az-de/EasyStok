@@ -10,6 +10,7 @@ namespace EasyStock.Domain.Entities
         public Guid Id { get; set; }
         public Guid EmpresaId { get; set; }
         public Guid CategoriaId { get; set; }
+        public Guid? SubcategoriaId { get; set; }
         public string Nome { get; set; } = null!;
         public string? DescricaoBase { get; set; }
         public string? Marca { get; set; }
@@ -34,6 +35,7 @@ namespace EasyStock.Domain.Entities
 
         public Empresa? Empresa { get; set; }
         public Categoria? Categoria { get; set; }
+        public Categoria? Subcategoria { get; set; }
         public ICollection<ProdutoCaracteristica>? Caracteristicas { get; set; }
         public ICollection<ProdutoEmbalagem>? Embalagens { get; set; }
         public ICollection<ProdutoVariacao>? Variacoes { get; set; }

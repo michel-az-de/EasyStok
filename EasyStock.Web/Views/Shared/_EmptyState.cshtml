@@ -1,0 +1,30 @@
+@{
+    var icon = ViewData["EmptyIcon"] as string ?? "📋";
+    var title = ViewData["EmptyTitle"] as string ?? "Nenhum item encontrado";
+    var description = ViewData["EmptyDescription"] as string;
+    var ctaText = ViewData["EmptyCta"] as string;
+    var ctaHref = ViewData["EmptyCtaHref"] as string;
+    var ctaModal = ViewData["EmptyCtaModal"] as string;
+}
+
+<div class="text-center py-12 text-slate-400">
+    <div class="text-5xl mb-3">@icon</div>
+    <p class="font-semibold text-slate-600">@title</p>
+    @if (!string.IsNullOrEmpty(description))
+    {
+        <p class="text-sm mt-1 text-slate-500 max-w-sm mx-auto">@description</p>
+    }
+    @if (!string.IsNullOrEmpty(ctaHref))
+    {
+        <a href="@ctaHref" class="mt-4 inline-block px-4 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            @ctaText
+        </a>
+    }
+    else if (!string.IsNullOrEmpty(ctaModal))
+    {
+        <button type="button" x-data @@click="$dispatch('open-modal', '@ctaModal')"
+                class="mt-4 inline-block px-4 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            @ctaText
+        </button>
+    }
+</div>

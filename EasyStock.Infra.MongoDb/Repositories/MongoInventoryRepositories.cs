@@ -126,11 +126,11 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             .ToListAsync();
     }
 
-    public async Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
-        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+    public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.QuantidadeAtual.Value > 0).AnyAsync();
 
-    public async Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
-        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.ProdutoVariacaoId == variacaoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+    public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.ProdutoVariacaoId == variacaoId && x.QuantidadeAtual.Value > 0).AnyAsync();
 
     public async Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id)
     {
@@ -192,7 +192,16 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
         return Task.CompletedTask;
     }
 
-    public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, int page = 1, int pageSize = 20)
+    public async Task<MovimentacaoEstoque?> GetByIdAsync(Guid id) =>
+        await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+    public Task UpdateAsync(MovimentacaoEstoque movimentacao)
+    {
+        EnqueueReplace(Collection, movimentacao.Id, movimentacao);
+        return Task.CompletedTask;
+    }
+
+    public async Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, NaturezaMovimentacaoEstoque? natureza = null, int page = 1, int pageSize = 20)
     {
         var filter = Builders<MovimentacaoEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
 
@@ -202,6 +211,8 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
             filter &= Builders<MovimentacaoEstoque>.Filter.Lte(x => x.DataMovimentacao, ate.Value);
         if (tipo.HasValue)
             filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Tipo, tipo.Value);
+        if (natureza.HasValue)
+            filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Natureza, natureza.Value);
 
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)
@@ -299,6 +310,22 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
             x["ValorTotal"].ToDecimal()))
             .ToList();
     }
+
+    public async Task<KpisMovimentacao> GetKpisAsync(Guid empresaId, DateTime? de = null, DateTime? ate = null, TipoMovimentacaoEstoque? tipo = null, NaturezaMovimentacaoEstoque? natureza = null)
+    {
+        var filter = Builders<MovimentacaoEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (de.HasValue) filter &= Builders<MovimentacaoEstoque>.Filter.Gte(x => x.DataMovimentacao, de.Value);
+        if (ate.HasValue) filter &= Builders<MovimentacaoEstoque>.Filter.Lte(x => x.DataMovimentacao, ate.Value);
+        if (tipo.HasValue) filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Tipo, tipo.Value);
+        if (natureza.HasValue) filter &= Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Natureza, natureza.Value);
+
+        var all = await Collection.Find(filter).ToListAsync();
+        return new KpisMovimentacao(
+            all.Sum(m => m.Quantidade.Value),
+            all.Where(m => m.ValorTotal != null).Sum(m => m.ValorTotal!.Valor),
+            all.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda),
+            all.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda));
+    }
 }
 
 public sealed class VendaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -359,22 +386,49 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
     public async Task<Notificacao?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, TipoAlertaEstoque? tipo = null, int page = 1, int pageSize = 20)
+    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, TipoAlertaEstoque? tipo = null, SeveridadeNotificacao? severidade = null, int page = 1, int pageSize = 20)
     {
         var filter = Builders<Notificacao>.Filter.Eq(x => x.EmpresaId, empresaId);
         if (lida.HasValue)
             filter &= Builders<Notificacao>.Filter.Eq(x => x.Lida, lida.Value);
         if (tipo.HasValue)
             filter &= Builders<Notificacao>.Filter.Eq(x => x.TipoAlerta, tipo.Value);
+        if (severidade.HasValue)
+            filter &= Builders<Notificacao>.Filter.Eq(x => x.Severidade, severidade.Value);
 
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)
-            .SortByDescending(x => x.CriadaEm)
+            .SortBy(x => x.Severidade)
+            .ThenByDescending(x => x.CriadaEm)
             .Skip((page - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync();
 
         return (items, total);
+    }
+
+    public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5)
+    {
+        return await Collection.Find(x => x.EmpresaId == empresaId && !x.Lida)
+            .SortBy(x => x.Severidade)
+            .ThenByDescending(x => x.CriadaEm)
+            .Limit(limit)
+            .ToListAsync();
+    }
+
+    public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId)
+    {
+        var naoLidas = await Collection.Find(x => x.EmpresaId == empresaId && !x.Lida).ToListAsync();
+        var porTipo = naoLidas.GroupBy(n => n.TipoAlerta.ToString()).ToDictionary(g => g.Key, g => g.Count());
+        return new NotificacaoResumo
+        {
+            TotalNaoLidas = naoLidas.Count,
+            Criticas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Critica),
+            Altas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Alta),
+            Medias = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Media),
+            Informativas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Informativa),
+            PorTipo = porTipo
+        };
     }
 
     public async Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>

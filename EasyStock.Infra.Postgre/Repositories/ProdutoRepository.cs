@@ -7,8 +7,8 @@ using System.Text.Json;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
-    // Proposed PostgreSQL index for performance:
-    // CREATE INDEX idx_produtos_empresa_nome ON produtos (empresaid, nome);
+    // DTO intermediário para serialização de cache (value tuples não são suportados pelo System.Text.Json)
+    internal sealed record PaginacaoCacheEntry(List<Produto> Produtos, int TotalCount);
 
     public sealed class ProdutoRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
         : IProdutoRepository
@@ -72,8 +72,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 var cachedData = await cache.GetStringAsync(cacheKey);
                 if (!string.IsNullOrEmpty(cachedData))
                 {
-                    var cachedResult = JsonSerializer.Deserialize<(IEnumerable<Produto>, int)>(cachedData);
-                    return cachedResult;
+                    var entry = JsonSerializer.Deserialize<PaginacaoCacheEntry>(cachedData);
+                    if (entry is not null)
+                        return (entry.Produtos, entry.TotalCount);
                 }
             }
 
@@ -96,18 +97,17 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Take(pageSize)
                 .ToListAsync();
 
-            var result = (produtos, totalCount);
-
             if (cache is not null)
             {
-                var serialized = JsonSerializer.Serialize(result);
+                var entry = new PaginacaoCacheEntry(produtos, totalCount);
+                var serialized = JsonSerializer.Serialize(entry);
                 await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = CacheDuration
                 });
             }
 
-            return result;
+            return (produtos, totalCount);
         }
 
         public async Task InsertAsync(Produto produto)

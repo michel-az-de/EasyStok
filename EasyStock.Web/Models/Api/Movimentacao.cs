@@ -14,6 +14,8 @@ public record Movimentacao
     public DateTime DataMovimentacao { get; init; }
     public string? Descricao { get; init; }
     public string? DocumentoReferencia { get; init; }
+    public DateTime? EstornadaEm { get; init; }
+    public string? MovimentacaoEstornadaId { get; init; }
     public Produto? Produto { get; init; }
     public Variacao? ProdutoVariacao { get; init; }
 
@@ -31,4 +33,12 @@ public record QuantidadeDto
 public record DinheiroDto
 {
     public decimal Valor { get; init; }
+}
+
+public record KpisResponse
+{
+    public int TotalUnidades { get; init; }
+    public decimal ReceitaTotal { get; init; }
+    public int TotalVendas { get; init; }
+    public int TotalPerdas { get; init; }
 }

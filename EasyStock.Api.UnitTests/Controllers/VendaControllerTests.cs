@@ -1,7 +1,9 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -12,11 +14,13 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class VendaControllerTests
 {
     private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly VendaController _controller;
 
     public VendaControllerTests()
     {
-        _controller = new VendaController(_vendaRepository);
+        _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
+        _controller = new VendaController(_vendaRepository, _currentUser);
     }
 
     [Fact]
