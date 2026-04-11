@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +18,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Include(c => c.SubCategorias)
                 .Where(c => c.EmpresaId == empresaId && c.CategoriaPaiId == null)
-                .OrderBy(c => c.Nome)
+                .OrderByDescending(c => c.CriadoEm)
+                .ThenByDescending(c => c.Id)
                 .ToListAsync();
 
         public Task<bool> ExisteProdutosNaCategoriaAsync(Guid categoriaId) =>

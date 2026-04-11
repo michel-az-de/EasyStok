@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
@@ -70,7 +70,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
         {
             var versao = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
-            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sort}_{order}";
+            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_alteradoem_desc";
 
             if (cache is not null)
             {
@@ -89,13 +89,10 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var totalCount = await query.CountAsync();
 
-            var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
-            query = sort?.ToLowerInvariant() switch
-            {
-                "status"    => desc ? query.OrderByDescending(p => p.Status) : query.OrderBy(p => p.Status),
-                "criadoem"  => desc ? query.OrderByDescending(p => p.CriadoEm) : query.OrderBy(p => p.CriadoEm),
-                _           => desc ? query.OrderByDescending(p => p.Nome) : query.OrderBy(p => p.Nome),
-            };
+            query = query
+                .OrderByDescending(p => p.AlteradoEm)
+                .ThenByDescending(p => p.CriadoEm)
+                .ThenByDescending(p => p.Id);
 
             var produtos = await query
                 .Skip((page - 1) * pageSize)

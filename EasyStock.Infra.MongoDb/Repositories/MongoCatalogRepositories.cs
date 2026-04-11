@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.MongoDb.Data;
 using MongoDB.Driver;
@@ -22,11 +22,17 @@ public sealed class CategoriaRepository(MongoEasyStockContext context, MongoUnit
 
     public async Task<IEnumerable<Categoria>> GetByEmpresaAsync(Guid empresaId)
     {
-        var categorias = await Collection.Find(x => x.EmpresaId == empresaId).SortBy(x => x.Nome).ToListAsync();
+        var categorias = await Collection.Find(x => x.EmpresaId == empresaId)
+            .SortByDescending(x => x.CriadoEm)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync();
         var lookup = categorias.ToLookup(x => x.CategoriaPaiId);
 
         foreach (var categoria in categorias)
-            categoria.SubCategorias = lookup[categoria.Id].ToList();
+            categoria.SubCategorias = lookup[categoria.Id]
+                .OrderByDescending(x => x.CriadoEm)
+                .ThenByDescending(x => x.Id)
+                .ToList();
 
         return categorias.Where(x => x.CategoriaPaiId is null).ToList();
     }
@@ -126,16 +132,10 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         var filter = Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId);
         var total = (int)await Collection.CountDocumentsAsync(filter);
 
-        var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
-        var findFluent = Collection.Find(filter);
-        var sorted = sort?.ToLowerInvariant() switch
-        {
-            "status"   => desc ? findFluent.SortByDescending(x => x.Status) : findFluent.SortBy(x => x.Status),
-            "criadoem" => desc ? findFluent.SortByDescending(x => x.CriadoEm) : findFluent.SortBy(x => x.CriadoEm),
-            _          => desc ? findFluent.SortByDescending(x => x.Nome) : findFluent.SortBy(x => x.Nome),
-        };
-
-        var items = await sorted
+        var items = await Collection.Find(filter)
+            .SortByDescending(x => x.AlteradoEm)
+            .ThenByDescending(x => x.CriadoEm)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync();
