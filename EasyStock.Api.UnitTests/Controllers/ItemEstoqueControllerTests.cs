@@ -23,6 +23,7 @@ public class ItemEstoqueControllerTests
     private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
     private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
     private readonly IProdutoVariacaoRepository _produtoVariacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly IFornecedorRepository _fornecedorRepository = Substitute.For<IFornecedorRepository>();
     private readonly IMovimentacaoEstoqueRepository _movimentacaoEstoqueRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
     private readonly IItemVendaRepository _itemVendaRepository = Substitute.For<IItemVendaRepository>();
@@ -61,7 +62,8 @@ public class ItemEstoqueControllerTests
         _buscarUseCase = new BuscarEstoqueInteligenteUseCase(
             _produtoRepository,
             _produtoVariacaoRepository,
-            _itemEstoqueRepository);
+            _itemEstoqueRepository,
+            _fornecedorRepository);
         _controller = new ItemEstoqueController(
             _itemEstoqueRepository,
             _registrarEntradaUseCase,
