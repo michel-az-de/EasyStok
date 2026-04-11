@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    <form asp-action="SalvarReposicao" asp-controller="Entradas" method="post" x-ref="mainForm">
+    <form asp-action="SalvarReposicao" asp-controller="Entradas" method="post" x-ref="mainForm" @@submit="submitting = true">
         @Html.AntiForgeryToken()
         <input type="hidden" name="ItemEstoqueId" x-model="itemEstoqueId" />
         <input type="hidden" name="ProdutoId" x-model="produtoId" />
@@ -203,9 +203,12 @@
                                 class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                             ← Voltar
                         </button>
-                        <button type="button" @@click="step = 4" :disabled="!qty || qty < 1"
-                                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg disabled:opacity-50">
-                            Revisar →
+                        <button type="submit"
+                                :disabled="submitting"
+                                :class="{ 'opacity-50 cursor-not-allowed': submitting }"
+                                class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
+                            <span x-show="!submitting">Confirmar reposição</span>
+                            <span x-show="submitting" x-cloak>Registrando...</span>
                         </button>
                     </div>
                 </div>
@@ -276,12 +279,12 @@
                             class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                         ← Voltar
                     </button>
-                    <button type="submit" x-data="{ loading: false }" @@click="loading = true"
-                            :disabled="loading"
-                            :class="{ 'opacity-50 cursor-not-allowed': loading }"
+                    <button type="submit"
+                            :disabled="submitting"
+                            :class="{ 'opacity-50 cursor-not-allowed': submitting }"
                             class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                        <span x-show="!loading">Confirmar reposição</span>
-                        <span x-show="loading" x-cloak>Registrando...</span>
+                        <span x-show="!submitting">Confirmar reposição</span>
+                        <span x-show="submitting" x-cloak>Registrando...</span>
                     </button>
                 </div>
             </div>
@@ -294,6 +297,7 @@
         function reposicaoWizard() {
             return {
                 step: 1,
+                submitting: false,
                 buscaTerm: '',
                 buscando: false,
                 resultados: [],

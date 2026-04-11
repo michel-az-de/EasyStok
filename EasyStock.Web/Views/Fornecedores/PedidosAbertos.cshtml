@@ -188,7 +188,7 @@ else
      @@click.self="open = false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Pedido de Compra</h2>
-        <form asp-action="CriarPedido" asp-controller="Fornecedores" method="post">
+        <form asp-action="CriarPedido" asp-controller="Fornecedores" method="post" x-data="{ loading: false }" @@submit="loading = true">
             @Html.AntiForgeryToken()
             <div class="space-y-3 mb-4">
                 <div>
@@ -234,7 +234,7 @@ else
                         class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                     Cancelar
                 </button>
-                <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+                <button type="submit"
                         :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
                         class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                     <span x-show="!loading">Criar Pedido</span>
