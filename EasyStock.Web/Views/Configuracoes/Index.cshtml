@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<form asp-action="Salvar" asp-controller="Configuracoes" method="post" class="max-w-2xl space-y-6">
+<form asp-action="Salvar" asp-controller="Configuracoes" method="post" class="max-w-2xl space-y-6" x-data="{ loading: false }" @@submit="loading = true">
     @Html.AntiForgeryToken()
 
     <!-- Alertas de Estoque -->
@@ -127,7 +127,7 @@
     </div>
 
     <div class="flex justify-end">
-        <button type="submit" x-data="{ loading: false }" @@click="loading = true"
+        <button type="submit"
                 :disabled="loading"
                 :class="{ 'opacity-50 cursor-not-allowed': loading }"
                 class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 text-sm">
