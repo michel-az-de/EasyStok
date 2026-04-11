@@ -8,6 +8,7 @@ namespace EasyStock.Domain.Enums
         ReposicaoSugerida = 4,
         PedidoAtrasado = 5,
         PedidoRecebido = 6,
+        ProdutoVencido = 7,
 
         EstoqueBaixo = EstoqueCritico,
         ProximoVencimento = ValidadeProxima,

@@ -1,5 +1,6 @@
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,21 +18,22 @@ public class NotificacaoController(
     IUnitOfWork unitOfWork,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "List notifications (paginated)", Description = "Filter by read status and alert type.")]
+    [SwaggerOperation(Summary = "List notifications (paginated)", Description = "Filter by read status, alert type and severity.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid empresaId,
         [FromQuery] bool? lida = null,
-        [FromQuery] EasyStock.Domain.Enums.TipoAlertaEstoque? tipo = null,
+        [FromQuery] TipoAlertaEstoque? tipo = null,
+        [FromQuery] SeveridadeNotificacao? severidade = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, page, pageSize);
+        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, severidade, page, pageSize);
         return DataPaged(items, totalCount, page, pageSize);
     }
 
@@ -46,6 +48,32 @@ public class NotificacaoController(
 
         var count = await notificacaoRepository.CountNaoLidasAsync(resolvedEmpresaId);
         return DataOk(new { count });
+    }
+
+    [SwaggerOperation(Summary = "Get notification summary", Description = "Counts by severity and type for unread notifications.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("resumo")]
+    public async Task<IActionResult> GetResumo([FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var resumo = await notificacaoRepository.GetResumoAsync(resolvedEmpresaId);
+        return DataOk(resumo);
+    }
+
+    [SwaggerOperation(Summary = "Get recent unread notifications", Description = "Top 5 unread sorted by severity for topbar dropdown.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("recentes")]
+    public async Task<IActionResult> GetRecentes([FromQuery] Guid empresaId, [FromQuery] int limit = 5)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var items = await notificacaoRepository.GetRecentesNaoLidasAsync(resolvedEmpresaId, Math.Min(limit, 10));
+        return DataOk(items);
     }
 
     [SwaggerOperation(Summary = "Mark notification as read")]

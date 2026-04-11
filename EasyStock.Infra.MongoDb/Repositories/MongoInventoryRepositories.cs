@@ -359,22 +359,49 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
     public async Task<Notificacao?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, TipoAlertaEstoque? tipo = null, int page = 1, int pageSize = 20)
+    public async Task<(IEnumerable<Notificacao> Items, int TotalCount)> GetByEmpresaAsync(Guid empresaId, bool? lida = null, TipoAlertaEstoque? tipo = null, SeveridadeNotificacao? severidade = null, int page = 1, int pageSize = 20)
     {
         var filter = Builders<Notificacao>.Filter.Eq(x => x.EmpresaId, empresaId);
         if (lida.HasValue)
             filter &= Builders<Notificacao>.Filter.Eq(x => x.Lida, lida.Value);
         if (tipo.HasValue)
             filter &= Builders<Notificacao>.Filter.Eq(x => x.TipoAlerta, tipo.Value);
+        if (severidade.HasValue)
+            filter &= Builders<Notificacao>.Filter.Eq(x => x.Severidade, severidade.Value);
 
         var total = (int)await Collection.CountDocumentsAsync(filter);
         var items = await Collection.Find(filter)
-            .SortByDescending(x => x.CriadaEm)
+            .SortBy(x => x.Severidade)
+            .ThenByDescending(x => x.CriadaEm)
             .Skip((page - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync();
 
         return (items, total);
+    }
+
+    public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5)
+    {
+        return await Collection.Find(x => x.EmpresaId == empresaId && !x.Lida)
+            .SortBy(x => x.Severidade)
+            .ThenByDescending(x => x.CriadaEm)
+            .Limit(limit)
+            .ToListAsync();
+    }
+
+    public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId)
+    {
+        var naoLidas = await Collection.Find(x => x.EmpresaId == empresaId && !x.Lida).ToListAsync();
+        var porTipo = naoLidas.GroupBy(n => n.TipoAlerta.ToString()).ToDictionary(g => g.Key, g => g.Count());
+        return new NotificacaoResumo
+        {
+            TotalNaoLidas = naoLidas.Count,
+            Criticas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Critica),
+            Altas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Alta),
+            Medias = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Media),
+            Informativas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Informativa),
+            PorTipo = porTipo
+        };
     }
 
     public async Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>

@@ -1,17 +1,80 @@
 @model NotificacoesViewModel
 @{
-    ViewBag.Title = "Notificações";
+    ViewBag.Title = "Notificacoes";
     Layout = "_Layout";
+
+    string SeveridadeBorder(string s) => s switch {
+        "Critica" => "border-l-4 border-red-500",
+        "Alta" => "border-l-4 border-orange-500",
+        "Media" => "border-l-4 border-yellow-400",
+        "Informativa" => "border-l-4 border-slate-300",
+        _ => "border-l-4 border-yellow-400"
+    };
+
+    string SeveridadeBadge(string s) => s switch {
+        "Critica" => "bg-red-100 text-red-700",
+        "Alta" => "bg-orange-100 text-orange-700",
+        "Media" => "bg-yellow-100 text-yellow-700",
+        "Informativa" => "bg-slate-100 text-slate-600",
+        _ => "bg-slate-100 text-slate-600"
+    };
+
+    string TipoIcon(string tipo) => tipo switch {
+        "EstoqueCritico" or "EstoqueBaixo" => "<svg class='w-5 h-5 text-red-500' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z' clip-rule='evenodd'/></svg>",
+        "ProdutoVencido" => "<svg class='w-5 h-5 text-red-600' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' clip-rule='evenodd'/></svg>",
+        "ValidadeProxima" or "ProximoVencimento" => "<svg class='w-5 h-5 text-amber-500' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z' clip-rule='evenodd'/></svg>",
+        "ProdutoParado" => "<svg class='w-5 h-5 text-blue-500' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z' clip-rule='evenodd'/></svg>",
+        "ReposicaoSugerida" or "Reposicao" => "<svg class='w-5 h-5 text-emerald-500' fill='currentColor' viewBox='0 0 20 20'><path d='M8 5a1 1 0 100 2h5.586l-1.293 1.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L13.586 5H8zM12 15a1 1 0 100-2H6.414l1.293-1.293a1 1 0 10-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L6.414 15H12z'/></svg>",
+        "PedidoAtrasado" => "<svg class='w-5 h-5 text-orange-500' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z' clip-rule='evenodd'/></svg>",
+        "PedidoRecebido" => "<svg class='w-5 h-5 text-slate-400' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z' clip-rule='evenodd'/></svg>",
+        _ => "<svg class='w-5 h-5 text-slate-400' fill='currentColor' viewBox='0 0 20 20'><path d='M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z'/></svg>"
+    };
+
+    string TempoRelativo(DateTimeOffset dt) {
+        var diff = DateTimeOffset.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "agora";
+        if (diff.TotalMinutes < 60) return $"ha {(int)diff.TotalMinutes}min";
+        if (diff.TotalHours < 24) return $"ha {(int)diff.TotalHours}h";
+        if (diff.TotalDays < 7) return $"ha {(int)diff.TotalDays}d";
+        return dt.ToLocalTime().ToString("dd/MM/yyyy");
+    }
+
+    var tiposFiltro = new[] {
+        ("", "Todos"),
+        ("EstoqueCritico", "Estoque Critico"),
+        ("ProdutoVencido", "Vencido"),
+        ("ValidadeProxima", "Validade"),
+        ("ProdutoParado", "Parado"),
+        ("ReposicaoSugerida", "Reposicao"),
+        ("PedidoAtrasado", "Ped. Atrasado"),
+        ("PedidoRecebido", "Ped. Recebido")
+    };
 }
 
-<div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-bold text-slate-900">Notificações</h1>
-        @if (Model.NaoLidas > 0)
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div class="flex items-center gap-3 flex-wrap">
+        <h1 class="text-2xl font-bold text-slate-900">Notificacoes</h1>
+        @if (Model.Resumo != null)
         {
-            <span class="px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-sm font-medium">
-                @Model.NaoLidas não lidas
-            </span>
+            @if (Model.Resumo.Criticas > 0)
+            {
+                <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-bold">
+                    @Model.Resumo.Criticas critica@(Model.Resumo.Criticas > 1 ? "s" : "")
+                </span>
+            }
+            @if (Model.Resumo.Altas > 0)
+            {
+                <span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">
+                    @Model.Resumo.Altas alta@(Model.Resumo.Altas > 1 ? "s" : "")
+                </span>
+            }
+            @if (Model.Resumo.TotalNaoLidas > 0)
+            {
+                <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
+                    @Model.Resumo.TotalNaoLidas nao lida@(Model.Resumo.TotalNaoLidas > 1 ? "s" : "")
+                </span>
+            }
         }
     </div>
     @if (Model.NaoLidas > 0)
@@ -19,85 +82,130 @@
         <form asp-action="MarcarTodas" asp-controller="Notificacoes" method="post">
             @Html.AntiForgeryToken()
             <button type="submit"
-                    class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                    class="text-sm text-indigo-600 hover:text-indigo-700 font-medium whitespace-nowrap">
                 Marcar todas como lidas
             </button>
         </form>
     }
 </div>
 
-<!-- Tabs -->
-<div x-data="{ tab: 'todas' }" class="mb-6">
-    <div class="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        <button type="button" @@click="tab = 'todas'"
-                :class="tab === 'todas' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">
-            Todas
-        </button>
-        <button type="button" @@click="tab = 'nao_lidas'"
-                :class="tab === 'nao_lidas' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">
-            Não lidas
-        </button>
-    </div>
-
-    @if (!Model.Items.Any())
+<!-- Filtros por tipo -->
+<div class="flex flex-wrap gap-2 mb-4">
+    @foreach (var (valor, label) in tiposFiltro)
     {
-        <div class="ws mt-4 text-center py-16 text-slate-400">
-            <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <p class="text-sm">Nenhuma notificação</p>
-        </div>
+        var isActive = (Model.FiltroTipo ?? "") == valor;
+        var href = string.IsNullOrEmpty(valor) ? "/notificacoes" : $"/notificacoes?tipo={valor}";
+        <a href="@href"
+           class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(isActive ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+            @label
+        </a>
     }
-    else
-    {
-        <div class="space-y-2 mt-4">
-            @foreach (var n in Model.Items)
+</div>
+
+<!-- Filtros por status -->
+<div class="flex gap-2 mb-6">
+    @{
+        var filtroLida = ViewContext.HttpContext.Request.Query["lida"].FirstOrDefault();
+        var baseUrl = string.IsNullOrEmpty(Model.FiltroTipo) ? "/notificacoes" : $"/notificacoes?tipo={Model.FiltroTipo}";
+        var sep = baseUrl.Contains('?') ? "&" : "?";
+    }
+    <a href="@baseUrl"
+       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(filtroLida == null ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+        Todas
+    </a>
+    <a href="@(baseUrl + sep)lida=false"
+       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(filtroLida == "false" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+        Nao lidas
+    </a>
+    <a href="@(baseUrl + sep)lida=true"
+       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(filtroLida == "true" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+        Lidas
+    </a>
+</div>
+
+@if (!Model.Items.Any())
+{
+    <div class="ws text-center py-16">
+        <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-sm font-medium text-slate-500">Nenhuma notificacao encontrada</p>
+        <p class="text-xs text-slate-400 mt-1">
+            @if (!string.IsNullOrEmpty(Model.FiltroTipo) || filtroLida != null)
             {
-                var tipoIcon = n.Tipo switch {
-                    "estoque_critico" => "🔴",
-                    "validade" => "⚠️",
-                    "reposicao" => "📦",
-                    "parado" => "🕐",
-                    _ => "🔔"
-                };
-                <div x-show="tab === 'todas' || (tab === 'nao_lidas' && !@n.Lida.ToString().ToLower())"
-                     class="ws flex items-start gap-4 @(!n.Lida ? "border-l-4 border-indigo-500" : "opacity-70")">
-                    <span class="text-2xl flex-shrink-0">@tipoIcon</span>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-start justify-between gap-2">
-                            <div>
-                                <div class="font-medium text-slate-900 text-sm">@n.Titulo</div>
-                                <div class="text-sm text-slate-600 mt-0.5">@n.Mensagem</div>
-                                <div class="text-xs text-slate-400 mt-1">
-                                    @n.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 flex-shrink-0">
+                <span>Tente ajustar os filtros ou </span><a href="/notificacoes" class="text-indigo-600 hover:underline">ver todas</a>
+            }
+            else
+            {
+                <span>As notificacoes serao geradas automaticamente com base no seu estoque.</span>
+            }
+        </p>
+    </div>
+}
+else
+{
+    <div class="space-y-2">
+        @foreach (var n in Model.Items)
+        {
+            <div class="ws flex items-start gap-4 @SeveridadeBorder(n.Severidade) @(!n.Lida ? "" : "opacity-60")">
+                <div class="flex-shrink-0 mt-0.5">@Html.Raw(TipoIcon(n.Tipo))</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-semibold text-slate-900 text-sm">@n.Titulo</span>
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold @SeveridadeBadge(n.Severidade)">@n.Severidade</span>
                                 @if (!n.Lida)
                                 {
-                                    <form asp-action="MarcarLida" asp-controller="Notificacoes"
-                                          asp-route-id="@n.Id" method="post">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit"
-                                                class="text-xs text-indigo-600 hover:text-indigo-700 whitespace-nowrap">
-                                            Marcar lida
-                                        </button>
-                                    </form>
+                                    <span class="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0"></span>
                                 }
-                                <form asp-action="Excluir" asp-controller="Notificacoes"
+                            </div>
+                            <div class="text-sm text-slate-600 mt-1">@n.Mensagem</div>
+                            <div class="flex items-center gap-3 mt-2">
+                                @if (!string.IsNullOrEmpty(n.ReferenciaId))
+                                {
+                                    <a href="@n.AcaoUrl"
+                                       class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-xs font-medium transition-colors">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                        </svg>
+                                        @n.AcaoLabel
+                                    </a>
+                                }
+                                <span class="text-xs text-slate-400">@TempoRelativo(n.CreatedAt)</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            @if (!n.Lida)
+                            {
+                                <form asp-action="MarcarLida" asp-controller="Notificacoes"
                                       asp-route-id="@n.Id" method="post">
                                     @Html.AntiForgeryToken()
                                     <button type="submit"
-                                            class="text-xs text-slate-400 hover:text-red-500">×</button>
+                                            title="Marcar como lida"
+                                            class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </button>
                                 </form>
-                            </div>
+                            }
+                            <form asp-action="Excluir" asp-controller="Notificacoes"
+                                  asp-route-id="@n.Id" method="post">
+                                @Html.AntiForgeryToken()
+                                <button type="submit"
+                                        title="Excluir"
+                                        class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
-            }
-        </div>
-    }
-</div>
+            </div>
+        }
+    </div>
+}
