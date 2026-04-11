@@ -6,8 +6,6 @@ namespace EasyStock.Domain.Enums
         Warn,
         Critical,
         Slow,
-        Ativo = Ok,
-        Esgotado = Critical,
         Vencido,
         Descartado,
         Bloqueado

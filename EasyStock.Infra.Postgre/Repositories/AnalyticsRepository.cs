@@ -21,21 +21,6 @@ namespace EasyStock.Infra.Postgre.Repositories
             Converters = { new JsonStringEnumConverter() }
         };
 
-        private static readonly TimeSpan DashboardTtl    = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ReceitaTtl      = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan MargemTtl       = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan MovimentacaoTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ValidadeTtl     = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ParadosTtl      = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan SazonalidadeTtl = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan ReposicaoTtl    = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ProjecaoTtl     = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan CanalTtl        = TimeSpan.FromMinutes(10);
-
-        // Dashboard alert thresholds (independent of per-store configuration)
-        private const int DashboardDiasAlertaVencimento = 30;
-        private const int DashboardDiasAlertaParado     = 90;
-
         private async Task<T?> GetCachedAsync<T>(string key)
         {
             if (cache is null) return default;
@@ -53,40 +38,35 @@ namespace EasyStock.Infra.Postgre.Repositories
             });
         }
 
-        private static (DateTime De, DateTime Ate) BuildPeriodo(int dias)
-        {
-            var ate = DateTime.UtcNow;
-            return (ate.AddDays(-dias), ate);
-        }
-
-        private async Task<Dictionary<Guid, decimal>> GetTaxasSaidaAsync(
-            Guid empresaId, DateTime de, DateTime ate, int dias)
-        {
-            return await dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate)
-                .GroupBy(m => m.ProdutoId)
-                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => m.Quantidade.Value) })
-                .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
-        }
+        private static readonly TimeSpan DashboardTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan ReceitaTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan MargemTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan MovimentacaoTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan ValidadeTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan ParadosTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan SazonalidadeTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan ReposicaoTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan ProjecaoTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan CanalTtl = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan ComparacaoTtl = TimeSpan.FromMinutes(5);
 
         // Dashboard
 
-        public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30)
+        public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:dashboard:{empresaId}:{periodoDias}";
+            var cacheKey = $"analytics:dashboard:{empresaId}:{periodoDias}:{lojaId}";
             var cached = await GetCachedAsync<DashboardResumo>(cacheKey);
             if (cached is not null) return cached;
 
-            var (de, ate) = BuildPeriodo(periodoDias);
+            var ate = DateTime.UtcNow;
+            var de = ate.AddDays(-periodoDias);
 
             // Estoque
             var estoqueQuery = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+            if (lojaId.HasValue)
+                estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
 
             var estoqueData = await estoqueQuery.Select(i => new
             {
@@ -104,26 +84,36 @@ namespace EasyStock.Infra.Postgre.Repositories
             var valorVenda = estoqueData.Sum(e => e.ValorVenda);
             var alertasEstoqueBaixo = estoqueData.Count(e => e.EstaAbaixoMinimo);
 
-            // Alertas vencimento
-            var cutoffValidade = DateTime.UtcNow.AddDays(DashboardDiasAlertaVencimento);
-            var alertasVencimento = await dbContext.ItensEstoque
+            // Alertas vencimento (30 dias)
+            var cutoffValidade = DateTime.UtcNow.AddDays(30);
+            var validadeQuery = dbContext.ItensEstoque
                 .AsNoTracking()
-                .CountAsync(i => i.EmpresaId == empresaId && i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade);
+                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade);
+            if (lojaId.HasValue)
+                validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
+            var alertasVencimento = await validadeQuery.CountAsync();
 
-            // Alertas parados
-            var cutoffParado = DateTime.UtcNow.AddDays(-DashboardDiasAlertaParado);
-            var alertasParados = await dbContext.ItensEstoque
+            // Alertas parados (90 dias)
+            var cutoffParado = DateTime.UtcNow.AddDays(-90);
+            var paradosQuery = dbContext.ItensEstoque
                 .AsNoTracking()
-                .CountAsync(i => i.EmpresaId == empresaId &&
+                .Where(i => i.EmpresaId == empresaId &&
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado));
+            if (lojaId.HasValue)
+                paradosQuery = paradosQuery.Where(i => i.LojaId == lojaId.Value);
+            var alertasParados = await paradosQuery.CountAsync();
 
             // Vendas do período
-            var movData = await dbContext.MovimentacoesEstoque
+            var movQuery = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == TipoMovimentacaoEstoque.Saida &&
                     m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate)
+                    m.DataMovimentacao <= ate);
+            if (lojaId.HasValue)
+                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+            var movData = await movQuery
                 .Select(m => new { m.Quantidade.Value, ValorTotal = m.ValorTotal != null ? m.ValorTotal.Valor : 0m })
                 .ToListAsync();
 
@@ -152,17 +142,21 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // Receita
 
-        public async Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12)
+        public async Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:receita:{empresaId}:{meses}";
+            var cacheKey = $"analytics:receita:{empresaId}:{meses}:{lojaId}";
             var cached = await GetCachedAsync<List<ReceitaPorPeriodo>>(cacheKey);
             if (cached is not null) return cached;
 
             var de = DateTime.UtcNow.AddMonths(-meses);
 
-            var raw = await dbContext.Vendas
+            var vendasQuery = dbContext.Vendas
                 .AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de)
+                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de);
+            if (lojaId.HasValue)
+                vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
+
+            var raw = await vendasQuery
                 .Select(v => new
                 {
                     v.DataVenda.Year,
@@ -196,20 +190,24 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // Margem
 
-        public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20)
+        public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}";
+            var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
             var cached = await GetCachedAsync<List<MargemPorProduto>>(cacheKey);
             if (cached is not null) return cached;
 
-            var (de, _) = BuildPeriodo(dias);
+            var de = DateTime.UtcNow.AddDays(-dias);
 
-            var raw = await dbContext.MovimentacoesEstoque
+            var movQuery = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == TipoMovimentacaoEstoque.Saida &&
                     m.DataMovimentacao >= de &&
-                    m.ValorUnitario != null)
+                    m.ValorUnitario != null);
+            if (lojaId.HasValue)
+                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+            var raw = await movQuery
                 .Join(dbContext.Produtos.AsNoTracking(),
                     m => m.ProdutoId,
                     p => p.Id,
@@ -256,9 +254,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             Guid empresaId,
             DateTime de,
             DateTime ate,
-            TipoMovimentacaoEstoque? tipo = null)
+            TipoMovimentacaoEstoque? tipo = null,
+            Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:movimentacoes:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{tipo}";
+            var cacheKey = $"analytics:movimentacoes:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{tipo}:{lojaId}";
             var cached = await GetCachedAsync<List<MovimentacaoResumo>>(cacheKey);
             if (cached is not null) return cached;
 
@@ -270,6 +269,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             if (tipo.HasValue)
                 query = query.Where(m => m.Tipo == tipo.Value);
+            if (lojaId.HasValue)
+                query = query.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
 
             var raw = await query
                 .Select(m => new
@@ -303,9 +304,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         // Validade
 
         public async Task<(IReadOnlyList<ValidadeAlerta> Items, int TotalCount)> GetAlertasValidadeAsync(
-            Guid empresaId, int dias = 30, int page = 1, int pageSize = 20)
+            Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:validade:{empresaId}:{dias}:{page}:{pageSize}";
+            var cacheKey = $"analytics:validade:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
             var cached = await GetCachedAsync<(List<ValidadeAlerta>, int)>(cacheKey);
             if (cached != default) return cached;
 
@@ -318,6 +319,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                     i.ValidadeEm != null &&
                     i.ValidadeEm.DataValidade <= cutoff &&
                     i.QuantidadeAtual.Value > 0);
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
 
@@ -356,9 +359,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         // Parados
 
         public async Task<(IReadOnlyList<ItemParadoDetalhe> Items, int TotalCount)> GetItensParadosDetalhadosAsync(
-            Guid empresaId, int diasSemMovimento = 90, int page = 1, int pageSize = 20)
+            Guid empresaId, int diasSemMovimento = 90, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:parados:{empresaId}:{diasSemMovimento}:{page}:{pageSize}";
+            var cacheKey = $"analytics:parados:{empresaId}:{diasSemMovimento}:{page}:{pageSize}:{lojaId}";
             var cached = await GetCachedAsync<(List<ItemParadoDetalhe>, int)>(cacheKey);
             if (cached != default) return cached;
 
@@ -370,6 +373,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId &&
                     i.QuantidadeAtual.Value > 0 &&
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
 
@@ -407,20 +412,24 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // Sazonalidade
 
-        public async Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12)
+        public async Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:sazonalidade:{empresaId}:{produtoId}:{meses}";
+            var cacheKey = $"analytics:sazonalidade:{empresaId}:{produtoId}:{meses}:{lojaId}";
             var cached = await GetCachedAsync<List<SazonalidadeMensal>>(cacheKey);
             if (cached is not null) return cached;
 
             var de = DateTime.UtcNow.AddMonths(-meses);
 
-            var raw = await dbContext.MovimentacoesEstoque
+            var movQuery = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.ProdutoId == produtoId &&
                     m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de)
+                    m.DataMovimentacao >= de);
+            if (lojaId.HasValue)
+                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+            var raw = await movQuery
                 .Select(m => new
                 {
                     m.DataMovimentacao.Year,
@@ -462,20 +471,36 @@ namespace EasyStock.Infra.Postgre.Repositories
         // Reposicao sugerida
 
         public async Task<(IReadOnlyList<ReposicaoSugerida> Items, int TotalCount)> GetSugestaoReposicaoDetalhadaAsync(
-            Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20)
+            Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:reposicao:{empresaId}:{diasHistorico}:{page}:{pageSize}";
+            var cacheKey = $"analytics:reposicao:{empresaId}:{diasHistorico}:{page}:{pageSize}:{lojaId}";
             var cached = await GetCachedAsync<(List<ReposicaoSugerida>, int)>(cacheKey);
             if (cached != default) return cached;
 
-            var (de, ate) = BuildPeriodo(diasHistorico);
+            var de = DateTime.UtcNow.AddDays(-diasHistorico);
+            var ate = DateTime.UtcNow;
             var dias = Math.Max(1, diasHistorico);
 
-            var taxas = await GetTaxasSaidaAsync(empresaId, de, ate, dias);
+            // Taxa de saída por produto
+            var taxaQuery = dbContext.MovimentacoesEstoque
+                .AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                    m.DataMovimentacao >= de &&
+                    m.DataMovimentacao <= ate);
+            if (lojaId.HasValue)
+                taxaQuery = taxaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+            var taxas = await taxaQuery
+                .GroupBy(m => m.ProdutoId)
+                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => m.Quantidade.Value) })
+                .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value < i.QuantidadeMinima);
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
 
@@ -523,20 +548,35 @@ namespace EasyStock.Infra.Postgre.Repositories
         // Projecao de ruptura
 
         public async Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
-            Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20)
+            Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:projecao:{empresaId}:{diasHistorico}:{page}:{pageSize}";
+            var cacheKey = $"analytics:projecao:{empresaId}:{diasHistorico}:{page}:{pageSize}:{lojaId}";
             var cached = await GetCachedAsync<(List<ProjecaoRuptura>, int)>(cacheKey);
             if (cached != default) return cached;
 
-            var (de, ate) = BuildPeriodo(diasHistorico);
+            var de = DateTime.UtcNow.AddDays(-diasHistorico);
+            var ate = DateTime.UtcNow;
             var dias = Math.Max(1, diasHistorico);
 
-            var taxas = await GetTaxasSaidaAsync(empresaId, de, ate, dias);
+            var taxaQuery = dbContext.MovimentacoesEstoque
+                .AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                    m.DataMovimentacao >= de &&
+                    m.DataMovimentacao <= ate);
+            if (lojaId.HasValue)
+                taxaQuery = taxaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+            var taxas = await taxaQuery
+                .GroupBy(m => m.ProdutoId)
+                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => m.Quantidade.Value) })
+                .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value > 0);
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
 
@@ -580,15 +620,19 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // Vendas por canal
 
-        public async Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate)
+        public async Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
         {
-            var cacheKey = $"analytics:canal:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}";
+            var cacheKey = $"analytics:canal:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{lojaId}";
             var cached = await GetCachedAsync<List<VendaPorCanal>>(cacheKey);
             if (cached is not null) return cached;
 
-            var raw = await dbContext.Vendas
+            var vendasQuery = dbContext.Vendas
                 .AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate)
+                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate);
+            if (lojaId.HasValue)
+                vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
+
+            var raw = await vendasQuery
                 .Select(v => new
                 {
                     v.Canal,
@@ -619,6 +663,398 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             await SetCachedAsync(cacheKey, result, CanalTtl);
             return result;
+        }
+
+        // ── Store Intelligence Methods ──────────────────────────────────────
+
+        public async Task<IReadOnlyList<LojaComparacao>> GetComparacaoLojasAsync(Guid empresaId, int periodoDias = 30)
+        {
+            var cacheKey = $"analytics:comparacao:{empresaId}:{periodoDias}";
+            var cached = await GetCachedAsync<List<LojaComparacao>>(cacheKey);
+            if (cached is not null) return cached;
+
+            var lojas = await dbContext.Lojas.AsNoTracking()
+                .Where(l => l.EmpresaId == empresaId && l.Ativa)
+                .Select(l => new { l.Id, l.Nome })
+                .ToListAsync();
+
+            if (lojas.Count == 0)
+                return [];
+
+            var ate = DateTime.UtcNow;
+            var de = ate.AddDays(-periodoDias);
+            var dias = Math.Max(1, periodoDias);
+            var cutoffValidade = ate.AddDays(30);
+            var cutoffParado = ate.AddDays(-90);
+
+            // Stock aggregates grouped by LojaId
+            var stockByLoja = await dbContext.ItensEstoque.AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.LojaId != null)
+                .GroupBy(i => i.LojaId!.Value)
+                .Select(g => new
+                {
+                    LojaId = g.Key,
+                    TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
+                    QuantidadeTotal = g.Sum(i => i.QuantidadeAtual.Value),
+                    ValorEstoque = g.Sum(i => (i.PrecoVendaSugerido != null ? i.PrecoVendaSugerido.Valor : i.CustoUnitario.Valor * 1.3m) * i.QuantidadeAtual.Value),
+                    AlertasCriticos = g.Count(i => i.QuantidadeAtual.Value <= 2),
+                    ItensAbaixoMinimo = g.Count(i => i.QuantidadeAtual.Value < i.QuantidadeMinima),
+                    AlertasVencimento = g.Count(i => i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade),
+                    ItensParados = g.Count(i => i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado),
+                    TotalItens = g.Count(),
+                    ValorVencendo = g.Where(i => i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade)
+                        .Sum(i => i.CustoUnitario.Valor * i.QuantidadeAtual.Value)
+                })
+                .ToDictionaryAsync(x => x.LojaId);
+
+            // Sales velocity by loja (via ItemEstoque.LojaId)
+            var salesByLoja = await dbContext.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                    m.DataMovimentacao >= de && m.DataMovimentacao <= ate &&
+                    m.ItemEstoque != null && m.ItemEstoque.LojaId != null)
+                .GroupBy(m => m.ItemEstoque!.LojaId!.Value)
+                .Select(g => new
+                {
+                    LojaId = g.Key,
+                    TotalSaidas = g.Sum(m => m.Quantidade.Value),
+                    ReceitaTotal = g.Sum(m => m.ValorTotal != null ? m.ValorTotal.Valor : 0m)
+                })
+                .ToDictionaryAsync(x => x.LojaId);
+
+            // Company-wide average daily sales for velocity scoring
+            var totalEmpresaSaidas = salesByLoja.Values.Sum(s => s.TotalSaidas);
+            var mediaEmpresaDiaria = lojas.Count > 0 ? (decimal)totalEmpresaSaidas / dias / lojas.Count : 0m;
+
+            var result = lojas.Select(loja =>
+            {
+                var stock = stockByLoja.GetValueOrDefault(loja.Id);
+                var sales = salesByLoja.GetValueOrDefault(loja.Id);
+
+                var totalItens = stock?.TotalItens ?? 0;
+                var totalSkus = stock?.TotalSkus ?? 0;
+                var quantidadeEstoque = stock?.QuantidadeTotal ?? 0;
+                var valorEstoque = stock?.ValorEstoque ?? 0m;
+                var alertasCriticos = stock?.AlertasCriticos ?? 0;
+                var itensAbaixoMinimo = stock?.ItensAbaixoMinimo ?? 0;
+                var alertasVencimento = stock?.AlertasVencimento ?? 0;
+                var itensParados = stock?.ItensParados ?? 0;
+                var valorVencendo = stock?.ValorVencendo ?? 0m;
+                var totalSaidas = sales?.TotalSaidas ?? 0;
+                var receita = sales?.ReceitaTotal ?? 0m;
+                var mediaDiaria = (decimal)totalSaidas / dias;
+
+                var alertasTotal = alertasCriticos + alertasVencimento + itensParados + itensAbaixoMinimo;
+                var (score, classificacao) = CalcularHealthScore(totalItens, alertasCriticos, itensAbaixoMinimo,
+                    mediaDiaria, mediaEmpresaDiaria, valorVencendo, valorEstoque, itensParados);
+
+                return new LojaComparacao(
+                    LojaId: loja.Id,
+                    NomeLoja: loja.Nome,
+                    HealthScore: score,
+                    HealthClassificacao: classificacao,
+                    ReceitaPeriodo: Math.Round(receita, 2),
+                    TotalSkus: totalSkus,
+                    QuantidadeEstoque: quantidadeEstoque,
+                    ValorEstoque: Math.Round(valorEstoque, 2),
+                    AlertasTotal: alertasTotal,
+                    AlertasCriticos: alertasCriticos,
+                    AlertasVencimento: alertasVencimento,
+                    ItensParados: itensParados,
+                    ItensAbaixoMinimo: itensAbaixoMinimo,
+                    MediaVendasDiaria: Math.Round(mediaDiaria, 2));
+            })
+            .OrderByDescending(x => x.HealthScore)
+            .ToList();
+
+            await SetCachedAsync(cacheKey, result, ComparacaoTtl);
+            return result;
+        }
+
+        public async Task<LojaResumoInteligencia?> GetResumoInteligenciaLojaAsync(Guid empresaId, Guid lojaId, int periodoDias = 30)
+        {
+            var cacheKey = $"analytics:resumo-loja:{empresaId}:{lojaId}:{periodoDias}";
+            var cached = await GetCachedAsync<LojaResumoInteligencia>(cacheKey);
+            if (cached is not null) return cached;
+
+            var loja = await dbContext.Lojas.AsNoTracking()
+                .Where(l => l.Id == lojaId && l.EmpresaId == empresaId)
+                .Select(l => new { l.Id, l.Nome })
+                .FirstOrDefaultAsync();
+            if (loja is null) return null;
+
+            var dashboard = await GetDashboardResumoAsync(empresaId, periodoDias, lojaId);
+
+            var ate = DateTime.UtcNow;
+            var de = ate.AddDays(-periodoDias);
+            var dias = Math.Max(1, periodoDias);
+            var cutoffValidade = ate.AddDays(30);
+            var cutoffParado = ate.AddDays(-90);
+
+            // Extra per-store metrics for health score
+            var storeItems = await dbContext.ItensEstoque.AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && i.LojaId == lojaId)
+                .Select(i => new
+                {
+                    IsCritical = i.QuantidadeAtual.Value <= 2,
+                    IsBelowMin = i.QuantidadeAtual.Value < i.QuantidadeMinima,
+                    IsExpiring = i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade,
+                    IsIdle = i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado,
+                    ValorVencendo = i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade
+                        ? i.CustoUnitario.Valor * i.QuantidadeAtual.Value : 0m
+                })
+                .ToListAsync();
+
+            var totalItens = storeItems.Count;
+            var alertasCriticos = storeItems.Count(i => i.IsCritical);
+            var itensAbaixoMinimo = storeItems.Count(i => i.IsBelowMin);
+            var itensParados = storeItems.Count(i => i.IsIdle);
+            var valorVencendo = storeItems.Sum(i => i.ValorVencendo);
+
+            // Company average for velocity scoring
+            var empresaSaidas = await dbContext.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                    m.DataMovimentacao >= de && m.DataMovimentacao <= ate)
+                .SumAsync(m => m.Quantidade.Value);
+            var lojasCount = await dbContext.Lojas.AsNoTracking()
+                .CountAsync(l => l.EmpresaId == empresaId && l.Ativa);
+            var mediaEmpresaDiaria = lojasCount > 0 ? (decimal)empresaSaidas / dias / lojasCount : 0m;
+
+            var (score, classificacao, dimStock, dimSales, dimExpiry, dimIdle, dimReplen) =
+                CalcularHealthScoreDetalhado(totalItens, alertasCriticos, itensAbaixoMinimo,
+                    dashboard.MediaVendasDiaria, mediaEmpresaDiaria,
+                    valorVencendo, dashboard.ValorTotalEstoque, itensParados);
+
+            // Last movement
+            var ultimaMov = await dbContext.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId)
+                .OrderByDescending(m => m.DataMovimentacao)
+                .Select(m => (DateTime?)m.DataMovimentacao)
+                .FirstOrDefaultAsync();
+
+            var result = new LojaResumoInteligencia(
+                LojaId: loja.Id,
+                NomeLoja: loja.Nome,
+                TotalSkus: dashboard.TotalSkus,
+                QuantidadeTotalEmEstoque: dashboard.QuantidadeTotalEmEstoque,
+                ValorTotalEstoque: dashboard.ValorTotalEstoque,
+                ValorCustoEstoque: dashboard.ValorCustoEstoque,
+                AlertasEstoqueBaixo: dashboard.AlertasEstoqueBaixo,
+                AlertasVencimento: dashboard.AlertasVencimento,
+                AlertasItensParados: dashboard.AlertasItensParados,
+                ItensAbaixoMinimo: itensAbaixoMinimo,
+                MediaVendasDiaria: dashboard.MediaVendasDiaria,
+                ReceitaPeriodo: dashboard.ReceitaEstimadaPeriodo,
+                UltimaMovimentacao: ultimaMov,
+                HealthScore: score,
+                HealthClassificacao: classificacao,
+                DimStockHealth: dimStock,
+                DimSalesVelocity: dimSales,
+                DimExpiryRisk: dimExpiry,
+                DimIdleRisk: dimIdle,
+                DimReplenishmentUrgency: dimReplen);
+
+            await SetCachedAsync(cacheKey, result, ComparacaoTtl);
+            return result;
+        }
+
+        public async Task<IReadOnlyList<ProdutoTurnover>> GetTopProdutosPorLojaAsync(
+            Guid empresaId, Guid lojaId, int periodoDias = 30, int top = 10, bool ascending = false)
+        {
+            var cacheKey = $"analytics:turnover:{empresaId}:{lojaId}:{periodoDias}:{top}:{ascending}";
+            var cached = await GetCachedAsync<List<ProdutoTurnover>>(cacheKey);
+            if (cached is not null) return cached;
+
+            var de = DateTime.UtcNow.AddDays(-periodoDias);
+            var ate = DateTime.UtcNow;
+            var dias = Math.Max(1, periodoDias);
+
+            var raw = await dbContext.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                    m.DataMovimentacao >= de && m.DataMovimentacao <= ate &&
+                    m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId)
+                .Join(dbContext.Produtos.AsNoTracking(), m => m.ProdutoId, p => p.Id, (m, p) => new
+                {
+                    m.ProdutoId,
+                    NomeProduto = p.Nome,
+                    Quantidade = m.Quantidade.Value,
+                    Valor = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                })
+                .ToListAsync();
+
+            var grouped = raw
+                .GroupBy(x => new { x.ProdutoId, x.NomeProduto })
+                .Select(g => new ProdutoTurnover(
+                    ProdutoId: g.Key.ProdutoId,
+                    NomeProduto: g.Key.NomeProduto,
+                    QuantidadeVendida: g.Sum(x => x.Quantidade),
+                    ReceitaGerada: Math.Round(g.Sum(x => x.Valor), 2),
+                    TaxaSaidaDiaria: Math.Round((decimal)g.Sum(x => x.Quantidade) / dias, 2)));
+
+            var result = (ascending
+                ? grouped.OrderBy(x => x.QuantidadeVendida)
+                : grouped.OrderByDescending(x => x.QuantidadeVendida))
+                .Take(top)
+                .ToList();
+
+            await SetCachedAsync(cacheKey, result, ComparacaoTtl);
+            return result;
+        }
+
+        public async Task<IReadOnlyList<IndicadorAcao>> GetIndicadoresAcaoAsync(
+            Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+        {
+            var cacheKey = $"analytics:indicadores:{empresaId}:{periodoDias}:{lojaId}";
+            var cached = await GetCachedAsync<List<IndicadorAcao>>(cacheKey);
+            if (cached is not null) return cached;
+
+            var comparacao = await GetComparacaoLojasAsync(empresaId, periodoDias);
+            var lojasAlvo = lojaId.HasValue
+                ? comparacao.Where(l => l.LojaId == lojaId.Value).ToList()
+                : comparacao.ToList();
+
+            var mediaHealth = comparacao.Count > 0 ? comparacao.Average(l => l.HealthScore) : 0m;
+            var indicadores = new List<IndicadorAcao>();
+
+            foreach (var loja in lojasAlvo)
+            {
+                // Health critico
+                if (loja.HealthScore < 40)
+                    indicadores.Add(new IndicadorAcao("atencao_imediata", "critico",
+                        $"{loja.NomeLoja}: atenção imediata",
+                        $"Score de saúde {loja.HealthScore:F0}/100 — abaixo do limiar crítico.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Alertas criticos
+                if (loja.AlertasCriticos > 0)
+                    indicadores.Add(new IndicadorAcao("alto_risco", "alto",
+                        $"{loja.NomeLoja}: {loja.AlertasCriticos} item(ns) em estoque crítico",
+                        "Itens com 2 unidades ou menos. Risco de ruptura iminente.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Bom desempenho
+                if (loja.HealthScore >= 80)
+                    indicadores.Add(new IndicadorAcao("bom_desempenho", "positivo",
+                        $"{loja.NomeLoja}: excelente saúde operacional",
+                        $"Score {loja.HealthScore:F0}/100 — operação saudável.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Itens parados
+                if (loja.ItensParados > 0 && loja.QuantidadeEstoque > 0 &&
+                    (decimal)loja.ItensParados / loja.QuantidadeEstoque > 0.3m)
+                    indicadores.Add(new IndicadorAcao("excesso_ociosidade", "medio",
+                        $"{loja.NomeLoja}: {loja.ItensParados} item(ns) parado(s)",
+                        "Mais de 30% do estoque sem movimentação há 90+ dias.",
+                        loja.LojaId, loja.NomeLoja, null));
+                else if (loja.ItensParados > 0)
+                    indicadores.Add(new IndicadorAcao("excesso_ociosidade", "baixo",
+                        $"{loja.NomeLoja}: {loja.ItensParados} item(ns) parado(s)",
+                        "Itens sem movimentação há 90+ dias.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Reposicao urgente
+                if (loja.ItensAbaixoMinimo > 3)
+                    indicadores.Add(new IndicadorAcao("urgencia_reposicao", "alto",
+                        $"{loja.NomeLoja}: {loja.ItensAbaixoMinimo} itens abaixo do mínimo",
+                        "Vários itens precisam de reposição urgente.",
+                        loja.LojaId, loja.NomeLoja, null));
+                else if (loja.ItensAbaixoMinimo > 0)
+                    indicadores.Add(new IndicadorAcao("urgencia_reposicao", "medio",
+                        $"{loja.NomeLoja}: {loja.ItensAbaixoMinimo} item(ns) abaixo do mínimo",
+                        "Itens precisam de reposição.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Risco de vencimento
+                if (loja.AlertasVencimento > 0)
+                    indicadores.Add(new IndicadorAcao("risco_vencimento", "alto",
+                        $"{loja.NomeLoja}: {loja.AlertasVencimento} item(ns) próximo(s) do vencimento",
+                        "Itens com validade nos próximos 30 dias.",
+                        loja.LojaId, loja.NomeLoja, null));
+
+                // Oportunidade comercial
+                if (mediaHealth > 0 && loja.MediaVendasDiaria > 0 && loja.HealthScore >= 60)
+                    indicadores.Add(new IndicadorAcao("oportunidade", "positivo",
+                        $"{loja.NomeLoja}: boa velocidade de vendas",
+                        $"Média de {loja.MediaVendasDiaria:F1} un/dia. Considere ampliar mix.",
+                        loja.LojaId, loja.NomeLoja, null));
+            }
+
+            // Sort: critico first, then alto, medio, baixo, positivo
+            var severityOrder = new Dictionary<string, int>
+            {
+                ["critico"] = 0, ["alto"] = 1, ["medio"] = 2, ["baixo"] = 3, ["positivo"] = 4
+            };
+            var result = indicadores
+                .OrderBy(i => severityOrder.GetValueOrDefault(i.Severidade, 5))
+                .ThenBy(i => i.NomeLoja)
+                .ToList();
+
+            await SetCachedAsync(cacheKey, result, ComparacaoTtl);
+            return result;
+        }
+
+        // ── Health Score Calculation ─────────────────────────────────────
+
+        private static (decimal Score, string Classificacao) CalcularHealthScore(
+            int totalItens, int itensCriticos, int itensAbaixoMinimo,
+            decimal mediaDiaria, decimal mediaEmpresaDiaria,
+            decimal valorVencendo, decimal valorEstoque, int itensParados)
+        {
+            var (score, classificacao, _, _, _, _, _) = CalcularHealthScoreDetalhado(
+                totalItens, itensCriticos, itensAbaixoMinimo,
+                mediaDiaria, mediaEmpresaDiaria, valorVencendo, valorEstoque, itensParados);
+            return (score, classificacao);
+        }
+
+        private static (decimal Score, string Classificacao,
+            decimal DimStock, decimal DimSales, decimal DimExpiry, decimal DimIdle, decimal DimReplen)
+            CalcularHealthScoreDetalhado(
+                int totalItens, int itensCriticos, int itensAbaixoMinimo,
+                decimal mediaDiaria, decimal mediaEmpresaDiaria,
+                decimal valorVencendo, decimal valorEstoque, int itensParados)
+        {
+            var maxItens = Math.Max(totalItens, 1);
+
+            // StockHealth (30%): fewer critical items = higher score
+            var dimStock = Math.Max(0, 100m - (decimal)itensCriticos / maxItens * 100m);
+
+            // SalesVelocity (25%): store rate vs company average
+            decimal dimSales;
+            if (mediaEmpresaDiaria <= 0)
+                dimSales = mediaDiaria > 0 ? 100m : 50m;
+            else
+                dimSales = Math.Min(100m, mediaDiaria / mediaEmpresaDiaria * 100m);
+
+            // ExpiryRisk (20%): less value at expiry risk = higher score
+            var maxValor = Math.Max(valorEstoque, 1m);
+            var dimExpiry = Math.Max(0, 100m - valorVencendo / maxValor * 100m);
+
+            // IdleRisk (15%): fewer idle items = higher score
+            var dimIdle = Math.Max(0, 100m - (decimal)itensParados / maxItens * 100m);
+
+            // ReplenishmentUrgency (10%): fewer items below minimum = higher score
+            var dimReplen = Math.Max(0, 100m - (decimal)itensAbaixoMinimo / maxItens * 100m);
+
+            var score = Math.Round(
+                0.30m * dimStock +
+                0.25m * dimSales +
+                0.20m * dimExpiry +
+                0.15m * dimIdle +
+                0.10m * dimReplen, 1);
+
+            var classificacao = score switch
+            {
+                >= 80 => "Excelente",
+                >= 60 => "Bom",
+                >= 40 => "Atencao",
+                _ => "Critico"
+            };
+
+            return (score, classificacao,
+                Math.Round(dimStock, 1), Math.Round(dimSales, 1),
+                Math.Round(dimExpiry, 1), Math.Round(dimIdle, 1), Math.Round(dimReplen, 1));
         }
     }
 }

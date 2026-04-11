@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -12,7 +13,9 @@ namespace EasyStock.Api.Controllers;
 [ValidateEmpresaId]
 [ApiController]
 [Route("api/vendas")]
-public class VendaController(IVendaRepository vendaRepository) : EasyStockControllerBase
+public class VendaController(
+    IVendaRepository vendaRepository,
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List sales (paginated)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -23,8 +26,12 @@ public class VendaController(IVendaRepository vendaRepository) : EasyStockContro
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var (vendas, totalCount) = await vendaRepository.GetVendasPorEmpresaAsync(empresaId, page, pageSize);
-        return DataPaged(vendas, totalCount, page, pageSize);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (p, ps) = NormalisePage(page, pageSize);
+        var (vendas, totalCount) = await vendaRepository.GetVendasPorEmpresaAsync(resolvedEmpresaId, p, ps);
+        return DataPaged(vendas, totalCount, p, ps);
     }
 
     [SwaggerOperation(Summary = "Get sale details")]
@@ -34,7 +41,10 @@ public class VendaController(IVendaRepository vendaRepository) : EasyStockContro
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid empresaId)
     {
-        var venda = await vendaRepository.GetByIdAsync(empresaId, id);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var venda = await vendaRepository.GetByIdAsync(resolvedEmpresaId, id);
         return venda is null ? DataNotFound() : DataOk(venda);
     }
 
@@ -45,7 +55,10 @@ public class VendaController(IVendaRepository vendaRepository) : EasyStockContro
     [HttpGet("{id}/itens")]
     public async Task<IActionResult> GetItens(Guid id, [FromQuery] Guid empresaId)
     {
-        var venda = await vendaRepository.GetByIdAsync(empresaId, id);
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var venda = await vendaRepository.GetByIdAsync(resolvedEmpresaId, id);
         if (venda is null)
             return DataNotFound();
 

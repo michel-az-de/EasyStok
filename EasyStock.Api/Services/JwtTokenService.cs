@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.AutenticarUsuario;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace EasyStock.Api.Services;
@@ -49,6 +50,8 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
 
     public string GerarRefreshToken()
     {
-        return Guid.NewGuid().ToString() + Guid.NewGuid().ToString(); // 64 chars
+        var bytes = new byte[32];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes);
     }
 }

@@ -38,8 +38,9 @@ public class ItemEstoqueController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, page, pageSize);
-        return DataPaged(itens, totalCount, page, pageSize);
+        var (p, ps) = NormalisePage(page, pageSize);
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps);
+        return DataPaged(itens, totalCount, p, ps);
     }
 
     [SwaggerOperation(Summary = "Smart inventory search", Description = "Full-text search across product name, SKU, barcode and internal code.")]
