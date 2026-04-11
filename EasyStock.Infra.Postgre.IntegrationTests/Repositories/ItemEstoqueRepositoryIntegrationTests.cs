@@ -47,7 +47,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             QuantidadeInicial = Quantidade.From(10),
             QuantidadeAtual = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
@@ -101,7 +101,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 CustoUnitario = Dinheiro.FromDecimal(250m),
                 PrecoVendaSugerido = Dinheiro.FromDecimal(399.90m),
                 ValidadeEm = Validade.From(new DateTime(2026, 12, 31)),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -157,7 +157,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
                 QuantidadeAtual = Quantidade.From(10),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -168,7 +168,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
                 QuantidadeAtual = Quantidade.From(5),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -179,7 +179,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaB.Id,
                 ProdutoId = Guid.NewGuid(), // Produto B, mas não importa
                 QuantidadeAtual = Quantidade.From(20),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -233,7 +233,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
                 QuantidadeAtual = Quantidade.From(3), // Baixo
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -244,7 +244,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
                 QuantidadeAtual = Quantidade.From(10), // Normal
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -255,7 +255,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 EmpresaId = empresaB.Id,
                 ProdutoId = Guid.NewGuid(),
                 QuantidadeAtual = Quantidade.From(2), // Baixo, mas empresa B
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow

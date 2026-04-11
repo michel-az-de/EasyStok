@@ -81,4 +81,10 @@ public abstract class EasyStockControllerBase : ControllerBase
     /// <summary>Validates and normalises the order parameter to "asc" or "desc".</summary>
     protected static string NormaliseOrder(string? order) =>
         string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+
+    // ── Pagination helpers ───────────────────────────────────────────────────
+
+    /// <summary>Clamps page (min 1) and pageSize (1..maxPageSize) to safe values.</summary>
+    protected static (int Page, int PageSize) NormalisePage(int page, int pageSize, int maxPageSize = 200) =>
+        (Math.Max(1, page), Math.Clamp(pageSize, 1, maxPageSize));
 }

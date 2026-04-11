@@ -39,9 +39,10 @@ public class ProdutoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
+        var (p, ps) = NormalisePage(page, pageSize);
         var (produtos, totalCount) = await produtoRepository.GetProdutosPaginadosAsync(
-            resolvedEmpresaId, page, pageSize, sort, NormaliseOrder(order));
-        return DataPaged(produtos, totalCount, page, pageSize);
+            resolvedEmpresaId, p, ps, sort, NormaliseOrder(order));
+        return DataPaged(produtos, totalCount, p, ps);
     }
 
     [SwaggerOperation(Summary = "Get product details", Description = "Returns full product details including variants, characteristics and packaging.")]
@@ -213,6 +214,10 @@ public class ProdutoController(
     {
         if (file is null || file.Length == 0)
             return DataBadRequest("Arquivo nao informado.");
+
+        const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
+        if (file.Length > MaxFileSize)
+            return DataBadRequest("Arquivo excede o limite de 10 MB.");
 
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;

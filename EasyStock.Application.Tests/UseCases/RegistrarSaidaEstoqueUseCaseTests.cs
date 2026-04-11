@@ -128,7 +128,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -140,7 +140,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(5),
             QuantidadeInicial = Quantidade.From(5),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -285,7 +285,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(2),
             QuantidadeInicial = Quantidade.From(2),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -418,7 +418,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -481,7 +481,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -543,7 +543,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
             ValidadeEm = Validade.From(new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc))
         };
@@ -606,7 +606,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -618,7 +618,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(1),
             QuantidadeInicial = Quantidade.From(1),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
@@ -687,7 +687,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(250m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 

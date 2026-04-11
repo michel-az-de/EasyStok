@@ -110,7 +110,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 QuantidadeInicial = Quantidade.From(5),
                 QuantidadeAtual = Quantidade.From(5),
                 CustoUnitario = Dinheiro.FromDecimal(200m),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -180,7 +180,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     QuantidadeInicial = Quantidade.From(10),
                     QuantidadeAtual = Quantidade.From(10),
                     CustoUnitario = Dinheiro.FromDecimal(250m),
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow,
@@ -194,7 +194,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     QuantidadeInicial = Quantidade.From(5),
                     QuantidadeAtual = Quantidade.From(5),
                     CustoUnitario = Dinheiro.FromDecimal(250m),
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow,
@@ -439,7 +439,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 QuantidadeInicial = Quantidade.From(4),
                 QuantidadeAtual = Quantidade.From(4),
                 CustoUnitario = Dinheiro.FromDecimal(250m),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
                 ValidadeEm = Validade.From(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)),
                 CriadoEm = DateTime.UtcNow,
@@ -508,7 +508,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 QuantidadeInicial = Quantidade.From(5),
                 QuantidadeAtual = Quantidade.From(5),
                 CustoUnitario = Dinheiro.FromDecimal(200m),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -575,7 +575,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 QuantidadeInicial = Quantidade.From(10),
                 QuantidadeAtual = Quantidade.From(10),
                 CustoUnitario = Dinheiro.FromDecimal(250m),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow
@@ -619,7 +619,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     EmpresaId = empresaId,
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(3), // Baixo
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
@@ -630,7 +630,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     EmpresaId = empresaId,
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(2), // Baixo
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
@@ -641,7 +641,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     EmpresaId = empresaId,
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(10), // Normal
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
@@ -653,7 +653,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(1), // Baixo
                     ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(20)), // Próximo vencimento
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
@@ -665,7 +665,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     ProdutoId = produtoId,
                     QuantidadeAtual = Quantidade.From(5),
                     UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-100), // Parado
-                    Status = StatusItemEstoque.Ativo,
+                    Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
@@ -767,7 +767,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 QuantidadeInicial = Quantidade.From(10),
                 QuantidadeAtual = Quantidade.From(10),
                 CustoUnitario = Dinheiro.FromDecimal(250m),
-                Status = StatusItemEstoque.Ativo,
+                Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
                 AlteradoEm = DateTime.UtcNow

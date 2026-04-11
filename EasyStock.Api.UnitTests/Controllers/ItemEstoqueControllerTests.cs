@@ -209,7 +209,7 @@ public class ItemEstoqueControllerTests
             QuantidadeAtual = Quantidade.From(8),
             QuantidadeInicial = Quantidade.From(8),
             CustoUnitario = Dinheiro.FromDecimal(150m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-2),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-1)
         });
@@ -334,7 +334,7 @@ public class ItemEstoqueControllerTests
             QuantidadeAtual = Quantidade.From(10),
             QuantidadeInicial = Quantidade.From(10),
             CustoUnitario = Dinheiro.FromDecimal(150m),
-            Status = StatusItemEstoque.Ativo,
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-10),
             UltimaMovimentacaoEm = DateTime.UtcNow.AddDays(-2)
         });

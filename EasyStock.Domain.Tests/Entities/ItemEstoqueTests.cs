@@ -50,7 +50,7 @@ public class ItemEstoqueTests
             null,
             DateTime.UtcNow);
 
-        item.Status.Should().Be(StatusItemEstoque.Ativo);
+        item.Status.Should().Be(StatusItemEstoque.Ok);
         item.QuantidadeInicial.Value.Should().Be(10);
         item.ChavePesquisa.Should().Contain("CAP3426");
         item.ChavePesquisa.Should().Contain("Galaxy Buds FE");
@@ -81,12 +81,12 @@ public class ItemEstoqueTests
     [Fact]
     public void Deve_registrar_saida_e_marcar_esgotado_quando_zerar()
     {
-        var item = CriarItem(status: StatusItemEstoque.Ativo, quantidadeAtual: 3);
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 3);
 
         item.RegistrarSaida(Quantidade.From(3), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
 
         item.QuantidadeAtual.Value.Should().Be(0);
-        item.Status.Should().Be(StatusItemEstoque.Esgotado);
+        item.Status.Should().Be(StatusItemEstoque.Critical);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class ItemEstoqueTests
     [Fact]
     public void Deve_marcar_vencido_ao_recalcular_status()
     {
-        var item = CriarItem(status: StatusItemEstoque.Ativo, validade: Validade.From(new DateTime(2026, 4, 1)));
+        var item = CriarItem(status: StatusItemEstoque.Ok, validade: Validade.From(new DateTime(2026, 4, 1)));
 
         item.RecalcularStatus(new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc));
 
