@@ -1,0 +1,286 @@
+@model EasyStock.Web.Services.DiagnosticoApiResult
+@{
+    Layout = null;
+    var apiOk = ViewBag.ApiAlcancavel == true;
+    var apiUrl = ViewBag.ApiBaseUrl as string ?? "N/A";
+    var ts = (DateTimeOffset)ViewBag.Timestamp;
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Diagnostico — EasyStock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen">
+    <div class="max-w-4xl mx-auto py-8 px-4">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Diagnostico EasyStock</h1>
+                <p class="text-sm text-slate-500 mt-1">Ultima verificacao: @ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="/diagnostico" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
+                    Verificar novamente
+                </a>
+                <a href="/dashboard" class="px-4 py-2 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition">
+                    Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Status Geral -->
+        @if (apiOk && Model is not null)
+        {
+            var statusColor = Model.Status switch { "ok" => "green", "degraded" => "yellow", _ => "red" };
+            var statusText = Model.Status switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Sistema com falhas criticas" };
+            <div class="bg-@(statusColor)-50 border border-@(statusColor)-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+                @if (statusColor == "green")
+                {
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                }
+                else if (statusColor == "yellow")
+                {
+                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                }
+                else
+                {
+                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                }
+                <div>
+                    <p class="font-semibold">@statusText</p>
+                    <p class="text-sm text-slate-600">Ambiente: @Model.Ambiente | Uptime: @Model.Uptime | Versao: @Model.Versao</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div>
+                    <p class="font-semibold text-red-800">API inacessivel</p>
+                    <p class="text-sm text-red-600">Nao foi possivel conectar na API. Verifique se o servico esta em execucao.</p>
+                </div>
+            </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Web -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-slate-800">Web</h2>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                    </span>
+                </div>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Status</td><td class="py-1.5 font-medium">Operacional</td></tr>
+                    <tr><td class="py-1.5 text-slate-500">URL da API</td><td class="py-1.5 font-mono text-xs break-all">@apiUrl</td></tr>
+                </table>
+            </div>
+
+            <!-- API -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-slate-800">API</h2>
+                    @if (apiOk)
+                    {
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> FALHA
+                        </span>
+                    }
+                </div>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Alcancavel</td><td class="py-1.5 font-medium">@(apiOk ? "Sim" : "Nao")</td></tr>
+                    @if (Model is not null)
+                    {
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Ambiente</td><td class="py-1.5">@Model.Ambiente</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Uptime</td><td class="py-1.5">@Model.Uptime</td></tr>
+                    }
+                </table>
+            </div>
+
+            @if (Model is not null)
+            {
+                <!-- Banco -->
+                var bancoOk = Model.Banco.Conexao == "ok";
+                <div class="bg-white rounded-xl border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">Banco de Dados</h2>
+                        @if (bancoOk && !Model.Banco.Fallback)
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                            </span>
+                        }
+                        else if (bancoOk && Model.Banco.Fallback)
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> FALLBACK
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> FALHA
+                            </span>
+                        }
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Provider</td><td class="py-1.5 font-medium">@Model.Banco.Provider</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@Model.Banco.ProviderConfigurado</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Fallback</td><td class="py-1.5">@(Model.Banco.Fallback ? "Sim" : "Nao")</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Conexao</td><td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Migrations</td><td class="py-1.5">@(Model.Banco.MigrationsAplicadas == true ? "Aplicadas" : Model.Banco.MigrationsAplicadas == false ? "Falha" : "N/A")</td></tr>
+                        @if (Model.Banco.Erro is not null)
+                        {
+                            <tr><td class="py-1.5 text-slate-500">Erro</td><td class="py-1.5 text-red-600 text-xs">@Model.Banco.Erro</td></tr>
+                        }
+                    </table>
+                </div>
+
+                <!-- Redis -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">Redis</h2>
+                        @if (Model.Redis.Conexao == "ok")
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                            </span>
+                        }
+                        else if (Model.Redis.Conexao == "nao_configurado")
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                                N/A
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> FALHA
+                            </span>
+                        }
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Nao")</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Conexao</td><td class="py-1.5">@Model.Redis.Conexao</td></tr>
+                    </table>
+                </div>
+
+                <!-- SMTP -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">SMTP / Email</h2>
+                        @if (Model.Smtp.Configurado)
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Configurado
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                                Console only
+                            </span>
+                        }
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Tipo</td><td class="py-1.5">@Model.Smtp.Tipo</td></tr>
+                        <tr><td class="py-1.5 text-slate-500">Host</td><td class="py-1.5">@(Model.Smtp.Host ?? "N/A")</td></tr>
+                    </table>
+                </div>
+
+                <!-- Storage -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">Storage</h2>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> @Model.Storage.Provider
+                        </span>
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr><td class="py-1.5 text-slate-500">Diretorio existe</td><td class="py-1.5">@(Model.Storage.DiretorioExiste == true ? "Sim" : Model.Storage.DiretorioExiste == false ? "Nao" : "N/A")</td></tr>
+                    </table>
+                </div>
+
+                <!-- IA -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">IA (Anthropic)</h2>
+                        @if (Model.Ia.Habilitado)
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Habilitado
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                                Desabilitado
+                            </span>
+                        }
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr><td class="py-1.5 text-slate-500">API Key presente</td><td class="py-1.5">@(Model.Ia.ApiKeyPresente ? "Sim" : "Nao")</td></tr>
+                    </table>
+                </div>
+
+                <!-- Configuracoes -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800">Configuracoes Criticas</h2>
+                    </div>
+                    <table class="w-full text-sm">
+                        <tr class="border-b border-slate-100">
+                            <td class="py-1.5 text-slate-500">JWT Secret</td>
+                            <td class="py-1.5 font-medium @(Model.Configuracoes.JwtSecretPresente ? "text-green-700" : "text-red-700")">
+                                @(Model.Configuracoes.JwtSecretPresente ? (Model.Configuracoes.JwtSecretSeguro == true ? "Presente e seguro" : "Presente (curta)") : "AUSENTE")
+                            </td>
+                        </tr>
+                        <tr class="border-b border-slate-100">
+                            <td class="py-1.5 text-slate-500">Connection String</td>
+                            <td class="py-1.5 font-medium @(Model.Configuracoes.ConnectionStringPresente ? "text-green-700" : "text-red-700")">
+                                @(Model.Configuracoes.ConnectionStringPresente ? "Presente" : "AUSENTE")
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5 text-slate-500">CORS Origins</td>
+                            <td class="py-1.5 font-mono text-xs">@(Model.Configuracoes.CorsOrigins.Length > 0 ? string.Join(", ", Model.Configuracoes.CorsOrigins) : "Nenhum configurado")</td>
+                        </tr>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- Footer links -->
+        <div class="mt-6 text-center text-sm text-slate-500">
+            <a href="/diagnostico/json" class="text-indigo-600 hover:underline">JSON</a>
+            @if (apiOk)
+            {
+                <span class="mx-2">|</span>
+                <a href="@(apiUrl.Replace("/api", ""))/swagger" target="_blank" class="text-indigo-600 hover:underline">Swagger</a>
+                <span class="mx-2">|</span>
+                <a href="@(apiUrl.Replace("/api", ""))/health" target="_blank" class="text-indigo-600 hover:underline">Health</a>
+                <span class="mx-2">|</span>
+                <a href="@(apiUrl.Replace("/api", ""))/health/ready" target="_blank" class="text-indigo-600 hover:underline">Readiness</a>
+            }
+        </div>
+
+        <!-- Auto-refresh -->
+        <script>
+            setTimeout(() => location.reload(), 60000);
+        </script>
+    </div>
+</body>
+</html>

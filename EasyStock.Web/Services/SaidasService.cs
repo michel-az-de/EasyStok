@@ -19,6 +19,8 @@ public class SaidasService(ApiClient api, SessionService session)
         }
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
+        var naturezaApi = MapNatureza(natureza);
+        if (!string.IsNullOrEmpty(natureza)) qs += $"&natureza={Uri.EscapeDataString(naturezaApi)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
@@ -40,8 +42,8 @@ public class SaidasService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
-            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
-        return await api.PostAsync<object>("estoque/saida", new
+            return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
+        return api.PostAsync<object>("estoque/saida", new
         {
             empresaId,
             itens = new[]

@@ -126,11 +126,11 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             .ToListAsync();
     }
 
-    public async Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
-        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+    public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.QuantidadeAtual.Value > 0).AnyAsync();
 
-    public async Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
-        await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.ProdutoVariacaoId == variacaoId && x.QuantidadeAtual.Value > 0).AnyAsync();
+    public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId && x.ProdutoVariacaoId == variacaoId && x.QuantidadeAtual.Value > 0).AnyAsync();
 
     public async Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id)
     {
@@ -404,8 +404,8 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
         return (items, total);
     }
 
-    public async Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>
-        await Collection.Find(x => x.EmpresaId == empresaId && x.TipoAlerta == tipo && x.ReferenciaId == referenciaId && !x.Lida).AnyAsync();
+    public Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>
+        Collection.Find(x => x.EmpresaId == empresaId && x.TipoAlerta == tipo && x.ReferenciaId == referenciaId && !x.Lida).AnyAsync();
 
     public Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia)
     {

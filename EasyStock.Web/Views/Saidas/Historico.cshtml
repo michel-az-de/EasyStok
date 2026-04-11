@@ -46,6 +46,10 @@
 
 <!-- Filtros -->
 <form method="get" class="ws mb-6">
+    @if (!string.IsNullOrEmpty(Model.FiltroNatureza))
+    {
+        <input type="hidden" name="natureza" value="@Model.FiltroNatureza" />
+    }
     <div class="flex flex-wrap gap-3 items-end">
         <!-- Pill filters por natureza -->
         <div class="flex gap-2 flex-wrap">

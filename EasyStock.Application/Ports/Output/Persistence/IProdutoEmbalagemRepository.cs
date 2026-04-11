@@ -4,6 +4,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
 {
     public interface IProdutoEmbalagemRepository
     {
+        Task<IEnumerable<ProdutoEmbalagem>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
         Task InsertAsync(ProdutoEmbalagem embalagem);
+        Task UpdateAsync(ProdutoEmbalagem embalagem);
+        Task DeleteAsync(Guid id);
     }
 }

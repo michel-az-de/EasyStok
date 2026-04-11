@@ -98,6 +98,19 @@ public class ItemEstoqueController(
         return DataOk(await registrarSaidaUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
     }
 
+    [SwaggerOperation(Summary = "Get stock items by product")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("por-produto/{produtoId}")]
+    public async Task<IActionResult> GetByProduto(Guid produtoId, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var items = await itemEstoqueRepository.GetByProdutoAsync(resolvedEmpresaId, produtoId);
+        return DataOk(items);
+    }
+
     [SwaggerOperation(Summary = "Get stock item replenishment data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
