@@ -6,7 +6,10 @@ using Microsoft.AspNetCore.WebUtilities;
 
 namespace EasyStock.Web.Services;
 
-public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHandler> log) : DelegatingHandler
+public class TokenRefreshHandler(
+    SessionService session,
+    ILogger<TokenRefreshHandler> log,
+    IHttpContextAccessor httpContextAccessor) : DelegatingHandler
 {
     private bool _isRefreshing;
 
@@ -56,6 +59,7 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
                     else
                     {
                         log.LogWarning("Token refresh failed — clearing session");
+                        MarkSessionExpired();
                         session.Clear();
                     }
                 }
@@ -66,11 +70,32 @@ public class TokenRefreshHandler(SessionService session, ILogger<TokenRefreshHan
             }
             else
             {
+                MarkSessionExpired();
                 session.Clear();
             }
         }
 
         return response;
+    }
+
+    private void MarkSessionExpired()
+    {
+        try
+        {
+            httpContextAccessor.HttpContext?.Response.Cookies.Append(
+                "_se", "1",
+                new CookieOptions
+                {
+                    HttpOnly = false,
+                    Path = "/",
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(30),
+                    SameSite = SameSiteMode.Strict
+                });
+        }
+        catch
+        {
+            // Não bloquear o fluxo se o cookie não puder ser escrito
+        }
     }
 
     private async Task<string?> TryRefreshAsync(string refreshToken, CancellationToken ct)

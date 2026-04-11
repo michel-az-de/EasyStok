@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace EasyStock.Web.Services;
@@ -12,21 +14,32 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
 
     public string ApiBaseUrl => configuration["ApiSettings:BaseUrl"] ?? "não configurado";
 
-    public async Task<DiagnosticoApiResult?> ObterDiagnosticoAsync()
+    public async Task<(DiagnosticoApiResult? Result, long LatenciaMs)> ObterDiagnosticoComLatenciaAsync()
     {
+        var sw = Stopwatch.StartNew();
         try
         {
             var response = await httpClient.GetAsync("diagnostico");
+            sw.Stop();
+
             if (!response.IsSuccessStatusCode)
-                return null;
+                return (null, sw.ElapsedMilliseconds);
 
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<DiagnosticoApiResult>(json, JsonOptions);
+            var result = JsonSerializer.Deserialize<DiagnosticoApiResult>(json, JsonOptions);
+            return (result, sw.ElapsedMilliseconds);
         }
         catch
         {
-            return null;
+            sw.Stop();
+            return (null, sw.ElapsedMilliseconds);
         }
+    }
+
+    public async Task<DiagnosticoApiResult?> ObterDiagnosticoAsync()
+    {
+        var (result, _) = await ObterDiagnosticoComLatenciaAsync();
+        return result;
     }
 
     public async Task<bool> PingApiAsync()
@@ -39,6 +52,26 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<LogsApiResult?> FetchLogsAsync(string bearerToken, int n = 100)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"diagnostico/logs?n={n}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<LogsApiResult>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
         }
     }
 }
@@ -57,6 +90,7 @@ public sealed class DiagnosticoApiResult
     public StorageInfo Storage { get; set; } = new();
     public IaInfo Ia { get; set; } = new();
     public ConfigInfo Configuracoes { get; set; } = new();
+    public List<CausaProvavelInfo> CausasProvaveis { get; set; } = [];
 }
 
 public sealed class BancoInfo
@@ -67,6 +101,8 @@ public sealed class BancoInfo
     public string Conexao { get; set; } = "";
     public bool? MigrationsAplicadas { get; set; }
     public string? Erro { get; set; }
+    public long LatenciaMs { get; set; }
+    public string? CausaProvavel { get; set; }
 }
 
 public sealed class RedisInfo
@@ -74,6 +110,8 @@ public sealed class RedisInfo
     public bool Configurado { get; set; }
     public string Conexao { get; set; } = "";
     public string? Erro { get; set; }
+    public long LatenciaMs { get; set; }
+    public string? CausaProvavel { get; set; }
 }
 
 public sealed class SmtpInfo
@@ -102,4 +140,28 @@ public sealed class ConfigInfo
     public bool? JwtSecretSeguro { get; set; }
     public string[] CorsOrigins { get; set; } = [];
     public bool ConnectionStringPresente { get; set; }
+}
+
+public sealed class CausaProvavelInfo
+{
+    public string Componente { get; set; } = "";
+    public string Severidade { get; set; } = "warning";
+    public string Descricao { get; set; } = "";
+    public string Sugestao { get; set; } = "";
+}
+
+public sealed class LogsApiResult
+{
+    public bool Disponivel { get; set; }
+    public string? Motivo { get; set; }
+    public string? Arquivo { get; set; }
+    public int TotalLinhas { get; set; }
+    public LogEntryInfo[] Entradas { get; set; } = [];
+}
+
+public sealed class LogEntryInfo
+{
+    public DateTimeOffset Timestamp { get; set; }
+    public string Level { get; set; } = "";
+    public string Message { get; set; } = "";
 }

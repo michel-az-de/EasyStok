@@ -1,9 +1,40 @@
 @model EasyStock.Web.Services.DiagnosticoApiResult
+@using EasyStock.Web.Services
 @{
     Layout = null;
     var apiOk = ViewBag.ApiAlcancavel == true;
     var apiUrl = ViewBag.ApiBaseUrl as string ?? "N/A";
     var ts = (DateTimeOffset)ViewBag.Timestamp;
+    var latenciaApiMs = (long)(ViewBag.LatenciaApiMs ?? 0L);
+    var isAdmin = ViewBag.IsAdmin == true;
+    var logs = ViewBag.Logs as LogsApiResult;
+
+    var apiBase = apiUrl.Contains("/api") ? apiUrl[..apiUrl.LastIndexOf("/api")] : apiUrl;
+
+    // Helpers locais
+    string StatusClass(string s) => s switch {
+        "ok" => "bg-green-100 text-green-800",
+        "degraded" => "bg-yellow-100 text-yellow-800",
+        "critical" => "bg-red-100 text-red-800",
+        "falha" => "bg-red-100 text-red-800",
+        "nao_configurado" => "bg-slate-100 text-slate-500",
+        _ => "bg-slate-100 text-slate-600"
+    };
+    string DotClass(string s) => s switch {
+        "ok" => "bg-green-500",
+        "degraded" => "bg-yellow-500",
+        "critical" => "bg-red-500",
+        "falha" => "bg-red-500",
+        _ => "bg-slate-400"
+    };
+    string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
+
+    var overallStatus = apiOk && Model is not null ? Model.Status : "critical";
+    var overallIcon = overallStatus switch { "ok" => "✅", "degraded" => "⚠️", _ => "🔴" };
+    var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado — verificar alertas", _ => "Falha crítica detectada" };
+    var overallHero = overallStatus switch { "ok" => "bg-green-50 border-green-200", "degraded" => "bg-yellow-50 border-yellow-200", _ => "bg-red-50 border-red-200" };
+    var overallTextColor = overallStatus switch { "ok" => "text-green-800", "degraded" => "text-yellow-800", _ => "text-red-800" };
+    var overallSubColor = overallStatus switch { "ok" => "text-green-600", "degraded" => "text-yellow-700", _ => "text-red-700" };
 }
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -12,275 +43,543 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Diagnóstico — EasyStock</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .log-panel { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-900 min-h-screen">
-    <div class="max-w-4xl mx-auto py-8 px-4">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-800">Diagnóstico EasyStock</h1>
-                <p class="text-sm text-slate-500 mt-1">Última verificação: @ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</p>
+<body class="bg-slate-100 text-slate-900 min-h-screen" x-data="diagApp()">
+<div class="max-w-5xl mx-auto py-8 px-4">
+
+    <!-- ── HEADER ─────────────────────────────────────────────────────── -->
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-2xl font-bold text-slate-800">Diagnóstico</span>
+                <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">EasyStock</span>
             </div>
-            <div class="flex gap-2">
-                <a href="/diagnostico" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                    Verificar novamente
-                </a>
-                <a href="/dashboard" class="px-4 py-2 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition">
-                    Dashboard
-                </a>
+            <p class="text-sm text-slate-500">
+                Última verificação: <strong>@ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</strong>
+                <span class="mx-1">·</span>
+                <span x-text="`Atualiza em ${countdown}s`" class="text-indigo-500 font-medium"></span>
+            </p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+            <button @@click="refresh()"
+                    :disabled="refreshing"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-lg transition">
+                <svg x-show="refreshing" class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <svg x-show="!refreshing" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span x-text="refreshing ? 'Verificando...' : 'Verificar agora'">Verificar agora</span>
+            </button>
+            <a href="/dashboard" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition">
+                Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- ── STATUS HERO ────────────────────────────────────────────────── -->
+    <div class="@overallHero border rounded-2xl p-5 mb-6 flex items-center gap-4">
+        <span class="text-4xl">@overallIcon</span>
+        <div class="flex-1">
+            <p class="font-bold text-lg @overallTextColor">@overallText</p>
+            @if (apiOk && Model is not null)
+            {
+                <p class="text-sm @overallSubColor mt-0.5">
+                    Ambiente: <strong>@Model.Ambiente</strong>
+                    &nbsp;·&nbsp; Uptime: <strong>@Model.Uptime</strong>
+                    &nbsp;·&nbsp; Versão: <strong>@Model.Versao</strong>
+                    &nbsp;·&nbsp; Latência API:
+                    <strong class="@LatBadgeClass(latenciaApiMs) px-1.5 py-0.5 rounded text-xs">@latenciaApiMs ms</strong>
+                </p>
+            }
+            else if (!apiOk)
+            {
+                <p class="text-sm @overallSubColor mt-0.5">
+                    API inacessível — verifique se o serviço está no ar e se a URL está correta.
+                </p>
+            }
+        </div>
+    </div>
+
+    <!-- ── CAUSAS PROVÁVEIS (só se há issues) ────────────────────────── -->
+    @if (apiOk && Model is not null && Model.CausasProvaveis.Count > 0)
+    {
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+            <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                </svg>
+                Causas Prováveis
+            </h2>
+            <div class="space-y-3">
+                @foreach (var causa in Model.CausasProvaveis)
+                {
+                    var severity = causa.Severidade == "critical"
+                        ? "border-red-200 bg-red-50"
+                        : "border-yellow-200 bg-yellow-50";
+                    var titleColor = causa.Severidade == "critical" ? "text-red-800" : "text-yellow-800";
+                    var bodyColor = causa.Severidade == "critical" ? "text-red-700" : "text-yellow-700";
+
+                    <div class="border @severity rounded-lg px-4 py-3">
+                        <p class="font-semibold text-sm @titleColor">[@causa.Componente] @causa.Descricao</p>
+                        <p class="text-xs @bodyColor mt-0.5">💡 @causa.Sugestao</p>
+                    </div>
+                }
             </div>
         </div>
+    }
+    else if (!apiOk)
+    {
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+            <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                </svg>
+                Diagnóstico de Conectividade
+            </h2>
+            <div class="border border-red-200 bg-red-50 rounded-lg px-4 py-3">
+                <p class="font-semibold text-sm text-red-800">[API] Não foi possível conectar à API</p>
+                <p class="text-xs text-red-700 mt-1">💡 URL configurada: <code class="font-mono">@apiUrl</code></p>
+                <p class="text-xs text-red-700 mt-1">💡 Verifique se a API está no ar, se a URL em <code>appsettings.json → ApiSettings:BaseUrl</code> está correta e se há problemas de rede ou CORS.</p>
+            </div>
+        </div>
+    }
 
-        <!-- Status Geral -->
-        @if (apiOk && Model is not null)
-        {
-            var statusColor = Model.Status switch { "ok" => "green", "degraded" => "yellow", _ => "red" };
-            var statusText = Model.Status switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Sistema com falhas críticas" };
-            <div class="bg-@(statusColor)-50 border border-@(statusColor)-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-                @if (statusColor == "green")
+    <!-- ── CARDS GRID ─────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+        <!-- Web -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                    <span class="text-base">🌐</span> Web
+                </h2>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Operacional
+                </span>
+            </div>
+            <table class="w-full text-sm">
+                <tr class="border-b border-slate-100">
+                    <td class="py-1.5 text-slate-500 w-2/5">Status</td>
+                    <td class="py-1.5 font-medium text-green-700">Online</td>
+                </tr>
+                <tr>
+                    <td class="py-1.5 text-slate-500">URL da API</td>
+                    <td class="py-1.5 font-mono text-xs break-all text-slate-700">@apiUrl</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- API -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                    <span class="text-base">⚡</span> API
+                </h2>
+                @if (apiOk)
                 {
-                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                }
-                else if (statusColor == "yellow")
-                {
-                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Acessível
+                    </span>
                 }
                 else
                 {
-                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Inacessível
+                    </span>
                 }
-                <div>
-                    <p class="font-semibold">@statusText</p>
-                    <p class="text-sm text-slate-600">Ambiente: @Model.Ambiente | Uptime: @Model.Uptime | Versão: @Model.Versao</p>
-                </div>
             </div>
-        }
-        else
-        {
-            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                <div>
-                    <p class="font-semibold text-red-800">API inacessível</p>
-                    <p class="text-sm text-red-600">Não foi possível conectar na API. Verifique se o serviço está em execução.</p>
-                </div>
-            </div>
-        }
+            <table class="w-full text-sm">
+                <tr class="border-b border-slate-100">
+                    <td class="py-1.5 text-slate-500 w-2/5">Alcançável</td>
+                    <td class="py-1.5 font-medium @(apiOk ? "text-green-700" : "text-red-700")">@(apiOk ? "Sim" : "Não")</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                    <td class="py-1.5 text-slate-500">Latência</td>
+                    <td class="py-1.5">
+                        <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(latenciaApiMs)">@latenciaApiMs ms</span>
+                    </td>
+                </tr>
+                @if (Model is not null)
+                {
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Ambiente</td>
+                        <td class="py-1.5">@Model.Ambiente</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1.5 text-slate-500">Uptime</td>
+                        <td class="py-1.5 font-medium">@Model.Uptime</td>
+                    </tr>
+                }
+            </table>
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Web -->
+        @if (Model is not null)
+        {
+            <!-- Banco de Dados -->
+            var bancoOk = Model.Banco.Conexao == "ok";
+            var bancoStatus = bancoOk && !Model.Banco.Fallback ? "ok" : bancoOk && Model.Banco.Fallback ? "degraded" : "falha";
             <div class="bg-white rounded-xl border border-slate-200 p-5">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800">Web</h2>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-base">🗄️</span> Banco de Dados
+                    </h2>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium @StatusClass(bancoStatus)">
+                        <span class="w-1.5 h-1.5 @DotClass(bancoStatus) rounded-full"></span>
+                        @(bancoStatus == "ok" ? "OK" : bancoStatus == "degraded" ? "FALLBACK" : "FALHA")
                     </span>
                 </div>
                 <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Status</td><td class="py-1.5 font-medium">Operacional</td></tr>
-                    <tr><td class="py-1.5 text-slate-500">URL da API</td><td class="py-1.5 font-mono text-xs break-all">@apiUrl</td></tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500 w-2/5">Provider</td>
+                        <td class="py-1.5 font-medium">@Model.Banco.Provider</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Configurado</td>
+                        <td class="py-1.5">@Model.Banco.ProviderConfigurado</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Fallback</td>
+                        <td class="py-1.5 @(Model.Banco.Fallback ? "text-amber-600 font-medium" : "")">@(Model.Banco.Fallback ? "Sim ⚠️" : "Não")</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Conexão</td>
+                        <td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Latência</td>
+                        <td class="py-1.5">
+                            <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(Model.Banco.LatenciaMs)">@Model.Banco.LatenciaMs ms</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="py-1.5 text-slate-500">Migrations</td>
+                        <td class="py-1.5">@(Model.Banco.MigrationsAplicadas == true ? "✅ Aplicadas" : Model.Banco.MigrationsAplicadas == false ? "❌ Falha" : "N/A")</td>
+                    </tr>
+                    @if (Model.Banco.Erro is not null)
+                    {
+                        <tr>
+                            <td class="py-1.5 text-slate-500">Erro</td>
+                            <td class="py-1.5 text-red-600 text-xs break-all">@Model.Banco.Erro</td>
+                        </tr>
+                    }
                 </table>
             </div>
 
-            <!-- API -->
+            <!-- Redis -->
+            var redisStatus = Model.Redis.Conexao == "ok" ? "ok" : Model.Redis.Conexao == "nao_configurado" ? "nao_configurado" : "falha";
             <div class="bg-white rounded-xl border border-slate-200 p-5">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800">API</h2>
-                    @if (apiOk)
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-base">⚡</span> Redis
+                    </h2>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium @StatusClass(redisStatus)">
+                        @if (redisStatus == "nao_configurado")
+                        {
+                            <span>N/A</span>
+                        }
+                        else
+                        {
+                            <span class="w-1.5 h-1.5 @DotClass(redisStatus) rounded-full"></span>
+                            <span>@(redisStatus == "ok" ? "OK" : "FALHA")</span>
+                        }
+                    </span>
+                </div>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500 w-2/5">Configurado</td>
+                        <td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Não")</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500">Conexão</td>
+                        <td class="py-1.5">@Model.Redis.Conexao</td>
+                    </tr>
+                    @if (Model.Redis.Configurado)
+                    {
+                        <tr>
+                            <td class="py-1.5 text-slate-500">Latência</td>
+                            <td class="py-1.5">
+                                <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(Model.Redis.LatenciaMs)">@Model.Redis.LatenciaMs ms</span>
+                            </td>
+                        </tr>
+                    }
+                </table>
+            </div>
+
+            <!-- SMTP -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-base">📧</span> SMTP / Email
+                    </h2>
+                    @if (Model.Smtp.Configurado)
                     {
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Configurado
                         </span>
                     }
                     else
                     {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> FALHA
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                            Console only
                         </span>
                     }
                 </div>
                 <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Alcançável</td><td class="py-1.5 font-medium">@(apiOk ? "Sim" : "Não")</td></tr>
-                    @if (Model is not null)
-                    {
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Ambiente</td><td class="py-1.5">@Model.Ambiente</td></tr>
-                        <tr><td class="py-1.5 text-slate-500">Uptime</td><td class="py-1.5">@Model.Uptime</td></tr>
-                    }
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 text-slate-500 w-2/5">Tipo</td>
+                        <td class="py-1.5 text-xs font-mono">@Model.Smtp.Tipo</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1.5 text-slate-500">Host</td>
+                        <td class="py-1.5">@(Model.Smtp.Host ?? "N/A")</td>
+                    </tr>
                 </table>
             </div>
 
-            @if (Model is not null)
-            {
-                <!-- Banco -->
-                var bancoOk = Model.Banco.Conexao == "ok";
-                <div class="bg-white rounded-xl border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">Banco de Dados</h2>
-                        @if (bancoOk && !Model.Banco.Fallback)
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
-                            </span>
-                        }
-                        else if (bancoOk && Model.Banco.Fallback)
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> FALLBACK
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> FALHA
-                            </span>
-                        }
-                    </div>
-                    <table class="w-full text-sm">
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Provider</td><td class="py-1.5 font-medium">@Model.Banco.Provider</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@Model.Banco.ProviderConfigurado</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Fallback</td><td class="py-1.5">@(Model.Banco.Fallback ? "Sim" : "Não")</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Conexão</td><td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td></tr>
-                        <tr><td class="py-1.5 text-slate-500">Migrations</td><td class="py-1.5">@(Model.Banco.MigrationsAplicadas == true ? "Aplicadas" : Model.Banco.MigrationsAplicadas == false ? "Falha" : "N/A")</td></tr>
-                        @if (Model.Banco.Erro is not null)
-                        {
-                            <tr><td class="py-1.5 text-slate-500">Erro</td><td class="py-1.5 text-red-600 text-xs">@Model.Banco.Erro</td></tr>
-                        }
-                    </table>
+            <!-- Storage -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-base">📁</span> Storage
+                    </h2>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> @Model.Storage.Provider
+                    </span>
                 </div>
+                <table class="w-full text-sm">
+                    <tr>
+                        <td class="py-1.5 text-slate-500 w-2/5">Diretório</td>
+                        <td class="py-1.5 @(Model.Storage.DiretorioExiste == false ? "text-red-600 font-medium" : "")">
+                            @(Model.Storage.DiretorioExiste == true ? "✅ Existe" : Model.Storage.DiretorioExiste == false ? "❌ Não encontrado" : "N/A")
+                        </td>
+                    </tr>
+                </table>
+            </div>
 
-                <!-- Redis -->
-                <div class="bg-white rounded-xl border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">Redis</h2>
-                        @if (Model.Redis.Conexao == "ok")
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> OK
-                            </span>
-                        }
-                        else if (Model.Redis.Conexao == "nao_configurado")
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                                N/A
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> FALHA
-                            </span>
-                        }
-                    </div>
-                    <table class="w-full text-sm">
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Configurado</td><td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Não")</td></tr>
-                        <tr><td class="py-1.5 text-slate-500">Conexão</td><td class="py-1.5">@Model.Redis.Conexao</td></tr>
-                    </table>
-                </div>
-
-                <!-- SMTP -->
-                <div class="bg-white rounded-xl border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">SMTP / Email</h2>
-                        @if (Model.Smtp.Configurado)
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Configurado
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                                Console only
-                            </span>
-                        }
-                    </div>
-                    <table class="w-full text-sm">
-                        <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-500">Tipo</td><td class="py-1.5">@Model.Smtp.Tipo</td></tr>
-                        <tr><td class="py-1.5 text-slate-500">Host</td><td class="py-1.5">@(Model.Smtp.Host ?? "N/A")</td></tr>
-                    </table>
-                </div>
-
-                <!-- Storage -->
-                <div class="bg-white rounded-xl border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">Storage</h2>
+            <!-- IA -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-base">🤖</span> IA (Anthropic)
+                    </h2>
+                    @if (Model.Ia.Habilitado)
+                    {
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> @Model.Storage.Provider
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Habilitado
                         </span>
-                    </div>
-                    <table class="w-full text-sm">
-                        <tr><td class="py-1.5 text-slate-500">Diretório existe</td><td class="py-1.5">@(Model.Storage.DiretorioExiste == true ? "Sim" : Model.Storage.DiretorioExiste == false ? "Não" : "N/A")</td></tr>
-                    </table>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                            Desabilitado
+                        </span>
+                    }
                 </div>
+                <table class="w-full text-sm">
+                    <tr>
+                        <td class="py-1.5 text-slate-500 w-2/5">API Key</td>
+                        <td class="py-1.5 @(Model.Ia.Habilitado && !Model.Ia.ApiKeyPresente ? "text-red-600 font-medium" : "")">
+                            @(Model.Ia.ApiKeyPresente ? "✅ Presente" : "Ausente")
+                        </td>
+                    </tr>
+                </table>
+            </div>
 
-                <!-- IA -->
-                <div class="bg-white rounded-xl border border-slate-200 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">IA (Anthropic)</h2>
-                        @if (Model.Ia.Habilitado)
+            <!-- Configurações Críticas — full width -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
+                <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <span class="text-base">🔐</span> Configurações Críticas
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="border border-slate-100 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">JWT Secret</p>
+                        @if (!Model.Configuracoes.JwtSecretPresente)
                         {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Habilitado
-                            </span>
+                            <p class="font-semibold text-red-600">❌ AUSENTE</p>
+                        }
+                        else if (Model.Configuracoes.JwtSecretSeguro == false)
+                        {
+                            <p class="font-semibold text-amber-600">⚠️ Presente (curta)</p>
                         }
                         else
                         {
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                                Desabilitado
-                            </span>
+                            <p class="font-semibold text-green-700">✅ Presente e seguro</p>
                         }
                     </div>
-                    <table class="w-full text-sm">
-                        <tr><td class="py-1.5 text-slate-500">API Key presente</td><td class="py-1.5">@(Model.Ia.ApiKeyPresente ? "Sim" : "Não")</td></tr>
-                    </table>
-                </div>
-
-                <!-- Configuracoes -->
-                <div class="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="font-semibold text-slate-800">Configurações Críticas</h2>
+                    <div class="border border-slate-100 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">Connection String</p>
+                        <p class="font-semibold @(Model.Configuracoes.ConnectionStringPresente ? "text-green-700" : "text-red-600")">
+                            @(Model.Configuracoes.ConnectionStringPresente ? "✅ Presente" : "❌ AUSENTE")
+                        </p>
                     </div>
-                    <table class="w-full text-sm">
-                        <tr class="border-b border-slate-100">
-                            <td class="py-1.5 text-slate-500">JWT Secret</td>
-                            <td class="py-1.5 font-medium @(Model.Configuracoes.JwtSecretPresente ? "text-green-700" : "text-red-700")">
-                                @(Model.Configuracoes.JwtSecretPresente ? (Model.Configuracoes.JwtSecretSeguro == true ? "Presente e seguro" : "Presente (curta)") : "AUSENTE")
-                            </td>
-                        </tr>
-                        <tr class="border-b border-slate-100">
-                            <td class="py-1.5 text-slate-500">Connection String</td>
-                            <td class="py-1.5 font-medium @(Model.Configuracoes.ConnectionStringPresente ? "text-green-700" : "text-red-700")">
-                                @(Model.Configuracoes.ConnectionStringPresente ? "Presente" : "AUSENTE")
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="py-1.5 text-slate-500">CORS Origins</td>
-                            <td class="py-1.5 font-mono text-xs">@(Model.Configuracoes.CorsOrigins.Length > 0 ? string.Join(", ", Model.Configuracoes.CorsOrigins) : "Nenhum configurado")</td>
-                        </tr>
-                    </table>
+                    <div class="border border-slate-100 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">CORS Origins</p>
+                        @if (Model.Configuracoes.CorsOrigins.Length == 0)
+                        {
+                            <p class="font-semibold text-amber-600">⚠️ Nenhum configurado</p>
+                        }
+                        else
+                        {
+                            <p class="text-xs font-mono text-slate-700 break-all">@string.Join(", ", Model.Configuracoes.CorsOrigins)</p>
+                        }
+                    </div>
                 </div>
-            }
-        </div>
+            </div>
+        }
+    </div>
 
-        <!-- Footer links -->
-        <div class="mt-6 text-center text-sm text-slate-500">
-            <a href="/diagnostico/json" class="text-indigo-600 hover:underline">JSON</a>
+    <!-- ── QUICK LINKS ────────────────────────────────────────────────── -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+        <h2 class="text-sm font-semibold text-slate-600 mb-3">🔗 Links Rápidos</h2>
+        <div class="flex flex-wrap gap-2">
+            <a href="/diagnostico/json" target="_blank"
+               class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                JSON
+            </a>
             @if (apiOk)
             {
-                <span class="mx-2">|</span>
-                <a href="@(apiUrl.Replace("/api", ""))/swagger" target="_blank" class="text-indigo-600 hover:underline">Swagger</a>
-                <span class="mx-2">|</span>
-                <a href="@(apiUrl.Replace("/api", ""))/health" target="_blank" class="text-indigo-600 hover:underline">Health</a>
-                <span class="mx-2">|</span>
-                <a href="@(apiUrl.Replace("/api", ""))/health/ready" target="_blank" class="text-indigo-600 hover:underline">Readiness</a>
+                <a href="@apiBase/swagger" target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition">
+                    📖 Swagger
+                </a>
+                <a href="@apiBase/health" target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
+                    ❤️ Health
+                </a>
+                <a href="@apiBase/health/ready" target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
+                    ✅ Readiness
+                </a>
+                <a href="@apiBase/health/live" target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
+                    🟢 Liveness
+                </a>
+                <a href="@apiUrl" target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-mono">
+                    API Base
+                </a>
             }
         </div>
-
-        <!-- Auto-refresh -->
-        <script>
-            setTimeout(() => location.reload(), 60000);
-        </script>
     </div>
+
+    <!-- ── LOGS (só para admins) ──────────────────────────────────────── -->
+    @if (isAdmin)
+    {
+        <div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                    <span class="text-base">📋</span> Logs Recentes
+                    <span class="text-xs font-normal text-slate-400">(visível apenas para admins)</span>
+                </h2>
+                @if (logs is not null && logs.Disponivel)
+                {
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500">@logs.TotalLinhas linhas · @logs.Arquivo</span>
+                        <button onclick="copyLogs()"
+                                class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition">
+                            Copiar
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (logs is null)
+            {
+                <p class="text-sm text-slate-500 italic">Não foi possível buscar os logs. Verifique se a API está acessível.</p>
+            }
+            else if (!logs.Disponivel)
+            {
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p class="text-sm text-slate-500">ℹ️ @logs.Motivo</p>
+                    <p class="text-xs text-slate-400 mt-1">Logs em arquivo ficam disponíveis quando o Serilog file sink está configurado e o volume de logs é persistente.</p>
+                </div>
+            }
+            else if (logs.Entradas.Length == 0)
+            {
+                <p class="text-sm text-slate-500 italic">Nenhum evento de log encontrado no arquivo atual.</p>
+            }
+            else
+            {
+                <div id="logPanel" class="log-panel bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto text-xs space-y-0.5">
+                    @foreach (var entry in logs.Entradas.Reverse())
+                    {
+                        var levelBg = entry.Level switch {
+                            "ERROR" or "FATAL" => "bg-red-900 text-red-300",
+                            "WARN" => "bg-yellow-900 text-yellow-300",
+                            "INFO" => "bg-blue-900 text-blue-300",
+                            _ => "bg-slate-800 text-slate-400"
+                        };
+                        var msgColor = entry.Level switch {
+                            "ERROR" or "FATAL" => "text-red-200",
+                            "WARN" => "text-yellow-200",
+                            "INFO" => "text-slate-200",
+                            _ => "text-slate-400"
+                        };
+                        <div class="flex items-start gap-2 py-0.5">
+                            <span class="text-slate-500 shrink-0">@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                            <span class="px-1 rounded text-[10px] font-bold @levelBg shrink-0 leading-4 mt-0.5">@entry.Level</span>
+                            <span class="@msgColor break-all">@entry.Message</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (!User.Identity?.IsAuthenticated ?? true)
+    {
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+            <p class="text-sm text-slate-500">
+                🔒 <a href="/auth/login?returnUrl=/diagnostico" class="text-indigo-600 hover:underline">Faça login</a> como Admin para visualizar os logs recentes.
+            </p>
+        </div>
+    }
+
+</div>
+
+<script>
+    function diagApp() {
+        return {
+            countdown: 60,
+            refreshing: false,
+            timer: null,
+
+            init() {
+                this.timer = setInterval(() => {
+                    this.countdown--;
+                    if (this.countdown <= 0) {
+                        this.refresh();
+                    }
+                }, 1000);
+            },
+
+            refresh() {
+                this.refreshing = true;
+                clearInterval(this.timer);
+                window.location.reload();
+            }
+        };
+    }
+
+    function copyLogs() {
+        const panel = document.getElementById('logPanel');
+        if (!panel) return;
+        const text = panel.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            btn.textContent = 'Copiado!';
+            setTimeout(() => btn.textContent = 'Copiar', 2000);
+        });
+    }
+</script>
 </body>
 </html>
