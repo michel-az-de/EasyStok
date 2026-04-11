@@ -16,6 +16,7 @@ public class BuscarEstoqueInteligenteUseCaseTests
         var produtoRepository = Substitute.For<IProdutoRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
         var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var fornecedorRepository = Substitute.For<IFornecedorRepository>();
 
         produtoRepository.SearchAsync(empresaId, "CAP3426").Returns([
             new Produto { Id = Guid.NewGuid(), Nome = "Galaxy Buds FE", SkuBase = CodigoSku.From("BUDS-FE") }
@@ -29,7 +30,9 @@ public class BuscarEstoqueInteligenteUseCaseTests
             new ItemEstoque { Id = Guid.NewGuid(), ProdutoId = Guid.NewGuid(), CodigoInterno = "CAP3426", ChavePesquisa = "CAP3426 BUDS-FE" }
         ]);
 
-        var useCase = new BuscarEstoqueInteligenteUseCase(produtoRepository, variacaoRepository, itemRepository);
+        fornecedorRepository.SearchAsync(empresaId, "CAP3426").Returns([]);
+
+        var useCase = new BuscarEstoqueInteligenteUseCase(produtoRepository, variacaoRepository, itemRepository, fornecedorRepository);
 
         var result = await useCase.ExecuteAsync(new BuscarEstoqueInteligenteQuery(empresaId, "CAP3426"));
 

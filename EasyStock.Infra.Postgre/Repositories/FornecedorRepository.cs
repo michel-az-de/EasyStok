@@ -52,6 +52,25 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (fornecedores, total);
         }
 
+        public async Task<IEnumerable<Fornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+        {
+            termo = termo.Trim();
+            if (string.IsNullOrWhiteSpace(termo)) return [];
+
+            var pattern = $"%{termo}%";
+
+            return await dbContext.Fornecedores
+                .AsNoTracking()
+                .Where(f => f.EmpresaId == empresaId && f.Ativo &&
+                    (EF.Functions.ILike(f.Nome, pattern) ||
+                     (f.Documento != null && EF.Functions.ILike(f.Documento, pattern)) ||
+                     (f.Email != null && EF.Functions.ILike(f.Email, pattern)) ||
+                     (f.Contato != null && EF.Functions.ILike(f.Contato, pattern))))
+                .OrderBy(f => f.Nome)
+                .Take(maxResults)
+                .ToListAsync();
+        }
+
         public Task AddAsync(Fornecedor fornecedor) =>
             dbContext.Fornecedores.AddAsync(fornecedor).AsTask();
 
