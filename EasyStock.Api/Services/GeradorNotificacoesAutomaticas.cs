@@ -45,26 +45,53 @@ public sealed class GeradorNotificacoesAutomaticas(
             {
                 await ProcessarPaginadoAsync(
                     page => estoqueRepository.GetEstoqueBaixoAsync(empresa.Id, Math.Max(2, configuracaoLoja.QuantidadeMinimaPadrao), page, 100, loja.Id),
-                    item => CriarSeNaoExisteNoDiaAsync(
-                        empresa.Id,
-                        TipoAlertaEstoque.EstoqueCritico,
-                        item.Id,
-                        $"Estoque critico: item '{item.CodigoInterno ?? item.Id.ToString()}' com {item.QuantidadeAtual.Value} unidade(s)."),
+                    item =>
+                    {
+                        var qty = item.QuantidadeAtual.Value;
+                        var severidade = qty <= 2 ? SeveridadeNotificacao.Critica : SeveridadeNotificacao.Alta;
+                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
+                        return CriarSeNaoExisteNoDiaAsync(
+                            empresa.Id,
+                            TipoAlertaEstoque.EstoqueCritico,
+                            "Estoque Critico",
+                            $"{codigo} com apenas {qty} unidade(s) — minimo configurado: {configuracaoLoja.QuantidadeMinimaPadrao}. Considere repor este item.",
+                            severidade,
+                            item.Id);
+                    },
                     ct);
             }
 
             if (configuracaoLoja.NotificarValidade)
             {
+                // Itens proximos do vencimento (ainda nao vencidos)
                 await ProcessarPaginadoAsync(
                     page => estoqueRepository.GetProximoVencimentoAsync(empresa.Id, configuracaoLoja.DiasAlertaValidade, page, 100, loja.Id),
                     item =>
                     {
                         var diasRestantes = item.ValidadeEm?.DiasAteVencimento() ?? 0;
+                        if (diasRestantes < 0)
+                        {
+                            // Ja vencido — gera ProdutoVencido
+                            var codigoV = item.CodigoInterno ?? item.Id.ToString()[..8];
+                            return CriarSeNaoExisteNoDiaAsync(
+                                empresa.Id,
+                                TipoAlertaEstoque.ProdutoVencido,
+                                "Produto Vencido",
+                                $"{codigoV} venceu ha {Math.Abs(diasRestantes)} dia(s). Retire do estoque ou descarte conforme procedimento.",
+                                SeveridadeNotificacao.Critica,
+                                item.Id);
+                        }
+
+                        var severidade = diasRestantes <= 3 ? SeveridadeNotificacao.Alta : SeveridadeNotificacao.Media;
+                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
+                        var dataValidade = item.ValidadeEm!.DataValidade.ToString("dd/MM/yyyy");
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.ValidadeProxima,
-                            item.Id,
-                            $"Validade proxima: '{item.CodigoInterno ?? item.Id.ToString()}' vence em {diasRestantes} dia(s).");
+                            "Validade Proxima",
+                            $"{codigo} vence em {diasRestantes} dia(s) ({dataValidade}). {qty_context(item)} Priorize a venda ou rotatividade.",
+                            severidade,
+                            item.Id);
                     },
                     ct);
             }
@@ -73,11 +100,18 @@ public sealed class GeradorNotificacoesAutomaticas(
             {
                 await ProcessarPaginadoAsync(
                     page => estoqueRepository.GetItensParadosAsync(empresa.Id, configuracaoLoja.DiasAlertaParado, page, 100, loja.Id),
-                    item => CriarSeNaoExisteNoDiaAsync(
-                        empresa.Id,
-                        TipoAlertaEstoque.ProdutoParado,
-                        item.Id,
-                        $"Produto parado ha mais de {configuracaoLoja.DiasAlertaParado} dias: '{item.CodigoInterno ?? item.Id.ToString()}'."),
+                    item =>
+                    {
+                        var dias = item.DiasSemMovimentacao > 0 ? item.DiasSemMovimentacao : configuracaoLoja.DiasAlertaParado;
+                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
+                        return CriarSeNaoExisteNoDiaAsync(
+                            empresa.Id,
+                            TipoAlertaEstoque.ProdutoParado,
+                            "Produto Parado",
+                            $"{codigo} sem movimentacao ha {dias} dias. {qty_context(item)} Avalie promocao ou reposicionamento.",
+                            SeveridadeNotificacao.Media,
+                            item.Id);
+                    },
                     ct);
             }
 
@@ -88,11 +122,14 @@ public sealed class GeradorNotificacoesAutomaticas(
                     item =>
                     {
                         var previsao = item.PrevisaoZeramentoDias?.ToString() ?? "indefinida";
+                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.ReposicaoSugerida,
-                            item.Id,
-                            $"Reposicao sugerida para '{item.CodigoInterno ?? item.Id.ToString()}'. Previsao de zeramento: {previsao}.");
+                            "Reposicao Sugerida",
+                            $"{codigo} precisa de reposicao. {qty_context(item)} Previsao de zeramento: {previsao} dia(s).",
+                            SeveridadeNotificacao.Media,
+                            item.Id);
                     },
                     ct);
             }
@@ -101,11 +138,14 @@ public sealed class GeradorNotificacoesAutomaticas(
         var pedidosAtrasados = await pedidoFornecedorRepository.GetPedidosAtrasadosAsync(empresa.Id, hoje);
         foreach (var pedido in pedidosAtrasados)
         {
+            var previsao = pedido.PrevisaoEntrega?.ToString("dd/MM/yyyy") ?? "nao informada";
             await CriarSeNaoExisteNoDiaAsync(
                 empresa.Id,
                 TipoAlertaEstoque.PedidoAtrasado,
-                pedido.Id,
-                $"Pedido atrasado: {pedido.Id} com previsao em {(pedido.PrevisaoEntrega?.ToString("yyyy-MM-dd") ?? "data nao informada")}.");
+                "Pedido Atrasado",
+                $"Pedido com previsao em {previsao} ainda nao foi recebido. Entre em contato com o fornecedor.",
+                SeveridadeNotificacao.Alta,
+                pedido.Id);
         }
 
         var pedidosRecebidos = await pedidoFornecedorRepository.GetPedidosRecebidosNoPeriodoAsync(empresa.Id, hoje.AddHours(-1), hoje);
@@ -114,18 +154,33 @@ public sealed class GeradorNotificacoesAutomaticas(
             await CriarSeNaoExisteNoDiaAsync(
                 empresa.Id,
                 TipoAlertaEstoque.PedidoRecebido,
-                pedido.Id,
-                $"Pedido recebido: {pedido.Id} confirmado em {pedido.DataRecebimento:yyyy-MM-dd HH:mm}.");
+                "Pedido Recebido",
+                $"Pedido confirmado em {pedido.DataRecebimento:dd/MM/yyyy HH:mm}. Confira os itens recebidos.",
+                SeveridadeNotificacao.Informativa,
+                pedido.Id);
         }
     }
 
-    private async Task CriarSeNaoExisteNoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, string mensagem)
+    private static string qty_context(ItemEstoque item)
+    {
+        var qty = item.QuantidadeAtual.Value;
+        return qty > 0 ? $"Estoque atual: {qty} un." : "Estoque zerado.";
+    }
+
+    private async Task CriarSeNaoExisteNoDiaAsync(
+        Guid empresaId,
+        TipoAlertaEstoque tipo,
+        string titulo,
+        string mensagem,
+        SeveridadeNotificacao severidade,
+        Guid? referenciaId)
     {
         var jaExiste = await notificacaoRepository.ExisteNotificacaoDoDiaAsync(empresaId, tipo, referenciaId, DateTime.UtcNow);
         if (jaExiste)
             return;
 
-        await notificacaoRepository.AddAsync(Notificacao.Criar(empresaId, tipo, mensagem, referenciaId));
+        await notificacaoRepository.AddAsync(
+            Notificacao.Criar(empresaId, tipo, titulo, mensagem, severidade, referenciaId));
     }
 
     private static async Task ProcessarPaginadoAsync(
