@@ -29,11 +29,11 @@ public sealed class HealthSnapshotService(
     {
         logger.LogInformation("HealthSnapshotService iniciado.");
 
-        // Wait 10s before first snapshot to let app warm up
-        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-
-        // Restore history from Redis so charts survive restarts
+        // Restore history from Redis immediately so charts have data on load
         await LoadSnapshotsFromRedisAsync(stoppingToken);
+
+        // Short warm-up delay before first fresh snapshot
+        await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {

@@ -426,6 +426,42 @@ public sealed class DiagnosticoController(
         });
     }
 
+    [HttpPost("logs/limpar")]
+    [Authorize(Policy = "Admin")]
+    public IActionResult LimparLogs()
+    {
+        var logsDir = GetLogDirectory();
+        if (!Directory.Exists(logsDir))
+            return Ok(new { success = false, mensagem = "Diretório de logs não encontrado.", arquivosTruncados = 0 });
+
+        var arquivos = Directory.GetFiles(logsDir, "easystock-*.log");
+        var truncados = 0;
+        var erros = new List<string>();
+
+        foreach (var arquivo in arquivos)
+        {
+            try
+            {
+                using var fs = new FileStream(arquivo, FileMode.Truncate, FileAccess.Write, FileShare.ReadWrite);
+                truncados++;
+            }
+            catch (Exception ex)
+            {
+                erros.Add(Path.GetFileName(arquivo) + ": " + ex.Message);
+            }
+        }
+
+        return Ok(new
+        {
+            success = true,
+            arquivosTruncados = truncados,
+            mensagem = truncados > 0
+                ? $"{truncados} arquivo(s) de log limpo(s)."
+                : "Nenhum arquivo de log encontrado.",
+            erros
+        });
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // Helpers privados (existentes)
     // ──────────────────────────────────────────────────────────────────────
