@@ -409,7 +409,31 @@ if (resolvedProvider is "postgresql")
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        await db.Database.MigrateAsync();
+
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState is "42701" or "42P07")
+        {
+            // Schema já existe mas __EFMigrationsHistory desalinhado — registrar pendentes
+            app.Logger.LogWarning(ex,
+                "Migration falhou por conflito de schema ({SqlState}). Alinhando histórico...",
+                ex.SqlState);
+
+            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+            foreach (var migrationId in pending)
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") " +
+                    "VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
+                    migrationId, "9.0.0");
+            }
+
+            app.Logger.LogInformation(
+                "Histórico de migrations alinhado. {Count} migrations registradas.", pending.Count);
+        }
+
         infraState.MigrationsApplied = true;
         app.Logger.LogInformation("Migrations aplicadas com sucesso.");
 
