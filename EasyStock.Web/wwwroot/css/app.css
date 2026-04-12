@@ -788,8 +788,89 @@ html.theme-dark [x-data="criarFornecedorModal()"] .supplier-modal__footer {
     box-shadow: 0 20px 40px rgba(239, 68, 68, .28);
 }
 
+.grid-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(203, 213, 225, .92);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .98) 0%, rgba(248, 250, 252, .94) 100%);
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.grid-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, .08);
+}
+
+.grid-action-btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.grid-action-btn--primary {
+    border-color: rgba(165, 180, 252, .7);
+    color: #4F46E5;
+    background: linear-gradient(180deg, rgba(238, 242, 255, .96) 0%, rgba(224, 231, 255, .9) 100%);
+}
+
+.grid-action-btn--success {
+    border-color: rgba(167, 243, 208, .85);
+    color: #047857;
+    background: linear-gradient(180deg, rgba(236, 253, 245, .98) 0%, rgba(209, 250, 229, .92) 100%);
+}
+
+.grid-action-btn--danger {
+    border-color: rgba(254, 202, 202, .9);
+    color: #DC2626;
+    background: linear-gradient(180deg, rgba(254, 242, 242, .98) 0%, rgba(254, 226, 226, .92) 100%);
+}
+
+.grid-action-btn--ghost {
+    border-color: rgba(226, 232, 240, .94);
+    color: #334155;
+}
+
 html.theme-dark .app-primary-btn--success {
     box-shadow: 0 18px 38px rgba(5, 150, 105, .28);
+}
+
+html.theme-dark .grid-action-btn {
+    background: linear-gradient(180deg, rgba(15, 23, 42, .92) 0%, rgba(15, 23, 42, .88) 100%);
+    border-color: rgba(71, 85, 105, .68);
+    color: #CBD5E1;
+    box-shadow: 0 12px 26px rgba(2, 6, 23, .18);
+}
+
+html.theme-dark .grid-action-btn:hover {
+    box-shadow: 0 16px 32px rgba(2, 6, 23, .26);
+}
+
+html.theme-dark .grid-action-btn--primary {
+    border-color: rgba(99, 102, 241, .42);
+    color: #C7D2FE;
+    background: linear-gradient(180deg, rgba(49, 46, 129, .38) 0%, rgba(30, 41, 59, .92) 100%);
+}
+
+html.theme-dark .grid-action-btn--success {
+    border-color: rgba(16, 185, 129, .36);
+    color: #A7F3D0;
+    background: linear-gradient(180deg, rgba(6, 78, 59, .56) 0%, rgba(15, 23, 42, .92) 100%);
+}
+
+html.theme-dark .grid-action-btn--danger {
+    border-color: rgba(239, 68, 68, .34);
+    color: #FECACA;
+    background: linear-gradient(180deg, rgba(127, 29, 29, .46) 0%, rgba(15, 23, 42, .92) 100%);
 }
 
 html.theme-dark .pedido-modal__header,

@@ -70,18 +70,27 @@
                         <td>
                             <div class="flex items-center gap-3">
                                 <a href="/inteligencia-lojas/@l.Id"
-                                   class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                                   class="grid-action-btn grid-action-btn--success">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.79 2-4 2s-4-.895-4-2 1.79-2 4-2 4 .895 4 2zm12-2c0 1.105-1.79 2-4 2s-4-.895-4-2 1.79-2 4-2 4 .895 4 2zM9 10l12-3" />
+                                    </svg>
                                     Inteligência
                                 </a>
                                 <button type="button" @@click="editando = !editando"
-                                        class="text-xs text-indigo-600 hover:text-indigo-700"
+                                        class="grid-action-btn grid-action-btn--primary"
                                         x-show="!editando">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
                                     Editar
                                 </button>
                                 @if (l.Ativa)
                                 {
                                     <button type="button" @@click="confirm = true"
-                                            class="text-xs text-red-600 hover:text-red-700">
+                                            class="grid-action-btn grid-action-btn--danger">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M6.343 6.343l11.314 11.314" />
+                                        </svg>
                                         Desativar
                                     </button>
                                 }
