@@ -66,7 +66,7 @@ public sealed class DiagnosticoController(
             EnhancedLogsResult? enhancedLogs = null;
             try
             {
-                var cutoff = DateTime.UtcNow.AddHours(-24);
+                var cutoff = DateTime.UtcNow.AddHours(-48);
                 var logsDir = GetLogDirectory();
                 if (Directory.Exists(logsDir))
                 {
@@ -90,7 +90,7 @@ public sealed class DiagnosticoController(
                         {
                             Disponivel = true,
                             QueryTimestamp = DateTimeOffset.UtcNow,
-                            PeriodoHoras = 24,
+                            PeriodoHoras = 48,
                             TotalEntries = allEntries.Count,
                             Entradas = allEntries.TakeLast(500).ToArray(),
                             Resumo = BuildLogSummary(allEntries),
@@ -263,6 +263,68 @@ public sealed class DiagnosticoController(
                 Disponivel = false,
                 Motivo = $"Erro ao processar logs: {ex.Message}"
             });
+        }
+    }
+
+    [HttpGet("logs/live")]
+    public IActionResult LiveLogs([FromQuery] string? since = null)
+    {
+        var cutoff = DateTimeOffset.TryParse(since, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+            ? parsed.UtcDateTime
+            : DateTime.UtcNow.AddMinutes(-5);
+
+        var logsDir = GetLogDirectory();
+        if (!Directory.Exists(logsDir))
+            return Ok(new { rows = Array.Empty<string>(), count = 0 });
+
+        try
+        {
+            var dir = new DirectoryInfo(logsDir);
+            var logFiles = dir.GetFiles("easystock-*.log")
+                .Where(f => f.LastWriteTimeUtc >= cutoff.AddHours(-1))
+                .OrderBy(f => f.Name)
+                .ToList();
+
+            var allEntries = new List<EnhancedLogEntry>();
+            foreach (var file in logFiles)
+            {
+                allEntries.AddRange(ParseEnhancedLogFile(file.FullName, cutoff));
+                if (allEntries.Count > 200) break;
+            }
+
+            var rows = allEntries.TakeLast(200).Select(e =>
+            {
+                var levelClass = e.Level switch
+                {
+                    "ERROR" or "FATAL" => "log-error",
+                    "WARN" => "log-warn",
+                    "DEBUG" => "log-debug",
+                    _ => "log-info"
+                };
+                var cat = e.Categoria switch
+                {
+                    "http_request" => $"<span class='log-cat cat-http'>{e.HttpMethod} {e.StatusCode}</span>",
+                    "migration" => "<span class='log-cat cat-migration'>MIGRATION</span>",
+                    "startup" => "<span class='log-cat cat-startup'>STARTUP</span>",
+                    "error" => "<span class='log-cat cat-error'>ERROR</span>",
+                    "db_operation" => "<span class='log-cat cat-db'>DB</span>",
+                    _ => ""
+                };
+                var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
+                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 200 ? e.Message[..200] + "..." : e.Message);
+                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception.Length > 300 ? e.Exception[..300] + "..." : e.Exception)}</div>" : "";
+                return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
+                       $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
+                       $"<span class='log-level'>{e.Level}</span>" +
+                       $"{cat}{elapsed}" +
+                       $"<span class='log-msg'>{msg}</span>{exc}</div>";
+            }).ToArray();
+
+            return Ok(new { rows, count = rows.Length });
+        }
+        catch
+        {
+            return Ok(new { rows = Array.Empty<string>(), count = 0 });
         }
     }
 
@@ -1239,7 +1301,7 @@ public sealed class DiagnosticoController(
         " : "<div class='section-empty'>Aguardando snapshots de saude (coletados a cada 60s)...</div>")}}
 
         {{(logs?.Disponivel == true ? $@"
-        <div class='card'><h2>&#128200; Volume por Hora (24h)</h2>
+        <div class='card'><h2>&#128200; Volume por Hora (48h)</h2>
             <div class='chart-box' style='height:250px'><canvas id='volumeChart'></canvas></div>
         </div>
         " : "")}}
@@ -1250,13 +1312,14 @@ public sealed class DiagnosticoController(
         {{(logs?.Disponivel == true ? $@"
         {logStatsHtml}
         <div class='card'>
-            <h2>&#128466; Console de Logs (ultimas 24h)</h2>
+            <h2>&#128466; Console de Logs (ultimas 48h) <span id='liveDot' style='display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-left:6px;vertical-align:middle'></span></h2>
             <div class='log-controls'>
                 <input type='text' id='logFilter' placeholder='Filtrar mensagens...' oninput='filterLogs()'>
                 <button class='active' onclick='toggleLevel(this,""all"")'>Todos</button>
                 <button onclick='toggleLevel(this,""ERROR"")'>Erros</button>
                 <button onclick='toggleLevel(this,""WARN"")'>Warnings</button>
                 <button onclick='toggleLevel(this,""INFO"")'>Info</button>
+                <button onclick='clearLogs()' style='margin-left:auto;background:#334155;color:#f1f5f9'>Limpar</button>
             </div>
             <div class='log-console' id='logConsole'>
                 {logEntriesHtml}
@@ -1268,7 +1331,7 @@ public sealed class DiagnosticoController(
 
         <!-- PATTERNS TAB -->
         <div class="panel" id="tab-patterns">
-        {{(patternsHtml.Length > 0 ? patternsHtml : "<div class='section-empty'>Nenhum padrao detectado nas ultimas 24h.</div>")}}
+        {{(patternsHtml.Length > 0 ? patternsHtml : "<div class='section-empty'>Nenhum padrao detectado nas ultimas 48h.</div>")}}
 
         {{(logs?.Disponivel == true && logs.Resumo.ErrorsByEndpoint.Count > 0 ?
             "<div class='card'><h2>&#128680; Erros por Endpoint</h2><table>" +
@@ -1289,12 +1352,51 @@ public sealed class DiagnosticoController(
         </div>
 
         <script>
+        let _liveTimer=null;
+        let _lastPollTime=new Date().toISOString();
+
         function showTab(name){
             document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
             if(name==='health')initHealthCharts();
+            if(name==='logs')startLiveLogs();
+            else stopLiveLogs();
+        }
+
+        function startLiveLogs(){
+            if(_liveTimer)return;
+            const dot=document.getElementById('liveDot');
+            if(dot)dot.style.display='inline-block';
+            _liveTimer=setInterval(pollLiveLogs,5000);
+        }
+        function stopLiveLogs(){
+            if(_liveTimer){clearInterval(_liveTimer);_liveTimer=null;}
+            const dot=document.getElementById('liveDot');
+            if(dot)dot.style.display='none';
+        }
+        async function pollLiveLogs(){
+            try{
+                const r=await fetch('/api/diagnostico/logs/live?since='+encodeURIComponent(_lastPollTime));
+                if(!r.ok)return;
+                const d=await r.json();
+                if(d.count>0){
+                    const console=document.getElementById('logConsole');
+                    if(console){
+                        const tmp=document.createElement('div');
+                        tmp.innerHTML=d.rows.join('');
+                        Array.from(tmp.children).reverse().forEach(el=>console.prepend(el));
+                        filterLogs();
+                    }
+                }
+                _lastPollTime=new Date().toISOString();
+            }catch{}
+        }
+        function clearLogs(){
+            const c=document.getElementById('logConsole');
+            if(c)c.innerHTML='';
+            _lastPollTime=new Date().toISOString();
         }
 
         // Auto-refresh
