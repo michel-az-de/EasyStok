@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Observability;
+using EasyStock.Infra.Postgre.Data;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
 using Microsoft.AspNetCore.Authorization;
@@ -341,11 +342,9 @@ public sealed class DiagnosticoController(
             if (infraState.DatabaseProvider is "postgresql" or "sqlite")
             {
                 using var scope = HttpContext.RequestServices.CreateScope();
-                var dbType = typeof(Microsoft.EntityFrameworkCore.DbContext);
-                var dbContext = scope.ServiceProvider.GetServices<object>()
-                    .FirstOrDefault(s => s.GetType().IsSubclassOf(dbType) || s.GetType() == dbType);
+                var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
 
-                if (dbContext is Microsoft.EntityFrameworkCore.DbContext db)
+                if (db is not null)
                 {
                     var canConnect = await db.Database.CanConnectAsync(ct);
                     status.Conexao = canConnect ? "ok" : "falha";
