@@ -263,6 +263,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                 ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status),
             HttpStatusCode.InternalServerError =>
                 ApiResult<T>.Fail("SERVER_ERROR", "Erro no servidor. Tente novamente.", status),
+            HttpStatusCode.BadRequest => await ParseBodyError<T>(response, status),
             HttpStatusCode.Conflict => await ParseBodyError<T>(response, status),
             HttpStatusCode.UnprocessableEntity => await ParseBodyError<T>(response, status),
             _ => ApiResult<T>.Fail("HTTP_ERROR", $"Erro HTTP {status}.", status)
@@ -277,16 +278,40 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // Try { error: { code, message } } or { code, message }
-            JsonElement errEl = root.TryGetProperty("error", out var e) ? e : root;
-            var code = errEl.TryGetProperty("code", out var c) ? c.GetString() : "API_ERROR";
-            var msg = errEl.TryGetProperty("message", out var m) ? m.GetString() : "Erro na requisição.";
+            // Format 1: { error: { code, message, detail } }
+            if (root.TryGetProperty("error", out var errEl))
+            {
+                var code = errEl.TryGetProperty("code", out var c) ? c.GetString() : "API_ERROR";
+                var msg = errEl.TryGetProperty("detail", out var d) ? d.GetString()
+                        : errEl.TryGetProperty("message", out var m) ? m.GetString()
+                        : "Erro na requisicao.";
+                return ApiResult<T>.Fail(code ?? "API_ERROR", msg ?? "Erro na requisicao.", status);
+            }
 
-            return ApiResult<T>.Fail(code ?? "API_ERROR", msg ?? "Erro na requisição.", status);
+            // Format 2: FluentValidation / ASP.NET { errors: { "Field": ["msg", ...] } }
+            if (root.TryGetProperty("errors", out var errorsEl) && errorsEl.ValueKind == JsonValueKind.Object)
+            {
+                var messages = new List<string>();
+                foreach (var prop in errorsEl.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in prop.Value.EnumerateArray())
+                            messages.Add(item.GetString() ?? prop.Name);
+                    }
+                }
+                var joined = messages.Count > 0 ? string.Join(" ", messages) : "Dados invalidos.";
+                return ApiResult<T>.Fail("VALIDATION_ERROR", joined, status);
+            }
+
+            // Format 3: { code, message } (flat)
+            var flatCode = root.TryGetProperty("code", out var fc) ? fc.GetString() : "API_ERROR";
+            var flatMsg = root.TryGetProperty("message", out var fm) ? fm.GetString() : "Erro na requisicao.";
+            return ApiResult<T>.Fail(flatCode ?? "API_ERROR", flatMsg ?? "Erro na requisicao.", status);
         }
         catch
         {
-            return ApiResult<T>.Fail("API_ERROR", "Erro na requisição.", status);
+            return ApiResult<T>.Fail("API_ERROR", "Erro na requisicao.", status);
         }
     }
     private static bool IsPagedResultType(Type type) =>

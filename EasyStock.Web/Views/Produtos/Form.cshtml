@@ -572,83 +572,126 @@
         </div>
     </div>
 
-    <!-- ══════════════ STEP 4: REVISAO ══════════════ -->
+    <!-- ══════════════ STEP 4: REVISAO E-COMMERCE ══════════════ -->
     <div x-show="step === 4" x-transition:enter.duration.200ms>
 
-        <!-- Preview Card -->
-        <div class="ws overflow-hidden p-0">
-            <div class="aspect-video bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden max-h-52">
-                <template x-if="photoPreviews.length > 0"><img :src="photoPreviews[0]" class="w-full h-full object-cover" /></template>
-                <template x-if="photoPreviews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
-                <template x-if="photoPreviews.length === 0 && existingPhotos.length === 0">
-                    <svg class="w-16 h-16 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                </template>
+        <!-- Product Card — layout e-commerce -->
+        <div class="bg-white rounded-2xl shadow-lg shadow-slate-200/60 overflow-hidden border border-slate-100">
+            <div class="grid grid-cols-1 sm:grid-cols-[280px_1fr]">
+
+                <!-- Foto principal -->
+                <div class="relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
+                    <template x-if="photoPreviews.length > 0"><img :src="photoPreviews[0]" class="w-full h-full object-cover" /></template>
+                    <template x-if="photoPreviews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
+                    <template x-if="photoPreviews.length === 0 && existingPhotos.length === 0">
+                        <div class="text-center p-6">
+                            <svg class="w-12 h-12 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <p class="text-xs text-slate-300 mt-2">Sem foto</p>
+                        </div>
+                    </template>
+                    <!-- Photo count badge -->
+                    <div x-show="(photoPreviews.length + existingPhotos.length) > 1" x-cloak
+                         class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                        <span x-text="(photoPreviews.length + existingPhotos.length)"></span> fotos
+                    </div>
+                </div>
+
+                <!-- Info panel -->
+                <div class="p-5 sm:p-6 flex flex-col">
+                    <!-- Tags -->
+                    <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                        <span x-show="categoriaNome" x-cloak class="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-semibold" x-text="categoriaNome"></span>
+                        <span x-show="marca" x-cloak class="text-[11px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full" x-text="marca"></span>
+                        <span class="text-[11px] bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full"
+                              x-text="tipo === 0 ? 'Fisico' : tipo === 1 ? 'Alimento' : 'Servico'"></span>
+                    </div>
+
+                    <!-- Nome -->
+                    <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight" x-text="nome || 'Nome do produto'"></h2>
+
+                    <!-- SKU -->
+                    <div x-show="sku" x-cloak class="mt-1">
+                        <span class="text-xs font-mono text-slate-400">SKU: </span>
+                        <span class="text-xs font-mono text-slate-500 font-medium" x-text="sku"></span>
+                    </div>
+
+                    <!-- Descricao curta -->
+                    <p class="text-sm text-slate-500 mt-3 line-clamp-2 flex-grow" x-text="descricao || 'Sem descricao'" :class="{ 'italic text-slate-300': !descricao }"></p>
+
+                    <!-- Preco destaque -->
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <div class="flex items-end gap-3 flex-wrap">
+                            <span class="text-3xl font-black text-slate-900 tracking-tight"
+                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'Preco nao definido'"
+                                  :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
+                            <span x-show="margem > 0" x-cloak
+                                  :class="margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
+                                  class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
+                                  x-text="margem.toFixed(1) + '% margem'"></span>
+                        </div>
+                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitario: R$ ' + custo.toFixed(2)"></div>
+                    </div>
+                </div>
             </div>
-            <div class="p-5">
-                <h3 class="font-bold text-slate-900 text-lg" x-text="nome || 'Nome do produto'" :class="{ 'text-slate-300 italic': !nome }"></h3>
-                <div class="flex flex-wrap items-center gap-1.5 mt-2">
-                    <span x-show="sku" x-cloak class="text-xs font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded" x-text="sku"></span>
-                    <span x-show="categoriaNome" x-cloak class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium" x-text="categoriaNome"></span>
-                    <span x-show="marca" x-cloak class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full" x-text="marca"></span>
+
+            <!-- Details row -->
+            <div class="border-t border-slate-100 px-5 sm:px-6 py-3 flex flex-wrap gap-4 text-xs text-slate-500 bg-slate-50/50">
+                <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    <span x-text="variacoes.filter(v => v.nome).length + ' variacao(oes)'"></span>
                 </div>
-                <p class="text-sm text-slate-500 mt-3 line-clamp-3" x-text="descricao || 'Sem descricao'" :class="{ 'italic text-slate-300': !descricao }"></p>
-                <div class="mt-4 pt-4 border-t border-slate-100 flex items-baseline gap-3">
-                    <span class="text-2xl font-extrabold text-slate-900" x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'R$ --'"></span>
-                    <span x-show="custo > 0" x-cloak class="text-xs text-slate-400" x-text="'Custo: R$ ' + custo.toFixed(2)"></span>
-                    <span x-show="margem > 0" x-cloak
-                          :class="margem < 10 ? 'bg-red-50 text-red-600' : margem < 30 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'"
-                          class="text-xs font-semibold px-2 py-0.5 rounded-full" x-text="margem.toFixed(1) + '%'"></span>
+                <div x-show="caracteristicas.filter(c => c.nome).length > 0" x-cloak class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                    <span x-text="caracteristicas.filter(c => c.nome).length + ' caracteristica(s)'"></span>
                 </div>
-                <div class="mt-3 pt-3 border-t border-slate-100 space-y-1">
-                    <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="variacoes.filter(v => v.nome).length + ' variacao(oes)'"></div>
-                    <div x-show="caracteristicas.filter(c => c.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="caracteristicas.filter(c => c.nome).length + ' caracteristica(s)'"></div>
-                    <div x-show="embalagens.filter(e => e.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="embalagens.filter(e => e.nome).length + ' embalagem(ns)'"></div>
+                <div x-show="embalagens.filter(e => e.nome).length > 0" x-cloak class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                    <span x-text="embalagens.filter(e => e.nome).length + ' embalagem(ns)'"></span>
+                </div>
+                <div x-show="controlaValidade" x-cloak class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                    <span>Controla validade</span>
                 </div>
             </div>
         </div>
 
-        <!-- Completion -->
-        <div class="ws">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold text-slate-600">Preenchimento</span>
-                <span class="text-xs font-bold" :class="completionPercent === 100 ? 'text-emerald-600' : 'text-slate-400'" x-text="completionPercent + '%'"></span>
+        <!-- Completion + Quick edit -->
+        <div class="mt-4 bg-white rounded-xl border border-slate-100 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1.5">
+                    <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="h-2 rounded-full transition-all duration-500"
+                             :class="completionPercent === 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
+                             :style="'width: ' + completionPercent + '%'"></div>
+                    </div>
+                    <span class="text-sm font-bold tabular-nums" :class="completionPercent === 100 ? 'text-emerald-600' : 'text-slate-400'" x-text="completionPercent + '%'"></span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="text-[10px] font-medium" :class="nome ? 'text-emerald-500' : 'text-slate-300'"><span x-text="nome ? '✓' : '○'"></span> Nome</span>
+                    <span class="text-[10px] font-medium" :class="categoriaId ? 'text-emerald-500' : 'text-slate-300'"><span x-text="categoriaId ? '✓' : '○'"></span> Categoria</span>
+                    <span class="text-[10px] font-medium" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
+                    <span class="text-[10px] font-medium" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
+                    <span class="text-[10px] font-medium" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Desc</span>
+                    <span class="text-[10px] font-medium" :class="(photoPreviews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(photoPreviews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
+                </div>
             </div>
-            <div class="w-full bg-slate-100 rounded-full h-1.5">
-                <div class="h-1.5 rounded-full transition-all duration-300"
-                     :class="completionPercent === 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
-                     :style="'width: ' + completionPercent + '%'"></div>
-            </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
-                <span class="text-[10px]" :class="nome ? 'text-emerald-500' : 'text-slate-300'"><span x-text="nome ? '✓' : '○'"></span> Nome</span>
-                <span class="text-[10px]" :class="categoriaId ? 'text-emerald-500' : 'text-slate-300'"><span x-text="categoriaId ? '✓' : '○'"></span> Categoria</span>
-                <span class="text-[10px]" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
-                <span class="text-[10px]" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
-                <span class="text-[10px]" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Descricao</span>
-                <span class="text-[10px]" :class="(photoPreviews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(photoPreviews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
-            </div>
-
-            <!-- Edit links -->
-            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-                <button type="button" @@click="step = 1" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar info basica</button>
-                <span class="text-slate-300">|</span>
-                <button type="button" @@click="step = 2" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar fotos/precos</button>
-                <span class="text-slate-300">|</span>
-                <button type="button" @@click="step = 3" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar detalhes</button>
+            <div class="flex gap-2 flex-shrink-0">
+                <button type="button" @@click="step = 1" class="text-[11px] text-indigo-600 hover:bg-indigo-50 font-semibold px-2.5 py-1 rounded-lg transition-colors">Editar</button>
+                <button type="button" @@click="step = 2" class="text-[11px] text-indigo-600 hover:bg-indigo-50 font-semibold px-2.5 py-1 rounded-lg transition-colors">Fotos</button>
+                <button type="button" @@click="step = 3" class="text-[11px] text-indigo-600 hover:bg-indigo-50 font-semibold px-2.5 py-1 rounded-lg transition-colors">Detalhes</button>
             </div>
         </div>
 
-        <!-- Nav Step 4 -->
-        <div class="flex justify-between mt-4">
+        <!-- CTA -->
+        <div class="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-5">
             <button type="button" @@click="prevStep()"
-                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                    class="px-5 py-3 border border-slate-300 text-slate-600 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors text-center">
                 &larr; Voltar
             </button>
             <button type="submit"
                     :disabled="saving"
                     :class="{ 'opacity-50 cursor-not-allowed': saving }"
-                    class="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/25">
+                    class="flex-1 sm:flex-initial px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 text-center">
                 <span x-show="!saving">@(isEdit ? "Salvar alteracoes" : "Criar produto")</span>
                 <span x-show="saving" x-cloak class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
             </button>

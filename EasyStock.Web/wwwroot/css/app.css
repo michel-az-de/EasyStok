@@ -498,3 +498,101 @@ html.theme-dark .drop-active {
 /* ─── Safe-area utilities ────────────────────────────────────── */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ═══════════════════════════════════════════════════════════════
+   PRODUCT FORM — MOBILE-FIRST UX
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Mobile: full-width form, larger touch targets */
+@media (max-width: 639px) {
+    /* Stepper: compact horizontal */
+    .step-circle { width: 28px; height: 28px; font-size: 12px; }
+
+    /* Form inputs: larger touch targets */
+    form[novalidate] input[type="text"],
+    form[novalidate] input[type="number"],
+    form[novalidate] textarea,
+    form[novalidate] select {
+        font-size: 16px !important;  /* prevent iOS zoom */
+        padding: 12px 14px;
+        border-radius: 10px;
+    }
+
+    /* Labels: slightly bigger on mobile */
+    form[novalidate] label {
+        font-size: 13px;
+    }
+
+    /* Cards: tighter padding on mobile */
+    form[novalidate] .ws {
+        padding: 16px;
+        border-radius: 14px;
+    }
+
+    /* Section headers: compact */
+    form[novalidate] .section-hd {
+        margin-bottom: 12px;
+    }
+    form[novalidate] .section-hd-icon {
+        width: 28px;
+        height: 28px;
+    }
+    form[novalidate] .section-hd-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Photo drop zone: shorter on mobile */
+    form[novalidate] [class*="border-dashed"] {
+        padding: 24px 16px;
+    }
+
+    /* Dynamic items (variacoes, caracteristicas): stack vertically */
+    form[novalidate] .grid.grid-cols-2 {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Price grid: stack on very small screens */
+    form[novalidate] .grid.grid-cols-3 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* Navigation buttons: full width, stacked */
+    form[novalidate] .flex.justify-between {
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+    form[novalidate] .flex.justify-between > * {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Review card photo: taller on mobile */
+    form[novalidate] .grid.grid-cols-1.sm\\:grid-cols-\\[280px_1fr\\] {
+        grid-template-columns: 1fr;
+    }
+
+    /* Bottom safe area for CTA button */
+    form[novalidate] button[type="submit"] {
+        padding: 14px 20px;
+        font-size: 15px;
+        border-radius: 14px;
+    }
+}
+
+/* Tablet: 2-col pricing, side-by-side nav */
+@media (min-width: 640px) and (max-width: 1023px) {
+    form[novalidate] .grid.grid-cols-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Drop zone active state */
+.drop-active {
+    border-color: #818CF8 !important;
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* Smooth step transitions */
+[x-show] { will-change: opacity, transform; }
