@@ -1,5 +1,6 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -38,11 +39,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null)
         {
-            skuBase = skuBase.Trim();
+            var sku = CodigoSku.From(skuBase.Trim());
 
             return dbContext.Produtos
                 .AsNoTracking()
-                .Where(p => p.EmpresaId == empresaId && EF.Property<string?>(p, "SkuBase") == skuBase)
+                .Where(p => p.EmpresaId == empresaId && p.SkuBase == sku)
                 .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
                 .AnyAsync();
         }
@@ -54,13 +55,17 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var pattern = $"%{termo}%";
 
+            // SKU usa Value Object com HasConversion — busca exata pelo VO
+            CodigoSku? skuExato = null;
+            try { skuExato = CodigoSku.From(termo); } catch { /* termo invalido para SKU */ }
+
             return await dbContext.Produtos
                 .AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId &&
                     (EF.Functions.ILike(p.Nome, pattern) ||
                      (p.Marca != null && EF.Functions.ILike(p.Marca, pattern)) ||
                      (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
-                     (EF.Property<string?>(p, "SkuBase") != null && EF.Functions.ILike(EF.Property<string>(p, "SkuBase"), pattern)) ||
+                     (skuExato != null && p.SkuBase == skuExato) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
                 .Take(maxResults)
                 .ToListAsync();

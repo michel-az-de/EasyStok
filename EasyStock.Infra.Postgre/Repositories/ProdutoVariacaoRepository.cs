@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,11 +26,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null)
         {
-            sku = sku.Trim();
+            var skuObj = CodigoSku.From(sku.Trim());
 
             return dbContext.ProdutosVariacao
                 .AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && EF.Property<string?>(v, "Sku") == sku)
+                .Where(v => v.EmpresaId == empresaId && v.Sku == skuObj)
                 .Where(v => !ignoreVariacaoId.HasValue || v.Id != ignoreVariacaoId.Value)
                 .AnyAsync();
         }
@@ -41,6 +42,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var pattern = $"%{termo}%";
 
+            CodigoSku? skuExato = null;
+            try { skuExato = CodigoSku.From(termo); } catch { /* termo invalido para SKU */ }
+
             return await dbContext.ProdutosVariacao
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId &&
@@ -48,8 +52,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (v.Cor != null && EF.Functions.ILike(v.Cor, pattern)) ||
                      (v.Tamanho != null && EF.Functions.ILike(v.Tamanho, pattern)) ||
                      (v.DescricaoComercial != null && EF.Functions.ILike(v.DescricaoComercial, pattern)) ||
-                     (EF.Property<string?>(v, "Sku") != null && EF.Functions.ILike(EF.Property<string>(v, "Sku"), pattern)) ||
-                    (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
+                     (skuExato != null && v.Sku == skuExato) ||
+                     (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
                 .Take(maxResults)
                 .ToListAsync();
         }
