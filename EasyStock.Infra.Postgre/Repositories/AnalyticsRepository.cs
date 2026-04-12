@@ -70,12 +70,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var estoqueData = await estoqueQuery.Select(i => new
             {
-                Quantidade = i.QuantidadeAtual.Value,
-                ValorCusto = i.CustoUnitario.Valor * i.QuantidadeAtual.Value,
-                ValorVenda = (i.PrecoVendaSugerido != null
-                    ? i.PrecoVendaSugerido.Valor
-                    : i.CustoUnitario.Valor * 1.3m) * i.QuantidadeAtual.Value,
-                EstaAbaixoMinimo = i.QuantidadeAtual.Value < i.QuantidadeMinima
+                Quantidade = EF.Property<int>(i, "QuantidadeAtual"),
+                ValorCusto = EF.Property<decimal>(i, "CustoUnitario") * EF.Property<int>(i, "QuantidadeAtual"),
+                ValorVenda = (EF.Property<decimal?>(i, "PrecoVendaSugerido")
+                    ?? EF.Property<decimal>(i, "CustoUnitario") * 1.3m) * EF.Property<int>(i, "QuantidadeAtual"),
+                EstaAbaixoMinimo = EF.Property<int>(i, "QuantidadeAtual") < i.QuantidadeMinima
             }).ToListAsync();
 
             var totalSkus = await estoqueQuery.Select(i => i.ProdutoId).Distinct().CountAsync();
@@ -88,7 +87,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var cutoffValidade = DateTime.UtcNow.AddDays(30);
             var validadeQuery = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade);
+                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade);
             if (lojaId.HasValue)
                 validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
             var alertasVencimento = await validadeQuery.CountAsync();
@@ -114,10 +113,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
 
             var movData = await movQuery
-                .Select(m => new { m.Quantidade.Value, ValorTotal = m.ValorTotal != null ? m.ValorTotal.Valor : 0m })
+                .Select(m => new { Quantidade = EF.Property<int>(m, "Quantidade"), ValorTotal = EF.Property<decimal?>(m, "ValorTotal") ?? 0m })
                 .ToListAsync();
 
-            var totalSaidasQtd = movData.Sum(m => m.Value);
+            var totalSaidasQtd = movData.Sum(m => m.Quantidade);
             var receitaEstimada = movData.Sum(m => m.ValorTotal);
             var dias = Math.Max(1, periodoDias);
             var mediaVendasDiaria = (decimal)totalSaidasQtd / dias;
@@ -161,7 +160,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     v.DataVenda.Year,
                     v.DataVenda.Month,
-                    ValorTotal = v.ValorTotal.Valor,
+                    ValorTotal = EF.Property<decimal>(v, "ValorTotal"),
                     v.ItensVenda
                 })
                 .ToListAsync();
@@ -215,9 +214,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                     {
                         m.ProdutoId,
                         NomeProduto = p.Nome,
-                        CustoUnitario = m.ItemEstoque != null ? m.ItemEstoque.CustoUnitario.Valor : (p.CustoReferencia != null ? p.CustoReferencia.Valor : 0m),
-                        PrecoVenda = m.ValorUnitario!.Valor,
-                        Quantidade = m.Quantidade.Value
+                        CustoUnitario = m.ItemEstoque != null ? EF.Property<decimal>(m.ItemEstoque, "CustoUnitario") : (p.CustoReferencia != null ? EF.Property<decimal>(p, "CustoReferencia") : 0m),
+                        PrecoVenda = EF.Property<decimal>(m, "ValorUnitario"),
+                        Quantidade = EF.Property<int>(m, "Quantidade")
                     })
                 .ToListAsync();
 
@@ -279,8 +278,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                     m.DataMovimentacao.Month,
                     m.DataMovimentacao.Day,
                     m.Tipo,
-                    Quantidade = m.Quantidade.Value,
-                    Valor = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                    Quantidade = EF.Property<int>(m, "Quantidade"),
+                    Valor = EF.Property<decimal?>(m, "ValorTotal") ?? 0m
                 })
                 .ToListAsync();
 
@@ -317,8 +316,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
                     i.ValidadeEm != null &&
-                    i.ValidadeEm.DataValidade <= cutoff &&
-                    i.QuantidadeAtual.Value > 0);
+                    EF.Property<DateTime?>(i, "ValidadeEm") <= cutoff &&
+                    EF.Property<int>(i, "QuantidadeAtual") > 0);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -335,9 +334,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                     x.i.ProdutoId,
                     NomeProduto = x.p.Nome,
                     x.i.CodigoInterno,
-                    Quantidade = x.i.QuantidadeAtual.Value,
+                    Quantidade = EF.Property<int>(x.i, "QuantidadeAtual"),
                     DataValidade = x.i.ValidadeEm!.DataValidade,
-                    Custo = x.i.CustoUnitario.Valor
+                    Custo = EF.Property<decimal>(x.i, "CustoUnitario")
                 })
                 .ToListAsync();
 
@@ -371,7 +370,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
-                    i.QuantidadeAtual.Value > 0 &&
+                    EF.Property<int>(i, "QuantidadeAtual") > 0 &&
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
@@ -389,9 +388,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                     x.i.ProdutoId,
                     NomeProduto = x.p.Nome,
                     x.i.CodigoInterno,
-                    Quantidade = x.i.QuantidadeAtual.Value,
+                    Quantidade = EF.Property<int>(x.i, "QuantidadeAtual"),
                     x.i.UltimaMovimentacaoEm,
-                    Custo = x.i.CustoUnitario.Valor
+                    Custo = EF.Property<decimal>(x.i, "CustoUnitario")
                 })
                 .ToListAsync();
 
@@ -434,8 +433,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     m.DataMovimentacao.Year,
                     m.DataMovimentacao.Month,
-                    Quantidade = m.Quantidade.Value,
-                    Valor = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                    Quantidade = EF.Property<int>(m, "Quantidade"),
+                    Valor = EF.Property<decimal?>(m, "ValorTotal") ?? 0m
                 })
                 .ToListAsync();
 
@@ -493,12 +492,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var taxas = await taxaQuery
                 .GroupBy(m => m.ProdutoId)
-                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => m.Quantidade.Value) })
+                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => EF.Property<int>(m, "Quantidade")) })
                 .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value < i.QuantidadeMinima);
+                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") < i.QuantidadeMinima);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -506,7 +505,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var raw = await query
                 .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => x.i.QuantidadeAtual.Value)
+                .OrderBy(x => EF.Property<int>(x.i, "QuantidadeAtual"))
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new
@@ -515,9 +514,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                     x.i.ProdutoId,
                     NomeProduto = x.p.Nome,
                     x.i.CodigoInterno,
-                    Quantidade = x.i.QuantidadeAtual.Value,
+                    Quantidade = EF.Property<int>(x.i, "QuantidadeAtual"),
                     x.i.QuantidadeMinima,
-                    Custo = x.i.CustoUnitario.Valor
+                    Custo = EF.Property<decimal>(x.i, "CustoUnitario")
                 })
                 .ToListAsync();
 
@@ -569,12 +568,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var taxas = await taxaQuery
                 .GroupBy(m => m.ProdutoId)
-                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => m.Quantidade.Value) })
+                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => EF.Property<int>(m, "Quantidade")) })
                 .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.QuantidadeAtual.Value > 0);
+                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") > 0);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -591,7 +590,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     x.i.ProdutoId,
                     NomeProduto = x.p.Nome,
                     x.i.CodigoInterno,
-                    Quantidade = x.i.QuantidadeAtual.Value
+                    Quantidade = EF.Property<int>(x.i, "QuantidadeAtual")
                 })
                 .ToListAsync();
 
@@ -636,7 +635,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(v => new
                 {
                     v.Canal,
-                    ValorTotal = v.ValorTotal.Valor,
+                    ValorTotal = EF.Property<decimal>(v, "ValorTotal"),
                     v.ItensVenda
                 })
                 .ToListAsync();
@@ -695,15 +694,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     LojaId = g.Key,
                     TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
-                    QuantidadeTotal = g.Sum(i => i.QuantidadeAtual.Value),
-                    ValorEstoque = g.Sum(i => (i.PrecoVendaSugerido != null ? i.PrecoVendaSugerido.Valor : i.CustoUnitario.Valor * 1.3m) * i.QuantidadeAtual.Value),
-                    AlertasCriticos = g.Count(i => i.QuantidadeAtual.Value <= 2),
-                    ItensAbaixoMinimo = g.Count(i => i.QuantidadeAtual.Value < i.QuantidadeMinima),
-                    AlertasVencimento = g.Count(i => i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade),
+                    QuantidadeTotal = g.Sum(i => EF.Property<int>(i, "QuantidadeAtual")),
+                    ValorEstoque = g.Sum(i => (i.PrecoVendaSugerido != null ? EF.Property<decimal?>(i, "PrecoVendaSugerido") : EF.Property<decimal>(i, "CustoUnitario") * 1.3m) * EF.Property<int>(i, "QuantidadeAtual")),
+                    AlertasCriticos = g.Count(i => EF.Property<int>(i, "QuantidadeAtual") <= 2),
+                    ItensAbaixoMinimo = g.Count(i => EF.Property<int>(i, "QuantidadeAtual") < i.QuantidadeMinima),
+                    AlertasVencimento = g.Count(i => i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade),
                     ItensParados = g.Count(i => i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado),
                     TotalItens = g.Count(),
-                    ValorVencendo = g.Where(i => i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade)
-                        .Sum(i => i.CustoUnitario.Valor * i.QuantidadeAtual.Value)
+                    ValorVencendo = g.Where(i => i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade)
+                        .Sum(i => EF.Property<decimal>(i, "CustoUnitario") * EF.Property<int>(i, "QuantidadeAtual"))
                 })
                 .ToDictionaryAsync(x => x.LojaId);
 
@@ -717,8 +716,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(g => new
                 {
                     LojaId = g.Key,
-                    TotalSaidas = g.Sum(m => m.Quantidade.Value),
-                    ReceitaTotal = g.Sum(m => m.ValorTotal != null ? m.ValorTotal.Valor : 0m)
+                    TotalSaidas = g.Sum(m => EF.Property<int>(m, "Quantidade")),
+                    ReceitaTotal = g.Sum(m => m.ValorTotal != null ? EF.Property<decimal?>(m, "ValorTotal") : 0m)
                 })
                 .ToDictionaryAsync(x => x.LojaId);
 
@@ -796,12 +795,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && i.LojaId == lojaId)
                 .Select(i => new
                 {
-                    IsCritical = i.QuantidadeAtual.Value <= 2,
-                    IsBelowMin = i.QuantidadeAtual.Value < i.QuantidadeMinima,
-                    IsExpiring = i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade,
+                    IsCritical = EF.Property<int>(i, "QuantidadeAtual") <= 2,
+                    IsBelowMin = EF.Property<int>(i, "QuantidadeAtual") < i.QuantidadeMinima,
+                    IsExpiring = i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade,
                     IsIdle = i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado,
-                    ValorVencendo = i.ValidadeEm != null && i.ValidadeEm.DataValidade <= cutoffValidade
-                        ? i.CustoUnitario.Valor * i.QuantidadeAtual.Value : 0m
+                    ValorVencendo = i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade
+                        ? EF.Property<decimal>(i, "CustoUnitario") * EF.Property<int>(i, "QuantidadeAtual") : 0m
                 })
                 .ToListAsync();
 
@@ -816,7 +815,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == TipoMovimentacaoEstoque.Saida &&
                     m.DataMovimentacao >= de && m.DataMovimentacao <= ate)
-                .SumAsync(m => m.Quantidade.Value);
+                .SumAsync(m => EF.Property<int>(m, "Quantidade"));
             var lojasCount = await dbContext.Lojas.AsNoTracking()
                 .CountAsync(l => l.EmpresaId == empresaId && l.Ativa);
             var mediaEmpresaDiaria = lojasCount > 0 ? (decimal)empresaSaidas / dias / lojasCount : 0m;
@@ -879,8 +878,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     m.ProdutoId,
                     NomeProduto = p.Nome,
-                    Quantidade = m.Quantidade.Value,
-                    Valor = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                    Quantidade = EF.Property<int>(m, "Quantidade"),
+                    Valor = EF.Property<decimal?>(m, "ValorTotal") ?? 0m
                 })
                 .ToListAsync();
 
