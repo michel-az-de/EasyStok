@@ -304,6 +304,14 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return Json(new { ok = true });
     }
 
+    [HttpGet("/produtos/marcas-sugestoes")]
+    public async Task<IActionResult> MarcasSugestoes(string? q)
+    {
+        var result = await svc.ListarMarcasAsync(q);
+        if (!result.Success) return Json(Array.Empty<string>());
+        return Json(result.Data ?? []);
+    }
+
     [HttpGet("/produtos/buscar")]
     public async Task<IActionResult> Buscar(string? q, int limit = 10)
     {

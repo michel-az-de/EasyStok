@@ -47,10 +47,10 @@ public class EntradasService(ApiClient api, SessionService session)
             quantidadeAdicional = vm.Qty,
             novoCustoUnitario = vm.Custo,
             novoPrecoVendaSugerido = vm.Preco,
-            dataReposicao = vm.Data.ToDateTime(TimeOnly.MinValue),
+            dataReposicao = DateTime.SpecifyKind(vm.Data.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
             observacoes = vm.Observacoes,
             novaValidade = vm.Validade.HasValue
-                ? vm.Validade.Value.ToDateTime(TimeOnly.MinValue)
+                ? DateTime.SpecifyKind(vm.Validade.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
                 : (DateTime?)null
         });
     }
@@ -72,10 +72,12 @@ public class EntradasService(ApiClient api, SessionService session)
         quantidade = vm.Qty,
         custoUnitario = vm.Custo,
         precoVendaSugerido = vm.Preco,
-        dataEntrada = vm.Data.ToDateTime(TimeOnly.MinValue),
+        dataEntrada = DateTime.SpecifyKind(vm.Data.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
         natureza,
         codigoLote = vm.Lote,
-        validade = vm.Validade.HasValue ? vm.Validade.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+        validade = vm.Validade.HasValue
+            ? DateTime.SpecifyKind(vm.Validade.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
+            : (DateTime?)null,
         observacoes = vm.Observacoes
     };
 }

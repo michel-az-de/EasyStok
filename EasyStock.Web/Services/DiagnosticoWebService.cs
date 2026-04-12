@@ -154,6 +154,49 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
             return null;
         }
     }
+
+    public async Task<(Stream? Content, string? FileName)> ExportarLogsAsync(string bearerToken, int hours = 48)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"diagnostico/logs/exportar?hours={hours}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null);
+
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                        ?? response.Content.Headers.ContentDisposition?.FileName
+                        ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log";
+            var stream = await response.Content.ReadAsStreamAsync();
+            return (stream, fileName.Trim('"'));
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    public async Task<SalvarStorageResult?> SalvarLogsStorageAsync(string bearerToken)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "diagnostico/logs/salvar-storage");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<SalvarStorageResult>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -343,5 +386,14 @@ public sealed class LimparLogsResult
 {
     public bool Success { get; set; }
     public string Mensagem { get; set; } = "";
-    public int ArquivosTruncados { get; set; }
+    public int ArquivosExcluidos { get; set; }
+}
+
+public sealed class SalvarStorageResult
+{
+    public bool Success { get; set; }
+    public string Mensagem { get; set; } = "";
+    public string? StorageKey { get; set; }
+    public string? Url { get; set; }
+    public long TamanhoBytes { get; set; }
 }

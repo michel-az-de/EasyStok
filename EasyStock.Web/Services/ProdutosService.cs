@@ -167,6 +167,10 @@ public class ProdutosService(ApiClient api, SessionService session)
     public Task<ApiResult<bool>> RemoverFotoAsync(string produtoId, string fotoId) =>
         api.DeleteAsync($"produtos/{produtoId}/fotos/{fotoId}?empresaId={GetEmpresaId()}");
 
+    public Task<ApiResult<List<string>>> ListarMarcasAsync(string? q = null) =>
+        api.GetAsync<List<string>>($"produtos/marcas?empresaId={GetEmpresaId()}{(string.IsNullOrWhiteSpace(q) ? "" : $"&q={Uri.EscapeDataString(q)}")}");
+
+
     private static bool HasDimensoes(ProdutoFormViewModel vm) =>
         vm.DimensoesPeso.HasValue || vm.DimensoesLargura.HasValue ||
         vm.DimensoesAltura.HasValue || vm.DimensoesComprimento.HasValue;

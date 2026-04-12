@@ -432,21 +432,43 @@
                         Agrupar por operacao
                     </label>
                     <span class="text-xs text-slate-400" x-text="filteredLogs.length + ' entradas'"></span>
-                    <button @@click="limparLogs()" :disabled="clearingLogs"
-                        class="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
-                        <span class="material-icons-round text-sm" :class="clearingLogs ? 'animate-spin' : ''">
-                            <template x-if="clearingLogs">sync</template>
-                            <template x-if="!clearingLogs">delete_sweep</template>
-                        </span>
-                        <span x-text="clearingLogs ? 'Limpando...' : 'Limpar arquivos de log'"></span>
-                    </button>
+                    <div class="ml-auto flex items-center gap-2">
+                        <a href="/diagnostico/api/logs/exportar?hours=48"
+                           class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
+                            <span class="material-icons-round text-sm">download</span>
+                            Exportar
+                        </a>
+                        <button @@click="salvarStorage()" :disabled="savingStorage"
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm" :class="savingStorage ? 'animate-spin' : ''">
+                                <template x-if="savingStorage">sync</template>
+                                <template x-if="!savingStorage">cloud_upload</template>
+                            </span>
+                            <span x-text="savingStorage ? 'Salvando...' : 'Salvar no storage'"></span>
+                        </button>
+                        <button @@click="limparLogs()" :disabled="clearingLogs"
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm" :class="clearingLogs ? 'animate-spin' : ''">
+                                <template x-if="clearingLogs">sync</template>
+                                <template x-if="!clearingLogs">delete_forever</template>
+                            </span>
+                            <span x-text="clearingLogs ? 'Excluindo...' : 'Excluir logs'"></span>
+                        </button>
+                    </div>
                 </div>
                 <!-- Limpar resultado -->
                 <div x-show="clearLogsMsg" x-cloak x-transition
-                    class="mb-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                    class="mb-2 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
                     :class="clearLogsOk ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
                     <span class="material-icons-round text-base" x-text="clearLogsOk ? 'check_circle' : 'error'"></span>
                     <span x-text="clearLogsMsg"></span>
+                </div>
+                <!-- Storage resultado -->
+                <div x-show="saveStorageMsg" x-cloak x-transition
+                    class="mb-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                    :class="saveStorageOk ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                    <span class="material-icons-round text-base" x-text="saveStorageOk ? 'cloud_done' : 'error'"></span>
+                    <span x-text="saveStorageMsg"></span>
                 </div>
 
                 <!-- Log Volume Mini Chart -->
@@ -617,6 +639,9 @@ function diagApp() {
         clearingLogs: false,
         clearLogsMsg: '',
         clearLogsOk: true,
+        savingStorage: false,
+        saveStorageMsg: '',
+        saveStorageOk: true,
 
         // Log filters
         logFilter: { level: 'ALL', search: '', groupByCorrelation: false },
@@ -757,7 +782,7 @@ function diagApp() {
         },
 
         async limparLogs() {
-            if (!confirm('Isso vai apagar o conteúdo de todos os arquivos de log no servidor. Continuar?')) return;
+            if (!confirm('ATENÇÃO: Isso vai EXCLUIR permanentemente todos os arquivos de log do servidor. Esta ação não pode ser desfeita. Continuar?')) return;
             this.clearingLogs = true;
             this.clearLogsMsg = '';
             try {
@@ -768,24 +793,50 @@ function diagApp() {
                 if (r.ok) {
                     const data = await r.json();
                     this.clearLogsOk = data.success !== false;
-                    this.clearLogsMsg = data.mensagem ?? 'Logs limpos.';
-                    // Reload logs after clearing
+                    this.clearLogsMsg = data.mensagem ?? 'Logs excluídos.';
                     this.enhancedLogs = null;
                     await this.fetchEnhancedLogs();
                 } else if (r.status === 401 || r.status === 403) {
                     this.clearLogsOk = false;
-                    this.clearLogsMsg = 'Sem permissão para limpar logs.';
+                    this.clearLogsMsg = 'Sem permissão para excluir logs.';
                 } else {
                     this.clearLogsOk = false;
                     this.clearLogsMsg = 'Erro ao comunicar com a API (' + r.status + ').';
                 }
             } catch (e) {
                 this.clearLogsOk = false;
-                this.clearLogsMsg = 'Erro de rede ao limpar logs.';
+                this.clearLogsMsg = 'Erro de rede ao excluir logs.';
             }
             this.clearingLogs = false;
-            // Auto-dismiss message after 5s
             setTimeout(() => { this.clearLogsMsg = ''; }, 5000);
+        },
+
+        async salvarStorage() {
+            if (!confirm('Salvar todos os logs atuais no storage configurado?')) return;
+            this.savingStorage = true;
+            this.saveStorageMsg = '';
+            try {
+                const r = await fetch('/diagnostico/api/logs/salvar-storage', {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    this.saveStorageOk = data.success !== false;
+                    this.saveStorageMsg = data.mensagem + (data.url ? ' — ' + data.url : '');
+                } else if (r.status === 401 || r.status === 403) {
+                    this.saveStorageOk = false;
+                    this.saveStorageMsg = 'Sem permissão para salvar logs no storage.';
+                } else {
+                    this.saveStorageOk = false;
+                    this.saveStorageMsg = 'Erro ao comunicar com a API (' + r.status + ').';
+                }
+            } catch (e) {
+                this.saveStorageOk = false;
+                this.saveStorageMsg = 'Erro de rede ao salvar logs.';
+            }
+            this.savingStorage = false;
+            setTimeout(() => { this.saveStorageMsg = ''; }, 8000);
         },
 
         renderHealthChart() {

@@ -433,18 +433,18 @@ public sealed class DiagnosticoController(
     {
         var logsDir = GetLogDirectory();
         if (!Directory.Exists(logsDir))
-            return Ok(new { success = false, mensagem = "Diretório de logs não encontrado.", arquivosTruncados = 0 });
+            return Ok(new { success = false, mensagem = "Diretório de logs não encontrado.", arquivosExcluidos = 0 });
 
         var arquivos = Directory.GetFiles(logsDir, "easystock-*.log");
-        var truncados = 0;
+        var excluidos = 0;
         var erros = new List<string>();
 
         foreach (var arquivo in arquivos)
         {
             try
             {
-                using var fs = new FileStream(arquivo, FileMode.Truncate, FileAccess.Write, FileShare.ReadWrite);
-                truncados++;
+                System.IO.File.Delete(arquivo);
+                excluidos++;
             }
             catch (Exception ex)
             {
@@ -455,12 +455,122 @@ public sealed class DiagnosticoController(
         return Ok(new
         {
             success = true,
-            arquivosTruncados = truncados,
-            mensagem = truncados > 0
-                ? $"{truncados} arquivo(s) de log limpo(s)."
+            arquivosExcluidos = excluidos,
+            mensagem = excluidos > 0
+                ? $"{excluidos} arquivo(s) de log excluído(s) permanentemente."
                 : "Nenhum arquivo de log encontrado.",
             erros
         });
+    }
+
+    [HttpGet("logs/exportar")]
+    [Authorize(Policy = "Admin")]
+    public IActionResult ExportarLogs([FromQuery] int hours = 48)
+    {
+        hours = Math.Clamp(hours, 1, 168);
+        var logsDir = GetLogDirectory();
+        if (!Directory.Exists(logsDir))
+            return NotFound(new { error = "Diretório de logs não encontrado." });
+
+        var cutoff = DateTime.UtcNow.AddHours(-hours);
+        var arquivos = new DirectoryInfo(logsDir)
+            .GetFiles("easystock-*.log")
+            .Where(f => f.LastWriteTimeUtc >= cutoff || f.Name.Contains(DateTime.UtcNow.ToString("yyyyMMdd")))
+            .OrderBy(f => f.Name)
+            .ToArray();
+
+        if (arquivos.Length == 0)
+            return NotFound(new { error = "Nenhum arquivo de log encontrado para o período." });
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# EasyStock Logs — exportado em {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine($"# Período: últimas {hours}h — {arquivos.Length} arquivo(s)");
+        sb.AppendLine();
+
+        foreach (var f in arquivos)
+        {
+            sb.AppendLine($"### {f.Name} ###");
+            try
+            {
+                using var fs = new FileStream(f.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                sb.AppendLine(reader.ReadToEnd());
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"[ERRO AO LER: {ex.Message}]");
+            }
+            sb.AppendLine();
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var fileName = $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log";
+        return File(bytes, "text/plain; charset=utf-8", fileName);
+    }
+
+    [HttpPost("logs/salvar-storage")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> SalvarLogsStorage([FromServices] IFileStorage fileStorage, CancellationToken ct)
+    {
+        var logsDir = GetLogDirectory();
+        if (!Directory.Exists(logsDir))
+            return NotFound(new { error = "Diretório de logs não encontrado." });
+
+        var arquivos = new DirectoryInfo(logsDir)
+            .GetFiles("easystock-*.log")
+            .OrderBy(f => f.Name)
+            .ToArray();
+
+        if (arquivos.Length == 0)
+            return Ok(new { success = false, mensagem = "Nenhum arquivo de log encontrado." });
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# EasyStock Logs — salvo em {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine($"# {arquivos.Length} arquivo(s)");
+        sb.AppendLine();
+
+        foreach (var f in arquivos)
+        {
+            sb.AppendLine($"### {f.Name} ###");
+            try
+            {
+                using var fs = new FileStream(f.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                sb.AppendLine(reader.ReadToEnd());
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"[ERRO AO LER: {ex.Message}]");
+            }
+            sb.AppendLine();
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var fileName = $"logs/easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log";
+
+        try
+        {
+            var result = await fileStorage.UploadAsync(new FileUploadRequest(
+                BucketPath: "logs",
+                FileName: $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log",
+                ContentType: "text/plain",
+                Content: bytes,
+                IsPublic: false), ct);
+
+            return Ok(new
+            {
+                success = true,
+                mensagem = "Logs salvos no storage com sucesso.",
+                storageKey = result.StorageKey,
+                url = result.Url,
+                tamanhoBytes = result.Size
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao salvar logs no storage.");
+            return StatusCode(500, new { success = false, mensagem = $"Erro ao salvar no storage: {ex.Message}" });
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────

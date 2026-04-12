@@ -143,6 +143,30 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         return (items, total);
     }
 
+    public async Task<IReadOnlyList<string>> GetMarcasAsync(Guid empresaId, string? filtro = null, int max = 20)
+    {
+        var filter = Builders<Produto>.Filter.And(
+            Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<Produto>.Filter.Ne(x => x.Marca, (string?)null),
+            Builders<Produto>.Filter.Ne(x => x.Marca, ""));
+
+        if (!string.IsNullOrWhiteSpace(filtro))
+        {
+            var regex = new MongoDB.Bson.BsonRegularExpression(filtro, "i");
+            filter = Builders<Produto>.Filter.And(filter, Builders<Produto>.Filter.Regex(x => x.Marca, regex));
+        }
+
+        var marcas = await Collection.Find(filter)
+            .Project(p => p.Marca!)
+            .ToListAsync();
+
+        return marcas.Where(m => !string.IsNullOrEmpty(m))
+            .Distinct()
+            .OrderBy(m => m)
+            .Take(max)
+            .ToList();
+    }
+
     public Task InsertAsync(Produto produto)
     {
         EnqueueInsert(Collection, produto);
