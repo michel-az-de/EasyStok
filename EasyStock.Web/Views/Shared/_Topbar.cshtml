@@ -4,7 +4,7 @@
     if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
 }
 
-<header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+<header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
     <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
             class="lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
@@ -13,16 +13,35 @@
         </svg>
     </button>
 
-    <!-- Busca global (trigger) -->
-    <div class="flex-1" x-data="buscaUnificada()" @@keydown.window.ctrl.k.prevent="abrir()" @@keydown.window.slash.prevent="if(!document.activeElement || document.activeElement.tagName === 'BODY') abrir()">
-        <!-- Trigger button -->
+    <!-- Page title (mobile only) -->
+    <div class="flex-1 lg:hidden min-w-0">
+        <span class="text-sm font-semibold text-slate-800 truncate block">@(ViewBag.Title as string ?? "EasyStock")</span>
+    </div>
+
+    <!-- Busca global -->
+    <div x-data="buscaUnificada()"
+         @@keydown.window.ctrl.k.prevent="abrir()"
+         @@keydown.window.slash.prevent="if(!document.activeElement || document.activeElement.tagName === 'BODY') abrir()"
+         class="contents">
+
+        <!-- Desktop: full search bar -->
+        <div class="hidden lg:block flex-1">
+            <button @@click="abrir()"
+                    class="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-xs">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
+                </svg>
+                <span class="flex-1 text-left truncate">Buscar...</span>
+                <kbd class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-slate-100 border border-slate-200 rounded text-slate-400">Ctrl K</kbd>
+            </button>
+        </div>
+
+        <!-- Mobile: icon-only search -->
         <button @@click="abrir()"
-                class="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-xs">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
             </svg>
-            <span class="flex-1 text-left truncate hidden sm:block">Buscar...</span>
-            <kbd class="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-slate-100 border border-slate-200 rounded text-slate-400">Ctrl K</kbd>
         </button>
 
         <!-- Command palette overlay -->
@@ -212,8 +231,8 @@
         }
     </script>
 
-    <!-- Ação rápida -->
-    <div x-data="{ open: false }" class="relative">
+    <!-- Ação rápida (desktop only) -->
+    <div x-data="{ open: false }" class="relative hidden lg:block">
         <button @@click="open = !open"
                 class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,10 +267,10 @@
     <!-- Notificações Dropdown -->
     <div x-data="notifDropdown()" class="relative">
         <button @@click="toggle()" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span id="topbar-notif-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center"></span>
+            <span id="topbar-notif-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"></span>
         </button>
 
         <div x-show="open" @@click.outside="open = false" x-cloak x-transition
@@ -406,7 +425,7 @@
             <div class="text-left hidden sm:block">
                 <div class="text-sm font-semibold text-slate-800 leading-tight">@usuarioNome</div>
             </div>
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="hidden sm:block w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
         </button>
