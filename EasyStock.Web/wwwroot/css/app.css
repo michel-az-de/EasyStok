@@ -673,6 +673,156 @@ html.theme-dark [x-data="criarFornecedorModal()"] .supplier-modal__footer {
     border-color: rgba(71, 85, 105, .55);
 }
 
+.app-primary-btn--success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    box-shadow: 0 16px 34px rgba(16, 185, 129, .22);
+}
+
+.app-primary-btn--success:hover {
+    filter: brightness(1.03);
+    box-shadow: 0 20px 40px rgba(16, 185, 129, .28);
+}
+
+.pedido-modal__header,
+.pedido-action-modal__header {
+    padding: 24px 24px 20px;
+    background:
+        radial-gradient(circle at top right, rgba(99, 102, 241, .12) 0%, transparent 30%),
+        linear-gradient(180deg, rgba(248, 250, 252, .96) 0%, rgba(255, 255, 255, .92) 100%);
+    border-bottom: 1px solid rgba(226, 232, 240, .92);
+}
+
+.pedido-modal__eyebrow,
+.pedido-action-modal__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, .12);
+    color: #4F46E5;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+
+.pedido-modal__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.pedido-modal__chips span {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(199, 210, 254, .8);
+    background: rgba(255, 255, 255, .72);
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pedido-form {
+    padding: 20px 24px 0;
+}
+
+.pedido-form > div {
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(226, 232, 240, .92);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .98) 0%, rgba(248, 250, 252, .94) 100%);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, .05);
+}
+
+.pedido-modal__footer {
+    margin-top: 20px;
+    padding: 18px 24px 24px;
+    background: rgba(255, 255, 255, .84);
+    border-color: rgba(226, 232, 240, .92);
+}
+
+.pedido-modal__footer .app-primary-btn,
+.pedido-modal__footer .ui-secondary-btn,
+.pedido-action-modal__footer .app-primary-btn,
+.pedido-action-modal__footer .ui-secondary-btn,
+.pedido-action-modal__footer .pedido-danger-btn {
+    min-width: 144px;
+}
+
+.pedido-action-modal__body {
+    padding: 20px 24px 24px;
+}
+
+.pedido-action-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    align-items: center;
+}
+
+.pedido-action-modal__footer--compact {
+    padding: 20px 24px 24px;
+}
+
+.pedido-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 14px;
+    border: 0;
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: #FFF;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 16px 34px rgba(239, 68, 68, .22);
+    transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
+}
+
+.pedido-danger-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+    box-shadow: 0 20px 40px rgba(239, 68, 68, .28);
+}
+
+html.theme-dark .app-primary-btn--success {
+    box-shadow: 0 18px 38px rgba(5, 150, 105, .28);
+}
+
+html.theme-dark .pedido-modal__header,
+html.theme-dark .pedido-action-modal__header {
+    background:
+        radial-gradient(circle at top right, rgba(99, 102, 241, .16) 0%, transparent 32%),
+        linear-gradient(180deg, rgba(15, 23, 42, .98) 0%, rgba(15, 23, 42, .92) 100%);
+    border-bottom-color: rgba(71, 85, 105, .55);
+}
+
+html.theme-dark .pedido-modal__eyebrow,
+html.theme-dark .pedido-action-modal__eyebrow {
+    background: rgba(99, 102, 241, .18);
+    color: #C7D2FE;
+}
+
+html.theme-dark .pedido-modal__chips span {
+    background: rgba(15, 23, 42, .72);
+    border-color: rgba(71, 85, 105, .58);
+    color: #CBD5E1;
+}
+
+html.theme-dark .pedido-form > div {
+    background: linear-gradient(180deg, rgba(15, 23, 42, .92) 0%, rgba(15, 23, 42, .86) 100%);
+    border-color: rgba(71, 85, 105, .55);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03);
+}
+
+html.theme-dark .pedido-modal__footer {
+    background: rgba(15, 23, 42, .86);
+    border-color: rgba(71, 85, 105, .55);
+}
+
 @media (max-width: 639px) {
     [x-data="criarFornecedorModal()"] .supplier-modal {
         width: calc(100vw - 20px);
@@ -695,6 +845,52 @@ html.theme-dark [x-data="criarFornecedorModal()"] .supplier-modal__footer {
     [x-data="criarFornecedorModal()"] .supplier-modal__footer {
         padding-left: 16px;
         padding-right: 16px;
+    }
+
+    .pedido-modal {
+        width: calc(100vw - 20px);
+    }
+
+    .pedido-form {
+        grid-template-columns: 1fr;
+        padding: 16px 16px 0;
+        gap: 12px;
+    }
+
+    .pedido-form > div,
+    .pedido-form > .col-span-2 {
+        grid-column: auto;
+        padding: 16px;
+    }
+
+    .pedido-modal__header,
+    .pedido-modal__footer,
+    .pedido-action-modal__header,
+    .pedido-action-modal__body,
+    .pedido-action-modal__footer--compact {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .pedido-modal__chips {
+        justify-content: flex-start;
+    }
+
+    .pedido-action-modal__footer {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .pedido-modal__footer {
+        flex-direction: column-reverse;
+    }
+
+    .pedido-modal__footer .app-primary-btn,
+    .pedido-modal__footer .ui-secondary-btn,
+    .pedido-action-modal__footer .app-primary-btn,
+    .pedido-action-modal__footer .ui-secondary-btn,
+    .pedido-action-modal__footer .pedido-danger-btn {
+        width: 100%;
     }
 }
 

@@ -20,14 +20,13 @@
         }
     </div>
     <button type="button" x-data @@click="$dispatch('open-modal', 'novo-pedido')"
-            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            class="app-primary-btn">
         + Novo Pedido
     </button>
 </div>
 
 @if (Model.TotalPedidos > 0)
 {
-    <!-- Resumo -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="ws">
             <div class="text-sm text-slate-500">Total de pedidos</div>
@@ -39,132 +38,135 @@
         </div>
     </div>
 
-    <!-- Tabela -->
     <div class="ws">
         <div class="overflow-x-auto">
-        <table class="tbl-full">
-            <thead>
-                <tr>
-                    <th>Fornecedor</th>
-                    <th>Data Pedido</th>
-                    <th>Previsão Entrega</th>
-                    <th>Valor</th>
-                    <th>Status</th>
-                    <th>Canal</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var ped in Model.Pedidos)
-                {
-                    <tr x-data="{ confirmCancel: false, confirmReceber: false, tracking: '' }">
-                        <td>
-                            <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
-                               class="font-medium text-indigo-600 hover:text-indigo-700">
-                                @ped.FornecedorNome
-                            </a>
-                        </td>
-                        <td class="text-slate-600">@ped.DataPedido.ToString("dd/MM/yyyy")</td>
-                        <td class="text-slate-600">
-                            @if (ped.PrevisaoEntrega.HasValue)
-                            {
-                                var previsao = ped.PrevisaoEntrega.Value;
-                                var atrasado = previsao.Date < DateTime.Today && ped.Status != 3;
-                                <span class="@(atrasado ? "text-red-600 font-medium" : "")">
-                                    @previsao.ToString("dd/MM/yyyy")
-                                    @if (atrasado)
-                                    {
-                                        <span class="text-xs ml-1">(atrasado)</span>
-                                    }
-                                </span>
-                            }
-                            else
-                            {
-                                <span>—</span>
-                            }
-                        </td>
-                        <td class="text-slate-600">R$ @((ped.ValorEstimado ?? 0).ToString("N2"))</td>
-                        <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @ped.StatusCssClass">
-                                @ped.StatusLabel
-                            </span>
-                        </td>
-                        <td class="text-slate-500 text-sm">@(ped.Canal ?? "—")</td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                @if (ped.Status == 1 || ped.Status == 2)
-                                {
-                                    <button type="button" @@click="confirmReceber = true"
-                                            class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
-                                        Recebido
-                                    </button>
-                                    <button type="button" @@click="confirmCancel = true"
-                                            class="text-xs text-red-500 hover:text-red-700">
-                                        Cancelar
-                                    </button>
-                                }
-                                <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
-                                   class="text-xs text-indigo-600 hover:text-indigo-700">Ver</a>
-                            </div>
-
-                            <!-- Modal confirmar recebimento -->
-                            <div x-show="confirmReceber" x-cloak
-                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                 @@click.self="confirmReceber = false">
-                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                                    <h3 class="font-semibold text-slate-900 mb-2">Confirmar recebimento</h3>
-                                    <p class="text-sm text-slate-600 mb-3">
-                                        Pedido de <strong>@ped.FornecedorNome</strong>
-                                    </p>
-                                    <label class="block text-xs text-slate-500 mb-1">Código de rastreio (opcional)</label>
-                                    <input type="text" x-model="tracking" placeholder="Ex: BR123456789"
-                                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4" />
-                                    <div class="flex justify-end gap-3">
-                                        <button type="button" @@click="confirmReceber = false"
-                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">Voltar</button>
-                                        <form asp-action="ReceberPedido" asp-controller="Fornecedores"
-                                              asp-route-id="@ped.PedidoId" method="post">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="tracking" :value="tracking" />
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">
-                                                Confirmar recebimento
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Confirmar cancelamento -->
-                            <div x-show="confirmCancel" x-cloak
-                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                 @@click.self="confirmCancel = false">
-                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                                    <h3 class="font-semibold text-slate-900 mb-2">Cancelar pedido</h3>
-                                    <p class="text-sm text-slate-600 mb-4">
-                                        Cancelar pedido de <strong>@ped.FornecedorNome</strong>? Esta ação não pode ser desfeita.
-                                    </p>
-                                    <div class="flex justify-end gap-3">
-                                        <button type="button" @@click="confirmCancel = false"
-                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
-                                            Voltar
-                                        </button>
-                                        <form asp-action="CancelarPedido" asp-controller="Fornecedores"
-                                              asp-route-id="@ped.PedidoId" method="post">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
-                                                Confirmar cancelamento
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
+            <table class="tbl-full">
+                <thead>
+                    <tr>
+                        <th>Fornecedor</th>
+                        <th>Data Pedido</th>
+                        <th>Previsão Entrega</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Canal</th>
+                        <th>Ações</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var ped in Model.Pedidos)
+                    {
+                        <tr x-data="{ confirmCancel: false, confirmReceber: false, tracking: '' }">
+                            <td>
+                                <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
+                                   class="font-medium text-indigo-600 hover:text-indigo-700">
+                                    @ped.FornecedorNome
+                                </a>
+                            </td>
+                            <td class="text-slate-600">@ped.DataPedido.ToString("dd/MM/yyyy")</td>
+                            <td class="text-slate-600">
+                                @if (ped.PrevisaoEntrega.HasValue)
+                                {
+                                    var previsao = ped.PrevisaoEntrega.Value;
+                                    var atrasado = previsao.Date < DateTime.Today && ped.Status != 3;
+                                    <span class="@(atrasado ? "text-red-600 font-medium" : "")">
+                                        @previsao.ToString("dd/MM/yyyy")
+                                        @if (atrasado)
+                                        {
+                                            <span class="text-xs ml-1">(atrasado)</span>
+                                        }
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>&mdash;</span>
+                                }
+                            </td>
+                            <td class="text-slate-600">R$ @((ped.ValorEstimado ?? 0).ToString("N2"))</td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @ped.StatusCssClass">
+                                    @ped.StatusLabel
+                                </span>
+                            </td>
+                            <td class="text-slate-500 text-sm">@(ped.Canal ?? "-")</td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    @if (ped.Status == 1 || ped.Status == 2)
+                                    {
+                                        <button type="button" @@click="confirmReceber = true"
+                                                class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                                            Recebido
+                                        </button>
+                                        <button type="button" @@click="confirmCancel = true"
+                                                class="text-xs text-red-500 hover:text-red-700">
+                                            Cancelar
+                                        </button>
+                                    }
+                                    <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@ped.FornecedorId"
+                                       class="text-xs text-indigo-600 hover:text-indigo-700">Ver</a>
+                                </div>
+
+                                <div x-show="confirmReceber" x-cloak
+                                     class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4"
+                                     @@click.self="confirmReceber = false">
+                                    <div class="ui-modal pedido-action-modal w-full max-w-md overflow-hidden">
+                                        <div class="pedido-action-modal__header">
+                                            <span class="pedido-action-modal__eyebrow">Recebimento</span>
+                                            <h3 class="text-lg font-semibold text-slate-900">Confirmar recebimento</h3>
+                                            <p class="text-sm text-slate-600">
+                                                Finalize a chegada do pedido de <strong>@ped.FornecedorNome</strong> e registre o rastreio, se existir.
+                                            </p>
+                                        </div>
+                                        <div class="pedido-action-modal__body">
+                                            <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Código de rastreio</label>
+                                            <input type="text" x-model="tracking" placeholder="Ex: BR123456789"
+                                                   class="ui-field mb-4" />
+                                            <div class="pedido-action-modal__footer">
+                                                <button type="button" @@click="confirmReceber = false"
+                                                        class="ui-secondary-btn">Voltar</button>
+                                                <form asp-action="ReceberPedido" asp-controller="Fornecedores"
+                                                      asp-route-id="@ped.PedidoId" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="tracking" :value="tracking" />
+                                                    <button type="submit" class="app-primary-btn app-primary-btn--success">
+                                                        Confirmar recebimento
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div x-show="confirmCancel" x-cloak
+                                     class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4"
+                                     @@click.self="confirmCancel = false">
+                                    <div class="ui-modal pedido-action-modal pedido-action-modal--danger w-full max-w-md overflow-hidden">
+                                        <div class="pedido-action-modal__header">
+                                            <span class="pedido-action-modal__eyebrow">Cancelamento</span>
+                                            <h3 class="text-lg font-semibold text-slate-900">Cancelar pedido</h3>
+                                            <p class="text-sm text-slate-600">
+                                                O pedido de <strong>@ped.FornecedorNome</strong> será encerrado e essa ação não poderá ser desfeita.
+                                            </p>
+                                        </div>
+                                        <div class="pedido-action-modal__footer pedido-action-modal__footer--compact">
+                                            <button type="button" @@click="confirmCancel = false"
+                                                    class="ui-secondary-btn">
+                                                Voltar
+                                            </button>
+                                            <form asp-action="CancelarPedido" asp-controller="Fornecedores"
+                                                  asp-route-id="@ped.PedidoId" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="pedido-danger-btn">
+                                                    Confirmar cancelamento
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 }
@@ -181,62 +183,76 @@ else
     </div>
 }
 
-<!-- Modal Novo Pedido -->
 <div x-data="{ open: false }" @@open-modal.window="open = ($event.detail === 'novo-pedido')"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4"
      @@click.self="open = false">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Pedido de Compra</h2>
+    <div class="ui-modal pedido-modal w-full max-w-3xl overflow-y-auto max-h-[92vh]">
+        <div class="pedido-modal__header">
+            <span class="pedido-modal__eyebrow">Compra assistida</span>
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Novo pedido de compra</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-slate-600">
+                        Registre o pedido com contexto comercial, previsão e observações para acompanhar melhor a entrega e o recebimento.
+                    </p>
+                </div>
+                <div class="pedido-modal__chips">
+                    <span>Mais contexto</span>
+                    <span>Melhor follow-up</span>
+                    <span>Pronto para mobile</span>
+                </div>
+            </div>
+        </div>
         <form asp-action="CriarPedido" asp-controller="Fornecedores" method="post" x-data="{ loading: false }" @@submit="loading = true">
             @Html.AntiForgeryToken()
-            <div class="space-y-3 mb-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Fornecedor *</label>
-                    <select name="fornecedorId" required
-                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <div class="pedido-form grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Fornecedor *</label>
+                    <select name="fornecedorId" required class="ui-select">
                         <option value="">Selecione...</option>
                         @foreach (var f in Model.Fornecedores)
                         {
                             <option value="@f.Id">@f.Nome</option>
                         }
                     </select>
+                    <p class="mt-2 text-xs text-slate-500">Escolha o parceiro que vai receber este pedido para manter o histórico centralizado.</p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Data do Pedido *</label>
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Data do pedido *</label>
                     <input type="date" name="dataPedido" required
                            value="@DateTime.Today.ToString("yyyy-MM-dd")"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Previsão de Entrega</label>
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Previsão de entrega</label>
                     <input type="date" name="previsaoEntrega"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Valor Estimado (R$)</label>
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Valor estimado (R$)</label>
                     <input type="number" name="valorEstimado" min="0" step="0.01" placeholder="0,00"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Canal</label>
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Canal</label>
                     <input type="text" name="canal" placeholder="Ex: WhatsApp, Site, Telefone"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field" />
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                    <textarea name="observacoes" rows="2" placeholder="Opcional"
-                              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                <div class="col-span-2">
+                    <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Observações</label>
+                    <textarea name="observacoes" rows="3" placeholder="Ex: prazo combinado, itens esperados, condição de frete ou detalhes do contato"
+                              class="ui-textarea"></textarea>
                 </div>
             </div>
-            <div class="flex justify-end gap-3">
+            <div class="pedido-modal__footer flex justify-end gap-3 border-t">
                 <button type="button" @@click="open = false"
-                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        class="ui-secondary-btn">
                     Cancelar
                 </button>
                 <button type="submit"
                         :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
-                        class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                        class="app-primary-btn">
                     <span x-show="!loading">Criar Pedido</span>
                     <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
                 </button>
