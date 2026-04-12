@@ -395,10 +395,18 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.AddMemoryCache();
 
-builder.Services.AddStackExchangeRedisCache(options =>
+var redisConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionRedis);
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
-    options.Configuration = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionRedis) ?? "localhost:6379";
-});
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
 
 builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
 

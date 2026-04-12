@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace EasyStock.Api.BackgroundServices;
@@ -104,17 +105,18 @@ public sealed class HealthSnapshotService(
         {
             var sw = Stopwatch.StartNew();
             using var scope = scopeFactory.CreateScope();
-            var dbType = typeof(Microsoft.EntityFrameworkCore.DbContext);
-            var dbContext = scope.ServiceProvider.GetServices<object>()
-                .FirstOrDefault(s => s.GetType().IsSubclassOf(dbType) || s.GetType() == dbType);
-
-            if (dbContext is Microsoft.EntityFrameworkCore.DbContext db)
+            var dbContext = scope.ServiceProvider.GetService<EasyStockDbContext>();
+            if (dbContext is not null)
             {
-                var canConnect = await db.Database.CanConnectAsync(ct);
+                var canConnect = await dbContext.Database.CanConnectAsync(ct);
                 sw.Stop();
                 snapshot.DbLatencyMs = sw.ElapsedMilliseconds;
                 snapshot.DbStatus = canConnect ? "ok" : "falha";
                 if (!canConnect) snapshot.OverallStatus = "critical";
+            }
+            else
+            {
+                snapshot.DbStatus = "sem_efcore";
             }
         }
         catch (Exception ex)

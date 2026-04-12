@@ -8,6 +8,7 @@ using EasyStock.Api.Observability;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
+using Azure.Storage.Files.Shares;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
@@ -43,7 +44,7 @@ public sealed class DiagnosticoController(
             Banco = await GetBancoStatusAsync(ct),
             Redis = await GetRedisStatusAsync(ct),
             Smtp = GetSmtpStatus(),
-            Storage = GetStorageStatus(),
+            Storage = await GetStorageStatusAsync(ct),
             Ia = GetIaStatus(),
             Configuracoes = GetConfiguracoesStatus()
         };
@@ -462,15 +463,53 @@ public sealed class DiagnosticoController(
         };
     }
 
-    private StorageStatus GetStorageStatus()
+    private async Task<StorageStatus> GetStorageStatusAsync(CancellationToken ct)
     {
         var provider = configuration["FileStorage:Provider"] ?? "Local";
-        var status = new StorageStatus { Provider = provider, Configurado = true };
+        var status = new StorageStatus { Provider = provider };
 
         if (string.Equals(provider, "Local", StringComparison.OrdinalIgnoreCase))
         {
             var rootPath = configuration["FileStorage:LocalRootPath"] ?? "uploaded-files";
             status.DiretorioExiste = Directory.Exists(rootPath);
+            status.Configurado = true;
+        }
+        else if (string.Equals(provider, "AzureFileShare", StringComparison.OrdinalIgnoreCase))
+        {
+            var connStr = configuration["FileStorage:AzureFileShare:ConnectionString"];
+            var shareName = configuration["FileStorage:AzureFileShare:ShareName"];
+            status.Configurado = !string.IsNullOrWhiteSpace(connStr) && !string.IsNullOrWhiteSpace(shareName);
+            if (status.Configurado)
+            {
+                try
+                {
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(TimeSpan.FromSeconds(5));
+                    var serviceClient = new ShareServiceClient(connStr);
+                    var shareClient = serviceClient.GetShareClient(shareName);
+                    await shareClient.GetPropertiesAsync(cts.Token);
+                    status.DiretorioExiste = true;
+                }
+                catch
+                {
+                    status.DiretorioExiste = false;
+                    status.Configurado = false;
+                }
+            }
+        }
+        else if (string.Equals(provider, "S3", StringComparison.OrdinalIgnoreCase))
+        {
+            var endpoint = configuration["FileStorage:S3:ServiceUrl"];
+            var bucket = configuration["FileStorage:S3:BucketName"];
+            var key = configuration["FileStorage:S3:AccessKey"];
+            status.Configurado = !string.IsNullOrWhiteSpace(endpoint)
+                              && !string.IsNullOrWhiteSpace(bucket)
+                              && !string.IsNullOrWhiteSpace(key);
+            status.DiretorioExiste = status.Configurado;
+        }
+        else
+        {
+            status.Configurado = true;
         }
 
         return status;
@@ -1168,7 +1207,8 @@ public sealed class DiagnosticoController(
             </table></div>
             <div class="card"><h2>&#128193; Storage</h2><table>
                 <tr><td>Provider</td><td>{{r.Storage.Provider}}</td></tr>
-                <tr><td>Diretorio existe</td><td>{{BoolBadge(r.Storage.DiretorioExiste)}}</td></tr>
+                <tr><td>Configurado</td><td>{{BoolBadge(r.Storage.Configurado)}}</td></tr>
+                <tr><td>{{(r.Storage.Provider == "Local" ? "Diretorio existe" : "Conexao")}}</td><td>{{BoolBadge(r.Storage.DiretorioExiste)}}</td></tr>
             </table></div>
             <div class="card"><h2>&#129302; IA (Anthropic)</h2><table>
                 <tr><td>Habilitado</td><td>{{BoolBadge(r.Ia.Habilitado)}}</td></tr>
