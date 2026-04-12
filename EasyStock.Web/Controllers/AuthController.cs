@@ -92,7 +92,14 @@ public class AuthController(ApiClient api, SessionService session) : Controller
             claims.Add(new Claim("empresaId", empresaId));
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+        var authProps = new AuthenticationProperties
+        {
+            IsPersistent = vm.ManterLogado,
+            ExpiresUtc = vm.ManterLogado
+                ? DateTimeOffset.UtcNow.AddDays(30)
+                : DateTimeOffset.UtcNow.AddMinutes(480)
+        };
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProps);
 
         if (string.IsNullOrEmpty(empresaId))
         {

@@ -37,6 +37,103 @@ html.theme-dark {
     color-scheme: dark;
 }
 
+/* ─── Auth pages (login / selecionar-loja) ───────────────────── */
+
+/* Light mode defaults */
+.auth-title       { color: #0F172A; }
+.auth-subtitle    { color: #64748B; }
+.auth-footer      { color: #94A3B8; }
+.auth-label       { color: #374151; }
+.auth-card-title  { color: #0F172A; }
+.auth-card-subtitle { color: #64748B; }
+.auth-icon-btn    { color: #9CA3AF; }
+.auth-icon-btn:hover { color: #4B5563; }
+.auth-icon-muted  { color: #CBD5E1; }
+
+.auth-card {
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.auth-loja-card {
+    background: #ffffff;
+    border: 1px solid #E2E8F0;
+}
+.auth-loja-card:hover {
+    background: #EEF2FF;
+    border-color: #A5B4FC;
+}
+
+.auth-input {
+    border: 1px solid #D1D5DB;
+    background: rgba(255, 255, 255, 0.9);
+    color: #111827;
+}
+.auth-input:focus {
+    box-shadow: var(--indigo-glow);
+    border-color: #818CF8;
+}
+.auth-input::placeholder { color: #9CA3AF; }
+
+.auth-alert-warn {
+    background: #FFFBEB;
+    border: 1px solid #FCD34D;
+    color: #92400E;
+}
+.auth-alert-error {
+    background: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    color: #991B1B;
+}
+
+/* Dark mode overrides */
+html.theme-dark .auth-title      { color: #F1F5F9 !important; }
+html.theme-dark .auth-subtitle   { color: #94A3B8 !important; }
+html.theme-dark .auth-footer     { color: #475569 !important; }
+html.theme-dark .auth-label      { color: #CBD5E1 !important; }
+html.theme-dark .auth-card-title { color: #F1F5F9 !important; }
+html.theme-dark .auth-card-subtitle { color: #94A3B8 !important; }
+html.theme-dark .auth-icon-btn   { color: #475569 !important; }
+html.theme-dark .auth-icon-btn:hover { color: #94A3B8 !important; }
+html.theme-dark .auth-icon-muted { color: #334155 !important; }
+
+html.theme-dark .auth-card {
+    background: rgba(15, 23, 42, 0.92) !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
+}
+
+html.theme-dark .auth-loja-card {
+    background: rgba(15, 23, 42, 0.86) !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
+}
+html.theme-dark .auth-loja-card:hover {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+html.theme-dark .auth-input {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border-color: rgba(71, 85, 105, 0.7) !important;
+    color: #E2E8F0 !important;
+}
+html.theme-dark .auth-input::placeholder { color: #475569 !important; }
+html.theme-dark .auth-input:focus {
+    border-color: #6366F1 !important;
+}
+
+html.theme-dark .auth-alert-warn {
+    background: rgba(120, 53, 15, 0.2) !important;
+    border-color: rgba(217, 119, 6, 0.4) !important;
+    color: #FCD34D !important;
+}
+html.theme-dark .auth-alert-error {
+    background: rgba(127, 29, 29, 0.2) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #FCA5A5 !important;
+}
+
 /* ─── Prevent Alpine.js flash ────────────────────────────────── */
 [x-cloak] { display: none !important; }
 

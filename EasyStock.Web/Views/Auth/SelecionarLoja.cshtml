@@ -9,16 +9,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Selecionar Loja — EasyStock</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/app.css" />
 </head>
-<body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
+<body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
     <div class="w-full max-w-lg mx-auto px-4">
         <div class="text-center mb-8">
             <span class="text-4xl">🏪</span>
-            <h1 class="text-2xl font-extrabold text-slate-900 mt-2">Selecione sua loja</h1>
-            <p class="text-slate-500 text-sm mt-1">Escolha qual loja você deseja gerenciar agora</p>
+            <h1 class="text-2xl font-extrabold auth-title mt-2">Selecione sua loja</h1>
+            <p class="auth-subtitle text-sm mt-1">Escolha qual loja você deseja gerenciar agora</p>
         </div>
 
         <div class="grid gap-3">
@@ -30,14 +41,13 @@
                     <input type="hidden" name="lojaNome" value="@loja.Nome" />
                     <input type="hidden" name="lojaEmoji" value="@loja.Emoji" />
                     <input type="hidden" name="empresaId" value="@loja.EmpresaId" />
-                    <button type="submit"
-                            class="w-full bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl p-5 text-left flex items-center gap-4 transition-all shadow-sm group">
+                    <button type="submit" class="auth-loja-card w-full rounded-xl p-5 text-left flex items-center gap-4 transition-all shadow-sm group">
                         <span class="text-3xl">@(loja.Emoji ?? "🏪")</span>
                         <div>
-                            <div class="font-bold text-slate-900 group-hover:text-indigo-700">@loja.Nome</div>
-                            <div class="text-slate-500 text-sm">@loja.Cidade · @loja.Plano</div>
+                            <div class="font-bold auth-card-title group-hover:text-indigo-500 transition-colors">@loja.Nome</div>
+                            <div class="auth-card-subtitle text-sm">@loja.Cidade · @loja.Plano</div>
                         </div>
-                        <svg class="ml-auto w-5 h-5 text-slate-300 group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="ml-auto w-5 h-5 auth-icon-muted group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
@@ -47,11 +57,11 @@
 
         @if (!Model.Any())
         {
-            <div class="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                <p class="text-slate-500">Nenhuma loja encontrada para este usuário.</p>
+            <div class="auth-card rounded-xl p-8 text-center">
+                <p class="auth-card-subtitle">Nenhuma loja encontrada para este usuário.</p>
                 <form asp-action="Logout" asp-controller="Auth" method="post" class="mt-2">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="text-indigo-600 text-sm font-semibold hover:underline">Fazer logout</button>
+                    <button type="submit" class="text-indigo-500 text-sm font-semibold hover:underline">Fazer logout</button>
                 </form>
             </div>
         }
