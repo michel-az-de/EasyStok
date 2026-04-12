@@ -67,6 +67,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
                      (skuExato != null && p.SkuBase == skuExato) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
+                .OrderBy(p => p.Nome)
                 .Take(maxResults)
                 .ToListAsync();
         }
