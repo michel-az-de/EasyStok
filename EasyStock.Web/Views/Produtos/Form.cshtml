@@ -75,7 +75,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nome do produto *</label>
-                    <input name="Nome" x-model="nome" value="@Model.Nome"
+                    <input name="Nome" x-model="nome"
                            placeholder="Ex: Camiseta Basica Masculina Algodao"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
@@ -85,23 +85,23 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
                     @if (roots.Any())
                     {
-                        <select name="CategoriaId"
-                                @@change="categoriaId = $el.value; subcategoriaId = ''"
+                        <select name="CategoriaId" x-model="categoriaId"
+                                @@change="subcategoriaId = ''"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione...</option>
                             @foreach (var cat in roots)
                             {
-                                <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
+                                <option value="@cat.Id.ToString().ToLower()">@cat.Nome</option>
                                 @foreach (var sub in children[cat.Id])
                                 {
-                                    <option value="@sub.Id" selected="@(Model.CategoriaId == sub.Id)">&nbsp;&nbsp;-- @sub.Nome</option>
+                                    <option value="@sub.Id.ToString().ToLower()">&nbsp;&nbsp;-- @sub.Nome</option>
                                 }
                             }
                         </select>
                     }
                     else
                     {
-                        <input name="CategoriaId" value="@Model.CategoriaId" placeholder="ID da categoria"
+                        <input name="CategoriaId" x-model="categoriaId" placeholder="ID da categoria"
                                class="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     }
                     <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
@@ -109,23 +109,18 @@
 
                 <div x-show="subcategorias.length > 0" x-transition>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
-                    <select name="SubcategoriaId" @@change="subcategoriaId = $el.value"
+                    <select name="SubcategoriaId" x-model="subcategoriaId"
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                         <option value="">Nenhuma</option>
-                        @if (Model.SubcategoriaId.HasValue)
-                        {
-                            var subcat = categorias.FirstOrDefault(c => c.Id == Model.SubcategoriaId.Value);
-                            if (subcat != null) { <option value="@subcat.Id" selected>@subcat.Nome</option> }
-                        }
                         <template x-for="sub in subcategorias" :key="sub.id">
-                            <option :value="sub.id" x-text="sub.nome"></option>
+                            <option :value="sub.id" x-text="sub.nome" :selected="sub.id === subcategoriaId"></option>
                         </template>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
-                    <input name="SkuBase" x-model="sku" value="@Model.SkuBase" placeholder="Ex: CAM-BAS-001"
+                    <input name="SkuBase" x-model="sku" placeholder="Ex: CAM-BAS-001"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
@@ -135,7 +130,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Marca</label>
-                    <input name="Marca" x-model="marca" value="@Model.Marca" placeholder="Ex: Nike, Samsung..."
+                    <input name="Marca" x-model="marca" placeholder="Ex: Nike, Samsung..."
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
@@ -248,13 +243,18 @@
                 </div>
                 <h3 class="font-bold text-slate-800">Precos e margem</h3>
             </div>
+            <!-- Hidden inputs: enviam null quando valor é 0 (API exige PrecoReferencia > 0 se presente) -->
+            <input type="hidden" name="CustoReferencia" :value="custo > 0 ? custo : ''" />
+            <input type="hidden" name="PrecoReferencia" :value="preco > 0 ? preco : ''" />
+            <input type="hidden" name="MargemEstimada" :value="margem > 0 ? margem : ''" />
+
             <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input name="CustoReferencia" type="number" step="0.01" min="0"
-                               value="@Model.CustoReferencia" x-model.number="custo" @@input="onCustoInput()"
+                        <input type="number" step="0.01" min="0"
+                               x-model.number="custo" @@input="onCustoInput()"
                                :class="{ 'field-calculated': lastEdited === 'margem' && custo > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -262,8 +262,8 @@
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Margem</label>
                     <div class="relative">
-                        <input name="MargemEstimada" type="number" step="0.1"
-                               value="@Model.MargemEstimada" x-model.number="margem" @@input="onMargemInput()"
+                        <input type="number" step="0.1"
+                               x-model.number="margem" @@input="onMargemInput()"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
@@ -278,8 +278,8 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preco venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input name="PrecoReferencia" type="number" step="0.01" min="0"
-                               value="@Model.PrecoReferencia" x-model.number="preco" @@input="onPrecoInput()"
+                        <input type="number" step="0.01" min="0"
+                               x-model.number="preco" @@input="onPrecoInput()"
                                :class="{ 'field-calculated': lastEdited === 'margem' && preco > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -734,19 +734,8 @@
                 // ── Submit ──
                 saving: false,
                 submitForm() {
-                    // Validacoes com feedback claro
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
-                    if (this.preco > 0 && this.preco <= 0.001) { this.step = 2; window.showToast('Preco de venda invalido.', 'warning'); return; }
-
-                    // Garantir que PrecoReferencia seja null (nao 0) se nao preenchido — API exige > 0 se presente
-                    const precoInput = this.$el.querySelector('input[name="PrecoReferencia"]');
-                    if (precoInput && (this.preco === 0 || this.preco === '')) precoInput.value = '';
-                    const custoInput = this.$el.querySelector('input[name="CustoReferencia"]');
-                    if (custoInput && (this.custo === 0 || this.custo === '')) custoInput.value = '';
-                    const margemInput = this.$el.querySelector('input[name="MargemEstimada"]');
-                    if (margemInput && (this.margem === 0 || this.margem === '')) margemInput.value = '';
-
                     this.saving = true;
                     this._clearDraft();
                     this.$nextTick(() => this.$el.submit());
@@ -800,11 +789,6 @@
                         if (d.variacoes?.length) this.variacoes = d.variacoes;
                         if (d.caracteristicas?.length) this.caracteristicas = d.caracteristicas;
                         if (d.embalagens?.length) this.embalagens = d.embalagens;
-                        // Sync select element for CategoriaId
-                        this.$nextTick(() => {
-                            const sel = this.$el.querySelector('select[name="CategoriaId"]');
-                            if (sel && this.categoriaId) sel.value = this.categoriaId;
-                        });
                         window.showToast('Rascunho restaurado.', 'info', 2000);
                     } catch {}
                 },
