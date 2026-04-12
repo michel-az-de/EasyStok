@@ -16,6 +16,10 @@ public static class BackgroundJobServiceCollectionExtensions
 
         services.AddHostedService<AnalisadorEstoqueBackgroundService>();
 
+        // Health snapshot service (singleton para ser injetado no DiagnosticoController)
+        services.AddSingleton<HealthSnapshotService>();
+        services.AddHostedService(sp => sp.GetRequiredService<HealthSnapshotService>());
+
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()
             ?? new BackgroundJobOptions();
 

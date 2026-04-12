@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
@@ -20,7 +21,9 @@ public sealed class DiagnosticoController(
     ResolvedInfrastructureState infraState,
     IConfiguration configuration,
     IDistributedCache cache,
-    IEmailService emailService) : ControllerBase
+    IEmailService emailService,
+    HealthSnapshotService healthSnapshotService,
+    IHttpClientFactory httpClientFactory) : ControllerBase
 {
     [HttpGet("ping")]
     public IActionResult Ping() => Ok(new { pong = true, timestamp = DateTimeOffset.UtcNow });
@@ -78,7 +81,6 @@ public sealed class DiagnosticoController(
 
         if (!System.IO.File.Exists(logFile))
         {
-            // Tenta encontrar o arquivo de log mais recente no diretório
             var dir = new DirectoryInfo(logsDir);
             if (dir.Exists)
             {
@@ -102,7 +104,6 @@ public sealed class DiagnosticoController(
         try
         {
             string[] lines;
-            // Leitura com FileShare.ReadWrite para não bloquear Serilog
             using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var reader = new StreamReader(fs))
             {
@@ -140,7 +141,186 @@ public sealed class DiagnosticoController(
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Helpers privados
+    // NOVOS ENDPOINTS — Central de Operações Inteligente
+    // ──────────────────────────────────────────────────────────────────────
+
+    [HttpGet("logs/enhanced")]
+    [Authorize(Policy = "Admin")]
+    public IActionResult EnhancedLogs([FromQuery] int hours = 24)
+    {
+        hours = Math.Clamp(hours, 1, 72);
+        var cutoff = DateTime.UtcNow.AddHours(-hours);
+
+        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        if (!Directory.Exists(logsDir))
+        {
+            return Ok(new EnhancedLogsResult
+            {
+                Disponivel = false,
+                Motivo = "Diretório de logs não encontrado."
+            });
+        }
+
+        try
+        {
+            // Collect log files covering the requested window
+            var dir = new DirectoryInfo(logsDir);
+            var logFiles = dir.GetFiles("easystock-*.log")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Where(f => f.LastWriteTimeUtc >= cutoff)
+                .OrderBy(f => f.Name)
+                .ToList();
+
+            if (logFiles.Count == 0)
+            {
+                return Ok(new EnhancedLogsResult
+                {
+                    Disponivel = false,
+                    Motivo = "Nenhum arquivo de log encontrado para o período solicitado."
+                });
+            }
+
+            var allEntries = new List<EnhancedLogEntry>();
+
+            foreach (var file in logFiles)
+            {
+                var entries = ParseEnhancedLogFile(file.FullName, cutoff);
+                allEntries.AddRange(entries);
+
+                if (allEntries.Count > 5000)
+                {
+                    allEntries = allEntries.TakeLast(5000).ToList();
+                    break;
+                }
+            }
+
+            // Build summary
+            var summary = BuildLogSummary(allEntries);
+
+            // Detect patterns
+            var patterns = DetectPatterns(allEntries);
+
+            return Ok(new EnhancedLogsResult
+            {
+                Disponivel = true,
+                QueryTimestamp = DateTimeOffset.UtcNow,
+                PeriodoHoras = hours,
+                TotalEntries = allEntries.Count,
+                Entradas = allEntries.ToArray(),
+                Resumo = summary,
+                Padroes = patterns.ToArray()
+            });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new EnhancedLogsResult
+            {
+                Disponivel = false,
+                Motivo = $"Erro ao processar logs: {ex.Message}"
+            });
+        }
+    }
+
+    [HttpGet("endpoints")]
+    public async Task<IActionResult> TestEndpoints(CancellationToken ct)
+    {
+        // Determine self base URL
+        var request = HttpContext.Request;
+        var baseUrl = $"{request.Scheme}://{request.Host}";
+
+        var routes = new[]
+        {
+            ("/diagnostico/ping", "GET", 200),
+            ("/health", "GET", 200),
+            ("/health/live", "GET", 200),
+            ("/health/ready", "GET", 200),
+            ("/api/diagnostico", "GET", 200),
+            ("/api/produtos", "GET", 401),
+            ("/api/categorias", "GET", 401),
+            ("/api/estoque", "GET", 401),
+            ("/api/movimentacoes", "GET", 401),
+            ("/api/analytics/dashboard", "GET", 401),
+            ("/api/notificacoes", "GET", 401),
+            ("/api/auth/me", "GET", 401),
+            ("/swagger/v1-ptbr/swagger.json", "GET", 200),
+        };
+
+        var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+
+        var results = new List<EndpointTestResult>();
+
+        foreach (var (route, method, expectedStatus) in routes)
+        {
+            var result = new EndpointTestResult
+            {
+                Rota = route,
+                Metodo = method,
+                TestadoEm = DateTimeOffset.UtcNow
+            };
+
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var response = await client.GetAsync(baseUrl + route, ct);
+                sw.Stop();
+
+                result.StatusCode = (int)response.StatusCode;
+                result.LatenciaMs = sw.ElapsedMilliseconds;
+
+                // Auth-protected endpoints returning 401 are "alive"
+                var isExpectedStatus = result.StatusCode == expectedStatus ||
+                                       (expectedStatus == 401 && result.StatusCode == 401);
+                var isHealthy = result.StatusCode < 500 && isExpectedStatus;
+
+                result.Status = isHealthy
+                    ? (result.LatenciaMs < 300 ? "ok" : result.LatenciaMs < 1000 ? "slow" : "very_slow")
+                    : "error";
+            }
+            catch (TaskCanceledException)
+            {
+                result.Status = "timeout";
+                result.LatenciaMs = 5000;
+                result.StatusCode = 0;
+            }
+            catch (Exception ex)
+            {
+                result.Status = "error";
+                result.Erro = ex.Message;
+                result.StatusCode = 0;
+            }
+
+            results.Add(result);
+        }
+
+        var healthy = results.Count(r => r.Status == "ok");
+        var slow = results.Count(r => r.Status is "slow" or "very_slow");
+        var failed = results.Count(r => r.Status is "error" or "timeout");
+
+        return Ok(new EndpointsTestResponse
+        {
+            Resultados = results.ToArray(),
+            Saudaveis = healthy,
+            Lentos = slow,
+            Falhas = failed,
+            TestadoEm = DateTimeOffset.UtcNow
+        });
+    }
+
+    [HttpGet("historico")]
+    public IActionResult HealthHistory()
+    {
+        var snapshots = healthSnapshotService.GetSnapshots();
+        return Ok(new HealthHistoryResponse
+        {
+            Snapshots = snapshots.ToArray(),
+            Desde = snapshots.Count > 0 ? snapshots[0].Timestamp : DateTimeOffset.UtcNow,
+            Total = snapshots.Count
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Helpers privados (existentes)
     // ──────────────────────────────────────────────────────────────────────
 
     private async Task<BancoStatus> GetBancoStatusAsync(CancellationToken ct)
@@ -156,7 +336,6 @@ public sealed class DiagnosticoController(
             Erro = infraState.MigrationError
         };
 
-        // Teste de conexão em tempo real
         try
         {
             if (infraState.DatabaseProvider is "postgresql" or "sqlite")
@@ -346,15 +525,28 @@ public sealed class DiagnosticoController(
         ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}h {ts.Minutes}m" : $"{ts.Minutes}m {ts.Seconds}s";
 
     // ──────────────────────────────────────────────────────────────────────
-    // Log parsing
+    // Enhanced Log Parsing
     // ──────────────────────────────────────────────────────────────────────
 
-    // Formato: [2025-01-15 14:32:01 INF] mensagem
+    // Format: [2025-01-15 14:32:01 INF] message {Properties:j}
     private static readonly Regex LogLineRegex = new(
         @"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w{3})\] (.+)$",
         RegexOptions.Compiled);
 
-    // Padrões de dados sensíveis a mascarar
+    // HTTP request log from Serilog: HTTP GET /api/produtos responded 200 in 12.3456 ms
+    private static readonly Regex HttpRequestRegex = new(
+        @"HTTP (\w+) (\S+) responded (\d+) in ([\d.]+) ms",
+        RegexOptions.Compiled);
+
+    // Properties JSON block at the end of a message
+    private static readonly Regex PropertiesRegex = new(
+        @"\s*\{[^{}]*""CorrelationId""[^{}]*\}\s*$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CorrelationIdRegex = new(
+        @"""CorrelationId""\s*:\s*""([^""]+)""",
+        RegexOptions.Compiled);
+
     private static readonly Regex[] SensitivePatterns =
     [
         new Regex(@"(?i)(password|senha|secret|apikey|api_key|token|connectionstring)\s*[=:]\s*\S+", RegexOptions.Compiled),
@@ -368,7 +560,6 @@ public sealed class DiagnosticoController(
 
         var message = match.Groups[3].Value;
 
-        // Mascarar dados sensíveis
         foreach (var pattern in SensitivePatterns)
             message = pattern.Replace(message, m =>
             {
@@ -377,21 +568,327 @@ public sealed class DiagnosticoController(
             });
 
         var levelStr = match.Groups[2].Value.ToUpperInvariant();
-        var level = levelStr switch
-        {
-            "ERR" => "ERROR",
-            "WRN" => "WARN",
-            "INF" => "INFO",
-            "DBG" => "DEBUG",
-            "VRB" => "VERBOSE",
-            "FTL" => "FATAL",
-            _ => levelStr
-        };
+        var level = NormalizeLevel(levelStr);
 
         if (!DateTimeOffset.TryParse(match.Groups[1].Value, out var ts))
             return null;
 
         return new LogEntry { Timestamp = ts, Level = level, Message = message };
+    }
+
+    private static string NormalizeLevel(string levelStr) => levelStr switch
+    {
+        "ERR" => "ERROR",
+        "WRN" => "WARN",
+        "INF" => "INFO",
+        "DBG" => "DEBUG",
+        "VRB" => "VERBOSE",
+        "FTL" => "FATAL",
+        _ => levelStr
+    };
+
+    private static List<EnhancedLogEntry> ParseEnhancedLogFile(string filePath, DateTime cutoff)
+    {
+        var entries = new List<EnhancedLogEntry>();
+        var currentEntry = (EnhancedLogEntry?)null;
+        var exceptionLines = new List<string>();
+
+        using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(fs);
+
+        while (!reader.EndOfStream)
+        {
+            var line = reader.ReadLine();
+            if (line is null) continue;
+
+            var match = LogLineRegex.Match(line);
+            if (match.Success)
+            {
+                // Flush previous entry
+                if (currentEntry is not null)
+                {
+                    if (exceptionLines.Count > 0)
+                        currentEntry.Exception = string.Join("\n", exceptionLines);
+                    entries.Add(currentEntry);
+                    exceptionLines.Clear();
+                }
+
+                if (!DateTime.TryParse(match.Groups[1].Value, out var ts))
+                    continue;
+
+                if (ts < cutoff)
+                {
+                    currentEntry = null;
+                    continue;
+                }
+
+                var levelStr = NormalizeLevel(match.Groups[2].Value.ToUpperInvariant());
+                var rawMessage = match.Groups[3].Value;
+
+                // Extract CorrelationId from Properties JSON block
+                string? correlationId = null;
+                var propsMatch = PropertiesRegex.Match(rawMessage);
+                if (propsMatch.Success)
+                {
+                    var corrMatch = CorrelationIdRegex.Match(propsMatch.Value);
+                    if (corrMatch.Success)
+                        correlationId = corrMatch.Groups[1].Value;
+                    rawMessage = rawMessage[..propsMatch.Index].TrimEnd();
+                }
+
+                // Mask sensitive data
+                foreach (var pattern in SensitivePatterns)
+                    rawMessage = pattern.Replace(rawMessage, m =>
+                    {
+                        var key = m.Value.Split(['=', ':'], 2)[0];
+                        return $"{key}=[REDACTED]";
+                    });
+
+                currentEntry = new EnhancedLogEntry
+                {
+                    Timestamp = new DateTimeOffset(ts, TimeSpan.Zero),
+                    Level = levelStr,
+                    Message = rawMessage,
+                    CorrelationId = correlationId
+                };
+
+                // Classify & extract HTTP request data
+                var httpMatch = HttpRequestRegex.Match(rawMessage);
+                if (httpMatch.Success)
+                {
+                    currentEntry.Categoria = "http_request";
+                    currentEntry.HttpMethod = httpMatch.Groups[1].Value;
+                    currentEntry.Endpoint = httpMatch.Groups[2].Value;
+                    if (int.TryParse(httpMatch.Groups[3].Value, out var sc))
+                        currentEntry.StatusCode = sc;
+                    if (double.TryParse(httpMatch.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture, out var elapsed))
+                        currentEntry.ElapsedMs = elapsed;
+                }
+                else if (levelStr is "ERROR" or "FATAL")
+                {
+                    currentEntry.Categoria = "error";
+                }
+                else if (rawMessage.Contains("Migration", StringComparison.OrdinalIgnoreCase) ||
+                         rawMessage.Contains("Migrating", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentEntry.Categoria = "migration";
+                }
+                else if (rawMessage.Contains("Application started") ||
+                         rawMessage.Contains("Now listening on") ||
+                         rawMessage.Contains("Content root path") ||
+                         rawMessage.Contains("Hosting environment") ||
+                         rawMessage.Contains("iniciado"))
+                {
+                    currentEntry.Categoria = "startup";
+                }
+                else if (rawMessage.Contains("CanConnect", StringComparison.OrdinalIgnoreCase) ||
+                         rawMessage.Contains("DbContext", StringComparison.OrdinalIgnoreCase) ||
+                         rawMessage.Contains("database", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentEntry.Categoria = "db_operation";
+                }
+                else
+                {
+                    currentEntry.Categoria = "general";
+                }
+            }
+            else if (currentEntry is not null)
+            {
+                // Multi-line continuation (exception stack trace)
+                exceptionLines.Add(line);
+            }
+        }
+
+        // Flush last entry
+        if (currentEntry is not null)
+        {
+            if (exceptionLines.Count > 0)
+                currentEntry.Exception = string.Join("\n", exceptionLines);
+            entries.Add(currentEntry);
+        }
+
+        return entries;
+    }
+
+    private static LogSummary BuildLogSummary(List<EnhancedLogEntry> entries)
+    {
+        var httpEntries = entries.Where(e => e.Categoria == "http_request").ToList();
+
+        var errorsByEndpoint = httpEntries
+            .Where(e => e.StatusCode >= 500)
+            .GroupBy(e => e.Endpoint ?? "unknown")
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var requestsByHour = entries
+            .GroupBy(e => e.Timestamp.ToString("HH"))
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var errorsByHour = entries
+            .Where(e => e.Level is "ERROR" or "FATAL")
+            .GroupBy(e => e.Timestamp.ToString("HH"))
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return new LogSummary
+        {
+            TotalRequests = httpEntries.Count,
+            TotalErrors = entries.Count(e => e.Level is "ERROR" or "FATAL"),
+            TotalWarnings = entries.Count(e => e.Level == "WARN"),
+            AvgResponseTimeMs = httpEntries.Count > 0
+                ? Math.Round(httpEntries.Where(e => e.ElapsedMs.HasValue).Average(e => e.ElapsedMs!.Value), 1)
+                : 0,
+            ErrorsByEndpoint = errorsByEndpoint,
+            RequestsByHour = requestsByHour,
+            ErrorsByHour = errorsByHour
+        };
+    }
+
+    private List<DetectedPattern> DetectPatterns(List<EnhancedLogEntry> entries)
+    {
+        var patterns = new List<DetectedPattern>();
+
+        // 1. Repeated errors: same message 3+ times within 1 hour window
+        var errorEntries = entries.Where(e => e.Level is "ERROR" or "FATAL").ToList();
+        var errorGroups = errorEntries
+            .GroupBy(e => e.Message.Length > 100 ? e.Message[..100] : e.Message)
+            .Where(g => g.Count() >= 3);
+
+        foreach (var group in errorGroups)
+        {
+            patterns.Add(new DetectedPattern
+            {
+                Tipo = "repeated_error",
+                Severidade = "critical",
+                Descricao = $"Erro repetido {group.Count()}x: {group.Key[..Math.Min(group.Key.Length, 120)]}",
+                Sugestao = "Investigue a causa raiz deste erro recorrente. Pode indicar um bug sistemático.",
+                Ocorrencias = group.Count(),
+                PrimeiraOcorrencia = group.Min(e => e.Timestamp),
+                UltimaOcorrencia = group.Max(e => e.Timestamp)
+            });
+        }
+
+        // 2. Slow endpoints: avg > 1000ms
+        var httpByEndpoint = entries
+            .Where(e => e.Categoria == "http_request" && e.ElapsedMs.HasValue)
+            .GroupBy(e => e.Endpoint ?? "unknown");
+
+        foreach (var group in httpByEndpoint)
+        {
+            var avg = group.Average(e => e.ElapsedMs!.Value);
+            if (avg > 1000)
+            {
+                patterns.Add(new DetectedPattern
+                {
+                    Tipo = "slow_endpoint",
+                    Severidade = "warning",
+                    Descricao = $"Endpoint lento: {group.Key} — média de {avg:F0}ms ({group.Count()} requests)",
+                    Sugestao = "Verifique queries N+1, falta de índices ou operações bloqueantes neste endpoint.",
+                    Ocorrencias = group.Count(),
+                    PrimeiraOcorrencia = group.Min(e => e.Timestamp),
+                    UltimaOcorrencia = group.Max(e => e.Timestamp)
+                });
+            }
+        }
+
+        // 3. Migration failures
+        var migrationErrors = entries
+            .Where(e => e.Categoria == "migration" && e.Level is "ERROR" or "FATAL")
+            .ToList();
+
+        if (migrationErrors.Count > 0)
+        {
+            patterns.Add(new DetectedPattern
+            {
+                Tipo = "migration_failure",
+                Severidade = "critical",
+                Descricao = $"Falha de migration detectada ({migrationErrors.Count} erros)",
+                Sugestao = "Verifique o estado do banco de dados e as migrations pendentes. Execute 'dotnet ef migrations list' para diagnóstico.",
+                Ocorrencias = migrationErrors.Count,
+                PrimeiraOcorrencia = migrationErrors.Min(e => e.Timestamp),
+                UltimaOcorrencia = migrationErrors.Max(e => e.Timestamp)
+            });
+        }
+
+        // 4. Deploy/restart detection: startup messages after activity gap
+        var startupEntries = entries.Where(e => e.Categoria == "startup").ToList();
+        if (startupEntries.Count > 0)
+        {
+            var restartCount = startupEntries
+                .Select(e => e.Timestamp)
+                .Distinct()
+                .Count();
+
+            // More than 1 startup in the window means restarts
+            if (restartCount > 1)
+            {
+                patterns.Add(new DetectedPattern
+                {
+                    Tipo = "deploy_restart",
+                    Severidade = "warning",
+                    Descricao = $"Detectados {restartCount} reinícios/deploys no período",
+                    Sugestao = "Múltiplos reinícios podem indicar crashes, OOM kills ou deploys frequentes. Verifique logs de startup para erros.",
+                    Ocorrencias = restartCount,
+                    PrimeiraOcorrencia = startupEntries.Min(e => e.Timestamp),
+                    UltimaOcorrencia = startupEntries.Max(e => e.Timestamp)
+                });
+            }
+            else
+            {
+                patterns.Add(new DetectedPattern
+                {
+                    Tipo = "deploy_restart",
+                    Severidade = "info",
+                    Descricao = "1 startup detectado no período (deploy ou reinício normal)",
+                    Sugestao = "Startup único é normal após deploy. Verifique se todos os serviços estão operacionais.",
+                    Ocorrencias = 1,
+                    PrimeiraOcorrencia = startupEntries.Min(e => e.Timestamp),
+                    UltimaOcorrencia = startupEntries.Max(e => e.Timestamp)
+                });
+            }
+        }
+
+        // 5. Error spike: any 5-min bucket with >5x the average error rate
+        var errorBuckets = errorEntries
+            .GroupBy(e => new DateTimeOffset(
+                e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day,
+                e.Timestamp.Hour, e.Timestamp.Minute / 5 * 5, 0, e.Timestamp.Offset))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        if (errorBuckets.Count > 2)
+        {
+            var avgErrorRate = errorBuckets.Values.Average();
+            var spikes = errorBuckets.Where(b => b.Value > avgErrorRate * 5 && b.Value >= 3).ToList();
+
+            foreach (var spike in spikes)
+            {
+                patterns.Add(new DetectedPattern
+                {
+                    Tipo = "error_spike",
+                    Severidade = "critical",
+                    Descricao = $"Pico de erros: {spike.Value} erros em 5min (média: {avgErrorRate:F1})",
+                    Sugestao = "Investigue o que aconteceu neste período. Pode estar relacionado a deploy, falha de dependência ou pico de tráfego.",
+                    Ocorrencias = spike.Value,
+                    PrimeiraOcorrencia = spike.Key,
+                    UltimaOcorrencia = spike.Key.AddMinutes(5)
+                });
+            }
+        }
+
+        // 6. Configuration warnings from current state
+        if (infraState.IsFallback)
+        {
+            patterns.Add(new DetectedPattern
+            {
+                Tipo = "config_warning",
+                Severidade = "warning",
+                Descricao = "API operando em modo fallback (SQLite)",
+                Sugestao = "O banco principal estava indisponível no startup. Reinicie a API após corrigir a conexão principal.",
+                Ocorrencias = 1
+            });
+        }
+
+        return patterns;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -417,7 +914,7 @@ public sealed class DiagnosticoController(
         };
 
         var causasHtml = r.CausasProvaveis.Count > 0
-            ? "<div class='card'><h2>⚠️ Causas Prováveis</h2>" +
+            ? "<div class='card'><h2>Causas Provaveis</h2>" +
               string.Join("", r.CausasProvaveis.Select(c =>
                   $"<p><strong>[{c.Componente}]</strong> {c.Descricao}<br><em>{c.Sugestao}</em></p>")) +
               "</div>"
@@ -477,7 +974,7 @@ public sealed class DiagnosticoController(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// DTOs
+// DTOs — Existentes
 // ──────────────────────────────────────────────────────────────────────────
 
 public sealed class DiagnosticoResult
@@ -548,7 +1045,7 @@ public sealed class ConfiguracoesStatus
 public sealed class CausaProvavel
 {
     public string Componente { get; set; } = "";
-    public string Severidade { get; set; } = "warning"; // critical | warning | info
+    public string Severidade { get; set; } = "warning";
     public string Descricao { get; set; } = "";
     public string Sugestao { get; set; } = "";
 }
@@ -567,4 +1064,83 @@ public sealed class LogEntry
     public DateTimeOffset Timestamp { get; set; }
     public string Level { get; set; } = "";
     public string Message { get; set; } = "";
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// DTOs — Central de Operações Inteligente
+// ──────────────────────────────────────────────────────────────────────────
+
+public sealed class EnhancedLogsResult
+{
+    public bool Disponivel { get; set; }
+    public string? Motivo { get; set; }
+    public DateTimeOffset QueryTimestamp { get; set; }
+    public int PeriodoHoras { get; set; }
+    public int TotalEntries { get; set; }
+    public EnhancedLogEntry[] Entradas { get; set; } = [];
+    public LogSummary Resumo { get; set; } = new();
+    public DetectedPattern[] Padroes { get; set; } = [];
+}
+
+public sealed class EnhancedLogEntry
+{
+    public DateTimeOffset Timestamp { get; set; }
+    public string Level { get; set; } = "";
+    public string Message { get; set; } = "";
+    public string? CorrelationId { get; set; }
+    public string? Endpoint { get; set; }
+    public string? HttpMethod { get; set; }
+    public int? StatusCode { get; set; }
+    public double? ElapsedMs { get; set; }
+    public string? Exception { get; set; }
+    public string Categoria { get; set; } = "general";
+}
+
+public sealed class LogSummary
+{
+    public int TotalRequests { get; set; }
+    public int TotalErrors { get; set; }
+    public int TotalWarnings { get; set; }
+    public double AvgResponseTimeMs { get; set; }
+    public Dictionary<string, int> ErrorsByEndpoint { get; set; } = new();
+    public Dictionary<string, int> RequestsByHour { get; set; } = new();
+    public Dictionary<string, int> ErrorsByHour { get; set; } = new();
+}
+
+public sealed class DetectedPattern
+{
+    public string Tipo { get; set; } = "";
+    public string Severidade { get; set; } = "info";
+    public string Descricao { get; set; } = "";
+    public string Sugestao { get; set; } = "";
+    public int Ocorrencias { get; set; }
+    public DateTimeOffset? PrimeiraOcorrencia { get; set; }
+    public DateTimeOffset? UltimaOcorrencia { get; set; }
+}
+
+public sealed class EndpointTestResult
+{
+    public string Rota { get; set; } = "";
+    public string Metodo { get; set; } = "GET";
+    public int StatusCode { get; set; }
+    public long LatenciaMs { get; set; }
+    public string Status { get; set; } = "ok";
+    public string? Erro { get; set; }
+    public DateTimeOffset TestadoEm { get; set; }
+}
+
+public sealed class EndpointsTestResponse
+{
+    public EndpointTestResult[] Resultados { get; set; } = [];
+    public int Saudaveis { get; set; }
+    public int Lentos { get; set; }
+    public int Falhas { get; set; }
+    public DateTimeOffset TestadoEm { get; set; }
+}
+
+public sealed class HealthHistoryResponse
+{
+    public HealthSnapshot[] Snapshots { get; set; } = [];
+    public DateTimeOffset Desde { get; set; }
+    public int Total { get; set; }
 }
