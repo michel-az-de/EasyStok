@@ -83,4 +83,19 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
             return StatusCode(502, new { error = "Não foi possível obter logs da API" });
         return base.Json(result);
     }
+
+    [HttpPost]
+    [Route("diagnostico/api/logs/limpar")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> ProxyLimparLogs()
+    {
+        var token = session.GetToken();
+        if (string.IsNullOrEmpty(token))
+            return Unauthorized();
+
+        var result = await diagnosticoService.LimparLogsAsync(token);
+        if (result is null)
+            return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
 }

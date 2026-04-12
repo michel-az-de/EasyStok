@@ -134,6 +134,26 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
             return null;
         }
     }
+
+    public async Task<LimparLogsResult?> LimparLogsAsync(string bearerToken)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "diagnostico/logs/limpar");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<LimparLogsResult>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -317,4 +337,11 @@ public sealed class HealthHistoryWebResponse
     public HealthSnapshotInfo[] Snapshots { get; set; } = [];
     public DateTimeOffset Desde { get; set; }
     public int Total { get; set; }
+}
+
+public sealed class LimparLogsResult
+{
+    public bool Success { get; set; }
+    public string Mensagem { get; set; } = "";
+    public int ArquivosTruncados { get; set; }
 }
