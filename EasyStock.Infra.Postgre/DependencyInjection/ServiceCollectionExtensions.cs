@@ -77,7 +77,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 services.AddHttpClient("Anthropic");
                 services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
                 services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
-                services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
+                services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoClaude>();
             }
             else
             {
