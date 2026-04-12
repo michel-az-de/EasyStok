@@ -894,6 +894,7 @@
                     } catch {}
                 },
                 _clearDraft() {
+                    clearTimeout(this._draftTimer);
                     try { sessionStorage.removeItem(this._draftKey); } catch {}
                 },
                 hasDraft() {

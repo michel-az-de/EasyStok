@@ -24,7 +24,7 @@ internal sealed class GeradorDescricaoAnuncioOpenAI(
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             logger.LogWarning("OpenAI:ApiKey não configurado. Usando fallback para produto {ProdutoId}.", produto.Id);
-            return produto.DescricaoBase ?? produto.Nome;
+            return ObterDescricaoFallback(produto, itemEstoque);
         }
 
         var model = configuration["OpenAI:Model"] ?? "gpt-4o-mini";
@@ -61,9 +61,15 @@ internal sealed class GeradorDescricaoAnuncioOpenAI(
         catch (Exception ex)
         {
             logger.LogError(ex, "Erro ao gerar descrição via OpenAI para produto {ProdutoId}.", produto.Id);
-            return produto.DescricaoBase ?? produto.Nome;
+            return ObterDescricaoFallback(produto, itemEstoque);
         }
     }
+
+    private static string ObterDescricaoFallback(Produto produto, ItemEstoque? itemEstoque) =>
+        itemEstoque?.DescricaoAnuncio
+        ?? produto.SugestaoDescricaoAnuncio
+        ?? produto.DescricaoBase
+        ?? produto.Nome;
 
     private static string ConstruirPrompt(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoes)
     {

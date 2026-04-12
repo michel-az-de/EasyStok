@@ -96,14 +96,20 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var newId = result.Data?.ProdutoId ?? Guid.Empty;
         if (newId != Guid.Empty)
         {
+            int uploadErrors = 0;
             foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
-                await svc.UploadFotoAsync(newId.ToString(), foto);
+            {
+                var r = await svc.UploadFotoAsync(newId.ToString(), foto);
+                if (!r.Success) uploadErrors++;
+            }
 
-            Toast("success", "Produto criado com sucesso!");
-            return RedirectToAction(nameof(Index));
+            Toast(uploadErrors > 0 ? "warning" : "success",
+                uploadErrors > 0
+                    ? $"Produto criado, mas {uploadErrors} foto(s) nao foram enviadas."
+                    : "Produto criado com sucesso!");
+            return RedirectToAction(nameof(Detail), new { id = newId });
         }
 
-        // Produto criado (201) mas ID nao parseado — redirecionar para lista
         Toast("success", "Produto criado com sucesso!");
         return RedirectToAction(nameof(Index));
     }
@@ -193,10 +199,17 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             return View("Form", vm);
         }
 
+        int uploadErrors = 0;
         foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
-            await svc.UploadFotoAsync(id, foto);
+        {
+            var r = await svc.UploadFotoAsync(id, foto);
+            if (!r.Success) uploadErrors++;
+        }
 
-        Toast("success", "Produto atualizado com sucesso!");
+        Toast(uploadErrors > 0 ? "warning" : "success",
+            uploadErrors > 0
+                ? $"Produto atualizado, mas {uploadErrors} foto(s) nao foram enviadas."
+                : "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
     }
 
@@ -290,7 +303,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             var ultima = prod.Data.Fotos.Last();
             return Json(new { ok = true, fotoId = ultima.FotoId, url = ultima.Url });
         }
-        return Json(new { ok = true, fotoId = (object?)null, url = (object?)null });
+        return Json(new { ok = false, erro = "Foto enviada, mas nao foi possivel obter os dados. Recarregue a pagina." });
     }
 
     /// <summary>Remoção de foto via AJAX — retorna JSON {ok}</summary>

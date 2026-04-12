@@ -11,8 +11,10 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IWebH
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
     {
         var relativePath = request.BucketPath.Replace('\\', '/').Trim('/');
-        var rootPath = GetRootPath();
-        var targetDirectory = Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var rootPath = Path.GetFullPath(GetRootPath());
+        var targetDirectory = Path.GetFullPath(Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!targetDirectory.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Caminho de upload invalido.");
         Directory.CreateDirectory(targetDirectory);
 
         var safeFileName = Path.GetFileName(request.FileName);
@@ -32,7 +34,10 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IWebH
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
     {
         var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
-        var filePath = Path.Combine(GetRootPath(), safeKey);
+        var rootPath = Path.GetFullPath(GetRootPath());
+        var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
+        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Caminho de exclusao invalido.");
         if (File.Exists(filePath))
             File.Delete(filePath);
 

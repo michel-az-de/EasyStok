@@ -53,6 +53,18 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasMany(p => p.Caracteristicas).WithOne(c => c.Produto).HasForeignKey(c => c.ProdutoId);
             builder.HasMany(p => p.Embalagens).WithOne(e => e.Produto).HasForeignKey(e => e.ProdutoId);
             builder.HasMany(p => p.Variacoes).WithOne(v => v.Produto).HasForeignKey(v => v.ProdutoId);
+
+            // ── Indexes ──
+            builder.HasIndex(p => new { p.EmpresaId, p.SkuBase })
+                .IsUnique()
+                .HasFilter("\"SkuBase\" IS NOT NULL")
+                .HasDatabaseName("ix_produtos_empresa_sku_unique");
+
+            builder.HasIndex(p => new { p.EmpresaId, p.Status })
+                .HasDatabaseName("ix_produtos_empresa_status");
+
+            builder.HasIndex(p => new { p.EmpresaId, p.AlteradoEm })
+                .HasDatabaseName("ix_produtos_empresa_alteradoem");
         }
     }
 }

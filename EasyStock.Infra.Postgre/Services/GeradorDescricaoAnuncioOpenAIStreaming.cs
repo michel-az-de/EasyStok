@@ -30,7 +30,7 @@ internal sealed class GeradorDescricaoAnuncioOpenAIStreaming(
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             logger.LogWarning("OpenAI:ApiKey não configurado. Retornando fallback para produto {ProdutoId}.", produto.Id);
-            yield return itemEstoque?.DescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
+            yield return itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
             yield break;
         }
 
@@ -61,7 +61,7 @@ internal sealed class GeradorDescricaoAnuncioOpenAIStreaming(
         catch (Exception ex)
         {
             logger.LogError(ex, "Erro ao iniciar stream OpenAI para produto {ProdutoId}.", produto.Id);
-            errorFallback = produto.DescricaoBase ?? produto.Nome;
+            errorFallback = itemEstoque?.DescricaoAnuncio ?? produto.SugestaoDescricaoAnuncio ?? produto.DescricaoBase ?? produto.Nome;
         }
 
         if (errorFallback is not null)

@@ -16,8 +16,8 @@ namespace EasyStock.Domain.ValueObjects
 
         public static CodigoSku From(string value)
         {
-            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("SKU é obrigatório.", nameof(value));
-            var normalized = value.Trim();
+            var normalized = value?.Trim();
+            if (string.IsNullOrEmpty(normalized)) throw new ArgumentException("SKU é obrigatório.", nameof(value));
             if (normalized.Length > 100) throw new ArgumentException("SKU muito longo.", nameof(value));
             foreach (var ch in normalized)
             {

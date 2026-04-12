@@ -44,40 +44,40 @@ namespace EasyStock.Infra.Postgre.Services
 
             using (response)
             {
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
+                await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
-            {
-                var line = await reader.ReadLineAsync(ct);
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                if (!line.StartsWith("data:")) continue;
-
-                var data = line["data:".Length..].Trim();
-                if (data == "[DONE]") break;
-
-                string? text = null;
-                try
+                while (!reader.EndOfStream && !ct.IsCancellationRequested)
                 {
-                    var json = JsonDocument.Parse(data);
-                    var type = json.RootElement.GetProperty("type").GetString();
+                    var line = await reader.ReadLineAsync(ct);
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (!line.StartsWith("data:")) continue;
 
-                    if (type == "content_block_delta")
+                    var data = line["data:".Length..].Trim();
+                    if (data == "[DONE]") break;
+
+                    string? text = null;
+                    try
                     {
-                        text = json.RootElement
-                            .GetProperty("delta")
-                            .GetProperty("text")
-                            .GetString();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "Falha ao parsear chunk SSE: {Data}", data);
-                }
+                        var json = JsonDocument.Parse(data);
+                        var type = json.RootElement.GetProperty("type").GetString();
 
-                if (!string.IsNullOrEmpty(text))
-                    yield return text;
-            }
+                        if (type == "content_block_delta")
+                        {
+                            text = json.RootElement
+                                .GetProperty("delta")
+                                .GetProperty("text")
+                                .GetString();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "Falha ao parsear chunk SSE: {Data}", data);
+                    }
+
+                    if (!string.IsNullOrEmpty(text))
+                        yield return text;
+                }
             }
         }
 
