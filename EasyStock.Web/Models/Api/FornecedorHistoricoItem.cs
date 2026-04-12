@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace EasyStock.Web.Models.Api;
 
 public record FornecedorHistoricoItem
@@ -7,6 +9,7 @@ public record FornecedorHistoricoItem
     public DateTime? PrevisaoEntrega { get; init; }
     public DateTime? DataRecebimento { get; init; }
     public decimal? ValorEstimado { get; init; }
+    [JsonConverter(typeof(EnumStringOrIntConverter))]
     public int Status { get; init; }
     public string? Canal { get; init; }
     public string? Tracking { get; init; }

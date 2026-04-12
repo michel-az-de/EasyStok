@@ -1,7 +1,10 @@
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EasyStock.Domain.ValueObjects
 {
+    [JsonConverter(typeof(ValidadeJsonConverter))]
     public sealed record Validade
     {
         public DateTime DataValidade { get; }
@@ -37,5 +40,38 @@ namespace EasyStock.Domain.ValueObjects
         }
 
         public override string ToString() => DataValidade.ToString("yyyy-MM-dd");
+
+        private sealed class ValidadeJsonConverter : JsonConverter<Validade>
+        {
+            public override Validade? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.TokenType == JsonTokenType.Null) return null;
+                if (reader.TokenType == JsonTokenType.String)
+                {
+                    var str = reader.GetString()!;
+                    return From(DateTime.Parse(str));
+                }
+
+                if (reader.TokenType == JsonTokenType.StartObject)
+                {
+                    DateTime? val = null;
+                    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                    {
+                        if (reader.TokenType == JsonTokenType.PropertyName &&
+                            reader.GetString()!.Equals("dataValidade", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reader.Read();
+                            val = reader.GetDateTime();
+                        }
+                    }
+                    return val.HasValue ? From(val.Value) : null;
+                }
+
+                throw new JsonException($"Unexpected token {reader.TokenType} for Validade.");
+            }
+
+            public override void Write(Utf8JsonWriter writer, Validade value, JsonSerializerOptions options)
+                => writer.WriteStringValue(value.DataValidade.ToString("yyyy-MM-dd"));
+        }
     }
 }
