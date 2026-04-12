@@ -10,6 +10,7 @@
     var allCatsJson = JsonSerializer.Serialize(categorias.Select(c => new { id = c.Id, nome = c.Nome }));
     var existingPhotosJson = JsonSerializer.Serialize(Model.ExistingPhotos.Select(f => new { fotoId = f.FotoId, url = f.Url }));
     var formAction = isEdit ? Url.Action("Atualizar", "Produtos", new { id = Model.Id }) : Url.Action("Criar", "Produtos");
+    var stepNames = new[] { "Essencial", "Fotos e Precos", "Detalhes", "Revisao" };
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -21,27 +22,46 @@
     </a>
     <div class="pg-hd">
         <h1>@ViewBag.Title</h1>
-        <p>@(isEdit ? "Atualize as informações do produto" : "Preencha os dados do novo produto")</p>
+        <p>@(isEdit ? "Atualize as informacoes do produto" : "Cadastre um novo produto em poucos passos")</p>
     </div>
 </div>
 
-<form action="@formAction" method="post" enctype="multipart/form-data"
+<form action="@formAction" method="post" enctype="multipart/form-data" novalidate
       x-data="produtoForm()"
-      @@submit="saving = true"
-      class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      @@submit.prevent="submitForm()"
+      class="max-w-3xl">
     @Html.AntiForgeryToken()
     @if (isEdit)
     {
-        <input type="hidden" name="Id" :value="productId" />
+        <input type="hidden" name="Id" value="@Model.Id" />
         <input type="hidden" name="Status" value="@Model.Status" />
     }
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- COLUNA PRINCIPAL                            -->
-    <!-- ═══════════════════════════════════════════ -->
-    <div class="space-y-4">
+    <!-- ══════════════ STEPPER BAR ══════════════ -->
+    <div class="ws mb-6">
+        <div class="flex items-center">
+            @for (int i = 0; i < stepNames.Length; i++)
+            {
+                var sn = i + 1;
+                var last = i == stepNames.Length - 1;
+                <div class="flex items-center @(last ? "" : "flex-1")">
+                    <div class="step-circle cursor-pointer" :class="step > @sn ? 'done' : step === @sn ? 'active' : ''"
+                         @@click="goToStep(@sn)">@sn</div>
+                    <div class="ml-2 hidden sm:block">
+                        <div class="text-xs font-semibold cursor-pointer" :class="step === @sn ? 'text-indigo-600' : 'text-slate-400'"
+                             @@click="goToStep(@sn)">@stepNames[i]</div>
+                    </div>
+                    @if (!last)
+                    {
+                        <div class="flex-1 mx-3 h-0.5 bg-slate-200" :class="step > @sn ? 'bg-indigo-500' : ''"></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
 
-        <!-- ── Informações básicas ── -->
+    <!-- ══════════════ STEP 1: ESSENCIAL ══════════════ -->
+    <div x-show="step === 1" x-transition:enter.duration.200ms>
         <div class="ws">
             <div class="section-hd">
                 <div class="section-hd-icon bg-indigo-50 text-indigo-500">
@@ -49,52 +69,26 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Informações básicas</h3>
+                <h3 class="font-bold text-slate-800">Informacoes do produto</h3>
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2">
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nome *</label>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nome do produto *</label>
                     <input name="Nome" x-model="nome" value="@Model.Nome"
-                           placeholder="Ex: Camiseta Básica Masculina Algodão" required
+                           placeholder="Ex: Camiseta Basica Masculina Algodao"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
-                    <input name="SkuBase" x-model="sku" value="@Model.SkuBase"
-                           placeholder="Ex: CAM-BAS-001"
-                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Cod. Barras</label>
-                    <input name="CodigoBarras" value="@Model.CodigoBarras"
-                           placeholder="EAN-13 ou código interno"
-                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Marca</label>
-                    <input name="Marca" x-model="marca" value="@Model.Marca"
-                           placeholder="Ex: Nike, Samsung, Tramontina..."
-                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tipo</label>
-                    <select name="Tipo" x-model.number="tipo"
-                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                        @if (Model.Tipo == 0) { <option value="0" selected>Físico</option> } else { <option value="0">Físico</option> }
-                        @if (Model.Tipo == 1) { <option value="1" selected>Alimento</option> } else { <option value="1">Alimento</option> }
-                        @if (Model.Tipo == 2) { <option value="2" selected>Serviço</option> } else { <option value="2">Serviço</option> }
-                    </select>
-                </div>
+
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Categoria *</label>
                     @if (roots.Any())
                     {
                         <select name="CategoriaId"
                                 @@change="categoriaId = $el.value; subcategoriaId = ''"
-                                required
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                            <option value="">Selecione uma categoria</option>
+                            <option value="">Selecione...</option>
                             @foreach (var cat in roots)
                             {
                                 <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
@@ -107,64 +101,98 @@
                     }
                     else
                     {
-                        <div class="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2 mb-1.5">
-                            Categorias não puderam ser carregadas. Informe o ID manualmente.
-                        </div>
-                        <input name="CategoriaId" value="@Model.CategoriaId" placeholder="ID da categoria (GUID)"
+                        <input name="CategoriaId" value="@Model.CategoriaId" placeholder="ID da categoria"
                                class="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     }
                     <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
+
                 <div x-show="subcategorias.length > 0" x-transition>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
-                    <select name="SubcategoriaId"
-                            @@change="subcategoriaId = $el.value"
+                    <select name="SubcategoriaId" @@change="subcategoriaId = $el.value"
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                         <option value="">Nenhuma</option>
                         @if (Model.SubcategoriaId.HasValue)
                         {
                             var subcat = categorias.FirstOrDefault(c => c.Id == Model.SubcategoriaId.Value);
-                            if (subcat != null)
-                            {
-                                <option value="@subcat.Id" selected>@subcat.Nome</option>
-                            }
+                            if (subcat != null) { <option value="@subcat.Id" selected>@subcat.Nome</option> }
                         }
                         <template x-for="sub in subcategorias" :key="sub.id">
                             <option :value="sub.id" x-text="sub.nome"></option>
                         </template>
                     </select>
                 </div>
-                <div class="col-span-2">
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
+                    <input name="SkuBase" x-model="sku" value="@Model.SkuBase" placeholder="Ex: CAM-BAS-001"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Codigo de barras</label>
+                    <input name="CodigoBarras" value="@Model.CodigoBarras" placeholder="EAN-13"
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Marca</label>
+                    <input name="Marca" x-model="marca" value="@Model.Marca" placeholder="Ex: Nike, Samsung..."
+                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tipo</label>
+                    <select name="Tipo" x-model.number="tipo"
+                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        @if (Model.Tipo == 0) { <option value="0" selected>Fisico</option> } else { <option value="0">Fisico</option> }
+                        @if (Model.Tipo == 1) { <option value="1" selected>Alimento</option> } else { <option value="1">Alimento</option> }
+                        @if (Model.Tipo == 2) { <option value="2" selected>Servico</option> } else { <option value="2">Servico</option> }
+                    </select>
+                </div>
+                <div class="sm:col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input name="ControlaValidade" type="checkbox" value="true" @(Model.ControlaValidade ? "checked" : "") @@change="controlaValidade = $el.checked"
+                        <input name="ControlaValidade" type="checkbox" value="true" @(Model.ControlaValidade ? "checked" : "")
+                               @@change="controlaValidade = $el.checked"
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
                         <span class="text-sm text-slate-700">Controla validade</span>
                     </label>
                 </div>
-            </div>
-            <div class="mt-4">
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
-                <textarea name="DescricaoBase" x-model="descricao" rows="3"
-                          placeholder="Descreva as principais características do produto, material, uso indicado..."
-                          class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">@Model.DescricaoBase</textarea>
-                @if (isEdit)
-                {
-                    <button type="button" :disabled="aiGenerating || !nome"
-                            @@click="generateDescription()"
-                            class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-semibold mt-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                        <span x-show="!aiGenerating">Gerar descrição com IA</span>
-                        <span x-show="aiGenerating" x-cloak class="inline-flex items-center gap-1">
-                            <span class="spinner"></span> Gerando...
-                        </span>
-                    </button>
-                }
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Descricao</label>
+                    <textarea name="DescricaoBase" x-model="descricao" rows="3"
+                              placeholder="Descreva o produto em poucas palavras..."
+                              class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">@Model.DescricaoBase</textarea>
+                    @if (isEdit)
+                    {
+                        <button type="button" :disabled="aiGenerating || !nome"
+                                @@click="generateDescription()"
+                                class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-semibold mt-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <span x-show="!aiGenerating">Gerar com IA</span>
+                            <span x-show="aiGenerating" x-cloak class="inline-flex items-center gap-1"><span class="spinner"></span> Gerando...</span>
+                        </button>
+                    }
+                </div>
             </div>
         </div>
 
-        <!-- ── Fotos do produto ── -->
+        <!-- Nav Step 1 -->
+        <div class="flex justify-between mt-4">
+            <a href="@(isEdit ? $"/produtos/{Model.Id}" : "/produtos")"
+               class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                Cancelar
+            </a>
+            <button type="button" @@click="nextStep()"
+                    class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
+                Proximo &rarr;
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════ STEP 2: FOTOS E PRECOS ══════════════ -->
+    <div x-show="step === 2" x-transition:enter.duration.200ms>
+
+        <!-- Fotos -->
         <div class="ws">
             <div class="section-hd">
                 <div class="section-hd-icon bg-violet-50 text-violet-500">
@@ -176,38 +204,29 @@
                 <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + photoPreviews.length) + '/5'"></span>
             </div>
 
-            <!-- Existing photos (edit mode) -->
             <div x-show="existingPhotos.length > 0" x-transition class="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-3">
                 <template x-for="foto in existingPhotos" :key="foto.fotoId">
-                    <div class="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                    <div class="relative aspect-square rounded-lg overflow-hidden border border-slate-200">
                         <img :src="foto.url" class="w-full h-full object-cover" />
                     </div>
                 </template>
             </div>
 
-            <!-- Drop zone -->
             <div x-show="(existingPhotos.length + photoPreviews.length) < 5"
                  @@dragover.prevent="$el.classList.add('drop-active')"
                  @@dragleave="$el.classList.remove('drop-active')"
                  @@drop.prevent="$el.classList.remove('drop-active'); handleDrop($event)"
                  @@click="$refs.fileInput.click()"
-                 class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors">
-                <svg class="w-8 h-8 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-300 transition-colors">
+                <svg class="w-10 h-10 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p class="text-sm text-slate-500">Arraste imagens ou clique para selecionar</p>
-                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Máx. 5 MB cada</p>
-                <span class="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-lg hover:bg-indigo-100 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Selecionar arquivos
-                </span>
+                <p class="text-sm text-slate-500 font-medium">Arraste imagens ou clique para selecionar</p>
+                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 5 MB cada</p>
             </div>
             <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
                    @@change="handleFileSelect($event)" />
 
-            <!-- New photo previews -->
             <div x-show="photoPreviews.length > 0" x-transition class="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-3">
                 <template x-for="(preview, i) in photoPreviews" :key="i">
                     <div class="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
@@ -217,17 +236,9 @@
                     </div>
                 </template>
             </div>
-
-            <!-- Create mode hint -->
-            <template x-if="!isEdit && photoPreviews.length > 0">
-                <p class="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    As fotos serão enviadas automaticamente após salvar o produto.
-                </p>
-            </template>
         </div>
 
-        <!-- ── Preços e Margem ── -->
+        <!-- Precos -->
         <div class="ws">
             <div class="section-hd">
                 <div class="section-hd-icon bg-emerald-50 text-emerald-500">
@@ -235,7 +246,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Preços e margem</h3>
+                <h3 class="font-bold text-slate-800">Precos e margem</h3>
             </div>
             <div class="grid grid-cols-3 gap-4">
                 <div>
@@ -249,7 +260,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Margem (%)</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Margem</label>
                     <div class="relative">
                         <input name="MargemEstimada" type="number" step="0.1"
                                value="@Model.MargemEstimada" x-model.number="margem" @@input="onMargemInput()"
@@ -260,11 +271,11 @@
                     <template x-if="margem > 0">
                         <span class="text-xs mt-1 block font-medium"
                               :class="margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
-                              x-text="margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
+                              x-text="margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudavel'"></span>
                     </template>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preco venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
                         <input name="PrecoReferencia" type="number" step="0.01" min="0"
@@ -277,27 +288,48 @@
             <template x-if="lastEdited !== 'none' && (margem > 0 || preco > 0)">
                 <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Campos com borda verde foram calculados automaticamente. Você pode editá-los manualmente.
+                    Campos com borda verde foram calculados. Voce pode edita-los.
                 </p>
             </template>
         </div>
 
-        <!-- ── Dimensões e peso ── -->
-        <div class="ws" x-data="{ showDimensoes: @(Model.DimensoesPeso.HasValue || Model.DimensoesLargura.HasValue || Model.DimensoesAltura.HasValue || Model.DimensoesComprimento.HasValue ? "true" : "false") }">
-            <button type="button" @@click="showDimensoes = !showDimensoes" class="w-full flex items-center justify-between">
+        <!-- Nav Step 2 -->
+        <div class="flex justify-between mt-4">
+            <button type="button" @@click="prevStep()"
+                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                &larr; Voltar
+            </button>
+            <button type="button" @@click="nextStep()"
+                    class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
+                Proximo &rarr;
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════ STEP 3: DETALHES (OPCIONAL) ══════════════ -->
+    <div x-show="step === 3" x-transition:enter.duration.200ms>
+
+        <div class="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg px-4 py-3 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Etapa opcional — pule se nao precisar agora. Voce pode adicionar detalhes depois.
+        </div>
+
+        <!-- Dimensoes -->
+        <div class="ws" x-data="{ open: @(Model.DimensoesPeso.HasValue || Model.DimensoesLargura.HasValue ? "true" : "false") }">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-sky-50 text-sky-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                         </svg>
                     </div>
-                    <h3 class="font-bold text-slate-800">Dimensões e peso</h3>
+                    <h3 class="font-bold text-slate-800">Dimensoes e peso</h3>
                 </div>
-                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': showDimensoes }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div x-show="showDimensoes" x-transition class="mt-4">
+            <div x-show="open" x-transition class="mt-4">
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-xs text-slate-600 mb-1">Peso (kg)</label>
@@ -323,7 +355,7 @@
             </div>
         </div>
 
-        <!-- ── Variações ── -->
+        <!-- Variacoes -->
         <div class="ws">
             <div class="section-hd">
                 <div class="section-hd-icon bg-amber-50 text-amber-500">
@@ -331,34 +363,31 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Variações</h3>
+                <h3 class="font-bold text-slate-800">Variacoes</h3>
                 <span x-show="variacoes.length" class="text-xs text-slate-400 ml-auto" x-text="variacoes.length"></span>
             </div>
             <div class="space-y-3 mb-3">
                 <template x-for="(v, i) in variacoes" :key="i">
                     <div class="border border-slate-200 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-semibold text-slate-500" x-text="'Variação ' + (i+1)"></span>
+                            <span class="text-xs font-semibold text-slate-500" x-text="'Variacao ' + (i+1)"></span>
                             <button type="button" @@click="variacoes.splice(i, 1)"
                                     class="text-red-500 hover:text-red-700 text-xs font-semibold">Remover</button>
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome"
-                                       placeholder="Ex: P, M, G, Azul..."
+                                <input type="text" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome" placeholder="Ex: P, M, G..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-600 mb-1">Cor</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor"
-                                       placeholder="Ex: Azul, Vermelho..."
+                                <input type="text" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor" placeholder="Azul, Vermelho..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-600 mb-1">Tamanho</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho"
-                                       placeholder="Ex: P, M, G, 42..."
+                                <input type="text" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho" placeholder="P, M, G, 42..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
@@ -389,59 +418,54 @@
             </div>
             <button type="button" @@click="variacoes.push({nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
                     class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                Adicionar variação
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Adicionar variacao
             </button>
         </div>
 
-        <!-- ── Características ── -->
-        <div class="ws" x-data="{ showCaract: @(Model.Caracteristicas.Any() ? "true" : "false") }">
-            <button type="button" @@click="showCaract = !showCaract" class="w-full flex items-center justify-between">
+        <!-- Caracteristicas -->
+        <div class="ws" x-data="{ open: @(Model.Caracteristicas.Any() ? "true" : "false") }">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-rose-50 text-rose-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                         </svg>
                     </div>
-                    <h3 class="font-bold text-slate-800">Características</h3>
+                    <h3 class="font-bold text-slate-800">Caracteristicas</h3>
                     <span x-show="caracteristicas.length" class="text-xs text-slate-400 ml-2" x-text="caracteristicas.length"></span>
                 </div>
-                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': showCaract }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div x-show="showCaract" x-transition class="mt-4">
+            <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
                     <template x-for="(c, i) in caracteristicas" :key="i">
                         <div class="border border-slate-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-semibold text-slate-500" x-text="'Característica ' + (i+1)"></span>
+                                <span class="text-xs font-semibold text-slate-500" x-text="'Caracteristica ' + (i+1)"></span>
                                 <button type="button" @@click="caracteristicas.splice(i, 1)"
                                         class="text-red-500 hover:text-red-700 text-xs font-semibold">Remover</button>
                             </div>
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div class="col-span-2">
                                     <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome"
-                                           placeholder="Ex: Material, Voltagem..."
+                                    <input type="text" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome" placeholder="Ex: Material, Voltagem..."
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Quantidade</label>
-                                    <input type="number" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia"
-                                           min="0"
+                                    <input type="number" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Variação</label>
+                                    <label class="block text-xs text-slate-600 mb-1">Variacao</label>
                                     <input type="text" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
-                                           placeholder="Variação relacionada"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div class="col-span-2 sm:col-span-4">
-                                    <label class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                    <label class="block text-xs text-slate-600 mb-1">Descricao</label>
                                     <input type="text" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
@@ -452,17 +476,15 @@
                 </div>
                 <button type="button" @@click="caracteristicas.push({nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Adicionar característica
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    Adicionar caracteristica
                 </button>
             </div>
         </div>
 
-        <!-- ── Embalagens ── -->
-        <div class="ws" x-data="{ showEmb: @(Model.Embalagens.Any() ? "true" : "false") }">
-            <button type="button" @@click="showEmb = !showEmb" class="w-full flex items-center justify-between">
+        <!-- Embalagens -->
+        <div class="ws" x-data="{ open: @(Model.Embalagens.Any() ? "true" : "false") }">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-teal-50 text-teal-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -472,11 +494,11 @@
                     <h3 class="font-bold text-slate-800">Embalagens</h3>
                     <span x-show="embalagens.length" class="text-xs text-slate-400 ml-2" x-text="embalagens.length"></span>
                 </div>
-                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': showEmb }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div x-show="showEmb" x-transition class="mt-4">
+            <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
                     <template x-for="(e, i) in embalagens" :key="i">
                         <div class="border border-slate-200 rounded-lg p-3">
@@ -488,19 +510,18 @@
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 <div class="col-span-2">
                                     <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                    <input type="text" :name="'Embalagens[' + i + '].Nome'" x-model="e.nome"
-                                           placeholder="Ex: Caixa individual, Fardo..."
+                                    <input type="text" :name="'Embalagens[' + i + '].Nome'" x-model="e.nome" placeholder="Ex: Caixa individual..."
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="flex items-center gap-2 cursor-pointer mt-5">
                                         <input type="checkbox" :name="'Embalagens[' + i + '].Padrao'" x-model="e.padrao" value="true"
                                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
-                                        <span class="text-xs text-slate-600">Padrão</span>
+                                        <span class="text-xs text-slate-600">Padrao</span>
                                     </label>
                                 </div>
                                 <div class="col-span-2 sm:col-span-3">
-                                    <label class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                    <label class="block text-xs text-slate-600 mb-1">Descricao</label>
                                     <input type="text" :name="'Embalagens[' + i + '].Descricao'" x-model="e.descricao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
@@ -508,26 +529,22 @@
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Peso (kg)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Peso'" x-model.number="e.peso"
-                                           step="0.001" min="0"
+                                    <input type="number" :name="'Embalagens[' + i + '].Peso'" x-model.number="e.peso" step="0.001" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Largura (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Largura'" x-model.number="e.largura"
-                                           step="0.01" min="0"
+                                    <input type="number" :name="'Embalagens[' + i + '].Largura'" x-model.number="e.largura" step="0.01" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Altura (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Altura'" x-model.number="e.altura"
-                                           step="0.01" min="0"
+                                    <input type="number" :name="'Embalagens[' + i + '].Altura'" x-model.number="e.altura" step="0.01" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Comprimento (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Comprimento'" x-model.number="e.comprimento"
-                                           step="0.01" min="0"
+                                    <input type="number" :name="'Embalagens[' + i + '].Comprimento'" x-model.number="e.comprimento" step="0.01" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                             </div>
@@ -536,95 +553,67 @@
                 </div>
                 <button type="button" @@click="embalagens.push({nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Adicionar embalagem
                 </button>
             </div>
         </div>
+
+        <!-- Nav Step 3 -->
+        <div class="flex justify-between mt-4">
+            <button type="button" @@click="prevStep()"
+                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                &larr; Voltar
+            </button>
+            <button type="button" @@click="nextStep()"
+                    class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
+                Revisar &rarr;
+            </button>
+        </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- PREVIEW PANEL (coluna direita)              -->
-    <!-- ═══════════════════════════════════════════ -->
-    <div class="lg:sticky lg:top-6 lg:self-start space-y-4">
+    <!-- ══════════════ STEP 4: REVISAO ══════════════ -->
+    <div x-show="step === 4" x-transition:enter.duration.200ms>
 
-        <!-- Product Preview Card -->
-        <div class="ws preview-card overflow-hidden p-0">
-            <!-- Photo area -->
-            <div class="aspect-video bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden">
-                <template x-if="photoPreviews.length > 0">
-                    <img :src="photoPreviews[0]" class="w-full h-full object-cover" />
-                </template>
-                <template x-if="photoPreviews.length === 0 && existingPhotos.length > 0">
-                    <img :src="existingPhotos[0].url" class="w-full h-full object-cover" />
-                </template>
+        <!-- Preview Card -->
+        <div class="ws overflow-hidden p-0">
+            <div class="aspect-video bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden max-h-52">
+                <template x-if="photoPreviews.length > 0"><img :src="photoPreviews[0]" class="w-full h-full object-cover" /></template>
+                <template x-if="photoPreviews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
                 <template x-if="photoPreviews.length === 0 && existingPhotos.length === 0">
                     <svg class="w-16 h-16 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                 </template>
             </div>
-
-            <!-- Product info -->
             <div class="p-5">
-                <h3 class="font-bold text-slate-900 text-lg leading-tight"
-                    x-text="nome || 'Nome do produto'"
-                    :class="{ 'text-slate-300 italic': !nome }"></h3>
-
-                <!-- Tags -->
+                <h3 class="font-bold text-slate-900 text-lg" x-text="nome || 'Nome do produto'" :class="{ 'text-slate-300 italic': !nome }"></h3>
                 <div class="flex flex-wrap items-center gap-1.5 mt-2">
-                    <span x-show="sku" class="text-xs font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded" x-text="sku" x-cloak></span>
-                    <span x-show="categoriaNome" class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium" x-text="categoriaNome" x-cloak></span>
-                    <span x-show="marca" class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full" x-text="marca" x-cloak></span>
+                    <span x-show="sku" x-cloak class="text-xs font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded" x-text="sku"></span>
+                    <span x-show="categoriaNome" x-cloak class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium" x-text="categoriaNome"></span>
+                    <span x-show="marca" x-cloak class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full" x-text="marca"></span>
                 </div>
-
-                <!-- Description -->
-                <p class="text-sm text-slate-500 mt-3 line-clamp-3"
-                   x-text="descricao || 'Sem descrição'"
-                   :class="{ 'italic text-slate-300': !descricao }"></p>
-
-                <!-- Pricing -->
-                <div class="mt-4 pt-4 border-t border-slate-100">
-                    <div class="flex items-baseline gap-3">
-                        <span class="text-2xl font-extrabold text-slate-900"
-                              x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'R$ —'"></span>
-                    </div>
-                    <div class="flex items-center gap-3 mt-1.5">
-                        <span x-show="custo > 0" x-cloak class="text-xs text-slate-400" x-text="'Custo: R$ ' + custo.toFixed(2)"></span>
-                        <span x-show="margem > 0" x-cloak
-                              :class="margem < 10 ? 'bg-red-50 text-red-600' : margem < 30 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'"
-                              class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                              x-text="margem.toFixed(1) + '% margem'"></span>
-                    </div>
+                <p class="text-sm text-slate-500 mt-3 line-clamp-3" x-text="descricao || 'Sem descricao'" :class="{ 'italic text-slate-300': !descricao }"></p>
+                <div class="mt-4 pt-4 border-t border-slate-100 flex items-baseline gap-3">
+                    <span class="text-2xl font-extrabold text-slate-900" x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'R$ --'"></span>
+                    <span x-show="custo > 0" x-cloak class="text-xs text-slate-400" x-text="'Custo: R$ ' + custo.toFixed(2)"></span>
+                    <span x-show="margem > 0" x-cloak
+                          :class="margem < 10 ? 'bg-red-50 text-red-600' : margem < 30 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'"
+                          class="text-xs font-semibold px-2 py-0.5 rounded-full" x-text="margem.toFixed(1) + '%'"></span>
                 </div>
-
-                <!-- Variations & characteristics summary -->
-                <div class="mt-4 pt-3 border-t border-slate-100 space-y-1.5">
-                    <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="flex items-center gap-2 text-xs text-slate-500">
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
-                        <span x-text="variacoes.filter(v => v.nome).length + ' variação(ões)'"></span>
-                    </div>
-                    <div x-show="caracteristicas.filter(c => c.nome).length > 0" x-cloak class="flex items-center gap-2 text-xs text-slate-500">
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                        <span x-text="caracteristicas.filter(c => c.nome).length + ' característica(s)'"></span>
-                    </div>
-                    <div x-show="embalagens.filter(e => e.nome).length > 0" x-cloak class="flex items-center gap-2 text-xs text-slate-500">
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                        <span x-text="embalagens.filter(e => e.nome).length + ' embalagem(ns)'"></span>
-                    </div>
+                <div class="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                    <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="variacoes.filter(v => v.nome).length + ' variacao(oes)'"></div>
+                    <div x-show="caracteristicas.filter(c => c.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="caracteristicas.filter(c => c.nome).length + ' caracteristica(s)'"></div>
+                    <div x-show="embalagens.filter(e => e.nome).length > 0" x-cloak class="text-xs text-slate-500" x-text="embalagens.filter(e => e.nome).length + ' embalagem(ns)'"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Completion Indicator -->
+        <!-- Completion -->
         <div class="ws">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-semibold text-slate-600">Preenchimento</span>
-                <span class="text-xs font-bold"
-                      :class="completionPercent === 100 ? 'text-emerald-600' : 'text-slate-400'"
-                      x-text="completionPercent + '%'"></span>
+                <span class="text-xs font-bold" :class="completionPercent === 100 ? 'text-emerald-600' : 'text-slate-400'" x-text="completionPercent + '%'"></span>
             </div>
             <div class="w-full bg-slate-100 rounded-full h-1.5">
                 <div class="h-1.5 rounded-full transition-all duration-300"
@@ -632,42 +621,37 @@
                      :style="'width: ' + completionPercent + '%'"></div>
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
-                <span class="text-[10px]" :class="nome ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="nome ? '✓' : '○'"></span> Nome
-                </span>
-                <span class="text-[10px]" :class="categoriaId ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="categoriaId ? '✓' : '○'"></span> Categoria
-                </span>
-                <span class="text-[10px]" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="custo > 0 ? '✓' : '○'"></span> Custo
-                </span>
-                <span class="text-[10px]" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="preco > 0 ? '✓' : '○'"></span> Preço
-                </span>
-                <span class="text-[10px]" :class="descricao ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="descricao ? '✓' : '○'"></span> Descrição
-                </span>
-                <span class="text-[10px]" :class="(photoPreviews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'">
-                    <span x-text="(photoPreviews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto
-                </span>
+                <span class="text-[10px]" :class="nome ? 'text-emerald-500' : 'text-slate-300'"><span x-text="nome ? '✓' : '○'"></span> Nome</span>
+                <span class="text-[10px]" :class="categoriaId ? 'text-emerald-500' : 'text-slate-300'"><span x-text="categoriaId ? '✓' : '○'"></span> Categoria</span>
+                <span class="text-[10px]" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
+                <span class="text-[10px]" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
+                <span class="text-[10px]" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Descricao</span>
+                <span class="text-[10px]" :class="(photoPreviews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(photoPreviews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
+            </div>
+
+            <!-- Edit links -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
+                <button type="button" @@click="step = 1" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar info basica</button>
+                <span class="text-slate-300">|</span>
+                <button type="button" @@click="step = 2" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar fotos/precos</button>
+                <span class="text-slate-300">|</span>
+                <button type="button" @@click="step = 3" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Editar detalhes</button>
             </div>
         </div>
 
-        <!-- Save Actions -->
-        <div class="ws">
+        <!-- Nav Step 4 -->
+        <div class="flex justify-between mt-4">
+            <button type="button" @@click="prevStep()"
+                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                &larr; Voltar
+            </button>
             <button type="submit"
                     :disabled="saving"
                     :class="{ 'opacity-50 cursor-not-allowed': saving }"
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm mb-3">
-                <span x-show="!saving">@(isEdit ? "Salvar alterações" : "Criar produto")</span>
-                <span x-show="saving" x-cloak class="inline-flex items-center gap-2">
-                    <span class="spinner"></span> Salvando...
-                </span>
+                    class="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/25">
+                <span x-show="!saving">@(isEdit ? "Salvar alteracoes" : "Criar produto")</span>
+                <span x-show="saving" x-cloak class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
             </button>
-            <a href="@(isEdit ? $"/produtos/{Model.Id}" : "/produtos")"
-               class="w-full block text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-sm">
-                Cancelar
-            </a>
         </div>
     </div>
 </form>
@@ -683,7 +667,37 @@
                 isEdit,
                 productId: '@(Model.Id ?? "")',
 
-                // ── Preview reactivity ──
+                // ── Wizard ──
+                step: 1,
+                maxStepReached: isEdit ? 4 : 1,
+
+                nextStep() {
+                    if (this.step === 1 && !this.step1Valid) {
+                        if (!this.nome) window.showToast('Informe o nome do produto.', 'warning');
+                        else window.showToast('Selecione uma categoria.', 'warning');
+                        return;
+                    }
+                    if (this.step < 4) {
+                        this.step++;
+                        this.maxStepReached = Math.max(this.maxStepReached, this.step);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                },
+                prevStep() { if (this.step > 1) { this.step--; window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+                goToStep(n) { if (n >= 1 && n <= 4 && n <= this.maxStepReached) { this.step = n; window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+
+                get step1Valid() { return !!this.nome && !!this.categoriaId; },
+
+                // ── Submit ──
+                saving: false,
+                submitForm() {
+                    if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
+                    if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    this.saving = true;
+                    this.$nextTick(() => this.$el.submit());
+                },
+
+                // ── Fields ──
                 nome: @Html.Raw(JsonSerializer.Serialize(Model.Nome ?? "")),
                 descricao: @Html.Raw(JsonSerializer.Serialize(Model.DescricaoBase ?? "")),
                 marca: @Html.Raw(JsonSerializer.Serialize(Model.Marca ?? "")),
@@ -691,11 +705,9 @@
                 tipo: @Model.Tipo,
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
 
-                // ── Categories ── (lowercase para garantir match exato com JSON serializado)
                 categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
                 subcategoriaId: '@(Model.SubcategoriaId?.ToString().ToLower() ?? "")',
 
-                // ── Dynamic arrays ──
                 variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
                     nome = v.Nome ?? "", cor = v.Cor ?? "", tamanho = v.Tamanho ?? "",
                     descricaoComercial = v.DescricaoComercial ?? "", sku = v.Sku ?? "",
@@ -712,7 +724,7 @@
                     comprimento = e.Comprimento, padrao = e.Padrao
                 }))),
 
-                // ── Pricing (bidirectional) ──
+                // ── Pricing ──
                 preco: @(Model.PrecoReferencia?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
                 custo: @(Model.CustoReferencia?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
                 margem: @(Model.MargemEstimada?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
@@ -779,7 +791,7 @@
                         const dt = new DataTransfer();
                         this.photoFiles.forEach(f => dt.items.add(f));
                         this.$refs.fileInput.files = dt.files;
-                    } catch (e) { /* DataTransfer não suportado — fallback para file select nativo */ }
+                    } catch (e) { /* DataTransfer fallback */ }
                 },
 
                 // ── AI ──
@@ -789,11 +801,9 @@
                     this.aiGenerating = true;
                     try {
                         const params = new URLSearchParams({
-                            produtoId: this.productId,
-                            canal: 'descricao',
-                            tom: 'profissional',
+                            produtoId: this.productId, canal: 'descricao', tom: 'profissional',
                             foco: 'beneficios',
-                            contexto: 'Gere apenas uma descrição comercial curta e objetiva (2-3 frases) para usar no cadastro do produto. Não use listas. Não use título.'
+                            contexto: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases) para usar no cadastro do produto. Nao use listas. Nao use titulo.'
                         });
                         const res = await fetch('/anuncios/gerar?' + params.toString());
                         if (!res.ok) throw new Error();
@@ -805,30 +815,18 @@
                             if (done) break;
                             const text = decoder.decode(value);
                             for (const line of text.split('\n')) {
-                                if (line.startsWith('data: ')) {
-                                    this.descricao += line.slice(6);
-                                }
+                                if (line.startsWith('data: ')) this.descricao += line.slice(6);
                             }
                         }
                     } catch { /* silently fail */ }
                     this.aiGenerating = false;
                 },
 
-                // ── UX ──
-                saving: false,
-
+                // ── Completion ──
                 get completionPercent() {
-                    const fields = [
-                        !!this.nome,
-                        !!this.categoriaId,
-                        this.preco > 0,
-                        this.custo > 0,
-                        !!this.descricao,
-                        (this.photoPreviews.length + this.existingPhotos.length) > 0
-                    ];
+                    const fields = [!!this.nome, !!this.categoriaId, this.preco > 0, this.custo > 0, !!this.descricao, (this.photoPreviews.length + this.existingPhotos.length) > 0];
                     return Math.round(fields.filter(Boolean).length / fields.length * 100);
                 },
-
             };
         }
     </script>
