@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-[AllowAnonymous]
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService, SessionService session) : Controller
 {
+    [AllowAnonymous]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
     {
@@ -22,7 +22,6 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
         ViewBag.Timestamp = DateTimeOffset.UtcNow;
         ViewBag.LatenciaApiMs = latenciaApiMs;
 
-        // Busca logs se o usuário estiver autenticado como Admin/SuperAdmin
         if (User.Identity?.IsAuthenticated == true &&
             (User.IsInRole("Admin") || User.IsInRole("SuperAdmin")))
         {
@@ -32,6 +31,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
         return View(apiResult);
     }
 
+    [AllowAnonymous]
     [Route("diagnostico/json")]
     public async Task<IActionResult> Json()
     {
@@ -50,27 +50,29 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     // Proxy endpoints para Alpine.js (async client-side loading)
     // ──────────────────────────────────────────────────────────────────────
 
+    [AllowAnonymous]
     [Route("diagnostico/api/endpoints")]
     public async Task<IActionResult> ProxyEndpoints()
     {
         var result = await diagnosticoService.FetchEndpointTestsAsync();
         if (result is null)
-            return base.Json(new { error = "Não foi possível conectar à API" });
+            return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
 
+    [AllowAnonymous]
     [Route("diagnostico/api/historico")]
     public async Task<IActionResult> ProxyHistorico()
     {
         var result = await diagnosticoService.FetchHealthHistoryAsync();
         if (result is null)
-            return base.Json(new { error = "Não foi possível conectar à API" });
+            return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
 
     [Route("diagnostico/api/logs-enhanced")]
     [Authorize(Roles = "Admin,SuperAdmin")]
-    public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 24)
+    public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 48)
     {
         var token = session.GetToken();
         if (string.IsNullOrEmpty(token))
@@ -78,7 +80,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
 
         var result = await diagnosticoService.FetchEnhancedLogsAsync(token, hours);
         if (result is null)
-            return base.Json(new { error = "Não foi possível obter logs da API" });
+            return StatusCode(502, new { error = "Não foi possível obter logs da API" });
         return base.Json(result);
     }
 }

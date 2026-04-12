@@ -157,7 +157,7 @@
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200 p-4">
-                <div class="text-xs text-slate-500 font-medium mb-1">Erros 24h</div>
+                <div class="text-xs text-slate-500 font-medium mb-1">Erros 48h</div>
                 <div class="text-2xl font-bold" :class="errorCount24h > 0 ? 'text-red-600' : 'text-green-600'"
                     x-text="enhancedLogs ? enhancedLogs.resumo.totalErrors : '—'">—</div>
                 <div class="text-xs text-slate-400 mt-1" x-text="enhancedLogs ? enhancedLogs.resumo.totalWarnings + ' warnings' : 'Carregando...'">Carregando...</div>
@@ -187,6 +187,9 @@
                     <div x-show="!healthHistory" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
                         <span class="material-icons-round animate-spin mr-2">hourglass_empty</span>Carregando...
                     </div>
+                    <div x-show="healthHistory && (!healthHistory.snapshots || healthHistory.snapshots.length === 0)" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                        <span class="material-icons-round mr-2">hourglass_empty</span>Aguardando snapshots (coletados a cada 60s)...
+                    </div>
                 </div>
             </div>
 
@@ -195,7 +198,7 @@
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
                         <span class="material-icons-round text-base text-red-500">error_outline</span>
-                        Erros por Hora (24h)
+                        Erros por Hora (48h)
                     </h3>
                 </div>
                 <div class="h-52 relative">
@@ -274,10 +277,16 @@
                         <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
                             <span class="material-icons-round text-base text-amber-500">folder</span>Storage
                         </h3>
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">@Model.Storage.Provider</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @(Model.Storage.Configurado ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")">@Model.Storage.Provider</span>
                     </div>
                     <div class="space-y-1 text-xs text-slate-600">
-                        <div class="flex justify-between"><span>Diretorio</span><span class="font-medium @(Model.Storage.DiretorioExiste == true ? "text-green-600" : "text-red-600")">@(Model.Storage.DiretorioExiste == true ? "Existe" : "Ausente")</span></div>
+                        <div class="flex justify-between"><span>Configurado</span><span class="font-medium @(Model.Storage.Configurado ? "text-green-600" : "text-red-600")">@(Model.Storage.Configurado ? "Sim" : "Não")</span></div>
+                        <div class="flex justify-between">
+                            <span>@(Model.Storage.Provider == "Local" ? "Diretório" : "Conexão")</span>
+                            <span class="font-medium @(Model.Storage.DiretorioExiste == true ? "text-green-600" : Model.Storage.DiretorioExiste == false ? "text-red-600" : "text-slate-400")">
+                                @(Model.Storage.DiretorioExiste == true ? "OK" : Model.Storage.DiretorioExiste == false ? "Falha" : "N/A")
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -444,7 +453,7 @@
                         <template x-for="(entry, idx) in filteredLogs.slice(0, visibleLogs)" :key="idx">
                             <div class="border-b border-slate-100 last:border-0">
                                 <div @@click="entry._expanded = !entry._expanded"
-                                    class="flex items-start gap-2 px-4 py-2 cursor-pointer hover:bg-slate-50 transition-colors border-l-3"
+                                    class="flex items-start gap-2 px-4 py-2 cursor-pointer hover:bg-slate-50 transition-colors border-l-4"
                                     :class="{
                                         'border-l-red-500': entry.level === 'ERROR' || entry.level === 'FATAL',
                                         'border-l-yellow-400': entry.level === 'WARN',
@@ -514,7 +523,7 @@
         <div x-show="!loadingLogs && patterns.length === 0" class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
             <span class="material-icons-round text-4xl text-green-400 mb-2">verified</span>
             <p class="text-green-700 font-medium">Nenhum problema detectado</p>
-            <p class="text-xs text-green-600 mt-1">Os algoritmos de deteccao nao encontraram padroes anomalos nas ultimas 24h.</p>
+            <p class="text-xs text-green-600 mt-1">Os algoritmos de deteccao nao encontraram padroes anomalos nas ultimas 48h.</p>
         </div>
 
         <!-- Patterns by Category -->
@@ -713,7 +722,7 @@ function diagApp() {
         async fetchEnhancedLogs() {
             this.loadingLogs = true;
             try {
-                const r = await fetch('/diagnostico/api/logs-enhanced?hours=24');
+                const r = await fetch('/diagnostico/api/logs-enhanced?hours=48');
                 if (r.ok) {
                     this.enhancedLogs = await r.json();
                     // Add _expanded property to each entry
