@@ -737,7 +737,68 @@
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
                     this.saving = true;
+                    this._clearDraft();
                     this.$nextTick(() => this.$el.submit());
+                },
+
+                // ── Draft persistence (sessionStorage) ──
+                _draftKey: 'easystock_produto_draft' + (isEdit ? '_edit' : '_new'),
+                init() {
+                    if (!isEdit) this._restoreDraft();
+                    this.$watch('nome', () => this._saveDraft());
+                    this.$watch('sku', () => this._saveDraft());
+                    this.$watch('marca', () => this._saveDraft());
+                    this.$watch('descricao', () => this._saveDraft());
+                    this.$watch('categoriaId', () => this._saveDraft());
+                    this.$watch('preco', () => this._saveDraft());
+                    this.$watch('custo', () => this._saveDraft());
+                    this.$watch('margem', () => this._saveDraft());
+                    this.$watch('step', () => this._saveDraft());
+                },
+                _saveDraft() {
+                    try {
+                        sessionStorage.setItem(this._draftKey, JSON.stringify({
+                            nome: this.nome, sku: this.sku, marca: this.marca,
+                            descricao: this.descricao, categoriaId: this.categoriaId,
+                            subcategoriaId: this.subcategoriaId, tipo: this.tipo,
+                            preco: this.preco, custo: this.custo, margem: this.margem,
+                            controlaValidade: this.controlaValidade, step: this.step,
+                            maxStepReached: this.maxStepReached,
+                            variacoes: this.variacoes, caracteristicas: this.caracteristicas,
+                            embalagens: this.embalagens
+                        }));
+                    } catch {}
+                },
+                _restoreDraft() {
+                    try {
+                        const raw = sessionStorage.getItem(this._draftKey);
+                        if (!raw) return;
+                        const d = JSON.parse(raw);
+                        if (d.nome) this.nome = d.nome;
+                        if (d.sku) this.sku = d.sku;
+                        if (d.marca) this.marca = d.marca;
+                        if (d.descricao) this.descricao = d.descricao;
+                        if (d.categoriaId) this.categoriaId = d.categoriaId;
+                        if (d.subcategoriaId) this.subcategoriaId = d.subcategoriaId;
+                        if (d.tipo !== undefined) this.tipo = d.tipo;
+                        if (d.preco > 0) this.preco = d.preco;
+                        if (d.custo > 0) this.custo = d.custo;
+                        if (d.margem > 0) this.margem = d.margem;
+                        if (d.controlaValidade) this.controlaValidade = d.controlaValidade;
+                        if (d.step > 1) { this.step = d.step; this.maxStepReached = d.maxStepReached || d.step; }
+                        if (d.variacoes?.length) this.variacoes = d.variacoes;
+                        if (d.caracteristicas?.length) this.caracteristicas = d.caracteristicas;
+                        if (d.embalagens?.length) this.embalagens = d.embalagens;
+                        // Sync select element for CategoriaId
+                        this.$nextTick(() => {
+                            const sel = this.$el.querySelector('select[name="CategoriaId"]');
+                            if (sel && this.categoriaId) sel.value = this.categoriaId;
+                        });
+                        window.showToast('Rascunho restaurado.', 'info', 2000);
+                    } catch {}
+                },
+                _clearDraft() {
+                    try { sessionStorage.removeItem(this._draftKey); } catch {}
                 },
 
                 // ── Fields ──

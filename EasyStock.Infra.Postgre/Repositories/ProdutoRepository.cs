@@ -42,7 +42,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             return dbContext.Produtos
                 .AsNoTracking()
-                .Where(p => p.EmpresaId == empresaId && p.SkuBase != null && p.SkuBase.Value == skuBase)
+                .Where(p => p.EmpresaId == empresaId && EF.Property<string?>(p, "SkuBase") == skuBase)
                 .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
                 .AnyAsync();
         }
@@ -60,7 +60,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (EF.Functions.ILike(p.Nome, pattern) ||
                      (p.Marca != null && EF.Functions.ILike(p.Marca, pattern)) ||
                      (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
-                     (p.SkuBase != null && EF.Functions.ILike(p.SkuBase.Value, pattern)) ||
+                     (EF.Property<string?>(p, "SkuBase") != null && EF.Functions.ILike(EF.Property<string>(p, "SkuBase"), pattern)) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
                 .Take(maxResults)
                 .ToListAsync();
