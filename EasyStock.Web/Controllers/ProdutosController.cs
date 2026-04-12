@@ -87,6 +87,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (!result.Success && result.HttpStatus is not (200 or 201))
         {
             HasError(result);
+            if (result.ErrorMessage?.Contains("SKU") == true)
+                ModelState.AddModelError("SkuBase", result.ErrorMessage);
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
@@ -203,7 +205,12 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     public async Task<IActionResult> Excluir(string id)
     {
         var result = await svc.ExcluirAsync(id);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (!result.Success)
+        {
+            var msg = result.ErrorMessage ?? "Erro ao excluir produto.";
+            Toast("error", msg.Contains("estoque") ? "Produto possui estoque disponível. Zere o estoque antes de excluir." : msg);
+            return RedirectToAction(nameof(Detail), new { id });
+        }
 
         Toast("success", "Produto excluído com sucesso!");
         return RedirectToAction(nameof(Index));
