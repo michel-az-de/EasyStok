@@ -18,7 +18,7 @@
     </div>
     <button type="button"
             x-data @@click="$dispatch('open-modal', 'convidar')"
-            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
         + Novo Usuário
     </button>
 </div>
@@ -72,9 +72,9 @@
                                   x-show="editando" x-cloak class="flex gap-2 items-center">
                                 @Html.AntiForgeryToken()
                                 <input type="text" name="nome" x-model="nomeEdit"
-                                       class="border border-slate-300 rounded px-2 py-1 text-xs" required />
+                                       class="ui-field border border-slate-300 rounded px-2 py-1 text-xs" required />
                                 <button type="submit"
-                                        class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
+                                        class="app-primary-btn px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
                                     Salvar
                                 </button>
                             </form>
@@ -96,7 +96,7 @@
                                   x-show="editPerfil" x-cloak class="space-y-1">
                                 @Html.AntiForgeryToken()
                                 <select name="perfilId"
-                                        class="w-full border border-slate-300 rounded px-2 py-1 text-xs">
+                                        class="ui-select w-full border border-slate-300 rounded px-2 py-1 text-xs">
                                     @foreach (var (val, label) in perfis)
                                     {
                                         if (u.Role == val)
@@ -110,7 +110,7 @@
                                     }
                                 </select>
                                 <select name="lojaId"
-                                        class="w-full border border-slate-300 rounded px-2 py-1 text-xs">
+                                        class="ui-select w-full border border-slate-300 rounded px-2 py-1 text-xs">
                                     <option value="">Sem loja</option>
                                     @foreach (var l in Model.Lojas)
                                     {
@@ -126,7 +126,7 @@
                                 </select>
                                 <div class="flex gap-1">
                                     <button type="submit"
-                                            class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
+                                            class="app-primary-btn px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
                                         Salvar
                                     </button>
                                     <button type="button" @@click="editPerfil = false"
@@ -150,14 +150,14 @@
                             <div x-show="confirm" x-cloak
                                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                                  @@click.self="confirm = false">
-                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
+                                <div class="ui-modal bg-white rounded-xl p-6 w-80 shadow-xl">
                                     <h3 class="font-semibold text-slate-900 mb-2">Remover usuário</h3>
                                     <p class="text-sm text-slate-600 mb-4">
                                         Remover <strong>@u.Nome</strong>? Esta ação revoga o acesso imediatamente.
                                     </p>
                                     <div class="flex justify-end gap-3">
                                         <button type="button" @@click="confirm = false"
-                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
+                                                class="ui-secondary-btn px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
                                             Cancelar
                                         </button>
                                         <form action="/usuarios/@u.Id/excluir" method="post">
@@ -184,7 +184,7 @@
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
      @@click.self="open = false">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Usuário</h2>
         <form asp-action="Convidar" asp-controller="Usuarios" method="post">
             @Html.AntiForgeryToken()
@@ -192,22 +192,22 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
                     <input type="text" name="Nome" required
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field w-full text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Email *</label>
                     <input type="email" name="Email" required
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field w-full text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Senha *</label>
                     <input type="password" name="Senha" required
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                           class="ui-field w-full text-sm" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
                     <select name="PerfilId"
-                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            class="ui-select w-full text-sm">
                         @foreach (var (val, label) in perfis)
                         {
                             if (val == "Operador")
@@ -224,7 +224,7 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Loja</label>
                     <select name="LojaId"
-                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            class="ui-select w-full text-sm">
                         <option value="">Sem loja específica</option>
                         @foreach (var l in Model.Lojas)
                         {
@@ -235,12 +235,12 @@
             </div>
             <div class="flex justify-end gap-3">
                 <button type="button" @@click="open = false"
-                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                     Cancelar
                 </button>
                 <button type="submit" x-data="{ loading: false }" @@click="loading = true"
                         :disabled="loading" :class="{ 'opacity-50 cursor-not-allowed': loading }"
-                        class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                     <span x-show="!loading">Novo Usuário</span>
                     <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
                 </button>
