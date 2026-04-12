@@ -10,9 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-[AllowAnonymous]
 public class AuthController(ApiClient api, SessionService session) : Controller
 {
+    [AllowAnonymous]
     [HttpGet("/auth/login")]
     public IActionResult Login(string? returnUrl = null)
     {
@@ -30,6 +30,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View();
     }
 
+    [AllowAnonymous]
     [HttpPost("/auth/login")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel vm, string? returnUrl = null)
@@ -69,6 +70,18 @@ public class AuthController(ApiClient api, SessionService session) : Controller
             nivel
         );
 
+        var meResult = await api.GetAsync<JsonElement>("auth/me");
+        if (meResult.Success)
+        {
+            var meData = meResult.Data;
+            var temaPreferido = GetString(meData, "temaPreferido");
+            session.SetTemaPreferido(temaPreferido);
+        }
+        else
+        {
+            session.SetTemaPreferido("light");
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, GetString(usuario, "nome") ?? vm.Email),
@@ -105,6 +118,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return SafeRedirect(returnUrl);
     }
 
+    [Authorize]
     [HttpGet("/auth/selecionar-loja")]
     public IActionResult SelecionarLoja()
     {
@@ -120,6 +134,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View(lojas);
     }
 
+    [Authorize]
     [HttpPost("/auth/selecionar-loja")]
     [ValidateAntiForgeryToken]
     public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji, string? empresaId)
@@ -128,6 +143,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return RedirectToAction("Index", "Dashboard");
     }
 
+    [AllowAnonymous]
     [HttpGet("/auth/registrar")]
     public IActionResult Registrar()
     {
@@ -136,6 +152,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View(new RegisterViewModel());
     }
 
+    [AllowAnonymous]
     [HttpPost("/auth/registrar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Registrar(RegisterViewModel vm)
@@ -161,6 +178,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return RedirectToAction(nameof(Login));
     }
 
+    [AllowAnonymous]
     [HttpGet("/auth/esqueci-senha")]
     public IActionResult EsqueciSenha()
     {
@@ -169,6 +187,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View();
     }
 
+    [AllowAnonymous]
     [HttpPost("/auth/esqueci-senha")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EsqueciSenha(ForgotPasswordViewModel vm)
@@ -189,6 +208,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View(new ForgotPasswordViewModel());
     }
 
+    [AllowAnonymous]
     [HttpGet("/auth/redefinir-senha")]
     public IActionResult RedefinirSenha(string token)
     {
@@ -198,6 +218,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return View(new ResetPasswordViewModel { Token = token });
     }
 
+    [AllowAnonymous]
     [HttpPost("/auth/redefinir-senha")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RedefinirSenha(ResetPasswordViewModel vm)
@@ -215,6 +236,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         return RedirectToAction(nameof(Login));
     }
 
+    [Authorize]
     [HttpPost("/auth/logout")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -223,6 +245,20 @@ public class AuthController(ApiClient api, SessionService session) : Controller
         session.Clear();
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction(nameof(Login));
+    }
+
+    [Authorize]
+    [HttpPost("/auth/theme")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Theme([FromForm] string theme)
+    {
+        var normalizedTheme = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+        var result = await api.PatchAsync<JsonElement>("auth/me", new { temaPreferido = normalizedTheme });
+        if (!result.Success)
+            return BadRequest(new { success = false, message = result.ErrorMessage ?? "Não foi possível salvar a preferência de tema." });
+
+        session.SetTemaPreferido(normalizedTheme);
+        return Json(new { success = true, theme = normalizedTheme });
     }
 
     private IActionResult SafeRedirect(string? returnUrl) =>

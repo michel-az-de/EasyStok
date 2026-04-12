@@ -212,6 +212,25 @@
         }
     </script>
 
+    <div class="relative">
+        <button type="button"
+                onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
+                class="theme-toggle-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
+                title="Alternar tema">
+            <span class="theme-icon-light" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364 6.364-1.591-1.591M7.227 7.227 5.636 5.636m12.728 0-1.591 1.591M7.227 16.773l-1.591 1.591M12 16a4 4 0 100-8 4 4 0 000 8z" />
+                </svg>
+            </span>
+            <span class="theme-icon-dark hidden" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1012 21a8.96 8.96 0 008.354-5.646z" />
+                </svg>
+            </span>
+            <span class="hidden md:inline theme-toggle-label">Tema escuro</span>
+        </button>
+    </div>
+
     <!-- Ação rápida -->
     <div x-data="{ open: false }" class="relative">
         <button @@click="open = !open"
@@ -394,6 +413,51 @@
                 }
             };
         }
+
+        window.EasyStockTheme = {
+            async toggle() {
+                const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+                const next = current === 'dark' ? 'light' : 'dark';
+                await this.apply(next, true);
+            },
+            async apply(theme, persist) {
+                const normalized = theme === 'dark' ? 'dark' : 'light';
+                document.documentElement.dataset.theme = normalized;
+                document.documentElement.classList.toggle('theme-dark', normalized === 'dark');
+                document.body.classList.toggle('theme-dark', normalized === 'dark');
+                localStorage.setItem('easystock-theme', normalized);
+                this.refreshToggle(normalized);
+
+                if (!persist) return;
+
+                const token = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
+                const form = new URLSearchParams();
+                form.append('theme', normalized);
+
+                try {
+                    await fetch('/auth/theme', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'RequestVerificationToken': token || ''
+                        },
+                        body: form.toString()
+                    });
+                } catch { }
+            },
+            refreshToggle(theme) {
+                const isDark = theme === 'dark';
+                document.querySelectorAll('.theme-icon-light').forEach(el => el.classList.toggle('hidden', isDark));
+                document.querySelectorAll('.theme-icon-dark').forEach(el => el.classList.toggle('hidden', !isDark));
+                document.querySelectorAll('.theme-toggle-label').forEach(el => el.textContent = isDark ? 'Tema claro' : 'Tema escuro');
+            },
+            init() {
+                const active = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+                this.refreshToggle(active);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => window.EasyStockTheme.init());
     </script>
 
     <!-- Avatar / usuário -->

@@ -37,6 +37,7 @@ public abstract class BaseController(SessionService session) : Controller
         ViewBag.LojaAtualNome = session.GetLojaNome();
         ViewBag.LojaAtualEmoji = session.GetLojaEmoji() ?? "🏪";
         ViewBag.Role = session.GetUsuarioRole();
+        ViewBag.UserTheme = session.GetTemaPreferido();
         base.OnActionExecuting(context);
     }
 }

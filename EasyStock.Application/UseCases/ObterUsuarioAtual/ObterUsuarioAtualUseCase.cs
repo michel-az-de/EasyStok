@@ -33,6 +33,7 @@ public sealed class ObterUsuarioAtualUseCase(
             usuario.Nome,
             usuario.Email,
             usuario.Ativo,
-            usuario.CriadoEm);
+            usuario.CriadoEm,
+            usuario.TemaPreferido);
     }
 }

@@ -1,12 +1,28 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var theme = (ViewBag.UserTheme as string)?.ToLowerInvariant() == "dark" ? "dark" : "light";
+    var antiForgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full">
+<html lang="pt-BR" class="h-full @(theme == "dark" ? "theme-dark" : string.Empty)" data-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewBag.Title — EasyStock</title>
+    <title>@ViewBag.Title - EasyStock</title>
+    <meta name="csrf-token" content="@antiForgeryToken" />
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const serverTheme = '@theme';
+            const theme = stored === 'dark' || stored === 'light' ? stored : serverTheme;
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -27,9 +43,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/app.css" />
 </head>
-<body class="h-full font-[Inter] text-slate-900 antialiased" style="background-color:#F1F5F9;background-image:radial-gradient(ellipse 80% 60% at 60% 0%,rgba(99,102,241,.04) 0%,transparent 70%);">
+<body class="h-full font-[Inter] text-slate-900 antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
     <div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden">
-        <!-- Mobile backdrop -->
         <div x-show="sidebarOpen"
              x-transition:enter="transition-opacity ease-linear duration-200"
              x-transition:enter-start="opacity-0"

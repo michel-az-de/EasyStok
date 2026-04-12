@@ -29,6 +29,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasMaxLength(500)
                 .HasColumnType("character varying(500)");
 
+            builder.Property(u => u.TemaPreferido)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasColumnType("character varying(20)")
+                .HasDefaultValue("light");
+
             builder.Property(u => u.SenhaHash)
                 .IsRequired()
                 .HasMaxLength(500)

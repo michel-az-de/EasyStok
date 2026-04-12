@@ -9,6 +9,7 @@ namespace EasyStock.Domain.Entities
         public string Nome { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string? AvatarUrl { get; set; }
+        public string TemaPreferido { get; set; } = "light";
         public string SenhaHash { get; set; } = null!;
         public bool Ativo { get; set; }
         public DateTime? UltimoAcessoEm { get; set; }

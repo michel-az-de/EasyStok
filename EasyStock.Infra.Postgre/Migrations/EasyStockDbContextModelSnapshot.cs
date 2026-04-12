@@ -1265,6 +1265,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("TemaPreferido")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("light");
+
                     b.Property<DateTime?>("UltimoAcessoEm")
                         .HasColumnType("timestamp with time zone");
 

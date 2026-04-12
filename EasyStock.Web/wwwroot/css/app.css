@@ -2,6 +2,8 @@
 
 /* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
+    --app-bg: #F1F5F9;
+    --app-bg-image: radial-gradient(ellipse 80% 60% at 60% 0%, rgba(99, 102, 241, .06) 0%, transparent 70%);
     --shadow-xs: 0 1px 2px rgba(15, 23, 42, .04);
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 4px rgba(15, 23, 42, .06);
     --shadow-md: 0 2px 8px rgba(15, 23, 42, .06), 0 1px 3px rgba(15, 23, 42, .08);
@@ -14,6 +16,14 @@
     --radius-xs: 6px;
     --indigo-glow: 0 0 0 3px rgba(99, 102, 241, .15);
     --green-glow:  0 0 0 3px rgba(22, 163, 74,  .15);
+}
+
+html.theme-dark {
+    --app-bg: #09111f;
+    --app-bg-image:
+        radial-gradient(ellipse 90% 70% at 80% 0%, rgba(79, 70, 229, .18) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 50% at 15% 15%, rgba(56, 189, 248, .12) 0%, transparent 55%);
+    color-scheme: dark;
 }
 
 /* ─── Prevent Alpine.js flash ────────────────────────────────── */
@@ -290,4 +300,100 @@
 .drop-active {
     border-color: #818CF8 !important;
     background: linear-gradient(135deg, rgba(238, 242, 255, .6) 0%, rgba(224, 231, 255, .3) 100%);
+}
+
+/* Dark mode */
+html.theme-dark body {
+    color: #E5EEF8;
+}
+
+html.theme-dark header,
+html.theme-dark .ws,
+html.theme-dark .bg-white,
+html.theme-dark .theme-toggle-btn,
+html.theme-dark .preview-card,
+html.theme-dark .drop-zone,
+html.theme-dark .bg-slate-50 {
+    background-color: rgba(15, 23, 42, .86) !important;
+    border-color: rgba(71, 85, 105, .55) !important;
+    color: #E5EEF8 !important;
+}
+
+html.theme-dark .ws {
+    box-shadow: 0 12px 32px rgba(2, 6, 23, .35);
+}
+
+html.theme-dark .ws:hover,
+html.theme-dark .preview-card:hover {
+    box-shadow: 0 16px 40px rgba(2, 6, 23, .42);
+}
+
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-800,
+html.theme-dark .text-slate-700 {
+    color: #E5EEF8 !important;
+}
+
+html.theme-dark .text-slate-600,
+html.theme-dark .text-slate-500,
+html.theme-dark .text-slate-400 {
+    color: #94A3B8 !important;
+}
+
+html.theme-dark .border-slate-200,
+html.theme-dark .border-slate-100,
+html.theme-dark .border-slate-300 {
+    border-color: rgba(71, 85, 105, .55) !important;
+}
+
+html.theme-dark .hover\:bg-slate-50:hover,
+html.theme-dark .hover\:bg-slate-100:hover,
+html.theme-dark .tbl-full tr:hover td {
+    background-color: rgba(30, 41, 59, .9) !important;
+}
+
+html.theme-dark input,
+html.theme-dark select,
+html.theme-dark textarea {
+    background-color: rgba(15, 23, 42, .92) !important;
+    color: #E5EEF8 !important;
+    border-color: rgba(71, 85, 105, .7) !important;
+}
+
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+    color: #64748B !important;
+}
+
+html.theme-dark .tbl-full th {
+    background: rgba(15, 23, 42, .95);
+    color: #CBD5E1;
+    border-bottom-color: rgba(71, 85, 105, .55);
+}
+
+html.theme-dark .tbl-full td {
+    color: #CBD5E1;
+    border-bottom-color: rgba(51, 65, 85, .7);
+}
+
+html.theme-dark .kpi-val {
+    background: linear-gradient(135deg, #E0E7FF 15%, #38BDF8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+html.theme-dark .pg-hd h1,
+html.theme-dark .section-hd h2,
+html.theme-dark .section-hd h3 {
+    color: #F8FAFC !important;
+}
+
+html.theme-dark .field-calculated {
+    background-color: rgba(22, 163, 74, .12) !important;
+    border-color: rgba(74, 222, 128, .55) !important;
+}
+
+html.theme-dark .drop-active {
+    background: linear-gradient(135deg, rgba(49, 46, 129, .35) 0%, rgba(30, 41, 59, .55) 100%) !important;
 }

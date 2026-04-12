@@ -29,7 +29,8 @@ public sealed class AtualizarUsuarioAtualUseCase(
             throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
         }
 
-        if (!string.Equals(usuario.Email, command.Email, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(command.Email) &&
+            !string.Equals(usuario.Email, command.Email, StringComparison.OrdinalIgnoreCase))
         {
             var existente = await usuarioRepository.GetByEmailAsync(command.Email);
             if (existente != null && existente.Id != usuario.Id)
@@ -38,14 +39,21 @@ public sealed class AtualizarUsuarioAtualUseCase(
             }
         }
 
-        usuario.Nome = command.Nome;
-        usuario.Email = command.Email;
+        if (!string.IsNullOrWhiteSpace(command.Nome))
+            usuario.Nome = command.Nome;
+
+        if (!string.IsNullOrWhiteSpace(command.Email))
+            usuario.Email = command.Email;
+
+        if (!string.IsNullOrWhiteSpace(command.TemaPreferido))
+            usuario.TemaPreferido = string.Equals(command.TemaPreferido, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+
         usuario.AlteradoEm = DateTime.UtcNow;
 
         await usuarioRepository.UpdateAsync(usuario);
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Usuario {UsuarioId} atualizado", usuario.Id);
-        return new AtualizarUsuarioAtualResult(usuario.Id, usuario.Nome, usuario.Email);
+        return new AtualizarUsuarioAtualResult(usuario.Id, usuario.Nome, usuario.Email, usuario.TemaPreferido);
     }
 }

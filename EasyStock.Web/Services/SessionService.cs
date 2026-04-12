@@ -13,6 +13,7 @@ public class SessionService(IHttpContextAccessor acc)
     public string? GetUsuarioId() => Session.GetString("usuario_id");
     public string? GetUsuarioNome() => Session.GetString("usuario_nome");
     public string? GetUsuarioRole() => Session.GetString("usuario_role");
+    public string GetTemaPreferido() => Session.GetString("usuario_tema") ?? "light";
     public bool IsLoggedIn() => !string.IsNullOrEmpty(GetToken());
 
     public void SetTokens(string accessToken, string refreshToken)
@@ -26,6 +27,11 @@ public class SessionService(IHttpContextAccessor acc)
         Session.SetString("usuario_id", id);
         Session.SetString("usuario_nome", nome);
         Session.SetString("usuario_role", role);
+    }
+
+    public void SetTemaPreferido(string? tema)
+    {
+        Session.SetString("usuario_tema", string.Equals(tema, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light");
     }
 
     public void SetEmpresaId(string empresaId)
