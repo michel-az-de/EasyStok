@@ -1323,21 +1323,30 @@ public sealed class DiagnosticoController(
         <!-- HEALTH TAB -->
         <div class="panel" id="tab-health">
         {{(snapshots.Count > 0 ? $@"
-        <div class='card'><h2>&#128200; Latencia do Banco de Dados (ultimos {snapshots.Count} snapshots)</h2>
+        <div class='stats-grid' style='grid-template-columns:repeat(4,1fr);margin-bottom:1rem'>
+            <div class='stat-box'><div class='stat-num' id='kpiDb'>{(snapshots.Count > 0 ? snapshots[^1].DbLatencyMs + "ms" : "—")}</div><div class='stat-label'>DB Latencia (ultimo)</div></div>
+            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? "" : "")}'><div class='stat-num'>{(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? snapshots[^1].RedisLatencyMs + "ms" : "N/C")}</div><div class='stat-label'>Redis Latencia (ultimo)</div></div>
+            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].ErrorCount > 0 ? "err" : "")}'><div class='stat-num' id='kpiErr'>{(snapshots.Count > 0 ? snapshots[^1].ErrorCount.ToString() : "—")}</div><div class='stat-label'>Erros (ultimo min)</div></div>
+            <div class='stat-box'><div class='stat-num' id='kpiSnap'>{snapshots.Count} snapshots</div><div class='stat-label'>Historico (max 120 = 2h)</div></div>
+        </div>
+        <div class='card'><h2>&#128200; Latencia do Banco de Dados</h2>
             <div class='chart-box'><canvas id='dbChart'></canvas></div>
         </div>
         <div class='grid-2'>
             <div class='card'><h2>&#128200; Latencia Redis</h2>
                 <div class='chart-box'><canvas id='redisChart'></canvas></div>
             </div>
-            <div class='card'><h2>&#128200; Erros por Snapshot</h2>
+            <div class='card'><h2>&#128200; Erros por Snapshot (por minuto)</h2>
                 <div class='chart-box'><canvas id='errChart'></canvas></div>
             </div>
         </div>
-        " : "<div class='section-empty'>Aguardando snapshots de saude (coletados a cada 60s)...</div>")}}
+        " : @"<div class='card'><div class='section-empty'>
+            Aguardando primeiros snapshots de saude (coletados a cada 60s)...<br>
+            <small style='color:#475569;margin-top:.5rem;display:block'>Os graficos aparecao automaticamente apos o primeiro minuto de uptime.</small>
+        </div></div>")}}
 
         {{(logs?.Disponivel == true ? $@"
-        <div class='card'><h2>&#128200; Volume por Hora (48h)</h2>
+        <div class='card'><h2>&#128200; Volume de Requests e Erros por Hora (48h)</h2>
             <div class='chart-box' style='height:250px'><canvas id='volumeChart'></canvas></div>
         </div>
         " : "")}}
@@ -1367,13 +1376,38 @@ public sealed class DiagnosticoController(
 
         <!-- PATTERNS TAB -->
         <div class="panel" id="tab-patterns">
-        {{(patternsHtml.Length > 0 ? patternsHtml : "<div class='section-empty'>Nenhum padrao detectado nas ultimas 48h.</div>")}}
+        {{(patternsHtml.Length > 0 ? patternsHtml : "<div class='card' style='border-color:#052e16'><div class='section-empty' style='color:#16a34a'>&#10003; Nenhum padrao anomalo detectado nas ultimas 48h.</div></div>")}}
 
-        {{(logs?.Disponivel == true && logs.Resumo.ErrorsByEndpoint.Count > 0 ?
-            "<div class='card'><h2>&#128680; Erros por Endpoint</h2><table>" +
-            string.Join("", logs.Resumo.ErrorsByEndpoint.OrderByDescending(kv => kv.Value).Select(kv =>
-                $"<tr><td>{kv.Key}</td><td><span class='badge crit'>{kv.Value} erros</span></td></tr>")) +
-            "</table></div>" : "")}}
+        {{(logs?.Disponivel == true ? $@"
+        <div class='grid-2'>
+        " + (logs.Resumo.ErrorsByEndpoint.Count > 0 ?
+            "<div class='card'><h2>&#128680; Top Endpoints com Erros</h2><table>" +
+            string.Join("", logs.Resumo.ErrorsByEndpoint.OrderByDescending(kv => kv.Value).Take(10).Select(kv =>
+                $"<tr><td style='font-family:monospace;font-size:.8rem'>{System.Net.WebUtility.HtmlEncode(kv.Key)}</td><td><span class='badge crit'>{kv.Value}x</span></td></tr>")) +
+            "</table></div>"
+            : "<div class='card'><h2>&#128680; Erros por Endpoint</h2><div class='section-empty'>Sem erros registrados nos endpoints.</div></div>")
+        + (logs.Resumo.TotalRequests > 0 && logs.Resumo.AvgResponseTimeMs > 0 ?
+            $"<div class='card'><h2>&#9201; Performance (48h)</h2><table>" +
+            $"<tr><td>Total Requests</td><td><strong>{logs.Resumo.TotalRequests}</strong></td></tr>" +
+            $"<tr><td>Tempo Medio Resposta</td><td><strong style='color:{(logs.Resumo.AvgResponseTimeMs < 200 ? "#22c55e" : logs.Resumo.AvgResponseTimeMs < 1000 ? "#f59e0b" : "#ef4444")}'>{logs.Resumo.AvgResponseTimeMs:F0}ms</strong></td></tr>" +
+            $"<tr><td>Taxa de Erro</td><td><strong style='color:{(logs.Resumo.TotalErrors == 0 ? "#22c55e" : "#ef4444")}'>{(logs.Resumo.TotalRequests > 0 ? (100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests):0):F1}%</strong></td></tr>" +
+            $"<tr><td>Warnings</td><td><strong>{logs.Resumo.TotalWarnings}</strong></td></tr>" +
+            "</table></div>"
+            : "")
+        + @"</div>" : "")}}
+
+        <!-- Snapshot health summary -->
+        {{(snapshots.Count > 0 ? $@"
+        <div class='card'><h2>&#128308; Saude do Banco — Historico de Status</h2>
+        <div style='display:flex;flex-wrap:wrap;gap:3px;margin-top:.5rem'>
+        {string.Join("", snapshots.TakeLast(60).Select(s => {
+            var color = s.DbStatus == "ok" ? "#16a34a" : "#dc2626";
+            var title = $"{s.Timestamp:HH:mm} — DB:{s.DbStatus} {s.DbLatencyMs}ms Erros:{s.ErrorCount}";
+            return $"<span title='{System.Net.WebUtility.HtmlEncode(title)}' style='display:inline-block;width:10px;height:20px;border-radius:2px;background:{color};cursor:help'></span>";
+        }))}
+        </div>
+        <div style='font-size:.7rem;color:#64748b;margin-top:.4rem'>Cada bloco = 1 minuto. Verde=OK, Vermelho=Falha. Ultimos {Math.Min(snapshots.Count, 60)} minutos.</div>
+        </div>" : "")}}
         </div>
 
         <div class="links">
@@ -1396,10 +1430,16 @@ public sealed class DiagnosticoController(
             document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
-            if(name==='health')initHealthCharts();
+            if(name==='health'){setTimeout(initHealthCharts,50);}
             if(name==='logs')startLiveLogs();
             else stopLiveLogs();
         }
+        // Auto-init health charts if health tab is loaded directly
+        document.addEventListener('DOMContentLoaded',function(){
+            if(document.getElementById('tab-health')&&document.getElementById('tab-health').classList.contains('active')){
+                setTimeout(initHealthCharts,100);
+            }
+        });
 
         function startLiveLogs(){
             if(_liveTimer)return;
@@ -1441,6 +1481,27 @@ public sealed class DiagnosticoController(
             else{clearInterval(this._timer)}
         });
 
+        // Live-refresh health charts every 60s without full reload
+        setInterval(function(){
+            fetch('/api/diagnostico/historico').then(r=>r.ok?r.json():null).then(d=>{
+                if(!d||!d.snapshots||!d.snapshots.length)return;
+                var s=d.snapshots;
+                cLabels=s.map(x=>new Date(x.timestamp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+                dbData=s.map(x=>x.dbLatencyMs>=0?x.dbLatencyMs:null);
+                redisData=s.map(x=>x.redisLatencyMs!=null?x.redisLatencyMs:null);
+                errData=s.map(x=>x.errorCount);
+                // Update KPIs
+                var last=s[s.length-1];
+                var kpiDb=document.getElementById('kpiDb');var kpiErr=document.getElementById('kpiErr');
+                var kpiSnap=document.getElementById('kpiSnap');
+                if(kpiDb)kpiDb.textContent=last.dbLatencyMs+'ms';
+                if(kpiErr)kpiErr.textContent=last.errorCount;
+                if(kpiSnap)kpiSnap.textContent=d.total+' snapshots';
+                // Re-render charts if visible
+                if(document.getElementById('tab-health').classList.contains('active'))initHealthCharts();
+            }).catch(()=>{});
+        },60000);
+
         // Log filtering
         let activeLevel='all';
         function toggleLevel(btn,level){
@@ -1470,29 +1531,36 @@ public sealed class DiagnosticoController(
         <script>
         var CO={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false} },
             scales:{x:{ticks:{color:'#64748b',maxTicksLimit:15,font:{size:10} },grid:{color:'#1e293b'} },
-                    y:{ticks:{color:'#64748b',font:{size:10} },grid:{color:'#1e293b'} } };
-        var COz=JSON.parse(JSON.stringify(CO));COz.scales.y.beginAtZero=true;
-        var COzL=JSON.parse(JSON.stringify(COz));COzL.plugins.legend={display:true,labels:{color:'#94a3b8',font:{size:11} } };
+                    y:{beginAtZero:true,suggestedMax:50,ticks:{color:'#64748b',font:{size:10},callback:function(v){return v+'ms'} },grid:{color:'#1e293b'} } } };
+        var COz={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false} },
+            scales:{x:{ticks:{color:'#64748b',maxTicksLimit:15,font:{size:10} },grid:{color:'#1e293b'} },
+                    y:{beginAtZero:true,suggestedMax:1,ticks:{color:'#64748b',font:{size:10},stepSize:1},grid:{color:'#1e293b'} } } };
+        var COzL={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{size:11} } } },
+            scales:{x:{ticks:{color:'#64748b',maxTicksLimit:24,font:{size:10} },grid:{color:'#1e293b'} },
+                    y:{beginAtZero:true,suggestedMax:5,ticks:{color:'#64748b',font:{size:10} },grid:{color:'#1e293b'} } } };
 
-        var _healthChartsInited=false;
+        var _dbChart=null,_redisChart=null,_errChart=null,_volChart=null;
         function initHealthCharts(){
-            if(_healthChartsInited)return;
-            _healthChartsInited=true;
-            if(typeof cLabels!=='undefined'){
-                new Chart(document.getElementById('dbChart'),{type:'line',data:{labels:cLabels,
-                    datasets:[{label:'DB Latencia (ms)',data:dbData,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.1)',
-                        fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
-                new Chart(document.getElementById('redisChart'),{type:'line',data:{labels:cLabels,
-                    datasets:[{label:'Redis (ms)',data:redisData,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',
-                        fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
-                new Chart(document.getElementById('errChart'),{type:'bar',data:{labels:cLabels,
-                    datasets:[{label:'Erros',data:errData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}]},options:COz});
-            }
+            if(typeof cLabels==='undefined')return;
+            if(_dbChart){_dbChart.data.labels=cLabels;_dbChart.data.datasets[0].data=dbData;_dbChart.update();
+                _redisChart.data.labels=cLabels;_redisChart.data.datasets[0].data=redisData;_redisChart.update();
+                _errChart.data.labels=cLabels;_errChart.data.datasets[0].data=errData;_errChart.update();return;}
+            var dbOpts=JSON.parse(JSON.stringify(CO));
+            var maxDb=Math.max(...dbData.filter(v=>v>0));
+            if(maxDb>0)dbOpts.scales.y.suggestedMax=Math.ceil(maxDb*1.3);
+            _dbChart=new Chart(document.getElementById('dbChart'),{type:'line',data:{labels:cLabels,
+                datasets:[{label:'DB Latencia (ms)',data:dbData,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.1)',
+                    fill:true,tension:.3,pointRadius:2,borderWidth:2,spanGaps:true}]},options:dbOpts});
+            _redisChart=new Chart(document.getElementById('redisChart'),{type:'line',data:{labels:cLabels,
+                datasets:[{label:'Redis (ms)',data:redisData,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',
+                    fill:true,tension:.3,pointRadius:2,borderWidth:2,spanGaps:true}]},options:JSON.parse(JSON.stringify(CO))});
+            _errChart=new Chart(document.getElementById('errChart'),{type:'bar',data:{labels:cLabels,
+                datasets:[{label:'Erros',data:errData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1,borderRadius:2}]},options:COz});
             if(typeof volLabels!=='undefined'&&document.getElementById('volumeChart')){
-                new Chart(document.getElementById('volumeChart'),{type:'bar',data:{labels:volLabels,
+                _volChart=new Chart(document.getElementById('volumeChart'),{type:'bar',data:{labels:volLabels,
                     datasets:[
-                        {label:'Requests',data:reqData,backgroundColor:'rgba(56,189,248,0.5)',borderColor:'#38bdf8',borderWidth:1},
-                        {label:'Erros',data:errHData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}
+                        {label:'Requests',data:reqData,backgroundColor:'rgba(56,189,248,0.5)',borderColor:'#38bdf8',borderWidth:1,borderRadius:2},
+                        {label:'Erros',data:errHData,backgroundColor:'rgba(239,68,68,0.7)',borderColor:'#ef4444',borderWidth:1,borderRadius:2}
                     ]},options:COzL});
             }
         }
