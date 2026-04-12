@@ -149,7 +149,7 @@ body.app-body {
     position: relative;
 }
 
-.app-main::before {
+html:not(.theme-dark) .app-main::before {
     content: "";
     position: fixed;
     inset: 0;
@@ -346,20 +346,9 @@ body.app-body {
 .tbl-full tr:hover td { background: rgba(248, 250, 252, .92); }
 
 .app-sidebar {
-    background:
-        linear-gradient(180deg, rgba(15, 23, 42, .985) 0%, rgba(15, 23, 42, .96) 46%, rgba(2, 6, 23, .98) 100%);
-    border-right: 1px solid rgba(148, 163, 184, .12);
-    box-shadow: 22px 0 44px rgba(15, 23, 42, .16);
-}
-
-.app-sidebar::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(circle at top left, rgba(129, 140, 248, .22) 0%, transparent 28%),
-        linear-gradient(180deg, rgba(255, 255, 255, .03) 0%, rgba(255, 255, 255, 0) 24%);
+    background: #0F172A;
+    border-right: 1px solid rgba(148, 163, 184, .10);
+    box-shadow: 18px 0 34px rgba(15, 23, 42, .14);
 }
 
 .app-sidebar > * {
@@ -367,13 +356,13 @@ body.app-body {
     z-index: 1;
 }
 
-.app-store-trigger,
-.app-sidebar-menu {
+html:not(.theme-dark) .app-store-trigger,
+html:not(.theme-dark) .app-sidebar-menu {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
 }
 
-.app-topbar {
+html:not(.theme-dark) .app-topbar {
     background: rgba(255, 255, 255, .74);
     border-bottom: 1px solid rgba(148, 163, 184, .16);
     backdrop-filter: blur(20px);
@@ -391,28 +380,29 @@ body.app-body {
     -webkit-backdrop-filter: blur(18px);
 }
 
-.app-icon-btn,
-.app-surface-btn,
-.app-avatar-trigger {
+html:not(.theme-dark) .app-icon-btn,
+html:not(.theme-dark) .app-surface-btn,
+html:not(.theme-dark) .app-avatar-trigger {
     border: 1px solid rgba(226, 232, 240, .88);
     background: rgba(255, 255, 255, .82);
     box-shadow: 0 8px 22px rgba(15, 23, 42, .05);
 }
 
-.app-icon-btn:hover,
-.app-surface-btn:hover,
-.app-avatar-trigger:hover {
+html:not(.theme-dark) .app-icon-btn:hover,
+html:not(.theme-dark) .app-surface-btn:hover,
+html:not(.theme-dark) .app-avatar-trigger:hover {
     background: rgba(255, 255, 255, .96);
     border-color: rgba(99, 102, 241, .18);
 }
 
-.app-search-trigger {
+html:not(.theme-dark) .app-search-trigger {
     background: linear-gradient(180deg, rgba(255, 255, 255, .88) 0%, rgba(248, 250, 252, .92) 100%) !important;
     border-color: rgba(226, 232, 240, .9) !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 8px 22px rgba(15, 23, 42, .04);
+    color: #475569 !important;
 }
 
-.app-search-trigger:hover {
+html:not(.theme-dark) .app-search-trigger:hover {
     border-color: rgba(99, 102, 241, .22) !important;
     box-shadow: 0 14px 30px rgba(15, 23, 42, .06);
 }
@@ -428,11 +418,38 @@ body.app-body {
     transform: translateY(-1px);
 }
 
-.app-dropdown,
-.app-command-panel {
+html:not(.theme-dark) .app-dropdown,
+html:not(.theme-dark) .app-command-panel {
     background: rgba(255, 255, 255, .92) !important;
     border-color: rgba(226, 232, 240, .92) !important;
     box-shadow: 0 28px 60px rgba(15, 23, 42, .14) !important;
+}
+
+html:not(.theme-dark) .app-topbar .app-primary-btn,
+html:not(.theme-dark) .app-topbar .theme-toggle-btn,
+html:not(.theme-dark) .app-topbar .app-icon-btn,
+html:not(.theme-dark) .app-topbar .app-avatar-trigger {
+    min-height: 44px;
+}
+
+html:not(.theme-dark) .app-topbar .theme-toggle-btn,
+html:not(.theme-dark) .app-topbar .app-avatar-trigger {
+    border-radius: 14px;
+}
+
+html:not(.theme-dark) .app-command-panel .border-b,
+html:not(.theme-dark) .app-command-panel .border-t,
+html:not(.theme-dark) .app-dropdown .border-b,
+html:not(.theme-dark) .app-dropdown .border-t {
+    border-color: rgba(226, 232, 240, .85) !important;
+}
+
+html:not(.theme-dark) .app-command-panel a.group:hover {
+    background: rgba(248, 250, 252, .92) !important;
+}
+
+html:not(.theme-dark) .app-command-panel a.group[class*="bg-indigo-50"] {
+    background: linear-gradient(90deg, rgba(238, 242, 255, .95) 0%, rgba(248, 250, 252, .95) 100%) !important;
 }
 
 /* ─── Wizard steps ───────────────────────────────────────────── */
@@ -558,6 +575,7 @@ html.theme-dark .app-command-panel {
 }
 
 html.theme-dark .app-sidebar {
+    background: #0F172A;
     box-shadow: 22px 0 44px rgba(2, 6, 23, .35);
     border-right-color: rgba(71, 85, 105, .45);
 }
