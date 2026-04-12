@@ -18,6 +18,8 @@ using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -405,45 +407,62 @@ var app = builder.Build();
 // Migration automática e seed de dados (somente PostgreSQL)
 if (resolvedProvider is "postgresql")
 {
+    // Migrations — cada uma em scope isolado para tolerar conflitos de schema
     try
     {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-
-        try
+        List<string> pendingMigrations;
+        using (var checkScope = app.Services.CreateScope())
         {
-            await db.Database.MigrateAsync();
+            var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState is "42701" or "42P07")
-        {
-            // Schema já existe mas __EFMigrationsHistory desalinhado — registrar pendentes
-            app.Logger.LogWarning(ex,
-                "Migration falhou por conflito de schema ({SqlState}). Alinhando histórico...",
-                ex.SqlState);
 
-            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
-            foreach (var migrationId in pending)
+        app.Logger.LogInformation("{Count} migrations pendentes.", pendingMigrations.Count);
+
+        foreach (var migrationId in pendingMigrations)
+        {
+            try
             {
-                await db.Database.ExecuteSqlRawAsync(
+                using var migScope = app.Services.CreateScope();
+                var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
+                await migrator.MigrateAsync(migrationId);
+                app.Logger.LogInformation("Migration {MigrationId} aplicada.", migrationId);
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState is "42701" or "42P07")
+            {
+                // Schema já existe: registrar como aplicada sem executar
+                app.Logger.LogWarning(
+                    "Migration {MigrationId}: schema já existe ({SqlState}), registrando.",
+                    migrationId, ex.SqlState);
+                using var regScope = app.Services.CreateScope();
+                var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                await regDb.Database.ExecuteSqlRawAsync(
                     "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") " +
                     "VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
                     migrationId, "9.0.0");
             }
-
-            app.Logger.LogInformation(
-                "Histórico de migrations alinhado. {Count} migrations registradas.", pending.Count);
         }
 
         infraState.MigrationsApplied = true;
         app.Logger.LogInformation("Migrations aplicadas com sucesso.");
-
-        await SeedData.ExecutarAsync(scope.ServiceProvider, app.Logger);
     }
     catch (Exception ex)
     {
         infraState.MigrationsApplied = false;
         infraState.MigrationError = ex.Message;
-        app.Logger.LogError(ex, "Erro durante migration/seed. A aplicacao continuara mas pode estar incompleta.");
+        app.Logger.LogError(ex, "Erro durante migrations. A aplicacao continuara mas pode estar incompleta.");
+    }
+
+    // Seed separado para não afetar o status de migrations
+    try
+    {
+        using var seedScope = app.Services.CreateScope();
+        await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
     }
 }
 
