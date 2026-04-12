@@ -523,6 +523,10 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("CorrelationId", httpContext.Items["CorrelationId"]);
         diagnosticContext.Set("Endpoint", httpContext.Request.Path);
         diagnosticContext.Set("MetodoHttp", httpContext.Request.Method);
+        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                  ?? httpContext.User?.FindFirst("sub")?.Value;
+        if (userId is not null)
+            diagnosticContext.Set("UserId", userId);
     };
 });
 

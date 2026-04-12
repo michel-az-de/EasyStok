@@ -30,4 +30,7 @@ public static class ConfigurationKeys
     // ── App configuration sections ───────────────────────────────────────────
     public const string SectionEasyStock        = "EasyStock";
     public const string SectionFileStorage      = "FileStorage";
+
+    // ── Logging ──────────────────────────────────────────────────────────────
+    public const string LogDirectory            = "LogSettings:LogDirectory";
 }

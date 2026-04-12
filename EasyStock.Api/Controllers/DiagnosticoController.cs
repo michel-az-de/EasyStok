@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Api.BackgroundServices;
+using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Application.Ports.Output;
@@ -65,7 +66,7 @@ public sealed class DiagnosticoController(
             try
             {
                 var cutoff = DateTime.UtcNow.AddHours(-24);
-                var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+                var logsDir = GetLogDirectory();
                 if (Directory.Exists(logsDir))
                 {
                     var dir = new DirectoryInfo(logsDir);
@@ -118,7 +119,7 @@ public sealed class DiagnosticoController(
     {
         n = Math.Clamp(n, 1, 200);
 
-        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        var logsDir = GetLogDirectory();
         var today = DateTime.UtcNow.ToString("yyyyMMdd");
         var logFile = Path.Combine(logsDir, $"easystock-{today}.log");
 
@@ -194,7 +195,7 @@ public sealed class DiagnosticoController(
         hours = Math.Clamp(hours, 1, 72);
         var cutoff = DateTime.UtcNow.AddHours(-hours);
 
-        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        var logsDir = GetLogDirectory();
         if (!Directory.Exists(logsDir))
         {
             return Ok(new EnhancedLogsResult
@@ -932,6 +933,11 @@ public sealed class DiagnosticoController(
         return patterns;
     }
 
+    private string GetLogDirectory() =>
+        configuration[ConfigurationKeys.LogDirectory] is { Length: > 0 } configured
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "logs");
+
     // ──────────────────────────────────────────────────────────────────────
     // HTML rendering (fallback simples para Accept: text/html)
     // ──────────────────────────────────────────────────────────────────────
@@ -1248,6 +1254,7 @@ public sealed class DiagnosticoController(
             document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
+            if(name==='health')initHealthCharts();
         }
 
         // Auto-refresh
@@ -1289,22 +1296,27 @@ public sealed class DiagnosticoController(
         var COz=JSON.parse(JSON.stringify(CO));COz.scales.y.beginAtZero=true;
         var COzL=JSON.parse(JSON.stringify(COz));COzL.plugins.legend={display:true,labels:{color:'#94a3b8',font:{size:11} } };
 
-        if(typeof cLabels!=='undefined'){
-            new Chart(document.getElementById('dbChart'),{type:'line',data:{labels:cLabels,
-                datasets:[{label:'DB Latencia (ms)',data:dbData,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.1)',
-                    fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
-            new Chart(document.getElementById('redisChart'),{type:'line',data:{labels:cLabels,
-                datasets:[{label:'Redis (ms)',data:redisData,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',
-                    fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
-            new Chart(document.getElementById('errChart'),{type:'bar',data:{labels:cLabels,
-                datasets:[{label:'Erros',data:errData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}]},options:COz});
-        }
-        if(typeof volLabels!=='undefined'&&document.getElementById('volumeChart')){
-            new Chart(document.getElementById('volumeChart'),{type:'bar',data:{labels:volLabels,
-                datasets:[
-                    {label:'Requests',data:reqData,backgroundColor:'rgba(56,189,248,0.5)',borderColor:'#38bdf8',borderWidth:1},
-                    {label:'Erros',data:errHData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}
-                ]},options:COzL});
+        var _healthChartsInited=false;
+        function initHealthCharts(){
+            if(_healthChartsInited)return;
+            _healthChartsInited=true;
+            if(typeof cLabels!=='undefined'){
+                new Chart(document.getElementById('dbChart'),{type:'line',data:{labels:cLabels,
+                    datasets:[{label:'DB Latencia (ms)',data:dbData,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.1)',
+                        fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
+                new Chart(document.getElementById('redisChart'),{type:'line',data:{labels:cLabels,
+                    datasets:[{label:'Redis (ms)',data:redisData,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',
+                        fill:true,tension:.3,pointRadius:1,borderWidth:2}]},options:CO});
+                new Chart(document.getElementById('errChart'),{type:'bar',data:{labels:cLabels,
+                    datasets:[{label:'Erros',data:errData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}]},options:COz});
+            }
+            if(typeof volLabels!=='undefined'&&document.getElementById('volumeChart')){
+                new Chart(document.getElementById('volumeChart'),{type:'bar',data:{labels:volLabels,
+                    datasets:[
+                        {label:'Requests',data:reqData,backgroundColor:'rgba(56,189,248,0.5)',borderColor:'#38bdf8',borderWidth:1},
+                        {label:'Erros',data:errHData,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}
+                    ]},options:COzL});
+            }
         }
         </script>
         </body></html>

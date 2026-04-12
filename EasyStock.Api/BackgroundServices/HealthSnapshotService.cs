@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Distributed;
 
@@ -8,13 +9,20 @@ namespace EasyStock.Api.BackgroundServices;
 public sealed class HealthSnapshotService(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
+    IDistributedCache cache,
     ILogger<HealthSnapshotService> logger) : BackgroundService
 {
     private readonly ConcurrentQueue<HealthSnapshot> _snapshots = new();
     private const int MaxSnapshots = 120; // 2h at 60s intervals
+    private const string RedisHistoryKey = "healthsnap:history";
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
 
     public IReadOnlyList<HealthSnapshot> GetSnapshots() => _snapshots.ToArray();
+
+    private string GetLogDirectory() =>
+        configuration["LogSettings:LogDirectory"] is { Length: > 0 } configured
+            ? configured
+            : Path.Combine(AppContext.BaseDirectory, "logs");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -22,6 +30,9 @@ public sealed class HealthSnapshotService(
 
         // Wait 10s before first snapshot to let app warm up
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+
+        // Restore history from Redis so charts survive restarts
+        await LoadSnapshotsFromRedisAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -32,6 +43,8 @@ public sealed class HealthSnapshotService(
 
                 while (_snapshots.Count > MaxSnapshots)
                     _snapshots.TryDequeue(out _);
+
+                await PersistSnapshotsToRedisAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -43,6 +56,38 @@ public sealed class HealthSnapshotService(
             }
 
             await Task.Delay(Interval, stoppingToken);
+        }
+    }
+
+    private async Task LoadSnapshotsFromRedisAsync(CancellationToken ct)
+    {
+        try
+        {
+            var json = await cache.GetStringAsync(RedisHistoryKey, ct);
+            if (json is null) return;
+            var loaded = JsonSerializer.Deserialize<HealthSnapshot[]>(json);
+            if (loaded is null) return;
+            foreach (var snap in loaded) _snapshots.Enqueue(snap);
+            while (_snapshots.Count > MaxSnapshots) _snapshots.TryDequeue(out _);
+            logger.LogInformation("Carregados {Count} snapshots do Redis.", loaded.Length);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Nao foi possivel carregar snapshots do Redis.");
+        }
+    }
+
+    private async Task PersistSnapshotsToRedisAsync(CancellationToken ct)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(_snapshots.ToArray());
+            await cache.SetStringAsync(RedisHistoryKey, json,
+                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(2) }, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Nao foi possivel persistir snapshots no Redis.");
         }
     }
 
@@ -123,7 +168,7 @@ public sealed class HealthSnapshotService(
     {
         try
         {
-            var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+            var logsDir = GetLogDirectory();
             var today = DateTime.UtcNow.ToString("yyyyMMdd");
             var logFile = Path.Combine(logsDir, $"easystock-{today}.log");
 
