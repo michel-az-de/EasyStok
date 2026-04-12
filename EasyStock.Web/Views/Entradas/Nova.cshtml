@@ -370,9 +370,11 @@
                             window.location.href = '/estoque';
                         } else {
                             this.erroMsg = data.errorMessage || 'Erro ao registrar entrada. Tente novamente.';
+                            window.showToast(this.erroMsg, 'error', 4000);
                         }
                     } catch {
                         this.erroMsg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+                        window.showToast(this.erroMsg, 'error', 4000);
                     } finally {
                         this.submitting = false;
                     }

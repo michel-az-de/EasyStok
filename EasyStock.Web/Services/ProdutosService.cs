@@ -145,7 +145,9 @@ public class ProdutosService(ApiClient api, SessionService session)
     {
         using var form = new MultipartFormDataContent();
         using var stream = foto.OpenReadStream();
-        form.Add(new StreamContent(stream), "file", foto.FileName);
+        var sc = new StreamContent(stream);
+        sc.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(foto.ContentType ?? "application/octet-stream");
+        form.Add(sc, "file", foto.FileName);
         return await api.PostMultipartAsync<object>($"produtos/{id}/fotos?empresaId={GetEmpresaId()}", form);
     }
 
