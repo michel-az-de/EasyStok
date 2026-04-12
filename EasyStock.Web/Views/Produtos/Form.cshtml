@@ -124,7 +124,7 @@
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     @if (ViewData.ModelState["SkuBase"]?.Errors.Count > 0)
                     {
-                        <p class="text-xs text-red-500 mt-1">@ViewData.ModelState["SkuBase"]!.Errors[0].ErrorMessage</p>
+                        <p class="text-xs text-red-500 mt-1">@ViewData.ModelState["SkuBase"]!.Errors[0].ErrorMessage — clique "Preencher com IA" para gerar novo SKU.</p>
                     }
                 </div>
                 <div>
@@ -915,8 +915,10 @@
                     if (!this.sku) {
                         const words = this.nome.trim().toUpperCase().split(/\s+/).filter(w => w.length > 0);
                         const parts = words.slice(0, 3).map(w => w.substring(0, 3).replace(/[^A-Z0-9]/g, ''));
-                        const suffix = String(Date.now()).slice(-5);
-                        this.sku = parts.filter(Boolean).join('-') + (parts.filter(Boolean).length ? '-' + suffix : suffix);
+                        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                        let rnd = '';
+                        for (let i = 0; i < 6; i++) rnd += chars[Math.floor(Math.random() * chars.length)];
+                        this.sku = parts.filter(Boolean).join('-') + (parts.filter(Boolean).length ? '-' + rnd : rnd);
                         changed.push('SKU');
                     }
 
@@ -984,7 +986,7 @@
                 nome: @Html.Raw(JsonSerializer.Serialize(Model.Nome ?? "")),
                 descricao: @Html.Raw(JsonSerializer.Serialize(Model.DescricaoBase ?? "")),
                 marca: @Html.Raw(JsonSerializer.Serialize(Model.Marca ?? "")),
-                sku: @Html.Raw(JsonSerializer.Serialize(Model.SkuBase ?? "")),
+                sku: @Html.Raw(JsonSerializer.Serialize(ViewData.ModelState.ContainsKey("SkuBase") && ViewData.ModelState["SkuBase"]!.Errors.Count > 0 ? "" : (Model.SkuBase ?? ""))),
                 codigoBarras: @Html.Raw(JsonSerializer.Serialize(Model.CodigoBarras ?? "")),
                 tipo: @Model.Tipo,
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
