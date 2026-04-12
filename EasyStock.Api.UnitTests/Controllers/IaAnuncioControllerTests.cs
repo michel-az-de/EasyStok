@@ -1,6 +1,7 @@
-using EasyStock.Api.Controllers;
+﻿using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Domain.Entities;
@@ -18,6 +19,7 @@ public class IaAnuncioControllerTests
     private readonly IAssinaturaEmpresaRepository _assinaturaRepo = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly IGeradorAutoPreenchimento _geradorAutoPreenchimento = Substitute.For<IGeradorAutoPreenchimento>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
 
     private readonly IaAnuncioController _controller;
@@ -40,6 +42,7 @@ public class IaAnuncioControllerTests
             listarUseCase,
             excluirUseCase,
             obterUsoUseCase,
+            _geradorAutoPreenchimento,
             _currentUser);
     }
 
