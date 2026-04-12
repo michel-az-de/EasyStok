@@ -4,10 +4,10 @@
     if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
 }
 
-<header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+<header class="app-topbar bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
     <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
-            class="lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
+            class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
@@ -27,7 +27,7 @@
         <!-- Desktop: full search bar -->
         <div class="hidden lg:block flex-1">
             <button @@click="abrir()"
-                    class="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-xs">
+                    class="app-search-trigger flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-xs">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
                 </svg>
@@ -38,7 +38,7 @@
 
         <!-- Mobile: icon-only search -->
         <button @@click="abrir()"
-                class="lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
+                class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
             </svg>
@@ -52,7 +52,7 @@
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="fechar()"></div>
 
             <!-- Painel -->
-            <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            <div class="app-command-panel relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
                  @@keydown.arrow-down.prevent="mover(1)" @@keydown.arrow-up.prevent="mover(-1)"
                  @@keydown.enter.prevent="selecionar()">
                 <!-- Input -->
@@ -234,7 +234,7 @@
     <div class="relative">
         <button type="button"
                 onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
-                class="theme-toggle-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
+                class="theme-toggle-btn app-surface-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 title="Alternar tema">
             <span class="theme-icon-light" aria-hidden="true">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,14 +253,14 @@
     <!-- Ação rápida (desktop only) -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
         <button @@click="open = !open"
-                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                class="app-primary-btn flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span class="hidden sm:inline">Ação rápida</span>
         </button>
         <div x-show="open" @@click.outside="open = false"
-             class="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+             class="app-dropdown absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
             <a href="/entradas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                 <span>📥</span> Nova entrada
             </a>
@@ -285,7 +285,7 @@
 
     <!-- Notificações Dropdown -->
     <div x-data="notifDropdown()" class="relative">
-        <button @@click="toggle()" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+        <button @@click="toggle()" class="app-icon-btn relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
             <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
@@ -293,7 +293,7 @@
         </button>
 
         <div x-show="open" @@click.outside="open = false" x-cloak x-transition
-             class="absolute right-0 mt-2 w-96 max-h-[480px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col">
+             class="app-dropdown absolute right-0 mt-2 w-96 max-h-[480px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                 <div class="flex items-center gap-2">
@@ -482,7 +482,7 @@
     <!-- Avatar / usuário -->
     <div x-data="{ open: false }" class="relative">
         <button @@click="open = !open"
-                class="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors">
             <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
                 @iniciais
             </div>
@@ -494,7 +494,7 @@
             </svg>
         </button>
         <div x-show="open" @@click.outside="open = false"
-             class="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+             class="app-dropdown absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
             <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-100">@usuarioNome</div>
             <form asp-controller="Auth" asp-action="Logout" method="post">
                 @Html.AntiForgeryToken()
