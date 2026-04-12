@@ -7,8 +7,8 @@
 <html lang="pt-BR" class="h-full @(theme == "dark" ? "theme-dark" : string.Empty)" data-theme="@theme">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewBag.Title - EasyStock</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@ViewBag.Title — EasyStock</title>
     <meta name="csrf-token" content="@antiForgeryToken" />
     <script>
         (function () {
@@ -57,14 +57,94 @@
         @await Html.PartialAsync("_Sidebar")
         <div class="flex flex-col flex-1 overflow-hidden min-w-0">
             @await Html.PartialAsync("_Topbar")
-            <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+            <main class="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
                 @await Html.PartialAsync("_Toast")
                 @RenderBody()
             </main>
         </div>
     </div>
+
+    {{-- Bottom nav: outside flex wrapper so it sits above everything --}}
+    @await Html.PartialAsync("_BottomNav")
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <script src="~/js/toast.js"></script>
+    <script>
+        /* ── Notification polling ──────────────────────────────────────
+           Polls /notificacoes/resumo every 45s.
+           - Updates badge counters on first poll
+           - On count increase: shakes bell, shows push toast for criticals
+        ─────────────────────────────────────────────────────────────── */
+        (function () {
+            var lastCount    = -1;
+            var lastCritical = 0;
+            var INTERVAL     = 45000;
+
+            function updateBadge(id, count) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                if (count > 0) {
+                    el.textContent = count > 99 ? '99+' : String(count);
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            }
+
+            function shakeBell() {
+                var bell = document.getElementById('notif-bell-icon');
+                if (!bell) return;
+                bell.classList.remove('bell-shake');
+                void bell.offsetWidth; // force reflow
+                bell.classList.add('bell-shake');
+                setTimeout(function () { bell.classList.remove('bell-shake'); }, 800);
+            }
+
+            async function poll() {
+                try {
+                    var r = await fetch('/notificacoes/resumo');
+                    if (!r.ok) return;
+                    var data = await r.json();
+                    var count    = data.totalNaoLidas ?? 0;
+                    var critical = data.criticas      ?? 0;
+
+                    updateBadge('topbar-notif-badge', count);
+                    updateBadge('notif-badge',        count);
+
+                    if (lastCount === -1) {
+                        lastCount    = count;
+                        lastCritical = critical;
+                        return;
+                    }
+
+                    if (count > lastCount) {
+                        shakeBell();
+                        var delta = count - lastCount;
+                        if (critical > lastCritical) {
+                            var dc = critical - lastCritical;
+                            window.showToast && window.showToast(
+                                dc + ' nova' + (dc > 1 ? 's' : '') + ' notificação' + (dc > 1 ? 'ões' : '') + ' crítica' + (dc > 1 ? 's' : ''),
+                                'error'
+                            );
+                        } else {
+                            window.showToast && window.showToast(
+                                delta + ' nova' + (delta > 1 ? 's' : '') + ' notificação' + (delta > 1 ? 'ões' : ''),
+                                'info'
+                            );
+                        }
+                    }
+
+                    lastCount    = count;
+                    lastCritical = critical;
+                } catch (e) { /* silent */ }
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                poll();
+                setInterval(poll, INTERVAL);
+            });
+        })();
+    </script>
     @RenderSection("Scripts", required: false)
 </body>
 </html>

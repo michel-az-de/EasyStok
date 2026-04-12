@@ -30,8 +30,6 @@
       @@submit="saving = true"
       class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
     @Html.AntiForgeryToken()
-    <input type="file" name="fotos" multiple accept="image/*"
-           x-ref="actualFileInput" class="hidden" aria-hidden="true">
     @if (isEdit)
     {
         <input type="hidden" name="Id" :value="productId" />
@@ -56,14 +54,14 @@
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2">
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nome *</label>
-                    <input name="Nome" x-model="nome"
-                           placeholder="Ex: Camiseta Básica Masculina Algodão"
+                    <input name="Nome" x-model="nome" value="@Model.Nome"
+                           placeholder="Ex: Camiseta Básica Masculina Algodão" required
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
-                    <input name="SkuBase" x-model="sku"
+                    <input name="SkuBase" x-model="sku" value="@Model.SkuBase"
                            placeholder="Ex: CAM-BAS-001"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
@@ -75,7 +73,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Marca</label>
-                    <input name="Marca" x-model="marca"
+                    <input name="Marca" x-model="marca" value="@Model.Marca"
                            placeholder="Ex: Nike, Samsung, Tramontina..."
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
@@ -83,9 +81,9 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tipo</label>
                     <select name="Tipo" x-model.number="tipo"
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                        <option value="0">Físico</option>
-                        <option value="1">Alimento</option>
-                        <option value="2">Serviço</option>
+                        @if (Model.Tipo == 0) { <option value="0" selected>Físico</option> } else { <option value="0">Físico</option> }
+                        @if (Model.Tipo == 1) { <option value="1" selected>Alimento</option> } else { <option value="1">Alimento</option> }
+                        @if (Model.Tipo == 2) { <option value="2" selected>Serviço</option> } else { <option value="2">Serviço</option> }
                     </select>
                 </div>
                 <div>
@@ -93,8 +91,8 @@
                     @if (roots.Any())
                     {
                         <select name="CategoriaId"
-                                x-model="categoriaId"
-                                @@change="categoriaId = $el.value.toLowerCase(); subcategoriaId = null"
+                                @@change="categoriaId = $el.value; subcategoriaId = ''"
+                                required
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <option value="">Selecione uma categoria</option>
                             @foreach (var cat in roots)
@@ -120,9 +118,17 @@
                 <div x-show="subcategorias.length > 0" x-transition>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subcategoria</label>
                     <select name="SubcategoriaId"
-                            x-model="subcategoriaId"
+                            @@change="subcategoriaId = $el.value"
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                         <option value="">Nenhuma</option>
+                        @if (Model.SubcategoriaId.HasValue)
+                        {
+                            var subcat = categorias.FirstOrDefault(c => c.Id == Model.SubcategoriaId.Value);
+                            if (subcat != null)
+                            {
+                                <option value="@subcat.Id" selected>@subcat.Nome</option>
+                            }
+                        }
                         <template x-for="sub in subcategorias" :key="sub.id">
                             <option :value="sub.id" x-text="sub.nome"></option>
                         </template>
@@ -130,7 +136,7 @@
                 </div>
                 <div class="col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input name="ControlaValidade" type="checkbox" value="true" :checked="controlaValidade" @@change="controlaValidade = $el.checked"
+                        <input name="ControlaValidade" type="checkbox" value="true" @(Model.ControlaValidade ? "checked" : "") @@change="controlaValidade = $el.checked"
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
                         <span class="text-sm text-slate-700">Controla validade</span>
                     </label>
@@ -140,7 +146,7 @@
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
                 <textarea name="DescricaoBase" x-model="descricao" rows="3"
                           placeholder="Descreva as principais características do produto, material, uso indicado..."
-                          class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+                          class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">@Model.DescricaoBase</textarea>
                 @if (isEdit)
                 {
                     <button type="button" :disabled="aiGenerating || !nome"
@@ -191,8 +197,14 @@
                 </svg>
                 <p class="text-sm text-slate-500">Arraste imagens ou clique para selecionar</p>
                 <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Máx. 5 MB cada</p>
+                <span class="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-lg hover:bg-indigo-100 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Selecionar arquivos
+                </span>
             </div>
-            <input type="file" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
+            <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
                    @@change="handleFileSelect($event)" />
 
             <!-- New photo previews -->
@@ -231,7 +243,7 @@
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
                         <input name="CustoReferencia" type="number" step="0.01" min="0"
-                               x-model.number="custo" @@input="onCustoInput()"
+                               value="@Model.CustoReferencia" x-model.number="custo" @@input="onCustoInput()"
                                :class="{ 'field-calculated': lastEdited === 'margem' && custo > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -240,7 +252,7 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Margem (%)</label>
                     <div class="relative">
                         <input name="MargemEstimada" type="number" step="0.1"
-                               x-model.number="margem" @@input="onMargemInput()"
+                               value="@Model.MargemEstimada" x-model.number="margem" @@input="onMargemInput()"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
@@ -256,7 +268,7 @@
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
                         <input name="PrecoReferencia" type="number" step="0.01" min="0"
-                               x-model.number="preco" @@input="onPrecoInput()"
+                               value="@Model.PrecoReferencia" x-model.number="preco" @@input="onPrecoInput()"
                                :class="{ 'field-calculated': lastEdited === 'margem' && preco > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -680,8 +692,8 @@
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
 
                 // ── Categories ── (lowercase para garantir match exato com JSON serializado)
-                categoriaId: '@Model.CategoriaId'.toLowerCase(),
-                subcategoriaId: '@(Model.SubcategoriaId?.ToString() ?? "")'.toLowerCase(),
+                categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
+                subcategoriaId: '@(Model.SubcategoriaId?.ToString().ToLower() ?? "")',
 
                 // ── Dynamic arrays ──
                 variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
@@ -763,9 +775,11 @@
                     this._syncFileInput();
                 },
                 _syncFileInput() {
-                    const dt = new DataTransfer();
-                    this.photoFiles.forEach(f => dt.items.add(f));
-                    this.$refs.actualFileInput.files = dt.files;
+                    try {
+                        const dt = new DataTransfer();
+                        this.photoFiles.forEach(f => dt.items.add(f));
+                        this.$refs.fileInput.files = dt.files;
+                    } catch (e) { /* DataTransfer não suportado — fallback para file select nativo */ }
                 },
 
                 // ── AI ──
