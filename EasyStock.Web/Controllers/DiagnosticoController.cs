@@ -98,4 +98,34 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
             return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
+
+    [Route("diagnostico/api/logs/exportar")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
+    {
+        var token = session.GetToken();
+        if (string.IsNullOrEmpty(token))
+            return Unauthorized();
+
+        var (stream, fileName) = await diagnosticoService.ExportarLogsAsync(token, hours);
+        if (stream is null)
+            return StatusCode(502, new { error = "Não foi possível obter logs da API" });
+
+        return File(stream, "text/plain; charset=utf-8", fileName ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
+    }
+
+    [HttpPost]
+    [Route("diagnostico/api/logs/salvar-storage")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> ProxySalvarStorage()
+    {
+        var token = session.GetToken();
+        if (string.IsNullOrEmpty(token))
+            return Unauthorized();
+
+        var result = await diagnosticoService.SalvarLogsStorageAsync(token);
+        if (result is null)
+            return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
 }

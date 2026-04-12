@@ -118,6 +118,23 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (produtos, totalCount);
         }
 
+        public async Task<IReadOnlyList<string>> GetMarcasAsync(Guid empresaId, string? filtro = null, int max = 20)
+        {
+            var query = dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.Marca != null && p.Marca != "");
+
+            if (!string.IsNullOrWhiteSpace(filtro))
+                query = query.Where(p => EF.Functions.ILike(p.Marca!, $"%{filtro}%"));
+
+            return await query
+                .Select(p => p.Marca!)
+                .Distinct()
+                .OrderBy(m => m)
+                .Take(max)
+                .ToListAsync();
+        }
+
         public async Task InsertAsync(Produto produto)
         {
             await dbContext.Produtos.AddAsync(produto);

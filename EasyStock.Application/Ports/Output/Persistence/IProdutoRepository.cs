@@ -12,5 +12,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc");
         Task InsertAsync(Produto produto);
         Task UpdateAsync(Produto produto);
+        Task<IReadOnlyList<string>> GetMarcasAsync(Guid empresaId, string? filtro = null, int max = 20);
     }
 }

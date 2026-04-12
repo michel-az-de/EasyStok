@@ -65,6 +65,22 @@ public class ProdutoController(
         }
     }
 
+    [SwaggerOperation(Summary = "List distinct product brands", Description = "Returns a list of distinct brand names for autocomplete.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("marcas")]
+    public async Task<IActionResult> ListarMarcas(
+        [FromQuery] Guid empresaId,
+        [FromQuery] string? q,
+        [FromQuery] int max = 20)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var marcas = await produtoRepository.GetMarcasAsync(resolvedEmpresaId, q, Math.Min(max, 50));
+        return DataOk(marcas);
+    }
+
     [SwaggerOperation(Summary = "Full-text product search", Description = "Searches product name, barcode, brand and SKU.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

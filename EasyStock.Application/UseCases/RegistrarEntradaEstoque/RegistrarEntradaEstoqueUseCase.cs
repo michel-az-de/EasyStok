@@ -167,7 +167,15 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             if (geradorDescricaoAnuncio is null)
                 return produto.SugestaoDescricaoAnuncio;
 
-            return await geradorDescricaoAnuncio.GerarAsync(produto, variacao, null, command.InstrucoesGeracaoDescricao);
+            try
+            {
+                return await geradorDescricaoAnuncio.GerarAsync(produto, variacao, null, command.InstrucoesGeracaoDescricao);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Falha ao gerar descrição de anúncio via IA para o produto {ProdutoId}. Entrada será salva sem descrição.", produto.Id);
+                return produto.SugestaoDescricaoAnuncio;
+            }
         }
     }
 }

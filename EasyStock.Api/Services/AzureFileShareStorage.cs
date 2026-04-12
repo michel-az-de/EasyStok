@@ -13,6 +13,9 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(_opts.ConnectionString) || _opts.ConnectionString.Contains("<"))
+            throw new InvalidOperationException("Azure File Share não está configurado. Verifique appsettings.Production.json.");
+
         var serviceClient = new ShareServiceClient(_opts.ConnectionString);
         var shareClient = serviceClient.GetShareClient(_opts.ShareName);
         await shareClient.CreateIfNotExistsAsync(cancellationToken: ct);
