@@ -81,10 +81,7 @@ html.theme-dark {
     font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #0F172A 30%, #4F46E5 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0F172A;
     line-height: 1.15;
 }
 .kpi-lbl {

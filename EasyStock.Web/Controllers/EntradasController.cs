@@ -10,10 +10,12 @@ namespace EasyStock.Web.Controllers;
 public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, SessionService session) : BaseController(session)
 {
     [HttpGet("/entradas/nova")]
-    public IActionResult Nova()
+    public IActionResult Nova(string? produtoId = null)
     {
         ViewBag.Title = "Nova Entrada";
         ViewBag.ActiveMenuItem = "Entradas";
+        if (!string.IsNullOrEmpty(produtoId))
+            ViewBag.PreSelProdutoId = produtoId;
         return View(new EntradaFormViewModel());
     }
 

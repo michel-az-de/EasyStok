@@ -264,6 +264,28 @@
                 erroMsg: '',
                 submitting: false,
 
+                async init() {
+                    const preId = '@(ViewBag.PreSelProdutoId ?? "")';
+                    if (!preId) return;
+                    try {
+                        const r = await fetch('/estoque/produto-detalhe/' + preId);
+                        if (!r.ok) return;
+                        const d = await r.json();
+                        this.produtoId = d.id;
+                        this.produtoNome = d.nome;
+                        this.produtoSku = d.sku || '';
+                        this.produtoEmoji = '📦';
+                        this.variacoes = d.variacoes || [];
+                        this.estoqueAtual = d.estoqueTotal || 0;
+                        this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                        if (d.custoReferencia) this.custo = d.custoReferencia;
+                        if (d.precoReferencia) this.preco = d.precoReferencia;
+                        this.controlaValidade = d.controlaValidade || false;
+                        this.calcularTotal();
+                        this.step = 2;
+                    } catch {}
+                },
+
                 async buscarProduto() {
                     if (this.buscaTerm.length < 2) { this.resultados = []; return; }
                     this.buscando = true;
