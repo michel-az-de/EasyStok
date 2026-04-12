@@ -98,7 +98,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
                 await svc.UploadFotoAsync(newId.ToString(), foto);
 
             Toast("success", "Produto criado com sucesso!");
-            return RedirectToAction(nameof(Detail), new { id = newId });
+            return RedirectToAction(nameof(Index));
         }
 
         // Produto criado (201) mas ID nao parseado — redirecionar para lista

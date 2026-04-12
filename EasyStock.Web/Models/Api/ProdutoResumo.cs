@@ -14,8 +14,28 @@ public record ProdutoResumo
     public string? Marca { get; init; }
     [JsonConverter(typeof(EnumStringOrIntConverter))]
     public int Status { get; init; }
+    public string? FotosJson { get; init; }
 
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
+
+    /// <summary>URL da primeira foto do produto, ou null se não tiver.</summary>
+    public string? PrimeiraFotoUrl
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(FotosJson)) return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(FotosJson);
+                var arr = doc.RootElement;
+                if (arr.ValueKind != JsonValueKind.Array || arr.GetArrayLength() == 0) return null;
+                return arr[0].TryGetProperty("url", out var u) ? u.GetString()
+                     : arr[0].TryGetProperty("Url", out var u2) ? u2.GetString()
+                     : null;
+            }
+            catch { return null; }
+        }
+    }
 }
 
 [JsonConverter(typeof(SkuBaseDtoJsonConverter))]
