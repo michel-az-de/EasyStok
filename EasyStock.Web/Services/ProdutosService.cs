@@ -139,7 +139,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         api.DeleteAsync($"produtos/{id}");
 
     public Task<ApiResult<object>> HistoricoAsync(string id) =>
-        api.GetAsync<object>($"produtos/{id}/historico");
+        api.GetAsync<object>($"produtos/{id}/historico?empresaId={GetEmpresaId()}");
 
     public async Task<ApiResult<object>> UploadFotoAsync(string id, IFormFile foto)
     {

@@ -191,7 +191,8 @@
                                 <form asp-action="RemoverVariacao" asp-controller="Produtos"
                                       asp-route-id="@p.ProdutoId" asp-route-vid="@v.VariacaoId" method="post">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remover</button>
+                                    <button type="submit" onclick="return confirm('Remover esta variação?')"
+                                            class="text-xs text-red-500 hover:text-red-700">Remover</button>
                                 </form>
                             </div>
                         }
