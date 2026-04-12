@@ -136,7 +136,15 @@ namespace EasyStock.Infra.Postgre.Services
                 request.Content = JsonContent.Create(requestBody);
 
                 var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-                response.EnsureSuccessStatusCode();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    logger.LogError("Anthropic API retornou {StatusCode} para produto {ProdutoId}: {ErrorBody}",
+                        (int)response.StatusCode, produtoId, errorBody);
+                    return null;
+                }
+
                 return response;
             }
             catch (Exception ex)

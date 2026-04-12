@@ -103,7 +103,15 @@ internal sealed class GeradorAutoPreenchimentoClaude(
             request.Content = JsonContent.Create(requestBody);
 
             var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("Anthropic API retornou {StatusCode} para auto-preenchimento de '{Nome}': {ErrorBody}",
+                    (int)response.StatusCode, nomeProduto, errorBody);
+                return null;
+            }
+
             return response;
         }
         catch (Exception ex)
