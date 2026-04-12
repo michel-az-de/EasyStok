@@ -12,6 +12,7 @@ public record ProdutoResumo
     public DinheiroDto? PrecoReferencia { get; init; }
     public DinheiroDto? CustoReferencia { get; init; }
     public string? Marca { get; init; }
+    [JsonConverter(typeof(EnumStringOrIntConverter))]
     public int Status { get; init; }
 
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
