@@ -359,6 +359,9 @@ builder.Services.AddRateLimiter(options =>
 // Background Services
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 
+// HttpClient para diagnóstico de endpoints (self-testing)
+builder.Services.AddHttpClient();
+
 // Exception Handler
 builder.Services.AddExceptionHandler<EasyStock.Api.Observability.GlobalExceptionHandler>();
 

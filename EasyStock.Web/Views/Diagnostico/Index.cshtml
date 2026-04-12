@@ -7,11 +7,9 @@
     var ts = (DateTimeOffset)ViewBag.Timestamp;
     var latenciaApiMs = (long)(ViewBag.LatenciaApiMs ?? 0L);
     var isAdmin = ViewBag.IsAdmin == true;
-    var logs = ViewBag.Logs as LogsApiResult;
 
     var apiBase = apiUrl.Contains("/api") ? apiUrl[..apiUrl.LastIndexOf("/api")] : apiUrl;
 
-    // Helpers locais
     string StatusClass(string s) => s switch {
         "ok" => "bg-green-100 text-green-800",
         "degraded" => "bg-yellow-100 text-yellow-800",
@@ -30,556 +28,855 @@
     string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
 
     var overallStatus = apiOk && Model is not null ? Model.Status : "critical";
-    var overallIcon = overallStatus switch { "ok" => "✅", "degraded" => "⚠️", _ => "🔴" };
-    var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado — verificar alertas", _ => "Falha crítica detectada" };
-    var overallHero = overallStatus switch { "ok" => "bg-green-50 border-green-200", "degraded" => "bg-yellow-50 border-yellow-200", _ => "bg-red-50 border-red-200" };
-    var overallTextColor = overallStatus switch { "ok" => "text-green-800", "degraded" => "text-yellow-800", _ => "text-red-800" };
-    var overallSubColor = overallStatus switch { "ok" => "text-green-600", "degraded" => "text-yellow-700", _ => "text-red-700" };
+    var overallIcon = overallStatus switch { "ok" => "check_circle", "degraded" => "warning", _ => "error" };
+    var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Falha critica detectada" };
+    var overallHero = overallStatus switch { "ok" => "from-green-500 to-emerald-600", "degraded" => "from-yellow-500 to-amber-600", _ => "from-red-500 to-rose-600" };
 }
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Diagnóstico — EasyStock</title>
+    <title>Central de Operacoes — EasyStock</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
     <style>
         body { font-family: 'Inter', sans-serif; }
         [x-cloak] { display: none !important; }
-        .log-panel { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; }
+        .log-mono { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.75rem; }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #4338ca; font-weight: 600; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #64748b; }
+        .tab-inactive:hover { color: #334155; border-color: #cbd5e1; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-900 min-h-screen" x-data="diagApp()">
-<div class="max-w-5xl mx-auto py-8 px-4">
+<body class="bg-slate-50 text-slate-900 min-h-screen" x-data="diagApp()" x-init="init()">
 
-    <!-- ── HEADER ─────────────────────────────────────────────────────── -->
-    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
-        <div>
-            <div class="flex items-center gap-2 mb-1">
-                <span class="text-2xl font-bold text-slate-800">Diagnóstico</span>
-                <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">EasyStock</span>
+<!-- ── HERO HEADER ──────────────────────────────────────────────────── -->
+<div class="bg-gradient-to-r @overallHero text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="material-icons-round text-3xl opacity-90">@overallIcon</span>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Central de Operacoes</h1>
+                    <p class="text-sm opacity-90">
+                        @overallText
+                        @if (apiOk && Model is not null)
+                        {
+                            <span class="opacity-75">
+                                &mdash; @Model.Ambiente &middot; v@(Model.Versao) &middot; Uptime @Model.Uptime
+                            </span>
+                        }
+                    </p>
+                </div>
             </div>
-            <p class="text-sm text-slate-500">
-                Última verificação: <strong>@ts.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</strong>
-                <span class="mx-1">·</span>
-                <span x-text="`Atualiza em ${countdown}s`" class="text-indigo-500 font-medium"></span>
-            </p>
-        </div>
-        <div class="flex gap-2 shrink-0">
-            <button @@click="refresh()"
-                    :disabled="refreshing"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-lg transition">
-                <svg x-show="refreshing" class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-                <svg x-show="!refreshing" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span x-text="refreshing ? 'Verificando...' : 'Verificar agora'">Verificar agora</span>
-            </button>
-            <a href="/dashboard" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition">
-                Dashboard
-            </a>
+            <div class="flex items-center gap-3">
+                <span class="text-xs opacity-75" x-text="`Auto-refresh em ${countdown}s`"></span>
+                <button @@click="refreshAll()" :disabled="refreshing"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
+                    <span class="material-icons-round text-base" :class="refreshing && 'animate-spin'">refresh</span>
+                    <span x-text="refreshing ? 'Atualizando...' : 'Atualizar'">Atualizar</span>
+                </button>
+                <a href="/dashboard" class="inline-flex items-center gap-1 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition">
+                    <span class="material-icons-round text-base">dashboard</span>
+                    Dashboard
+                </a>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- ── STATUS HERO ────────────────────────────────────────────────── -->
-    <div class="@overallHero border rounded-2xl p-5 mb-6 flex items-center gap-4">
-        <span class="text-4xl">@overallIcon</span>
-        <div class="flex-1">
-            <p class="font-bold text-lg @overallTextColor">@overallText</p>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ── TABS ──────────────────────────────────────────────────────── -->
+    <div class="flex gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
+        <button @@click="activeTab='overview'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
+            :class="activeTab==='overview' ? 'tab-active' : 'tab-inactive'">
+            <span class="material-icons-round text-base align-middle mr-1">monitoring</span>Visao Geral
+        </button>
+        <button @@click="activeTab='endpoints'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
+            :class="activeTab==='endpoints' ? 'tab-active' : 'tab-inactive'">
+            <span class="material-icons-round text-base align-middle mr-1">api</span>Endpoints
+            <span x-show="endpoints" class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+                :class="endpointsFailed > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
+                x-text="endpoints ? `${endpoints.saudaveis}/${endpoints.resultados.length}` : ''"></span>
+        </button>
+        <button @@click="activeTab='logs'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
+            :class="activeTab==='logs' ? 'tab-active' : 'tab-inactive'">
+            <span class="material-icons-round text-base align-middle mr-1">receipt_long</span>Logs Inteligentes
+            <span x-show="enhancedLogs && enhancedLogs.resumo" class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+                :class="enhancedLogs?.resumo?.totalErrors > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'"
+                x-text="enhancedLogs?.resumo ? enhancedLogs.resumo.totalErrors + ' erros' : ''"></span>
+        </button>
+        <button @@click="activeTab='insights'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
+            :class="activeTab==='insights' ? 'tab-active' : 'tab-inactive'">
+            <span class="material-icons-round text-base align-middle mr-1">psychology</span>Insights
+            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                x-text="patterns.length"></span>
+        </button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB 1: VISAO GERAL
+         ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="activeTab==='overview'" x-cloak class="fade-in">
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             @if (apiOk && Model is not null)
             {
-                <p class="text-sm @overallSubColor mt-0.5">
-                    Ambiente: <strong>@Model.Ambiente</strong>
-                    &nbsp;·&nbsp; Uptime: <strong>@Model.Uptime</strong>
-                    &nbsp;·&nbsp; Versão: <strong>@Model.Versao</strong>
-                    &nbsp;·&nbsp; Latência API:
-                    <strong class="@LatBadgeClass(latenciaApiMs) px-1.5 py-0.5 rounded text-xs">@latenciaApiMs ms</strong>
-                </p>
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="text-xs text-slate-500 font-medium mb-1">Uptime</div>
+                    <div class="text-2xl font-bold text-slate-800">@Model.Uptime</div>
+                    <div class="text-xs text-slate-400 mt-1">@Model.Ambiente</div>
+                </div>
             }
-            else if (!apiOk)
+            else
             {
-                <p class="text-sm @overallSubColor mt-0.5">
-                    API inacessível — verifique se o serviço está no ar e se a URL está correta.
-                </p>
+                <div class="bg-white rounded-xl border border-red-200 p-4">
+                    <div class="text-xs text-slate-500 font-medium mb-1">Uptime</div>
+                    <div class="text-2xl font-bold text-red-600">Offline</div>
+                    <div class="text-xs text-red-400 mt-1">API inacessivel</div>
+                </div>
             }
+
+            <div class="bg-white rounded-xl border border-slate-200 p-4">
+                <div class="text-xs text-slate-500 font-medium mb-1">Latencia API</div>
+                <div class="text-2xl font-bold @(latenciaApiMs < 200 ? "text-green-600" : latenciaApiMs < 1000 ? "text-yellow-600" : "text-red-600")">@latenciaApiMs<span class="text-sm font-medium">ms</span></div>
+                <div class="text-xs text-slate-400 mt-1">Web → API round-trip</div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 p-4">
+                <div class="text-xs text-slate-500 font-medium mb-1">Erros 24h</div>
+                <div class="text-2xl font-bold" :class="errorCount24h > 0 ? 'text-red-600' : 'text-green-600'"
+                    x-text="enhancedLogs ? enhancedLogs.resumo.totalErrors : '—'">—</div>
+                <div class="text-xs text-slate-400 mt-1" x-text="enhancedLogs ? enhancedLogs.resumo.totalWarnings + ' warnings' : 'Carregando...'">Carregando...</div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 p-4">
+                <div class="text-xs text-slate-500 font-medium mb-1">Endpoints</div>
+                <div class="text-2xl font-bold" :class="endpointsFailed > 0 ? 'text-red-600' : 'text-green-600'"
+                    x-text="endpoints ? endpoints.saudaveis + '/' + endpoints.resultados.length : '—'">—</div>
+                <div class="text-xs text-slate-400 mt-1" x-text="endpoints ? endpoints.lentos + ' lentos, ' + endpoints.falhas + ' falhas' : 'Carregando...'">Carregando...</div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <!-- Health Timeline Chart -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                        <span class="material-icons-round text-base text-indigo-500">show_chart</span>
+                        Saude da API & Banco
+                    </h3>
+                    <span class="text-xs text-slate-400" x-text="healthHistory ? healthHistory.total + ' snapshots' : ''"></span>
+                </div>
+                <div class="h-52 relative">
+                    <canvas id="healthChart"></canvas>
+                    <div x-show="!healthHistory" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                        <span class="material-icons-round animate-spin mr-2">hourglass_empty</span>Carregando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Rate Chart -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                        <span class="material-icons-round text-base text-red-500">error_outline</span>
+                        Erros por Hora (24h)
+                    </h3>
+                </div>
+                <div class="h-52 relative">
+                    <canvas id="errorsChart"></canvas>
+                    <div x-show="!enhancedLogs" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                        @if (isAdmin)
+                        {
+                            <span><span class="material-icons-round animate-spin mr-2 align-middle">hourglass_empty</span>Carregando...</span>
+                        }
+                        else
+                        {
+                            <span><span class="material-icons-round mr-2 align-middle">lock</span>Requer permissao Admin</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            @if (apiOk && Model is not null)
+            {
+                <!-- Banco -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-blue-500">storage</span>Banco de Dados
+                        </h3>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @StatusClass(Model.Banco.Conexao)">
+                            <span class="w-1.5 h-1.5 rounded-full @DotClass(Model.Banco.Conexao)"></span>@Model.Banco.Conexao
+                        </span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>Provider</span><span class="font-medium">@Model.Banco.Provider</span></div>
+                        <div class="flex justify-between"><span>Latencia</span><span class="font-medium @LatBadgeClass(Model.Banco.LatenciaMs) px-1.5 rounded">@(Model.Banco.LatenciaMs)ms</span></div>
+                        <div class="flex justify-between"><span>Migrations</span><span class="font-medium @(Model.Banco.MigrationsAplicadas == true ? "text-green-600" : "text-red-600")">@(Model.Banco.MigrationsAplicadas == true ? "OK" : "Falha")</span></div>
+                        @if (Model.Banco.Fallback) { <div class="text-amber-600 font-medium mt-1">Modo Fallback (SQLite)</div> }
+                    </div>
+                </div>
+
+                <!-- Redis -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-red-400">memory</span>Redis
+                        </h3>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @StatusClass(Model.Redis.Conexao)">
+                            <span class="w-1.5 h-1.5 rounded-full @DotClass(Model.Redis.Conexao)"></span>@Model.Redis.Conexao
+                        </span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>Configurado</span><span class="font-medium">@(Model.Redis.Configurado ? "Sim" : "Nao")</span></div>
+                        @if (Model.Redis.Configurado) { <div class="flex justify-between"><span>Latencia</span><span class="font-medium">@(Model.Redis.LatenciaMs)ms</span></div> }
+                    </div>
+                </div>
+
+                <!-- SMTP -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-purple-500">email</span>SMTP
+                        </h3>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @(Model.Smtp.Configurado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500")">
+                            @(Model.Smtp.Configurado ? "Configurado" : "Console")
+                        </span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>Tipo</span><span class="font-medium">@Model.Smtp.Tipo</span></div>
+                        <div class="flex justify-between"><span>Host</span><span class="font-medium">@(Model.Smtp.Host ?? "N/A")</span></div>
+                    </div>
+                </div>
+
+                <!-- Storage -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-amber-500">folder</span>Storage
+                        </h3>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">@Model.Storage.Provider</span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>Diretorio</span><span class="font-medium @(Model.Storage.DiretorioExiste == true ? "text-green-600" : "text-red-600")">@(Model.Storage.DiretorioExiste == true ? "Existe" : "Ausente")</span></div>
+                    </div>
+                </div>
+
+                <!-- IA -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-violet-500">smart_toy</span>IA (Anthropic)
+                        </h3>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @(Model.Ia.Habilitado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500")">
+                            @(Model.Ia.Habilitado ? "Ativo" : "Desabilitado")
+                        </span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>API Key</span><span class="font-medium @(Model.Ia.ApiKeyPresente ? "text-green-600" : "text-slate-400")">@(Model.Ia.ApiKeyPresente ? "Presente" : "Ausente")</span></div>
+                    </div>
+                </div>
+
+                <!-- Config -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-slate-500">settings</span>Configuracao
+                        </h3>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-600">
+                        <div class="flex justify-between"><span>JWT Secret</span><span class="font-medium @(Model.Configuracoes.JwtSecretSeguro == true ? "text-green-600" : "text-red-600")">@(Model.Configuracoes.JwtSecretSeguro == true ? "Seguro" : Model.Configuracoes.JwtSecretPresente ? "Fraco" : "Ausente")</span></div>
+                        <div class="flex justify-between"><span>Conn String</span><span class="font-medium @(Model.Configuracoes.ConnectionStringPresente ? "text-green-600" : "text-red-600")">@(Model.Configuracoes.ConnectionStringPresente ? "OK" : "Ausente")</span></div>
+                        <div class="flex justify-between"><span>CORS</span><span class="font-medium">@(Model.Configuracoes.CorsOrigins.Length) origin(s)</span></div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="col-span-full bg-red-50 border border-red-200 rounded-xl p-5">
+                    <p class="font-semibold text-red-800 flex items-center gap-2">
+                        <span class="material-icons-round">cloud_off</span>API Inacessivel
+                    </p>
+                    <p class="text-sm text-red-700 mt-1">URL: <code class="font-mono text-xs bg-red-100 px-1 py-0.5 rounded">@apiUrl</code></p>
+                    <p class="text-xs text-red-600 mt-2">Verifique se a API esta no ar e se a URL em appsettings.json esta correta.</p>
+                </div>
+            }
+        </div>
+
+        <!-- Causas Provaveis -->
+        @if (apiOk && Model is not null && Model.CausasProvaveis.Count > 0)
+        {
+            <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+                <h3 class="font-semibold text-sm text-slate-800 mb-3 flex items-center gap-1.5">
+                    <span class="material-icons-round text-base text-amber-500">report_problem</span>
+                    Causas Provaveis
+                </h3>
+                <div class="space-y-2">
+                    @foreach (var causa in Model.CausasProvaveis)
+                    {
+                        var sv = causa.Severidade == "critical" ? "border-l-red-500 bg-red-50" : "border-l-yellow-500 bg-yellow-50";
+                        var tc = causa.Severidade == "critical" ? "text-red-800" : "text-yellow-800";
+                        var bc = causa.Severidade == "critical" ? "text-red-600" : "text-yellow-700";
+                        <div class="border-l-4 @sv rounded-r-lg px-4 py-2.5">
+                            <p class="font-medium text-sm @tc">[@causa.Componente] @causa.Descricao</p>
+                            <p class="text-xs @bc mt-0.5">@causa.Sugestao</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB 2: ENDPOINTS
+         ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="activeTab==='endpoints'" x-cloak class="fade-in">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                <span class="material-icons-round text-indigo-500">api</span>Monitor de Endpoints
+            </h2>
+            <button @@click="fetchEndpoints()" :disabled="loadingEndpoints"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-lg transition">
+                <span class="material-icons-round text-base" :class="loadingEndpoints && 'animate-spin'">refresh</span>
+                Testar Todos
+            </button>
+        </div>
+
+        <div x-show="loadingEndpoints && !endpoints" class="text-center py-12 text-slate-400">
+            <span class="material-icons-round text-4xl animate-spin mb-2">hourglass_empty</span>
+            <p>Testando endpoints...</p>
+        </div>
+
+        <div x-show="endpoints" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <template x-for="ep in endpoints?.resultados || []" :key="ep.rota">
+                <div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <code class="text-xs font-mono text-slate-700 truncate flex-1" x-text="ep.rota"></code>
+                        <span class="w-2.5 h-2.5 rounded-full ml-2 shrink-0"
+                            :class="ep.status === 'ok' ? 'bg-green-500' : ep.status === 'slow' || ep.status === 'very_slow' ? 'bg-yellow-500 pulse-dot' : 'bg-red-500 pulse-dot'"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs px-2 py-0.5 rounded font-medium"
+                            :class="ep.statusCode >= 500 ? 'bg-red-100 text-red-700' : ep.statusCode >= 400 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'"
+                            x-text="ep.statusCode || 'ERR'"></span>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded"
+                            :class="ep.latenciaMs < 200 ? 'bg-green-50 text-green-700' : ep.latenciaMs < 500 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'"
+                            x-text="ep.latenciaMs + 'ms'"></span>
+                        <span class="text-xs text-slate-400" x-text="ep.metodo"></span>
+                    </div>
+                    <div x-show="ep.erro" class="mt-2 text-xs text-red-600 truncate" x-text="ep.erro"></div>
+                </div>
+            </template>
         </div>
     </div>
 
-    <!-- ── CAUSAS PROVÁVEIS (só se há issues) ────────────────────────── -->
-    @if (apiOk && Model is not null && Model.CausasProvaveis.Count > 0)
-    {
-        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
-            <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-                </svg>
-                Causas Prováveis
-            </h2>
-            <div class="space-y-3">
-                @foreach (var causa in Model.CausasProvaveis)
-                {
-                    var severity = causa.Severidade == "critical"
-                        ? "border-red-200 bg-red-50"
-                        : "border-yellow-200 bg-yellow-50";
-                    var titleColor = causa.Severidade == "critical" ? "text-red-800" : "text-yellow-800";
-                    var bodyColor = causa.Severidade == "critical" ? "text-red-700" : "text-yellow-700";
-
-                    <div class="border @severity rounded-lg px-4 py-3">
-                        <p class="font-semibold text-sm @titleColor">[@causa.Componente] @causa.Descricao</p>
-                        <p class="text-xs @bodyColor mt-0.5">💡 @causa.Sugestao</p>
-                    </div>
-                }
-            </div>
-        </div>
-    }
-    else if (!apiOk)
-    {
-        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
-            <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-                </svg>
-                Diagnóstico de Conectividade
-            </h2>
-            <div class="border border-red-200 bg-red-50 rounded-lg px-4 py-3">
-                <p class="font-semibold text-sm text-red-800">[API] Não foi possível conectar à API</p>
-                <p class="text-xs text-red-700 mt-1">💡 URL configurada: <code class="font-mono">@apiUrl</code></p>
-                <p class="text-xs text-red-700 mt-1">💡 Verifique se a API está no ar, se a URL em <code>appsettings.json → ApiSettings:BaseUrl</code> está correta e se há problemas de rede ou CORS.</p>
-            </div>
-        </div>
-    }
-
-    <!-- ── CARDS GRID ─────────────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-
-        <!-- Web -->
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                    <span class="text-base">🌐</span> Web
-                </h2>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Operacional
-                </span>
-            </div>
-            <table class="w-full text-sm">
-                <tr class="border-b border-slate-100">
-                    <td class="py-1.5 text-slate-500 w-2/5">Status</td>
-                    <td class="py-1.5 font-medium text-green-700">Online</td>
-                </tr>
-                <tr>
-                    <td class="py-1.5 text-slate-500">URL da API</td>
-                    <td class="py-1.5 font-mono text-xs break-all text-slate-700">@apiUrl</td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- API -->
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                    <span class="text-base">⚡</span> API
-                </h2>
-                @if (apiOk)
-                {
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Acessível
-                    </span>
-                }
-                else
-                {
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Inacessível
-                    </span>
-                }
-            </div>
-            <table class="w-full text-sm">
-                <tr class="border-b border-slate-100">
-                    <td class="py-1.5 text-slate-500 w-2/5">Alcançável</td>
-                    <td class="py-1.5 font-medium @(apiOk ? "text-green-700" : "text-red-700")">@(apiOk ? "Sim" : "Não")</td>
-                </tr>
-                <tr class="border-b border-slate-100">
-                    <td class="py-1.5 text-slate-500">Latência</td>
-                    <td class="py-1.5">
-                        <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(latenciaApiMs)">@latenciaApiMs ms</span>
-                    </td>
-                </tr>
-                @if (Model is not null)
-                {
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Ambiente</td>
-                        <td class="py-1.5">@Model.Ambiente</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1.5 text-slate-500">Uptime</td>
-                        <td class="py-1.5 font-medium">@Model.Uptime</td>
-                    </tr>
-                }
-            </table>
-        </div>
-
-        @if (Model is not null)
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB 3: LOGS INTELIGENTES
+         ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="activeTab==='logs'" x-cloak class="fade-in">
+        @if (!isAdmin)
         {
-            <!-- Banco de Dados -->
-            var bancoOk = Model.Banco.Conexao == "ok";
-            var bancoStatus = bancoOk && !Model.Banco.Fallback ? "ok" : bancoOk && Model.Banco.Fallback ? "degraded" : "falha";
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-base">🗄️</span> Banco de Dados
-                    </h2>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium @StatusClass(bancoStatus)">
-                        <span class="w-1.5 h-1.5 @DotClass(bancoStatus) rounded-full"></span>
-                        @(bancoStatus == "ok" ? "OK" : bancoStatus == "degraded" ? "FALLBACK" : "FALHA")
-                    </span>
-                </div>
-                <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500 w-2/5">Provider</td>
-                        <td class="py-1.5 font-medium">@Model.Banco.Provider</td>
-                    </tr>
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Configurado</td>
-                        <td class="py-1.5">@Model.Banco.ProviderConfigurado</td>
-                    </tr>
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Fallback</td>
-                        <td class="py-1.5 @(Model.Banco.Fallback ? "text-amber-600 font-medium" : "")">@(Model.Banco.Fallback ? "Sim ⚠️" : "Não")</td>
-                    </tr>
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Conexão</td>
-                        <td class="py-1.5 font-medium @(bancoOk ? "text-green-700" : "text-red-700")">@Model.Banco.Conexao</td>
-                    </tr>
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Latência</td>
-                        <td class="py-1.5">
-                            <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(Model.Banco.LatenciaMs)">@Model.Banco.LatenciaMs ms</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="py-1.5 text-slate-500">Migrations</td>
-                        <td class="py-1.5">@(Model.Banco.MigrationsAplicadas == true ? "✅ Aplicadas" : Model.Banco.MigrationsAplicadas == false ? "❌ Falha" : "N/A")</td>
-                    </tr>
-                    @if (Model.Banco.Erro is not null)
-                    {
-                        <tr>
-                            <td class="py-1.5 text-slate-500">Erro</td>
-                            <td class="py-1.5 text-red-600 text-xs break-all">@Model.Banco.Erro</td>
-                        </tr>
-                    }
-                </table>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+                <span class="material-icons-round text-4xl text-slate-300 mb-2">lock</span>
+                <p class="text-slate-500 font-medium">Logs requerem permissao Admin</p>
+                <p class="text-xs text-slate-400 mt-1">Faca login como Admin ou SuperAdmin para acessar logs inteligentes.</p>
             </div>
-
-            <!-- Redis -->
-            var redisStatus = Model.Redis.Conexao == "ok" ? "ok" : Model.Redis.Conexao == "nao_configurado" ? "nao_configurado" : "falha";
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-base">⚡</span> Redis
-                    </h2>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium @StatusClass(redisStatus)">
-                        @if (redisStatus == "nao_configurado")
-                        {
-                            <span>N/A</span>
-                        }
-                        else
-                        {
-                            <span class="w-1.5 h-1.5 @DotClass(redisStatus) rounded-full"></span>
-                            <span>@(redisStatus == "ok" ? "OK" : "FALHA")</span>
-                        }
-                    </span>
-                </div>
-                <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500 w-2/5">Configurado</td>
-                        <td class="py-1.5">@(Model.Redis.Configurado ? "Sim" : "Não")</td>
-                    </tr>
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500">Conexão</td>
-                        <td class="py-1.5">@Model.Redis.Conexao</td>
-                    </tr>
-                    @if (Model.Redis.Configurado)
-                    {
-                        <tr>
-                            <td class="py-1.5 text-slate-500">Latência</td>
-                            <td class="py-1.5">
-                                <span class="text-xs font-medium px-1.5 py-0.5 rounded @LatBadgeClass(Model.Redis.LatenciaMs)">@Model.Redis.LatenciaMs ms</span>
-                            </td>
-                        </tr>
-                    }
-                </table>
-            </div>
-
-            <!-- SMTP -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-base">📧</span> SMTP / Email
-                    </h2>
-                    @if (Model.Smtp.Configurado)
-                    {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Configurado
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                            Console only
-                        </span>
-                    }
-                </div>
-                <table class="w-full text-sm">
-                    <tr class="border-b border-slate-100">
-                        <td class="py-1.5 text-slate-500 w-2/5">Tipo</td>
-                        <td class="py-1.5 text-xs font-mono">@Model.Smtp.Tipo</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1.5 text-slate-500">Host</td>
-                        <td class="py-1.5">@(Model.Smtp.Host ?? "N/A")</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Storage -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-base">📁</span> Storage
-                    </h2>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> @Model.Storage.Provider
-                    </span>
-                </div>
-                <table class="w-full text-sm">
-                    <tr>
-                        <td class="py-1.5 text-slate-500 w-2/5">Diretório</td>
-                        <td class="py-1.5 @(Model.Storage.DiretorioExiste == false ? "text-red-600 font-medium" : "")">
-                            @(Model.Storage.DiretorioExiste == true ? "✅ Existe" : Model.Storage.DiretorioExiste == false ? "❌ Não encontrado" : "N/A")
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- IA -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-base">🤖</span> IA (Anthropic)
-                    </h2>
-                    @if (Model.Ia.Habilitado)
-                    {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Habilitado
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                            Desabilitado
-                        </span>
-                    }
-                </div>
-                <table class="w-full text-sm">
-                    <tr>
-                        <td class="py-1.5 text-slate-500 w-2/5">API Key</td>
-                        <td class="py-1.5 @(Model.Ia.Habilitado && !Model.Ia.ApiKeyPresente ? "text-red-600 font-medium" : "")">
-                            @(Model.Ia.ApiKeyPresente ? "✅ Presente" : "Ausente")
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Configurações Críticas — full width -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
-                <h2 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                    <span class="text-base">🔐</span> Configurações Críticas
-                </h2>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="border border-slate-100 rounded-lg p-3">
-                        <p class="text-xs text-slate-500 mb-1">JWT Secret</p>
-                        @if (!Model.Configuracoes.JwtSecretPresente)
-                        {
-                            <p class="font-semibold text-red-600">❌ AUSENTE</p>
-                        }
-                        else if (Model.Configuracoes.JwtSecretSeguro == false)
-                        {
-                            <p class="font-semibold text-amber-600">⚠️ Presente (curta)</p>
-                        }
-                        else
-                        {
-                            <p class="font-semibold text-green-700">✅ Presente e seguro</p>
-                        }
+        }
+        else
+        {
+            <div>
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <div class="flex bg-white border border-slate-200 rounded-lg overflow-hidden text-xs">
+                        <button @@click="logFilter.level='ALL'" class="px-3 py-1.5 transition"
+                            :class="logFilter.level==='ALL' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'">Todos</button>
+                        <button @@click="logFilter.level='ERROR'" class="px-3 py-1.5 transition"
+                            :class="logFilter.level==='ERROR' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'">Erros</button>
+                        <button @@click="logFilter.level='WARN'" class="px-3 py-1.5 transition"
+                            :class="logFilter.level==='WARN' ? 'bg-yellow-600 text-white' : 'text-slate-600 hover:bg-slate-50'">Warnings</button>
+                        <button @@click="logFilter.level='INFO'" class="px-3 py-1.5 transition"
+                            :class="logFilter.level==='INFO' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'">Info</button>
                     </div>
-                    <div class="border border-slate-100 rounded-lg p-3">
-                        <p class="text-xs text-slate-500 mb-1">Connection String</p>
-                        <p class="font-semibold @(Model.Configuracoes.ConnectionStringPresente ? "text-green-700" : "text-red-600")">
-                            @(Model.Configuracoes.ConnectionStringPresente ? "✅ Presente" : "❌ AUSENTE")
-                        </p>
+                    <input type="text" x-model="logFilter.search" placeholder="Buscar nos logs..."
+                        class="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none" />
+                    <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                        <input type="checkbox" x-model="logFilter.groupByCorrelation" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-200" />
+                        Agrupar por operacao
+                    </label>
+                    <span class="text-xs text-slate-400" x-text="filteredLogs.length + ' entradas'"></span>
+                </div>
+
+                <!-- Log Volume Mini Chart -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+                    <div class="h-24">
+                        <canvas id="logVolumeChart"></canvas>
                     </div>
-                    <div class="border border-slate-100 rounded-lg p-3">
-                        <p class="text-xs text-slate-500 mb-1">CORS Origins</p>
-                        @if (Model.Configuracoes.CorsOrigins.Length == 0)
-                        {
-                            <p class="font-semibold text-amber-600">⚠️ Nenhum configurado</p>
-                        }
-                        else
-                        {
-                            <p class="text-xs font-mono text-slate-700 break-all">@string.Join(", ", Model.Configuracoes.CorsOrigins)</p>
-                        }
+                </div>
+
+                <!-- Loading -->
+                <div x-show="loadingLogs" class="text-center py-12 text-slate-400">
+                    <span class="material-icons-round text-4xl animate-spin mb-2">hourglass_empty</span>
+                    <p>Carregando logs...</p>
+                </div>
+
+                <!-- Log Entries -->
+                <div x-show="!loadingLogs && enhancedLogs" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div class="max-h-[600px] overflow-y-auto">
+                        <template x-for="(entry, idx) in filteredLogs.slice(0, visibleLogs)" :key="idx">
+                            <div class="border-b border-slate-100 last:border-0">
+                                <div @@click="entry._expanded = !entry._expanded"
+                                    class="flex items-start gap-2 px-4 py-2 cursor-pointer hover:bg-slate-50 transition-colors border-l-3"
+                                    :class="{
+                                        'border-l-red-500': entry.level === 'ERROR' || entry.level === 'FATAL',
+                                        'border-l-yellow-400': entry.level === 'WARN',
+                                        'border-l-blue-400': entry.categoria === 'startup',
+                                        'border-l-orange-400': entry.categoria === 'http_request' && entry.elapsedMs > 1000,
+                                        'border-l-transparent': !['ERROR','FATAL','WARN'].includes(entry.level) && entry.categoria !== 'startup'
+                                    }">
+                                    <span class="text-[10px] font-mono text-slate-400 shrink-0 mt-0.5 w-[110px]"
+                                        x-text="new Date(entry.timestamp).toLocaleString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'2-digit'})"></span>
+                                    <span class="text-[10px] font-bold shrink-0 w-10 mt-0.5"
+                                        :class="{
+                                            'text-red-600': entry.level === 'ERROR' || entry.level === 'FATAL',
+                                            'text-yellow-600': entry.level === 'WARN',
+                                            'text-blue-600': entry.level === 'INFO',
+                                            'text-slate-400': entry.level === 'DEBUG'
+                                        }" x-text="entry.level"></span>
+                                    <span class="text-xs text-slate-700 flex-1 truncate log-mono" x-text="entry.message"></span>
+                                    <span x-show="entry.elapsedMs" class="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded"
+                                        :class="entry.elapsedMs < 200 ? 'bg-green-50 text-green-700' : entry.elapsedMs < 1000 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'"
+                                        x-text="entry.elapsedMs ? Math.round(entry.elapsedMs) + 'ms' : ''"></span>
+                                    <span class="material-icons-round text-sm text-slate-400 shrink-0"
+                                        x-text="entry._expanded ? 'expand_less' : 'expand_more'"></span>
+                                </div>
+                                <!-- Expanded Details -->
+                                <div x-show="entry._expanded" x-cloak class="px-4 py-3 bg-slate-50 border-t border-slate-100 text-xs space-y-1">
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div x-show="entry.categoria"><span class="text-slate-400">Categoria:</span> <span class="font-medium" x-text="entry.categoria"></span></div>
+                                        <div x-show="entry.httpMethod"><span class="text-slate-400">Metodo:</span> <span class="font-medium" x-text="entry.httpMethod + ' ' + (entry.endpoint || '')"></span></div>
+                                        <div x-show="entry.statusCode"><span class="text-slate-400">Status:</span> <span class="font-medium" x-text="entry.statusCode"></span></div>
+                                        <div x-show="entry.correlationId"><span class="text-slate-400">CorrelationId:</span> <span class="font-mono text-[10px]" x-text="entry.correlationId"></span></div>
+                                    </div>
+                                    <div x-show="entry.exception" class="mt-2">
+                                        <p class="text-slate-500 font-medium mb-1">Stack Trace:</p>
+                                        <pre class="log-mono text-red-700 bg-red-50 p-2 rounded overflow-x-auto max-h-48 whitespace-pre-wrap" x-text="entry.exception"></pre>
+                                    </div>
+                                    <p class="log-mono text-slate-600 mt-1" x-text="entry.message"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <div x-show="filteredLogs.length > visibleLogs" class="px-4 py-3 border-t border-slate-200 text-center">
+                        <button @@click="visibleLogs += 100" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                            Carregar mais (<span x-text="filteredLogs.length - visibleLogs"></span> restantes)
+                        </button>
                     </div>
                 </div>
             </div>
         }
     </div>
 
-    <!-- ── QUICK LINKS ────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-        <h2 class="text-sm font-semibold text-slate-600 mb-3">🔗 Links Rápidos</h2>
-        <div class="flex flex-wrap gap-2">
-            <a href="/diagnostico/json" target="_blank"
-               class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
-                JSON
-            </a>
-            @if (apiOk)
-            {
-                <a href="@apiBase/swagger" target="_blank"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition">
-                    📖 Swagger
-                </a>
-                <a href="@apiBase/health" target="_blank"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
-                    ❤️ Health
-                </a>
-                <a href="@apiBase/health/ready" target="_blank"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
-                    ✅ Readiness
-                </a>
-                <a href="@apiBase/health/live" target="_blank"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition">
-                    🟢 Liveness
-                </a>
-                <a href="@apiUrl" target="_blank"
-                   class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-mono">
-                    API Base
-                </a>
-            }
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB 4: INSIGHTS
+         ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="activeTab==='insights'" x-cloak class="fade-in">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                <span class="material-icons-round text-indigo-500">psychology</span>Diagnosticos Inteligentes
+            </h2>
+            <span class="text-xs text-slate-400" x-text="patterns.length + ' padroes detectados'"></span>
+        </div>
+
+        <div x-show="loadingLogs && patterns.length === 0" class="text-center py-12 text-slate-400">
+            <span class="material-icons-round text-4xl animate-spin mb-2">hourglass_empty</span>
+            <p>Analisando padroes...</p>
+        </div>
+
+        <div x-show="!loadingLogs && patterns.length === 0" class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+            <span class="material-icons-round text-4xl text-green-400 mb-2">verified</span>
+            <p class="text-green-700 font-medium">Nenhum problema detectado</p>
+            <p class="text-xs text-green-600 mt-1">Os algoritmos de deteccao nao encontraram padroes anomalos nas ultimas 24h.</p>
+        </div>
+
+        <!-- Patterns by Category -->
+        <template x-for="category in patternCategories" :key="category.key">
+            <div x-show="patternsForCategory(category.key).length > 0" class="mb-6">
+                <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <span class="material-icons-round text-base" :class="category.iconColor" x-text="category.icon"></span>
+                    <span x-text="category.label"></span>
+                </h3>
+                <div class="space-y-2">
+                    <template x-for="(p, pidx) in patternsForCategory(category.key)" :key="pidx">
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow"
+                            :class="{
+                                'border-l-4 border-l-red-500': p.severidade === 'critical',
+                                'border-l-4 border-l-yellow-500': p.severidade === 'warning',
+                                'border-l-4 border-l-blue-400': p.severidade === 'info'
+                            }">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-slate-800" x-text="p.descricao"></p>
+                                    <p class="text-xs text-slate-500 mt-1" x-text="p.sugestao"></p>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                                        :class="{
+                                            'bg-red-100 text-red-700': p.severidade === 'critical',
+                                            'bg-yellow-100 text-yellow-700': p.severidade === 'warning',
+                                            'bg-blue-100 text-blue-700': p.severidade === 'info'
+                                        }" x-text="p.severidade"></span>
+                                    <div class="text-[10px] text-slate-400 mt-1" x-text="p.ocorrencias + 'x'"></div>
+                                </div>
+                            </div>
+                            <div x-show="p.primeiraOcorrencia" class="mt-2 text-[10px] text-slate-400">
+                                <span x-text="p.primeiraOcorrencia ? new Date(p.primeiraOcorrencia).toLocaleString('pt-BR') : ''"></span>
+                                <span x-show="p.ultimaOcorrencia && p.ultimaOcorrencia !== p.primeiraOcorrencia">
+                                    &rarr; <span x-text="p.ultimaOcorrencia ? new Date(p.ultimaOcorrencia).toLocaleString('pt-BR') : ''"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- Quick Links -->
+        <div class="mt-8 pt-6 border-t border-slate-200">
+            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Links Rapidos</h3>
+            <div class="flex flex-wrap gap-2">
+                <a href="/diagnostico/json" target="_blank" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">JSON Diagnostico</a>
+                <a href="@(apiBase)/swagger" target="_blank" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">Swagger</a>
+                <a href="@(apiBase)/health" target="_blank" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health</a>
+                <a href="@(apiBase)/health/ready" target="_blank" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health/ready</a>
+            </div>
         </div>
     </div>
 
-    <!-- ── LOGS (só para admins) ──────────────────────────────────────── -->
-    @if (isAdmin)
-    {
-        <div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                    <span class="text-base">📋</span> Logs Recentes
-                    <span class="text-xs font-normal text-slate-400">(visível apenas para admins)</span>
-                </h2>
-                @if (logs is not null && logs.Disponivel)
-                {
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-slate-500">@logs.TotalLinhas linhas · @logs.Arquivo</span>
-                        <button onclick="copyLogs()"
-                                class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition">
-                            Copiar
-                        </button>
-                    </div>
-                }
-            </div>
-
-            @if (logs is null)
-            {
-                <p class="text-sm text-slate-500 italic">Não foi possível buscar os logs. Verifique se a API está acessível.</p>
-            }
-            else if (!logs.Disponivel)
-            {
-                <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                    <p class="text-sm text-slate-500">ℹ️ @logs.Motivo</p>
-                    <p class="text-xs text-slate-400 mt-1">Logs em arquivo ficam disponíveis quando o Serilog file sink está configurado e o volume de logs é persistente.</p>
-                </div>
-            }
-            else if (logs.Entradas.Length == 0)
-            {
-                <p class="text-sm text-slate-500 italic">Nenhum evento de log encontrado no arquivo atual.</p>
-            }
-            else
-            {
-                <div id="logPanel" class="log-panel bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto text-xs space-y-0.5">
-                    @foreach (var entry in logs.Entradas.Reverse())
-                    {
-                        var levelBg = entry.Level switch {
-                            "ERROR" or "FATAL" => "bg-red-900 text-red-300",
-                            "WARN" => "bg-yellow-900 text-yellow-300",
-                            "INFO" => "bg-blue-900 text-blue-300",
-                            _ => "bg-slate-800 text-slate-400"
-                        };
-                        var msgColor = entry.Level switch {
-                            "ERROR" or "FATAL" => "text-red-200",
-                            "WARN" => "text-yellow-200",
-                            "INFO" => "text-slate-200",
-                            _ => "text-slate-400"
-                        };
-                        <div class="flex items-start gap-2 py-0.5">
-                            <span class="text-slate-500 shrink-0">@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
-                            <span class="px-1 rounded text-[10px] font-bold @levelBg shrink-0 leading-4 mt-0.5">@entry.Level</span>
-                            <span class="@msgColor break-all">@entry.Message</span>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-    }
-    else if (!User.Identity?.IsAuthenticated ?? true)
-    {
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
-            <p class="text-sm text-slate-500">
-                🔒 <a href="/auth/login?returnUrl=/diagnostico" class="text-indigo-600 hover:underline">Faça login</a> como Admin para visualizar os logs recentes.
-            </p>
-        </div>
-    }
-
 </div>
 
+<!-- ── ALPINE.JS APP ────────────────────────────────────────────────── -->
 <script>
-    function diagApp() {
-        return {
-            countdown: 60,
-            refreshing: false,
-            timer: null,
+function diagApp() {
+    return {
+        activeTab: 'overview',
+        refreshing: false,
+        countdown: 60,
+        countdownInterval: null,
 
-            init() {
-                this.timer = setInterval(() => {
-                    this.countdown--;
-                    if (this.countdown <= 0) {
-                        this.refresh();
-                    }
-                }, 1000);
-            },
+        // Data
+        endpoints: null,
+        healthHistory: null,
+        enhancedLogs: null,
 
-            refresh() {
-                this.refreshing = true;
-                clearInterval(this.timer);
-                window.location.reload();
+        // Loading states
+        loadingEndpoints: false,
+        loadingLogs: false,
+
+        // Log filters
+        logFilter: { level: 'ALL', search: '', groupByCorrelation: false },
+        visibleLogs: 100,
+
+        // Charts
+        healthChartInstance: null,
+        errorsChartInstance: null,
+        logVolumeChartInstance: null,
+
+        // Admin flag
+        isAdmin: @(isAdmin ? "true" : "false"),
+
+        // Pattern categories
+        patternCategories: [
+            { key: 'deploy', label: 'Deploy & Restarts', icon: 'rocket_launch', iconColor: 'text-blue-500' },
+            { key: 'migration', label: 'Migrations', icon: 'schema', iconColor: 'text-purple-500' },
+            { key: 'error', label: 'Erros Recorrentes', icon: 'bug_report', iconColor: 'text-red-500' },
+            { key: 'performance', label: 'Performance', icon: 'speed', iconColor: 'text-orange-500' },
+            { key: 'config', label: 'Configuracao', icon: 'settings', iconColor: 'text-slate-500' },
+        ],
+
+        get errorCount24h() {
+            return this.enhancedLogs?.resumo?.totalErrors ?? 0;
+        },
+
+        get endpointsFailed() {
+            return this.endpoints?.falhas ?? 0;
+        },
+
+        get patterns() {
+            return this.enhancedLogs?.padroes ?? [];
+        },
+
+        get filteredLogs() {
+            if (!this.enhancedLogs?.entradas) return [];
+            let entries = this.enhancedLogs.entradas;
+
+            if (this.logFilter.level !== 'ALL') {
+                if (this.logFilter.level === 'ERROR') {
+                    entries = entries.filter(e => e.level === 'ERROR' || e.level === 'FATAL');
+                } else {
+                    entries = entries.filter(e => e.level === this.logFilter.level);
+                }
             }
-        };
-    }
 
-    function copyLogs() {
-        const panel = document.getElementById('logPanel');
-        if (!panel) return;
-        const text = panel.innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            const btn = event.target;
-            btn.textContent = 'Copiado!';
-            setTimeout(() => btn.textContent = 'Copiar', 2000);
-        });
-    }
+            if (this.logFilter.search) {
+                const q = this.logFilter.search.toLowerCase();
+                entries = entries.filter(e =>
+                    e.message.toLowerCase().includes(q) ||
+                    (e.endpoint && e.endpoint.toLowerCase().includes(q)) ||
+                    (e.correlationId && e.correlationId.toLowerCase().includes(q))
+                );
+            }
+
+            // Reverse to show newest first
+            return [...entries].reverse();
+        },
+
+        patternsForCategory(catKey) {
+            const typeMap = {
+                deploy: ['deploy_restart'],
+                migration: ['migration_failure'],
+                error: ['repeated_error', 'error_spike'],
+                performance: ['slow_endpoint'],
+                config: ['config_warning'],
+            };
+            const types = typeMap[catKey] || [];
+            return this.patterns.filter(p => types.includes(p.tipo));
+        },
+
+        async init() {
+            // Start countdown
+            this.countdownInterval = setInterval(() => {
+                this.countdown--;
+                if (this.countdown <= 0) {
+                    this.countdown = 60;
+                    this.refreshAll();
+                }
+            }, 1000);
+
+            // Fetch data in parallel
+            this.fetchEndpoints();
+            this.fetchHealthHistory();
+            if (this.isAdmin) this.fetchEnhancedLogs();
+
+            // Auto-refresh health history every 60s
+            setInterval(() => this.fetchHealthHistory(), 60000);
+        },
+
+        async refreshAll() {
+            this.refreshing = true;
+            this.countdown = 60;
+            await Promise.all([
+                this.fetchEndpoints(),
+                this.fetchHealthHistory(),
+                this.isAdmin ? this.fetchEnhancedLogs() : Promise.resolve(),
+            ]);
+            this.refreshing = false;
+        },
+
+        async fetchEndpoints() {
+            this.loadingEndpoints = true;
+            try {
+                const r = await fetch('/diagnostico/api/endpoints');
+                if (r.ok) this.endpoints = await r.json();
+            } catch (e) { console.error('endpoints fetch error', e); }
+            this.loadingEndpoints = false;
+        },
+
+        async fetchHealthHistory() {
+            try {
+                const r = await fetch('/diagnostico/api/historico');
+                if (r.ok) {
+                    this.healthHistory = await r.json();
+                    this.$nextTick(() => this.renderHealthChart());
+                }
+            } catch (e) { console.error('historico fetch error', e); }
+        },
+
+        async fetchEnhancedLogs() {
+            this.loadingLogs = true;
+            try {
+                const r = await fetch('/diagnostico/api/logs-enhanced?hours=24');
+                if (r.ok) {
+                    this.enhancedLogs = await r.json();
+                    // Add _expanded property to each entry
+                    if (this.enhancedLogs?.entradas) {
+                        this.enhancedLogs.entradas.forEach(e => e._expanded = false);
+                    }
+                    this.$nextTick(() => {
+                        this.renderErrorsChart();
+                        this.renderLogVolumeChart();
+                    });
+                }
+            } catch (e) { console.error('enhanced logs fetch error', e); }
+            this.loadingLogs = false;
+        },
+
+        renderHealthChart() {
+            const canvas = document.getElementById('healthChart');
+            if (!canvas || !this.healthHistory?.snapshots?.length) return;
+
+            const snapshots = this.healthHistory.snapshots;
+            const labels = snapshots.map(s => new Date(s.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+            const apiData = snapshots.map(s => s.dbLatencyMs >= 0 ? s.dbLatencyMs : null);
+            const errData = snapshots.map(s => s.errorCount);
+
+            if (this.healthChartInstance) this.healthChartInstance.destroy();
+
+            this.healthChartInstance = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'DB Latencia (ms)',
+                            data: apiData,
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 1,
+                            borderWidth: 2,
+                        },
+                        {
+                            label: 'Erros/min',
+                            data: errData,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 1,
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } },
+                    },
+                    scales: {
+                        x: { ticks: { font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { font: { size: 9 }, callback: v => v + 'ms' }, grid: { color: '#f1f5f9' } },
+                        y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 9 } }, grid: { display: false } },
+                    }
+                }
+            });
+        },
+
+        renderErrorsChart() {
+            const canvas = document.getElementById('errorsChart');
+            if (!canvas || !this.enhancedLogs?.resumo) return;
+
+            const hours = this.enhancedLogs.resumo.errorsByHour || {};
+            const reqHours = this.enhancedLogs.resumo.requestsByHour || {};
+            const allHours = [...new Set([...Object.keys(hours), ...Object.keys(reqHours)])].sort();
+            const labels = allHours.map(h => h + ':00');
+            const errData = allHours.map(h => hours[h] || 0);
+            const reqData = allHours.map(h => reqHours[h] || 0);
+
+            if (this.errorsChartInstance) this.errorsChartInstance.destroy();
+
+            this.errorsChartInstance = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Requests',
+                            data: reqData,
+                            backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                            borderColor: '#6366f1',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                        },
+                        {
+                            label: 'Erros',
+                            data: errData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } },
+                    },
+                    scales: {
+                        x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+                    }
+                }
+            });
+        },
+
+        renderLogVolumeChart() {
+            const canvas = document.getElementById('logVolumeChart');
+            if (!canvas || !this.enhancedLogs?.resumo) return;
+
+            const reqHours = this.enhancedLogs.resumo.requestsByHour || {};
+            const errHours = this.enhancedLogs.resumo.errorsByHour || {};
+            const allHours = [...new Set([...Object.keys(reqHours), ...Object.keys(errHours)])].sort();
+            const labels = allHours.map(h => h + 'h');
+
+            if (this.logVolumeChartInstance) this.logVolumeChartInstance.destroy();
+
+            this.logVolumeChartInstance = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Logs',
+                            data: allHours.map(h => reqHours[h] || 0),
+                            backgroundColor: '#c7d2fe',
+                            borderRadius: 2,
+                        },
+                        {
+                            label: 'Erros',
+                            data: allHours.map(h => errHours[h] || 0),
+                            backgroundColor: '#fca5a5',
+                            borderRadius: 2,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { stacked: true, ticks: { font: { size: 8 } }, grid: { display: false } },
+                        y: { stacked: true, ticks: { font: { size: 8 } }, grid: { color: '#f1f5f9' } },
+                    }
+                }
+            });
+        },
+    };
+}
 </script>
 </body>
 </html>

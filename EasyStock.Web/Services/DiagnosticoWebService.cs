@@ -74,9 +74,72 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
             return null;
         }
     }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Novos métodos — Central de Operações Inteligente
+    // ──────────────────────────────────────────────────────────────────────
+
+    public async Task<EnhancedLogsWebResult?> FetchEnhancedLogsAsync(string bearerToken, int hours = 24)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"diagnostico/logs/enhanced?hours={hours}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<EnhancedLogsWebResult>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<EndpointsTestWebResponse?> FetchEndpointTestsAsync()
+    {
+        try
+        {
+            var response = await httpClient.GetAsync("diagnostico/endpoints");
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<EndpointsTestWebResponse>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<HealthHistoryWebResponse?> FetchHealthHistoryAsync()
+    {
+        try
+        {
+            var response = await httpClient.GetAsync("diagnostico/historico");
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<HealthHistoryWebResponse>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
-// DTOs espelhando a resposta da API
+// ──────────────────────────────────────────────────────────────────────────
+// DTOs espelhando a resposta da API — Existentes
+// ──────────────────────────────────────────────────────────────────────────
+
 public sealed class DiagnosticoApiResult
 {
     public string Status { get; set; } = "";
@@ -164,4 +227,94 @@ public sealed class LogEntryInfo
     public DateTimeOffset Timestamp { get; set; }
     public string Level { get; set; } = "";
     public string Message { get; set; } = "";
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// DTOs — Central de Operações Inteligente
+// ──────────────────────────────────────────────────────────────────────────
+
+public sealed class EnhancedLogsWebResult
+{
+    public bool Disponivel { get; set; }
+    public string? Motivo { get; set; }
+    public DateTimeOffset QueryTimestamp { get; set; }
+    public int PeriodoHoras { get; set; }
+    public int TotalEntries { get; set; }
+    public EnhancedLogEntryInfo[] Entradas { get; set; } = [];
+    public LogSummaryInfo Resumo { get; set; } = new();
+    public DetectedPatternInfo[] Padroes { get; set; } = [];
+}
+
+public sealed class EnhancedLogEntryInfo
+{
+    public DateTimeOffset Timestamp { get; set; }
+    public string Level { get; set; } = "";
+    public string Message { get; set; } = "";
+    public string? CorrelationId { get; set; }
+    public string? Endpoint { get; set; }
+    public string? HttpMethod { get; set; }
+    public int? StatusCode { get; set; }
+    public double? ElapsedMs { get; set; }
+    public string? Exception { get; set; }
+    public string Categoria { get; set; } = "general";
+}
+
+public sealed class LogSummaryInfo
+{
+    public int TotalRequests { get; set; }
+    public int TotalErrors { get; set; }
+    public int TotalWarnings { get; set; }
+    public double AvgResponseTimeMs { get; set; }
+    public Dictionary<string, int> ErrorsByEndpoint { get; set; } = new();
+    public Dictionary<string, int> RequestsByHour { get; set; } = new();
+    public Dictionary<string, int> ErrorsByHour { get; set; } = new();
+}
+
+public sealed class DetectedPatternInfo
+{
+    public string Tipo { get; set; } = "";
+    public string Severidade { get; set; } = "info";
+    public string Descricao { get; set; } = "";
+    public string Sugestao { get; set; } = "";
+    public int Ocorrencias { get; set; }
+    public DateTimeOffset? PrimeiraOcorrencia { get; set; }
+    public DateTimeOffset? UltimaOcorrencia { get; set; }
+}
+
+public sealed class EndpointTestWebResult
+{
+    public string Rota { get; set; } = "";
+    public string Metodo { get; set; } = "GET";
+    public int StatusCode { get; set; }
+    public long LatenciaMs { get; set; }
+    public string Status { get; set; } = "ok";
+    public string? Erro { get; set; }
+    public DateTimeOffset TestadoEm { get; set; }
+}
+
+public sealed class EndpointsTestWebResponse
+{
+    public EndpointTestWebResult[] Resultados { get; set; } = [];
+    public int Saudaveis { get; set; }
+    public int Lentos { get; set; }
+    public int Falhas { get; set; }
+    public DateTimeOffset TestadoEm { get; set; }
+}
+
+public sealed class HealthSnapshotInfo
+{
+    public DateTimeOffset Timestamp { get; set; }
+    public long DbLatencyMs { get; set; }
+    public string DbStatus { get; set; } = "ok";
+    public long? RedisLatencyMs { get; set; }
+    public string? RedisStatus { get; set; }
+    public int ErrorCount { get; set; }
+    public string OverallStatus { get; set; } = "ok";
+}
+
+public sealed class HealthHistoryWebResponse
+{
+    public HealthSnapshotInfo[] Snapshots { get; set; } = [];
+    public DateTimeOffset Desde { get; set; }
+    public int Total { get; set; }
 }
