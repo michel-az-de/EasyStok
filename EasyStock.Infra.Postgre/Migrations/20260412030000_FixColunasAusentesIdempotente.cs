@@ -19,6 +19,38 @@ namespace EasyStock.Infra.Postgre.Migrations
                 ADD COLUMN IF NOT EXISTS ""TemaPreferido"" character varying(20) NOT NULL DEFAULT 'light';
             ");
 
+            // EnriquecerProdutoSubcategoriaECaracteristica
+            migrationBuilder.Sql(@"
+                ALTER TABLE produtos
+                ADD COLUMN IF NOT EXISTS ""SubcategoriaId"" uuid;
+            ");
+            migrationBuilder.Sql(@"
+                ALTER TABLE produto_caracteristicas
+                ADD COLUMN IF NOT EXISTS ""VariacaoId"" uuid;
+            ");
+            migrationBuilder.Sql(@"
+                CREATE INDEX IF NOT EXISTS ""IX_produtos_SubcategoriaId""
+                    ON produtos (""SubcategoriaId"");
+                CREATE INDEX IF NOT EXISTS ""IX_produto_caracteristicas_VariacaoId""
+                    ON produto_caracteristicas (""VariacaoId"");
+            ");
+
+            // AdicionarEstornoMovimentacao
+            migrationBuilder.Sql(@"
+                ALTER TABLE movimentacoes_estoque
+                ADD COLUMN IF NOT EXISTS ""EstornadaEm"" timestamp with time zone;
+                ALTER TABLE movimentacoes_estoque
+                ADD COLUMN IF NOT EXISTS ""MovimentacaoEstornadaId"" uuid;
+            ");
+
+            // FixNotificacaoSeveridadeDefault
+            migrationBuilder.Sql(@"
+                ALTER TABLE notificacoes
+                ADD COLUMN IF NOT EXISTS ""Severidade"" character varying(20) NOT NULL DEFAULT 'Media';
+                ALTER TABLE notificacoes
+                ADD COLUMN IF NOT EXISTS ""Titulo"" character varying(120) NOT NULL DEFAULT '';
+            ");
+
             // configuracoes_loja pode nao ter sido criada se migration conflitou
             migrationBuilder.Sql(@"
                 CREATE TABLE IF NOT EXISTS configuracoes_loja (
