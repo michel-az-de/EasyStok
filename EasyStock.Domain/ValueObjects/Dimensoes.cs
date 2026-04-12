@@ -1,7 +1,10 @@
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EasyStock.Domain.ValueObjects
 {
+    [JsonConverter(typeof(DimensoesJsonConverter))]
     public sealed record Dimensoes
     {
         public decimal Peso { get; }
@@ -35,5 +38,40 @@ namespace EasyStock.Domain.ValueObjects
 
         public override string ToString() =>
             $"P:{Peso:F3} L:{Largura:F2} A:{Altura:F2} C:{Comprimento:F2}";
+
+        private sealed class DimensoesJsonConverter : JsonConverter<Dimensoes>
+        {
+            public override Dimensoes? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.TokenType == JsonTokenType.Null) return null;
+                if (reader.TokenType != JsonTokenType.StartObject)
+                    throw new JsonException($"Unexpected token {reader.TokenType} for Dimensoes.");
+
+                decimal peso = 0, largura = 0, altura = 0, comprimento = 0;
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                {
+                    if (reader.TokenType != JsonTokenType.PropertyName) continue;
+                    var prop = reader.GetString()!;
+                    reader.Read();
+
+                    if (prop.Equals("peso", StringComparison.OrdinalIgnoreCase)) peso = reader.GetDecimal();
+                    else if (prop.Equals("largura", StringComparison.OrdinalIgnoreCase)) largura = reader.GetDecimal();
+                    else if (prop.Equals("altura", StringComparison.OrdinalIgnoreCase)) altura = reader.GetDecimal();
+                    else if (prop.Equals("comprimento", StringComparison.OrdinalIgnoreCase)) comprimento = reader.GetDecimal();
+                }
+
+                return From(peso, largura, altura, comprimento);
+            }
+
+            public override void Write(Utf8JsonWriter writer, Dimensoes value, JsonSerializerOptions options)
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("peso", value.Peso);
+                writer.WriteNumber("largura", value.Largura);
+                writer.WriteNumber("altura", value.Altura);
+                writer.WriteNumber("comprimento", value.Comprimento);
+                writer.WriteEndObject();
+            }
+        }
     }
 }

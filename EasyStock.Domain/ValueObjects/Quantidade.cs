@@ -1,7 +1,10 @@
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EasyStock.Domain.ValueObjects
 {
+    [JsonConverter(typeof(QuantidadeJsonConverter))]
     public sealed record Quantidade
     {
         public int Value { get; }
@@ -30,5 +33,35 @@ namespace EasyStock.Domain.ValueObjects
         public static implicit operator int?(Quantidade? q) => q?.Value;
 
         public override string ToString() => Value.ToString();
+
+        private sealed class QuantidadeJsonConverter : JsonConverter<Quantidade>
+        {
+            public override Quantidade? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.TokenType == JsonTokenType.Null) return null;
+                if (reader.TokenType == JsonTokenType.Number)
+                    return From(reader.GetInt32());
+
+                if (reader.TokenType == JsonTokenType.StartObject)
+                {
+                    int? val = null;
+                    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                    {
+                        if (reader.TokenType == JsonTokenType.PropertyName &&
+                            reader.GetString()!.Equals("value", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reader.Read();
+                            val = reader.GetInt32();
+                        }
+                    }
+                    return val.HasValue ? From(val.Value) : null;
+                }
+
+                throw new JsonException($"Unexpected token {reader.TokenType} for Quantidade.");
+            }
+
+            public override void Write(Utf8JsonWriter writer, Quantidade value, JsonSerializerOptions options)
+                => writer.WriteNumberValue(value.Value);
+        }
     }
 }

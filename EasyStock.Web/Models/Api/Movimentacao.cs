@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace EasyStock.Web.Models.Api;
 
 public record Movimentacao
@@ -25,11 +28,13 @@ public record Movimentacao
     public DateOnly Data => DateOnly.FromDateTime(DataMovimentacao);
 }
 
+[JsonConverter(typeof(QuantidadeDtoJsonConverter))]
 public record QuantidadeDto
 {
     public int Value { get; init; }
 }
 
+[JsonConverter(typeof(DinheiroDtoJsonConverter))]
 public record DinheiroDto
 {
     public decimal Valor { get; init; }
@@ -41,4 +46,66 @@ public record KpisResponse
     public decimal ReceitaTotal { get; init; }
     public int TotalVendas { get; init; }
     public int TotalPerdas { get; init; }
+}
+
+// ── JsonConverters: handle both primitive (new) and object (old) JSON formats ──
+
+internal sealed class QuantidadeDtoJsonConverter : JsonConverter<QuantidadeDto>
+{
+    public override QuantidadeDto? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.Number)
+            return new QuantidadeDto { Value = reader.GetInt32() };
+
+        if (reader.TokenType == JsonTokenType.StartObject)
+        {
+            int val = 0;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName &&
+                    reader.GetString()!.Equals("value", StringComparison.OrdinalIgnoreCase))
+                {
+                    reader.Read();
+                    val = reader.GetInt32();
+                }
+            }
+            return new QuantidadeDto { Value = val };
+        }
+
+        throw new JsonException($"Unexpected token {reader.TokenType} for QuantidadeDto.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, QuantidadeDto value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value.Value);
+}
+
+internal sealed class DinheiroDtoJsonConverter : JsonConverter<DinheiroDto>
+{
+    public override DinheiroDto? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        if (reader.TokenType == JsonTokenType.Number)
+            return new DinheiroDto { Valor = reader.GetDecimal() };
+
+        if (reader.TokenType == JsonTokenType.StartObject)
+        {
+            decimal val = 0;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName &&
+                    reader.GetString()!.Equals("valor", StringComparison.OrdinalIgnoreCase))
+                {
+                    reader.Read();
+                    val = reader.GetDecimal();
+                }
+            }
+            return new DinheiroDto { Valor = val };
+        }
+
+        throw new JsonException($"Unexpected token {reader.TokenType} for DinheiroDto.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, DinheiroDto value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value.Valor);
 }
