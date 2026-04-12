@@ -24,6 +24,8 @@ namespace EasyStock.Domain.ValueObjects
             return new CodigoSku(normalized.ToUpperInvariant());
         }
 
+        public static implicit operator string?(CodigoSku? s) => s?.Value;
+
         public override string ToString() => Value;
     }
 }

@@ -734,8 +734,19 @@
                 // ── Submit ──
                 saving: false,
                 submitForm() {
+                    // Validacoes com feedback claro
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    if (this.preco > 0 && this.preco <= 0.001) { this.step = 2; window.showToast('Preco de venda invalido.', 'warning'); return; }
+
+                    // Garantir que PrecoReferencia seja null (nao 0) se nao preenchido — API exige > 0 se presente
+                    const precoInput = this.$el.querySelector('input[name="PrecoReferencia"]');
+                    if (precoInput && (this.preco === 0 || this.preco === '')) precoInput.value = '';
+                    const custoInput = this.$el.querySelector('input[name="CustoReferencia"]');
+                    if (custoInput && (this.custo === 0 || this.custo === '')) custoInput.value = '';
+                    const margemInput = this.$el.querySelector('input[name="MargemEstimada"]');
+                    if (margemInput && (this.margem === 0 || this.margem === '')) margemInput.value = '';
+
                     this.saving = true;
                     this._clearDraft();
                     this.$nextTick(() => this.$el.submit());

@@ -26,6 +26,9 @@ namespace EasyStock.Domain.ValueObjects
             return From(result);
         }
 
+        public static implicit operator int(Quantidade q) => q.Value;
+        public static implicit operator int?(Quantidade? q) => q?.Value;
+
         public override string ToString() => Value.ToString();
     }
 }

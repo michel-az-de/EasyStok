@@ -61,10 +61,10 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = BuildFilteredQuery(empresaId, de, ate, tipo, natureza);
 
-            var totalUnidades = await query.SumAsync(m => EF.Property<int>(m, "Quantidade"));
+            var totalUnidades = await query.SumAsync(m => m.Quantidade.Value);
             var receitaTotal = await query
                 .Where(m => m.ValorTotal != null)
-                .SumAsync(m => EF.Property<decimal?>(m, "ValorTotal") ?? 0m);
+                .SumAsync(m => m.ValorTotal!.Valor);
             var totalVendas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
             var totalPerdas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda);
 
@@ -120,7 +120,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (produtoId.HasValue)
                 query = query.Where(m => m.ProdutoId == produtoId.Value);
 
-            var totalSaidas = await query.SumAsync(m => EF.Property<int>(m, "Quantidade"));
+            var totalSaidas = await query.SumAsync(m => m.Quantidade.Value);
             var dias = Math.Max(1, (ate - de).Days);
             return (decimal)totalSaidas / dias;
         }
@@ -144,7 +144,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(g => new
                 {
                     ProdutoId = g.Key,
-                    TotalSaidas = g.Sum(m => EF.Property<int>(m, "Quantidade"))
+                    TotalSaidas = g.Sum(m => m.Quantidade.Value)
                 })
                 .ToListAsync();
 
@@ -167,8 +167,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     Ano = g.Key.Year,
                     Mes = g.Key.Month,
-                    TotalSaidas = g.Sum(m => EF.Property<int>(m, "Quantidade")),
-                    ValorTotal = g.Sum(m => EF.Property<decimal?>(m, "ValorTotal") ?? 0m)
+                    TotalSaidas = g.Sum(m => m.Quantidade.Value),
+                    ValorTotal = g.Sum(m => m.ValorTotal != null ? m.ValorTotal.Valor : 0m)
                 })
                 .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
                 .ToListAsync();

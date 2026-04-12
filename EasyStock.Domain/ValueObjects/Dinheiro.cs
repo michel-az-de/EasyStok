@@ -27,6 +27,9 @@ namespace EasyStock.Domain.ValueObjects
             return FromDecimal(result);
         }
 
+        public static implicit operator decimal(Dinheiro d) => d.Valor;
+        public static implicit operator decimal?(Dinheiro? d) => d?.Valor;
+
         public override string ToString() => Valor.ToString("F2");
     }
 }
