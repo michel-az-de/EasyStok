@@ -26,7 +26,8 @@ public sealed class DiagnosticoController(
     IDistributedCache cache,
     IEmailService emailService,
     HealthSnapshotService healthSnapshotService,
-    IHttpClientFactory httpClientFactory) : ControllerBase
+    IHttpClientFactory httpClientFactory,
+    ILogger<DiagnosticoController> logger) : ControllerBase
 {
     [HttpGet("ping")]
     public IActionResult Ping() => Ok(new { pong = true, timestamp = DateTimeOffset.UtcNow });
@@ -99,7 +100,7 @@ public sealed class DiagnosticoController(
                     }
                 }
             }
-            catch { /* logs are best-effort for dashboard */ }
+            catch (Exception ex) { logger.LogDebug(ex, "Log parsing failed — dashboard will render without log data."); }
 
             return Content(RenderHtml(result, snapshots, enhancedLogs), "text/html; charset=utf-8");
         }

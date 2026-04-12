@@ -9,6 +9,12 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
     {
         var headers = context.Response.Headers;
 
+        // Remove informacao de tecnologia do servidor (reconnaissance hardening)
+        headers.Remove("Server");
+        headers.Remove("X-Powered-By");
+        headers.Remove("X-AspNet-Version");
+        headers.Remove("X-AspNetMvc-Version");
+
         // Impede que browsers tentem inferir o Content-Type (MIME sniffing)
         headers["X-Content-Type-Options"] = "nosniff";
 
