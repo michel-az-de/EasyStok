@@ -20,16 +20,21 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
         var shareClient = serviceClient.GetShareClient(_opts.ShareName);
         await shareClient.CreateIfNotExistsAsync(cancellationToken: ct);
 
-        var dirPath = request.BucketPath.Trim('/');
-        var dirClient = shareClient.GetDirectoryClient(dirPath);
-        await dirClient.CreateIfNotExistsAsync(cancellationToken: ct);
+        // Ensure nested directories exist
+        var segments = request.BucketPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        ShareDirectoryClient dirClient = shareClient.GetRootDirectoryClient();
+        foreach (var segment in segments)
+        {
+            dirClient = dirClient.GetSubdirectoryClient(segment);
+            await dirClient.CreateIfNotExistsAsync(cancellationToken: ct);
+        }
 
         var fileClient = dirClient.GetFileClient(request.FileName);
         using var stream = new MemoryStream(request.Content);
         await fileClient.CreateAsync(stream.Length, cancellationToken: ct);
         await fileClient.UploadRangeAsync(new Azure.HttpRange(0, stream.Length), stream, cancellationToken: ct);
 
-        var storageKey = $"{dirPath}/{request.FileName}".Trim('/');
+        var storageKey = (request.BucketPath.Trim('/') + "/" + request.FileName).Trim('/');
         var sasUri = GenerateSasUri(fileClient, storageKey);
 
         return new StoredFileResult(storageKey, sasUri, request.ContentType, request.Content.LongLength);

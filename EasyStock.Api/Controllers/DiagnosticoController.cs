@@ -687,7 +687,9 @@ public sealed class DiagnosticoController(
         {
             var connStr = configuration["FileStorage:AzureFileShare:ConnectionString"];
             var shareName = configuration["FileStorage:AzureFileShare:ShareName"];
-            status.Configurado = !string.IsNullOrWhiteSpace(connStr) && !string.IsNullOrWhiteSpace(shareName);
+            status.Configurado = !string.IsNullOrWhiteSpace(connStr)
+                              && !connStr.Contains("<")
+                              && !string.IsNullOrWhiteSpace(shareName);
             if (status.Configurado)
             {
                 try
@@ -699,10 +701,17 @@ public sealed class DiagnosticoController(
                     await shareClient.GetPropertiesAsync(cts.Token);
                     status.DiretorioExiste = true;
                 }
-                catch
+                catch (Azure.RequestFailedException ex)
                 {
                     status.DiretorioExiste = false;
                     status.Configurado = false;
+                    status.Erro = $"Azure error {ex.ErrorCode}: {ex.Message}";
+                }
+                catch (Exception ex)
+                {
+                    status.DiretorioExiste = false;
+                    status.Configurado = false;
+                    status.Erro = ex.Message;
                 }
             }
         }
@@ -1734,6 +1743,7 @@ public sealed class StorageStatus
     public string Provider { get; set; } = "";
     public bool Configurado { get; set; }
     public bool? DiretorioExiste { get; set; }
+    public string? Erro { get; set; }
 }
 
 public sealed class IaStatus
