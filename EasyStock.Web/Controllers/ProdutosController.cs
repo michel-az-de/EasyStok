@@ -262,6 +262,41 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return Json(result.Data);
     }
 
+    /// <summary>Upload de foto via AJAX — retorna JSON {ok, fotoId, url}</summary>
+    [HttpPost("/produtos/{id}/fotos/ajax")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadFotoAjax(string id, IFormFile foto)
+    {
+        if (foto == null || foto.Length == 0)
+            return Json(new { ok = false, erro = "Selecione uma imagem." });
+        if (foto.Length > 5 * 1024 * 1024)
+            return Json(new { ok = false, erro = "Imagem não pode ser maior que 5MB." });
+
+        var uploadResult = await svc.UploadFotoAsync(id, foto);
+        if (!uploadResult.Success)
+            return Json(new { ok = false, erro = uploadResult.ErrorMessage ?? "Erro ao enviar foto." });
+
+        // Re-busca o produto para obter URL e ID da foto recém-enviada
+        var prod = await svc.ObterAsync(id);
+        if (prod.Success && prod.Data?.Fotos.Count > 0)
+        {
+            var ultima = prod.Data.Fotos.Last();
+            return Json(new { ok = true, fotoId = ultima.FotoId, url = ultima.Url });
+        }
+        return Json(new { ok = true, fotoId = (object?)null, url = (object?)null });
+    }
+
+    /// <summary>Remoção de foto via AJAX — retorna JSON {ok}</summary>
+    [HttpPost("/produtos/{id}/fotos/{fotoId}/remover")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoverFotoAjax(string id, string fotoId)
+    {
+        var result = await svc.RemoverFotoAsync(id, fotoId);
+        if (!result.Success)
+            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao remover foto." });
+        return Json(new { ok = true });
+    }
+
     [HttpGet("/produtos/buscar")]
     public async Task<IActionResult> Buscar(string? q, int limit = 10)
     {

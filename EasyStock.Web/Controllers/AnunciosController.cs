@@ -25,6 +25,45 @@ public class AnunciosController(
     }
 
     // GET is intentional — SSE streams never need anti-forgery
+    [HttpGet("/anuncios/completar-produto")]
+    public async Task CompletarProduto(
+        string? nome, string? categoria, string? marca, string? instrucoes)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.Connection = "keep-alive";
+
+        if (string.IsNullOrWhiteSpace(nome))
+        {
+            await Response.WriteAsync("data: {\"texto\":\"Informe o nome do produto.\"}\n\n");
+            await Response.WriteAsync("data: [DONE]\n\n");
+            await Response.Body.FlushAsync();
+            return;
+        }
+
+        var (success, stream, error) = await anunciosSvc.CompletarProdutoStreamAsync(
+            nome, categoria, marca, instrucoes);
+
+        if (!success || stream is null)
+        {
+            await Response.WriteAsync($"data: {error}\n\n");
+            await Response.Body.FlushAsync();
+            return;
+        }
+
+        using var s = stream;
+        using var reader = new StreamReader(s);
+
+        while (!reader.EndOfStream && !HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync();
+            if (line is null) break;
+            await Response.WriteAsync(line + "\n");
+            await Response.Body.FlushAsync();
+        }
+    }
+
+    // GET is intentional — SSE streams never need anti-forgery
     [HttpGet("/anuncios/gerar")]
     public async Task Gerar(
         string? produtoId, string? canal, string? tom,

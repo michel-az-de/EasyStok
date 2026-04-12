@@ -312,8 +312,9 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             var flatMsg = root.TryGetProperty("message", out var fm) ? fm.GetString() : "Erro na requisicao.";
             return ApiResult<T>.Fail(flatCode ?? "API_ERROR", flatMsg ?? "Erro na requisicao.", status);
         }
-        catch
+        catch (Exception ex)
         {
+            log.LogDebug(ex, "Could not parse error body from HTTP {Status} response on path handling", status);
             return ApiResult<T>.Fail("API_ERROR", "Erro na requisicao.", status);
         }
     }

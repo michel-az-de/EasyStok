@@ -1,3 +1,4 @@
+using EasyStock.Api.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace EasyStock.Api.Observability.HealthChecks;
@@ -20,8 +21,8 @@ public sealed class ConfigurationHealthCheck(
             problems.Add("Jwt:SecretKey muito curta (< 32 caracteres)");
 
         if (infraState.DatabaseProvider is "postgresql" &&
-            string.IsNullOrWhiteSpace(configuration.GetConnectionString("DefaultConnection")))
-            problems.Add("ConnectionStrings:DefaultConnection ausente para PostgreSQL");
+            string.IsNullOrWhiteSpace(configuration.GetConnectionString(ConfigurationKeys.ConnectionDefault)))
+            problems.Add($"ConnectionStrings:{ConfigurationKeys.ConnectionDefault} ausente para PostgreSQL");
 
         if (!environment.IsDevelopment())
         {
