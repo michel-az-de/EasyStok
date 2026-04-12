@@ -25,7 +25,7 @@ public class UsuariosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<object>> EditarAsync(string id, string nome) =>
         Guid.TryParse(id, out var uid)
-            ? api.PutAsync<object>($"usuarios/{id}", new { usuarioId = uid, nome, email = (string?)null })
+            ? api.PutAsync<object>($"usuarios/{id}", new { empresaId = GetEmpresaId(), usuarioId = uid, nome, email = (string?)null })
             : Task.FromResult(ApiResult<object>.Fail("INVALID_ID", "Id de usuário inválido."));
 
     public Task<ApiResult<bool>> RemoverAsync(string id) =>

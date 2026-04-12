@@ -2,8 +2,11 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class EstoqueService(ApiClient api)
+public class EstoqueService(ApiClient api, SessionService session)
 {
+    private Guid GetEmpresaId() =>
+        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
+
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
         int page = 1, string? status = null, string? categoria = null, string? search = null)
     {
@@ -11,7 +14,7 @@ public class EstoqueService(ApiClient api)
         // The regular GetAll endpoint does not support status/categoria/termo filters.
         if (!string.IsNullOrEmpty(search))
         {
-            var buscarQs = $"estoque/buscar?termo={Uri.EscapeDataString(search)}&limite=100";
+            var buscarQs = $"estoque/buscar?empresaId={GetEmpresaId()}&termo={Uri.EscapeDataString(search)}&limite=100";
             var buscarResult = await api.GetAsync<List<EstoqueSku>>(buscarQs);
             if (!buscarResult.Success)
                 return ApiResult<PagedResult<EstoqueSku>>.Fail(
@@ -25,7 +28,7 @@ public class EstoqueService(ApiClient api)
             });
         }
 
-        var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize=200");
+        var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=200");
         if (!result.Success || result.Data is null)
             return result;
 
@@ -67,16 +70,16 @@ public class EstoqueService(ApiClient api)
     }
 
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>
-        api.GetAsync<EstoqueSku>($"estoque/{id}");
+        api.GetAsync<EstoqueSku>($"estoque/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<List<EstoqueSku>>> ObterItensPorProdutoAsync(string produtoId) =>
-        api.GetAsync<List<EstoqueSku>>($"estoque/por-produto/{produtoId}");
+        api.GetAsync<List<EstoqueSku>>($"estoque/por-produto/{produtoId}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<ProdutoDetalhe>> ObterProdutoDetalheAsync(string id) =>
-        api.GetAsync<ProdutoDetalhe>($"produtos/{id}");
+        api.GetAsync<ProdutoDetalhe>($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
-        api.GetAsync<PagedResult<EstoqueSku>>("estoque?pageSize=20");
+        api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&pageSize=20");
 
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ExportarAsync()
     {
@@ -86,7 +89,7 @@ public class EstoqueService(ApiClient api)
 
         while (true)
         {
-            var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?page={page}&pageSize={pageSize}");
+            var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize={pageSize}");
             if (!result.Success)
                 return ApiResult<PagedResult<EstoqueSku>>.Fail(
                     result.ErrorCode!, result.ErrorMessage!, result.HttpStatus);

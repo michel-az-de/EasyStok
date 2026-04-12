@@ -409,6 +409,7 @@
                         </div>
                         <div class="mt-2">
                             <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="hidden" :name="'VariacoesRich[' + i + '].Ativa'" value="false" />
                                 <input type="checkbox" :name="'VariacoesRich[' + i + '].Ativa'" :checked="v.ativa"
                                        @@change="v.ativa = $el.checked" value="true"
                                        class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
@@ -517,6 +518,7 @@
                                 </div>
                                 <div>
                                     <label class="flex items-center gap-2 cursor-pointer mt-5">
+                                        <input type="hidden" :name="'Embalagens[' + i + '].Padrao'" value="false" />
                                         <input type="checkbox" :name="'Embalagens[' + i + '].Padrao'" x-model="e.padrao" value="true"
                                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
                                         <span class="text-xs text-slate-600">Padrao</span>

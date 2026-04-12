@@ -9,5 +9,5 @@ public class BuscaUnificadaService(ApiClient api, SessionService session)
 
     public Task<ApiResult<List<ResultadoBuscaUnificada>>> BuscarAsync(string termo, int limite = 15) =>
         api.GetAsync<List<ResultadoBuscaUnificada>>(
-            $"estoque/buscar?termo={Uri.EscapeDataString(termo)}&limite={limite}");
+            $"estoque/buscar?empresaId={GetEmpresaId()}&termo={Uri.EscapeDataString(termo)}&limite={limite}");
 }

@@ -18,7 +18,7 @@ public class EntradasService(ApiClient api, SessionService session)
             _ => "Entrada"
         };
 
-        var qs = $"movimentacoes?page={page}&pageSize=20&tipo={Uri.EscapeDataString(tipoApi)}";
+        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page={page}&pageSize=20&tipo={Uri.EscapeDataString(tipoApi)}";
         if (tipo?.ToLowerInvariant() is "reposicao" or "reposição")
             qs += "&natureza=Reposicao";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
@@ -58,7 +58,7 @@ public class EntradasService(ApiClient api, SessionService session)
     public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
     {
         var tipoFilter = string.IsNullOrEmpty(tipo) ? "Entrada" : tipo;
-        var qs = $"movimentacoes?page=1&pageSize=1000&tipo={Uri.EscapeDataString(tipoFilter)}";
+        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page=1&pageSize=1000&tipo={Uri.EscapeDataString(tipoFilter)}";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);

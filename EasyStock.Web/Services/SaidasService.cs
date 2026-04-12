@@ -11,7 +11,7 @@ public class SaidasService(ApiClient api, SessionService session)
     public Task<ApiResult<PagedResult<Movimentacao>>> ListarAsync(
         int page = 1, string? natureza = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        var qs = $"movimentacoes?page={page}&pageSize=20&tipo=Saida";
+        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page={page}&pageSize=20&tipo=Saida";
         if (!string.IsNullOrEmpty(natureza))
         {
             var mapped = MapNatureza(natureza);
@@ -25,7 +25,7 @@ public class SaidasService(ApiClient api, SessionService session)
     public Task<ApiResult<KpisResponse>> ObterKpisAsync(
         string? natureza = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        var qs = "movimentacoes/kpis?tipo=Saida";
+        var qs = $"movimentacoes/kpis?empresaId={GetEmpresaId()}&tipo=Saida";
         if (!string.IsNullOrEmpty(natureza))
         {
             var mapped = MapNatureza(natureza);
@@ -67,14 +67,14 @@ public class SaidasService(ApiClient api, SessionService session)
 
     public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? periodoInicio = null, string? periodoFim = null)
     {
-        var qs = "movimentacoes?page=1&pageSize=1000&tipo=Saida";
+        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page=1&pageSize=1000&tipo=Saida";
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
     public Task<ApiResult<object>> EstornarAsync(string id) =>
-        api.PostAsync<object>($"estoque/estorno/{Uri.EscapeDataString(id)}", new { });
+        api.PostAsync<object>($"estoque/estorno/{Uri.EscapeDataString(id)}?empresaId={GetEmpresaId()}", new { });
 
     // Maps lowercase UI natureza values to PascalCase API enum names.
     private static string MapNatureza(string? natureza) => natureza?.ToLowerInvariant() switch
