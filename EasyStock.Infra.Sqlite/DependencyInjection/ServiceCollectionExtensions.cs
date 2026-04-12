@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
             services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
         }
+        services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
 
         // Health check registered as singleton because it has no per-request state
         services.AddSingleton<SqliteDatabaseHealthCheck>();

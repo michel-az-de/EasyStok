@@ -193,12 +193,15 @@
                 }
             </div>
             <div class="flex items-center gap-2">
-                <button type="button" :disabled="!nome" @@click="autoFill()"
+                <button type="button" :disabled="!nome || autoFilling" @@click="autoFill()"
                         class="px-4 py-2.5 border border-violet-200 text-violet-600 hover:bg-violet-50 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Preencher auto
+                    <span x-show="!autoFilling" class="inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Preencher auto
+                    </span>
+                    <span x-show="autoFilling" x-cloak class="inline-flex items-center gap-1"><span class="spinner"></span> Gerando...</span>
                 </button>
                 <button type="button" @@click="nextStep()"
                         class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
@@ -829,9 +832,11 @@
                 },
 
                 // ── Auto-fill ──
-                autoFill() {
+                autoFilling: false,
+                async autoFill() {
                     if (!this.nome) return;
                     let changed = [];
+
                     // Auto-gera SKU a partir do nome se estiver vazio
                     if (!this.sku) {
                         const words = this.nome.trim().toUpperCase().split(/\s+/).filter(w => w.length > 0);
@@ -840,14 +845,63 @@
                         this.sku = parts.filter(Boolean).join('-') + (parts.filter(Boolean).length ? '-' + suffix : suffix);
                         changed.push('SKU');
                     }
-                    // Dispara geração de descrição se for modo edição
-                    if (this.productId && !this.descricao) {
-                        this.generateDescription();
+
+                    // Geração de descrição
+                    if (this.productId) {
+                        // Modo edição: usa endpoint existente com productId
+                        if (!this.descricao) {
+                            this.generateDescription();
+                            changed.push('Descrição');
+                        }
+                    } else if (!this.descricao) {
+                        // Novo produto: chama /anuncios/completar-produto via SSE
                         changed.push('Descrição');
+                        this.autoFilling = true;
+                        window.showToast('Gerando descrição com IA...', 'info', 2000);
+                        try {
+                            const categoriaEl = document.querySelector('select[name="CategoriaId"]');
+                            const categoriaNome = categoriaEl
+                                ? (categoriaEl.options?.[categoriaEl.selectedIndex]?.text ?? '')
+                                : '';
+                            const params = new URLSearchParams({
+                                nome: this.nome,
+                                categoria: categoriaNome,
+                                marca: this.marca ?? '',
+                                instrucoes: ''
+                            });
+                            const resp = await fetch(`/anuncios/completar-produto?${params}`);
+                            if (!resp.ok || !resp.body) throw new Error('Falha ao conectar com a IA.');
+                            const reader = resp.body.getReader();
+                            const decoder = new TextDecoder();
+                            let buffer = '';
+                            this.descricao = '';
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                buffer += decoder.decode(value, { stream: true });
+                                const lines = buffer.split('\n');
+                                buffer = lines.pop() ?? '';
+                                for (const line of lines) {
+                                    if (!line.startsWith('data: ')) continue;
+                                    const raw = line.slice(6).trim();
+                                    if (raw === '[DONE]') break;
+                                    try {
+                                        const obj = JSON.parse(raw);
+                                        if (obj.texto) this.descricao += obj.texto;
+                                    } catch {}
+                                }
+                            }
+                        } catch (e) {
+                            window.showToast('Erro ao gerar descrição: ' + e.message, 'error', 3000);
+                            changed = changed.filter(c => c !== 'Descrição');
+                        } finally {
+                            this.autoFilling = false;
+                        }
                     }
-                    if (changed.length > 0) {
+
+                    if (changed.length > 0 && !this.autoFilling) {
                         window.showToast('Preenchido: ' + changed.join(', '), 'success', 2500);
-                    } else {
+                    } else if (changed.length === 0) {
                         window.showToast('Campos já preenchidos. Nada alterado.', 'info', 2000);
                     }
                 },

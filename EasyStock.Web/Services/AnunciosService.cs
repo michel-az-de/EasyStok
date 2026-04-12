@@ -34,4 +34,21 @@ public class AnunciosService(ApiClient api, SessionService session)
             ? (true, result.Data, null)
             : (false, null, result.ErrorMessage ?? "Erro ao gerar anúncio.");
     }
+
+    public async Task<(bool Success, Stream? Stream, string? Error)> CompletarProdutoStreamAsync(
+        string nomeProduto, string? categoria, string? marca, string? instrucoes)
+    {
+        var body = new
+        {
+            nomeProduto,
+            categoria,
+            marca,
+            instrucoes
+        };
+
+        var result = await api.PostStreamAsync("ia/completar-produto", body);
+        return result.Success
+            ? (true, result.Data, null)
+            : (false, null, result.ErrorMessage ?? "Erro ao completar produto.");
+    }
 }

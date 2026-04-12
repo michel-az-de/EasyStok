@@ -61,18 +61,29 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
-            // AI: usa implementacao real se Anthropic:Enabled = true, caso contrario usa stub
+            // AI: OpenAI tem prioridade; Anthropic como fallback; stub se nenhum habilitado
+            var openAiEnabled = configuration.GetValue<bool>("OpenAI:Enabled");
             var anthropicEnabled = configuration.GetValue<bool>("Anthropic:Enabled");
-            if (anthropicEnabled)
+
+            if (openAiEnabled)
+            {
+                services.AddHttpClient("OpenAI");
+                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioOpenAI>();
+                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioOpenAIStreaming>();
+                services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoOpenAI>();
+            }
+            else if (anthropicEnabled)
             {
                 services.AddHttpClient("Anthropic");
                 services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
                 services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
+                services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
             else
             {
                 services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
                 services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
+                services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
 
             return services;

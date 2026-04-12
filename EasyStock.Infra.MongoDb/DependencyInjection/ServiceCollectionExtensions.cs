@@ -72,6 +72,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
             services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
         }
+        services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
 
         return services;
     }
