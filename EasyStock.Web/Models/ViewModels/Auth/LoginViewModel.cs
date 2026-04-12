@@ -11,4 +11,6 @@ public class LoginViewModel
     [Required(ErrorMessage = "Senha é obrigatória")]
     [DataType(DataType.Password)]
     public string Senha { get; set; } = string.Empty;
+
+    public bool ManterLogado { get; set; }
 }
