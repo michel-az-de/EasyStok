@@ -101,11 +101,14 @@
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
      @@click.self="open = false" @@keydown.escape.window="open = false">
-    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-lg p-6 overflow-y-auto max-h-screen">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Novo Fornecedor</h2>
-        <div x-show="erroMsg" x-cloak class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" x-text="erroMsg"></div>
+    <div class="ui-modal supplier-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 overflow-y-auto max-h-[92vh]">
+        <div class="supplier-modal__header">
+            <h2 class="text-lg font-semibold text-slate-900">Novo Fornecedor</h2>
+            <p class="text-sm text-slate-500 mt-1">Cadastre um parceiro com dados essenciais, contato e condições comerciais em um único fluxo.</p>
+        </div>
+        <div x-show="erroMsg" x-cloak class="mx-6 mt-5 mb-0 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
         @Html.AntiForgeryToken()
-        <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="supplier-form grid grid-cols-2 gap-3 mb-0">
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
                 <input type="text" x-model="form.nome" required @@input="erroMsg = ''"
@@ -143,30 +146,30 @@
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Categorias</label>
                 <input type="text" x-model="form.categoria" placeholder="Ex: eletrônicos, roupas..."
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Site</label>
                 <input type="url" x-model="form.siteUrl" placeholder="https://..."
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Pedido Mínimo</label>
                 <input type="text" x-model="form.pedidoMinimo" placeholder="Ex: R$ 500 ou 10 un"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Frete Padrão</label>
                 <input type="text" x-model="form.fretePadrao" placeholder="Ex: R$ 50 ou grátis acima de R$ 500"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
                 <textarea x-model="form.observacoes" rows="2"
-                          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                          class="ui-textarea w-full text-sm"></textarea>
             </div>
         </div>
-        <div class="flex justify-end gap-3 pt-3 border-t">
+        <div class="supplier-modal__footer flex justify-end gap-3 pt-3 border-t">
             <button type="button" @@click="open = false"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
