@@ -42,14 +42,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") <= limite);
+                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual <= limite);
 
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
-                .OrderBy(i => EF.Property<int>(i, "QuantidadeAtual"))
+                .OrderBy(i => (int)i.QuantidadeAtual)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -62,14 +62,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             var cutoff = DateTime.UtcNow.AddDays(dias);
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoff);
+                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoff);
 
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
-                .OrderBy(i => EF.Property<DateTime?>(i, nameof(ItemEstoque.ValidadeEm)))
+                .OrderBy(i => (DateTime?)i.ValidadeEm)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -102,14 +102,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") < limiteQuantidade);
+                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual < limiteQuantidade);
 
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
-                .OrderBy(i => EF.Property<int>(i, "QuantidadeAtual"))
+                .OrderBy(i => (int)i.QuantidadeAtual)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -140,10 +140,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId)
                 .Select(i => new
                 {
-                    Quantidade = EF.Property<int>(i, "QuantidadeAtual"),
-                    ValorTotal = EF.Property<decimal>(i, "CustoUnitario") * EF.Property<int>(i, "QuantidadeAtual"),
-                    PrecoReferencia = EF.Property<decimal?>(i, "PrecoVendaSugerido")
-                        ?? EF.Property<decimal>(i, "CustoUnitario") * FallbackMargemPrecoSugerido
+                    Quantidade = (int)i.QuantidadeAtual,
+                    ValorTotal = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
+                    PrecoReferencia = (decimal?)i.PrecoVendaSugerido
+                        ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido
                 })
                 .ToListAsync();
 
@@ -168,7 +168,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var query = dbContext.ItensEstoque
                 .Where(i => i.EmpresaId == empresaId &&
                             i.ProdutoId == produtoId &&
-                            EF.Property<int>(i, "QuantidadeAtual") > 0);
+                            (int)i.QuantidadeAtual > 0);
 
             if (produtoVariacaoId.HasValue)
                 query = query.Where(i => i.ProdutoVariacaoId == produtoVariacaoId.Value);
@@ -184,12 +184,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
             dbContext.ItensEstoque
                 .AsNoTracking()
-                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && EF.Property<int>(i, "QuantidadeAtual") > 0);
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && (int)i.QuantidadeAtual > 0);
 
         public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
             dbContext.ItensEstoque
                 .AsNoTracking()
-                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.ProdutoVariacaoId == variacaoId && EF.Property<int>(i, "QuantidadeAtual") > 0);
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.ProdutoVariacaoId == variacaoId && (int)i.QuantidadeAtual > 0);
 
         public Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id) =>
             dbContext.ItensEstoque

@@ -19,7 +19,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         api.GetAsync<ProdutoDetalhe>($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<List<CategoriaApi>>> ListarCategoriasAsync() =>
-        api.GetAsync<List<CategoriaApi>>("categorias");
+        api.GetAsync<List<CategoriaApi>>($"categorias?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<CadastrarProdutoApiResult>> CriarAsync(ProdutoFormViewModel vm) =>
         api.PostAsync<CadastrarProdutoApiResult>("produtos", new
@@ -136,7 +136,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         });
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
-        api.DeleteAsync($"produtos/{id}");
+        api.DeleteAsync($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<object>> HistoricoAsync(string id) =>
         api.GetAsync<object>($"produtos/{id}/historico?empresaId={GetEmpresaId()}");
@@ -146,7 +146,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         using var form = new MultipartFormDataContent();
         using var stream = foto.OpenReadStream();
         form.Add(new StreamContent(stream), "file", foto.FileName);
-        return await api.PostMultipartAsync<object>($"produtos/{id}/fotos", form);
+        return await api.PostMultipartAsync<object>($"produtos/{id}/fotos?empresaId={GetEmpresaId()}", form);
     }
 
     public Task<ApiResult<object>> AdicionarVariacaoAsync(string id, string nome, string? sku = null) =>
@@ -160,7 +160,7 @@ public class ProdutosService(ApiClient api, SessionService session)
         });
 
     public Task<ApiResult<bool>> RemoverVariacaoAsync(string id, string vid) =>
-        api.DeleteAsync($"produtos/{id}/variacoes/{vid}");
+        api.DeleteAsync($"produtos/{id}/variacoes/{vid}?empresaId={GetEmpresaId()}");
 
     private static bool HasDimensoes(ProdutoFormViewModel vm) =>
         vm.DimensoesPeso.HasValue || vm.DimensoesLargura.HasValue ||

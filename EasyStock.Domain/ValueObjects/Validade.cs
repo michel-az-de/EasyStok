@@ -39,6 +39,9 @@ namespace EasyStock.Domain.ValueObjects
             return DiasAteVencimento(referencia) <= dias;
         }
 
+        public static implicit operator DateTime(Validade v) => v.DataValidade;
+        public static implicit operator DateTime?(Validade? v) => v?.DataValidade;
+
         public override string ToString() => DataValidade.ToString("yyyy-MM-dd");
 
         private sealed class ValidadeJsonConverter : JsonConverter<Validade>

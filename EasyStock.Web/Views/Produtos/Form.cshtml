@@ -144,6 +144,7 @@
                 </div>
                 <div class="sm:col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="hidden" name="ControlaValidade" value="false" />
                         <input name="ControlaValidade" type="checkbox" value="true" @(Model.ControlaValidade ? "checked" : "")
                                @@change="controlaValidade = $el.checked"
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />

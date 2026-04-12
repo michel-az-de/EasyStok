@@ -86,7 +86,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var cutoffValidade = DateTime.UtcNow.AddDays(30);
             var validadeQuery = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade);
+                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade);
             if (lojaId.HasValue)
                 validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
             var alertasVencimento = await validadeQuery.CountAsync();
@@ -315,8 +315,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
                     i.ValidadeEm != null &&
-                    EF.Property<DateTime?>(i, "ValidadeEm") <= cutoff &&
-                    EF.Property<int>(i, "QuantidadeAtual") > 0);
+                    (DateTime?)i.ValidadeEm <= cutoff &&
+                    (int)i.QuantidadeAtual > 0);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -369,7 +369,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
-                    EF.Property<int>(i, "QuantidadeAtual") > 0 &&
+                    (int)i.QuantidadeAtual > 0 &&
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
@@ -496,7 +496,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") < i.QuantidadeMinima);
+                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual < i.QuantidadeMinima);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -504,7 +504,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var raw = await query
                 .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => EF.Property<int>(x.i, "QuantidadeAtual"))
+                .OrderBy(x => (int)x.i.QuantidadeAtual)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new
@@ -572,7 +572,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && EF.Property<int>(i, "QuantidadeAtual") > 0);
+                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual > 0);
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -697,10 +697,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                     ValorEstoque = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * 1.3m) * (int)i.QuantidadeAtual),
                     AlertasCriticos = g.Count(i => (int)i.QuantidadeAtual <= 2),
                     ItensAbaixoMinimo = g.Count(i => (int)i.QuantidadeAtual < i.QuantidadeMinima),
-                    AlertasVencimento = g.Count(i => i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade),
+                    AlertasVencimento = g.Count(i => i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade),
                     ItensParados = g.Count(i => i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado),
                     TotalItens = g.Count(),
-                    ValorVencendo = g.Where(i => i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade)
+                    ValorVencendo = g.Where(i => i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade)
                         .Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual)
                 })
                 .ToDictionaryAsync(x => x.LojaId);
@@ -796,9 +796,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     IsCritical = (int)i.QuantidadeAtual <= 2,
                     IsBelowMin = (int)i.QuantidadeAtual < i.QuantidadeMinima,
-                    IsExpiring = i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade,
+                    IsExpiring = i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade,
                     IsIdle = i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado,
-                    ValorVencendo = i.ValidadeEm != null && EF.Property<DateTime?>(i, "ValidadeEm") <= cutoffValidade
+                    ValorVencendo = i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade
                         ? (decimal)i.CustoUnitario * (int)i.QuantidadeAtual : 0m
                 })
                 .ToListAsync();
