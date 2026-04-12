@@ -84,21 +84,26 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         }
 
         var result = await svc.CriarAsync(vm);
-        if (HasError(result))
+        if (!result.Success && result.HttpStatus is not (200 or 201))
         {
+            HasError(result);
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
 
-        var newId = result.Data?.ProdutoId.ToString();
-        if (newId != null)
+        var newId = result.Data?.ProdutoId ?? Guid.Empty;
+        if (newId != Guid.Empty)
         {
             foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
-                await svc.UploadFotoAsync(newId, foto);
+                await svc.UploadFotoAsync(newId.ToString(), foto);
+
+            Toast("success", "Produto criado com sucesso!");
+            return RedirectToAction(nameof(Detail), new { id = newId });
         }
 
+        // Produto criado (201) mas ID nao parseado — redirecionar para lista
         Toast("success", "Produto criado com sucesso!");
-        return RedirectToAction(nameof(Detail), new { id = result.Data?.ProdutoId });
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet("/produtos/{id}/editar")]

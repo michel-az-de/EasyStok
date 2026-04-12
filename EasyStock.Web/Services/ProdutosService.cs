@@ -9,14 +9,14 @@ public class ProdutosService(ApiClient api, SessionService session)
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(int page = 1, int limit = 20) =>
-        api.GetAsync<List<ProdutoResumo>>($"produtos?page={page}&pageSize={limit}");
+        api.GetAsync<List<ProdutoResumo>>($"produtos?empresaId={GetEmpresaId()}&page={page}&pageSize={limit}");
 
     public Task<ApiResult<List<ProdutoResumo>>> BuscarAsync(string termo, int limite = 10) =>
         api.GetAsync<List<ProdutoResumo>>(
-            $"produtos/search?termo={Uri.EscapeDataString(termo)}&limite={limite}");
+            $"produtos/search?empresaId={GetEmpresaId()}&termo={Uri.EscapeDataString(termo)}&limite={limite}");
 
     public Task<ApiResult<ProdutoDetalhe>> ObterAsync(string id) =>
-        api.GetAsync<ProdutoDetalhe>($"produtos/{id}");
+        api.GetAsync<ProdutoDetalhe>($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<List<CategoriaApi>>> ListarCategoriasAsync() =>
         api.GetAsync<List<CategoriaApi>>("categorias");

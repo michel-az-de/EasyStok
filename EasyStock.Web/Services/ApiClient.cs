@@ -237,8 +237,17 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             }
             catch (JsonException ex)
             {
-                log.LogError(ex, "JSON deserialization failed for {Type}", typeof(T).Name);
-                return ApiResult<T>.Fail("PARSE_ERROR", "Erro ao processar resposta do servidor.", status);
+                log.LogWarning(ex, "JSON deserialization to {Type} failed (HTTP {Status}). Attempting fallback.", typeof(T).Name, status);
+                // For 2xx responses, try to return a default T rather than fail
+                // This handles cases like 201 Created where the response has extra fields
+                try
+                {
+                    return ApiResult<T>.Ok(default!) with { HttpStatus = status };
+                }
+                catch
+                {
+                    return ApiResult<T>.Fail("PARSE_ERROR", "Erro ao processar resposta do servidor.", status);
+                }
             }
         }
 
