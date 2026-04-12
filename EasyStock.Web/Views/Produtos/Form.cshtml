@@ -113,7 +113,7 @@
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                         <option value="">Nenhuma</option>
                         <template x-for="sub in subcategorias" :key="sub.id">
-                            <option :value="sub.id" x-text="sub.nome" :selected="sub.id === subcategoriaId"></option>
+                            <option :value="sub.id" x-text="sub.nome"></option>
                         </template>
                     </select>
                 </div>
@@ -125,7 +125,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Codigo de barras</label>
-                    <input name="CodigoBarras" value="@Model.CodigoBarras" placeholder="EAN-13"
+                    <input name="CodigoBarras" x-model="codigoBarras" placeholder="EAN-13"
                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
@@ -154,7 +154,7 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Descricao</label>
                     <textarea name="DescricaoBase" x-model="descricao" rows="3"
                               placeholder="Descreva o produto em poucas palavras..."
-                              class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">@Model.DescricaoBase</textarea>
+                              class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
                     @if (isEdit)
                     {
                         <button type="button" :disabled="aiGenerating || !nome"
@@ -743,22 +743,18 @@
 
                 // ── Draft persistence (sessionStorage) ──
                 _draftKey: 'easystock_produto_draft' + (isEdit ? '_edit' : '_new'),
+                _draftTimer: null,
                 init() {
                     if (!isEdit) this._restoreDraft();
-                    this.$watch('nome', () => this._saveDraft());
-                    this.$watch('sku', () => this._saveDraft());
-                    this.$watch('marca', () => this._saveDraft());
-                    this.$watch('descricao', () => this._saveDraft());
-                    this.$watch('categoriaId', () => this._saveDraft());
-                    this.$watch('preco', () => this._saveDraft());
-                    this.$watch('custo', () => this._saveDraft());
-                    this.$watch('margem', () => this._saveDraft());
-                    this.$watch('step', () => this._saveDraft());
+                    const save = () => { clearTimeout(this._draftTimer); this._draftTimer = setTimeout(() => this._saveDraft(), 500); };
+                    for (const f of ['nome','sku','marca','descricao','categoriaId','codigoBarras','preco','custo','margem','step'])
+                        this.$watch(f, save);
                 },
                 _saveDraft() {
                     try {
                         sessionStorage.setItem(this._draftKey, JSON.stringify({
                             nome: this.nome, sku: this.sku, marca: this.marca,
+                            codigoBarras: this.codigoBarras,
                             descricao: this.descricao, categoriaId: this.categoriaId,
                             subcategoriaId: this.subcategoriaId, tipo: this.tipo,
                             preco: this.preco, custo: this.custo, margem: this.margem,
@@ -777,6 +773,7 @@
                         if (d.nome) this.nome = d.nome;
                         if (d.sku) this.sku = d.sku;
                         if (d.marca) this.marca = d.marca;
+                        if (d.codigoBarras) this.codigoBarras = d.codigoBarras;
                         if (d.descricao) this.descricao = d.descricao;
                         if (d.categoriaId) this.categoriaId = d.categoriaId;
                         if (d.subcategoriaId) this.subcategoriaId = d.subcategoriaId;
@@ -801,6 +798,7 @@
                 descricao: @Html.Raw(JsonSerializer.Serialize(Model.DescricaoBase ?? "")),
                 marca: @Html.Raw(JsonSerializer.Serialize(Model.Marca ?? "")),
                 sku: @Html.Raw(JsonSerializer.Serialize(Model.SkuBase ?? "")),
+                codigoBarras: @Html.Raw(JsonSerializer.Serialize(Model.CodigoBarras ?? "")),
                 tipo: @Model.Tipo,
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
 
