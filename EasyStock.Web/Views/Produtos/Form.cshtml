@@ -896,6 +896,14 @@
                     document.addEventListener('click', (e) => {
                         if (!e.target.closest('.relative')?.querySelector('input[name="Marca"]')) this.marcaSugestoes = [];
                     });
+                    // Detecta restauração via bfcache (botão Voltar após submit bem-sucedido)
+                    window.addEventListener('pageshow', (e) => {
+                        if (e.persisted && this.saving) {
+                            // Página foi restaurada do cache com estado de "enviando" — significa que
+                            // o submit foi concluído. Redireciona para um formulário limpo.
+                            window.location.replace(window.location.href);
+                        }
+                    });
                 },
                 _saveDraft() {
                     try {
