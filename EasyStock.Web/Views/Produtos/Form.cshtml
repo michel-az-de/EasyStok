@@ -822,10 +822,38 @@
                 submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    if (this.saving) return;
                     this.saving = true;
                     this._clearDraft();
-                    this._syncFileInput();
-                    this.$nextTick(() => this.$el.submit());
+
+                    // Usa fetch + FormData para enviar fotos de forma confiável
+                    // (DataTransfer + input.files é instável entre navegadores)
+                    const form = this.$el;
+                    const fd = new FormData(form);
+                    fd.delete('fotos');
+                    this.pendingFiles.forEach(f => fd.append('fotos', f));
+
+                    fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' })
+                        .then(r => {
+                            if (r.redirected) { window.location.href = r.url; return; }
+                            // Se retornou HTML (validação falhou), recarrega com os erros
+                            if (r.ok) {
+                                const ct = r.headers.get('content-type') || '';
+                                if (ct.includes('text/html')) {
+                                    // Servidor retornou a view com erros de validação
+                                    r.text().then(html => { document.open(); document.write(html); document.close(); });
+                                } else {
+                                    window.location.href = '/produtos';
+                                }
+                                return;
+                            }
+                            this.saving = false;
+                            window.showToast('Erro ao salvar produto. Tente novamente.', 'error');
+                        })
+                        .catch(() => {
+                            this.saving = false;
+                            window.showToast('Erro de conexão. Verifique sua internet.', 'error');
+                        });
                 },
 
                 // ── Marca autocomplete ──
