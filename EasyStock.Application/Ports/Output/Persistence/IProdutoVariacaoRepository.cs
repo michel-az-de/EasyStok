@@ -8,9 +8,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<ProdutoVariacao?> GetByIdAsync(Guid empresaId, Guid produtoId, Guid id);
         Task<IEnumerable<ProdutoVariacao>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
         Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null);
-        Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
+        Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
         Task InsertAsync(ProdutoVariacao variacao);
         Task UpdateAsync(ProdutoVariacao variacao);
         Task DeleteAsync(Guid id);
+        Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId);
     }
 }

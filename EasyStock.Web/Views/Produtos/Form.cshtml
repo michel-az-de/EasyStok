@@ -261,7 +261,7 @@
                     </svg>
                 </div>
                 <h3 class="font-bold text-slate-800">Fotos do produto</h3>
-                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + pendingFiles.length) + '/5'"></span>
+                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + _pondFileCount) + '/5'"></span>
             </div>
 
             <!-- Fotos existentes (edit mode) -->
@@ -276,33 +276,31 @@
                 </div>
             </div>
 
-            <!-- Selecionar novas fotos -->
-            <div @@click="$refs.fileInput.click()"
-                 class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors">
-                <svg class="w-8 h-8 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <p class="text-sm text-slate-500 font-medium">Clique para selecionar fotos</p>
-                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 10 MB (otimizada automaticamente)</p>
-            </div>
-            <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
-                   @@change="addFiles()" />
+            <!-- FilePond (fotos ficam locais até o submit) -->
+            <input type="file" x-ref="pondInput" />
+            <p class="text-xs text-slate-400 mt-2">JPEG, PNG ou WebP. Max. 10 MB cada. As fotos serão enviadas ao salvar o produto.</p>
+        </div>
 
-            <!-- Previews das novas fotos selecionadas -->
-            <div x-show="previews.length > 0" x-transition class="mt-3">
-                <p class="text-xs text-slate-500 mb-2" x-text="pendingFiles.length + ' foto(s) selecionada(s) — serão enviadas ao salvar'"></p>
-                <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                    <template x-for="(src, i) in previews" :key="src">
-                        <div class="relative aspect-square rounded-lg overflow-hidden border-2 border-indigo-300 group">
-                            <img :src="src" class="w-full h-full object-cover" />
-                            <button type="button" @@click="removeFile(i)"
-                                    class="absolute top-1 right-1 w-5 h-5 bg-red-500/90 text-white rounded-full text-[10px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"
-                                    title="Remover">&#215;</button>
-                        </div>
-                    </template>
-                </div>
-                <button type="button" @@click="pendingFiles=[]; _rebuildPreviews()"
-                        class="text-xs text-red-500 hover:text-red-700 mt-2 font-medium">Limpar seleção</button>
+        <!-- Overlay de progresso (Fase 2 do submit — upload de fotos) -->
+        <div x-show="uploadPhase" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-3">
+                <p class="text-sm font-semibold text-slate-800">Enviando fotos...</p>
+                <template x-for="(qi, i) in uploadQueue" :key="i">
+                    <div class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                         :class="qi.status==='uploading' ? 'bg-indigo-50 text-indigo-700' :
+                                 qi.status==='done' ? 'bg-emerald-50 text-emerald-700' :
+                                 'bg-red-50 text-red-700'">
+                        <svg x-show="qi.status==='uploading'" class="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span x-show="qi.status==='done'" class="text-emerald-600 font-bold flex-shrink-0">&#10003;</span>
+                        <span x-show="qi.status==='error'" class="text-red-600 font-bold flex-shrink-0">&#10007;</span>
+                        <span x-text="qi.name" class="truncate flex-1"></span>
+                        <span x-show="qi.status==='error'" class="text-xs flex-shrink-0" x-text="qi.message"></span>
+                    </div>
+                </template>
             </div>
         </div>
 
@@ -449,7 +447,7 @@
                 <span x-show="variacoes.length" class="text-xs text-slate-400 ml-auto" x-text="variacoes.length"></span>
             </div>
             <div class="space-y-3 mb-3">
-                <template x-for="(v, i) in variacoes" :key="i">
+                <template x-for="(v, i) in variacoes" :key="v._id || i">
                     <div class="border border-slate-200 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-semibold text-slate-500" x-text="'Variação ' + (i+1)"></span>
@@ -458,33 +456,33 @@
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome" placeholder="Ex: P, M, G..."
+                                <label :for="'var-nome-' + i" class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                <input type="text" :id="'var-nome-' + i" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome" placeholder="Ex: P, M, G..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Cor</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor" placeholder="Azul, Vermelho..."
+                                <label :for="'var-cor-' + i" class="block text-xs text-slate-600 mb-1">Cor</label>
+                                <input type="text" :id="'var-cor-' + i" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor" placeholder="Azul, Vermelho..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Tamanho</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho" placeholder="P, M, G, 42..."
+                                <label :for="'var-tam-' + i" class="block text-xs text-slate-600 mb-1">Tamanho</label>
+                                <input type="text" :id="'var-tam-' + i" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho" placeholder="P, M, G, 42..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">SKU</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Sku'" x-model="v.sku"
+                                <label :for="'var-sku-' + i" class="block text-xs text-slate-600 mb-1">SKU</label>
+                                <input type="text" :id="'var-sku-' + i" :name="'VariacoesRich[' + i + '].Sku'" x-model="v.sku"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Cód. Barras</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
+                                <label :for="'var-ean-' + i" class="block text-xs text-slate-600 mb-1">Cód. Barras</label>
+                                <input type="text" :id="'var-ean-' + i" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Desc. comercial</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].DescricaoComercial'" x-model="v.descricaoComercial"
+                                <label :for="'var-desc-' + i" class="block text-xs text-slate-600 mb-1">Desc. comercial</label>
+                                <input type="text" :id="'var-desc-' + i" :name="'VariacoesRich[' + i + '].DescricaoComercial'" x-model="v.descricaoComercial"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                         </div>
@@ -500,7 +498,7 @@
                     </div>
                 </template>
             </div>
-            <button type="button" @@click="variacoes.push({nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
+            <button type="button" @@click="variacoes.push({_id:crypto.randomUUID(),nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
                     class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 Adicionar variação
@@ -525,7 +523,7 @@
             </button>
             <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
-                    <template x-for="(c, i) in caracteristicas" :key="i">
+                    <template x-for="(c, i) in caracteristicas" :key="c._id || i">
                         <div class="border border-slate-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-semibold text-slate-500" x-text="'Característica ' + (i+1)"></span>
@@ -534,23 +532,23 @@
                             </div>
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div class="col-span-2">
-                                    <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome" placeholder="Ex: Material, Voltagem..."
+                                    <label :for="'car-nome-' + i" class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                    <input type="text" :id="'car-nome-' + i" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome" placeholder="Ex: Material, Voltagem..."
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Quantidade</label>
-                                    <input type="number" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia" min="0"
+                                    <label :for="'car-qtd-' + i" class="block text-xs text-slate-600 mb-1">Quantidade</label>
+                                    <input type="number" :id="'car-qtd-' + i" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Variação</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
+                                    <label :for="'car-var-' + i" class="block text-xs text-slate-600 mb-1">Variação</label>
+                                    <input type="text" :id="'car-var-' + i" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div class="col-span-2 sm:col-span-4">
-                                    <label class="block text-xs text-slate-600 mb-1">Descrição</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
+                                    <label :for="'car-desc-' + i" class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                    <input type="text" :id="'car-desc-' + i" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                             </div>
@@ -558,7 +556,7 @@
                         </div>
                     </template>
                 </div>
-                <button type="button" @@click="caracteristicas.push({nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
+                <button type="button" @@click="caracteristicas.push({_id:crypto.randomUUID(),nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Adicionar característica
@@ -584,7 +582,7 @@
             </button>
             <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
-                    <template x-for="(e, i) in embalagens" :key="i">
+                    <template x-for="(e, i) in embalagens" :key="e._id || i">
                         <div class="border border-slate-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-semibold text-slate-500" x-text="'Embalagem ' + (i+1)"></span>
@@ -636,7 +634,7 @@
                         </div>
                     </template>
                 </div>
-                <button type="button" @@click="embalagens.push({nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
+                <button type="button" @@click="embalagens.push({_id:crypto.randomUUID(),nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Adicionar embalagem
@@ -757,7 +755,7 @@
                     <span class="text-[10px] font-medium" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
                     <span class="text-[10px] font-medium" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
                     <span class="text-[10px] font-medium" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Desc</span>
-                    <span class="text-[10px] font-medium" :class="(pendingFiles.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(pendingFiles.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
+                    <span class="text-[10px] font-medium" :class="(_pondFileCount + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(_pondFileCount + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
                 </div>
             </div>
             <div class="flex gap-2 flex-shrink-0">
@@ -784,7 +782,23 @@
     </div>
 </form>
 
+@section Styles {
+    <link href="https://unpkg.com/filepond@@^4/dist/filepond.min.css" rel="stylesheet" />
+    <link href="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.css" rel="stylesheet" />
+}
+
 @section Scripts {
+    <script src="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.js"></script>
+    <script src="https://unpkg.com/filepond-plugin-file-validate-type@@^1/dist/filepond-plugin-file-validate-type.min.js"></script>
+    <script src="https://unpkg.com/filepond-plugin-file-validate-size@@^2/dist/filepond-plugin-file-validate-size.min.js"></script>
+    <script src="https://unpkg.com/filepond@@^4/dist/filepond.min.js"></script>
+    <script>
+        FilePond.registerPlugin(
+            FilePondPluginImagePreview,
+            FilePondPluginFileValidateType,
+            FilePondPluginFileValidateSize
+        );
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         function produtoForm() {
@@ -817,43 +831,105 @@
 
                 get step1Valid() { return !!this.nome && !!this.categoriaId; },
 
-                // ── Submit ──
+                // ── Submit (duas fases: produto primeiro, fotos depois via AJAX) ──
                 saving: false,
-                submitForm() {
+                uploadPhase: false,
+                uploadQueue: [],
+                async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
                     if (this.saving) return;
                     this.saving = true;
                     this._clearDraft();
 
-                    // Usa fetch + FormData para enviar fotos de forma confiável
-                    // (DataTransfer + input.files é instável entre navegadores)
                     const form = this.$el;
                     const fd = new FormData(form);
+                    // Remover campos de arquivo — FilePond pode ter adicionado inputs hidden
                     fd.delete('fotos');
-                    this.pendingFiles.forEach(f => fd.append('fotos', f));
+                    for (const key of [...fd.keys()]) {
+                        if (key.startsWith('filepond')) fd.delete(key);
+                    }
 
-                    fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' })
-                        .then(r => {
-                            if (r.redirected) { window.location.href = r.url; return; }
-                            // Se retornou HTML (validação falhou), recarrega com os erros
-                            if (r.ok) {
-                                const ct = r.headers.get('content-type') || '';
-                                if (ct.includes('text/html')) {
-                                    // Servidor retornou a view com erros de validação
-                                    r.text().then(html => { document.open(); document.write(html); document.close(); });
-                                } else {
-                                    window.location.href = '/produtos';
+                    try {
+                        // === FASE 1: Criar/Atualizar produto (sem fotos) ===
+                        const r = await fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' });
+
+                        if (!r.ok && !r.redirected) {
+                            this.saving = false;
+                            const ct = r.headers.get('content-type') || '';
+                            if (ct.includes('text/html')) {
+                                // Renderiza a página de erro do servidor num iframe embutido
+                                // para preservar o histórico e os scripts Alpine já carregados
+                                try {
+                                    const html = await r.text();
+                                    // Tenta extrair mensagens de validação do HTML retornado
+                                    const tmp = document.createElement('div');
+                                    tmp.innerHTML = html;
+                                    const erros = [...tmp.querySelectorAll('.text-red-500,.field-validation-error,[data-valmsg-for]')]
+                                        .map(el => el.textContent.trim())
+                                        .filter(Boolean)
+                                        .slice(0, 3);
+                                    if (erros.length) {
+                                        erros.forEach(msg => window.showToast(msg, 'error'));
+                                    } else {
+                                        window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
+                                    }
+                                } catch {
+                                    window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
                                 }
-                                return;
+                            } else {
+                                window.showToast('Erro ao salvar produto.', 'error');
                             }
-                            this.saving = false;
-                            window.showToast('Erro ao salvar produto. Tente novamente.', 'error');
-                        })
-                        .catch(() => {
-                            this.saving = false;
-                            window.showToast('Erro de conexão. Verifique sua internet.', 'error');
-                        });
+                            return;
+                        }
+
+                        // Extrair ID do produto do redirect URL
+                        const redirectUrl = r.url;
+                        const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
+                        const productId = match ? match[1] : null;
+
+                        // === FASE 2: Upload de fotos via AJAX ===
+                        const pondFiles = this._pond ? this._pond.getFiles().map(f => f.file).filter(Boolean) : [];
+                        if (productId && pondFiles.length > 0) {
+                            await this._uploadPhotosAfterSave(productId, pondFiles);
+                        }
+
+                        window.location.href = redirectUrl || '/produtos';
+                    } catch (e) {
+                        this.saving = false;
+                        window.showToast('Erro de conexão ao salvar.', 'error');
+                    }
+                },
+                async _uploadPhotosAfterSave(productId, files) {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                    this.uploadPhase = true;
+                    this.uploadQueue = files.map(f => ({ name: f.name, status: 'uploading', message: '' }));
+
+                    let successCount = 0;
+                    for (let i = 0; i < files.length; i++) {
+                        try {
+                            const fd = new FormData();
+                            fd.append('foto', files[i]);
+                            fd.append('__RequestVerificationToken', token);
+                            const resp = await fetch('/produtos/' + productId + '/fotos/ajax', { method: 'POST', body: fd });
+                            const data = await resp.json();
+                            if (!data.ok) throw new Error(data.erro || 'Erro no servidor');
+                            this.uploadQueue[i].status = 'done';
+                            successCount++;
+                        } catch (err) {
+                            this.uploadQueue[i].status = 'error';
+                            this.uploadQueue[i].message = err.message;
+                        }
+                        this.uploadQueue = [...this.uploadQueue]; // forçar reatividade Alpine
+                    }
+
+                    // Pausa para o usuário ver o resultado
+                    await new Promise(resolve => setTimeout(resolve, 1200));
+                    this.uploadPhase = false;
+
+                    if (successCount < files.length) {
+                        window.showToast((files.length - successCount) + ' foto(s) falharam. Adicione-as na página do produto.', 'warning');
+                    }
                 },
 
                 // ── Marca autocomplete ──
@@ -889,14 +965,18 @@
                     this.codigoBarras = ts + check;
                     this.eanAviso = '';
                 },
+                _skuAbort: null,
                 async checkSkuDisponivel() {
                     const sku = (this.sku || '').trim();
                     if (!sku) { this.skuStatus = ''; return; }
+                    // Cancela requisição anterior se ainda estiver em andamento
+                    if (this._skuAbort) { this._skuAbort.abort(); }
+                    this._skuAbort = new AbortController();
                     this.skuStatus = 'verificando';
                     try {
                         const params = new URLSearchParams({ sku });
                         if (isEdit) params.set('ignoreProdutoId', '@Model.Id');
-                        const res = await fetch(`/produtos/check-sku?${params}`);
+                        const res = await fetch(`/produtos/check-sku?${params}`, { signal: this._skuAbort.signal });
                         if (!res.ok) { this.skuStatus = 'erro'; return; }
                         const data = await res.json();
                         if (data.disponivel === null || data.disponivel === undefined) {
@@ -905,7 +985,9 @@
                         } else {
                             this.skuStatus = data.disponivel ? 'disponivel' : 'indisponivel';
                         }
-                    } catch { this.skuStatus = 'erro'; }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') this.skuStatus = 'erro';
+                    }
                 },
                 validarCodigoBarras() {
                     const code = (this.codigoBarras || '').trim();
@@ -926,22 +1008,59 @@
                 // ── Draft persistence (sessionStorage) ──
                 _draftKey: 'easystock_produto_draft' + (isEdit ? '_edit' : '_new'),
                 _draftTimer: null,
+                // Handlers armazenados para remoção no destroy()
+                _clickHandler: null,
+                _pageshowHandler: null,
+
                 init() {
                     if (!isEdit) this._restoreDraft();
                     const save = () => { clearTimeout(this._draftTimer); this._draftTimer = setTimeout(() => this._saveDraft(), 500); };
                     for (const f of ['nome','sku','marca','descricao','categoriaId','codigoBarras','preco','custo','margem','step'])
                         this.$watch(f, save);
-                    document.addEventListener('click', (e) => {
+
+                    this._clickHandler = (e) => {
                         if (!e.target.closest('.relative')?.querySelector('input[name="Marca"]')) this.marcaSugestoes = [];
-                    });
+                    };
+                    document.addEventListener('click', this._clickHandler);
+
                     // Detecta restauração via bfcache (botão Voltar após submit bem-sucedido)
-                    window.addEventListener('pageshow', (e) => {
+                    this._pageshowHandler = (e) => {
                         if (e.persisted && this.saving) {
-                            // Página foi restaurada do cache com estado de "enviando" — significa que
-                            // o submit foi concluído. Redireciona para um formulário limpo.
                             window.location.replace(window.location.href);
                         }
+                    };
+                    window.addEventListener('pageshow', this._pageshowHandler);
+
+                    // Inicializar FilePond (guard contra dupla inicialização)
+                    this.$nextTick(() => {
+                        if (this._pond) return;
+                        const maxNew = 5 - this.existingPhotos.length;
+                        const self = this;
+                        this._pond = FilePond.create(this.$refs.pondInput, {
+                            allowMultiple: true,
+                            maxFiles: maxNew,
+                            acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+                            maxFileSize: '10MB',
+                            labelIdle: 'Arraste fotos aqui ou <span class="filepond--label-action">selecione</span>',
+                            labelMaxFileSizeExceeded: 'Arquivo muito grande',
+                            labelMaxFileSize: 'Tamanho maximo: {filesize}',
+                            labelFileTypeNotAllowed: 'Tipo nao permitido',
+                            fileValidateTypeLabelExpectedTypes: 'Aceitos: JPEG, PNG, WebP',
+                            labelFileProcessingComplete: 'Foto pronta',
+                            labelTapToCancel: '',
+                            labelTapToRetry: 'Toque para tentar novamente',
+                            credits: false,
+                        });
+                        this._pond.on('addfile', () => { self._pondFileCount = self._pond.getFiles().length; });
+                        this._pond.on('removefile', () => { self._pondFileCount = self._pond.getFiles().length; });
                     });
+                },
+                destroy() {
+                    if (this._pond) { this._pond.destroy(); this._pond = null; }
+                    if (this._clickHandler) { document.removeEventListener('click', this._clickHandler); this._clickHandler = null; }
+                    if (this._pageshowHandler) { window.removeEventListener('pageshow', this._pageshowHandler); this._pageshowHandler = null; }
+                    if (this._skuAbort) { this._skuAbort.abort(); this._skuAbort = null; }
+                    clearTimeout(this._draftTimer);
                 },
                 _saveDraft() {
                     try {
@@ -1105,17 +1224,20 @@
                 categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
                 subcategoriaId: '@(Model.SubcategoriaId?.ToString().ToLower() ?? "")',
 
-                variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
+                variacoes: @Html.Raw(JsonSerializer.Serialize((Model.VariacoesRich ?? []).Select(v => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = v.Nome ?? "", cor = v.Cor ?? "", tamanho = v.Tamanho ?? "",
                     descricaoComercial = v.DescricaoComercial ?? "", sku = v.Sku ?? "",
                     codigoBarras = v.CodigoBarras ?? "", ativa = v.Ativa
                 }))),
-                caracteristicas: @Html.Raw(JsonSerializer.Serialize(Model.Caracteristicas.Select(c => new {
+                caracteristicas: @Html.Raw(JsonSerializer.Serialize((Model.Caracteristicas ?? []).Select(c => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = c.Nome ?? "", descricao = c.Descricao ?? "",
                     quantidadeReferencia = c.QuantidadeReferencia,
                     variacaoPadrao = c.VariacaoPadrao ?? "", ordemExibicao = c.OrdemExibicao
                 }))),
-                embalagens: @Html.Raw(JsonSerializer.Serialize(Model.Embalagens.Select(e => new {
+                embalagens: @Html.Raw(JsonSerializer.Serialize((Model.Embalagens ?? []).Select(e => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = e.Nome ?? "", descricao = e.Descricao ?? "",
                     peso = e.Peso, largura = e.Largura, altura = e.Altura,
                     comprimento = e.Comprimento, padrao = e.Padrao
@@ -1160,36 +1282,10 @@
                     return cat ? cat.nome : '';
                 },
 
-                // ── Photos (acumula múltiplas seleções) ──
-                pendingFiles: [],
-                previews: [],
+                // ── Photos (FilePond) ──
+                _pond: null,
+                _pondFileCount: 0,
                 existingPhotos: @Html.Raw(existingPhotosJson),
-
-                addFiles() {
-                    const input = this.$refs.fileInput;
-                    if (!input?.files?.length) return;
-                    const maxTotal = 5 - this.existingPhotos.length;
-                    const newFiles = Array.from(input.files);
-                    for (const f of newFiles) {
-                        if (this.pendingFiles.length >= maxTotal) break;
-                        // Evita duplicatas por nome+tamanho
-                        if (this.pendingFiles.some(p => p.name === f.name && p.size === f.size)) continue;
-                        if (f.size > 10 * 1024 * 1024) { window.showToast('Arquivo ' + f.name + ' excede 10 MB.', 'warning'); continue; }
-                        if (!f.type.startsWith('image/')) { window.showToast('Arquivo ' + f.name + ' não é imagem.', 'warning'); continue; }
-                        this.pendingFiles.push(f);
-                    }
-                    input.value = '';
-                    this._rebuildPreviews();
-                },
-                removeFile(idx) {
-                    if (this.previews[idx]) URL.revokeObjectURL(this.previews[idx]);
-                    this.pendingFiles.splice(idx, 1);
-                    this._rebuildPreviews();
-                },
-                _rebuildPreviews() {
-                    this.previews.forEach(u => URL.revokeObjectURL(u));
-                    this.previews = this.pendingFiles.map(f => URL.createObjectURL(f));
-                },
 
                 // ── AI ──
                 aiGenerating: false,
@@ -1234,7 +1330,7 @@
 
                 // ── Completion (mesmos critérios ponderados da página do produto) ──
                 get completionPercent() {
-                    const fotos = this.pendingFiles.length + this.existingPhotos.length;
+                    const fotos = this._pondFileCount + this.existingPhotos.length;
                     const fields = [
                         { ok: fotos > 0,              pts: 20 },
                         { ok: !!this.descricao,        pts: 15 },

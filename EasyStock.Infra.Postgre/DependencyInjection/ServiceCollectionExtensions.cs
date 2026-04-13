@@ -25,6 +25,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 options.UseNpgsql(connectionString, npgsql =>
                 {
                     npgsql.MigrationsAssembly("EasyStock.Infra.Postgre");
+                    npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                    npgsql.CommandTimeout(30);
                     npgsql.EnableRetryOnFailure(
                         maxRetryCount: 3,
                         maxRetryDelay: TimeSpan.FromSeconds(5),

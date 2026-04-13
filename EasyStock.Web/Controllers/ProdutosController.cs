@@ -90,7 +90,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
     [HttpPost("/produtos/novo")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Criar(ProdutoFormViewModel vm, List<IFormFile> fotos)
+    public async Task<IActionResult> Criar(ProdutoFormViewModel vm)
     {
         if (!ModelState.IsValid)
         {
@@ -102,13 +102,6 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         var result = await svc.CriarAsync(vm);
 
-        // Auto-retry com novo SKU se duplicado
-        if (!result.Success && result.ErrorMessage?.Contains("SKU") == true)
-        {
-            vm.SkuBase = GerarSkuUnico(vm.Nome);
-            result = await svc.CriarAsync(vm);
-        }
-
         if (!result.Success && result.HttpStatus is not (200 or 201))
         {
             HasError(result);
@@ -119,17 +112,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var newId = result.Data?.ProdutoId ?? Guid.Empty;
         if (newId != Guid.Empty)
         {
-            int uploadErrors = 0;
-            foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 10 * 1024 * 1024).Take(5))
-            {
-                var r = await svc.UploadFotoAsync(newId.ToString(), foto);
-                if (!r.Success) uploadErrors++;
-            }
-
-            Toast(uploadErrors > 0 ? "warning" : "success",
-                uploadErrors > 0
-                    ? $"Produto criado, mas {uploadErrors} foto(s) nao foram enviadas."
-                    : "Produto criado com sucesso!");
+            Toast("success", "Produto criado com sucesso!");
             return RedirectToAction(nameof(Detail), new { id = newId });
         }
 
@@ -204,7 +187,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
     [HttpPost("/produtos/{id}/editar")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm, List<IFormFile> fotos)
+    public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm)
     {
         if (!ModelState.IsValid)
         {
@@ -222,17 +205,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             return View("Form", vm);
         }
 
-        int uploadErrors = 0;
-        foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 10 * 1024 * 1024).Take(5))
-        {
-            var r = await svc.UploadFotoAsync(id, foto);
-            if (!r.Success) uploadErrors++;
-        }
-
-        Toast(uploadErrors > 0 ? "warning" : "success",
-            uploadErrors > 0
-                ? $"Produto atualizado, mas {uploadErrors} foto(s) nao foram enviadas."
-                : "Produto atualizado com sucesso!");
+        Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
     }
 
@@ -378,8 +351,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var words = (nome ?? "PRD").Trim().ToUpper().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var parts = words.Take(3).Select(w => new string(w.Where(char.IsLetterOrDigit).Take(3).ToArray())).Where(p => p.Length > 0);
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        var rnd = new Random();
-        var suffix = new string(Enumerable.Range(0, 6).Select(_ => chars[rnd.Next(chars.Length)]).ToArray());
+        var suffix = new string(Enumerable.Range(0, 6).Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
         var prefix = string.Join("-", parts);
         return string.IsNullOrEmpty(prefix) ? suffix : $"{prefix}-{suffix}";
     }

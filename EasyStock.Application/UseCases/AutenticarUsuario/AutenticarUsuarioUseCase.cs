@@ -87,7 +87,6 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.AtualizarUltimoAcesso();
             await usuarioRepository.UpdateAsync(usuario);
-            await unitOfWork.CommitAsync();
 
             logger.LogInformation("Autenticacao bem-sucedida para o usuario: {UsuarioId}", usuario.Id);
 

@@ -38,6 +38,9 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableRelatorioMensalJob)
             services.AddHostedService<RelatorioMensalJob>();
 
+        if (options.EnableDiagnosticoEmailReport)
+            services.AddHostedService<DiagnosticoEmailReportJob>();
+
         return services;
     }
 }
