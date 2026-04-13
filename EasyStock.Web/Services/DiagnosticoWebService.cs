@@ -201,6 +201,99 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
             return null;
         }
     }
+
+    // ── Novos métodos ──────────────────────────────────────────────────────
+
+    public async Task<object?> FetchLixeiraAsync()
+    {
+        try
+        {
+            var r = await httpClient.GetAsync("diagnostico/logs/lixeira");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> EsvaziarLixeiraAsync()
+    {
+        try
+        {
+            var r = await httpClient.PostAsync("diagnostico/logs/lixeira/esvaziar", null);
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<EventosWebResult?> FetchEventosAsync(int hours = 48)
+    {
+        try
+        {
+            var r = await httpClient.GetAsync($"diagnostico/eventos?hours={hours}");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<EventosWebResult>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<SloWebResult?> FetchSloAsync(int hours = 24)
+    {
+        try
+        {
+            var r = await httpClient.GetAsync($"diagnostico/slo?hours={hours}");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<SloWebResult>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> AckAlertaAsync(string alertaId, object body)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(body, JsonOptions);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var r = await httpClient.PostAsync($"diagnostico/alertas/{alertaId}/ack", content);
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> FetchAcksAsync(string? ids)
+    {
+        try
+        {
+            var url = string.IsNullOrEmpty(ids) ? "diagnostico/alertas/acks" : $"diagnostico/alertas/acks?ids={Uri.EscapeDataString(ids)}";
+            var r = await httpClient.GetAsync(url);
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> FetchQueriesLentasAsync()
+    {
+        try
+        {
+            var r = await httpClient.GetAsync("diagnostico/queries-lentas");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> FetchHealthEmpresasAsync()
+    {
+        try
+        {
+            var r = await httpClient.GetAsync("diagnostico/health/empresas");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -346,6 +439,7 @@ public sealed class DetectedPatternInfo
     public int Ocorrencias { get; set; }
     public DateTimeOffset? PrimeiraOcorrencia { get; set; }
     public DateTimeOffset? UltimaOcorrencia { get; set; }
+    public string AlertaId { get; set; } = "";
 }
 
 public sealed class EndpointTestWebResult
@@ -390,7 +484,10 @@ public sealed class LimparLogsResult
 {
     public bool Success { get; set; }
     public string Mensagem { get; set; } = "";
+    // Mantido para compatibilidade retroativa; o novo campo é ArquivosMovidos
     public int ArquivosExcluidos { get; set; }
+    public int ArquivosMovidos { get; set; }
+    public string? Destino { get; set; }
 }
 
 public sealed class SalvarStorageResult
@@ -401,3 +498,32 @@ public sealed class SalvarStorageResult
     public string? Url { get; set; }
     public long TamanhoBytes { get; set; }
 }
+
+public sealed class TimelineEventInfo
+{
+    public DateTimeOffset Timestamp { get; set; }
+    public string Tipo { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Severidade { get; set; } = "info";
+}
+
+public sealed class EventosWebResult
+{
+    public bool Disponivel { get; set; }
+    public TimelineEventInfo[] Eventos { get; set; } = [];
+    public int PeriodoHoras { get; set; }
+}
+
+public sealed class SloWebResult
+{
+    public DateTimeOffset CalculadoEm { get; set; }
+    public int PeriodoHoras { get; set; }
+    public double? Uptime24h { get; set; }
+    public double? AvgResponseTimeMs { get; set; }
+    public double? P95ResponseTimeMs { get; set; }
+    public double ErrorRate { get; set; }
+    public int TotalRequests { get; set; }
+    public int TotalErrors { get; set; }
+    public int SnapshotsAnalisados { get; set; }
+}
+

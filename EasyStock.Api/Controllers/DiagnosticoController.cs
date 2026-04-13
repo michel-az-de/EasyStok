@@ -11,6 +11,7 @@ using EasyStock.Application.Ports.Output.Storage;
 using Azure.Storage.Files.Shares;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace EasyStock.Api.Controllers;
@@ -83,7 +84,7 @@ public sealed class DiagnosticoController(
                         var allEntries = new List<EnhancedLogEntry>();
                         foreach (var file in logFiles)
                         {
-                            allEntries.AddRange(ParseEnhancedLogFile(file.FullName, cutoff));
+                            allEntries.AddRange(DiagnosticoLogAnalyzer.ParseEnhancedLogFile(file.FullName, cutoff));
                             if (allEntries.Count > 5000) { allEntries = allEntries.TakeLast(5000).ToList(); break; }
                         }
 
@@ -94,8 +95,8 @@ public sealed class DiagnosticoController(
                             PeriodoHoras = 48,
                             TotalEntries = allEntries.Count,
                             Entradas = allEntries.TakeLast(500).ToArray(),
-                            Resumo = BuildLogSummary(allEntries),
-                            Padroes = DetectPatterns(allEntries).ToArray()
+                            Resumo = DiagnosticoLogAnalyzer.BuildLogSummary(allEntries),
+                            Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries, infraState.IsFallback).ToArray()
                         };
                     }
                 }
@@ -194,55 +195,16 @@ public sealed class DiagnosticoController(
     {
         hours = Math.Clamp(hours, 1, 72);
         var cutoff = DateTime.UtcNow.AddHours(-hours);
-
         var logsDir = GetLogDirectory();
+
         if (!Directory.Exists(logsDir))
-        {
-            return Ok(new EnhancedLogsResult
-            {
-                Disponivel = false,
-                Motivo = "Diretório de logs não encontrado."
-            });
-        }
+            return Ok(new EnhancedLogsResult { Disponivel = false, Motivo = "Diretório de logs não encontrado." });
 
         try
         {
-            // Collect log files covering the requested window
-            var dir = new DirectoryInfo(logsDir);
-            var logFiles = dir.GetFiles("easystock-*.log")
-                .OrderByDescending(f => f.LastWriteTimeUtc)
-                .Where(f => f.LastWriteTimeUtc >= cutoff)
-                .OrderBy(f => f.Name)
-                .ToList();
-
-            if (logFiles.Count == 0)
-            {
-                return Ok(new EnhancedLogsResult
-                {
-                    Disponivel = false,
-                    Motivo = "Nenhum arquivo de log encontrado para o período solicitado."
-                });
-            }
-
-            var allEntries = new List<EnhancedLogEntry>();
-
-            foreach (var file in logFiles)
-            {
-                var entries = ParseEnhancedLogFile(file.FullName, cutoff);
-                allEntries.AddRange(entries);
-
-                if (allEntries.Count > 5000)
-                {
-                    allEntries = allEntries.TakeLast(5000).ToList();
-                    break;
-                }
-            }
-
-            // Build summary
-            var summary = BuildLogSummary(allEntries);
-
-            // Detect patterns
-            var patterns = DetectPatterns(allEntries);
+            var allEntries = DiagnosticoLogAnalyzer.ParseAllLogFiles(logsDir, cutoff);
+            if (allEntries.Count == 0)
+                return Ok(new EnhancedLogsResult { Disponivel = false, Motivo = "Nenhum arquivo de log encontrado para o período solicitado." });
 
             return Ok(new EnhancedLogsResult
             {
@@ -251,17 +213,13 @@ public sealed class DiagnosticoController(
                 PeriodoHoras = hours,
                 TotalEntries = allEntries.Count,
                 Entradas = allEntries.ToArray(),
-                Resumo = summary,
-                Padroes = patterns.ToArray()
+                Resumo = DiagnosticoLogAnalyzer.BuildLogSummary(allEntries),
+                Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries, infraState.IsFallback).ToArray()
             });
         }
         catch (Exception ex)
         {
-            return Ok(new EnhancedLogsResult
-            {
-                Disponivel = false,
-                Motivo = $"Erro ao processar logs: {ex.Message}"
-            });
+            return Ok(new EnhancedLogsResult { Disponivel = false, Motivo = $"Erro ao processar logs: {ex.Message}" });
         }
     }
 
@@ -287,7 +245,7 @@ public sealed class DiagnosticoController(
             var allEntries = new List<EnhancedLogEntry>();
             foreach (var file in logFiles)
             {
-                allEntries.AddRange(ParseEnhancedLogFile(file.FullName, cutoff));
+                allEntries.AddRange(DiagnosticoLogAnalyzer.ParseEnhancedLogFile(file.FullName, cutoff));
                 if (allEntries.Count > 200) break;
             }
 
@@ -430,46 +388,100 @@ public sealed class DiagnosticoController(
     {
         var logsDir = GetLogDirectory();
         if (!Directory.Exists(logsDir))
-            return Ok(new { success = false, mensagem = "Diretório de logs não encontrado.", arquivosExcluidos = 0 });
+            return Ok(new { success = false, mensagem = "Diretório de logs não encontrado.", arquivosMovidos = 0 });
+
+        var lixeiraDir = Path.Combine(logsDir, "lixeira");
+        try { Directory.CreateDirectory(lixeiraDir); }
+        catch (Exception ex) { return Ok(new { success = false, mensagem = $"Não foi possível criar lixeira: {ex.Message}", arquivosMovidos = 0 }); }
 
         var arquivos = Directory.GetFiles(logsDir, "easystock-*.log");
-        var excluidos = 0;
-        var erros = new List<string>();
+        var movidos = 0;
+        var avisos = new List<string>();
 
         foreach (var arquivo in arquivos)
         {
+            var dest = Path.Combine(lixeiraDir, $"{DateTime.UtcNow:yyyyMMdd-HHmmss}_{Path.GetFileName(arquivo)}");
             try
             {
-                System.IO.File.Delete(arquivo);
-                excluidos++;
+                System.IO.File.Move(arquivo, dest);
+                movidos++;
             }
             catch (IOException)
             {
-                // Arquivo em uso pelo Serilog (dia corrente) — truncar em vez de excluir
+                // Arquivo bloqueado pelo Serilog (dia corrente) — copiar para lixeira e truncar in-place
                 try
                 {
+                    System.IO.File.Copy(arquivo, dest, overwrite: true);
                     using var fs = new FileStream(arquivo, FileMode.Truncate, FileAccess.Write, FileShare.ReadWrite);
-                    excluidos++;
-                    erros.Add(Path.GetFileName(arquivo) + ": truncado (em uso pelo Serilog)");
+                    movidos++;
+                    avisos.Add(Path.GetFileName(arquivo) + ": copiado para lixeira e truncado in-place (em uso pelo Serilog)");
                 }
                 catch (Exception ex2)
                 {
-                    erros.Add(Path.GetFileName(arquivo) + ": não foi possível excluir/truncar — " + ex2.Message);
+                    avisos.Add(Path.GetFileName(arquivo) + ": não foi possível mover/copiar — " + ex2.Message);
                 }
             }
             catch (Exception ex)
             {
-                erros.Add(Path.GetFileName(arquivo) + ": " + ex.Message);
+                avisos.Add(Path.GetFileName(arquivo) + ": " + ex.Message);
             }
         }
 
         return Ok(new
         {
             success = true,
-            arquivosExcluidos = excluidos,
-            mensagem = excluidos > 0
-                ? $"{excluidos} arquivo(s) de log excluído(s)/limpo(s) permanentemente."
+            arquivosMovidos = movidos,
+            destino = "logs/lixeira/",
+            mensagem = movidos > 0
+                ? $"{movidos} arquivo(s) de log movido(s) para a lixeira."
                 : "Nenhum arquivo de log encontrado.",
+            avisos
+        });
+    }
+
+    [HttpGet("logs/lixeira")]
+    public IActionResult InspecionarLixeira()
+    {
+        var lixeiraDir = Path.Combine(GetLogDirectory(), "lixeira");
+        if (!Directory.Exists(lixeiraDir))
+            return Ok(new { arquivos = Array.Empty<object>(), total = 0, tamanhoTotalBytes = 0L });
+
+        var arquivos = new DirectoryInfo(lixeiraDir)
+            .GetFiles("*")
+            .OrderByDescending(f => f.LastWriteTimeUtc)
+            .Select(f => new { nome = f.Name, tamanhoBytes = f.Length, movidoEm = f.LastWriteTimeUtc })
+            .ToArray();
+
+        return Ok(new
+        {
+            arquivos,
+            total = arquivos.Length,
+            tamanhoTotalBytes = arquivos.Sum(a => a.tamanhoBytes)
+        });
+    }
+
+    [HttpPost("logs/lixeira/esvaziar")]
+    public IActionResult EsvaziarLixeira()
+    {
+        var lixeiraDir = Path.Combine(GetLogDirectory(), "lixeira");
+        if (!Directory.Exists(lixeiraDir))
+            return Ok(new { success = true, arquivosExcluidos = 0, mensagem = "Lixeira já vazia." });
+
+        var arquivos = Directory.GetFiles(lixeiraDir);
+        var excluidos = 0;
+        var erros = new List<string>();
+
+        foreach (var arquivo in arquivos)
+        {
+            try { System.IO.File.Delete(arquivo); excluidos++; }
+            catch (Exception ex) { erros.Add(Path.GetFileName(arquivo) + ": " + ex.Message); }
+        }
+
+        return Ok(new
+        {
+            success = true,
+            arquivosExcluidos = excluidos,
+            mensagem = $"Lixeira esvaziada: {excluidos} arquivo(s) excluído(s).",
             erros
         });
     }
@@ -579,6 +591,283 @@ public sealed class DiagnosticoController(
         {
             logger.LogWarning(ex, "Falha ao salvar logs no storage.");
             return StatusCode(500, new { success = false, mensagem = $"Erro ao salvar no storage: {ex.Message}" });
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Novos endpoints — melhorias da central de diagnóstico
+    // ──────────────────────────────────────────────────────────────────────
+
+    [HttpGet("eventos")]
+    public IActionResult Eventos([FromQuery] int hours = 48)
+    {
+        hours = Math.Clamp(hours, 1, 72);
+        var cutoff = DateTime.UtcNow.AddHours(-hours);
+        var logsDir = GetLogDirectory();
+
+        try
+        {
+            var entries = DiagnosticoLogAnalyzer.ParseAllLogFiles(logsDir, cutoff);
+            var eventos = DiagnosticoLogAnalyzer.ExtractTimelineEvents(entries);
+            return Ok(new { disponivel = true, eventos, periodoHoras = hours });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { disponivel = false, eventos = Array.Empty<TimelineEvent>(), motivo = ex.Message });
+        }
+    }
+
+    [HttpGet("slo")]
+    public IActionResult Slo([FromQuery] int hours = 24)
+    {
+        hours = Math.Clamp(hours, 1, 168);
+        var cutoff = DateTime.UtcNow.AddHours(-hours);
+
+        // Uptime a partir dos health snapshots
+        var snapshots = healthSnapshotService.GetSnapshots();
+        var periodSnaps = snapshots.Where(s => s.Timestamp >= cutoff).ToList();
+        double? uptime = null;
+        if (periodSnaps.Count > 0)
+            uptime = Math.Round(periodSnaps.Count(s => s.OverallStatus != "critical") * 100.0 / periodSnaps.Count, 2);
+
+        // Latências e taxas a partir dos logs
+        var logsDir = GetLogDirectory();
+        double? avg = null, p95 = null;
+        int totalRequests = 0, totalErrors = 0;
+
+        try
+        {
+            var entries = DiagnosticoLogAnalyzer.ParseAllLogFiles(logsDir, cutoff.ToLocalTime() < DateTime.MinValue.AddHours(1) ? cutoff.ToUniversalTime() : cutoff);
+            var httpEntries = entries.Where(e => e.Categoria == "http_request" && e.ElapsedMs.HasValue).ToList();
+
+            if (httpEntries.Count > 0)
+            {
+                var sorted = httpEntries.Select(e => e.ElapsedMs!.Value).OrderBy(v => v).ToList();
+                avg = Math.Round(sorted.Average(), 1);
+                p95 = Math.Round(sorted[Math.Min(sorted.Count - 1, (int)(sorted.Count * 0.95))], 1);
+            }
+
+            totalRequests = httpEntries.Count;
+            totalErrors = entries.Count(e => e.Level is "ERROR" or "FATAL");
+        }
+        catch { /* logs indisponíveis — retornar parcial */ }
+
+        var errorRate = totalRequests > 0 ? Math.Round(totalErrors / (double)totalRequests, 4) : 0.0;
+
+        return Ok(new
+        {
+            calculadoEm = DateTimeOffset.UtcNow,
+            periodoHoras = hours,
+            uptime24h = uptime,
+            avgResponseTimeMs = avg,
+            p95ResponseTimeMs = p95,
+            errorRate,
+            totalRequests,
+            totalErrors,
+            snapshotsAnalisados = periodSnaps.Count,
+            fontes = new { snapshots = periodSnaps.Count > 0, logs = avg.HasValue }
+        });
+    }
+
+    [HttpPost("alertas/{alertaId}/ack")]
+    public async Task<IActionResult> AckAlerta(string alertaId, [FromBody] AckAlertaRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(alertaId) || alertaId.Length > 32)
+            return BadRequest(new { error = "AlertaId inválido." });
+
+        if (request.Status is not ("visto" or "em_investigacao" or "resolvido"))
+            return BadRequest(new { error = "Status inválido. Use: visto, em_investigacao ou resolvido." });
+
+        var ack = new AlertaAck
+        {
+            AlertaId = alertaId,
+            Status = request.Status,
+            Observacao = request.Observacao?.Trim(),
+            AtualizadoEm = DateTimeOffset.UtcNow
+        };
+
+        var cacheKey = $"diag:ack:{alertaId}";
+        await cache.SetStringAsync(cacheKey, System.Text.Json.JsonSerializer.Serialize(ack),
+            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(7) }, ct);
+
+        return Ok(ack);
+    }
+
+    [HttpGet("alertas/acks")]
+    public async Task<IActionResult> GetAcks([FromQuery] string? ids = null, CancellationToken ct = default)
+    {
+        // ids = comma-separated list of alertaIds to look up
+        var idList = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                 .Take(50).ToArray();
+
+        var acks = new List<AlertaAck>();
+        foreach (var id in idList)
+        {
+            try
+            {
+                var json = await cache.GetStringAsync($"diag:ack:{id}", ct);
+                if (json is not null)
+                {
+                    var ack = System.Text.Json.JsonSerializer.Deserialize<AlertaAck>(json);
+                    if (ack is not null) acks.Add(ack);
+                }
+            }
+            catch { /* cache indisponível */ }
+        }
+
+        return Ok(new { acks });
+    }
+
+    [HttpDelete("alertas/{alertaId}/ack")]
+    public async Task<IActionResult> RemoverAck(string alertaId, CancellationToken ct)
+    {
+        await cache.RemoveAsync($"diag:ack:{alertaId}", ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpGet("queries-lentas")]
+    public async Task<IActionResult> QueriesLentas(CancellationToken ct)
+    {
+        if (!infraState.DatabaseProvider.Equals("postgresql", StringComparison.OrdinalIgnoreCase))
+            return Ok(new { disponivel = false, motivo = "Apenas disponível com PostgreSQL." });
+
+        try
+        {
+            using var scope = HttpContext.RequestServices.CreateScope();
+            var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
+            if (db is null)
+                return Ok(new { disponivel = false, motivo = "DbContext não disponível." });
+
+            var conn = db.Database.GetDbConnection();
+            await conn.OpenAsync(ct);
+
+            const string sql = """
+                SELECT query,
+                       calls,
+                       total_exec_time / calls AS avg_ms,
+                       stddev_exec_time         AS stddev_ms,
+                       CASE WHEN calls > 0 THEN rows::float / calls ELSE 0 END AS avg_rows
+                FROM pg_stat_statements
+                WHERE calls > 10
+                ORDER BY avg_ms DESC
+                LIMIT 20
+                """;
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+            var queries = new List<object>();
+            while (await reader.ReadAsync(ct))
+            {
+                queries.Add(new
+                {
+                    query     = reader.GetString(0),
+                    calls     = reader.GetInt64(1),
+                    avgMs     = Math.Round(reader.GetDouble(2), 2),
+                    stddevMs  = reader.IsDBNull(3) ? (double?)null : Math.Round(reader.GetDouble(3), 2),
+                    avgRows   = Math.Round(reader.GetDouble(4), 1)
+                });
+            }
+
+            return Ok(new { disponivel = true, queries });
+        }
+        catch (Exception ex) when (ex.Message.Contains("pg_stat_statements", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new
+            {
+                disponivel = false,
+                motivo = "Extensão pg_stat_statements não está ativa.",
+                instrucoesPgStatStatements =
+                    "Execute no PostgreSQL: CREATE EXTENSION IF NOT EXISTS pg_stat_statements; " +
+                    "e adicione 'shared_preload_libraries = ''pg_stat_statements''' ao postgresql.conf, então reinicie o serviço."
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Erro ao consultar queries lentas.");
+            return Ok(new { disponivel = false, motivo = ex.Message });
+        }
+    }
+
+    [HttpGet("health/empresas")]
+    public async Task<IActionResult> HealthEmpresas(CancellationToken ct)
+    {
+        if (!infraState.DatabaseProvider.Equals("postgresql", StringComparison.OrdinalIgnoreCase) &&
+            !infraState.DatabaseProvider.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
+            return Ok(new { disponivel = false, motivo = "Apenas disponível com PostgreSQL ou SQLite." });
+
+        try
+        {
+            using var scope = HttpContext.RequestServices.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+
+            var empresas = await db.Empresas
+                .AsNoTracking()
+                .Select(e => new { e.Id, e.Nome })
+                .Take(20)
+                .ToListAsync(ct);
+
+            if (empresas.Count == 0)
+                return Ok(new { disponivel = true, empresas = Array.Empty<object>(), totalAnalisadas = 0, ok = 0, degraded = 0 });
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(12));
+
+            var checks = await Task.WhenAll(empresas.Select(async empresa =>
+            {
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    using var innerScope = HttpContext.RequestServices.CreateScope();
+                    var innerDb = innerScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+
+                    var prodCount = await innerDb.Produtos
+                        .AsNoTracking()
+                        .CountAsync(p => p.EmpresaId == empresa.Id, cts.Token);
+
+                    var vendaCount = await innerDb.Vendas
+                        .AsNoTracking()
+                        .CountAsync(v => v.EmpresaId == empresa.Id && v.DataVenda > DateTime.UtcNow.AddDays(-1), cts.Token);
+
+                    sw.Stop();
+                    var status = sw.ElapsedMilliseconds > 2000 ? "degraded" : "ok";
+
+                    return new
+                    {
+                        empresaId = empresa.Id,
+                        nome = empresa.Nome,
+                        status,
+                        latenciaMs = sw.ElapsedMilliseconds,
+                        produtos = prodCount,
+                        vendasUltimas24h = vendaCount,
+                        erro = (string?)null
+                    };
+                }
+                catch (OperationCanceledException)
+                {
+                    return new { empresaId = empresa.Id, nome = empresa.Nome, status = "timeout", latenciaMs = sw.ElapsedMilliseconds, produtos = 0, vendasUltimas24h = 0, erro = (string?)"Timeout" };
+                }
+                catch (Exception ex)
+                {
+                    return new { empresaId = empresa.Id, nome = empresa.Nome, status = "error", latenciaMs = sw.ElapsedMilliseconds, produtos = 0, vendasUltimas24h = 0, erro = (string?)ex.Message[..Math.Min(ex.Message.Length, 100)] };
+                }
+            }));
+
+            return Ok(new
+            {
+                disponivel = true,
+                empresas = checks,
+                totalAnalisadas = checks.Length,
+                ok = checks.Count(c => c.status == "ok"),
+                degraded = checks.Count(c => c.status is "degraded" or "timeout" or "error")
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Erro ao verificar saúde por empresa.");
+            return Ok(new { disponivel = false, motivo = ex.Message });
         }
     }
 
@@ -833,29 +1122,14 @@ public sealed class DiagnosticoController(
         ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}h {ts.Minutes}m" : $"{ts.Minutes}m {ts.Seconds}s";
 
     // ──────────────────────────────────────────────────────────────────────
-    // Enhanced Log Parsing
+    // ParseLogLine usado apenas pelo endpoint /logs (simples)
     // ──────────────────────────────────────────────────────────────────────
 
-    // Format: [2025-01-15 14:32:01 INF] message {Properties:j}
-    private static readonly Regex LogLineRegex = new(
+    private static readonly Regex _simpleLogLineRegex = new(
         @"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w{3})\] (.+)$",
         RegexOptions.Compiled);
 
-    // HTTP request log from Serilog: HTTP GET /api/produtos responded 200 in 12.3456 ms
-    private static readonly Regex HttpRequestRegex = new(
-        @"HTTP (\w+) (\S+) responded (\d+) in ([\d.]+) ms",
-        RegexOptions.Compiled);
-
-    // Properties JSON block at the end of a message
-    private static readonly Regex PropertiesRegex = new(
-        @"\s*\{[^{}]*""CorrelationId""[^{}]*\}\s*$",
-        RegexOptions.Compiled);
-
-    private static readonly Regex CorrelationIdRegex = new(
-        @"""CorrelationId""\s*:\s*""([^""]+)""",
-        RegexOptions.Compiled);
-
-    private static readonly Regex[] SensitivePatterns =
+    private static readonly Regex[] _simpleSensitivePatterns =
     [
         new Regex(@"(?i)(password|senha|secret|apikey|api_key|token|connectionstring)\s*[=:]\s*\S+", RegexOptions.Compiled),
         new Regex(@"Host=\S+;.*Password=[^;]+", RegexOptions.Compiled),
@@ -863,340 +1137,19 @@ public sealed class DiagnosticoController(
 
     private static LogEntry? ParseLogLine(string line)
     {
-        var match = LogLineRegex.Match(line);
+        var match = _simpleLogLineRegex.Match(line);
         if (!match.Success) return null;
 
         var message = match.Groups[3].Value;
-
-        foreach (var pattern in SensitivePatterns)
+        foreach (var pattern in _simpleSensitivePatterns)
             message = pattern.Replace(message, m =>
             {
                 var key = m.Value.Split(['=', ':'], 2)[0];
                 return $"{key}=[REDACTED]";
             });
 
-        var levelStr = match.Groups[2].Value.ToUpperInvariant();
-        var level = NormalizeLevel(levelStr);
-
-        if (!DateTimeOffset.TryParse(match.Groups[1].Value, out var ts))
-            return null;
-
-        return new LogEntry { Timestamp = ts, Level = level, Message = message };
-    }
-
-    private static string NormalizeLevel(string levelStr) => levelStr switch
-    {
-        "ERR" => "ERROR",
-        "WRN" => "WARN",
-        "INF" => "INFO",
-        "DBG" => "DEBUG",
-        "VRB" => "VERBOSE",
-        "FTL" => "FATAL",
-        _ => levelStr
-    };
-
-    private static List<EnhancedLogEntry> ParseEnhancedLogFile(string filePath, DateTime cutoff)
-    {
-        var entries = new List<EnhancedLogEntry>();
-        var currentEntry = (EnhancedLogEntry?)null;
-        var exceptionLines = new List<string>();
-
-        using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = new StreamReader(fs);
-
-        while (!reader.EndOfStream)
-        {
-            var line = reader.ReadLine();
-            if (line is null) continue;
-
-            var match = LogLineRegex.Match(line);
-            if (match.Success)
-            {
-                // Flush previous entry
-                if (currentEntry is not null)
-                {
-                    if (exceptionLines.Count > 0)
-                        currentEntry.Exception = string.Join("\n", exceptionLines);
-                    entries.Add(currentEntry);
-                    exceptionLines.Clear();
-                }
-
-                if (!DateTime.TryParse(match.Groups[1].Value, out var ts))
-                    continue;
-
-                if (ts < cutoff)
-                {
-                    currentEntry = null;
-                    continue;
-                }
-
-                var levelStr = NormalizeLevel(match.Groups[2].Value.ToUpperInvariant());
-                var rawMessage = match.Groups[3].Value;
-
-                // Extract CorrelationId from Properties JSON block
-                string? correlationId = null;
-                var propsMatch = PropertiesRegex.Match(rawMessage);
-                if (propsMatch.Success)
-                {
-                    var corrMatch = CorrelationIdRegex.Match(propsMatch.Value);
-                    if (corrMatch.Success)
-                        correlationId = corrMatch.Groups[1].Value;
-                    rawMessage = rawMessage[..propsMatch.Index].TrimEnd();
-                }
-
-                // Mask sensitive data
-                foreach (var pattern in SensitivePatterns)
-                    rawMessage = pattern.Replace(rawMessage, m =>
-                    {
-                        var key = m.Value.Split(['=', ':'], 2)[0];
-                        return $"{key}=[REDACTED]";
-                    });
-
-                currentEntry = new EnhancedLogEntry
-                {
-                    Timestamp = new DateTimeOffset(ts, TimeSpan.Zero),
-                    Level = levelStr,
-                    Message = rawMessage,
-                    CorrelationId = correlationId
-                };
-
-                // Classify & extract HTTP request data
-                var httpMatch = HttpRequestRegex.Match(rawMessage);
-                if (httpMatch.Success)
-                {
-                    currentEntry.Categoria = "http_request";
-                    currentEntry.HttpMethod = httpMatch.Groups[1].Value;
-                    currentEntry.Endpoint = httpMatch.Groups[2].Value;
-                    if (int.TryParse(httpMatch.Groups[3].Value, out var sc))
-                        currentEntry.StatusCode = sc;
-                    if (double.TryParse(httpMatch.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture, out var elapsed))
-                        currentEntry.ElapsedMs = elapsed;
-                }
-                else if (levelStr is "ERROR" or "FATAL")
-                {
-                    currentEntry.Categoria = "error";
-                }
-                else if (rawMessage.Contains("Migration", StringComparison.OrdinalIgnoreCase) ||
-                         rawMessage.Contains("Migrating", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentEntry.Categoria = "migration";
-                }
-                else if (rawMessage.Contains("Application started") ||
-                         rawMessage.Contains("Now listening on") ||
-                         rawMessage.Contains("Content root path") ||
-                         rawMessage.Contains("Hosting environment") ||
-                         rawMessage.Contains("iniciado"))
-                {
-                    currentEntry.Categoria = "startup";
-                }
-                else if (rawMessage.Contains("CanConnect", StringComparison.OrdinalIgnoreCase) ||
-                         rawMessage.Contains("DbContext", StringComparison.OrdinalIgnoreCase) ||
-                         rawMessage.Contains("database", StringComparison.OrdinalIgnoreCase))
-                {
-                    currentEntry.Categoria = "db_operation";
-                }
-                else
-                {
-                    currentEntry.Categoria = "general";
-                }
-            }
-            else if (currentEntry is not null)
-            {
-                // Multi-line continuation (exception stack trace)
-                exceptionLines.Add(line);
-            }
-        }
-
-        // Flush last entry
-        if (currentEntry is not null)
-        {
-            if (exceptionLines.Count > 0)
-                currentEntry.Exception = string.Join("\n", exceptionLines);
-            entries.Add(currentEntry);
-        }
-
-        return entries;
-    }
-
-    private static LogSummary BuildLogSummary(List<EnhancedLogEntry> entries)
-    {
-        var httpEntries = entries.Where(e => e.Categoria == "http_request").ToList();
-
-        var errorsByEndpoint = httpEntries
-            .Where(e => e.StatusCode >= 500)
-            .GroupBy(e => e.Endpoint ?? "unknown")
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        var requestsByHour = entries
-            .GroupBy(e => e.Timestamp.ToString("HH"))
-            .OrderBy(g => g.Key)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        var errorsByHour = entries
-            .Where(e => e.Level is "ERROR" or "FATAL")
-            .GroupBy(e => e.Timestamp.ToString("HH"))
-            .OrderBy(g => g.Key)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        return new LogSummary
-        {
-            TotalRequests = httpEntries.Count,
-            TotalErrors = entries.Count(e => e.Level is "ERROR" or "FATAL"),
-            TotalWarnings = entries.Count(e => e.Level == "WARN"),
-            AvgResponseTimeMs = httpEntries.Count > 0
-                ? Math.Round(httpEntries.Where(e => e.ElapsedMs.HasValue).Average(e => e.ElapsedMs!.Value), 1)
-                : 0,
-            ErrorsByEndpoint = errorsByEndpoint,
-            RequestsByHour = requestsByHour,
-            ErrorsByHour = errorsByHour
-        };
-    }
-
-    private List<DetectedPattern> DetectPatterns(List<EnhancedLogEntry> entries)
-    {
-        var patterns = new List<DetectedPattern>();
-
-        // 1. Repeated errors: same message 3+ times within 1 hour window
-        var errorEntries = entries.Where(e => e.Level is "ERROR" or "FATAL").ToList();
-        var errorGroups = errorEntries
-            .GroupBy(e => e.Message.Length > 100 ? e.Message[..100] : e.Message)
-            .Where(g => g.Count() >= 3);
-
-        foreach (var group in errorGroups)
-        {
-            patterns.Add(new DetectedPattern
-            {
-                Tipo = "repeated_error",
-                Severidade = "critical",
-                Descricao = $"Erro repetido {group.Count()}x: {group.Key[..Math.Min(group.Key.Length, 120)]}",
-                Sugestao = "Investigue a causa raiz deste erro recorrente. Pode indicar um bug sistemático.",
-                Ocorrencias = group.Count(),
-                PrimeiraOcorrencia = group.Min(e => e.Timestamp),
-                UltimaOcorrencia = group.Max(e => e.Timestamp)
-            });
-        }
-
-        // 2. Slow endpoints: avg > 1000ms
-        var httpByEndpoint = entries
-            .Where(e => e.Categoria == "http_request" && e.ElapsedMs.HasValue)
-            .GroupBy(e => e.Endpoint ?? "unknown");
-
-        foreach (var group in httpByEndpoint)
-        {
-            var avg = group.Average(e => e.ElapsedMs!.Value);
-            if (avg > 1000)
-            {
-                patterns.Add(new DetectedPattern
-                {
-                    Tipo = "slow_endpoint",
-                    Severidade = "warning",
-                    Descricao = $"Endpoint lento: {group.Key} — média de {avg:F0}ms ({group.Count()} requests)",
-                    Sugestao = "Verifique queries N+1, falta de índices ou operações bloqueantes neste endpoint.",
-                    Ocorrencias = group.Count(),
-                    PrimeiraOcorrencia = group.Min(e => e.Timestamp),
-                    UltimaOcorrencia = group.Max(e => e.Timestamp)
-                });
-            }
-        }
-
-        // 3. Migration failures
-        var migrationErrors = entries
-            .Where(e => e.Categoria == "migration" && e.Level is "ERROR" or "FATAL")
-            .ToList();
-
-        if (migrationErrors.Count > 0)
-        {
-            patterns.Add(new DetectedPattern
-            {
-                Tipo = "migration_failure",
-                Severidade = "critical",
-                Descricao = $"Falha de migration detectada ({migrationErrors.Count} erros)",
-                Sugestao = "Verifique o estado do banco de dados e as migrations pendentes. Execute 'dotnet ef migrations list' para diagnóstico.",
-                Ocorrencias = migrationErrors.Count,
-                PrimeiraOcorrencia = migrationErrors.Min(e => e.Timestamp),
-                UltimaOcorrencia = migrationErrors.Max(e => e.Timestamp)
-            });
-        }
-
-        // 4. Deploy/restart detection: startup messages after activity gap
-        var startupEntries = entries.Where(e => e.Categoria == "startup").ToList();
-        if (startupEntries.Count > 0)
-        {
-            var restartCount = startupEntries
-                .Select(e => e.Timestamp)
-                .Distinct()
-                .Count();
-
-            // More than 1 startup in the window means restarts
-            if (restartCount > 1)
-            {
-                patterns.Add(new DetectedPattern
-                {
-                    Tipo = "deploy_restart",
-                    Severidade = "warning",
-                    Descricao = $"Detectados {restartCount} reinícios/deploys no período",
-                    Sugestao = "Múltiplos reinícios podem indicar crashes, OOM kills ou deploys frequentes. Verifique logs de startup para erros.",
-                    Ocorrencias = restartCount,
-                    PrimeiraOcorrencia = startupEntries.Min(e => e.Timestamp),
-                    UltimaOcorrencia = startupEntries.Max(e => e.Timestamp)
-                });
-            }
-            else
-            {
-                patterns.Add(new DetectedPattern
-                {
-                    Tipo = "deploy_restart",
-                    Severidade = "info",
-                    Descricao = "1 startup detectado no período (deploy ou reinício normal)",
-                    Sugestao = "Startup único é normal após deploy. Verifique se todos os serviços estão operacionais.",
-                    Ocorrencias = 1,
-                    PrimeiraOcorrencia = startupEntries.Min(e => e.Timestamp),
-                    UltimaOcorrencia = startupEntries.Max(e => e.Timestamp)
-                });
-            }
-        }
-
-        // 5. Error spike: any 5-min bucket with >5x the average error rate
-        var errorBuckets = errorEntries
-            .GroupBy(e => new DateTimeOffset(
-                e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day,
-                e.Timestamp.Hour, e.Timestamp.Minute / 5 * 5, 0, e.Timestamp.Offset))
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        if (errorBuckets.Count > 2)
-        {
-            var avgErrorRate = errorBuckets.Values.Average();
-            var spikes = errorBuckets.Where(b => b.Value > avgErrorRate * 5 && b.Value >= 3).ToList();
-
-            foreach (var spike in spikes)
-            {
-                patterns.Add(new DetectedPattern
-                {
-                    Tipo = "error_spike",
-                    Severidade = "critical",
-                    Descricao = $"Pico de erros: {spike.Value} erros em 5min (média: {avgErrorRate:F1})",
-                    Sugestao = "Investigue o que aconteceu neste período. Pode estar relacionado a deploy, falha de dependência ou pico de tráfego.",
-                    Ocorrencias = spike.Value,
-                    PrimeiraOcorrencia = spike.Key,
-                    UltimaOcorrencia = spike.Key.AddMinutes(5)
-                });
-            }
-        }
-
-        // 6. Configuration warnings from current state
-        if (infraState.IsFallback)
-        {
-            patterns.Add(new DetectedPattern
-            {
-                Tipo = "config_warning",
-                Severidade = "warning",
-                Descricao = "API operando em modo fallback (SQLite)",
-                Sugestao = "O banco principal estava indisponível no startup. Reinicie a API após corrigir a conexão principal.",
-                Ocorrencias = 1
-            });
-        }
-
-        return patterns;
+        if (!DateTimeOffset.TryParse(match.Groups[1].Value, out var ts)) return null;
+        return new LogEntry { Timestamp = ts, Level = DiagnosticoLogAnalyzer.NormalizeLevel(match.Groups[2].Value.ToUpperInvariant()), Message = message };
     }
 
     private string GetLogDirectory() =>
@@ -1843,6 +1796,8 @@ public sealed class DetectedPattern
     public int Ocorrencias { get; set; }
     public DateTimeOffset? PrimeiraOcorrencia { get; set; }
     public DateTimeOffset? UltimaOcorrencia { get; set; }
+    /// <summary>ID estável para ack de alertas (SHA256 truncado).</summary>
+    public string AlertaId { get; set; } = "";
 }
 
 public sealed class EndpointTestResult
@@ -1870,4 +1825,20 @@ public sealed class HealthHistoryResponse
     public HealthSnapshot[] Snapshots { get; set; } = [];
     public DateTimeOffset Desde { get; set; }
     public int Total { get; set; }
+}
+
+// ── DTOs novos ────────────────────────────────────────────────────────────────
+
+public sealed class AckAlertaRequest
+{
+    public string Status { get; set; } = "";
+    public string? Observacao { get; set; }
+}
+
+public sealed class AlertaAck
+{
+    public string AlertaId { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string? Observacao { get; set; }
+    public DateTimeOffset AtualizadoEm { get; set; }
 }

@@ -108,4 +108,80 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
             return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
+
+    // ── Novos proxies ──────────────────────────────────────────────────────
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/logs/lixeira")]
+    public async Task<IActionResult> ProxyLixeira()
+    {
+        var result = await diagnosticoService.FetchLixeiraAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost]
+    [Route("diagnostico/api/logs/lixeira/esvaziar")]
+    public async Task<IActionResult> ProxyEsvaziarLixeira()
+    {
+        var result = await diagnosticoService.EsvaziarLixeiraAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/eventos")]
+    public async Task<IActionResult> ProxyEventos([FromQuery] int hours = 48)
+    {
+        var result = await diagnosticoService.FetchEventosAsync(hours);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/slo")]
+    public async Task<IActionResult> ProxySlo([FromQuery] int hours = 24)
+    {
+        var result = await diagnosticoService.FetchSloAsync(hours);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost]
+    [Route("diagnostico/api/alertas/{alertaId}/ack")]
+    public async Task<IActionResult> ProxyAckAlerta(string alertaId, [FromBody] object body)
+    {
+        var result = await diagnosticoService.AckAlertaAsync(alertaId, body);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/alertas/acks")]
+    public async Task<IActionResult> ProxyGetAcks([FromQuery] string? ids = null)
+    {
+        var result = await diagnosticoService.FetchAcksAsync(ids);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/queries-lentas")]
+    public async Task<IActionResult> ProxyQueriesLentas()
+    {
+        var result = await diagnosticoService.FetchQueriesLentasAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [Route("diagnostico/api/health/empresas")]
+    public async Task<IActionResult> ProxyHealthEmpresas()
+    {
+        var result = await diagnosticoService.FetchHealthEmpresasAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
 }

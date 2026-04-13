@@ -217,6 +217,116 @@
             </div>
         </div>
 
+        <!-- SLO Strip -->
+        <div x-show="slo" x-cloak class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="material-icons-round text-base text-emerald-500">verified</span>
+                <h3 class="text-sm font-semibold text-slate-700">SLO — Últimas 24h</h3>
+                <span class="text-xs text-slate-400 ml-auto" x-text="slo?.snapshotsAnalisados ? slo.snapshotsAnalisados + ' snapshots' : ''"></span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold"
+                        :class="slo?.uptime24h >= 99.9 ? 'text-green-600' : slo?.uptime24h >= 99 ? 'text-yellow-600' : slo?.uptime24h != null ? 'text-red-600' : 'text-slate-400'"
+                        x-text="slo?.uptime24h != null ? slo.uptime24h.toFixed(1) + '%' : 'N/D'"></div>
+                    <div class="text-xs text-slate-500">Uptime</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-indigo-600"
+                        x-text="slo?.avgResponseTimeMs != null ? Math.round(slo.avgResponseTimeMs) + 'ms' : 'N/D'"></div>
+                    <div class="text-xs text-slate-500">Resp. Média</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-orange-500"
+                        x-text="slo?.p95ResponseTimeMs != null ? Math.round(slo.p95ResponseTimeMs) + 'ms' : 'N/D'"></div>
+                    <div class="text-xs text-slate-500">P95</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold"
+                        :class="slo?.errorRate < 0.01 ? 'text-green-600' : 'text-red-600'"
+                        x-text="slo?.errorRate != null ? (slo.errorRate * 100).toFixed(2) + '%' : 'N/D'"></div>
+                    <div class="text-xs text-slate-500">Taxa de Erro</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queries SQL Lentas -->
+        <div x-show="queriesLentas" x-cloak class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                    <span class="material-icons-round text-base text-orange-500">query_stats</span>
+                    Queries SQL Lentas (pg_stat_statements)
+                </h3>
+                <button @@click="fetchQueriesLentas()" class="text-xs text-indigo-600 hover:underline">Atualizar</button>
+            </div>
+            <div x-show="!queriesLentas?.disponivel" class="text-xs text-slate-500 italic" x-text="queriesLentas?.motivo"></div>
+            <div x-show="queriesLentas?.instrucoesPgStatStatements"
+                class="text-xs bg-amber-50 border border-amber-200 rounded p-2 mt-1 font-mono"
+                x-text="queriesLentas?.instrucoesPgStatStatements"></div>
+            <div x-show="queriesLentas?.disponivel && queriesLentas?.queries?.length > 0" class="overflow-x-auto">
+                <table class="w-full text-xs mt-1">
+                    <thead><tr class="text-slate-500 border-b border-slate-100 text-right">
+                        <th class="text-left py-1.5 pr-2 font-medium">Query</th>
+                        <th class="py-1.5 px-2 font-medium">Calls</th>
+                        <th class="py-1.5 px-2 font-medium">Avg ms</th>
+                        <th class="py-1.5 px-2 font-medium">Stddev</th>
+                        <th class="py-1.5 pl-2 font-medium">Avg rows</th>
+                    </tr></thead>
+                    <tbody>
+                        <template x-for="(q, qi) in queriesLentas?.queries ?? []" :key="qi">
+                            <tr class="border-b border-slate-50 hover:bg-slate-50">
+                                <td class="py-1 pr-2 font-mono text-slate-600 max-w-xs truncate" x-text="q.query ? q.query.slice(0, 80) + (q.query.length > 80 ? '...' : '') : ''"></td>
+                                <td class="py-1 px-2 text-right text-slate-600" x-text="q.calls"></td>
+                                <td class="py-1 px-2 text-right font-semibold"
+                                    :class="q.avgMs > 1000 ? 'text-red-600' : q.avgMs > 200 ? 'text-yellow-600' : 'text-green-600'"
+                                    x-text="q.avgMs?.toFixed(1)"></td>
+                                <td class="py-1 px-2 text-right text-slate-400" x-text="q.stddevMs?.toFixed(1) ?? '—'"></td>
+                                <td class="py-1 pl-2 text-right text-slate-500" x-text="q.avgRows?.toFixed(1) ?? '—'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div x-show="queriesLentas?.disponivel && (!queriesLentas?.queries || queriesLentas.queries.length === 0)"
+                class="text-xs text-green-600 mt-1">Nenhuma query lenta encontrada ✓</div>
+        </div>
+
+        <!-- Saúde por Empresa -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                    <span class="material-icons-round text-base text-teal-500">business</span>
+                    Saúde por Empresa (sintético)
+                </h3>
+                <button @@click="fetchEmpresasHealth()" :disabled="loadingEmpresasHealth"
+                    class="text-xs px-3 py-1 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition">
+                    <span x-text="loadingEmpresasHealth ? 'Verificando...' : 'Verificar'"></span>
+                </button>
+            </div>
+            <div x-show="empresasHealth" x-cloak class="mt-3">
+                <div class="flex gap-3 text-xs text-slate-500 mb-2">
+                    <span x-text="'Total: ' + (empresasHealth?.totalAnalisadas ?? 0)"></span>
+                    <span class="text-green-600" x-text="'OK: ' + (empresasHealth?.ok ?? 0)"></span>
+                    <span class="text-red-600" x-show="(empresasHealth?.degraded ?? 0) > 0" x-text="'Degraded: ' + empresasHealth.degraded"></span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <template x-for="e in empresasHealth?.empresas ?? []" :key="e.empresaId">
+                        <div class="rounded-lg border p-2 text-xs"
+                            :class="e.status === 'ok' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'">
+                            <div class="font-medium text-slate-700 truncate" x-text="e.nome"></div>
+                            <div class="mt-0.5 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full shrink-0"
+                                    :class="e.status === 'ok' ? 'bg-green-500' : 'bg-red-500'"></span>
+                                <span :class="e.status === 'ok' ? 'text-green-700' : 'text-red-700'"
+                                    x-text="e.status + ' (' + e.latenciaMs + 'ms)'"></span>
+                            </div>
+                            <div x-show="e.erro" class="text-red-600 truncate mt-0.5" x-text="e.erro"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
         <!-- System Cards Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             @if (apiOk && Model is not null)
@@ -447,12 +557,17 @@
                             <span x-text="savingStorage ? 'Salvando...' : 'Salvar no storage'"></span>
                         </button>
                         <button @@click="limparLogs()" :disabled="clearingLogs"
-                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 disabled:opacity-50 transition">
                             <span class="material-icons-round text-sm" :class="clearingLogs ? 'animate-spin' : ''">
                                 <template x-if="clearingLogs">sync</template>
-                                <template x-if="!clearingLogs">delete_forever</template>
+                                <template x-if="!clearingLogs">delete</template>
                             </span>
-                            <span x-text="clearingLogs ? 'Excluindo...' : 'Excluir logs'"></span>
+                            <span x-text="clearingLogs ? 'Movendo...' : 'Mover para lixeira'"></span>
+                        </button>
+                        <button @@click="esvaziarLixeira()" :disabled="clearingLogs"
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm">delete_forever</span>
+                            <span>Esvaziar lixeira</span>
                         </button>
                     </div>
                 </div>
@@ -462,6 +577,13 @@
                     :class="clearLogsOk ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
                     <span class="material-icons-round text-base" x-text="clearLogsOk ? 'check_circle' : 'error'"></span>
                     <span x-text="clearLogsMsg"></span>
+                </div>
+                <!-- Lixeira resultado -->
+                <div x-show="esvaziarLixeiraMsg" x-cloak x-transition
+                    class="mb-2 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                    :class="esvaziarLixeiraOk ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                    <span class="material-icons-round text-base" x-text="esvaziarLixeiraOk ? 'check_circle' : 'error'"></span>
+                    <span x-text="esvaziarLixeiraMsg"></span>
                 </div>
                 <!-- Storage resultado -->
                 <div x-show="saveStorageMsg" x-cloak x-transition
@@ -599,6 +721,26 @@
                                     &rarr; <span x-text="p.ultimaOcorrencia ? new Date(p.ultimaOcorrencia).toLocaleString('pt-BR') : ''"></span>
                                 </span>
                             </div>
+                            <!-- Ack buttons -->
+                            <div x-show="p.alertaId" class="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                                <span class="text-[10px] text-slate-400 mr-1">Marcar como:</span>
+                                <template x-for="ackOpt in [
+                                    { status: 'visto', label: 'Visto', icon: 'visibility', cls: 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100' },
+                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+                                    { status: 'resolvido', label: 'Resolvido', icon: 'task_alt', cls: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' }
+                                ]" :key="ackOpt.status">
+                                    <button @@click="ackAlerta(p, ackOpt.status)"
+                                        class="flex items-center gap-1 px-2 py-1 text-[10px] font-medium border rounded-lg transition"
+                                        :class="getAck(p) && getAck(p).status === ackOpt.status
+                                            ? 'ring-2 ring-offset-1 ' + ackOpt.cls
+                                            : ackOpt.cls">
+                                        <span class="material-icons-round text-xs" x-text="ackOpt.icon"></span>
+                                        <span x-text="ackOpt.label"></span>
+                                        <span x-show="getAck(p) && getAck(p).status === ackOpt.status" class="ml-0.5">&#10003;</span>
+                                    </button>
+                                </template>
+                                <span x-show="getAck(p)" class="text-[10px] text-slate-400 ml-auto" x-text="getAck(p) ? 'por ' + new Date(getAck(p).atualizadoEm).toLocaleDateString('pt-BR') : ''"></span>
+                            </div>
                         </div>
                     </template>
                 </div>
@@ -632,6 +774,12 @@ function diagApp() {
         endpoints: null,
         healthHistory: null,
         enhancedLogs: null,
+        slo: null,
+        eventos: null,
+        acks: {},
+        queriesLentas: null,
+        empresasHealth: null,
+        loadingEmpresasHealth: false,
 
         // Loading states
         loadingEndpoints: false,
@@ -642,6 +790,8 @@ function diagApp() {
         savingStorage: false,
         saveStorageMsg: '',
         saveStorageOk: true,
+        esvaziarLixeiraMsg: '',
+        esvaziarLixeiraOk: true,
 
         // Log filters
         logFilter: { level: 'ALL', search: '', groupByCorrelation: false },
@@ -706,11 +856,25 @@ function diagApp() {
                 deploy: ['deploy_restart'],
                 migration: ['migration_failure'],
                 error: ['repeated_error', 'error_spike'],
-                performance: ['slow_endpoint'],
+                performance: ['slow_endpoint', 'performance_regression'],
                 config: ['config_warning'],
             };
             const types = typeMap[catKey] || [];
             return this.patterns.filter(p => types.includes(p.tipo));
+        },
+
+        getAck(p) { return this.acks[p.alertaId] ?? null; },
+
+        async ackAlerta(p, status) {
+            const r = await fetch(`/diagnostico/api/alertas/${p.alertaId}/ack`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (r.ok) {
+                const data = await r.json();
+                this.acks = { ...this.acks, [p.alertaId]: data };
+            }
         },
 
         async init() {
@@ -726,6 +890,9 @@ function diagApp() {
             // Fetch data in parallel
             this.fetchEndpoints();
             this.fetchHealthHistory();
+            this.fetchSlo();
+            this.fetchEventos();
+            this.fetchQueriesLentas();
             if (this.isAdmin) this.fetchEnhancedLogs();
 
             // Auto-refresh health history every 60s
@@ -738,6 +905,8 @@ function diagApp() {
             await Promise.all([
                 this.fetchEndpoints(),
                 this.fetchHealthHistory(),
+                this.fetchSlo(),
+                this.fetchEventos(),
                 this.isAdmin ? this.fetchEnhancedLogs() : Promise.resolve(),
             ]);
             this.refreshing = false;
@@ -762,13 +931,79 @@ function diagApp() {
             } catch (e) { console.error('historico fetch error', e); }
         },
 
+        async fetchSlo() {
+            try {
+                const r = await fetch('/diagnostico/api/slo?hours=24');
+                if (r.ok) this.slo = await r.json();
+            } catch (e) { console.error('slo fetch error', e); }
+        },
+
+        async fetchEventos() {
+            try {
+                const r = await fetch('/diagnostico/api/eventos?hours=48');
+                if (r.ok) {
+                    this.eventos = await r.json();
+                    this.$nextTick(() => this.renderHealthChart());
+                }
+            } catch (e) { console.error('eventos fetch error', e); }
+        },
+
+        async fetchQueriesLentas() {
+            try {
+                const r = await fetch('/diagnostico/api/queries-lentas');
+                if (r.ok) this.queriesLentas = await r.json();
+            } catch (e) { console.error('queries-lentas fetch error', e); }
+        },
+
+        async fetchAcks() {
+            if (!this.patterns.length) return;
+            const ids = this.patterns.map(p => p.alertaId).filter(Boolean).join(',');
+            if (!ids) return;
+            try {
+                const r = await fetch(`/diagnostico/api/alertas/acks?ids=${encodeURIComponent(ids)}`);
+                if (r.ok) {
+                    const data = await r.json();
+                    const map = {};
+                    (data.acks || []).forEach(a => { map[a.alertaId] = a; });
+                    this.acks = map;
+                }
+            } catch (e) { console.error('acks fetch error', e); }
+        },
+
+        async fetchEmpresasHealth() {
+            this.loadingEmpresasHealth = true;
+            try {
+                const r = await fetch('/diagnostico/api/health/empresas');
+                if (r.ok) this.empresasHealth = await r.json();
+            } catch (e) { console.error('empresas health fetch error', e); }
+            this.loadingEmpresasHealth = false;
+        },
+
+        async esvaziarLixeira() {
+            if (!confirm('Excluir permanentemente todos os logs na lixeira?')) return;
+            try {
+                const r = await fetch('/diagnostico/api/logs/lixeira/esvaziar', { method: 'POST' });
+                if (r.ok) {
+                    const data = await r.json();
+                    this.esvaziarLixeiraOk = data.success !== false;
+                    this.esvaziarLixeiraMsg = data.mensagem ?? 'Lixeira esvaziada.';
+                } else {
+                    this.esvaziarLixeiraOk = false;
+                    this.esvaziarLixeiraMsg = 'Erro ao esvaziar lixeira (' + r.status + ').';
+                }
+            } catch (e) {
+                this.esvaziarLixeiraOk = false;
+                this.esvaziarLixeiraMsg = 'Erro de rede.';
+            }
+            setTimeout(() => { this.esvaziarLixeiraMsg = ''; }, 5000);
+        },
+
         async fetchEnhancedLogs() {
             this.loadingLogs = true;
             try {
                 const r = await fetch('/diagnostico/api/logs-enhanced?hours=48');
                 if (r.ok) {
                     this.enhancedLogs = await r.json();
-                    // Add _expanded property to each entry
                     if (this.enhancedLogs?.entradas) {
                         this.enhancedLogs.entradas.forEach(e => e._expanded = false);
                     }
@@ -776,13 +1011,15 @@ function diagApp() {
                         this.renderErrorsChart();
                         this.renderLogVolumeChart();
                     });
+                    // Carregar acks dos padrões detectados
+                    this.$nextTick(() => this.fetchAcks());
                 }
             } catch (e) { console.error('enhanced logs fetch error', e); }
             this.loadingLogs = false;
         },
 
         async limparLogs() {
-            if (!confirm('ATENÇÃO: Isso vai EXCLUIR permanentemente todos os arquivos de log do servidor. Esta ação não pode ser desfeita. Continuar?')) return;
+            if (!confirm('Mover todos os arquivos de log para a lixeira? Os logs serão preservados na pasta lixeira e poderão ser excluídos permanentemente depois.')) return;
             this.clearingLogs = true;
             this.clearLogsMsg = '';
             try {
@@ -793,19 +1030,19 @@ function diagApp() {
                 if (r.ok) {
                     const data = await r.json();
                     this.clearLogsOk = data.success !== false;
-                    this.clearLogsMsg = data.mensagem ?? 'Logs excluídos.';
+                    this.clearLogsMsg = data.mensagem ?? 'Logs movidos para lixeira.';
                     this.enhancedLogs = null;
                     await this.fetchEnhancedLogs();
                 } else if (r.status === 401 || r.status === 403) {
                     this.clearLogsOk = false;
-                    this.clearLogsMsg = 'Sem permissão para excluir logs.';
+                    this.clearLogsMsg = 'Sem permissão.';
                 } else {
                     this.clearLogsOk = false;
                     this.clearLogsMsg = 'Erro ao comunicar com a API (' + r.status + ').';
                 }
             } catch (e) {
                 this.clearLogsOk = false;
-                this.clearLogsMsg = 'Erro de rede ao excluir logs.';
+                this.clearLogsMsg = 'Erro de rede.';
             }
             this.clearingLogs = false;
             setTimeout(() => { this.clearLogsMsg = ''; }, 5000);
@@ -848,7 +1085,52 @@ function diagApp() {
             const apiData = snapshots.map(s => s.dbLatencyMs >= 0 ? s.dbLatencyMs : null);
             const errData = snapshots.map(s => s.errorCount);
 
+            // Preparar eventos para overlay
+            const eventosLista = this.eventos?.eventos ?? [];
+
             if (this.healthChartInstance) this.healthChartInstance.destroy();
+
+            // Plugin inline para linhas verticais de eventos
+            const eventLinesPlugin = {
+                id: 'eventLines',
+                afterDraw: (chart) => {
+                    if (!eventosLista.length) return;
+                    const ctx = chart.ctx;
+                    const xAxis = chart.scales.x;
+                    const yAxis = chart.scales.y;
+                    if (!xAxis || !yAxis) return;
+
+                    eventosLista.forEach(ev => {
+                        const evTime = new Date(ev.timestamp).getTime();
+                        // Encontrar label mais próximo
+                        let nearestIdx = 0;
+                        let minDiff = Infinity;
+                        snapshots.forEach((s, i) => {
+                            const diff = Math.abs(new Date(s.timestamp).getTime() - evTime);
+                            if (diff < minDiff) { minDiff = diff; nearestIdx = i; }
+                        });
+
+                        const x = xAxis.getPixelForValue(nearestIdx);
+                        const color = ev.tipo === 'error_spike' ? 'rgba(239,68,68,0.7)' : 'rgba(99,102,241,0.7)';
+                        const label = ev.tipo === 'error_spike' ? '⚡' : '🚀';
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.setLineDash([4, 3]);
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 1.5;
+                        ctx.moveTo(x, yAxis.top);
+                        ctx.lineTo(x, yAxis.bottom);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = color;
+                        ctx.font = '11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(label, x, yAxis.top - 2);
+                        ctx.restore();
+                    });
+                }
+            };
 
             this.healthChartInstance = new Chart(canvas, {
                 type: 'line',
@@ -890,7 +1172,8 @@ function diagApp() {
                         y: { beginAtZero: true, ticks: { font: { size: 9 }, callback: v => v + 'ms' }, grid: { color: '#f1f5f9' } },
                         y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 9 } }, grid: { display: false } },
                     }
-                }
+                },
+                plugins: [eventLinesPlugin]
             });
         },
 
