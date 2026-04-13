@@ -28,7 +28,8 @@ public sealed record AtualizarProdutoCommand(
     string? AtributosJson,
     StatusProduto Status,
     IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
-    IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens);
+    IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
+    IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes);
 
 public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
@@ -245,6 +246,36 @@ public sealed class GerenciarProdutoUseCase(
                     Descricao = input.Descricao?.Trim(),
                     Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
                     Padrao = input.Padrao,
+                    CriadoEm = agora,
+                    AlteradoEm = agora
+                });
+            }
+        }
+
+        // Replace variacoes (delete all + re-insert)
+        if (command.Variacoes is not null)
+        {
+            var existentes = await produtoVariacaoRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+            foreach (var existente in existentes)
+                await produtoVariacaoRepository.DeleteAsync(existente.Id);
+
+            var agora = DateTime.UtcNow;
+            foreach (var variacao in command.Variacoes)
+            {
+                await produtoVariacaoRepository.InsertAsync(new ProdutoVariacao
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = command.EmpresaId,
+                    ProdutoId = command.ProdutoId,
+                    Nome = variacao.Nome.Trim(),
+                    Cor = variacao.Cor?.Trim(),
+                    Tamanho = variacao.Tamanho?.Trim(),
+                    DescricaoComercial = variacao.DescricaoComercial?.Trim(),
+                    Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
+                    CodigoBarras = variacao.CodigoBarras?.Trim(),
+                    AtributosJson = variacao.AtributosJson,
+                    DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
+                    Ativa = variacao.Ativa,
                     CriadoEm = agora,
                     AlteradoEm = agora
                 });

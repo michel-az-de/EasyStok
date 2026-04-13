@@ -272,7 +272,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <p class="text-sm text-slate-500 font-medium">Arraste imagens ou clique para selecionar</p>
-                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 5 MB cada</p>
+                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 10 MB cada (otimizada automaticamente)</p>
             </div>
             <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
                    @@change="handleFileSelect($event)" />
@@ -298,10 +298,10 @@
                 </div>
                 <h3 class="font-bold text-slate-800">Precos e margem</h3>
             </div>
-            <!-- Hidden inputs: enviam null quando valor é 0 (API exige PrecoReferencia > 0 se presente) -->
-            <input type="hidden" name="CustoReferencia" :value="custo > 0 ? custo : ''" />
-            <input type="hidden" name="PrecoReferencia" :value="preco > 0 ? preco : ''" />
-            <input type="hidden" name="MargemEstimada" :value="margem > 0 ? margem : ''" />
+            <!-- Hidden inputs: omite campo quando valor é 0 para evitar model binding com string vazia -->
+            <template x-if="custo > 0"><input type="hidden" name="CustoReferencia" :value="custo" /></template>
+            <template x-if="preco > 0"><input type="hidden" name="PrecoReferencia" :value="preco" /></template>
+            <template x-if="margem > 0"><input type="hidden" name="MargemEstimada" :value="margem" /></template>
 
             <div class="grid grid-cols-3 gap-4">
                 <div>
@@ -1060,7 +1060,7 @@
                 addPhotos(files) {
                     const maxNew = 5 - this.existingPhotos.length - this.photoFiles.length;
                     for (const file of Array.from(files).slice(0, Math.max(0, maxNew))) {
-                        if (file.size > 5 * 1024 * 1024) continue;
+                        if (file.size > 10 * 1024 * 1024) continue;
                         if (!file.type.startsWith('image/')) continue;
                         this.photoFiles.push(file);
                         this.photoPreviews.push(URL.createObjectURL(file));

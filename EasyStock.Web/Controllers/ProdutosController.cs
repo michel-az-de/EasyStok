@@ -84,11 +84,17 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         }
 
         var result = await svc.CriarAsync(vm);
+
+        // Auto-retry com novo SKU se duplicado
+        if (!result.Success && result.ErrorMessage?.Contains("SKU") == true)
+        {
+            vm.SkuBase = GerarSkuUnico(vm.Nome);
+            result = await svc.CriarAsync(vm);
+        }
+
         if (!result.Success && result.HttpStatus is not (200 or 201))
         {
             HasError(result);
-            if (result.ErrorMessage?.Contains("SKU") == true)
-                ModelState.AddModelError("SkuBase", result.ErrorMessage);
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
@@ -241,7 +247,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         if (foto.Length > 10 * 1024 * 1024)
         {
-            Toast("error", "Imagem não pode ser maior que 5MB.");
+            Toast("error", "Imagem nao pode ser maior que 10MB.");
             return RedirectToAction(nameof(Detail), new { id });
         }
 
@@ -348,5 +354,16 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     {
         var cats = await svc.ListarCategoriasAsync();
         ViewBag.Categorias = cats.Success ? cats.Data : [];
+    }
+
+    private static string GerarSkuUnico(string? nome)
+    {
+        var words = (nome ?? "PRD").Trim().ToUpper().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var parts = words.Take(3).Select(w => new string(w.Where(char.IsLetterOrDigit).Take(3).ToArray())).Where(p => p.Length > 0);
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var rnd = new Random();
+        var suffix = new string(Enumerable.Range(0, 6).Select(_ => chars[rnd.Next(chars.Length)]).ToArray());
+        var prefix = string.Join("-", parts);
+        return string.IsNullOrEmpty(prefix) ? suffix : $"{prefix}-{suffix}";
     }
 }

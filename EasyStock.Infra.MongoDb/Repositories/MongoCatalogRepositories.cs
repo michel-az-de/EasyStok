@@ -243,6 +243,12 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
         EnqueueReplace(Collection, variacao.Id, variacao);
         return Task.CompletedTask;
     }
+
+    public Task DeleteAsync(Guid id)
+    {
+        EnqueueDelete(Collection, id);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ProdutoCaracteristicaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

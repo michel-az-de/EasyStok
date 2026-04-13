@@ -87,7 +87,8 @@ public class GerenciarProdutoUseCaseTests
             null, null, TipoProduto.Fisico, null, null, false, null,
             null, null, null, null, StatusProduto.Ativo,
             new[] { new ProdutoCaracteristicaInput("Material", "Algodao", null, null, 0) },
-            new[] { new ProdutoEmbalagemInput("Caixa", null, null, true) });
+            new[] { new ProdutoEmbalagemInput("Caixa", null, null, true) },
+            null);
 
         await useCase.AtualizarAsync(command);
 
@@ -183,7 +184,8 @@ public class GerenciarProdutoUseCaseTests
             {
                 new ProdutoEmbalagemInput("Caixa 1", null, null, true),
                 new ProdutoEmbalagemInput("Caixa 2", null, null, true)
-            });
+            },
+            null);
 
         var act = () => useCase.AtualizarAsync(command);
 

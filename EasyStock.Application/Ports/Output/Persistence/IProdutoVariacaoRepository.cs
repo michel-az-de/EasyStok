@@ -11,5 +11,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
         Task InsertAsync(ProdutoVariacao variacao);
         Task UpdateAsync(ProdutoVariacao variacao);
+        Task DeleteAsync(Guid id);
     }
 }

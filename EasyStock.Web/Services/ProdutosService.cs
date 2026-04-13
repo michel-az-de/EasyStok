@@ -132,6 +132,18 @@ public class ProdutosService(ApiClient api, SessionService session)
                         comprimento = e.Comprimento ?? 0m
                     } : (object?)null,
                     padrao = e.Padrao
+                }).ToArray(),
+            variacoes = vm.VariacoesRich
+                .Where(v => !string.IsNullOrWhiteSpace(v.Nome))
+                .Select(v => new
+                {
+                    nome = v.Nome.Trim(),
+                    cor = v.Cor,
+                    tamanho = v.Tamanho,
+                    descricaoComercial = v.DescricaoComercial,
+                    sku = v.Sku,
+                    codigoBarras = v.CodigoBarras,
+                    ativa = v.Ativa
                 }).ToArray()
         });
 

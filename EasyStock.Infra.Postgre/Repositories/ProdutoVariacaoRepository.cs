@@ -66,5 +66,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.ProdutosVariacao.Update(variacao);
             return Task.CompletedTask;
         }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            var entity = await dbContext.ProdutosVariacao.FindAsync(id);
+            if (entity is not null)
+                dbContext.ProdutosVariacao.Remove(entity);
+        }
     }
 }

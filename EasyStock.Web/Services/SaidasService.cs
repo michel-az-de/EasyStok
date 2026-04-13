@@ -55,9 +55,11 @@ public class SaidasService(ApiClient api, SessionService session)
                     descricao = vm.Descricao
                 }
             },
-            dataVenda = vm.DtVenda.ToDateTime(TimeOnly.MinValue),
-            dataSaida = (vm.DtSaida ?? vm.DtVenda).ToDateTime(TimeOnly.MinValue),
-            dataEnvio = vm.DtEnvio.HasValue ? vm.DtEnvio.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+            dataVenda = DateTime.SpecifyKind(vm.DtVenda.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
+            dataSaida = DateTime.SpecifyKind((vm.DtSaida ?? vm.DtVenda).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
+            dataEnvio = vm.DtEnvio.HasValue
+                ? DateTime.SpecifyKind(vm.DtEnvio.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
+                : (DateTime?)null,
             notaFiscal = vm.NotaFiscal,
             natureza = MapNatureza(vm.Natureza),
             canal = MapCanal(vm.Canal),
