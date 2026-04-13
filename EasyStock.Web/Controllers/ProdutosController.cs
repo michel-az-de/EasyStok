@@ -62,6 +62,23 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return View(vm);
     }
 
+    [HttpGet("/produtos/check-sku")]
+    public async Task<IActionResult> CheckSku(string sku, string? ignoreProdutoId = null)
+    {
+        if (string.IsNullOrWhiteSpace(sku))
+            return Json(new { disponivel = true });
+
+        var result = await svc.BuscarAsync(sku.Trim(), 5);
+        if (!result.Success)
+            return Json(new { disponivel = true }); // em caso de erro, não bloquear o usuário
+
+        var exact = result.Data!.Any(p =>
+            string.Equals(p.SkuBase?.Value, sku.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            (ignoreProdutoId == null || !string.Equals(p.Id.ToString(), ignoreProdutoId, StringComparison.OrdinalIgnoreCase)));
+
+        return Json(new { disponivel = !exact });
+    }
+
     [HttpGet("/produtos/novo")]
     public async Task<IActionResult> Novo()
     {

@@ -10,13 +10,13 @@
     var iFields = new (bool ok, string label, int pts)[]
     {
         (p.Fotos.Any(),                               "Foto",        20),
-        (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descricao",   15),
+        (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descrição",   15),
         (p.CustoReferencia is > 0,                    "Custo",       15),
-        (p.PrecoReferencia is > 0,                    "Preco",       15),
-        (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cod.Barras",  10),
-        (p.Variacoes.Any(),                           "Variacoes",   10),
+        (p.PrecoReferencia is > 0,                    "Preço",       15),
+        (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cód.Barras",  10),
+        (p.Variacoes.Any(),                           "Variações",   10),
         (!string.IsNullOrWhiteSpace(p.Marca),         "Marca",        5),
-        (p.Dimensoes != null,                         "Dimensoes",    5),
+        (p.Dimensoes != null,                         "Dimensões",    5),
         (true,                                        "Nome",         3),
         (true,                                        "Categoria",    2),
     };
@@ -193,10 +193,10 @@
                 {
                     <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <p class="text-[11px] text-slate-400 font-medium mb-0.5">Peso</p>
-                        <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Peso:F3} kg")</p>
+                        <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Peso:0.##} kg")</p>
                     </div>
                     <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                        <p class="text-[11px] text-slate-400 font-medium mb-0.5">Dimensoes</p>
+                        <p class="text-[11px] text-slate-400 font-medium mb-0.5">Dimensões</p>
                         <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Largura:F1} x {p.Dimensoes.Altura:F1} x {p.Dimensoes.Comprimento:F1} cm")</p>
                     </div>
                 }
@@ -266,7 +266,7 @@
         <button @@click="tab='variacoes'"
                 :class="tab==='variacoes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
-            Variacoes
+            Variações
             <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                   :class="tab==='variacoes' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">@p.Variacoes.Count</span>
         </button>
@@ -283,7 +283,7 @@
                 class="px-4 py-2.5 text-sm transition-colors">Estoque</button>
         <button @@click="tab='historico'; loadHistorico()"
                 :class="tab==='historico' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors">Historico</button>
+                class="px-4 py-2.5 text-sm transition-colors">Histórico</button>
         @if (p.Caracteristicas.Any() || p.Embalagens.Any())
         {
             <button @@click="tab='detalhes'"
@@ -296,7 +296,7 @@
 <div x-show="tab==='variacoes'">
     <div class="ws">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-slate-800">Variacoes (@p.Variacoes.Count)</h3>
+            <h3 class="font-bold text-slate-800">Variações (@p.Variacoes.Count)</h3>
             <button @@click="showAddVariacao = !showAddVariacao"
                     class="text-xs font-semibold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
                 + Adicionar
@@ -526,7 +526,7 @@
     <!-- ═══ TAB: HISTORICO ═══ -->
     <div x-show="tab==='historico'">
         <div class="ws">
-            <h3 class="font-bold text-slate-800 mb-4">Historico de movimentacoes</h3>
+            <h3 class="font-bold text-slate-800 mb-4">Histórico de movimentações</h3>
 
             <div x-show="historico===null" class="text-center py-10 text-slate-400 flex items-center justify-center gap-2">
                 <span class="spinner"></span>
@@ -589,10 +589,10 @@
             @if (p.Caracteristicas.Any())
             {
                 <div class="ws mb-5">
-                    <h3 class="font-bold text-slate-800 mb-3">Caracteristicas (@p.Caracteristicas.Count)</h3>
+                    <h3 class="font-bold text-slate-800 mb-3">Características (@p.Caracteristicas.Count)</h3>
                     <div class="overflow-x-auto">
                         <table class="tbl-full">
-                            <thead><tr><th>Nome</th><th>Descricao</th><th class="text-center">Qtd</th><th>Variacao</th></tr></thead>
+                            <thead><tr><th>Nome</th><th>Descrição</th><th class="text-center">Qtd</th><th>Variação</th></tr></thead>
                             <tbody>
                                 @foreach (var c in p.Caracteristicas.OrderBy(x => x.OrdemExibicao))
                                 {
@@ -615,7 +615,7 @@
                     <h3 class="font-bold text-slate-800 mb-3">Embalagens (@p.Embalagens.Count)</h3>
                     <div class="overflow-x-auto">
                         <table class="tbl-full">
-                            <thead><tr><th>Nome</th><th>Descricao</th><th>Dimensoes</th><th class="text-center">Padrao</th></tr></thead>
+                            <thead><tr><th>Nome</th><th>Descrição</th><th>Dimensões</th><th class="text-center">Padrão</th></tr></thead>
                             <tbody>
                                 @foreach (var e in p.Embalagens)
                                 {
@@ -623,7 +623,7 @@
                                         <td class="font-medium">@e.Nome</td>
                                         <td class="text-sm text-slate-500">@(e.Descricao ?? "-")</td>
                                         <td class="text-sm font-mono text-slate-500">
-                                            @if (e.Dimensoes != null) { @($"{e.Dimensoes.Peso:F3}kg - {e.Dimensoes.Largura:F1}x{e.Dimensoes.Altura:F1}x{e.Dimensoes.Comprimento:F1} cm") }
+                                            @if (e.Dimensoes != null) { @($"{e.Dimensoes.Peso:0.##}kg - {e.Dimensoes.Largura:F1}x{e.Dimensoes.Altura:F1}x{e.Dimensoes.Comprimento:F1} cm") }
                                             else { <text>-</text> }
                                         </td>
                                         <td class="text-center">

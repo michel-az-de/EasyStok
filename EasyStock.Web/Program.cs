@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Net.Http.Headers;
+using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -73,7 +74,12 @@ builder.Services.AddScoped<InteligenciaLojasService>();
 
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>
-    o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
+{
+    o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+    // Decimal binder com InvariantCulture — evita que "8.5" (JS) seja interpretado
+    // como 85 pelo model binder padrão em cultura pt-BR.
+    o.ModelBinderProviders.Insert(0, new InvariantDecimalModelBinderProvider());
+});
 
 // 8. Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
