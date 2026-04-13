@@ -1,4 +1,4 @@
-@model DashboardViewModel
+﻿@model DashboardViewModel
 @using System.Globalization
 @{
     var ptBR = new CultureInfo("pt-BR");
@@ -8,13 +8,11 @@
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
 }
 
-<!-- Saudação -->
 <div class="pg-hd mb-6">
     <h1>@saudacaoIcon @saudacao, @primeiroNome!</h1>
     <p>Aqui está um resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
 </div>
 
-<!-- KPI Cards -->
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="ws dashboard-kpi-card">
         <div class="kpi-lbl">Total de SKUs</div>
@@ -34,31 +32,46 @@
     </div>
 </div>
 
-<!-- Attention Tiles -->
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <a href="/estoque?status=critico" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
-        <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-xl">🚨</div>
+        <div class="dashboard-attention-icon dashboard-attention-icon--critical">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v4m0 4h.01M10.29 3.86l-7.11 12.3A2 2 0 004.91 19h14.18a2 2 0 001.73-2.84l-7.11-12.3a2 2 0 00-3.42 0z" />
+            </svg>
+        </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-red-600">@Model.EstoqueCritico</div>
             <div class="kpi-lbl">Estoque crítico</div>
         </div>
     </a>
     <a href="/estoque?status=atencao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
-        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
+        <div class="dashboard-attention-icon dashboard-attention-icon--warning">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-amber-600">@Model.ProximosVencimento</div>
             <div class="kpi-lbl">Próx. ao vencimento</div>
         </div>
     </a>
     <a href="/estoque?status=parado" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
-        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
+        <div class="dashboard-attention-icon dashboard-attention-icon--info">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 13.5h10M9 17h6M8 6h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2z" />
+            </svg>
+        </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-blue-600">@Model.ProdutosParados</div>
             <div class="kpi-lbl">Parados +30 dias</div>
         </div>
     </a>
     <a href="/entradas/reposicao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
-        <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">💡</div>
+        <div class="dashboard-attention-icon dashboard-attention-icon--success">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.5m0 13V21m7.07-14.07l-1.77 1.77M6.7 17.3l-1.77 1.77M21 12h-2.5M5.5 12H3m14.3 5.3l1.77 1.77M6.93 6.93L5.16 5.16M15.5 12a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+            </svg>
+        </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-emerald-600">@Model.SugestoesReposicao</div>
             <div class="kpi-lbl">Sugestões de reposição</div>
@@ -66,10 +79,8 @@
     </a>
 </div>
 
-<!-- Conteúdo principal + Gráfico -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    <!-- Movimentações recentes -->
-    <div class="lg:col-span-2 ws">
+<div class="grid grid-cols-1 gap-6 mb-6">
+    <div class="ws">
         <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
         @if (Model.MovimentacoesRecentes.Any())
         {
@@ -78,7 +89,7 @@
                     <thead>
                         <tr>
                             <th>Tipo</th>
-                            <th class="text-right">Movimentações</th>
+                            <th class="text-right">Registros</th>
                             <th class="text-right">Qtd</th>
                             <th class="text-right">Valor</th>
                             <th class="text-right">Data</th>
@@ -93,11 +104,12 @@
                                         var badgeClass = m.Tipo switch
                                         {
                                             "Entrada" => "badge-ok",
-                                            "Saida" or "Saída" => "badge-warn",
+                                            "Saida" or "Saída" => "badge-critical",
                                             _ => "badge-slow"
                                         };
+                                        var tipoLabel = m.Tipo is "Saida" ? "Saída" : m.Tipo;
                                     }
-                                    <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@m.Tipo</span>
+                                    <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@tipoLabel</span>
                                 </td>
                                 <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
                                 <td class="text-right font-mono">@m.Qty</td>
@@ -128,16 +140,17 @@
         }
     </div>
 
-    <!-- Gráfico receita -->
-    <div class="ws">
+    <div class="ws dashboard-chart-card">
         <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 6 meses</h2>
         @if (Model.GraficoLabels.Any())
         {
-            <canvas id="grafico-receita" height="200"></canvas>
+            <div class="dashboard-chart-wrap">
+                <canvas id="grafico-receita" height="260"></canvas>
+            </div>
         }
         else
         {
-            <div class="flex flex-col items-center justify-center min-h-[200px] text-slate-400">
+            <div class="flex flex-col items-center justify-center min-h-[240px] text-slate-400">
                 <div class="text-4xl mb-3">📈</div>
                 <p class="text-sm font-semibold text-slate-500">Sem dados de receita</p>
                 <p class="text-xs mt-1">Registre saídas para visualizar o gráfico.</p>
@@ -146,7 +159,6 @@
     </div>
 </div>
 
-<!-- Ações rápidas -->
 <div class="ws">
     <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
     <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -196,10 +208,21 @@
                     responsive: true,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { display: false },
+                        x: {
+                            ticks: {
+                                color: '#64748B'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
                         y: {
                             ticks: {
+                                color: '#64748B',
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')
+                            },
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.18)'
                             }
                         }
                     }

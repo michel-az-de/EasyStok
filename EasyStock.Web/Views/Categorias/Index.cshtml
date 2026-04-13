@@ -1,4 +1,4 @@
-@using EasyStock.Web.Models.Api
+﻿@using EasyStock.Web.Models.Api
 @model List<CategoriaApi>
 @{
     ViewBag.Title = "Categorias";
@@ -33,7 +33,7 @@
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
-                <tr><th>Nome</th><th>ID</th><th>Ações</th></tr>
+                <tr><th>Nome</th><th>Ações</th></tr>
             </thead>
             <tbody>
                 @foreach (var c in Model)
@@ -56,7 +56,6 @@
                                 </button>
                             </form>
                         </td>
-                        <td class="text-slate-400 text-xs font-mono">@c.Id.ToString()[..8]...</td>
                         <td>
                             <div class="flex items-center gap-3">
                                 <button type="button" @@click="editando = !editando"
@@ -76,7 +75,6 @@
                                 </button>
                             </div>
 
-                            <!-- Modal confirmar remoção -->
                             <div x-show="confirm" x-cloak
                                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                                  @@click.self="confirm = false">
@@ -109,7 +107,6 @@
     }
 </div>
 
-<!-- Modal criar categoria -->
 <div x-data="{ open: false }" @@open-modal.window="open = ($event.detail === 'criar-cat')"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"

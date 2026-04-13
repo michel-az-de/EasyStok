@@ -47,16 +47,24 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ confirm: false }">
+                    <tr x-data="{ confirm: false, menuOpen: false }">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)
                                 {
-                                    <img src="@p.PrimeiraFotoUrl" alt="@p.Nome" class="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
+                                    <div class="product-list-thumb">
+                                        <img src="@p.PrimeiraFotoUrl" alt="@p.Nome" class="w-full h-full object-cover flex-shrink-0"
+                                             onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+                                        <div class="product-list-thumb__placeholder hidden">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                            </svg>
+                                        </div>
+                                    </div>
                                 }
                                 else
                                 {
-                                    <div class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <div class="product-list-thumb product-list-thumb__placeholder">
                                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                         </svg>
@@ -81,29 +89,39 @@
                             <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@p.StatusNome</span>
                         </td>
                         <td>
-                            <div class="flex items-center justify-end gap-2">
-                                <a href="/produtos/@p.Id"
-                                   class="grid-action-btn grid-action-btn--primary">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            <div class="relative flex items-center justify-end">
+                                <button type="button"
+                                        @@click="menuOpen = !menuOpen"
+                                        class="grid-action-btn grid-action-btn--ghost product-row-menu-btn"
+                                        title="Abrir ações do produto"
+                                        aria-label="Abrir ações do produto">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                     </svg>
-                                    Ver
-                                </a>
-                                <a href="/entradas/nova?produtoId=@p.Id"
-                                   class="grid-action-btn grid-action-btn--success">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Entrada
-                                </a>
-                                <button type="button" @@click="confirm = true"
-                                        class="grid-action-btn grid-action-btn--danger">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Excluir
                                 </button>
+                                <div x-show="menuOpen" x-cloak @@click.outside="menuOpen = false"
+                                     class="product-row-menu">
+                                    <a href="/produtos/@p.Id" class="product-row-menu__item">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Ver produto
+                                    </a>
+                                    <a href="/entradas/nova?produtoId=@p.Id" class="product-row-menu__item product-row-menu__item--success">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Registrar entrada
+                                    </a>
+                                    <button type="button" @@click="menuOpen = false; confirm = true"
+                                            class="product-row-menu__item product-row-menu__item--danger">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Excluir
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Modal confirmar exclusão -->

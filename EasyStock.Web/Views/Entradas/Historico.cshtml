@@ -1,4 +1,4 @@
-@model EntradasHistoricoViewModel
+﻿@model EntradasHistoricoViewModel
 @{
     var tiposOpcoes = new[] { ("", "Todos"), ("entrada", "Entradas"), ("saida", "Saídas"), ("reposicao", "Reposições") };
 }
@@ -17,10 +17,8 @@
     </a>
 </div>
 
-<!-- Filtros -->
 <div class="ws mb-4">
     <form method="get" class="flex flex-wrap gap-3 items-center">
-        <!-- Pills de tipo -->
         <div class="flex gap-1">
             @foreach (var (val, label) in tiposOpcoes)
             {
@@ -44,7 +42,6 @@
     </form>
 </div>
 
-<!-- Tabela -->
 <div class="ws">
     @if (Model.Entradas.Any())
     {
@@ -68,18 +65,25 @@
                     {
                         "entrada" => "badge-ok",
                         "reposicao" or "reposição" => "badge-slow",
-                        "saida" or "saída" => "badge-warn",
+                        "saida" or "saída" => "badge-critical",
                         _ => "badge-slow"
                     };
                     var naturezaBadge = e.Natureza?.ToLower() switch
                     {
                         "reposicao" or "reposição" => "badge-slow",
+                        "saida" or "saída" => "badge-critical",
                         _ => tipoBadge
                     };
                     var total = (e.Custo ?? 0) * e.Qty;
+                    var naturezaLabel = (e.Natureza ?? e.Tipo) switch
+                    {
+                        "Saida" => "Saída",
+                        "saida" => "Saída",
+                        _ => e.Natureza ?? e.Tipo
+                    };
                     <tr>
                         <td>
-                            <span class="badge @naturezaBadge px-2 py-0.5 rounded-full text-xs font-semibold">@(e.Natureza ?? e.Tipo)</span>
+                            <span class="badge @naturezaBadge px-2 py-0.5 rounded-full text-xs font-semibold">@naturezaLabel</span>
                         </td>
                         <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
                         <td class="text-slate-500">@(e.ProdutoVariacao?.Nome ?? "-")</td>
@@ -97,7 +101,6 @@
         </table>
         </div>
 
-        <!-- Paginação -->
         @if (Model.Paginacao.Pages > 1)
         {
             <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">

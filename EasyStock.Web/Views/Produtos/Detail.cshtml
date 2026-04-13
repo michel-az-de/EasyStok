@@ -96,10 +96,15 @@
             <div x-show="photos.length > 1" class="flex gap-2 overflow-x-auto pb-1">
                 <template x-for="(foto, idx) in photos" :key="foto.fotoId">
                     <button @@click="selectedPhotoIdx = idx"
-                            class="w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden border-2 transition-all"
+                            class="produto-thumb w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden border-2 transition-all"
                             :class="selectedPhotoIdx === idx ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'">
                         <img :src="foto.url" class="w-full h-full object-cover"
-                             onerror="this.onerror=null; this.style.display='none'; this.parentElement.classList.add('bg-slate-100');" />
+                             onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+                        <span class="produto-thumb__placeholder hidden">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </span>
                     </button>
                     </template>
             </div>
@@ -203,13 +208,14 @@
             </div>
 
             <!-- Integrity bar -->
-            <div class="produto-score-card bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <div class="produto-score-card bg-slate-50 rounded-xl p-3 border border-slate-100" title="A porcentagem resume o quanto do cadastro ja esta preenchido: fotos, descricao, custo, preco, codigo de barras, variacoes, marca, dimensoes, nome e categoria.">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div class="h-2 rounded-full @barCss transition-all" style="width: @score%"></div>
                     </div>
                     <span class="text-sm font-bold @scoreCss">@score%</span>
                 </div>
+                <p class="text-[11px] text-slate-400 mb-1">Completude do cadastro com base nos campos essenciais e comerciais do produto.</p>
                 @if (missing.Any())
                 {
                     <p class="text-[11px] text-slate-400">Falta: <span class="text-slate-500">@string.Join(", ", missing)</span></p>
@@ -241,7 +247,9 @@
                 </a>
                 <div x-data="{ open: false }" class="relative">
                     <button @@click="open = !open" @@click.away="open = false"
-                            class="produto-kebab-btn p-2.5 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors">
+                            class="produto-kebab-btn p-2.5 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors"
+                            title="Mais ações"
+                            aria-label="Mais ações do produto">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
                         </svg>

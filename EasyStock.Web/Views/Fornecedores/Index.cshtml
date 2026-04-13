@@ -83,7 +83,7 @@
                         <td class="text-slate-500 text-sm">@f.Categoria</td>
                         <td>
                             <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
-                                @f.Status
+                                @(string.IsNullOrWhiteSpace(f.Status) ? "—" : char.ToUpperInvariant(f.Status[0]) + f.Status[1..].ToLowerInvariant())
                             </span>
                         </td>
                         <td>

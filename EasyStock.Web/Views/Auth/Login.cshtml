@@ -28,15 +28,40 @@
     <link rel="stylesheet" href="~/css/app.css" />
 </head>
 <body class="h-full font-[Inter] antialiased min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
-    <div class="min-h-screen flex items-center justify-center px-4 py-10">
-        <div class="w-full max-w-sm mx-auto" x-data="loginForm()">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center gap-3 mb-3">
-                    <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 text-lg font-extrabold">ES</span>
-                    <span class="text-3xl font-extrabold tracking-tight auth-title">EasyStock</span>
+    <div class="auth-login-shell min-h-screen px-4 py-6 md:px-6 lg:px-8">
+        <div class="auth-login-layout mx-auto w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/60 shadow-2xl shadow-slate-900/10" x-data="loginForm()">
+            <section class="auth-login-brand hidden lg:flex lg:flex-col lg:justify-between">
+                <div>
+                    <div class="inline-flex items-center gap-3 mb-6">
+                        <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-lg shadow-indigo-950/15 text-lg font-extrabold">ES</span>
+                        <span class="text-3xl font-extrabold tracking-tight text-white">EasyStock</span>
+                    </div>
+                    <p class="text-sm uppercase tracking-[0.35em] text-white/65 mb-4">Operacao em tempo real</p>
+                    <h1 class="text-4xl font-extrabold leading-tight text-white max-w-md">Controle estoque, validade e saida em um fluxo mais claro.</h1>
+                    <p class="mt-4 max-w-lg text-base leading-7 text-white/78">Uma entrada mais alinhada ao restante do produto, com foco em rotina, leitura rapida e confianca para quem opera o dia inteiro.</p>
                 </div>
-                <p class="auth-subtitle text-sm">Gestao inteligente de estoque para operacao real</p>
-            </div>
+                <div class="grid grid-cols-2 gap-3 text-sm text-white/78">
+                    <div class="auth-login-brand-stat">
+                        <span class="auth-login-brand-stat__value">Visao</span>
+                        <span class="auth-login-brand-stat__label">Dashboards, alertas e historico num unico lugar</span>
+                    </div>
+                    <div class="auth-login-brand-stat">
+                        <span class="auth-login-brand-stat__value">Execucao</span>
+                        <span class="auth-login-brand-stat__label">Entradas e saidas com menos atrito operacional</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="auth-login-panel">
+                <div class="w-full max-w-md mx-auto">
+                    <div class="text-center mb-8 lg:text-left">
+                        <div class="inline-flex items-center gap-3 mb-3 lg:hidden">
+                            <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 text-lg font-extrabold">ES</span>
+                            <span class="text-3xl font-extrabold tracking-tight auth-title">EasyStock</span>
+                        </div>
+                        <h2 class="text-3xl font-extrabold tracking-tight auth-title">Entrar</h2>
+                        <p class="auth-subtitle text-sm mt-2">Acesse sua conta para continuar a operacao</p>
+                    </div>
 
             @if (sessionExpired)
             {
@@ -58,7 +83,7 @@
                 </div>
             }
 
-            <div class="auth-card rounded-3xl shadow-2xl p-8">
+                    <div class="auth-card rounded-3xl shadow-2xl p-8">
                 <h1 class="text-xl font-bold auth-card-title mb-1">Entrar</h1>
                 <p class="auth-card-subtitle text-sm mb-6">Acesse sua conta para continuar</p>
 
@@ -113,10 +138,17 @@
                         <span asp-validation-for="Senha" class="text-red-500 text-xs mt-1 block"></span>
                     </div>
 
-                    <div class="mb-6 flex items-center gap-2">
-                        <input asp-for="ManterLogado" type="checkbox" id="ManterLogado"
-                               class="auth-checkbox w-4 h-4 rounded accent-indigo-600 cursor-pointer" />
-                        <label for="ManterLogado" class="text-sm auth-label cursor-pointer select-none">Manter-me conectado</label>
+                    <div class="mb-6">
+                        <label for="ManterLogado" class="auth-check-control">
+                            <input asp-for="ManterLogado" type="checkbox" id="ManterLogado"
+                                   class="auth-checkbox sr-only peer" />
+                            <span class="auth-check-indicator" aria-hidden="true">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
+                                    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
+                            <span class="text-sm auth-label cursor-pointer select-none">Manter-me conectado</span>
+                        </label>
                     </div>
 
                     <button type="submit"
@@ -131,14 +163,16 @@
                 </form>
             </div>
 
-            <p class="text-center text-sm auth-subtitle mt-4">
+                    <p class="text-center text-sm auth-subtitle mt-4 lg:text-left">
                 Nao tem conta?
                 <a href="/auth/registrar" class="text-indigo-500 hover:text-indigo-400 font-medium">Criar conta gratis</a>
             </p>
 
-            <p class="text-center text-xs auth-footer mt-4">
+                    <p class="text-center text-xs auth-footer mt-4 lg:text-left">
                 &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
             </p>
+                </div>
+            </section>
         </div>
     </div>
 

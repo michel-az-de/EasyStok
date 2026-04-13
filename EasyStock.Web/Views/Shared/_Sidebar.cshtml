@@ -38,7 +38,8 @@
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+    <div class="sidebar-nav-wrap flex-1 min-h-0 relative">
+    <nav class="sidebar-nav flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         <!-- Principal -->
         <div class="nav-section">Principal</div>
         <a href="/dashboard" class="ni @(activeItem == "Dashboard" ? "active" : "")">
@@ -176,6 +177,8 @@
             Diagnóstico
         </a>
     </nav>
+    <div class="sidebar-scroll-hint" aria-hidden="true"></div>
+    </div>
 
     <!-- Branding -->
     <div class="px-4 py-3 border-t border-slate-700/50 mt-auto">
