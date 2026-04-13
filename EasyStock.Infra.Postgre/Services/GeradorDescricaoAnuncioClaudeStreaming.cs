@@ -140,7 +140,8 @@ namespace EasyStock.Infra.Postgre.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorBody = await response.Content.ReadAsStringAsync(ct);
-                    logger.LogError("Anthropic API retornou {StatusCode} para produto {ProdutoId}: {ErrorBody}",
+                    var logLevel = (int)response.StatusCode >= 500 ? Microsoft.Extensions.Logging.LogLevel.Error : Microsoft.Extensions.Logging.LogLevel.Warning;
+                    logger.Log(logLevel, "Anthropic API retornou {StatusCode} para produto {ProdutoId}: {ErrorBody}",
                         (int)response.StatusCode, produtoId, errorBody);
                     return null;
                 }

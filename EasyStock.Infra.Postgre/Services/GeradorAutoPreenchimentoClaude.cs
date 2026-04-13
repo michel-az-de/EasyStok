@@ -107,7 +107,8 @@ internal sealed class GeradorAutoPreenchimentoClaude(
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct);
-                logger.LogError("Anthropic API retornou {StatusCode} para auto-preenchimento de '{Nome}': {ErrorBody}",
+                var logLevel = (int)response.StatusCode >= 500 ? Microsoft.Extensions.Logging.LogLevel.Error : Microsoft.Extensions.Logging.LogLevel.Warning;
+                logger.Log(logLevel, "Anthropic API retornou {StatusCode} para auto-preenchimento de '{Nome}': {ErrorBody}",
                     (int)response.StatusCode, nomeProduto, errorBody);
                 return null;
             }
