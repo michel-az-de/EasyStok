@@ -34,7 +34,18 @@ public class NotificacaoController(
             return error!;
 
         var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, severidade, page, pageSize);
-        return DataPaged(items, totalCount, page, pageSize);
+        var dtos = items.Select(n => new
+        {
+            id = n.Id.ToString(),
+            tipo = n.TipoAlerta.ToString(),
+            titulo = n.Titulo,
+            mensagem = n.Mensagem,
+            severidade = n.Severidade.ToString(),
+            referenciaId = n.ReferenciaId?.ToString(),
+            lida = n.Lida,
+            createdAt = new DateTimeOffset(n.CriadaEm, TimeSpan.Zero)
+        });
+        return DataPaged(dtos, totalCount, page, pageSize);
     }
 
     [SwaggerOperation(Summary = "Get unread notification count", Description = "Lightweight endpoint for badge counters.")]
@@ -73,7 +84,18 @@ public class NotificacaoController(
             return error!;
 
         var items = await notificacaoRepository.GetRecentesNaoLidasAsync(resolvedEmpresaId, Math.Min(limit, 10));
-        return DataOk(items);
+        var dtos = items.Select(n => new
+        {
+            id = n.Id.ToString(),
+            tipo = n.TipoAlerta.ToString(),
+            titulo = n.Titulo,
+            mensagem = n.Mensagem,
+            severidade = n.Severidade.ToString(),
+            referenciaId = n.ReferenciaId?.ToString(),
+            lida = n.Lida,
+            createdAt = new DateTimeOffset(n.CriadaEm, TimeSpan.Zero)
+        });
+        return DataOk(dtos);
     }
 
     [SwaggerOperation(Summary = "Mark notification as read")]

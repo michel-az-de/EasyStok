@@ -40,8 +40,54 @@ public class ItemEstoqueController(
 
         var (p, ps) = NormalisePage(page, pageSize);
         var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps);
-        return DataPaged(itens, totalCount, p, ps);
+
+        var dtos = itens.Select(i => new
+        {
+            id = i.Id.ToString(),
+            produtoId = i.ProdutoId.ToString(),
+            varId = (i.ProdutoVariacaoId ?? Guid.Empty).ToString(),
+            sku = i.ChavePesquisa ?? i.CodigoInterno ?? i.CodigoMarketplace ?? "",
+            qty = (int)i.QuantidadeAtual,
+            entryDate = DateOnly.FromDateTime(i.EntradaEm),
+            lastMov = new DateTimeOffset(i.UltimaMovimentacaoEm ?? i.EntradaEm, TimeSpan.Zero),
+            validade = i.ValidadeEm != null ? DateOnly.FromDateTime(i.ValidadeEm.DataValidade) : (DateOnly?)null,
+            lote = i.CodigoLote?.Value,
+            vel = i.VelocidadeSaidaDiaria,
+            stopped = i.DiasSemMovimentacao,
+            status = MapStatus(i.Status),
+            custoUnitario = (decimal)i.CustoUnitario,
+            precoVendaSugerido = i.PrecoVendaSugerido != null ? (decimal?)i.PrecoVendaSugerido : null,
+            produto = i.Produto != null ? new
+            {
+                id = i.Produto.Id.ToString(),
+                sku = i.Produto.SkuBase?.Value ?? "",
+                nome = i.Produto.Nome,
+                emoji = (string?)null,
+                categoria = i.Produto.CategoriaId.ToString(),
+                status = i.Produto.Status.ToString()
+            } : null,
+            variacao = i.ProdutoVariacao != null ? new
+            {
+                id = i.ProdutoVariacao.Id.ToString(),
+                produtoId = i.ProdutoVariacao.ProdutoId.ToString(),
+                nome = i.ProdutoVariacao.Nome
+            } : null
+        });
+
+        return DataPaged(dtos, totalCount, p, ps);
     }
+
+    private static string MapStatus(EasyStock.Domain.Enums.StatusItemEstoque status) => status switch
+    {
+        EasyStock.Domain.Enums.StatusItemEstoque.Ok => "ok",
+        EasyStock.Domain.Enums.StatusItemEstoque.Warn => "atencao",
+        EasyStock.Domain.Enums.StatusItemEstoque.Critical => "critico",
+        EasyStock.Domain.Enums.StatusItemEstoque.Slow => "parado",
+        EasyStock.Domain.Enums.StatusItemEstoque.Vencido => "vencido",
+        EasyStock.Domain.Enums.StatusItemEstoque.Descartado => "descartado",
+        EasyStock.Domain.Enums.StatusItemEstoque.Bloqueado => "bloqueado",
+        _ => "ok"
+    };
 
     [SwaggerOperation(Summary = "Smart inventory search", Description = "Full-text search across product name, SKU, barcode and internal code.")]
     [ProducesResponseType(StatusCodes.Status200OK)]

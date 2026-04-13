@@ -10,7 +10,7 @@
     var allCatsJson = JsonSerializer.Serialize(categorias.Select(c => new { id = c.Id, nome = c.Nome }));
     var existingPhotosJson = JsonSerializer.Serialize(Model.ExistingPhotos.Select(f => new { fotoId = f.FotoId, url = f.Url }));
     var formAction = isEdit ? Url.Action("Atualizar", "Produtos", new { id = Model.Id }) : Url.Action("Criar", "Produtos");
-    var stepNames = new[] { "Essencial", "Fotos e Precos", "Detalhes", "Revisao" };
+    var stepNames = new[] { "Essencial", "Fotos e Preços", "Detalhes", "Revisão" };
 }
 
 <div class="flex items-center gap-3 mb-6">
@@ -242,7 +242,7 @@
                 </button>
                 <button type="button" @@click="nextStep()"
                         class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
-                    Proximo &rarr;
+                    Próximo &rarr;
                 </button>
             </div>
         </div>
@@ -310,7 +310,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Precos e margem</h3>
+                <h3 class="font-bold text-slate-800">Preços e margem</h3>
             </div>
             <!-- Hidden inputs: valor vazio quando zero (ASP.NET trata como null para nullable decimal) -->
             <input type="hidden" name="CustoReferencia" :value="custo > 0 ? custo : ''" />
@@ -340,7 +340,7 @@
                     <template x-if="margem > 0">
                         <span class="text-xs mt-1 block font-medium"
                               :class="margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
-                              x-text="margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudavel'"></span>
+                              x-text="margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
                     </template>
                     <div x-show="margemSugestoes.length > 0" class="flex gap-2 mt-1 flex-wrap">
                         <template x-for="s in margemSugestoes" :key="s.pct">
@@ -379,7 +379,7 @@
             </button>
             <button type="button" @@click="nextStep()"
                     class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
-                Proximo &rarr;
+                Próximo &rarr;
             </button>
         </div>
     </div>
@@ -703,14 +703,14 @@
                     <div class="mt-4 pt-4 border-t border-slate-100">
                         <div class="flex items-end gap-3 flex-wrap">
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
-                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'Preco nao definido'"
+                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'Preço não definido'"
                                   :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
                             <span x-show="margem > 0" x-cloak
                                   :class="margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
                                   class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
                                   x-text="margem.toFixed(1) + '% margem'"></span>
                         </div>
-                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitario: R$ ' + custo.toFixed(2)"></div>
+                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2)"></div>
                     </div>
                 </div>
             </div>
@@ -920,6 +920,25 @@
                         }));
                     } catch {}
                 },
+                _applyDraft(d) {
+                    if (d.nome) this.nome = d.nome;
+                    if (d.sku) this.sku = d.sku;
+                    if (d.marca) this.marca = d.marca;
+                    if (d.codigoBarras) this.codigoBarras = d.codigoBarras;
+                    if (d.descricao) this.descricao = d.descricao;
+                    if (d.categoriaId) this.categoriaId = d.categoriaId;
+                    if (d.subcategoriaId) this.subcategoriaId = d.subcategoriaId;
+                    if (d.tipo !== undefined) this.tipo = d.tipo;
+                    if (d.preco > 0) this.preco = d.preco;
+                    if (d.custo > 0) this.custo = d.custo;
+                    if (d.margem > 0) this.margem = d.margem;
+                    if (d.controlaValidade) this.controlaValidade = d.controlaValidade;
+                    if (d.step > 1) { this.step = d.step; this.maxStepReached = d.maxStepReached || d.step; }
+                    if (d.variacoes?.length) this.variacoes = d.variacoes;
+                    if (d.caracteristicas?.length) this.caracteristicas = d.caracteristicas;
+                    if (d.embalagens?.length) this.embalagens = d.embalagens;
+                    window.showToast('Rascunho restaurado.', 'info', 2000);
+                },
                 _restoreDraft() {
                     try {
                         const raw = sessionStorage.getItem(this._draftKey);
@@ -931,23 +950,13 @@
                             sessionStorage.removeItem(this._draftKey);
                             return;
                         }
-                        if (d.nome) this.nome = d.nome;
-                        if (d.sku) this.sku = d.sku;
-                        if (d.marca) this.marca = d.marca;
-                        if (d.codigoBarras) this.codigoBarras = d.codigoBarras;
-                        if (d.descricao) this.descricao = d.descricao;
-                        if (d.categoriaId) this.categoriaId = d.categoriaId;
-                        if (d.subcategoriaId) this.subcategoriaId = d.subcategoriaId;
-                        if (d.tipo !== undefined) this.tipo = d.tipo;
-                        if (d.preco > 0) this.preco = d.preco;
-                        if (d.custo > 0) this.custo = d.custo;
-                        if (d.margem > 0) this.margem = d.margem;
-                        if (d.controlaValidade) this.controlaValidade = d.controlaValidade;
-                        if (d.step > 1) { this.step = d.step; this.maxStepReached = d.maxStepReached || d.step; }
-                        if (d.variacoes?.length) this.variacoes = d.variacoes;
-                        if (d.caracteristicas?.length) this.caracteristicas = d.caracteristicas;
-                        if (d.embalagens?.length) this.embalagens = d.embalagens;
-                        window.showToast('Rascunho restaurado.', 'info', 2000);
+                        // Só pergunta se há dados significativos no rascunho
+                        if (!d.nome) return;
+                        if (!confirm('Existe um rascunho salvo para este formulário. Deseja continuar de onde parou?')) {
+                            this._clearDraft();
+                            return;
+                        }
+                        this._applyDraft(d);
                     } catch {}
                 },
                 _clearDraft() {

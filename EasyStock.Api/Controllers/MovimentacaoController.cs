@@ -38,7 +38,41 @@ public class MovimentacaoController(
         var (p, ps) = NormalisePage(page, pageSize);
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
             resolvedEmpresaId, de, ate, tipo, natureza, p, ps);
-        return DataPaged(items, totalCount, p, ps);
+
+        var dtos = items.Select(m => new
+        {
+            id = m.Id.ToString(),
+            produtoId = m.ProdutoId.ToString(),
+            produtoVariacaoId = m.ProdutoVariacaoId?.ToString(),
+            vendaId = m.VendaId?.ToString(),
+            tipo = m.Tipo.ToString(),
+            natureza = m.Natureza.ToString(),
+            quantidade = m.Quantidade.Value,
+            valorUnitario = m.ValorUnitario != null ? (decimal?)m.ValorUnitario.Valor : null,
+            valorTotal = m.ValorTotal != null ? (decimal?)m.ValorTotal.Valor : null,
+            dataMovimentacao = m.DataMovimentacao,
+            descricao = m.Descricao,
+            documentoReferencia = m.DocumentoReferencia,
+            estornadaEm = m.EstornadaEm,
+            movimentacaoEstornadaId = m.MovimentacaoEstornadaId?.ToString(),
+            produto = m.Produto != null ? new
+            {
+                id = m.Produto.Id.ToString(),
+                sku = m.Produto.SkuBase?.Value ?? "",
+                nome = m.Produto.Nome,
+                emoji = (string?)null,
+                categoria = m.Produto.CategoriaId.ToString(),
+                status = m.Produto.Status.ToString()
+            } : null,
+            produtoVariacao = m.ProdutoVariacao != null ? new
+            {
+                id = m.ProdutoVariacao.Id.ToString(),
+                produtoId = m.ProdutoVariacao.ProdutoId.ToString(),
+                nome = m.ProdutoVariacao.Nome
+            } : null
+        });
+
+        return DataPaged(dtos, totalCount, p, ps);
     }
 
     [SwaggerOperation(Summary = "Get KPI aggregates for movements", Description = "Returns server-side computed KPIs (total units, revenue, sales count, loss count).")]

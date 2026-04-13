@@ -41,6 +41,15 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         return View(vm);
     }
 
+    [HttpGet("/fornecedores/novo")]
+    public IActionResult Novo()
+    {
+        ViewBag.Title = "Fornecedores";
+        ViewBag.ActiveMenuItem = "Fornecedores";
+        // Redirect to index — the "novo" form is a modal on the listing page
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpGet("/fornecedores/{id}")]
     public async Task<IActionResult> Detail(string id)
     {

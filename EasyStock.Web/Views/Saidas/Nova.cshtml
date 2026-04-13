@@ -165,8 +165,8 @@
                class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </a>
-            <button type="submit" x-data="{ loading: false }"
-                    @@click="if (estoqueAtual === 0 && qty > 0) { $event.preventDefault(); window.showToast('Não há estoque disponível para este produto.', 'error'); return; } if (qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
+            <button type="submit"
+                    @@click="if (produtoId && estoqueAtual === 0) { $event.preventDefault(); window.showToast('Não há estoque disponível para este produto.', 'error'); return; } if (produtoId && qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
                     :disabled="loading"
                     :class="{ 'opacity-50 cursor-not-allowed': loading }"
                     class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
@@ -191,6 +191,7 @@ function saidaForm() {
         qty: 1,
         valorUnit: 0,
         total: 0,
+        loading: false,
         _debounce: null,
 
         buscarProduto() {
