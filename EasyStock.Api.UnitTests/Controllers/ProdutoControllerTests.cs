@@ -66,6 +66,7 @@ public class ProdutoControllerTests
 
         var gerenciarUploadsUseCase = new GerenciarUploadsUseCase(
             _fileStorage,
+            Substitute.For<IImageProcessor>(),
             _produtoRepository,
             _usuarioRepository,
             _lojaRepository,

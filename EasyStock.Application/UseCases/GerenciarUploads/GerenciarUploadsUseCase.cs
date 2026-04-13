@@ -14,6 +14,7 @@ public sealed record UploadedFileResult(
 
 public sealed class GerenciarUploadsUseCase(
     IFileStorage fileStorage,
+    IImageProcessor imageProcessor,
     IProdutoRepository produtoRepository,
     IUsuarioRepository usuarioRepository,
     ILojaRepository lojaRepository,
@@ -28,7 +29,7 @@ public sealed class GerenciarUploadsUseCase(
 
     public async Task<UploadedFileResult> UploadFotoProdutoAsync(Guid empresaId, Guid produtoId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
     {
-        ValidarImagem(fileName, contentType, content, 5 * 1024 * 1024);
+        ValidarImagem(fileName, contentType, content, 10 * 1024 * 1024); // aceita ate 10MB antes de otimizar
 
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
@@ -37,14 +38,16 @@ public sealed class GerenciarUploadsUseCase(
         if (fotos.Count >= 5)
             throw new UseCaseValidationException("O produto ja possui o limite maximo de 5 fotos.");
 
-        var extensao = Path.GetExtension(fileName);
+        // Otimizar: redimensiona para max 1920px e converte para WebP
+        var (optimized, optContentType, optExt) = imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85);
+
         var fotoId = Guid.NewGuid();
         var stored = await fileStorage.UploadAsync(
             new FileUploadRequest(
                 $"produtos/{empresaId}/{produtoId}",
-                $"{fotoId}{extensao}",
-                contentType,
-                content),
+                $"{fotoId}{optExt}",
+                optContentType,
+                optimized),
             cancellationToken);
 
         fotos.Add(new ProdutoFotoMetadata(fotoId, stored.Url, stored.StorageKey, DateTime.UtcNow));
@@ -54,7 +57,7 @@ public sealed class GerenciarUploadsUseCase(
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
 
-        return new UploadedFileResult(stored.Url, fileName, contentType, stored.Size, fotoId);
+        return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size, fotoId);
     }
 
     public async Task RemoverFotoProdutoAsync(Guid empresaId, Guid produtoId, Guid fotoId, CancellationToken cancellationToken = default)
@@ -79,18 +82,19 @@ public sealed class GerenciarUploadsUseCase(
 
     public async Task<UploadedFileResult> UploadAvatarUsuarioAsync(Guid usuarioId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
     {
-        ValidarImagem(fileName, contentType, content, 2 * 1024 * 1024);
+        ValidarImagem(fileName, contentType, content, 5 * 1024 * 1024);
 
         var usuario = await usuarioRepository.GetByIdAsync(usuarioId)
             ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-        var extensao = Path.GetExtension(fileName);
+        var (optimized, optContentType, optExt) = imageProcessor.Optimize(content, contentType, maxSide: 512, quality: 80);
+
         var stored = await fileStorage.UploadAsync(
             new FileUploadRequest(
                 $"usuarios/{usuarioId}/avatar",
-                $"{Guid.NewGuid()}{extensao}",
-                contentType,
-                content),
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
             cancellationToken);
 
         usuario.AvatarUrl = stored.Url;
@@ -99,12 +103,12 @@ public sealed class GerenciarUploadsUseCase(
         await usuarioRepository.UpdateAsync(usuario);
         await unitOfWork.CommitAsync();
 
-        return new UploadedFileResult(stored.Url, fileName, contentType, stored.Size);
+        return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
 
     public async Task<UploadedFileResult> UploadLogoLojaAsync(Guid empresaId, Guid lojaId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
     {
-        ValidarImagem(fileName, contentType, content, 2 * 1024 * 1024);
+        ValidarImagem(fileName, contentType, content, 5 * 1024 * 1024);
 
         var loja = await lojaRepository.GetByIdAsync(lojaId)
             ?? throw new UseCaseValidationException("Loja nao encontrada.");
@@ -112,13 +116,14 @@ public sealed class GerenciarUploadsUseCase(
         if (loja.EmpresaId != empresaId)
             throw new UseCaseValidationException("A loja informada nao pertence a empresa.");
 
-        var extensao = Path.GetExtension(fileName);
+        var (optimized, optContentType, optExt) = imageProcessor.Optimize(content, contentType, maxSide: 512, quality: 80);
+
         var stored = await fileStorage.UploadAsync(
             new FileUploadRequest(
                 $"lojas/{empresaId}/{lojaId}/logo",
-                $"{Guid.NewGuid()}{extensao}",
-                contentType,
-                content),
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
             cancellationToken);
 
         loja.LogoUrl = stored.Url;
@@ -127,7 +132,7 @@ public sealed class GerenciarUploadsUseCase(
         await lojaRepository.UpdateAsync(loja);
         await unitOfWork.CommitAsync();
 
-        return new UploadedFileResult(stored.Url, fileName, contentType, stored.Size);
+        return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
 
     private static void ValidarImagem(string fileName, string contentType, byte[] content, int maxSize)

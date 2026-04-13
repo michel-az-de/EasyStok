@@ -97,7 +97,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (newId != Guid.Empty)
         {
             int uploadErrors = 0;
-            foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
+            foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 10 * 1024 * 1024).Take(5))
             {
                 var r = await svc.UploadFotoAsync(newId.ToString(), foto);
                 if (!r.Success) uploadErrors++;
@@ -200,7 +200,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         }
 
         int uploadErrors = 0;
-        foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 5 * 1024 * 1024).Take(5))
+        foreach (var foto in fotos.Where(f => f.Length > 0 && f.Length <= 10 * 1024 * 1024).Take(5))
         {
             var r = await svc.UploadFotoAsync(id, foto);
             if (!r.Success) uploadErrors++;
@@ -239,7 +239,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             return RedirectToAction(nameof(Detail), new { id });
         }
 
-        if (foto.Length > 5 * 1024 * 1024)
+        if (foto.Length > 10 * 1024 * 1024)
         {
             Toast("error", "Imagem não pode ser maior que 5MB.");
             return RedirectToAction(nameof(Detail), new { id });
@@ -289,8 +289,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     {
         if (foto == null || foto.Length == 0)
             return Json(new { ok = false, erro = "Selecione uma imagem." });
-        if (foto.Length > 5 * 1024 * 1024)
-            return Json(new { ok = false, erro = "Imagem não pode ser maior que 5MB." });
+        if (foto.Length > 10 * 1024 * 1024)
+            return Json(new { ok = false, erro = "Imagem nao pode ser maior que 10MB." });
 
         var uploadResult = await svc.UploadFotoAsync(id, foto);
         if (!uploadResult.Success)
