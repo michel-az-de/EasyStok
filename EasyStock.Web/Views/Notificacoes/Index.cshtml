@@ -149,8 +149,7 @@ else
         @foreach (var n in Model.Items)
         {
             <div class="ws flex items-start gap-4 @SeveridadeBorder(n.Severidade) @(!n.Lida ? "" : "opacity-60")">
-                @{ var tipoSeguro = Enum.TryParse<EasyStock.Domain.Enums.TipoAlertaEstoque>(n.Tipo, out var _t) ? _t.ToString() : "Info"; }
-                <div class="flex-shrink-0 mt-0.5">@Html.Raw(TipoIcon(tipoSeguro))</div>
+                <div class="flex-shrink-0 mt-0.5">@Html.Raw(TipoIcon(n.Tipo))</div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">

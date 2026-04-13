@@ -1,4 +1,4 @@
-using EasyStock.Api.Controllers;
+﻿using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -46,7 +46,7 @@ public class NotificacaoControllerTests
     {
         _notificacaoRepository.GetByIdAsync(Arg.Any<Guid>()).Returns((Notificacao?)null);
 
-        var result = await _controller.Delete(Guid.NewGuid());
+        var result = await _controller.Delete(Guid.NewGuid(), Guid.NewGuid());
 
         // Novo contrato: NotFoundObjectResult com { error: { code: "NOT_FOUND" } }
         result.Should().BeOfType<NotFoundObjectResult>();
