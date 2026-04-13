@@ -258,6 +258,8 @@ else
     builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 }
 
+builder.Services.AddSingleton<IImageProcessor, EasyStock.Api.Services.SkiaImageProcessor>();
+
 // Observability
 builder.Services.AddSingleton<EasyStock.Api.Observability.MetricsService>();
 builder.Services.AddProblemDetails();
