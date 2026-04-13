@@ -186,13 +186,14 @@
                     this.carregando = true;
                     try {
                         const r = await fetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
-                        if (!r.ok) return;
+                        if (!r.ok) { this.semResultados = true; return; }
                         const data = await r.json();
                         this.results = Array.isArray(data) ? data : [];
                         this.semResultados = this.results.length === 0;
                         this.activeIdx = 0;
                     } catch {
                         this.results = [];
+                        this.semResultados = true;
                     } finally {
                         this.carregando = false;
                     }
@@ -329,7 +330,16 @@
                 <template x-if="loading">
                     <div class="px-4 py-8 text-center text-slate-400 text-sm">Carregando...</div>
                 </template>
-                <template x-if="!loading && items.length === 0">
+                <template x-if="!loading && erro">
+                    <div class="px-4 py-8 text-center text-slate-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <p class="text-sm">Não foi possível carregar notificações</p>
+                        <button @@click="erro=false; load()" class="mt-2 text-xs text-indigo-600 hover:underline">Tentar novamente</button>
+                    </div>
+                </template>
+                <template x-if="!loading && !erro && items.length === 0">
                     <div class="px-4 py-8 text-center text-slate-400">
                         <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -368,22 +378,27 @@
             return {
                 open: false,
                 loading: false,
+                erro: false,
                 items: [],
                 resumo: null,
                 async toggle() {
                     this.open = !this.open;
-                    if (this.open && this.items.length === 0) await this.load();
+                    if (this.open && this.items.length === 0 && !this.erro) await this.load();
                 },
                 async load() {
                     this.loading = true;
+                    this.erro = false;
                     try {
                         const [rItems, rResumo] = await Promise.all([
-                            fetch('/notificacoes/recentes').then(r => r.json()),
+                            fetch('/notificacoes/recentes').then(r => {
+                                if (!r.ok) throw new Error('HTTP ' + r.status);
+                                return r.json();
+                            }),
                             fetch('/notificacoes/resumo').then(r => r.json())
                         ]);
                         this.items = Array.isArray(rItems) ? rItems : [];
                         this.resumo = rResumo;
-                    } catch { this.items = []; }
+                    } catch { this.items = []; this.erro = true; }
                     this.loading = false;
                 },
                 async marcarLida(id) {

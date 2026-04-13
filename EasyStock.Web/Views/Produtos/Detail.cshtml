@@ -292,12 +292,9 @@
         <button @@click="tab='historico'; loadHistorico()"
                 :class="tab==='historico' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="px-4 py-2.5 text-sm transition-colors">Histórico</button>
-        @if (p.Caracteristicas.Any() || p.Embalagens.Any())
-        {
-            <button @@click="tab='detalhes'"
-                    :class="tab==='detalhes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                    class="px-4 py-2.5 text-sm transition-colors">Detalhes</button>
-        }
+        <button @@click="tab='detalhes'"
+                :class="tab==='detalhes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+                class="px-4 py-2.5 text-sm transition-colors">Detalhes</button>
     </div>
 
 <!-- ═══ TAB: VARIACOES ═══ -->
@@ -590,62 +587,67 @@
     </div>
 
     <!-- ═══ TAB: DETALHES (Caracteristicas + Embalagens) ═══ -->
-    @if (p.Caracteristicas.Any() || p.Embalagens.Any())
-    {
-        <div x-show="tab==='detalhes'">
-            @if (p.Caracteristicas.Any())
-            {
-                <div class="ws mb-5">
-                    <h3 class="font-bold text-slate-800 mb-3">Características (@p.Caracteristicas.Count)</h3>
-                    <div class="overflow-x-auto">
-                        <table class="tbl-full">
-                            <thead><tr><th>Nome</th><th>Descrição</th><th class="text-center">Qtd</th><th>Variação</th></tr></thead>
-                            <tbody>
-                                @foreach (var c in p.Caracteristicas.OrderBy(x => x.OrdemExibicao))
-                                {
-                                    <tr>
-                                        <td class="font-medium">@c.Nome</td>
-                                        <td class="text-sm text-slate-500">@(c.Descricao ?? "-")</td>
-                                        <td class="text-center text-sm">@(c.QuantidadeReferencia?.ToString() ?? "-")</td>
-                                        <td class="text-sm text-slate-500">@(c.VariacaoPadrao ?? "-")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+    <div x-show="tab==='detalhes'">
+        @if (!p.Caracteristicas.Any() && !p.Embalagens.Any())
+        {
+            <div class="ws text-center py-10 text-slate-400">
+                <div class="text-3xl mb-2">📋</div>
+                <p class="text-sm font-medium text-slate-500">Nenhum detalhe técnico cadastrado.</p>
+                <p class="text-xs mt-1">Edite o produto para adicionar características ou embalagens.</p>
+            </div>
+        }
+        @if (p.Caracteristicas.Any())
+        {
+            <div class="ws mb-5">
+                <h3 class="font-bold text-slate-800 mb-3">Características (@p.Caracteristicas.Count)</h3>
+                <div class="overflow-x-auto">
+                    <table class="tbl-full">
+                        <thead><tr><th>Nome</th><th>Descrição</th><th class="text-center">Qtd</th><th>Variação</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in p.Caracteristicas.OrderBy(x => x.OrdemExibicao))
+                            {
+                                <tr>
+                                    <td class="font-medium">@c.Nome</td>
+                                    <td class="text-sm text-slate-500">@(c.Descricao ?? "-")</td>
+                                    <td class="text-center text-sm">@(c.QuantidadeReferencia?.ToString() ?? "-")</td>
+                                    <td class="text-sm text-slate-500">@(c.VariacaoPadrao ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-            }
+            </div>
+        }
 
-            @if (p.Embalagens.Any())
-            {
-                <div class="ws">
-                    <h3 class="font-bold text-slate-800 mb-3">Embalagens (@p.Embalagens.Count)</h3>
-                    <div class="overflow-x-auto">
-                        <table class="tbl-full">
-                            <thead><tr><th>Nome</th><th>Descrição</th><th>Dimensões</th><th class="text-center">Padrão</th></tr></thead>
-                            <tbody>
-                                @foreach (var e in p.Embalagens)
-                                {
-                                    <tr>
-                                        <td class="font-medium">@e.Nome</td>
-                                        <td class="text-sm text-slate-500">@(e.Descricao ?? "-")</td>
-                                        <td class="text-sm font-mono text-slate-500">
-                                            @if (e.Dimensoes != null) { @($"{e.Dimensoes.Peso:0.##}kg - {e.Dimensoes.Largura:F1}x{e.Dimensoes.Altura:F1}x{e.Dimensoes.Comprimento:F1} cm") }
-                                            else { <text>-</text> }
-                                        </td>
-                                        <td class="text-center">
-                                            @if (e.Padrao) { <span class="badge badge-ok px-2 py-0.5 rounded-full text-xs font-semibold">Sim</span> }
-                                            else { <span class="text-sm text-slate-400">-</span> }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+        @if (p.Embalagens.Any())
+        {
+            <div class="ws">
+                <h3 class="font-bold text-slate-800 mb-3">Embalagens (@p.Embalagens.Count)</h3>
+                <div class="overflow-x-auto">
+                    <table class="tbl-full">
+                        <thead><tr><th>Nome</th><th>Descrição</th><th>Dimensões</th><th class="text-center">Padrão</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in p.Embalagens)
+                            {
+                                <tr>
+                                    <td class="font-medium">@e.Nome</td>
+                                    <td class="text-sm text-slate-500">@(e.Descricao ?? "-")</td>
+                                    <td class="text-sm font-mono text-slate-500">
+                                        @if (e.Dimensoes != null) { @($"{e.Dimensoes.Peso:0.##}kg - {e.Dimensoes.Largura:F1}x{e.Dimensoes.Altura:F1}x{e.Dimensoes.Comprimento:F1} cm") }
+                                        else { <text>-</text> }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (e.Padrao) { <span class="badge badge-ok px-2 py-0.5 rounded-full text-xs font-semibold">Sim</span> }
+                                        else { <span class="text-sm text-slate-400">-</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-            }
-        </div>
-    }
+            </div>
+        }
+    </div>
 
     <!-- ═══ MODAL: EXCLUIR ═══ -->
     <div x-show="showExcluir" x-cloak

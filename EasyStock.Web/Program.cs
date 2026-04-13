@@ -116,7 +116,7 @@ _ = Task.Run(async () =>
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/auth/login");
+    app.UseExceptionHandler("/error/500");
     app.UseHsts();
 }
 

@@ -38,7 +38,7 @@
             <tbody>
                 @foreach (var c in Model)
                 {
-                    <tr x-data="{ editando: false, confirm: false, nomeEdit: '@c.Nome' }">
+                    <tr x-data="{ editando: false, confirm: false, nomeEdit: @Json.Serialize(c.Nome) }">
                         <td>
                             <div x-show="!editando" class="font-medium text-slate-900">@c.Nome</div>
                             <form action="/categorias/@c.Id/editar" method="post"
