@@ -65,14 +65,11 @@
 
         // Wrapper handles animation
         const wrapper = document.createElement('div');
+        wrapper.className = 'toast';
         Object.assign(wrapper.style, {
-            transform:  'translateY(20px)',
-            opacity:    '0',
-            transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease',
             pointerEvents: 'auto',
             borderRadius: '14px',
             overflow:   'hidden',
-            boxShadow:  '0 8px 32px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.10)',
         });
 
         if (type === 'error') {
@@ -82,13 +79,14 @@
 
         // Body
         const body = document.createElement('div');
+        body.className = 'toast__body';
         Object.assign(body.style, {
             display:     'flex',
             alignItems:  'center',
             gap:         '10px',
             color:       '#ffffff',
             padding:     '13px 16px',
-            background:  cfg.bg,
+            background:  'transparent',
             fontFamily:  'Inter, system-ui, -apple-system, sans-serif',
         });
 
@@ -131,12 +129,13 @@
 
         // Progress bar track
         const progressTrack = document.createElement('div');
+        progressTrack.className = 'toast__progress-track';
         Object.assign(progressTrack.style, {
-            background:  cfg.bg,
             borderTop:   '1px solid rgba(0,0,0,.12)',
         });
 
         const progressBar = document.createElement('div');
+        progressBar.className = 'toast__progress-bar';
         Object.assign(progressBar.style, {
             height:     '3px',
             background: 'rgba(255,255,255,.4)',
@@ -152,8 +151,6 @@
         // Trigger enter animation (double rAF forces layout flush)
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
-                wrapper.style.transform = 'translateY(0)';
-                wrapper.style.opacity   = '1';
                 progressBar.style.width = '0%';
             });
         });
@@ -165,9 +162,7 @@
             if (dismissed) return;
             dismissed = true;
             clearTimeout(autoTimer);
-            wrapper.style.transition = 'transform 0.22s ease-in, opacity 0.18s ease-in';
-            wrapper.style.transform  = 'translateY(10px)';
-            wrapper.style.opacity    = '0';
+            wrapper.classList.add('dismissing');
             setTimeout(function () { wrapper.remove(); }, 240);
         }
 

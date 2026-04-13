@@ -29,12 +29,12 @@
                 <input type="hidden" name="ProdutoId" x-model="produtoId" />
 
                 <div x-show="showResults && resultados.length > 0"
-                     class="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
+                     class="dropdown-list absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
                      x-cloak>
                     <template x-for="p in resultados" :key="p.id">
                         <button type="button"
                                 @@click="selecionarProduto(p)"
-                                class="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm flex items-center gap-2">
+                                class="dropdown-item w-full text-left px-3 py-2 hover:bg-slate-50 text-sm flex items-center gap-2">
                             <span x-text="p.nome" class="font-medium"></span>
                             <span x-text="p.sku" class="text-slate-400 text-xs"></span>
                         </button>

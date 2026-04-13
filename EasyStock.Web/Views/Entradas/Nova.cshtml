@@ -53,10 +53,10 @@
                     <div x-show="buscando" class="absolute right-3 top-3 text-slate-400 text-sm">Buscando...</div>
                 </div>
 
-                <div class="space-y-2" x-show="resultados.length > 0">
+                <div class="dropdown-list space-y-2" x-show="resultados.length > 0">
                     <template x-for="p in resultados" :key="p.id">
                         <button type="button" @@click="selecionarProduto(p)"
-                                class="w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left">
+                                class="dropdown-item w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left">
                             <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
                                  x-text="p.emoji || '📦'"></div>
                             <div class="flex-1 min-w-0">
