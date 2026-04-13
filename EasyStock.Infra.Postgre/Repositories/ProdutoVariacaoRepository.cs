@@ -73,5 +73,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (entity is not null)
                 dbContext.ProdutosVariacao.Remove(entity);
         }
+
+        public async Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId) =>
+            await dbContext.ProdutosVariacao
+                .Where(v => v.EmpresaId == empresaId && v.ProdutoId == produtoId)
+                .ExecuteDeleteAsync();
     }
 }

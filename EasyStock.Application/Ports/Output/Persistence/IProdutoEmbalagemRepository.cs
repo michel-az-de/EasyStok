@@ -8,5 +8,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task InsertAsync(ProdutoEmbalagem embalagem);
         Task UpdateAsync(ProdutoEmbalagem embalagem);
         Task DeleteAsync(Guid id);
+        Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId);
     }
 }

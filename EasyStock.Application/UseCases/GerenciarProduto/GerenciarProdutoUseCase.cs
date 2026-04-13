@@ -200,12 +200,10 @@ public sealed class GerenciarProdutoUseCase(
         {
             await produtoRepository.UpdateAsync(produto);
 
-            // Replace caracteristicas (delete all + re-insert)
+            // Replace caracteristicas — batch delete + re-insert
             if (command.Caracteristicas is not null)
             {
-                var existentes = await caracteristicaRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-                foreach (var existente in existentes)
-                    await caracteristicaRepository.DeleteAsync(existente.Id);
+                await caracteristicaRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
 
                 var agora = DateTime.UtcNow;
                 foreach (var input in command.Caracteristicas)
@@ -226,15 +224,13 @@ public sealed class GerenciarProdutoUseCase(
                 }
             }
 
-            // Replace embalagens (delete all + re-insert)
+            // Replace embalagens — batch delete + re-insert
             if (command.Embalagens is not null)
             {
                 if (command.Embalagens.Count(e => e.Padrao) > 1)
                     throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
 
-                var existentes = await embalagemRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-                foreach (var existente in existentes)
-                    await embalagemRepository.DeleteAsync(existente.Id);
+                await embalagemRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
 
                 var agora = DateTime.UtcNow;
                 foreach (var input in command.Embalagens)
@@ -254,12 +250,10 @@ public sealed class GerenciarProdutoUseCase(
                 }
             }
 
-            // Replace variacoes (delete all + re-insert)
+            // Replace variacoes — batch delete + re-insert
             if (command.Variacoes is not null)
             {
-                var existentes = await produtoVariacaoRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-                foreach (var existente in existentes)
-                    await produtoVariacaoRepository.DeleteAsync(existente.Id);
+                await produtoVariacaoRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
 
                 var agora = DateTime.UtcNow;
                 foreach (var variacao in command.Variacoes)

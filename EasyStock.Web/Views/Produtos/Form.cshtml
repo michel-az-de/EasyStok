@@ -456,33 +456,33 @@
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome" placeholder="Ex: P, M, G..."
+                                <label :for="'var-nome-' + i" class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                <input type="text" :id="'var-nome-' + i" :name="'VariacoesRich[' + i + '].Nome'" x-model="v.nome" placeholder="Ex: P, M, G..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Cor</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor" placeholder="Azul, Vermelho..."
+                                <label :for="'var-cor-' + i" class="block text-xs text-slate-600 mb-1">Cor</label>
+                                <input type="text" :id="'var-cor-' + i" :name="'VariacoesRich[' + i + '].Cor'" x-model="v.cor" placeholder="Azul, Vermelho..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Tamanho</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho" placeholder="P, M, G, 42..."
+                                <label :for="'var-tam-' + i" class="block text-xs text-slate-600 mb-1">Tamanho</label>
+                                <input type="text" :id="'var-tam-' + i" :name="'VariacoesRich[' + i + '].Tamanho'" x-model="v.tamanho" placeholder="P, M, G, 42..."
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">SKU</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].Sku'" x-model="v.sku"
+                                <label :for="'var-sku-' + i" class="block text-xs text-slate-600 mb-1">SKU</label>
+                                <input type="text" :id="'var-sku-' + i" :name="'VariacoesRich[' + i + '].Sku'" x-model="v.sku"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Cód. Barras</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
+                                <label :for="'var-ean-' + i" class="block text-xs text-slate-600 mb-1">Cód. Barras</label>
+                                <input type="text" :id="'var-ean-' + i" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Desc. comercial</label>
-                                <input type="text" :name="'VariacoesRich[' + i + '].DescricaoComercial'" x-model="v.descricaoComercial"
+                                <label :for="'var-desc-' + i" class="block text-xs text-slate-600 mb-1">Desc. comercial</label>
+                                <input type="text" :id="'var-desc-' + i" :name="'VariacoesRich[' + i + '].DescricaoComercial'" x-model="v.descricaoComercial"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                         </div>
@@ -532,23 +532,23 @@
                             </div>
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div class="col-span-2">
-                                    <label class="block text-xs text-slate-600 mb-1">Nome *</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome" placeholder="Ex: Material, Voltagem..."
+                                    <label :for="'car-nome-' + i" class="block text-xs text-slate-600 mb-1">Nome *</label>
+                                    <input type="text" :id="'car-nome-' + i" :name="'Caracteristicas[' + i + '].Nome'" x-model="c.nome" placeholder="Ex: Material, Voltagem..."
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Quantidade</label>
-                                    <input type="number" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia" min="0"
+                                    <label :for="'car-qtd-' + i" class="block text-xs text-slate-600 mb-1">Quantidade</label>
+                                    <input type="number" :id="'car-qtd-' + i" :name="'Caracteristicas[' + i + '].QuantidadeReferencia'" x-model.number="c.quantidadeReferencia" min="0"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Variação</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
+                                    <label :for="'car-var-' + i" class="block text-xs text-slate-600 mb-1">Variação</label>
+                                    <input type="text" :id="'car-var-' + i" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div class="col-span-2 sm:col-span-4">
-                                    <label class="block text-xs text-slate-600 mb-1">Descrição</label>
-                                    <input type="text" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
+                                    <label :for="'car-desc-' + i" class="block text-xs text-slate-600 mb-1">Descrição</label>
+                                    <input type="text" :id="'car-desc-' + i" :name="'Caracteristicas[' + i + '].Descricao'" x-model="c.descricao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                             </div>

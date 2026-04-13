@@ -8,5 +8,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task InsertAsync(ProdutoCaracteristica caracteristica);
         Task UpdateAsync(ProdutoCaracteristica caracteristica);
         Task DeleteAsync(Guid id);
+        Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId);
     }
 }

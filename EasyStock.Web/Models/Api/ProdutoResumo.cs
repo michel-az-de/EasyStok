@@ -19,22 +19,30 @@ public record ProdutoResumo
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 
     /// <summary>URL da primeira foto do produto, ou null se não tiver.</summary>
-    public string? PrimeiraFotoUrl
+    public string? PrimeiraFotoUrl => FotoJsonHelper.PrimeiraUrl(FotosJson);
+}
+
+/// <summary>Utilitário para extrair dados de <c>FotosJson</c> sem duplicar lógica de parsing.</summary>
+internal static class FotoJsonHelper
+{
+    /// <summary>Retorna a URL da primeira foto serializada em <paramref name="fotosJson"/>, ou null.</summary>
+    public static string? PrimeiraUrl(string? fotosJson)
     {
-        get
+        if (string.IsNullOrWhiteSpace(fotosJson)) return null;
+        try
         {
-            if (string.IsNullOrWhiteSpace(FotosJson)) return null;
-            try
-            {
-                using var doc = JsonDocument.Parse(FotosJson);
-                var arr = doc.RootElement;
-                if (arr.ValueKind != JsonValueKind.Array || arr.GetArrayLength() == 0) return null;
-                return arr[0].TryGetProperty("url", out var u) ? u.GetString()
-                     : arr[0].TryGetProperty("Url", out var u2) ? u2.GetString()
-                     : null;
-            }
-            catch { return null; }
+            using var doc = JsonDocument.Parse(fotosJson);
+            var arr = doc.RootElement;
+            if (arr.ValueKind != JsonValueKind.Array || arr.GetArrayLength() == 0) return null;
+            var first = arr[0];
+            // Aceita tanto "url" (camelCase) quanto "Url" (PascalCase)
+            if (first.TryGetProperty("url", out var u) && u.ValueKind == JsonValueKind.String)
+                return u.GetString();
+            if (first.TryGetProperty("Url", out var u2) && u2.ValueKind == JsonValueKind.String)
+                return u2.GetString();
+            return null;
         }
+        catch { return null; }
     }
 }
 
