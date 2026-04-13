@@ -1,5 +1,13 @@
 /* EasyStock Web — Custom CSS (complemento ao Tailwind) */
 
+/* ── Z-Index Scale ─────────────────────────────────────────
+   dropdown/tooltip : 30
+   sidebar-overlay  : 40
+   modal            : 50
+   command-palette  : 100
+   toast            : 200
+──────────────────────────────────────────────────────────── */
+
 /* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
     --app-bg: #EEF4FB;

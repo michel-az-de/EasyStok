@@ -18,6 +18,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<(IEnumerable<Venda> Vendas, int TotalCount)> GetVendasPorEmpresaAsync(Guid empresaId, int page = 1, int pageSize = 20)
         {
+            pageSize = Math.Clamp(pageSize, 1, 500);
+            page = Math.Max(page, 1);
             var query = dbContext.Vendas
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId)

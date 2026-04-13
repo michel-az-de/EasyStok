@@ -55,22 +55,27 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId)
         {
-            var naoLidas = await dbContext.Notificacoes
-                .AsNoTracking()
+            var gruposPorSeveridade = await dbContext.Notificacoes
                 .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .GroupBy(n => n.Severidade)
+                .Select(g => new { Severidade = g.Key, Count = g.Count() })
                 .ToListAsync();
 
-            var porTipo = naoLidas
-                .GroupBy(n => n.TipoAlerta.ToString())
-                .ToDictionary(g => g.Key, g => g.Count());
+            var gruposPorTipo = await dbContext.Notificacoes
+                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .GroupBy(n => n.TipoAlerta)
+                .Select(g => new { Tipo = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            var porTipo = gruposPorTipo.ToDictionary(g => g.Tipo.ToString(), g => g.Count);
 
             return new NotificacaoResumo
             {
-                TotalNaoLidas = naoLidas.Count,
-                Criticas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Critica),
-                Altas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Alta),
-                Medias = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Media),
-                Informativas = naoLidas.Count(n => n.Severidade == SeveridadeNotificacao.Informativa),
+                TotalNaoLidas = gruposPorSeveridade.Sum(g => g.Count),
+                Criticas = gruposPorSeveridade.FirstOrDefault(g => g.Severidade == SeveridadeNotificacao.Critica)?.Count ?? 0,
+                Altas = gruposPorSeveridade.FirstOrDefault(g => g.Severidade == SeveridadeNotificacao.Alta)?.Count ?? 0,
+                Medias = gruposPorSeveridade.FirstOrDefault(g => g.Severidade == SeveridadeNotificacao.Media)?.Count ?? 0,
+                Informativas = gruposPorSeveridade.FirstOrDefault(g => g.Severidade == SeveridadeNotificacao.Informativa)?.Count ?? 0,
                 PorTipo = porTipo
             };
         }

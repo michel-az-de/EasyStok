@@ -128,6 +128,7 @@
                         <span x-show="skuStatus === 'disponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-semibold">✓ disponível</span>
                         <span x-show="skuStatus === 'indisponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 text-xs font-semibold">✗ em uso</span>
                         <span x-show="skuStatus === 'verificando'" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">...</span>
+                        <span x-show="skuStatus === 'erro'" class="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-semibold">⚠ verificar</span>
                     </div>
                     @if (ViewData.ModelState["SkuBase"]?.Errors.Count > 0)
                     {
@@ -864,10 +865,15 @@
                         const params = new URLSearchParams({ sku });
                         if (isEdit) params.set('ignoreProdutoId', '@Model.Id');
                         const res = await fetch(`/produtos/check-sku?${params}`);
-                        if (!res.ok) { this.skuStatus = ''; return; }
+                        if (!res.ok) { this.skuStatus = 'erro'; return; }
                         const data = await res.json();
-                        this.skuStatus = data.disponivel ? 'disponivel' : 'indisponivel';
-                    } catch { this.skuStatus = ''; }
+                        if (data.disponivel === null || data.disponivel === undefined) {
+                            this.skuStatus = 'erro';
+                            window.showToast(data.error || 'Não foi possível verificar o SKU. Confirme manualmente antes de salvar.', 'warning');
+                        } else {
+                            this.skuStatus = data.disponivel ? 'disponivel' : 'indisponivel';
+                        }
+                    } catch { this.skuStatus = 'erro'; }
                 },
                 validarCodigoBarras() {
                     const code = (this.codigoBarras || '').trim();

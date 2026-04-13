@@ -127,8 +127,9 @@ public class AnalyticsController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var result = await analyticsRepository.GetMargemPorProdutoAsync(resolvedEmpresaId, dias, page, pageSize);
-        return DataPaged(result, result.Count, page, pageSize);
+        var (p, ps) = NormalisePage(page, pageSize);
+        var result = await analyticsRepository.GetMargemPorProdutoAsync(resolvedEmpresaId, dias, p, ps);
+        return DataPaged(result, result.Count, p, ps);
     }
 
     [SwaggerOperation(Summary = "Get movement analytics")]

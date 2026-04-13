@@ -80,13 +80,17 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             if (cache is not null)
             {
-                var cachedData = await cache.GetStringAsync(cacheKey);
-                if (!string.IsNullOrEmpty(cachedData))
+                try
                 {
-                    var entry = JsonSerializer.Deserialize<PaginacaoCacheEntry>(cachedData);
-                    if (entry is not null)
-                        return (entry.Produtos, entry.TotalCount);
+                    var cachedData = await cache.GetStringAsync(cacheKey);
+                    if (!string.IsNullOrEmpty(cachedData))
+                    {
+                        var entry = JsonSerializer.Deserialize<PaginacaoCacheEntry>(cachedData);
+                        if (entry is not null)
+                            return (entry.Produtos, entry.TotalCount);
+                    }
                 }
+                catch { await cache.RemoveAsync(cacheKey); }
             }
 
             var query = dbContext.Produtos

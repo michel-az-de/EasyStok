@@ -94,7 +94,8 @@
                     }
                     <div x-data="{ on: @propVal.ToString().ToLower() }" class="relative">
                         <input type="hidden" name="@t.asp" :value="on ? 'true' : 'false'" />
-                        <button type="button" @@click="on = !on"
+                        <button type="button" role="switch" :aria-pressed="on.toString()"
+                                :aria-label="'@t.label'" @@click="on = !on"
                                 :class="on ? 'bg-indigo-600' : 'bg-slate-200'"
                                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
                             <span :class="on ? 'translate-x-6' : 'translate-x-1'"

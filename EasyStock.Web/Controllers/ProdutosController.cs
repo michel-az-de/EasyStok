@@ -70,7 +70,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         var result = await svc.BuscarAsync(sku.Trim(), 5);
         if (!result.Success)
-            return Json(new { disponivel = true }); // em caso de erro, não bloquear o usuário
+            return Json(new { disponivel = (bool?)null, error = result.ErrorMessage ?? "Erro ao verificar SKU" });
 
         var exact = result.Data!.Any(p =>
             string.Equals(p.SkuBase?.Value, sku.Trim(), StringComparison.OrdinalIgnoreCase) &&

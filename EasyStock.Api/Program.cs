@@ -311,7 +311,10 @@ builder.Services.AddCors(options =>
         if (allowedOrigins is { Length: > 0 })
             policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
         else if (builder.Environment.IsDevelopment())
+        {
+            Log.Warning("⚠️  CORS AllowAnyOrigin ativo — não use em produção!");
             policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
         else
             throw new InvalidOperationException(
                 "Cors:AllowedOrigins é obrigatório em produção. Configure a secao 'Cors:AllowedOrigins' no appsettings ou via variavel de ambiente.");
@@ -484,13 +487,8 @@ if (resolvedProvider is "sqlite" && !app.Environment.IsDevelopment())
     app.Logger.LogWarning("ATENCAO: Banco SQLite em uso em ambiente {Env}. Isso pode indicar falha de conexao com banco principal.", app.Environment.EnvironmentName);
 
 if (jwtKey.Length < 32)
-{
-    if (app.Environment.IsProduction())
-        throw new InvalidOperationException(
-            "Jwt:SecretKey tem menos de 32 caracteres. Em producao a chave deve ter pelo menos 32 caracteres para garantir seguranca.");
-    else
-        app.Logger.LogWarning("ATENCAO: Jwt:SecretKey tem menos de 32 caracteres. Recomendado usar chave mais longa.");
-}
+    throw new InvalidOperationException(
+        "JWT_SECRET deve ter pelo menos 32 caracteres.");
 
 Log.Information("""
 

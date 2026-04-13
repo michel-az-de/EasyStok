@@ -340,7 +340,7 @@
                             <form asp-action="RemoverVariacao" asp-controller="Produtos"
                                   asp-route-id="@p.ProdutoId" asp-route-vid="@v.VariacaoId" method="post">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" onclick="return confirm('Remover variacao @v.Nome?')"
+                                <button type="button" @@click="if (confirm('Remover variação ' + @Html.Raw(Json.Serialize(v.Nome)) + '?')) $el.closest('form').submit()"
                                         class="text-xs text-slate-300 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors ml-2">x</button>
                             </form>
                         </div>
@@ -712,6 +712,7 @@
                 uploadQueue: [],   // { name, status: 'uploading'|'done'|'error', message? }
                 uploading: false,
                 photoError: null,
+                _uploadQueueTimeout: null,
 
                 init() {
                     const t = new URLSearchParams(window.location.search).get('tab');
@@ -786,7 +787,8 @@
                         window.showToast(`${successCount} foto(s) salva(s) com sucesso!`, 'success');
 
                     // Clear queue after 4 seconds
-                    setTimeout(() => { this.uploadQueue = []; }, 4000);
+                    if (this._uploadQueueTimeout) clearTimeout(this._uploadQueueTimeout);
+                    this._uploadQueueTimeout = setTimeout(() => { this.uploadQueue = []; this._uploadQueueTimeout = null; }, 4000);
                 },
                 async deletePhoto(fotoId) {
                     if (!confirm('Remover esta foto?')) return;
@@ -815,6 +817,10 @@
                         const r = await fetch('/produtos/' + prodId + '/historico-json');
                         this.historico = r.ok ? await r.json() : [];
                     } catch { this.historico = []; }
+                },
+
+                destroy() {
+                    if (this._uploadQueueTimeout) clearTimeout(this._uploadQueueTimeout);
                 },
             };
         }
