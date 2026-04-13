@@ -4,7 +4,7 @@
     if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
 }
 
-<header class="app-topbar bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+<header class="app-topbar relative z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
     <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
             class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
@@ -46,13 +46,13 @@
 
         <!-- Command palette overlay -->
         <div x-show="aberto" x-cloak
-             class="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh] px-4"
+             class="fixed inset-0 z-[220] flex items-start justify-center pt-[8vh] px-4"
              @@keydown.escape.window="fechar()">
             <!-- Backdrop -->
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="fechar()"></div>
 
             <!-- Painel -->
-            <div class="app-command-panel relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            <div class="app-command-panel relative z-[221] w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
                  @@keydown.arrow-down.prevent="mover(1)" @@keydown.arrow-up.prevent="mover(-1)"
                  @@keydown.enter.prevent="selecionar()">
                 <!-- Input -->

@@ -181,9 +181,17 @@
                 {
                     <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100 col-span-2">
                         <p class="text-[11px] text-slate-400 font-medium mb-1.5">Código de barras</p>
-                        <div class="flex items-center gap-3">
-                            <svg id="barcode-svg" class="h-12"></svg>
-                            <span class="text-sm font-mono text-slate-700">@p.CodigoBarras</span>
+                        <div class="barcode-label">
+                            <div class="barcode-label__meta">
+                                @if (!string.IsNullOrEmpty(p.SkuBase))
+                                {
+                                    <span class="barcode-label__sku">SKU @p.SkuBase</span>
+                                }
+                                <span class="barcode-label__caption">Etiqueta pronta para leitura</span>
+                            </div>
+                            <div class="barcode-label__paper">
+                                <svg id="barcode-svg" class="barcode-label__svg" aria-label="CÃ³digo de barras do produto"></svg>
+                            </div>
                         </div>
                     </div>
                 }
@@ -686,7 +694,7 @@
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                try { JsBarcode('#barcode-svg', '@p.CodigoBarras', { format: 'CODE128', height: 40, displayValue: false, margin: 0 }); } catch(e) {}
+                try { JsBarcode('#barcode-svg', '@p.CodigoBarras', { format: 'CODE128', height: 64, displayValue: true, textMargin: 6, fontSize: 18, margin: 10, background: 'transparent', lineColor: '#111827', width: 1.7 }); } catch(e) {}
             });
         </script>
     }

@@ -2095,6 +2095,64 @@ html.theme-dark .ui-select.ui-select--plain {
     background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
 }
 
+.barcode-label {
+    display: grid;
+    gap: 12px;
+}
+
+.barcode-label__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.barcode-label__sku {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, .12);
+    color: #4338CA;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.barcode-label__caption {
+    font-size: 11px;
+    font-weight: 500;
+    color: #94A3B8;
+}
+
+.barcode-label__paper {
+    display: flex;
+    justify-content: center;
+    padding: 18px 18px 14px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .98) 0%, rgba(248, 250, 252, .98) 100%);
+    border: 1px solid rgba(226, 232, 240, .95);
+    box-shadow:
+        0 14px 28px rgba(15, 23, 42, .12),
+        8px 8px 0 rgba(15, 23, 42, .14);
+    overflow: hidden;
+}
+
+.barcode-label__svg {
+    width: min(100%, 420px);
+    height: auto;
+    display: block;
+}
+
+.barcode-label__svg text {
+    fill: #0F172A;
+    font-weight: 500;
+    letter-spacing: .08em;
+}
+
 .badge-critical {
     animation: pulseRed 1.8s ease-in-out infinite;
 }
@@ -2165,6 +2223,32 @@ html.theme-dark .tbl-full tbody tr:hover td {
 
 html.theme-dark .dropdown-item:hover {
     background: rgba(99, 102, 241, .18);
+}
+
+html.theme-dark .barcode-label__sku {
+    background: rgba(129, 140, 248, .18);
+    color: #C7D2FE;
+}
+
+html.theme-dark .barcode-label__caption {
+    color: #94A3B8;
+}
+
+html.theme-dark .barcode-label__paper {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .98) 0%, rgba(241, 245, 249, .98) 100%);
+    border-color: rgba(226, 232, 240, .92);
+    box-shadow:
+        0 18px 34px rgba(2, 6, 23, .34),
+        10px 10px 0 rgba(15, 23, 42, .3);
+}
+
+@media (max-width: 640px) {
+    .barcode-label__paper {
+        padding: 14px 10px 10px;
+        box-shadow:
+            0 10px 20px rgba(15, 23, 42, .14),
+            5px 5px 0 rgba(15, 23, 42, .12);
+    }
 }
 
 html.theme-dark .product-row-menu__item--success {
