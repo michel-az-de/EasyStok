@@ -37,7 +37,7 @@
 
 @Html.AntiForgeryToken()
 
-<div x-data="produtoHub()" x-init="init()">
+<div x-data="produtoHub()" x-init="init()" class="produto-detail-page">
 
     <!-- ═══ BACK + BREADCRUMB ═══ -->
     <div class="flex items-center gap-2 mb-4 text-sm text-slate-500">
@@ -57,7 +57,7 @@
         <!-- ── LEFT: IMAGE GALLERY ── -->
         <div class="space-y-3">
             <!-- Main image -->
-            <div class="aspect-square bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group">
+            <div class="produto-gallery-card aspect-square bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group">
                 <template x-if="photos.length > 0">
                     <img :src="mainPhoto" :key="mainPhoto" alt="@p.Nome"
                          class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
@@ -111,14 +111,14 @@
             <div>
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
                     <span class="badge @statusBadge px-2.5 py-0.5 rounded-full text-xs font-semibold">@p.StatusNome</span>
-                    <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-medium">@tipoBadge</span>
+                    <span class="produto-chip produto-chip--neutral text-[11px] bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-medium">@tipoBadge</span>
                     @if (p.QuantidadeTotalEstoque == 0)
                     {
-                        <span class="text-[11px] bg-red-50 text-red-600 px-2.5 py-0.5 rounded-full font-semibold">Sem estoque</span>
+                        <span class="produto-chip produto-chip--danger text-[11px] bg-red-50 text-red-600 px-2.5 py-0.5 rounded-full font-semibold">Sem estoque</span>
                     }
                     else
                     {
-                        <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
+                        <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
                     }
                 </div>
                 <h1 class="text-2xl font-extrabold text-slate-900 leading-tight mb-1">@p.Nome</h1>
@@ -135,7 +135,7 @@
             <!-- Price block -->
             @if (temPreco || temCusto)
             {
-                <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+                <div class="produto-price-card bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
                     @if (temPreco)
                     {
                         <div class="flex items-baseline gap-2 mb-1">
@@ -174,7 +174,7 @@
             <div class="grid grid-cols-2 gap-3">
                 @if (!string.IsNullOrEmpty(p.CodigoBarras))
                 {
-                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 col-span-2">
+                    <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100 col-span-2">
                         <p class="text-[11px] text-slate-400 font-medium mb-1.5">Codigo de barras</p>
                         <div class="flex items-center gap-3">
                             <svg id="barcode-svg" class="h-12"></svg>
@@ -184,18 +184,18 @@
                 }
                 @if (p.ControlaValidade)
                 {
-                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <p class="text-[11px] text-slate-400 font-medium mb-0.5">Validade</p>
                         <p class="text-sm font-semibold text-emerald-600">Controlada</p>
                     </div>
                 }
                 @if (p.Dimensoes != null)
                 {
-                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <p class="text-[11px] text-slate-400 font-medium mb-0.5">Peso</p>
                         <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Peso:F3} kg")</p>
                     </div>
-                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <p class="text-[11px] text-slate-400 font-medium mb-0.5">Dimensoes</p>
                         <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Largura:F1} x {p.Dimensoes.Altura:F1} x {p.Dimensoes.Comprimento:F1} cm")</p>
                     </div>
@@ -203,7 +203,7 @@
             </div>
 
             <!-- Integrity bar -->
-            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <div class="produto-score-card bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div class="h-2 rounded-full @barCss transition-all" style="width: @score%"></div>
@@ -241,13 +241,13 @@
                 </a>
                 <div x-data="{ open: false }" class="relative">
                     <button @@click="open = !open" @@click.away="open = false"
-                            class="p-2.5 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors">
+                            class="produto-kebab-btn p-2.5 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
                         </svg>
                     </button>
                     <div x-show="open" x-transition:enter.duration.100ms
-                         class="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl shadow-slate-200/80 border border-slate-100 py-1 z-20">
+                         class="produto-menu absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl shadow-slate-200/80 border border-slate-100 py-1 z-20">
                         <button @@click="open=false; showExcluir=true"
                                 class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
