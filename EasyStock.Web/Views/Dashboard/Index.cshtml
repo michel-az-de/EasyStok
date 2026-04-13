@@ -141,7 +141,7 @@
     </div>
 
     <div class="ws dashboard-chart-card">
-        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos 6 meses</h2>
+        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos @Model.GraficoLabels.Count @(Model.GraficoLabels.Count == 1 ? "mês" : "meses")</h2>
         @if (Model.GraficoLabels.Any())
         {
             <div class="dashboard-chart-wrap">

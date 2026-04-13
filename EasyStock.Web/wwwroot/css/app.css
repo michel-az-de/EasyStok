@@ -1991,8 +1991,11 @@ main > * {
     }
 }
 
-.ui-select--plain {
-    background-image: none;
+.ui-select--plain,
+.ui-select.ui-select--plain,
+html.theme-dark .ui-select--plain,
+html.theme-dark .ui-select.ui-select--plain {
+    background-image: none !important;
     padding-right: 14px;
 }
 
@@ -2010,9 +2013,9 @@ main > * {
 }
 
 .product-stepper-sticky {
-    position: sticky;
-    top: 16px;
+    position: relative;
     z-index: 15;
+    background: inherit;
     box-shadow: 0 18px 36px rgba(15, 23, 42, .08);
 }
 

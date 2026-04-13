@@ -1,5 +1,6 @@
 ﻿@model EntradasHistoricoViewModel
 @{
+    ViewBag.Title = "Histórico de Movimentações";
     var tiposOpcoes = new[] { ("", "Todos"), ("entrada", "Entradas"), ("saida", "Saídas"), ("reposicao", "Reposições") };
 }
 
@@ -88,10 +89,10 @@
                         <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
                         <td class="text-slate-500">@(e.ProdutoVariacao?.Nome ?? "-")</td>
                         <td class="text-center font-mono">@e.Qty</td>
-                        <td class="text-right font-mono text-slate-600">
+                        <td class="text-right font-mono text-slate-600 whitespace-nowrap">
                             @(e.Custo.HasValue ? e.Custo.Value.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
                         </td>
-                        <td class="text-right font-mono font-semibold">
+                        <td class="text-right font-mono font-semibold whitespace-nowrap">
                             @(e.Custo.HasValue ? total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
                         </td>
                         <td class="text-right text-slate-500">@e.Data.ToString("dd/MM/yyyy")</td>

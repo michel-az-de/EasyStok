@@ -306,7 +306,7 @@
             </div>
         </div>
 
-        <!-- Precos -->
+        <!-- Preços -->
         <div class="ws">
             <div class="section-hd">
                 <div class="section-hd-icon bg-emerald-50 text-emerald-500">
@@ -357,7 +357,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preco venda</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
                         <input type="number" step="0.01" min="0"
@@ -478,7 +478,7 @@
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-600 mb-1">Cod. Barras</label>
+                                <label class="block text-xs text-slate-600 mb-1">Cód. Barras</label>
                                 <input type="text" :name="'VariacoesRich[' + i + '].CodigoBarras'" x-model="v.codigoBarras"
                                        class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                             </div>
@@ -544,7 +544,7 @@
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-slate-600 mb-1">Variacao</label>
+                                    <label class="block text-xs text-slate-600 mb-1">Variação</label>
                                     <input type="text" :name="'Caracteristicas[' + i + '].VariacaoPadrao'" x-model="c.variacaoPadrao"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
@@ -707,14 +707,14 @@
                     <div class="mt-4 pt-4 border-t border-slate-100">
                         <div class="flex items-end gap-3 flex-wrap">
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
-                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2) : 'Preço não definido'"
+                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2).replace('.', ',') : 'Preço não definido'"
                                   :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
                             <span x-show="margem > 0" x-cloak
                                   :class="margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
                                   class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
-                                  x-text="margem.toFixed(1) + '% margem'"></span>
+                                  x-text="margem.toFixed(1).replace('.', ',') + '% margem'"></span>
                         </div>
-                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2)"></div>
+                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2).replace('.', ',')"></div>
                     </div>
                 </div>
             </div>
@@ -1204,7 +1204,7 @@
                     if (!this.custo || this.custo <= 0) return [];
                     return [30, 50, 100].map(pct => ({
                         pct,
-                        preco: (this.custo * (1 + pct / 100)).toFixed(2)
+                        preco: (this.custo * (1 + pct / 100)).toFixed(2).replace('.', ',')
                     }));
                 },
                 aplicarMargem(pct) {

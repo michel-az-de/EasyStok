@@ -519,7 +519,18 @@
             }
         };
 
-        document.addEventListener('DOMContentLoaded', () => window.EasyStockTheme.init());
+        document.addEventListener('DOMContentLoaded', () => {
+            window.EasyStockTheme.init();
+            // Atualiza badge de notificações no load da página
+            fetch('/notificacoes/resumo').then(r => r.ok ? r.json() : null).then(data => {
+                if (!data) return;
+                const badge = document.getElementById('topbar-notif-badge');
+                if (!badge) return;
+                const c = data.totalNaoLidas || 0;
+                if (c > 0) { badge.textContent = c > 99 ? '99+' : c; badge.classList.remove('hidden'); }
+                else { badge.classList.add('hidden'); }
+            }).catch(() => {});
+        });
     </script>
 
     <!-- Avatar / usuário -->

@@ -46,7 +46,7 @@ public class ItemEstoqueController(
             id = i.Id.ToString(),
             produtoId = i.ProdutoId.ToString(),
             varId = (i.ProdutoVariacaoId ?? Guid.Empty).ToString(),
-            sku = i.ChavePesquisa ?? i.CodigoInterno ?? i.CodigoMarketplace ?? "",
+            sku = i.Produto != null ? (i.Produto.SkuBase?.Value ?? "") : (i.CodigoInterno ?? ""),
             qty = (int)i.QuantidadeAtual,
             entryDate = DateOnly.FromDateTime(i.EntradaEm),
             lastMov = new DateTimeOffset(i.UltimaMovimentacaoEm ?? i.EntradaEm, TimeSpan.Zero),
