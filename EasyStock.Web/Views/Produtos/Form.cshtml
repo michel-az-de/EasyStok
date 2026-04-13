@@ -261,7 +261,7 @@
                     </svg>
                 </div>
                 <h3 class="font-bold text-slate-800">Fotos do produto</h3>
-                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + pendingFiles.length) + '/5'"></span>
+                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + _pondFileCount) + '/5'"></span>
             </div>
 
             <!-- Fotos existentes (edit mode) -->
@@ -276,33 +276,31 @@
                 </div>
             </div>
 
-            <!-- Selecionar novas fotos -->
-            <div @@click="$refs.fileInput.click()"
-                 class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors">
-                <svg class="w-8 h-8 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <p class="text-sm text-slate-500 font-medium">Clique para selecionar fotos</p>
-                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 10 MB (otimizada automaticamente)</p>
-            </div>
-            <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
-                   @@change="addFiles()" />
+            <!-- FilePond (fotos ficam locais até o submit) -->
+            <input type="file" x-ref="pondInput" />
+            <p class="text-xs text-slate-400 mt-2">JPEG, PNG ou WebP. Max. 10 MB cada. As fotos serão enviadas ao salvar o produto.</p>
+        </div>
 
-            <!-- Previews das novas fotos selecionadas -->
-            <div x-show="previews.length > 0" x-transition class="mt-3">
-                <p class="text-xs text-slate-500 mb-2" x-text="pendingFiles.length + ' foto(s) selecionada(s) — serão enviadas ao salvar'"></p>
-                <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                    <template x-for="(src, i) in previews" :key="src">
-                        <div class="relative aspect-square rounded-lg overflow-hidden border-2 border-indigo-300 group">
-                            <img :src="src" class="w-full h-full object-cover" />
-                            <button type="button" @@click="removeFile(i)"
-                                    class="absolute top-1 right-1 w-5 h-5 bg-red-500/90 text-white rounded-full text-[10px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"
-                                    title="Remover">&#215;</button>
-                        </div>
-                    </template>
-                </div>
-                <button type="button" @@click="pendingFiles=[]; _rebuildPreviews()"
-                        class="text-xs text-red-500 hover:text-red-700 mt-2 font-medium">Limpar seleção</button>
+        <!-- Overlay de progresso (Fase 2 do submit — upload de fotos) -->
+        <div x-show="uploadPhase" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-3">
+                <p class="text-sm font-semibold text-slate-800">Enviando fotos...</p>
+                <template x-for="(qi, i) in uploadQueue" :key="i">
+                    <div class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                         :class="qi.status==='uploading' ? 'bg-indigo-50 text-indigo-700' :
+                                 qi.status==='done' ? 'bg-emerald-50 text-emerald-700' :
+                                 'bg-red-50 text-red-700'">
+                        <svg x-show="qi.status==='uploading'" class="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span x-show="qi.status==='done'" class="text-emerald-600 font-bold flex-shrink-0">&#10003;</span>
+                        <span x-show="qi.status==='error'" class="text-red-600 font-bold flex-shrink-0">&#10007;</span>
+                        <span x-text="qi.name" class="truncate flex-1"></span>
+                        <span x-show="qi.status==='error'" class="text-xs flex-shrink-0" x-text="qi.message"></span>
+                    </div>
+                </template>
             </div>
         </div>
 
@@ -757,7 +755,7 @@
                     <span class="text-[10px] font-medium" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
                     <span class="text-[10px] font-medium" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
                     <span class="text-[10px] font-medium" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Desc</span>
-                    <span class="text-[10px] font-medium" :class="(pendingFiles.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(pendingFiles.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
+                    <span class="text-[10px] font-medium" :class="(_pondFileCount + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(_pondFileCount + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
                 </div>
             </div>
             <div class="flex gap-2 flex-shrink-0">
@@ -784,7 +782,23 @@
     </div>
 </form>
 
+@section Styles {
+    <link href="https://unpkg.com/filepond@@^4/dist/filepond.min.css" rel="stylesheet" />
+    <link href="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.css" rel="stylesheet" />
+}
+
 @section Scripts {
+    <script src="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.js"></script>
+    <script src="https://unpkg.com/filepond-plugin-file-validate-type@@^1/dist/filepond-plugin-file-validate-type.min.js"></script>
+    <script src="https://unpkg.com/filepond-plugin-file-validate-size@@^2/dist/filepond-plugin-file-validate-size.min.js"></script>
+    <script src="https://unpkg.com/filepond@@^4/dist/filepond.min.js"></script>
+    <script>
+        FilePond.registerPlugin(
+            FilePondPluginImagePreview,
+            FilePondPluginFileValidateType,
+            FilePondPluginFileValidateSize
+        );
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         function produtoForm() {
@@ -817,43 +831,89 @@
 
                 get step1Valid() { return !!this.nome && !!this.categoriaId; },
 
-                // ── Submit ──
+                // ── Submit (duas fases: produto primeiro, fotos depois via AJAX) ──
                 saving: false,
-                submitForm() {
+                uploadPhase: false,
+                uploadQueue: [],
+                async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
                     if (this.saving) return;
                     this.saving = true;
                     this._clearDraft();
 
-                    // Usa fetch + FormData para enviar fotos de forma confiável
-                    // (DataTransfer + input.files é instável entre navegadores)
                     const form = this.$el;
                     const fd = new FormData(form);
+                    // Remover campos de arquivo — FilePond pode ter adicionado inputs hidden
                     fd.delete('fotos');
-                    this.pendingFiles.forEach(f => fd.append('fotos', f));
+                    for (const key of [...fd.keys()]) {
+                        if (key.startsWith('filepond')) fd.delete(key);
+                    }
 
-                    fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' })
-                        .then(r => {
-                            if (r.redirected) { window.location.href = r.url; return; }
-                            // Se retornou HTML (validação falhou), recarrega com os erros
-                            if (r.ok) {
-                                const ct = r.headers.get('content-type') || '';
-                                if (ct.includes('text/html')) {
-                                    // Servidor retornou a view com erros de validação
-                                    r.text().then(html => { document.open(); document.write(html); document.close(); });
-                                } else {
-                                    window.location.href = '/produtos';
-                                }
-                                return;
+                    try {
+                        // === FASE 1: Criar/Atualizar produto (sem fotos) ===
+                        const r = await fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' });
+
+                        if (!r.ok && !r.redirected) {
+                            const ct = r.headers.get('content-type') || '';
+                            if (ct.includes('text/html')) {
+                                document.open();
+                                document.write(await r.text());
+                                document.close();
+                            } else {
+                                this.saving = false;
+                                window.showToast('Erro ao salvar produto.', 'error');
                             }
-                            this.saving = false;
-                            window.showToast('Erro ao salvar produto. Tente novamente.', 'error');
-                        })
-                        .catch(() => {
-                            this.saving = false;
-                            window.showToast('Erro de conexão. Verifique sua internet.', 'error');
-                        });
+                            return;
+                        }
+
+                        // Extrair ID do produto do redirect URL
+                        const redirectUrl = r.url;
+                        const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
+                        const productId = match ? match[1] : null;
+
+                        // === FASE 2: Upload de fotos via AJAX ===
+                        const pondFiles = this._pond ? this._pond.getFiles().map(f => f.file).filter(Boolean) : [];
+                        if (productId && pondFiles.length > 0) {
+                            await this._uploadPhotosAfterSave(productId, pondFiles);
+                        }
+
+                        window.location.href = redirectUrl || '/produtos';
+                    } catch (e) {
+                        this.saving = false;
+                        window.showToast('Erro de conexão ao salvar.', 'error');
+                    }
+                },
+                async _uploadPhotosAfterSave(productId, files) {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                    this.uploadPhase = true;
+                    this.uploadQueue = files.map(f => ({ name: f.name, status: 'uploading', message: '' }));
+
+                    let successCount = 0;
+                    for (let i = 0; i < files.length; i++) {
+                        try {
+                            const fd = new FormData();
+                            fd.append('foto', files[i]);
+                            fd.append('__RequestVerificationToken', token);
+                            const resp = await fetch('/produtos/' + productId + '/fotos/ajax', { method: 'POST', body: fd });
+                            const data = await resp.json();
+                            if (!data.ok) throw new Error(data.erro || 'Erro no servidor');
+                            this.uploadQueue[i].status = 'done';
+                            successCount++;
+                        } catch (err) {
+                            this.uploadQueue[i].status = 'error';
+                            this.uploadQueue[i].message = err.message;
+                        }
+                        this.uploadQueue = [...this.uploadQueue]; // forçar reatividade Alpine
+                    }
+
+                    // Pausa para o usuário ver o resultado
+                    await new Promise(resolve => setTimeout(resolve, 1200));
+                    this.uploadPhase = false;
+
+                    if (successCount < files.length) {
+                        window.showToast((files.length - successCount) + ' foto(s) falharam. Adicione-as na página do produto.', 'warning');
+                    }
                 },
 
                 // ── Marca autocomplete ──
@@ -937,11 +997,35 @@
                     // Detecta restauração via bfcache (botão Voltar após submit bem-sucedido)
                     window.addEventListener('pageshow', (e) => {
                         if (e.persisted && this.saving) {
-                            // Página foi restaurada do cache com estado de "enviando" — significa que
-                            // o submit foi concluído. Redireciona para um formulário limpo.
                             window.location.replace(window.location.href);
                         }
                     });
+
+                    // Inicializar FilePond
+                    this.$nextTick(() => {
+                        const maxNew = 5 - this.existingPhotos.length;
+                        const self = this;
+                        this._pond = FilePond.create(this.$refs.pondInput, {
+                            allowMultiple: true,
+                            maxFiles: maxNew,
+                            acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+                            maxFileSize: '10MB',
+                            labelIdle: 'Arraste fotos aqui ou <span class="filepond--label-action">selecione</span>',
+                            labelMaxFileSizeExceeded: 'Arquivo muito grande',
+                            labelMaxFileSize: 'Tamanho maximo: {filesize}',
+                            labelFileTypeNotAllowed: 'Tipo nao permitido',
+                            fileValidateTypeLabelExpectedTypes: 'Aceitos: JPEG, PNG, WebP',
+                            labelFileProcessingComplete: 'Foto pronta',
+                            labelTapToCancel: '',
+                            labelTapToRetry: 'Toque para tentar novamente',
+                            credits: false,
+                        });
+                        this._pond.on('addfile', () => { self._pondFileCount = self._pond.getFiles().length; });
+                        this._pond.on('removefile', () => { self._pondFileCount = self._pond.getFiles().length; });
+                    });
+                },
+                destroy() {
+                    if (this._pond) this._pond.destroy();
                 },
                 _saveDraft() {
                     try {
@@ -1160,36 +1244,10 @@
                     return cat ? cat.nome : '';
                 },
 
-                // ── Photos (acumula múltiplas seleções) ──
-                pendingFiles: [],
-                previews: [],
+                // ── Photos (FilePond) ──
+                _pond: null,
+                _pondFileCount: 0,
                 existingPhotos: @Html.Raw(existingPhotosJson),
-
-                addFiles() {
-                    const input = this.$refs.fileInput;
-                    if (!input?.files?.length) return;
-                    const maxTotal = 5 - this.existingPhotos.length;
-                    const newFiles = Array.from(input.files);
-                    for (const f of newFiles) {
-                        if (this.pendingFiles.length >= maxTotal) break;
-                        // Evita duplicatas por nome+tamanho
-                        if (this.pendingFiles.some(p => p.name === f.name && p.size === f.size)) continue;
-                        if (f.size > 10 * 1024 * 1024) { window.showToast('Arquivo ' + f.name + ' excede 10 MB.', 'warning'); continue; }
-                        if (!f.type.startsWith('image/')) { window.showToast('Arquivo ' + f.name + ' não é imagem.', 'warning'); continue; }
-                        this.pendingFiles.push(f);
-                    }
-                    input.value = '';
-                    this._rebuildPreviews();
-                },
-                removeFile(idx) {
-                    if (this.previews[idx]) URL.revokeObjectURL(this.previews[idx]);
-                    this.pendingFiles.splice(idx, 1);
-                    this._rebuildPreviews();
-                },
-                _rebuildPreviews() {
-                    this.previews.forEach(u => URL.revokeObjectURL(u));
-                    this.previews = this.pendingFiles.map(f => URL.createObjectURL(f));
-                },
 
                 // ── AI ──
                 aiGenerating: false,
@@ -1234,7 +1292,7 @@
 
                 // ── Completion (mesmos critérios ponderados da página do produto) ──
                 get completionPercent() {
-                    const fotos = this.pendingFiles.length + this.existingPhotos.length;
+                    const fotos = this._pondFileCount + this.existingPhotos.length;
                     const fields = [
                         { ok: fotos > 0,              pts: 20 },
                         { ok: !!this.descricao,        pts: 15 },
