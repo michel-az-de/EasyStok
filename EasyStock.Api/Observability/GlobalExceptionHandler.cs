@@ -19,15 +19,34 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         }
 
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
+        var requestPath = httpContext.Request.Path + httpContext.Request.QueryString;
+        var requestMethod = httpContext.Request.Method;
 
         var (statusCode, code, title, detail, logAsError) = MapException(exception);
 
         if (logAsError)
-            logger.LogError(exception, "Erro inesperado na API. CorrelationId: {CorrelationId}", correlationId);
+            logger.LogError(exception,
+                "Erro inesperado na API. CorrelationId: {CorrelationId} | {Method} {Path} | Exception: {ExceptionType}: {ExceptionMessage} | InnerException: {InnerException} | StackTrace: {StackTrace}",
+                correlationId, requestMethod, requestPath,
+                exception.GetType().FullName, exception.Message,
+                exception.InnerException?.Message ?? "(nenhuma)",
+                exception.StackTrace ?? "(sem stack trace)");
         else
-            logger.LogWarning(exception, "Erro tratado na API. CorrelationId: {CorrelationId}", correlationId);
+            logger.LogWarning(exception,
+                "Erro tratado na API. CorrelationId: {CorrelationId} | {Method} {Path} | {ExceptionType}: {ExceptionMessage}",
+                correlationId, requestMethod, requestPath,
+                exception.GetType().FullName, exception.Message);
 
-        var envelope = new ApiErrorResponse(new ApiError(code, title, detail, correlationId));
+        // Incluir detalhes completos do erro na resposta (útil para diagnóstico)
+        var errorDetail = detail;
+        if (statusCode >= 500)
+        {
+            errorDetail = $"{exception.GetType().Name}: {exception.Message}";
+            if (exception.InnerException is not null)
+                errorDetail += $" → {exception.InnerException.GetType().Name}: {exception.InnerException.Message}";
+        }
+
+        var envelope = new ApiErrorResponse(new ApiError(code, title, errorDetail, correlationId));
 
         httpContext.Response.StatusCode = statusCode;
         httpContext.Response.ContentType = "application/json";

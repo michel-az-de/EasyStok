@@ -38,13 +38,22 @@ using Swashbuckle.AspNetCore.Annotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog
+// Garantir que diretório de logs existe antes do Serilog iniciar
+{
+    var logDir = builder.Configuration["LogSettings:LogDirectory"] is { Length: > 0 } dir
+        ? dir
+        : Path.Combine(AppContext.BaseDirectory, "logs");
+    try { Directory.CreateDirectory(logDir); } catch { /* best-effort */ }
+}
+
+// Configure Serilog — máximo de informações em cada log entry
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
     .Enrich.WithProcessId()
+    .Enrich.WithMachineName()
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -528,16 +537,26 @@ app.Use(async (context, next) =>
 // Serilog Request Logging
 app.UseSerilogRequestLogging(options =>
 {
-    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath}{QueryString} responded {StatusCode} in {Elapsed:0.0000} ms";
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
         diagnosticContext.Set("CorrelationId", httpContext.Items["CorrelationId"]);
         diagnosticContext.Set("Endpoint", httpContext.Request.Path);
+        diagnosticContext.Set("QueryString", httpContext.Request.QueryString.ToString());
         diagnosticContext.Set("MetodoHttp", httpContext.Request.Method);
+        diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+        if (httpContext.Request.ContentLength is > 0)
+            diagnosticContext.Set("RequestSize", httpContext.Request.ContentLength);
+        diagnosticContext.Set("ResponseSize", httpContext.Response.ContentLength ?? 0);
         var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                   ?? httpContext.User?.FindFirst("sub")?.Value;
         if (userId is not null)
             diagnosticContext.Set("UserId", userId);
+        var empresaId = httpContext.User?.FindFirst("empresa_id")?.Value
+                     ?? httpContext.User?.FindFirst("EmpresaId")?.Value;
+        if (empresaId is not null)
+            diagnosticContext.Set("EmpresaId", empresaId);
     };
 });
 

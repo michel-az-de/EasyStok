@@ -20,6 +20,9 @@ public static class BackgroundJobServiceCollectionExtensions
         services.AddSingleton<HealthSnapshotService>();
         services.AddHostedService(sp => sp.GetRequiredService<HealthSnapshotService>());
 
+        // Backup automático de logs no file storage (a cada 30 min)
+        services.AddHostedService<LogStorageBackgroundService>();
+
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()
             ?? new BackgroundJobOptions();
 
