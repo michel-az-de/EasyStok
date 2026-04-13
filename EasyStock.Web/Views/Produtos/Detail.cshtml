@@ -376,10 +376,30 @@
                 <span class="text-xs text-slate-400" x-text="photos.length + '/5'"></span>
             </div>
 
-            <!-- Loading -->
-            <div x-show="uploading" x-cloak class="flex items-center gap-2 mb-3 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-sm text-indigo-700">
-                <span class="spinner w-4 h-4 border-indigo-500"></span>
-                Enviando foto(s)...
+            <!-- Upload queue status -->
+            <div x-show="uploadQueue.length > 0" x-cloak class="mb-4 space-y-1.5">
+                <template x-for="(qi, i) in uploadQueue" :key="i">
+                    <div class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                         :class="qi.status === 'uploading' ? 'bg-indigo-50 border border-indigo-200 text-indigo-700'
+                               : qi.status === 'done' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                               : 'bg-red-50 border border-red-200 text-red-700'">
+                        <template x-if="qi.status === 'uploading'">
+                            <span class="spinner w-4 h-4 border-indigo-500 flex-shrink-0"></span>
+                        </template>
+                        <template x-if="qi.status === 'done'">
+                            <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </template>
+                        <template x-if="qi.status === 'error'">
+                            <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </template>
+                        <span class="truncate" x-text="qi.name"></span>
+                        <span class="text-xs opacity-70 flex-shrink-0" x-show="qi.message" x-text="qi.message"></span>
+                    </div>
+                </template>
             </div>
 
             <!-- Grid -->
@@ -680,6 +700,7 @@
 
                 // ── Photos management ──
                 photos: initialPhotos.map(f => ({ ...f, toDelete: false })),
+                uploadQueue: [],   // { name, status: 'uploading'|'done'|'error', message? }
                 uploading: false,
                 photoError: null,
 
@@ -691,34 +712,72 @@
                     }
                 },
 
-                // ── Photo management (auto-save) ──
+                // ── Photo management (auto-save with per-file progress) ──
                 async handlePhotoSelect(e) {
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
                     const available = 5 - this.photos.length;
                     const files = Array.from(e.target.files).slice(0, Math.max(0, available));
                     e.target.value = '';
-                    if (files.length === 0) return;
+                    if (files.length === 0) {
+                        if (available <= 0) window.showToast('Limite de 5 fotos atingido.', 'warning');
+                        return;
+                    }
 
                     this.uploading = true;
                     this.photoError = null;
-                    for (const f of files) {
-                        if (f.size > 5 * 1024 * 1024) { window.showToast('Imagem muito grande (max. 5 MB).', 'warning'); continue; }
-                        if (!f.type.startsWith('image/')) continue;
-                        const fd = new FormData();
-                        fd.append('foto', f);
-                        fd.append('__RequestVerificationToken', token);
+                    this.uploadQueue = files.map(f => ({ name: f.name, status: 'uploading', message: null }));
+
+                    let successCount = 0;
+                    let errorCount = 0;
+
+                    for (let i = 0; i < files.length; i++) {
+                        const f = files[i];
+                        const qi = this.uploadQueue[i];
+
+                        if (f.size > 10 * 1024 * 1024) {
+                            qi.status = 'error';
+                            qi.message = 'Muito grande (max 10MB)';
+                            errorCount++;
+                            continue;
+                        }
+                        if (!f.type.startsWith('image/')) {
+                            qi.status = 'error';
+                            qi.message = 'Formato invalido';
+                            errorCount++;
+                            continue;
+                        }
+
                         try {
+                            const fd = new FormData();
+                            fd.append('foto', f);
+                            fd.append('__RequestVerificationToken', token);
                             const r = await fetch(`/produtos/${prodId}/fotos/ajax`, { method: 'POST', body: fd });
                             const d = await r.json();
-                            if (!d.ok) throw new Error(d.erro ?? 'Erro ao enviar');
-                            if (d.fotoId && d.url) this.photos.push({ fotoId: d.fotoId, url: d.url, toDelete: false });
+                            if (!d.ok) throw new Error(d.erro ?? 'Erro no servidor');
+                            if (d.fotoId && d.url) {
+                                this.photos.push({ fotoId: d.fotoId, url: d.url, toDelete: false });
+                            }
+                            qi.status = 'done';
+                            qi.message = 'Salva e otimizada';
+                            successCount++;
                         } catch (err) {
-                            this.photoError = 'Erro ao enviar foto: ' + (err.message ?? 'tente novamente.');
-                            window.showToast(this.photoError, 'error');
+                            qi.status = 'error';
+                            qi.message = err.message ?? 'Erro ao enviar';
+                            errorCount++;
                         }
                     }
+
                     this.uploading = false;
-                    if (!this.photoError) window.showToast('Foto(s) salva(s)!', 'success');
+
+                    if (errorCount > 0 && successCount > 0)
+                        window.showToast(`${successCount} foto(s) salva(s), ${errorCount} com erro.`, 'warning');
+                    else if (errorCount > 0)
+                        window.showToast(`Erro ao enviar ${errorCount} foto(s).`, 'error');
+                    else
+                        window.showToast(`${successCount} foto(s) salva(s) com sucesso!`, 'success');
+
+                    // Clear queue after 4 seconds
+                    setTimeout(() => { this.uploadQueue = []; }, 4000);
                 },
                 async deletePhoto(fotoId) {
                     if (!confirm('Remover esta foto?')) return;
