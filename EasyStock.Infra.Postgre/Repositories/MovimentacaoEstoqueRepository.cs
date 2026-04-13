@@ -61,7 +61,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = BuildFilteredQuery(empresaId, de, ate, tipo, natureza);
 
-            var totalUnidades = await query.SumAsync(m => m.Quantidade.Value);
+            var totalUnidades = await query.Select(m => m.Quantidade.Value).SumAsync();
             var receitaTotal = await query
                 .Where(m => m.ValorTotal != null)
                 .SumAsync(m => m.ValorTotal!.Valor);
@@ -120,7 +120,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (produtoId.HasValue)
                 query = query.Where(m => m.ProdutoId == produtoId.Value);
 
-            var totalSaidas = await query.SumAsync(m => m.Quantidade.Value);
+            var totalSaidas = await query.Select(m => m.Quantidade.Value).SumAsync();
             var dias = Math.Max(1, (ate - de).Days);
             return (decimal)totalSaidas / dias;
         }
@@ -140,11 +140,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                             m.Tipo == TipoMovimentacaoEstoque.Saida &&
                             m.DataMovimentacao >= de &&
                             m.DataMovimentacao <= ate)
+                .Select(m => new { m.ProdutoId, Quantidade = m.Quantidade.Value })
                 .GroupBy(m => m.ProdutoId)
                 .Select(g => new
                 {
                     ProdutoId = g.Key,
-                    TotalSaidas = g.Sum(m => m.Quantidade.Value)
+                    TotalSaidas = g.Sum(m => m.Quantidade)
                 })
                 .ToListAsync();
 
@@ -162,13 +163,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                             m.ProdutoId == produtoId &&
                             m.Tipo == TipoMovimentacaoEstoque.Saida &&
                             m.DataMovimentacao >= de)
+                .Select(m => new
+                {
+                    m.DataMovimentacao,
+                    Quantidade = m.Quantidade.Value,
+                    ValorTotal = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                })
                 .GroupBy(m => new { m.DataMovimentacao.Year, m.DataMovimentacao.Month })
                 .Select(g => new
                 {
                     Ano = g.Key.Year,
                     Mes = g.Key.Month,
-                    TotalSaidas = g.Sum(m => m.Quantidade.Value),
-                    ValorTotal = g.Sum(m => m.ValorTotal != null ? m.ValorTotal.Valor : 0m)
+                    TotalSaidas = g.Sum(m => m.Quantidade),
+                    ValorTotal = g.Sum(m => m.ValorTotal)
                 })
                 .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
                 .ToListAsync();
