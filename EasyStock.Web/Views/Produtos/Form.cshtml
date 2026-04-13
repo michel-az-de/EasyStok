@@ -251,40 +251,45 @@
                     </svg>
                 </div>
                 <h3 class="font-bold text-slate-800">Fotos do produto</h3>
-                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + photoPreviews.length) + '/5'"></span>
+                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + previews.length) + '/5'"></span>
             </div>
 
-            <div x-show="existingPhotos.length > 0" x-transition class="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-3">
-                <template x-for="foto in existingPhotos" :key="foto.fotoId">
-                    <div class="relative aspect-square rounded-lg overflow-hidden border border-slate-200">
-                        <img :src="foto.url" class="w-full h-full object-cover" />
-                    </div>
-                </template>
+            <!-- Fotos existentes (edit mode) -->
+            <div x-show="existingPhotos.length > 0" x-transition class="mb-3">
+                <p class="text-xs text-slate-500 mb-2" x-text="existingPhotos.length + ' foto(s) ja cadastrada(s) — gerencie na pagina do produto'"></p>
+                <div class="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                    <template x-for="foto in existingPhotos" :key="foto.fotoId">
+                        <div class="aspect-square rounded-lg overflow-hidden border border-slate-200">
+                            <img :src="foto.url" class="w-full h-full object-cover" />
+                        </div>
+                    </template>
+                </div>
             </div>
 
-            <div x-show="(existingPhotos.length + photoPreviews.length) < 5"
-                 @@dragover.prevent="$el.classList.add('drop-active')"
-                 @@dragleave="$el.classList.remove('drop-active')"
-                 @@drop.prevent="$el.classList.remove('drop-active'); handleDrop($event)"
-                 @@click="$refs.fileInput.click()"
-                 class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-300 transition-colors">
-                <svg class="w-10 h-10 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            <!-- Selecionar novas fotos -->
+            <div @@click="$refs.fileInput.click()"
+                 class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors">
+                <svg class="w-8 h-8 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <p class="text-sm text-slate-500 font-medium">Arraste imagens ou clique para selecionar</p>
-                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 10 MB cada (otimizada automaticamente)</p>
+                <p class="text-sm text-slate-500 font-medium">Clique para selecionar fotos</p>
+                <p class="text-xs text-slate-400 mt-1">JPEG, PNG ou WebP — Max. 10 MB (otimizada automaticamente)</p>
             </div>
             <input type="file" name="fotos" x-ref="fileInput" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
-                   @@change="handleFileSelect($event)" />
+                   @@change="updatePreviews()" />
 
-            <div x-show="photoPreviews.length > 0" x-transition class="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-3">
-                <template x-for="(preview, i) in photoPreviews" :key="i">
-                    <div class="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
-                        <img :src="preview" class="w-full h-full object-cover" />
-                        <button type="button" @@click="removePhoto(i)"
-                                class="absolute top-1 right-1 bg-red-500/90 hover:bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
-                    </div>
-                </template>
+            <!-- Previews das novas fotos selecionadas -->
+            <div x-show="previews.length > 0" x-transition class="mt-3">
+                <p class="text-xs text-slate-500 mb-2" x-text="previews.length + ' foto(s) selecionada(s) — serao enviadas ao salvar'"></p>
+                <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                    <template x-for="(src, i) in previews" :key="i">
+                        <div class="aspect-square rounded-lg overflow-hidden border-2 border-indigo-300">
+                            <img :src="src" class="w-full h-full object-cover" />
+                        </div>
+                    </template>
+                </div>
+                <button type="button" @@click="$refs.fileInput.value=''; previews=[]"
+                        class="text-xs text-red-500 hover:text-red-700 mt-2 font-medium">Limpar selecao</button>
             </div>
         </div>
 
@@ -298,10 +303,10 @@
                 </div>
                 <h3 class="font-bold text-slate-800">Precos e margem</h3>
             </div>
-            <!-- Hidden inputs: omite campo quando valor é 0 para evitar model binding com string vazia -->
-            <template x-if="custo > 0"><input type="hidden" name="CustoReferencia" :value="custo" /></template>
-            <template x-if="preco > 0"><input type="hidden" name="PrecoReferencia" :value="preco" /></template>
-            <template x-if="margem > 0"><input type="hidden" name="MargemEstimada" :value="margem" /></template>
+            <!-- Hidden inputs: valor vazio quando zero (ASP.NET trata como null para nullable decimal) -->
+            <input type="hidden" name="CustoReferencia" :value="custo > 0 ? custo : ''" />
+            <input type="hidden" name="PrecoReferencia" :value="preco > 0 ? preco : ''" />
+            <input type="hidden" name="MargemEstimada" :value="margem > 0 ? margem : ''" />
 
             <div class="grid grid-cols-3 gap-4">
                 <div>
@@ -648,18 +653,18 @@
 
                 <!-- Foto principal -->
                 <div class="relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
-                    <template x-if="photoPreviews.length > 0"><img :src="photoPreviews[0]" class="w-full h-full object-cover" /></template>
-                    <template x-if="photoPreviews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
-                    <template x-if="photoPreviews.length === 0 && existingPhotos.length === 0">
+                    <template x-if="previews.length > 0"><img :src="previews[0]" class="w-full h-full object-cover" /></template>
+                    <template x-if="previews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
+                    <template x-if="previews.length === 0 && existingPhotos.length === 0">
                         <div class="text-center p-6">
                             <svg class="w-12 h-12 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                             <p class="text-xs text-slate-300 mt-2">Sem foto</p>
                         </div>
                     </template>
                     <!-- Photo count badge -->
-                    <div x-show="(photoPreviews.length + existingPhotos.length) > 1" x-cloak
+                    <div x-show="(previews.length + existingPhotos.length) > 1" x-cloak
                          class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                        <span x-text="(photoPreviews.length + existingPhotos.length)"></span> fotos
+                        <span x-text="(previews.length + existingPhotos.length)"></span> fotos
                     </div>
                 </div>
 
@@ -739,7 +744,7 @@
                     <span class="text-[10px] font-medium" :class="custo > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="custo > 0 ? '✓' : '○'"></span> Custo</span>
                     <span class="text-[10px] font-medium" :class="preco > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="preco > 0 ? '✓' : '○'"></span> Preco</span>
                     <span class="text-[10px] font-medium" :class="descricao ? 'text-emerald-500' : 'text-slate-300'"><span x-text="descricao ? '✓' : '○'"></span> Desc</span>
-                    <span class="text-[10px] font-medium" :class="(photoPreviews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(photoPreviews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
+                    <span class="text-[10px] font-medium" :class="(previews.length + existingPhotos.length) > 0 ? 'text-emerald-500' : 'text-slate-300'"><span x-text="(previews.length + existingPhotos.length) > 0 ? '✓' : '○'"></span> Foto</span>
                 </div>
             </div>
             <div class="flex gap-2 flex-shrink-0">
@@ -927,7 +932,7 @@
                     if (this.productId) {
                         // Modo edição: usa endpoint existente com productId
                         if (!this.descricao) {
-                            this.generateDescription();
+                            await this.generateDescription();
                             changed.push('Descrição');
                         }
                     } else if (!this.descricao) {
@@ -1050,35 +1055,18 @@
                     return cat ? cat.nome : '';
                 },
 
-                // ── Photos ──
-                photoFiles: [],
-                photoPreviews: [],
+                // ── Photos (simples — file input nativo, sem DataTransfer) ──
+                previews: [],
                 existingPhotos: @Html.Raw(existingPhotosJson),
 
-                handleFileSelect(e) { this.addPhotos(e.target.files); e.target.value = ''; },
-                handleDrop(e) { this.addPhotos(e.dataTransfer.files); },
-                addPhotos(files) {
-                    const maxNew = 5 - this.existingPhotos.length - this.photoFiles.length;
-                    for (const file of Array.from(files).slice(0, Math.max(0, maxNew))) {
-                        if (file.size > 10 * 1024 * 1024) continue;
-                        if (!file.type.startsWith('image/')) continue;
-                        this.photoFiles.push(file);
-                        this.photoPreviews.push(URL.createObjectURL(file));
+                updatePreviews() {
+                    this.previews.forEach(u => URL.revokeObjectURL(u));
+                    this.previews = [];
+                    const files = this.$refs.fileInput?.files;
+                    if (!files) return;
+                    for (let i = 0; i < Math.min(files.length, 5); i++) {
+                        this.previews.push(URL.createObjectURL(files[i]));
                     }
-                    this._syncFileInput();
-                },
-                removePhoto(i) {
-                    URL.revokeObjectURL(this.photoPreviews[i]);
-                    this.photoFiles.splice(i, 1);
-                    this.photoPreviews.splice(i, 1);
-                    this._syncFileInput();
-                },
-                _syncFileInput() {
-                    try {
-                        const dt = new DataTransfer();
-                        this.photoFiles.forEach(f => dt.items.add(f));
-                        this.$refs.fileInput.files = dt.files;
-                    } catch (e) { /* DataTransfer fallback */ }
                 },
 
                 // ── AI ──
@@ -1124,7 +1112,7 @@
 
                 // ── Completion ──
                 get completionPercent() {
-                    const fields = [!!this.nome, !!this.categoriaId, this.preco > 0, this.custo > 0, !!this.descricao, (this.photoPreviews.length + this.existingPhotos.length) > 0];
+                    const fields = [!!this.nome, !!this.categoriaId, this.preco > 0, this.custo > 0, !!this.descricao, (this.previews.length + this.existingPhotos.length) > 0];
                     return Math.round(fields.filter(Boolean).length / fields.length * 100);
                 },
             };
