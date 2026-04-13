@@ -51,27 +51,25 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
 
             var termo = query.Termo.Trim();
 
-            // Run all searches in parallel
-            var tProdutos = produtoRepository.SearchAsync(query.EmpresaId, termo);
-            var tVariacoes = produtoVariacaoRepository.SearchAsync(query.EmpresaId, termo);
-            var tItens = itemEstoqueRepository.SearchAsync(query.EmpresaId, termo);
-            var tFornecedores = fornecedorRepository.SearchAsync(query.EmpresaId, termo);
-            var tPedidos = pedidoRepository.SearchAsync(query.EmpresaId, termo);
-            var tLojas = lojaRepository.SearchAsync(query.EmpresaId, termo);
-            var tUsuarios = usuarioRepository.SearchAsync(query.EmpresaId, termo);
-            var tMovimentacoes = movimentacaoRepository.SearchAsync(query.EmpresaId, termo);
-
-            await Task.WhenAll(tProdutos, tVariacoes, tItens, tFornecedores, tPedidos, tLojas, tUsuarios, tMovimentacoes);
+            // Busca sequencial — DbContext nao e thread-safe para queries paralelas
+            var produtos = await produtoRepository.SearchAsync(query.EmpresaId, termo);
+            var variacoes = await produtoVariacaoRepository.SearchAsync(query.EmpresaId, termo);
+            var itens = await itemEstoqueRepository.SearchAsync(query.EmpresaId, termo);
+            var fornecedores = await fornecedorRepository.SearchAsync(query.EmpresaId, termo);
+            var pedidos = await pedidoRepository.SearchAsync(query.EmpresaId, termo);
+            var lojas = await lojaRepository.SearchAsync(query.EmpresaId, termo);
+            var usuarios = await usuarioRepository.SearchAsync(query.EmpresaId, termo);
+            var movimentacoes = await movimentacaoRepository.SearchAsync(query.EmpresaId, termo);
 
             var resultados = new List<ResultadoBuscaInteligente>();
-            resultados.AddRange(tProdutos.Result.Select(p => CriarResultadoProduto(p, termo)));
-            resultados.AddRange(tVariacoes.Result.Select(v => CriarResultadoVariacao(v, termo)));
-            resultados.AddRange(tItens.Result.Select(i => CriarResultadoItemEstoque(i, termo)));
-            resultados.AddRange(tFornecedores.Result.Select(f => CriarResultadoFornecedor(f, termo)));
-            resultados.AddRange(tPedidos.Result.Select(p => CriarResultadoPedido(p, termo)));
-            resultados.AddRange(tLojas.Result.Select(l => CriarResultadoLoja(l, termo)));
-            resultados.AddRange(tUsuarios.Result.Select(u => CriarResultadoUsuario(u, termo)));
-            resultados.AddRange(tMovimentacoes.Result.Select(m => CriarResultadoMovimentacao(m, termo)));
+            resultados.AddRange(produtos.Select(p => CriarResultadoProduto(p, termo)));
+            resultados.AddRange(variacoes.Select(v => CriarResultadoVariacao(v, termo)));
+            resultados.AddRange(itens.Select(i => CriarResultadoItemEstoque(i, termo)));
+            resultados.AddRange(fornecedores.Select(f => CriarResultadoFornecedor(f, termo)));
+            resultados.AddRange(pedidos.Select(p => CriarResultadoPedido(p, termo)));
+            resultados.AddRange(lojas.Select(l => CriarResultadoLoja(l, termo)));
+            resultados.AddRange(usuarios.Select(u => CriarResultadoUsuario(u, termo)));
+            resultados.AddRange(movimentacoes.Select(m => CriarResultadoMovimentacao(m, termo)));
 
             return resultados
                 .OrderByDescending(r => r.Score)
