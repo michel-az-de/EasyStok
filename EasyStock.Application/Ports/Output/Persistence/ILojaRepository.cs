@@ -10,5 +10,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<int> CountByEmpresaAsync(Guid empresaId);
         Task AddAsync(Loja loja);
         Task UpdateAsync(Loja loja);
+        Task<IEnumerable<Loja>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
     }
 }

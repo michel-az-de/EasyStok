@@ -32,7 +32,15 @@ public class BuscarEstoqueInteligenteUseCaseTests
 
         fornecedorRepository.SearchAsync(empresaId, "CAP3426").Returns([]);
 
-        var useCase = new BuscarEstoqueInteligenteUseCase(produtoRepository, variacaoRepository, itemRepository, fornecedorRepository);
+        var pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
+        var lojaRepository = Substitute.For<ILojaRepository>();
+        var usuarioRepository = Substitute.For<IUsuarioRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        pedidoRepository.SearchAsync(empresaId, "CAP3426").Returns(Enumerable.Empty<PedidoFornecedor>());
+        lojaRepository.SearchAsync(empresaId, "CAP3426").Returns(Enumerable.Empty<Loja>());
+        usuarioRepository.SearchAsync(empresaId, "CAP3426").Returns(Enumerable.Empty<Usuario>());
+        movimentacaoRepository.SearchAsync(empresaId, "CAP3426").Returns(Enumerable.Empty<MovimentacaoEstoque>());
+        var useCase = new BuscarEstoqueInteligenteUseCase(produtoRepository, variacaoRepository, itemRepository, fornecedorRepository, pedidoRepository, lojaRepository, usuarioRepository, movimentacaoRepository);
 
         var result = await useCase.ExecuteAsync(new BuscarEstoqueInteligenteQuery(empresaId, "CAP3426"));
 

@@ -30,5 +30,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<decimal> GetTaxaSaidaDiariaAsync(Guid empresaId, Guid? produtoId, DateTime de, DateTime ate);
         Task<IReadOnlyDictionary<Guid, decimal>> GetTaxaSaidaDiariaPorProdutoAsync(Guid empresaId, IEnumerable<Guid> produtoIds, DateTime de, DateTime ate);
         Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(Guid empresaId, Guid produtoId, int meses = 12);
+        Task<IEnumerable<MovimentacaoEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
     }
 }

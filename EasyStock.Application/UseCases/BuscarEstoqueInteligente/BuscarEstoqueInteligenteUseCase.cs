@@ -9,7 +9,12 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
         Produto,
         Variacao,
         ItemEstoque,
-        Fornecedor
+        Fornecedor,
+        Pedido,
+        Entrada,
+        Saida,
+        Loja,
+        Usuario
     }
 
     public sealed record BuscarEstoqueInteligenteQuery(Guid EmpresaId, string Termo, int Limite = 50);
@@ -33,30 +38,40 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
         IProdutoRepository produtoRepository,
         IProdutoVariacaoRepository produtoVariacaoRepository,
         IItemEstoqueRepository itemEstoqueRepository,
-        IFornecedorRepository fornecedorRepository)
+        IFornecedorRepository fornecedorRepository,
+        IPedidoFornecedorRepository pedidoRepository,
+        ILojaRepository lojaRepository,
+        IUsuarioRepository usuarioRepository,
+        IMovimentacaoEstoqueRepository movimentacaoRepository)
     {
         public async Task<IReadOnlyCollection<ResultadoBuscaInteligente>> ExecuteAsync(BuscarEstoqueInteligenteQuery query)
         {
-            if (query.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
+            if (query.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId e obrigatorio.");
             if (string.IsNullOrWhiteSpace(query.Termo)) return [];
 
             var termo = query.Termo.Trim();
+
+            // Run all searches in parallel
             var tProdutos = produtoRepository.SearchAsync(query.EmpresaId, termo);
             var tVariacoes = produtoVariacaoRepository.SearchAsync(query.EmpresaId, termo);
             var tItens = itemEstoqueRepository.SearchAsync(query.EmpresaId, termo);
             var tFornecedores = fornecedorRepository.SearchAsync(query.EmpresaId, termo);
-            await Task.WhenAll(tProdutos, tVariacoes, tItens, tFornecedores);
+            var tPedidos = pedidoRepository.SearchAsync(query.EmpresaId, termo);
+            var tLojas = lojaRepository.SearchAsync(query.EmpresaId, termo);
+            var tUsuarios = usuarioRepository.SearchAsync(query.EmpresaId, termo);
+            var tMovimentacoes = movimentacaoRepository.SearchAsync(query.EmpresaId, termo);
 
-            var produtos = tProdutos.Result;
-            var variacoes = tVariacoes.Result;
-            var itens = tItens.Result;
-            var fornecedores = tFornecedores.Result;
+            await Task.WhenAll(tProdutos, tVariacoes, tItens, tFornecedores, tPedidos, tLojas, tUsuarios, tMovimentacoes);
 
             var resultados = new List<ResultadoBuscaInteligente>();
-            resultados.AddRange(produtos.Select(p => CriarResultadoProduto(p, termo)));
-            resultados.AddRange(variacoes.Select(v => CriarResultadoVariacao(v, termo)));
-            resultados.AddRange(itens.Select(i => CriarResultadoItemEstoque(i, termo)));
-            resultados.AddRange(fornecedores.Select(f => CriarResultadoFornecedor(f, termo)));
+            resultados.AddRange(tProdutos.Result.Select(p => CriarResultadoProduto(p, termo)));
+            resultados.AddRange(tVariacoes.Result.Select(v => CriarResultadoVariacao(v, termo)));
+            resultados.AddRange(tItens.Result.Select(i => CriarResultadoItemEstoque(i, termo)));
+            resultados.AddRange(tFornecedores.Result.Select(f => CriarResultadoFornecedor(f, termo)));
+            resultados.AddRange(tPedidos.Result.Select(p => CriarResultadoPedido(p, termo)));
+            resultados.AddRange(tLojas.Result.Select(l => CriarResultadoLoja(l, termo)));
+            resultados.AddRange(tUsuarios.Result.Select(u => CriarResultadoUsuario(u, termo)));
+            resultados.AddRange(tMovimentacoes.Result.Select(m => CriarResultadoMovimentacao(m, termo)));
 
             return resultados
                 .OrderByDescending(r => r.Score)
@@ -114,6 +129,58 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
                 fornecedor.Email ?? fornecedor.Documento,
                 fornecedor.Documento ?? fornecedor.Email ?? fornecedor.Nome,
                 CalcularScore(termo, fornecedor.Nome, fornecedor.Documento, fornecedor.Email, fornecedor.Contato));
+
+        private static ResultadoBuscaInteligente CriarResultadoPedido(PedidoFornecedor pedido, string termo) =>
+            new(
+                TipoResultadoBuscaInteligente.Pedido,
+                pedido.Id,
+                pedido.Id,
+                null,
+                $"Pedido {pedido.DataPedido:dd/MM/yyyy}",
+                pedido.Fornecedor?.Nome ?? pedido.Observacoes,
+                pedido.Tracking ?? pedido.Id.ToString()[..8],
+                CalcularScore(termo, pedido.Observacoes, pedido.Tracking, pedido.Canal, pedido.Fornecedor?.Nome),
+                Status: pedido.Status.ToString(),
+                FornecedorNome: pedido.Fornecedor?.Nome);
+
+        private static ResultadoBuscaInteligente CriarResultadoLoja(Domain.Entities.Loja loja, string termo) =>
+            new(
+                TipoResultadoBuscaInteligente.Loja,
+                loja.Id,
+                loja.Id,
+                null,
+                loja.Nome,
+                loja.Endereco ?? loja.Documento,
+                loja.Nome,
+                CalcularScore(termo, loja.Nome, loja.Documento, loja.Endereco),
+                Status: loja.Ativa ? "Ativa" : "Inativa");
+
+        private static ResultadoBuscaInteligente CriarResultadoUsuario(Usuario usuario, string termo) =>
+            new(
+                TipoResultadoBuscaInteligente.Usuario,
+                usuario.Id,
+                usuario.Id,
+                null,
+                usuario.Nome,
+                usuario.Email,
+                usuario.Email,
+                CalcularScore(termo, usuario.Nome, usuario.Email),
+                Status: usuario.Ativo ? "Ativo" : "Inativo");
+
+        private static ResultadoBuscaInteligente CriarResultadoMovimentacao(MovimentacaoEstoque mov, string termo)
+        {
+            var isEntrada = mov.Natureza.ToString().Contains("Entrada", StringComparison.OrdinalIgnoreCase);
+            return new(
+                isEntrada ? TipoResultadoBuscaInteligente.Entrada : TipoResultadoBuscaInteligente.Saida,
+                mov.Id,
+                mov.ProdutoId,
+                mov.ProdutoVariacaoId,
+                $"{(isEntrada ? "Entrada" : "Saida")} — {mov.Produto?.Nome ?? "Produto"}",
+                $"{mov.Quantidade?.Value ?? 0} un. em {mov.DataMovimentacao:dd/MM/yyyy}",
+                mov.DocumentoReferencia ?? mov.Descricao ?? mov.Id.ToString()[..8],
+                CalcularScore(termo, mov.Descricao, mov.DocumentoReferencia, mov.Produto?.Nome),
+                QuantidadeAtual: mov.Quantidade?.Value);
+        }
 
         private static int CalcularScore(string termo, params string?[] candidatos)
         {

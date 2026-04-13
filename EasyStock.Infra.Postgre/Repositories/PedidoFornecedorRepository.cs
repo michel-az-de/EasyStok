@@ -91,4 +91,20 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
             leadTimes.Count == 0 ? null : decimal.Round(leadTimes.Average(), 2),
             frequencia);
     }
+
+    public async Task<IEnumerable<PedidoFornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+    {
+        var pattern = $"%{termo.Trim()}%";
+        return await dbContext.PedidosFornecedor
+            .AsNoTracking()
+            .Include(p => p.Fornecedor)
+            .Where(p => p.EmpresaId == empresaId &&
+                ((p.Observacoes != null && EF.Functions.ILike(p.Observacoes, pattern)) ||
+                 (p.Tracking != null && EF.Functions.ILike(p.Tracking, pattern)) ||
+                 (p.Canal != null && EF.Functions.ILike(p.Canal, pattern)) ||
+                 (p.Fornecedor != null && EF.Functions.ILike(p.Fornecedor.Nome, pattern))))
+            .OrderByDescending(p => p.DataPedido)
+            .Take(maxResults)
+            .ToListAsync();
+    }
 }

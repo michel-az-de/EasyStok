@@ -71,7 +71,11 @@ public class ItemEstoqueControllerTests
             _produtoRepository,
             _produtoVariacaoRepository,
             _itemEstoqueRepository,
-            _fornecedorRepository);
+            _fornecedorRepository,
+            Substitute.For<IPedidoFornecedorRepository>(),
+            Substitute.For<ILojaRepository>(),
+            Substitute.For<IUsuarioRepository>(),
+            _movimentacaoEstoqueRepository);
         _controller = new ItemEstoqueController(
             _itemEstoqueRepository,
             _registrarEntradaUseCase,

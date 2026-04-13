@@ -175,5 +175,20 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             return resultado.Select(x => (x.Ano, x.Mes, x.TotalSaidas, x.ValorTotal));
         }
+
+        public async Task<IEnumerable<MovimentacaoEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+        {
+            var pattern = $"%{termo.Trim()}%";
+            return await dbContext.MovimentacoesEstoque
+                .AsNoTracking()
+                .Include(m => m.Produto)
+                .Where(m => m.EmpresaId == empresaId &&
+                    ((m.Descricao != null && EF.Functions.ILike(m.Descricao, pattern)) ||
+                     (m.DocumentoReferencia != null && EF.Functions.ILike(m.DocumentoReferencia, pattern)) ||
+                     (m.Produto != null && EF.Functions.ILike(m.Produto.Nome, pattern))))
+                .OrderByDescending(m => m.DataMovimentacao)
+                .Take(maxResults)
+                .ToListAsync();
+        }
     }
 }

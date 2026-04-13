@@ -60,7 +60,7 @@
                     <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
                     </svg>
-                    <input type="text" placeholder="Buscar produto, SKU, código, fornecedor..."
+                    <input type="text" placeholder="Buscar produto, SKU, fornecedor, loja, usuario..."
                            x-ref="input"
                            x-model="query"
                            @@input.debounce.300ms="buscar()"
@@ -203,18 +203,32 @@
                         case 'Variacao': return '/produtos/' + item.produtoId;
                         case 'ItemEstoque': return '/estoque';
                         case 'Fornecedor': return '/fornecedores/' + item.id;
+                        case 'Pedido': return '/fornecedores/pedidos';
+                        case 'Entrada': return '/entradas';
+                        case 'Saida': return '/saidas';
+                        case 'Loja': return '/configuracoes';
+                        case 'Usuario': return '/usuarios';
                         default: return '/produtos/' + item.produtoId;
                     }
                 },
                 badgeLabel(tipo) {
-                    return { Produto: 'Produto', Variacao: 'Variação', ItemEstoque: 'Estoque', Fornecedor: 'Fornecedor' }[tipo] || tipo;
+                    return {
+                        Produto: 'Produto', Variacao: 'Variacao', ItemEstoque: 'Estoque',
+                        Fornecedor: 'Fornecedor', Pedido: 'Pedido', Entrada: 'Entrada',
+                        Saida: 'Saida', Loja: 'Loja', Usuario: 'Usuario'
+                    }[tipo] || tipo;
                 },
                 badgeClasse(tipo) {
                     return {
                         Produto: 'bg-indigo-100 text-indigo-700',
                         Variacao: 'bg-violet-100 text-violet-700',
                         ItemEstoque: 'bg-emerald-100 text-emerald-700',
-                        Fornecedor: 'bg-amber-100 text-amber-700'
+                        Fornecedor: 'bg-amber-100 text-amber-700',
+                        Pedido: 'bg-orange-100 text-orange-700',
+                        Entrada: 'bg-teal-100 text-teal-700',
+                        Saida: 'bg-red-100 text-red-700',
+                        Loja: 'bg-cyan-100 text-cyan-700',
+                        Usuario: 'bg-slate-200 text-slate-700'
                     }[tipo] || 'bg-slate-100 text-slate-600';
                 },
                 statusClasse(status) {

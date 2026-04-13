@@ -34,6 +34,15 @@ public sealed class LojaRepository(MongoEasyStockContext context, MongoUnitOfWor
         EnqueueReplace(Collection, loja.Id, loja);
         return Task.CompletedTask;
     }
+
+    public async Task<IEnumerable<Loja>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+    {
+        var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(termo.Trim()), "i");
+        return await Collection.Find(
+            Builders<Loja>.Filter.Eq(x => x.EmpresaId, empresaId) &
+            Builders<Loja>.Filter.Regex(x => x.Nome, regex))
+            .Limit(maxResults).ToListAsync();
+    }
 }
 
 public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -206,6 +215,18 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
             leadTimes.Count == 0 ? null : decimal.Round(leadTimes.Average(), 2),
             frequencia);
     }
+
+    public async Task<IEnumerable<PedidoFornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+    {
+        var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(termo.Trim()), "i");
+        return await Collection.Find(
+            Builders<PedidoFornecedor>.Filter.Eq(x => x.EmpresaId, empresaId) &
+            Builders<PedidoFornecedor>.Filter.Or(
+                Builders<PedidoFornecedor>.Filter.Regex(x => x.Observacoes, regex),
+                Builders<PedidoFornecedor>.Filter.Regex(x => x.Tracking, regex)))
+            .SortByDescending(x => x.DataPedido)
+            .Limit(maxResults).ToListAsync();
+    }
 }
 
 public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -269,6 +290,21 @@ public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOf
         usuario.Perfis = null;
         EnqueueReplace(Usuarios, usuario.Id, usuario);
         return Task.CompletedTask;
+    }
+
+    public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+    {
+        var links = await UsuariosEmpresas.Find(x => x.EmpresaId == empresaId && x.Ativo).ToListAsync();
+        var ids = links.Select(x => x.UsuarioId).Distinct().ToList();
+        if (ids.Count == 0) return [];
+
+        var regex = new MongoDB.Bson.BsonRegularExpression(BuildContainsPattern(termo.Trim()), "i");
+        return await Usuarios.Find(
+            Builders<Usuario>.Filter.In(x => x.Id, ids) &
+            Builders<Usuario>.Filter.Or(
+                Builders<Usuario>.Filter.Regex(x => x.Nome, regex),
+                Builders<Usuario>.Filter.Regex(x => x.Email, regex)))
+            .Limit(maxResults).ToListAsync();
     }
 
     private async Task HydrateUsuarioAsync(Usuario usuario)
