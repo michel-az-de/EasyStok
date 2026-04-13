@@ -15,6 +15,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -113,6 +114,7 @@ public class AuthController(
     public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaCommand command)
         => DataOk(await resetarSenhaUseCase.ExecuteAsync(command));
 
+    [Authorize]
     [SwaggerOperation(Summary = "Get current authenticated user profile")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -120,6 +122,7 @@ public class AuthController(
     public async Task<IActionResult> GetMe()
         => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
+    [Authorize]
     [SwaggerOperation(Summary = "Update current user profile")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -127,6 +130,7 @@ public class AuthController(
     public async Task<IActionResult> UpdateMe([FromBody] AtualizarUsuarioAtualCommand command)
         => DataOk(await atualizarUsuarioAtualUseCase.ExecuteAsync(command));
 
+    [Authorize]
     [SwaggerOperation(Summary = "Change current user password")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

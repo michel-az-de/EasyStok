@@ -11,6 +11,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Uploads")]
 [Authorize]
+[ValidateEmpresaId]
 [ApiController]
 [Route("api/uploads")]
 public class UploadsController(

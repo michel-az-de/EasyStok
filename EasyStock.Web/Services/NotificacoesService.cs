@@ -7,13 +7,13 @@ public class NotificacoesService(ApiClient api, SessionService session)
     private Guid GetEmpresaId() =>
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    public Task<ApiResult<List<Notificacao>>> ListarAsync(bool? lida = null, string? tipo = null, string? severidade = null)
+    public Task<ApiResult<PagedResult<Notificacao>>> ListarAsync(bool? lida = null, string? tipo = null, string? severidade = null)
     {
         var qs = $"notificacoes?empresaId={GetEmpresaId()}&page=1&pageSize=200";
         if (lida.HasValue) qs += $"&lida={lida.Value.ToString().ToLower()}";
         if (!string.IsNullOrEmpty(tipo)) qs += $"&tipo={Uri.EscapeDataString(tipo)}";
         if (!string.IsNullOrEmpty(severidade)) qs += $"&severidade={Uri.EscapeDataString(severidade)}";
-        return api.GetAsync<List<Notificacao>>(qs);
+        return api.GetAsync<PagedResult<Notificacao>>(qs);
     }
 
     public Task<ApiResult<object>> BadgeAsync() =>

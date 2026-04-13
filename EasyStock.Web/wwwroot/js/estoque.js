@@ -20,14 +20,17 @@ async function fetchCategorias() {
 
         if (!Array.isArray(categorias) || categorias.length === 0) return;
 
-        nav.innerHTML = '';
+        // Use DocumentFragment to batch DOM update into a single reflow,
+        // minimising the layout-shift window that could cause mis-clicks.
+        const fragment = document.createDocumentFragment();
         categorias.forEach(cat => {
             const a = document.createElement('a');
             a.href = '/estoque?categoria=' + encodeURIComponent(cat.id);
             a.className = 'ni-sub';
             a.textContent = cat.nome;
-            nav.appendChild(a);
+            fragment.appendChild(a);
         });
+        nav.appendChild(fragment);
     } catch { /* silent: operação em background, falha não-crítica */ }
 }
 

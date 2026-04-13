@@ -34,7 +34,18 @@ public class NotificacaoController(
             return error!;
 
         var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, severidade, page, pageSize);
-        return DataPaged(items, totalCount, page, pageSize);
+        var dtos = items.Select(n => new
+        {
+            id = n.Id.ToString(),
+            tipo = n.TipoAlerta.ToString(),
+            titulo = n.Titulo,
+            mensagem = n.Mensagem,
+            severidade = n.Severidade.ToString(),
+            referenciaId = n.ReferenciaId?.ToString(),
+            lida = n.Lida,
+            createdAt = new DateTimeOffset(n.CriadaEm, TimeSpan.Zero)
+        });
+        return DataPaged(dtos, totalCount, page, pageSize);
     }
 
     [SwaggerOperation(Summary = "Get unread notification count", Description = "Lightweight endpoint for badge counters.")]
@@ -73,7 +84,18 @@ public class NotificacaoController(
             return error!;
 
         var items = await notificacaoRepository.GetRecentesNaoLidasAsync(resolvedEmpresaId, Math.Min(limit, 10));
-        return DataOk(items);
+        var dtos = items.Select(n => new
+        {
+            id = n.Id.ToString(),
+            tipo = n.TipoAlerta.ToString(),
+            titulo = n.Titulo,
+            mensagem = n.Mensagem,
+            severidade = n.Severidade.ToString(),
+            referenciaId = n.ReferenciaId?.ToString(),
+            lida = n.Lida,
+            createdAt = new DateTimeOffset(n.CriadaEm, TimeSpan.Zero)
+        });
+        return DataOk(dtos);
     }
 
     [SwaggerOperation(Summary = "Mark notification as read")]
@@ -82,12 +104,13 @@ public class NotificacaoController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPut("{id}/marcar-lida")]
     [HttpPatch("{id}/lida")]
-    public async Task<IActionResult> MarcarLida(Guid id)
+    public async Task<IActionResult> MarcarLida(Guid id, [FromQuery] Guid empresaId)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out _))
+            return DataNotFound();
+
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null) return DataNotFound();
-        if (!TryResolveEmpresaId(currentUser, notificacao.EmpresaId, out _, out var error))
-            return error!;
+        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId) return DataNotFound();
 
         notificacao.MarcarComoLida();
         await notificacaoRepository.UpdateAsync(notificacao);
@@ -116,12 +139,13 @@ public class NotificacaoController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid empresaId)
     {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out _))
+            return DataNotFound();
+
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null) return DataNotFound();
-        if (!TryResolveEmpresaId(currentUser, notificacao.EmpresaId, out _, out var error))
-            return error!;
+        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId) return DataNotFound();
 
         await notificacaoRepository.DeleteAsync(id);
         await unitOfWork.CommitAsync();

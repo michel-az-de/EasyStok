@@ -235,6 +235,10 @@ public class ProdutoController(
         if (file.Length > MaxFileSize)
             return DataBadRequest("Arquivo excede o limite de 10 MB.");
 
+        var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
+        if (!allowedMimeTypes.Contains(file.ContentType?.ToLowerInvariant()))
+            return DataBadRequest("Tipo de arquivo não permitido. Use JPEG, PNG, WebP ou GIF.");
+
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 

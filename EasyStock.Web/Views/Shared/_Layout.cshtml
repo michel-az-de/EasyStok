@@ -64,11 +64,33 @@
         </div>
     </div>
 
-    {{-- Bottom nav: outside flex wrapper so it sits above everything --}}
+    @* Bottom nav: outside flex wrapper so it sits above everything *@
     @await Html.PartialAsync("_BottomNav")
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <script src="~/js/toast.js"></script>
+    <script>
+        /* ── Decimal separator normalizer (BR locale: vírgula → ponto) ──
+           Intercepts comma keypresses on number inputs and converts to period,
+           allowing Brazilian users to type "10,50" and get "10.50".
+        ── */
+        document.addEventListener('keydown', function (e) {
+            if ((e.key === ',' || e.key === 'Decimal') && e.target.tagName === 'INPUT') {
+                var t = e.target;
+                if (t.type === 'number' || t.inputMode === 'decimal' || t.inputMode === 'numeric') {
+                    e.preventDefault();
+                    // For type=text/decimal inputs, insert a period at cursor position
+                    if (t.type !== 'number') {
+                        var s = t.selectionStart, end = t.selectionEnd;
+                        t.value = t.value.slice(0, s) + '.' + t.value.slice(end);
+                        t.setSelectionRange(s + 1, s + 1);
+                        t.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    // For type=number, only block the comma (browsers natively reject it)
+                }
+            }
+        }, true);
+    </script>
     <script>
         /* ── Notification polling ──────────────────────────────────────
            Polls /notificacoes/resumo every 45s.

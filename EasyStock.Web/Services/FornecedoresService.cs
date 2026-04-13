@@ -41,7 +41,7 @@ public class FornecedoresService(ApiClient api, SessionService session)
         string? pedidoMinimo, string? fretePadrao, string? observacoes)
     {
         if (!Guid.TryParse(id, out var fid))
-            return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(id)));
+            return Task.FromResult(ApiResult<object>.Fail("INVALID_ID", "ID de fornecedor inválido."));
 
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
@@ -77,7 +77,7 @@ public class FornecedoresService(ApiClient api, SessionService session)
         decimal? valorEstimado, string? canal, string? observacoes)
     {
         if (!Guid.TryParse(fornecedorId, out var fid))
-            return Task.FromException<ApiResult<object>>(new ArgumentException("O fornecedor informado é inválido.", nameof(fornecedorId)));
+            return Task.FromResult(ApiResult<object>.Fail("INVALID_ID", "ID de fornecedor inválido."));
 
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)

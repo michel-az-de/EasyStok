@@ -29,7 +29,7 @@ public class NotificacoesController(NotificacoesService svc, SessionService sess
 
         if (result.Success)
         {
-            vm.Items = result.Data!;
+            vm.Items = result.Data!.Data;
             vm.NaoLidas = vm.Items.Count(n => !n.Lida);
         }
 

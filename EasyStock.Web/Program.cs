@@ -37,7 +37,8 @@ builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<TokenRefreshHandler>();
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    var baseUrl = config["ApiSettings:BaseUrl"]!;
+    var baseUrl = config["ApiSettings:BaseUrl"]
+        ?? throw new InvalidOperationException("ApiSettings:BaseUrl é obrigatório no appsettings.json");
     if (!baseUrl.EndsWith('/')) baseUrl += "/";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(config.GetValue<int>("ApiSettings:TimeoutSeconds"));
@@ -116,7 +117,7 @@ _ = Task.Run(async () =>
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/auth/login");
+    app.UseExceptionHandler("/error/500");
     app.UseHsts();
 }
 

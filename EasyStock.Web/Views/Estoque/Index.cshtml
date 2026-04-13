@@ -119,8 +119,8 @@
                         <th>Produto / Variação</th>
                         <th>SKU</th>
                         <th class="text-center">Qtd</th>
-                        <th class="text-center">Rotatividade</th>
-                        <th>Último mov.</th>
+                        <th class="text-center hidden md:table-cell">Rotatividade</th>
+                        <th class="hidden md:table-cell">Último mov.</th>
                         <th>Validade</th>
                         <th class="text-center">Status</th>
                         <th></th>
@@ -144,7 +144,7 @@
                                     @item.Qty
                                 </span>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center hidden md:table-cell">
                                 <div class="vel-bar justify-center">
                                     @for (int seg = 1; seg <= 5; seg++)
                                     {
@@ -155,7 +155,7 @@
                                     }
                                 </div>
                             </td>
-                            <td class="text-slate-500 text-xs">
+                            <td class="text-slate-500 text-xs hidden md:table-cell">
                                 @item.LastMov.ToString("dd/MM/yyyy")
                             </td>
                             <td>
@@ -266,6 +266,7 @@
                 },
 
                 async confirmarSaida() {
+                    if (this.loading) return;
                     if (!this.qty || this.qty < 1) return;
                     if (this.qty > this.qtyDisponivel) {
                         window.showToast('Quantidade excede o estoque disponível (' + this.qtyDisponivel + ').', 'error');

@@ -45,7 +45,7 @@
         <div x-show="step === 1">
             <div class="ws">
                 <h3 class="font-bold text-slate-800 mb-4">Selecione o produto</h3>
-                <div class="relative mb-4">
+                <div class="relative mb-4 z-10">
                     <input type="text" x-model="buscaTerm"
                            @@input.debounce.300ms="buscarProduto()"
                            placeholder="Buscar por nome, marca ou SKU..."
@@ -244,6 +244,7 @@
                 buscaTerm: '',
                 buscando: false,
                 resultados: [],
+                _searchAbort: null,
                 produtoId: '',
                 produtoNome: '',
                 produtoSku: '',
@@ -288,16 +289,19 @@
 
                 async buscarProduto() {
                     if (this.buscaTerm.length < 2) { this.resultados = []; return; }
+                    if (this._searchAbort) this._searchAbort.abort();
+                    this._searchAbort = new AbortController();
                     this.buscando = true;
                     try {
-                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm));
+                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm), { signal: this._searchAbort.signal });
                         if (r.ok) {
                             this.resultados = await r.json();
                         } else {
                             this.resultados = [];
                             window.showToast('Erro ao buscar produtos. Tente novamente.', 'error');
                         }
-                    } catch {
+                    } catch (e) {
+                        if (e && e.name === 'AbortError') return;
                         this.resultados = [];
                         window.showToast('Não foi possível conectar ao servidor.', 'error');
                     } finally {
@@ -344,6 +348,7 @@
                 },
 
                 async submitEntrada() {
+                    if (this.submitting) return;
                     this.submitting = true;
                     this.erroMsg = '';
                     try {

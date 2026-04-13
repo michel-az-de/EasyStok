@@ -18,7 +18,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/diagnostico")]
 [Route("diagnostico")]
-[AllowAnonymous]
+[Authorize]
 [ApiExplorerSettings(GroupName = "v1-ptbr")]
 public sealed class DiagnosticoController(
     ResolvedInfrastructureState infraState,
