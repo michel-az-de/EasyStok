@@ -15,52 +15,52 @@
 </div>
 
 <!-- KPI Cards -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="ws">
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="ws dashboard-kpi-card">
         <div class="kpi-lbl">Total de SKUs</div>
-        <div class="kpi-val text-slate-900">@Model.TotalProdutos</div>
+        <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
     </div>
-    <div class="ws">
+    <div class="ws dashboard-kpi-card">
         <div class="kpi-lbl">Itens em estoque</div>
-        <div class="kpi-val text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
+        <div class="kpi-val dashboard-kpi-value text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
     </div>
-    <div class="ws">
+    <div class="ws dashboard-kpi-card">
         <div class="kpi-lbl">Valor em estoque</div>
-        <div class="kpi-val text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
+        <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
     </div>
-    <div class="ws">
+    <div class="ws dashboard-kpi-card">
         <div class="kpi-lbl">Receita estimada</div>
-        <div class="kpi-val text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
+        <div class="kpi-val dashboard-kpi-value text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
     </div>
 </div>
 
 <!-- Attention Tiles -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <a href="/estoque?status=critico" class="ws flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <a href="/estoque?status=critico" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-xl">🚨</div>
         <div>
-            <div class="kpi-val text-red-600">@Model.EstoqueCritico</div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-red-600">@Model.EstoqueCritico</div>
             <div class="kpi-lbl">Estoque crítico</div>
         </div>
     </a>
-    <a href="/estoque?status=atencao" class="ws flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
+    <a href="/estoque?status=atencao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">⏰</div>
         <div>
-            <div class="kpi-val text-amber-600">@Model.ProximosVencimento</div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-amber-600">@Model.ProximosVencimento</div>
             <div class="kpi-lbl">Próx. ao vencimento</div>
         </div>
     </a>
-    <a href="/estoque?status=parado" class="ws flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
+    <a href="/estoque?status=parado" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">💤</div>
         <div>
-            <div class="kpi-val text-blue-600">@Model.ProdutosParados</div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-blue-600">@Model.ProdutosParados</div>
             <div class="kpi-lbl">Parados +30 dias</div>
         </div>
     </a>
-    <a href="/entradas/reposicao" class="ws flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
+    <a href="/entradas/reposicao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
         <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">💡</div>
         <div>
-            <div class="kpi-val text-emerald-600">@Model.SugestoesReposicao</div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-emerald-600">@Model.SugestoesReposicao</div>
             <div class="kpi-lbl">Sugestões de reposição</div>
         </div>
     </a>

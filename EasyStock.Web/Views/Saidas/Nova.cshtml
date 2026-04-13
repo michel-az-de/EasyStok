@@ -15,7 +15,7 @@
     </a>
 </div>
 
-<div class="ws max-w-2xl" x-data="saidaForm()">
+<div class="ws max-w-2xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
     <form asp-action="Criar" asp-controller="Saidas" method="post">
         @Html.AntiForgeryToken()
 
@@ -25,7 +25,7 @@
             <div class="relative">
                 <input type="text" placeholder="Buscar produto..." x-model="busca"
                        @@input="buscarProduto()" @@focus="showResults = true"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                       class="ui-field w-full text-sm" />
                 <input type="hidden" name="ProdutoId" x-model="produtoId" />
 
                 <div x-show="showResults && resultados.length > 0"
@@ -47,7 +47,7 @@
         <div class="mb-4" x-show="variacoes.length > 0" x-cloak>
             <label class="block text-sm font-medium text-slate-700 mb-1">Variação</label>
             <select name="VarId" x-model="varId" @@change="atualizarEstoqueVariacao()"
-                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    class="ui-select w-full text-sm">
                 <option value="">Sem variação</option>
                 <template x-for="v in variacoes" :key="v.id">
                     <option :value="v.id" x-text="v.nome"></option>
@@ -60,7 +60,7 @@
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Natureza *</label>
                 <select asp-for="Natureza"
-                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        class="ui-select w-full text-sm">
                     <option value="venda">Venda</option>
                     <option value="perda">Perda</option>
                     <option value="prejuizo">Prejuízo</option>
@@ -76,7 +76,7 @@
                 <input asp-for="Qty" type="number" min="1"
                        x-model.number="qty"
                        @@input="calcularTotal()"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                       class="ui-field w-full text-sm" />
                 <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
                 <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
                     Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
@@ -92,12 +92,12 @@
                        x-model.number="valorUnit"
                        @@input="calcularTotal()"
                        placeholder="0,00"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Data da Venda *</label>
                 <input asp-for="DtVenda" type="date"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                       class="ui-field w-full text-sm" />
                 <span asp-validation-for="DtVenda" class="text-red-600 text-xs"></span>
             </div>
         </div>

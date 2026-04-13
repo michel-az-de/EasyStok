@@ -52,10 +52,10 @@
                     {
                         <label class="cursor-pointer">
                             <input type="radio" name="canal" value="@val" x-model="canal" class="sr-only" />
-                            <div :class="canal === '@val' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'"
+                            <div :class="canal === '@val' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100' : 'border-slate-200 hover:border-slate-300 text-slate-700'"
                                  class="border-2 rounded-lg p-2.5 text-center transition-all">
                                 <div class="text-lg">@icon</div>
-                                <div class="text-xs font-medium text-slate-700 mt-1">@label</div>
+                                <div class="text-xs font-medium mt-1">@label</div>
                             </div>
                         </label>
                     }
