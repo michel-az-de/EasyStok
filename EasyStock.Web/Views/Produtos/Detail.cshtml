@@ -699,8 +699,9 @@
                         if (t === 'historico') this.loadHistorico();
                     }
 
-                    // Inicializar FilePond na aba de fotos
+                    // Inicializar FilePond na aba de fotos (guard contra dupla inicialização)
                     this.$nextTick(() => {
+                        if (this._pond) return;
                         const self = this;
                         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
@@ -786,15 +787,18 @@
                                 self.photos = [...self.photos, { fotoId, url, toDelete: false }];
                                 if (self._pond) self._pond.maxFiles = 5 - self.photos.length;
                                 // Remover item do FilePond após delay (já está na galeria)
-                                setTimeout(() => { try { self._pond.removeFile(file.id); } catch {} }, 1500);
+                                setTimeout(() => { try { self._pond.removeFile(file.id); } catch {} }, 500);
                                 window.showToast('Foto adicionada!', 'success');
                             }
                         });
                     });
                 },
 
+                _deletingPhoto: false,
                 async deletePhoto(fotoId) {
+                    if (this._deletingPhoto) return;
                     if (!confirm('Remover esta foto?')) return;
+                    this._deletingPhoto = true;
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
                     const fd = new FormData();
                     fd.append('__RequestVerificationToken', token);
@@ -808,6 +812,8 @@
                         window.showToast('Foto removida.', 'success');
                     } catch (err) {
                         window.showToast('Erro ao remover foto.', 'error');
+                    } finally {
+                        this._deletingPhoto = false;
                     }
                 },
 

@@ -35,7 +35,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
+        public async Task<IEnumerable<ProdutoVariacao>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -43,7 +43,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var pattern = $"%{termo}%";
 
             CodigoSku? skuExato = null;
-            try { skuExato = CodigoSku.From(termo); } catch { /* termo invalido para SKU */ }
+            try { skuExato = CodigoSku.From(termo); } catch (ArgumentException) { /* termo invalido para SKU */ }
 
             return await dbContext.ProdutosVariacao
                 .AsNoTracking()

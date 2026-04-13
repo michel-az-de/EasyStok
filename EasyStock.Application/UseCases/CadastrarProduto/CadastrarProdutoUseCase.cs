@@ -113,76 +113,87 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 AlteradoEm = agora
             };
 
-            await produtoRepository.InsertAsync(produto);
-
             var caracteristicasIds = new List<Guid>();
-            foreach (var caracteristica in command.Caracteristicas ?? [])
+            var embalagensIds      = new List<Guid>();
+            var variacoesIds       = new List<Guid>();
+
+            try
             {
-                var entity = new ProdutoCaracteristica
+                await produtoRepository.InsertAsync(produto);
+
+                foreach (var caracteristica in command.Caracteristicas ?? [])
                 {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = produto.Id,
-                    Nome = caracteristica.Nome.Trim(),
-                    Descricao = caracteristica.Descricao?.Trim(),
-                    QuantidadeReferencia = caracteristica.QuantidadeReferencia,
-                    VariacaoPadrao = caracteristica.VariacaoPadrao?.Trim(),
-                    VariacaoId = caracteristica.VariacaoId,
-                    OrdemExibicao = caracteristica.OrdemExibicao,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                };
+                    var entity = new ProdutoCaracteristica
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = produto.Id,
+                        Nome = caracteristica.Nome.Trim(),
+                        Descricao = caracteristica.Descricao?.Trim(),
+                        QuantidadeReferencia = caracteristica.QuantidadeReferencia,
+                        VariacaoPadrao = caracteristica.VariacaoPadrao?.Trim(),
+                        VariacaoId = caracteristica.VariacaoId,
+                        OrdemExibicao = caracteristica.OrdemExibicao,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    };
 
-                await caracteristicaRepository.InsertAsync(entity);
-                caracteristicasIds.Add(entity.Id);
+                    await caracteristicaRepository.InsertAsync(entity);
+                    caracteristicasIds.Add(entity.Id);
+                }
+
+                foreach (var embalagem in command.Embalagens ?? [])
+                {
+                    var entity = new ProdutoEmbalagem
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = produto.Id,
+                        Nome = embalagem.Nome.Trim(),
+                        Descricao = embalagem.Descricao?.Trim(),
+                        Dimensoes = embalagem.Dimensoes.ToValueObjectOrNull(),
+                        Padrao = embalagem.Padrao,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    };
+
+                    await embalagemRepository.InsertAsync(entity);
+                    embalagensIds.Add(entity.Id);
+                }
+
+                foreach (var variacao in command.Variacoes ?? [])
+                {
+                    var entity = new ProdutoVariacao
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = produto.Id,
+                        Nome = variacao.Nome.Trim(),
+                        Cor = variacao.Cor?.Trim(),
+                        Tamanho = variacao.Tamanho?.Trim(),
+                        DescricaoComercial = variacao.DescricaoComercial?.Trim(),
+                        Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
+                        CodigoBarras = variacao.CodigoBarras?.Trim(),
+                        AtributosJson = variacao.AtributosJson,
+                        DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
+                        Ativa = variacao.Ativa,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    };
+
+                    await variacaoRepository.InsertAsync(entity);
+                    variacoesIds.Add(entity.Id);
+                }
+
+                await unitOfWork.CommitAsync();
             }
-
-            var embalagensIds = new List<Guid>();
-            foreach (var embalagem in command.Embalagens ?? [])
+            catch (Exception ex)
             {
-                var entity = new ProdutoEmbalagem
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = produto.Id,
-                    Nome = embalagem.Nome.Trim(),
-                    Descricao = embalagem.Descricao?.Trim(),
-                    Dimensoes = embalagem.Dimensoes.ToValueObjectOrNull(),
-                    Padrao = embalagem.Padrao,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                };
-
-                await embalagemRepository.InsertAsync(entity);
-                embalagensIds.Add(entity.Id);
+                logger.LogError(ex,
+                    "Erro ao cadastrar produto. EmpresaId: {EmpresaId}, Nome: {Nome}",
+                    command.EmpresaId, command.Nome);
+                throw;
             }
-
-            var variacoesIds = new List<Guid>();
-            foreach (var variacao in command.Variacoes ?? [])
-            {
-                var entity = new ProdutoVariacao
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = produto.Id,
-                    Nome = variacao.Nome.Trim(),
-                    Cor = variacao.Cor?.Trim(),
-                    Tamanho = variacao.Tamanho?.Trim(),
-                    DescricaoComercial = variacao.DescricaoComercial?.Trim(),
-                    Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
-                    CodigoBarras = variacao.CodigoBarras?.Trim(),
-                    AtributosJson = variacao.AtributosJson,
-                    DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
-                    Ativa = variacao.Ativa,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                };
-
-                await variacaoRepository.InsertAsync(entity);
-                variacoesIds.Add(entity.Id);
-            }
-
-            await unitOfWork.CommitAsync();
 
             logger.LogInformation("Produto cadastrado com sucesso. ProdutoId: {ProdutoId}, EmpresaId: {EmpresaId}", produto.Id, command.EmpresaId);
 

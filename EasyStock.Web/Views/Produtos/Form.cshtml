@@ -447,7 +447,7 @@
                 <span x-show="variacoes.length" class="text-xs text-slate-400 ml-auto" x-text="variacoes.length"></span>
             </div>
             <div class="space-y-3 mb-3">
-                <template x-for="(v, i) in variacoes" :key="i">
+                <template x-for="(v, i) in variacoes" :key="v._id || i">
                     <div class="border border-slate-200 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-semibold text-slate-500" x-text="'Variação ' + (i+1)"></span>
@@ -498,7 +498,7 @@
                     </div>
                 </template>
             </div>
-            <button type="button" @@click="variacoes.push({nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
+            <button type="button" @@click="variacoes.push({_id:crypto.randomUUID(),nome:'',cor:'',tamanho:'',descricaoComercial:'',sku:'',codigoBarras:'',ativa:true})"
                     class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 Adicionar variação
@@ -523,7 +523,7 @@
             </button>
             <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
-                    <template x-for="(c, i) in caracteristicas" :key="i">
+                    <template x-for="(c, i) in caracteristicas" :key="c._id || i">
                         <div class="border border-slate-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-semibold text-slate-500" x-text="'Característica ' + (i+1)"></span>
@@ -556,7 +556,7 @@
                         </div>
                     </template>
                 </div>
-                <button type="button" @@click="caracteristicas.push({nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
+                <button type="button" @@click="caracteristicas.push({_id:crypto.randomUUID(),nome:'',descricao:'',quantidadeReferencia:null,variacaoPadrao:'',ordemExibicao:0})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Adicionar característica
@@ -582,7 +582,7 @@
             </button>
             <div x-show="open" x-transition class="mt-4">
                 <div class="space-y-3 mb-3">
-                    <template x-for="(e, i) in embalagens" :key="i">
+                    <template x-for="(e, i) in embalagens" :key="e._id || i">
                         <div class="border border-slate-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-semibold text-slate-500" x-text="'Embalagem ' + (i+1)"></span>
@@ -634,7 +634,7 @@
                         </div>
                     </template>
                 </div>
-                <button type="button" @@click="embalagens.push({nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
+                <button type="button" @@click="embalagens.push({_id:crypto.randomUUID(),nome:'',descricao:'',peso:null,largura:null,altura:null,comprimento:null,padrao:false})"
                         class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     Adicionar embalagem
@@ -855,13 +855,29 @@
                         const r = await fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' });
 
                         if (!r.ok && !r.redirected) {
+                            this.saving = false;
                             const ct = r.headers.get('content-type') || '';
                             if (ct.includes('text/html')) {
-                                document.open();
-                                document.write(await r.text());
-                                document.close();
+                                // Renderiza a página de erro do servidor num iframe embutido
+                                // para preservar o histórico e os scripts Alpine já carregados
+                                try {
+                                    const html = await r.text();
+                                    // Tenta extrair mensagens de validação do HTML retornado
+                                    const tmp = document.createElement('div');
+                                    tmp.innerHTML = html;
+                                    const erros = [...tmp.querySelectorAll('.text-red-500,.field-validation-error,[data-valmsg-for]')]
+                                        .map(el => el.textContent.trim())
+                                        .filter(Boolean)
+                                        .slice(0, 3);
+                                    if (erros.length) {
+                                        erros.forEach(msg => window.showToast(msg, 'error'));
+                                    } else {
+                                        window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
+                                    }
+                                } catch {
+                                    window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
+                                }
                             } else {
-                                this.saving = false;
                                 window.showToast('Erro ao salvar produto.', 'error');
                             }
                             return;
@@ -949,14 +965,18 @@
                     this.codigoBarras = ts + check;
                     this.eanAviso = '';
                 },
+                _skuAbort: null,
                 async checkSkuDisponivel() {
                     const sku = (this.sku || '').trim();
                     if (!sku) { this.skuStatus = ''; return; }
+                    // Cancela requisição anterior se ainda estiver em andamento
+                    if (this._skuAbort) { this._skuAbort.abort(); }
+                    this._skuAbort = new AbortController();
                     this.skuStatus = 'verificando';
                     try {
                         const params = new URLSearchParams({ sku });
                         if (isEdit) params.set('ignoreProdutoId', '@Model.Id');
-                        const res = await fetch(`/produtos/check-sku?${params}`);
+                        const res = await fetch(`/produtos/check-sku?${params}`, { signal: this._skuAbort.signal });
                         if (!res.ok) { this.skuStatus = 'erro'; return; }
                         const data = await res.json();
                         if (data.disponivel === null || data.disponivel === undefined) {
@@ -965,7 +985,9 @@
                         } else {
                             this.skuStatus = data.disponivel ? 'disponivel' : 'indisponivel';
                         }
-                    } catch { this.skuStatus = 'erro'; }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') this.skuStatus = 'erro';
+                    }
                 },
                 validarCodigoBarras() {
                     const code = (this.codigoBarras || '').trim();
@@ -986,23 +1008,32 @@
                 // ── Draft persistence (sessionStorage) ──
                 _draftKey: 'easystock_produto_draft' + (isEdit ? '_edit' : '_new'),
                 _draftTimer: null,
+                // Handlers armazenados para remoção no destroy()
+                _clickHandler: null,
+                _pageshowHandler: null,
+
                 init() {
                     if (!isEdit) this._restoreDraft();
                     const save = () => { clearTimeout(this._draftTimer); this._draftTimer = setTimeout(() => this._saveDraft(), 500); };
                     for (const f of ['nome','sku','marca','descricao','categoriaId','codigoBarras','preco','custo','margem','step'])
                         this.$watch(f, save);
-                    document.addEventListener('click', (e) => {
+
+                    this._clickHandler = (e) => {
                         if (!e.target.closest('.relative')?.querySelector('input[name="Marca"]')) this.marcaSugestoes = [];
-                    });
+                    };
+                    document.addEventListener('click', this._clickHandler);
+
                     // Detecta restauração via bfcache (botão Voltar após submit bem-sucedido)
-                    window.addEventListener('pageshow', (e) => {
+                    this._pageshowHandler = (e) => {
                         if (e.persisted && this.saving) {
                             window.location.replace(window.location.href);
                         }
-                    });
+                    };
+                    window.addEventListener('pageshow', this._pageshowHandler);
 
-                    // Inicializar FilePond
+                    // Inicializar FilePond (guard contra dupla inicialização)
                     this.$nextTick(() => {
+                        if (this._pond) return;
                         const maxNew = 5 - this.existingPhotos.length;
                         const self = this;
                         this._pond = FilePond.create(this.$refs.pondInput, {
@@ -1025,7 +1056,11 @@
                     });
                 },
                 destroy() {
-                    if (this._pond) this._pond.destroy();
+                    if (this._pond) { this._pond.destroy(); this._pond = null; }
+                    if (this._clickHandler) { document.removeEventListener('click', this._clickHandler); this._clickHandler = null; }
+                    if (this._pageshowHandler) { window.removeEventListener('pageshow', this._pageshowHandler); this._pageshowHandler = null; }
+                    if (this._skuAbort) { this._skuAbort.abort(); this._skuAbort = null; }
+                    clearTimeout(this._draftTimer);
                 },
                 _saveDraft() {
                     try {
@@ -1189,17 +1224,20 @@
                 categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
                 subcategoriaId: '@(Model.SubcategoriaId?.ToString().ToLower() ?? "")',
 
-                variacoes: @Html.Raw(JsonSerializer.Serialize(Model.VariacoesRich.Select(v => new {
+                variacoes: @Html.Raw(JsonSerializer.Serialize((Model.VariacoesRich ?? []).Select(v => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = v.Nome ?? "", cor = v.Cor ?? "", tamanho = v.Tamanho ?? "",
                     descricaoComercial = v.DescricaoComercial ?? "", sku = v.Sku ?? "",
                     codigoBarras = v.CodigoBarras ?? "", ativa = v.Ativa
                 }))),
-                caracteristicas: @Html.Raw(JsonSerializer.Serialize(Model.Caracteristicas.Select(c => new {
+                caracteristicas: @Html.Raw(JsonSerializer.Serialize((Model.Caracteristicas ?? []).Select(c => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = c.Nome ?? "", descricao = c.Descricao ?? "",
                     quantidadeReferencia = c.QuantidadeReferencia,
                     variacaoPadrao = c.VariacaoPadrao ?? "", ordemExibicao = c.OrdemExibicao
                 }))),
-                embalagens: @Html.Raw(JsonSerializer.Serialize(Model.Embalagens.Select(e => new {
+                embalagens: @Html.Raw(JsonSerializer.Serialize((Model.Embalagens ?? []).Select(e => new {
+                    _id = Guid.NewGuid().ToString("N"),
                     nome = e.Nome ?? "", descricao = e.Descricao ?? "",
                     peso = e.Peso, largura = e.Largura, altura = e.Altura,
                     comprimento = e.Comprimento, padrao = e.Padrao

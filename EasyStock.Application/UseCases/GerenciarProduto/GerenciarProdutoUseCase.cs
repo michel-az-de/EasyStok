@@ -196,93 +196,105 @@ public sealed class GerenciarProdutoUseCase(
         produto.Status = command.Status;
         produto.AlteradoEm = DateTime.UtcNow;
 
-        await produtoRepository.UpdateAsync(produto);
-
-        // Replace caracteristicas (delete all + re-insert)
-        if (command.Caracteristicas is not null)
+        try
         {
-            var existentes = await caracteristicaRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-            foreach (var existente in existentes)
-                await caracteristicaRepository.DeleteAsync(existente.Id);
+            await produtoRepository.UpdateAsync(produto);
 
-            var agora = DateTime.UtcNow;
-            foreach (var input in command.Caracteristicas)
+            // Replace caracteristicas (delete all + re-insert)
+            if (command.Caracteristicas is not null)
             {
-                await caracteristicaRepository.InsertAsync(new ProdutoCaracteristica
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = command.ProdutoId,
-                    Nome = input.Nome.Trim(),
-                    Descricao = input.Descricao?.Trim(),
-                    QuantidadeReferencia = input.QuantidadeReferencia,
-                    VariacaoPadrao = input.VariacaoPadrao?.Trim(),
-                    OrdemExibicao = input.OrdemExibicao,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                });
-            }
-        }
+                var existentes = await caracteristicaRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+                foreach (var existente in existentes)
+                    await caracteristicaRepository.DeleteAsync(existente.Id);
 
-        // Replace embalagens (delete all + re-insert)
-        if (command.Embalagens is not null)
+                var agora = DateTime.UtcNow;
+                foreach (var input in command.Caracteristicas)
+                {
+                    await caracteristicaRepository.InsertAsync(new ProdutoCaracteristica
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = command.ProdutoId,
+                        Nome = input.Nome.Trim(),
+                        Descricao = input.Descricao?.Trim(),
+                        QuantidadeReferencia = input.QuantidadeReferencia,
+                        VariacaoPadrao = input.VariacaoPadrao?.Trim(),
+                        OrdemExibicao = input.OrdemExibicao,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    });
+                }
+            }
+
+            // Replace embalagens (delete all + re-insert)
+            if (command.Embalagens is not null)
+            {
+                if (command.Embalagens.Count(e => e.Padrao) > 1)
+                    throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
+
+                var existentes = await embalagemRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+                foreach (var existente in existentes)
+                    await embalagemRepository.DeleteAsync(existente.Id);
+
+                var agora = DateTime.UtcNow;
+                foreach (var input in command.Embalagens)
+                {
+                    await embalagemRepository.InsertAsync(new ProdutoEmbalagem
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = command.ProdutoId,
+                        Nome = input.Nome.Trim(),
+                        Descricao = input.Descricao?.Trim(),
+                        Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
+                        Padrao = input.Padrao,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    });
+                }
+            }
+
+            // Replace variacoes (delete all + re-insert)
+            if (command.Variacoes is not null)
+            {
+                var existentes = await produtoVariacaoRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
+                foreach (var existente in existentes)
+                    await produtoVariacaoRepository.DeleteAsync(existente.Id);
+
+                var agora = DateTime.UtcNow;
+                foreach (var variacao in command.Variacoes)
+                {
+                    await produtoVariacaoRepository.InsertAsync(new ProdutoVariacao
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = command.ProdutoId,
+                        Nome = variacao.Nome.Trim(),
+                        Cor = variacao.Cor?.Trim(),
+                        Tamanho = variacao.Tamanho?.Trim(),
+                        DescricaoComercial = variacao.DescricaoComercial?.Trim(),
+                        Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
+                        CodigoBarras = variacao.CodigoBarras?.Trim(),
+                        AtributosJson = variacao.AtributosJson,
+                        DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
+                        Ativa = variacao.Ativa,
+                        CriadoEm = agora,
+                        AlteradoEm = agora
+                    });
+                }
+            }
+
+            await unitOfWork.CommitAsync();
+        }
+        catch (UseCaseValidationException)
         {
-            if (command.Embalagens.Count(e => e.Padrao) > 1)
-                throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
-
-            var existentes = await embalagemRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-            foreach (var existente in existentes)
-                await embalagemRepository.DeleteAsync(existente.Id);
-
-            var agora = DateTime.UtcNow;
-            foreach (var input in command.Embalagens)
-            {
-                await embalagemRepository.InsertAsync(new ProdutoEmbalagem
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = command.ProdutoId,
-                    Nome = input.Nome.Trim(),
-                    Descricao = input.Descricao?.Trim(),
-                    Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
-                    Padrao = input.Padrao,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                });
-            }
+            throw; // deixa subir sem logar como erro inesperado
         }
-
-        // Replace variacoes (delete all + re-insert)
-        if (command.Variacoes is not null)
+        catch (Exception ex)
         {
-            var existentes = await produtoVariacaoRepository.GetByProdutoAsync(command.EmpresaId, command.ProdutoId);
-            foreach (var existente in existentes)
-                await produtoVariacaoRepository.DeleteAsync(existente.Id);
-
-            var agora = DateTime.UtcNow;
-            foreach (var variacao in command.Variacoes)
-            {
-                await produtoVariacaoRepository.InsertAsync(new ProdutoVariacao
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = command.EmpresaId,
-                    ProdutoId = command.ProdutoId,
-                    Nome = variacao.Nome.Trim(),
-                    Cor = variacao.Cor?.Trim(),
-                    Tamanho = variacao.Tamanho?.Trim(),
-                    DescricaoComercial = variacao.DescricaoComercial?.Trim(),
-                    Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
-                    CodigoBarras = variacao.CodigoBarras?.Trim(),
-                    AtributosJson = variacao.AtributosJson,
-                    DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
-                    Ativa = variacao.Ativa,
-                    CriadoEm = agora,
-                    AlteradoEm = agora
-                });
-            }
+            throw new InvalidOperationException(
+                $"Erro ao atualizar produto {command.ProdutoId}: {ex.Message}", ex);
         }
-
-        await unitOfWork.CommitAsync();
 
         if (cacheService is not null)
             await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(command.EmpresaId, command.ProdutoId));

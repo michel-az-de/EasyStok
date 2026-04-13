@@ -48,7 +48,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
+        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -57,7 +57,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             // SKU usa Value Object com HasConversion — busca exata pelo VO
             CodigoSku? skuExato = null;
-            try { skuExato = CodigoSku.From(termo); } catch { /* termo invalido para SKU */ }
+            try { skuExato = CodigoSku.From(termo); } catch (ArgumentException) { /* termo invalido para SKU */ }
 
             return await dbContext.Produtos
                 .AsNoTracking()
@@ -75,8 +75,11 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
             Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
         {
-            var versao = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
-            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_alteradoem_desc";
+            var sortNorm  = (sort  ?? "nome").ToLowerInvariant();
+            var orderNorm = (order ?? "asc").ToLowerInvariant();
+
+            var versao   = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
+            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sortNorm}_{orderNorm}";
 
             if (cache is not null)
             {
@@ -99,10 +102,17 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var totalCount = await query.CountAsync();
 
-            query = query
-                .OrderByDescending(p => p.AlteradoEm)
-                .ThenByDescending(p => p.CriadoEm)
-                .ThenByDescending(p => p.Id);
+            query = (sortNorm, orderNorm) switch
+            {
+                ("nome",       "asc")  => query.OrderBy(p => p.Nome).ThenByDescending(p => p.Id),
+                ("nome",       _)      => query.OrderByDescending(p => p.Nome).ThenByDescending(p => p.Id),
+                ("criadoem",   "asc")  => query.OrderBy(p => p.CriadoEm).ThenByDescending(p => p.Id),
+                ("criadoem",   _)      => query.OrderByDescending(p => p.CriadoEm).ThenByDescending(p => p.Id),
+                ("alteradoem", "asc")  => query.OrderBy(p => p.AlteradoEm).ThenByDescending(p => p.Id),
+                _                      => query.OrderByDescending(p => p.AlteradoEm)
+                                                .ThenByDescending(p => p.CriadoEm)
+                                                .ThenByDescending(p => p.Id)
+            };
 
             var produtos = await query
                 .Skip((page - 1) * pageSize)
@@ -126,7 +136,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.Produtos
                 .AsNoTracking()
-                .Where(p => p.EmpresaId == empresaId && p.Marca != null && p.Marca != "");
+                .Where(p => p.EmpresaId == empresaId && p.Marca != null && p.Marca.Trim() != "");
 
             if (!string.IsNullOrWhiteSpace(filtro))
                 query = query.Where(p => EF.Functions.ILike(p.Marca!, $"%{filtro}%"));
