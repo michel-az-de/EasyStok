@@ -22,11 +22,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
         ViewBag.Timestamp = DateTimeOffset.UtcNow;
         ViewBag.LatenciaApiMs = latenciaApiMs;
 
-        if (User.Identity?.IsAuthenticated == true &&
-            (User.IsInRole("Admin") || User.IsInRole("SuperAdmin")))
-        {
-            ViewBag.IsAdmin = true;
-        }
+        ViewBag.IsAdmin = true; // Diagnóstico é público — todas as funcionalidades liberadas
 
         return View(apiResult);
     }
@@ -70,60 +66,44 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
         return base.Json(result);
     }
 
+    [AllowAnonymous]
     [Route("diagnostico/api/logs-enhanced")]
-    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 48)
     {
-        var token = session.GetToken();
-        if (string.IsNullOrEmpty(token))
-            return Unauthorized();
-
-        var result = await diagnosticoService.FetchEnhancedLogsAsync(token, hours);
+        var result = await diagnosticoService.FetchEnhancedLogsAsync(null, hours);
         if (result is null)
             return StatusCode(502, new { error = "Não foi possível obter logs da API" });
         return base.Json(result);
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [Route("diagnostico/api/logs/limpar")]
-    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> ProxyLimparLogs()
     {
-        var token = session.GetToken();
-        if (string.IsNullOrEmpty(token))
-            return Unauthorized();
-
-        var result = await diagnosticoService.LimparLogsAsync(token);
+        var result = await diagnosticoService.LimparLogsAsync(null);
         if (result is null)
             return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
 
+    [AllowAnonymous]
     [Route("diagnostico/api/logs/exportar")]
-    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
     {
-        var token = session.GetToken();
-        if (string.IsNullOrEmpty(token))
-            return Unauthorized();
-
-        var (stream, fileName) = await diagnosticoService.ExportarLogsAsync(token, hours);
+        var (stream, fileName) = await diagnosticoService.ExportarLogsAsync(null, hours);
         if (stream is null)
             return StatusCode(502, new { error = "Não foi possível obter logs da API" });
 
         return File(stream, "text/plain; charset=utf-8", fileName ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [Route("diagnostico/api/logs/salvar-storage")]
-    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> ProxySalvarStorage()
     {
-        var token = session.GetToken();
-        if (string.IsNullOrEmpty(token))
-            return Unauthorized();
-
-        var result = await diagnosticoService.SalvarLogsStorageAsync(token);
+        var result = await diagnosticoService.SalvarLogsStorageAsync(null);
         if (result is null)
             return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);

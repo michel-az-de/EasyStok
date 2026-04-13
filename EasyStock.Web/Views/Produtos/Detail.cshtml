@@ -284,7 +284,7 @@
             Fotos
             <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                   :class="tab==='fotos' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'"
-                  x-text="photos.filter(x=>!x.toDelete).length + pendingFiles.length"></span>
+                  x-text="photos.length"></span>
         </button>
         <button @@click="tab='estoque'"
                 :class="tab==='estoque' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
@@ -416,6 +416,7 @@
                         <div class="w-full h-full items-center justify-center bg-slate-100 text-slate-400" style="display:none;">
                             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
                         </div>
                         <button type="button" @@click="deletePhoto(foto.fotoId)"
                                 class="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500/90 text-white rounded-full text-[11px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-sm transition-all"
@@ -724,6 +725,7 @@
 
                 // ── Photo management (auto-save with per-file progress) ──
                 async handlePhotoSelect(e) {
+                    if (this.uploading) return;
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
                     const available = 5 - this.photos.length;
                     const files = Array.from(e.target.files).slice(0, Math.max(0, available));
@@ -752,7 +754,7 @@
                         }
                         if (!f.type.startsWith('image/')) {
                             qi.status = 'error';
-                            qi.message = 'Formato invalido';
+                            qi.message = 'Formato inválido';
                             errorCount++;
                             continue;
                         }
@@ -765,10 +767,10 @@
                             const d = await r.json();
                             if (!d.ok) throw new Error(d.erro ?? 'Erro no servidor');
                             if (d.fotoId && d.url) {
-                                this.photos.push({ fotoId: d.fotoId, url: d.url, toDelete: false });
+                                // Reatribuição completa para garantir reatividade Alpine
+                                this.photos = [...this.photos, { fotoId: d.fotoId, url: d.url, toDelete: false }];
                             }
                             qi.status = 'done';
-                            qi.message = 'Salva e otimizada';
                             successCount++;
                         } catch (err) {
                             qi.status = 'error';
@@ -786,9 +788,9 @@
                     else
                         window.showToast(`${successCount} foto(s) salva(s) com sucesso!`, 'success');
 
-                    // Clear queue after 4 seconds
+                    // Limpa fila de upload após 2 segundos
                     if (this._uploadQueueTimeout) clearTimeout(this._uploadQueueTimeout);
-                    this._uploadQueueTimeout = setTimeout(() => { this.uploadQueue = []; this._uploadQueueTimeout = null; }, 4000);
+                    this._uploadQueueTimeout = setTimeout(() => { this.uploadQueue = []; this._uploadQueueTimeout = null; }, 2000);
                 },
                 async deletePhoto(fotoId) {
                     if (!confirm('Remover esta foto?')) return;

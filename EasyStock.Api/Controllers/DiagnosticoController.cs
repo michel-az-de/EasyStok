@@ -18,7 +18,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/diagnostico")]
 [Route("diagnostico")]
-[Authorize]
+[AllowAnonymous]
 [ApiExplorerSettings(GroupName = "v1-ptbr")]
 public sealed class DiagnosticoController(
     ResolvedInfrastructureState infraState,
@@ -116,7 +116,6 @@ public sealed class DiagnosticoController(
     }
 
     [HttpGet("logs")]
-    [Authorize(Policy = "Admin")]
     public IActionResult Logs([FromQuery] int n = 100)
     {
         n = Math.Clamp(n, 1, 200);
@@ -191,7 +190,6 @@ public sealed class DiagnosticoController(
     // ──────────────────────────────────────────────────────────────────────
 
     [HttpGet("logs/enhanced")]
-    [Authorize(Policy = "Admin")]
     public IActionResult EnhancedLogs([FromQuery] int hours = 24)
     {
         hours = Math.Clamp(hours, 1, 72);
@@ -312,8 +310,8 @@ public sealed class DiagnosticoController(
                     _ => ""
                 };
                 var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
-                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 200 ? e.Message[..200] + "..." : e.Message);
-                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception.Length > 300 ? e.Exception[..300] + "..." : e.Exception)}</div>" : "";
+                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "..." : e.Message);
+                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
                 return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
                        $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
                        $"<span class='log-level'>{e.Level}</span>" +
@@ -428,7 +426,6 @@ public sealed class DiagnosticoController(
     }
 
     [HttpPost("logs/limpar")]
-    [Authorize(Policy = "Admin")]
     public IActionResult LimparLogs()
     {
         var logsDir = GetLogDirectory();
@@ -446,6 +443,20 @@ public sealed class DiagnosticoController(
                 System.IO.File.Delete(arquivo);
                 excluidos++;
             }
+            catch (IOException)
+            {
+                // Arquivo em uso pelo Serilog (dia corrente) — truncar em vez de excluir
+                try
+                {
+                    using var fs = new FileStream(arquivo, FileMode.Truncate, FileAccess.Write, FileShare.ReadWrite);
+                    excluidos++;
+                    erros.Add(Path.GetFileName(arquivo) + ": truncado (em uso pelo Serilog)");
+                }
+                catch (Exception ex2)
+                {
+                    erros.Add(Path.GetFileName(arquivo) + ": não foi possível excluir/truncar — " + ex2.Message);
+                }
+            }
             catch (Exception ex)
             {
                 erros.Add(Path.GetFileName(arquivo) + ": " + ex.Message);
@@ -457,14 +468,13 @@ public sealed class DiagnosticoController(
             success = true,
             arquivosExcluidos = excluidos,
             mensagem = excluidos > 0
-                ? $"{excluidos} arquivo(s) de log excluído(s) permanentemente."
+                ? $"{excluidos} arquivo(s) de log excluído(s)/limpo(s) permanentemente."
                 : "Nenhum arquivo de log encontrado.",
             erros
         });
     }
 
     [HttpGet("logs/exportar")]
-    [Authorize(Policy = "Admin")]
     public IActionResult ExportarLogs([FromQuery] int hours = 48)
     {
         hours = Math.Clamp(hours, 1, 168);
@@ -509,7 +519,6 @@ public sealed class DiagnosticoController(
     }
 
     [HttpPost("logs/salvar-storage")]
-    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> SalvarLogsStorage([FromServices] IFileStorage fileStorage, CancellationToken ct)
     {
         var logsDir = GetLogDirectory();
@@ -1291,8 +1300,8 @@ public sealed class DiagnosticoController(
                     _ => ""
                 };
                 var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
-                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 200 ? e.Message[..200] + "..." : e.Message);
-                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception.Length > 300 ? e.Exception[..300] + "..." : e.Exception)}</div>" : "";
+                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "..." : e.Message);
+                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
                 return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
                        $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
                        $"<span class='log-level'>{e.Level}</span>" +

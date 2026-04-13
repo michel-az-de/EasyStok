@@ -79,12 +79,13 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
     // Novos métodos — Central de Operações Inteligente
     // ──────────────────────────────────────────────────────────────────────
 
-    public async Task<EnhancedLogsWebResult?> FetchEnhancedLogsAsync(string bearerToken, int hours = 24)
+    public async Task<EnhancedLogsWebResult?> FetchEnhancedLogsAsync(string? bearerToken, int hours = 24)
     {
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Get, $"diagnostico/logs/enhanced?hours={hours}");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            if (!string.IsNullOrEmpty(bearerToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             var response = await httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
@@ -135,12 +136,13 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         }
     }
 
-    public async Task<LimparLogsResult?> LimparLogsAsync(string bearerToken)
+    public async Task<LimparLogsResult?> LimparLogsAsync(string? bearerToken)
     {
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "diagnostico/logs/limpar");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            if (!string.IsNullOrEmpty(bearerToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             var response = await httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
@@ -155,12 +157,13 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         }
     }
 
-    public async Task<(Stream? Content, string? FileName)> ExportarLogsAsync(string bearerToken, int hours = 48)
+    public async Task<(Stream? Content, string? FileName)> ExportarLogsAsync(string? bearerToken, int hours = 48)
     {
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Get, $"diagnostico/logs/exportar?hours={hours}");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            if (!string.IsNullOrEmpty(bearerToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode)
@@ -178,12 +181,13 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         }
     }
 
-    public async Task<SalvarStorageResult?> SalvarLogsStorageAsync(string bearerToken)
+    public async Task<SalvarStorageResult?> SalvarLogsStorageAsync(string? bearerToken)
     {
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "diagnostico/logs/salvar-storage");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            if (!string.IsNullOrEmpty(bearerToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             var response = await httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)

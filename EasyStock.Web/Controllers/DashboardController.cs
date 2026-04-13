@@ -22,8 +22,10 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
         var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>("analytics/receita?meses=6");
 
+        await Task.WhenAll(dashTask, reposTask, movsTask, receitaTask);
+
         var (dashResult, reposResult, movsResult, receitaResult) = (
-            await dashTask, await reposTask, await movsTask, await receitaTask
+            dashTask.Result, reposTask.Result, movsTask.Result, receitaTask.Result
         );
 
         if (dashResult.Success && dashResult.Data is { } d)
