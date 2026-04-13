@@ -36,7 +36,7 @@
     }
     else
     {
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto users-table-wrap">
         <table class="tbl-full">
             <thead>
                 <tr><th>Nome</th><th>Email</th><th>Função</th><th>Perfil / Loja</th><th>Ações</th></tr>
@@ -136,8 +136,8 @@
                                 </div>
                             </form>
                         </td>
-                        <td>
-                            <div class="flex items-center gap-3">
+                        <td class="users-actions-cell">
+                            <div class="flex items-center gap-3 whitespace-nowrap">
                                 <button type="button" @@click="editando = !editando"
                                         class="grid-action-btn grid-action-btn--primary">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
