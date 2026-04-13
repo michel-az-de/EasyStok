@@ -1190,14 +1190,6 @@
                     this.previews.forEach(u => URL.revokeObjectURL(u));
                     this.previews = this.pendingFiles.map(f => URL.createObjectURL(f));
                 },
-                _syncFileInput() {
-                    // Reconstrói o FileList do input nativo para o form submit
-                    try {
-                        const dt = new DataTransfer();
-                        this.pendingFiles.forEach(f => dt.items.add(f));
-                        this.$refs.fileInput.files = dt.files;
-                    } catch {}
-                },
 
                 // ── AI ──
                 aiGenerating: false,
