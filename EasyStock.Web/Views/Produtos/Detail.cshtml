@@ -825,7 +825,9 @@
                     if (this._deletingPhoto) return;
                     if (!confirm('Remover esta foto?')) return;
                     this._deletingPhoto = true;
-                    const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content
+                               || document.querySelector('[name=__RequestVerificationToken]')?.value
+                               || '';
                     const fd = new FormData();
                     fd.append('__RequestVerificationToken', token);
                     try {
