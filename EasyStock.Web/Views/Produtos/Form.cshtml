@@ -121,15 +121,21 @@
 
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
-                    <div class="relative">
-                        <input name="SkuBase" x-model="sku" placeholder="Ex: CAM-BAS-001"
-                               @@blur="checkSkuDisponivel()"
-                               :class="skuStatus === 'indisponivel' ? 'border-red-400 focus:ring-red-300' : skuStatus === 'disponivel' ? 'border-emerald-400 focus:ring-emerald-300' : ''"
-                               class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                        <span x-show="skuStatus === 'disponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-semibold">✓ disponível</span>
-                        <span x-show="skuStatus === 'indisponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 text-xs font-semibold">✗ em uso</span>
-                        <span x-show="skuStatus === 'verificando'" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">...</span>
-                        <span x-show="skuStatus === 'erro'" class="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-semibold">⚠ verificar</span>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input name="SkuBase" x-model="sku" placeholder="Ex: CAM-BAS-001"
+                                   @@blur="checkSkuDisponivel()"
+                                   :class="skuStatus === 'indisponivel' ? 'border-red-400 focus:ring-red-300' : skuStatus === 'disponivel' ? 'border-emerald-400 focus:ring-emerald-300' : ''"
+                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            <span x-show="skuStatus === 'disponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 text-xs font-semibold">&#10003; disponível</span>
+                            <span x-show="skuStatus === 'indisponivel'" class="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 text-xs font-semibold">&#10007; em uso</span>
+                            <span x-show="skuStatus === 'verificando'" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">...</span>
+                            <span x-show="skuStatus === 'erro'" class="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-semibold">&#9888; verificar</span>
+                        </div>
+                        <button type="button" @@click="gerarSku()"
+                                class="px-3 py-2.5 border border-slate-300 text-slate-600 text-xs rounded-lg hover:bg-slate-50 flex-shrink-0">
+                            Gerar
+                        </button>
                     </div>
                     @if (ViewData.ModelState["SkuBase"]?.Errors.Count > 0)
                     {
@@ -180,6 +186,11 @@
                         @if (Model.Tipo == 1) { <option value="1" selected>Alimento</option> } else { <option value="1">Alimento</option> }
                         @if (Model.Tipo == 2) { <option value="2" selected>Serviço</option> } else { <option value="2">Serviço</option> }
                     </select>
+                    <p x-show="tipoSugerido !== null && tipo !== tipoSugerido" x-cloak
+                       class="text-xs text-indigo-500 mt-1 cursor-pointer hover:underline"
+                       @@click="tipo = tipoSugerido; controlaValidade = (tipoSugerido === 1)">
+                        <span x-text="tipoSugerido === 1 ? '💡 Sugestão: usar tipo Alimento para esta categoria' : ''"></span>
+                    </p>
                 </div>
                 <div class="sm:col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -230,6 +241,7 @@
                     </button>
                 }
             </div>
+            <span class="text-xs text-slate-400 font-semibold hidden sm:block">Etapa 1 de 4</span>
             <div class="flex items-center gap-2">
                 <button type="button" :disabled="!nome || autoFilling" @@click="autoFill()"
                         class="px-4 py-2.5 border border-violet-200 text-violet-600 hover:bg-violet-50 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
@@ -267,32 +279,48 @@
                 <span class="premium-photo-counter ml-auto" x-text="totalPhotoCount + '/5'"></span>
             </div>
 
-            <!-- Fotos existentes (edit mode) -->
-            <div x-show="existingPhotos.length > 0" x-transition class="mb-3">
-                <p class="text-xs text-slate-500 mb-2" x-text="existingPhotos.length + ' foto(s) já cadastrada(s)'"></p>
-                <div class="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                    <template x-for="foto in existingPhotos" :key="foto.fotoId">
-                        <div class="aspect-square rounded-lg overflow-hidden border border-slate-200">
+            <!-- Grid de previews (existentes + novas) -->
+            <div x-show="totalPhotoCount > 0" x-transition class="mb-4">
+                <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                    <!-- Fotos existentes -->
+                    <template x-for="(foto, idx) in existingPhotos" :key="'ex-' + foto.fotoId">
+                        <div class="relative aspect-square rounded-xl overflow-hidden border-2 group"
+                             :class="idx === 0 && previews.length === 0 ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'">
                             <img :src="foto.url" class="w-full h-full object-cover" />
+                            <span x-show="idx === 0 && previews.length === 0"
+                                  class="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Capa</span>
+                            <span class="absolute bottom-1.5 left-1.5 text-[10px] font-semibold text-white bg-black/50 backdrop-blur px-1.5 py-0.5 rounded"
+                                  x-text="'Foto ' + (idx + 1)"></span>
+                        </div>
+                    </template>
+                    <!-- Previews de novas fotos -->
+                    <template x-for="(url, idx) in previews" :key="'new-' + idx">
+                        <div class="relative aspect-square rounded-xl overflow-hidden border-2 group"
+                             :class="idx === 0 && existingPhotos.length === 0 ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'">
+                            <img :src="url" class="w-full h-full object-cover" />
+                            <span x-show="idx === 0 && existingPhotos.length === 0"
+                                  class="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Capa</span>
+                            <span class="absolute bottom-1.5 left-1.5 text-[10px] font-semibold text-white bg-black/50 backdrop-blur px-1.5 py-0.5 rounded"
+                                  x-text="'Foto ' + (existingPhotos.length + idx + 1)"></span>
+                            <button type="button" @@click="removePondFile(idx)"
+                                    aria-label="Remover foto"
+                                    class="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-white/90 hover:bg-red-500 hover:text-white text-slate-500 rounded-full shadow-sm text-xs font-bold opacity-0 group-hover:opacity-100 transition-all">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
                         </div>
                     </template>
                 </div>
             </div>
 
-            <!-- FilePond (fotos ficam locais até o submit) -->
-            <div class="photo-upload-container">
-                <div class="photo-upload-badges">
-                    <span class="photo-upload-badge" x-text="remainingPhotoSlots + ' vaga(s)'"></span>
+            <!-- FilePond (hidden, controlado via API) -->
+            <div class="photo-upload-container" :class="totalPhotoCount >= 5 ? 'hidden' : ''">
+                <div class="flex items-center gap-2 mb-3 flex-wrap">
+                    <span class="photo-upload-badge"
+                          x-text="remainingPhotoSlots > 0 ? 'Você pode adicionar mais ' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' foto' : ' fotos') : 'Limite atingido'"></span>
                     <span class="photo-upload-badge">JPEG, PNG, WebP</span>
                     <span class="photo-upload-badge">até 10 MB</span>
                 </div>
                 <input type="file" x-ref="pondInput" />
-                <div class="photo-upload-hint">
-                    <span class="photo-upload-status" :class="totalPhotoCount > 0 ? 'photo-upload-status--ready' : ''">
-                        <span class="photo-upload-status__dot"></span>
-                        <span x-text="totalPhotoCount > 0 ? totalPhotoCount + ' imagem(ns) pronta(s)' : 'Nenhuma imagem selecionada'"></span>
-                    </span>
-                </div>
             </div>
         </div>
 
@@ -320,14 +348,17 @@
         </div>
 
         <!-- Preços -->
-        <div class="ws">
+        <div class="ws mt-6">
             <div class="section-hd">
                 <div class="section-hd-icon bg-emerald-50 text-emerald-500">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Preços e margem</h3>
+                <div>
+                    <h3 class="font-bold text-slate-800">Preços e margem</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Preencha custo ou margem para calcular automaticamente.</p>
+                </div>
             </div>
             <!-- Hidden inputs: valor vazio quando zero (ASP.NET trata como null para nullable decimal) -->
             <input type="hidden" name="CustoReferencia" :value="custo > 0 ? custo : ''" />
@@ -389,11 +420,24 @@
         </div>
 
         <!-- Nav Step 2 -->
-        <div class="flex justify-between mt-4">
-            <button type="button" @@click="prevStep()"
-                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
-                &larr; Voltar
-            </button>
+        <div class="flex items-center justify-between mt-4 gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+                <button type="button" @@click="prevStep()"
+                        class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                    &larr; Voltar
+                </button>
+                @if (!isEdit)
+                {
+                    <button type="button" @@click="salvarRascunho()"
+                            class="px-4 py-2.5 border border-slate-300 text-slate-500 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Rascunho
+                    </button>
+                }
+            </div>
+            <span class="text-xs text-slate-400 font-semibold hidden sm:block">Etapa 2 de 4</span>
             <button type="button" @@click="nextStep()"
                     class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
                 Próximo &rarr;
@@ -658,11 +702,24 @@
         </div>
 
         <!-- Nav Step 3 -->
-        <div class="flex justify-between mt-4">
-            <button type="button" @@click="prevStep()"
-                    class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
-                &larr; Voltar
-            </button>
+        <div class="flex items-center justify-between mt-4 gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+                <button type="button" @@click="prevStep()"
+                        class="px-5 py-2.5 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                    &larr; Voltar
+                </button>
+                @if (!isEdit)
+                {
+                    <button type="button" @@click="salvarRascunho()"
+                            class="px-4 py-2.5 border border-slate-300 text-slate-500 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Rascunho
+                    </button>
+                }
+            </div>
+            <span class="text-xs text-slate-400 font-semibold hidden sm:block">Etapa 3 de 4</span>
             <button type="button" @@click="nextStep()"
                     class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
                 Revisar &rarr;
@@ -985,6 +1042,18 @@
                     this.codigoBarras = ts + check;
                     this.eanAviso = '';
                 },
+                gerarSku() {
+                    const base = this.nome || '';
+                    const words = base.trim().toUpperCase().split(/\s+/).filter(w => w.length > 0);
+                    const parts = words.slice(0, 3).map(w => w.substring(0, 3).replace(/[^A-Z0-9]/g, ''));
+                    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                    let rnd = '';
+                    for (let i = 0; i < 4; i++) rnd += chars[Math.floor(Math.random() * chars.length)];
+                    const prefix = parts.filter(Boolean).join('-');
+                    this.sku = prefix ? prefix + '-' + rnd : rnd;
+                    this.skuStatus = '';
+                    this.checkSkuDisponivel();
+                },
                 _skuAbort: null,
                 async checkSkuDisponivel() {
                     const sku = (this.sku || '').trim();
@@ -1061,8 +1130,8 @@
                             acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
                             maxFileSize: '10MB',
                             maxParallelUploads: 1,
-                            imagePreviewHeight: 160,
-                            imagePreviewMaxHeight: 200,
+                            imagePreviewHeight: 100,
+                            imagePreviewMaxHeight: 120,
                             itemInsertLocation: 'after',
                             allowDrop: true,
                             allowBrowse: true,
@@ -1285,6 +1354,14 @@
                         this.custo = +( this.preco * (1 - this.margem / 100) ).toFixed(2);
                 },
 
+                // ── Tipo sugerido baseado na categoria ──
+                get tipoSugerido() {
+                    const nome = (this.categoriaNome || '').toLowerCase();
+                    const alimentoKeywords = ['aliment', 'comida', 'bebida', 'massa', 'doce', 'salgad', 'latic', 'carne', 'frut', 'verdur', 'legum', 'cereal', 'pão', 'padari', 'confeit', 'hortifruti', 'mercearia', 'grão', 'tempero', 'condiment', 'molho', 'sorvete', 'gelat', 'biscoito', 'bolacha', 'chocolate', 'café', 'chá', 'suco', 'refrigerant'];
+                    if (alimentoKeywords.some(k => nome.includes(k))) return 1;
+                    return null;
+                },
+
                 // ── Categories ──
                 get subcategorias() {
                     if (!this.categoriaId) return [];
@@ -1307,6 +1384,13 @@ get remainingPhotoSlots() {
     return Math.max(0, 5 - this.totalPhotoCount);
 },
 previews: [],      // URLs de preview locais dos arquivos no FilePond
+removePondFile(idx) {
+    if (!this._pond) return;
+    const files = this._pond.getFiles();
+    if (files[idx]) {
+        this._pond.removeFile(files[idx].id);
+    }
+},
 
                 // ── AI ──
                 aiGenerating: false,

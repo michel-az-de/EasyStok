@@ -1256,6 +1256,16 @@ html.theme-dark .pedido-modal__footer {
     transition: border-color var(--transition), background-color var(--transition);
 }
 
+/* Hide number input spinners for consistent appearance */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
 /* ─── Section header ─────────────────────────────────────────── */
 .section-hd {
     display: flex;
@@ -2405,7 +2415,7 @@ html.theme-dark .ui-select.ui-select--plain {
 }
 
 .photo-upload-container .filepond--drop-label {
-    min-height: 160px;
+    min-height: 120px;
 }
 
 .photo-upload-container .filepond--drop-label label {
@@ -2456,42 +2466,7 @@ html.theme-dark .ui-select.ui-select--plain {
     background-color: rgba(255, 255, 255, .24);
 }
 
-.photo-upload-hint {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 12px;
-}
-
-.photo-upload-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(15, 23, 42, .04);
-    color: #64748B;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.photo-upload-status__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: rgba(148, 163, 184, .8);
-    box-shadow: 0 0 0 4px rgba(148, 163, 184, .14);
-}
-
-.photo-upload-status--ready {
-    background: rgba(16, 185, 129, .1);
-    color: #047857;
-}
-
-.photo-upload-status--ready .photo-upload-status__dot {
-    background: #10B981;
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, .16);
-}
+/* photo-upload-status removed — replaced by inline preview grid */
 
 .badge-critical {
     animation: pulseRed 1.8s ease-in-out infinite;
@@ -2597,8 +2572,7 @@ html.theme-dark .produto-detail-page--compact .produto-gallery-card--hero {
 }
 
 html.theme-dark .premium-photo-section__subtitle,
-html.theme-dark .premium-photo-rail__note,
-html.theme-dark .photo-upload-status {
+html.theme-dark .premium-photo-rail__note {
     color: #94A3B8;
 }
 
@@ -2639,10 +2613,6 @@ html.theme-dark .photo-upload-container .filepond--drop-label label {
 html.theme-dark .photo-upload-container .filepond--label-action {
     color: #A5B4FC;
     border-bottom-color: rgba(165, 180, 252, .4);
-}
-
-html.theme-dark .photo-upload-status {
-    background: rgba(148, 163, 184, .08);
 }
 
 @media (max-width: 640px) {
