@@ -594,6 +594,77 @@ public sealed class DiagnosticoController(
         }
     }
 
+    [HttpGet("logs/storage")]
+    public async Task<IActionResult> ListarLogsStorage([FromServices] IFileStorage fileStorage, CancellationToken ct)
+    {
+        try
+        {
+            var arquivos = await fileStorage.ListAsync("logs", ct);
+            return Ok(new
+            {
+                disponivel = true,
+                arquivos = arquivos.Select(f => new
+                {
+                    storageKey = f.StorageKey,
+                    nome = f.FileName,
+                    tamanhoBytes = f.SizeBytes,
+                    dataModificacao = f.LastModified
+                }),
+                total = arquivos.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao listar logs no storage.");
+            return Ok(new { disponivel = false, motivo = ex.Message, arquivos = Array.Empty<object>(), total = 0 });
+        }
+    }
+
+    [HttpGet("logs/storage/conteudo")]
+    public async Task<IActionResult> CarregarLogStorage([FromServices] IFileStorage fileStorage, [FromQuery] string file, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(file) || file.Length > 200 || file.Contains(".."))
+            return BadRequest(new { error = "Parâmetro 'file' inválido." });
+
+        try
+        {
+            var bytes = await fileStorage.DownloadAsync(file, ct);
+            var text = System.Text.Encoding.UTF8.GetString(bytes);
+
+            // Salvar em arquivo temp, parsear com analisador existente
+            var tmpPath = Path.Combine(Path.GetTempPath(), $"easystock-storage-{Guid.NewGuid():N}.log");
+            try
+            {
+                await System.IO.File.WriteAllTextAsync(tmpPath, text, ct);
+                var cutoff = DateTime.UtcNow.AddDays(-30); // arquivo histórico — sem limite agressivo
+                var entries = DiagnosticoLogAnalyzer.ParseEnhancedLogFile(tmpPath, cutoff);
+                var summary = DiagnosticoLogAnalyzer.BuildLogSummary(entries);
+                var padroes = DiagnosticoLogAnalyzer.DetectPatterns(entries, isFallback: false);
+
+                return Ok(new EnhancedLogsResult
+                {
+                    Disponivel = true,
+                    Motivo = null,
+                    QueryTimestamp = DateTimeOffset.UtcNow,
+                    PeriodoHoras = 0,
+                    TotalEntries = entries.Count,
+                    Entradas = entries.Take(500).ToArray(),
+                    Resumo = summary,
+                    Padroes = padroes.ToArray()
+                });
+            }
+            finally
+            {
+                try { System.IO.File.Delete(tmpPath); } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao carregar log do storage: {Key}", file);
+            return StatusCode(500, new { error = $"Erro ao carregar arquivo: {ex.Message}" });
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // Novos endpoints — melhorias da central de diagnóstico
     // ──────────────────────────────────────────────────────────────────────
@@ -1299,19 +1370,22 @@ public sealed class DiagnosticoController(
         {
             patternsHtmlAck = "<div class='card'><h2>&#128270; Padroes Detectados</h2><div class='patterns-list'>" +
                 string.Join("", logs.Padroes.Select(p =>
-                    $"<div class='pattern-item' data-alerta-id='{p.AlertaId}'>{SevBadge(p.Severidade)} <strong>{p.Tipo}</strong> " +
+                    $"<div class='pattern-item' data-alerta-id='{p.AlertaId}' data-tipo='{System.Net.WebUtility.HtmlEncode(p.Tipo)}'>" +
+                    $"{SevBadge(p.Severidade)} <strong>{p.Tipo}</strong> " +
                     $"<span class='pattern-count'>({p.Ocorrencias}x)</span><br>" +
-                    $"<span class='pattern-desc'>{p.Descricao}</span><br>" +
-                    $"<em class='pattern-tip'>{p.Sugestao}</em>" +
-                    (p.UltimaOcorrencia.HasValue ? $"<br><small>Ultima: {p.UltimaOcorrencia:HH:mm:ss}</small>" : "") +
+                    $"<span class='pattern-desc'>{System.Net.WebUtility.HtmlEncode(p.Descricao)}</span><br>" +
+                    $"<em class='pattern-tip'>{System.Net.WebUtility.HtmlEncode(p.Sugestao)}</em>" +
+                    (p.UltimaOcorrencia.HasValue ? $"<br><small style='color:#64748b'>Ultima: {p.UltimaOcorrencia:HH:mm:ss} | Primeira: {p.PrimeiraOcorrencia:HH:mm:ss}</small>" : "") +
                     (!string.IsNullOrEmpty(p.AlertaId) ? $"""
-                    <div class='ack-row' style='margin-top:.5rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap'>
+                    <div class='ack-row' style='margin-top:.6rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap'>
                         <span style='font-size:.7rem;color:#64748b'>Marcar:</span>
-                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='visto' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.3rem;cursor:pointer'>Visto</button>
-                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='em_investigacao' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #78350f;background:#1c1917;color:#f59e0b;border-radius:.3rem;cursor:pointer'>Investigando</button>
-                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='resolvido' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #052e16;background:#0f172a;color:#22c55e;border-radius:.3rem;cursor:pointer'>Resolvido</button>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='visto' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.3rem;cursor:pointer'>&#10003; Visto</button>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='em_investigacao' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #78350f;background:#1c1917;color:#f59e0b;border-radius:.3rem;cursor:pointer'>&#128269; Investigando</button>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='resolvido' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #052e16;background:#0f172a;color:#22c55e;border-radius:.3rem;cursor:pointer'>&#10003; Resolvido</button>
+                        <button onclick='verLogsDoAlerta(this)' data-desc='{System.Net.WebUtility.HtmlEncode(p.Descricao.Length > 40 ? p.Descricao[..40] : p.Descricao)}' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #1e3a5f;background:#0f172a;color:#60a5fa;border-radius:.3rem;cursor:pointer'>&#128269; Ver logs</button>
                         <span class='ack-status-label' style='font-size:.7rem;color:#64748b;margin-left:.25rem'></span>
                     </div>
+                    <div class='investigacao-panel' style='display:none;margin-top:.6rem;border-top:1px solid #334155;padding-top:.5rem'></div>
                     """ : "") +
                     "</div>")) +
                 "</div></div>";
@@ -1379,7 +1453,18 @@ public sealed class DiagnosticoController(
             .refresh-bar{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#94a3b8}
             .refresh-bar label{cursor:pointer;display:flex;align-items:center;gap:.25rem}
             .section-empty{color:#64748b;text-align:center;padding:2rem;font-size:.85rem}
+            .toast-container{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.5rem;z-index:9999;pointer-events:none}
+            .toast{padding:.65rem 1rem;border-radius:.5rem;font-size:.8rem;color:#f1f5f9;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:320px;word-break:break-word}
+            .toast.show{opacity:1;transform:translateY(0)}
+            .toast.success{background:#052e16;border:1px solid #16a34a;color:#4ade80}
+            .toast.error{background:#450a0a;border:1px solid #dc2626;color:#fca5a5}
+            .toast.info{background:#1e293b;border:1px solid #334155;color:#94a3b8}
+            .investigacao-panel .inv-log-entry{font-family:monospace;font-size:.7rem;color:#cbd5e1;padding:.2rem .3rem;border-bottom:1px solid #1e293b;word-break:break-all}
+            .investigacao-panel .inv-log-entry:last-child{border:none}
+            .pattern-item.resolved{opacity:.6;border-color:#052e16}
+            .pattern-item.investigating{border-color:#78350f;background:#1c1917}
         </style></head><body>
+        <div class='toast-container' id='toastContainer'></div>
         <div class="container">
         <header>
             <h1>EasyStock - Central de Diagnostico</h1>
@@ -1396,7 +1481,7 @@ public sealed class DiagnosticoController(
             <button class="tab active" onclick="showTab('overview')">Visao Geral</button>
             <button class="tab" onclick="showTab('health')">Saude &amp; Graficos</button>
             <button class="tab" onclick="showTab('logs')">Logs 24h</button>
-            <button class="tab" onclick="showTab('patterns')">Alertas &amp; Padroes</button>
+            <button class="tab" onclick="showTab('patterns')">Alertas &amp; Padroes{{(logs?.Padroes.Length > 0 ? $" <span style='background:#450a0a;color:#ef4444;border-radius:9999px;padding:.1rem .45rem;font-size:.65rem;font-weight:700'>{logs.Padroes.Length}</span>" : "")}}</button>
         </div>
 
         <!-- OVERVIEW TAB -->
@@ -1487,22 +1572,48 @@ public sealed class DiagnosticoController(
         <div class="panel" id="tab-logs">
         {{(logs?.Disponivel == true ? $@"
         {logStatsHtml}
+        <!-- Timeline visual de erros -->
+        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem'>
+                <h3 style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128200; Timeline de Erros &amp; Requests — ultimas 48h (por hora)</h3>
+                <span style='font-size:.7rem;color:#475569'>Clique para filtrar por hora</span>
+            </div>
+            <div style='position:relative;height:80px'><canvas id='errorTimelineChart'></canvas></div>
+            <div id='timelineFilterInfo' style='font-size:.7rem;color:#f59e0b;margin-top:.3rem;min-height:1rem'></div>
+        </div>
+        <!-- Storage de logs -->
+        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
+            <div style='display:flex;align-items:center;gap:.75rem;flex-wrap:wrap'>
+                <span style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128230; Logs Arquivados (Storage)</span>
+                <button onclick='loadStorageFileList()' style='padding:.3rem .65rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.35rem;cursor:pointer'>Listar arquivos</button>
+                <select id='storageFileSelect' style='display:none;background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.3rem .5rem;border-radius:.35rem;font-size:.75rem;max-width:260px' onchange='loadStorageFileContent()'><option value=''>-- selecione --</option></select>
+                <button id='clearStorageBtn' onclick='clearStorageView()' style='display:none;padding:.3rem .65rem;font-size:.75rem;background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5;border-radius:.35rem;cursor:pointer'>&#10005; Limpar</button>
+                <span id='storageStatusMsg' style='font-size:.75rem;color:#94a3b8'></span>
+            </div>
+            <div id='storageArchiveIndicator' style='display:none;margin-top:.4rem;font-size:.75rem;color:#f59e0b;background:#422006;border:1px solid #78350f;border-radius:.3rem;padding:.3rem .6rem'>
+                &#128197; Exibindo logs de arquivo arquivado no storage — dados historicos
+            </div>
+        </div>
         <div class='card'>
-            <h2>&#128466; Console de Logs (ultimas 48h) <span id='liveDot' style='display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-left:6px;vertical-align:middle'></span></h2>
+            <h2>&#128466; Console de Logs <span id='logSourceLabel' style='font-size:.75rem;font-weight:400;color:#94a3b8'>(ultimas 48h)</span>
+                <span id='liveDot' style='display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-left:6px;vertical-align:middle'></span>
+                <span id='liveTimestamp' style='font-size:.7rem;font-weight:400;color:#475569;margin-left:.5rem'></span>
+            </h2>
             <div class='log-controls'>
                 <input type='text' id='logFilter' placeholder='Filtrar mensagens...' oninput='filterLogs()'>
                 <button class='active' onclick='toggleLevel(this,""all"")'>Todos</button>
                 <button onclick='toggleLevel(this,""ERROR"")'>Erros</button>
                 <button onclick='toggleLevel(this,""WARN"")'>Warnings</button>
                 <button onclick='toggleLevel(this,""INFO"")'>Info</button>
-                <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>Mover p/ lixeira</button>
-                <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>Esvaziar lixeira</button>
-                <div id='lixeiraMsg' style='font-size:.75rem;color:#94a3b8'></div>
+                <a href='/api/diagnostico/logs/exportar' download style='padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;font-size:.75rem;text-decoration:none;white-space:nowrap;cursor:pointer'>&#11015; Exportar</a>
+                <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>&#128465; Mover p/ lixeira</button>
+                <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>&#128465; Esvaziar lixeira</button>
+                <span id='lixeiraBadge' style='font-size:.72rem;color:#94a3b8;white-space:nowrap'></span>
             </div>
             <div class='log-console' id='logConsole'>
                 {logEntriesHtml}
             </div>
-            <div style='margin-top:.5rem;font-size:.75rem;color:#64748b'>Mostrando ate 200 entradas mais recentes de {logs.TotalEntries} total</div>
+            <div style='margin-top:.5rem;font-size:.75rem;color:#64748b' id='logCountInfo'>Mostrando ate 200 entradas mais recentes de {logs.TotalEntries} total</div>
         </div>
         " : "<div class='section-empty'>Logs nao disponiveis neste ambiente.</div>")}}
         </div>
@@ -1564,14 +1675,14 @@ public sealed class DiagnosticoController(
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
             if(name==='health'){setTimeout(initHealthCharts,50);}
-            if(name==='logs')startLiveLogs();
+            if(name==='logs'){startLiveLogs();setTimeout(initErrorTimeline,50);reloadLixeiraInfo();}
             else stopLiveLogs();
         }
-        // Auto-init health charts if health tab is loaded directly
         document.addEventListener('DOMContentLoaded',function(){
             if(document.getElementById('tab-health')&&document.getElementById('tab-health').classList.contains('active')){
                 setTimeout(initHealthCharts,100);
             }
+            loadAckStatuses();
         });
 
         function startLiveLogs(){
@@ -1591,15 +1702,17 @@ public sealed class DiagnosticoController(
                 if(!r.ok)return;
                 const d=await r.json();
                 if(d.count>0){
-                    const console=document.getElementById('logConsole');
-                    if(console){
+                    const console_=document.getElementById('logConsole');
+                    if(console_){
                         const tmp=document.createElement('div');
                         tmp.innerHTML=d.rows.join('');
-                        Array.from(tmp.children).reverse().forEach(el=>console.prepend(el));
+                        Array.from(tmp.children).reverse().forEach(el=>console_.prepend(el));
                         filterLogs();
                     }
                 }
                 _lastPollTime=new Date().toISOString();
+                const ts=document.getElementById('liveTimestamp');
+                if(ts)ts.textContent='• '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
             }catch{}
         }
         function clearLogs(){
@@ -1652,25 +1765,115 @@ public sealed class DiagnosticoController(
             });
         }
 
+        function showToast(msg,type='info'){
+            const c=document.getElementById('toastContainer');if(!c)return;
+            const t=document.createElement('div');
+            t.className='toast '+type;t.textContent=msg;
+            c.appendChild(t);
+            requestAnimationFrame(()=>{ requestAnimationFrame(()=>t.classList.add('show')); });
+            setTimeout(()=>{t.classList.remove('show');setTimeout(()=>c.removeChild(t),300);},3500);
+        }
+        async function reloadLixeiraInfo(){
+            try{
+                const r=await fetch('/api/diagnostico/logs/lixeira');
+                if(!r.ok)return;
+                const d=await r.json();
+                const badge=document.getElementById('lixeiraBadge');
+                if(badge) badge.textContent=d.total>0?`Lixeira: ${d.total} arquivo(s)`:'Lixeira vazia';
+            }catch{}
+        }
         async function moverParaLixeira(){
             if(!confirm('Mover todos os logs para a lixeira?'))return;
-            const msg=document.getElementById('lixeiraMsg');
-            if(msg)msg.textContent='Movendo...';
+            showToast('Movendo logs para lixeira...','info');
             try{
                 const r=await fetch('/api/diagnostico/logs/limpar',{method:'POST'});
                 const d=await r.json();
-                if(msg)msg.textContent=d.mensagem||'Logs movidos para lixeira.';
-            }catch(e){if(msg)msg.textContent='Erro: '+e.message;}
+                if(d.success||d.arquivosMovidos>=0){
+                    clearLogs();
+                    showToast(d.mensagem||'Logs movidos para lixeira.','success');
+                    await reloadLixeiraInfo();
+                } else { showToast(d.mensagem||'Nenhum arquivo movido.','info'); }
+            }catch(e){showToast('Erro: '+e.message,'error');}
         }
         async function esvaziarLixeira(){
             if(!confirm('Excluir permanentemente todos os logs da lixeira?'))return;
-            const msg=document.getElementById('lixeiraMsg');
-            if(msg)msg.textContent='Esvaziando...';
+            showToast('Esvaziando lixeira...','info');
             try{
                 const r=await fetch('/api/diagnostico/logs/lixeira/esvaziar',{method:'POST'});
                 const d=await r.json();
-                if(msg)msg.textContent=d.mensagem||'Lixeira esvaziada.';
-            }catch(e){if(msg)msg.textContent='Erro: '+e.message;}
+                showToast(d.mensagem||'Lixeira esvaziada.', d.arquivosExcluidos>0?'success':'info');
+                await reloadLixeiraInfo();
+            }catch(e){showToast('Erro: '+e.message,'error');}
+        }
+        async function loadStorageFileList(){
+            const sel=document.getElementById('storageFileSelect');
+            const st=document.getElementById('storageStatusMsg');
+            if(st)st.textContent='Carregando lista...';
+            try{
+                const r=await fetch('/api/diagnostico/logs/storage');
+                const d=await r.json();
+                if(!d.disponivel||d.total===0){
+                    if(st)st.textContent=d.motivo||'Nenhum arquivo no storage.';
+                    return;
+                }
+                if(sel){
+                    sel.innerHTML='<option value="">-- selecione um arquivo --</option>';
+                    d.arquivos.forEach(f=>{
+                        const opt=document.createElement('option');
+                        opt.value=f.storageKey;
+                        const dt=new Date(f.dataModificacao).toLocaleDateString('pt-BR');
+                        opt.textContent=`${f.nome} (${dt}, ${(f.tamanhoBytes/1024).toFixed(0)}KB)`;
+                        sel.appendChild(opt);
+                    });
+                    sel.style.display='block';
+                    const clearBtn=document.getElementById('clearStorageBtn');
+                    if(clearBtn)clearBtn.style.display='block';
+                }
+                if(st)st.textContent=`${d.total} arquivo(s) encontrado(s).`;
+            }catch(e){if(st)st.textContent='Erro: '+e.message;}
+        }
+        async function loadStorageFileContent(){
+            const sel=document.getElementById('storageFileSelect');
+            const key=sel?.value;
+            if(!key)return;
+            const st=document.getElementById('storageStatusMsg');
+            if(st)st.textContent='Carregando arquivo...';
+            showToast('Carregando log do storage...','info');
+            try{
+                const r=await fetch('/api/diagnostico/logs/storage/conteudo?file='+encodeURIComponent(key));
+                const d=await r.json();
+                if(d.error){showToast(d.error,'error');return;}
+                const console_=document.getElementById('logConsole');
+                if(console_){
+                    const rows=d.entradas?.slice().reverse().map(e=>{
+                        const lc=e.level==='ERROR'||e.level==='FATAL'?'log-error':e.level==='WARN'?'log-warn':'log-info';
+                        const msg=(e.message||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                        return `<div class="log-row ${lc}" data-level="${e.level||'INFO'}"><span class="log-time">${(e.timestamp||'').substring(11,19)}</span><span class="log-level">${e.level||''}</span><span class="log-msg">${msg}</span></div>`;
+                    })||[];
+                    console_.innerHTML=rows.join('');
+                    const info=document.getElementById('logCountInfo');
+                    if(info)info.textContent=`Exibindo ${rows.length} entradas do arquivo arquivado`;
+                    const lbl=document.getElementById('logSourceLabel');
+                    if(lbl)lbl.textContent='(arquivo do storage — historico)';
+                }
+                const ind=document.getElementById('storageArchiveIndicator');
+                if(ind)ind.style.display='block';
+                if(st)st.textContent=`${d.totalEntries} entradas carregadas.`;
+                showToast(`${d.totalEntries} entradas carregadas do storage.`,'success');
+            }catch(e){showToast('Erro: '+e.message,'error');}
+        }
+        function clearStorageView(){
+            const sel=document.getElementById('storageFileSelect');
+            const ind=document.getElementById('storageArchiveIndicator');
+            const lbl=document.getElementById('logSourceLabel');
+            if(sel){sel.style.display='none';sel.value='';}
+            const clearBtn=document.getElementById('clearStorageBtn');
+            if(clearBtn)clearBtn.style.display='none';
+            if(ind)ind.style.display='none';
+            if(lbl)lbl.textContent='(ultimas 48h)';
+            const st=document.getElementById('storageStatusMsg');
+            if(st)st.textContent='';
+            location.reload();
         }
         async function loadQueriesLentas(){
             const el=document.getElementById('queriesLentasResult');
@@ -1713,10 +1916,82 @@ public sealed class DiagnosticoController(
                         btn.style.opacity='1';btn.style.outline='2px solid currentColor';btn.style.outlineOffset='2px';
                         const lbl=card.querySelector('.ack-status-label');
                         if(lbl)lbl.textContent='✓ '+status.replace('_',' ');
+                        if(status==='em_investigacao'){
+                            card.classList.add('investigating');
+                            expandInvestigacao(card);
+                        } else if(status==='resolvido'){
+                            card.classList.add('resolved');
+                            card.classList.remove('investigating');
+                            const panel=card.querySelector('.investigacao-panel');
+                            if(panel)panel.style.display='none';
+                            showToast('Alerta marcado como resolvido.','success');
+                        } else {
+                            showToast('Alerta marcado como visto.','info');
+                        }
                     }
                 }
             }catch{}
             btn.disabled=false;
+        }
+        function expandInvestigacao(card){
+            const panel=card.querySelector('.investigacao-panel');
+            if(!panel)return;
+            const desc=card.querySelector('.pattern-desc');
+            const keyword=(desc?.textContent||'').trim().substring(0,50).toLowerCase();
+            const allRows=[...document.querySelectorAll('#logConsole .log-row')];
+            const matches=keyword?allRows.filter(r=>r.textContent.toLowerCase().includes(keyword)).slice(0,15):[];
+            let html=`<div style='font-size:.72rem;color:#f59e0b;margin-bottom:.4rem;font-weight:500'>&#128269; Investigando — entradas relacionadas:</div>`;
+            if(matches.length>0){
+                html+=matches.map(r=>{
+                    const t=r.querySelector('.log-time')?.textContent||'';
+                    const l=r.querySelector('.log-level')?.textContent||'';
+                    const m=r.querySelector('.log-msg')?.textContent||'';
+                    const lc=l==='ERROR'||l==='FATAL'?'color:#f87171':l==='WARN'?'color:#fbbf24':'color:#cbd5e1';
+                    return `<div class='inv-log-entry'><span style='color:#64748b'>${t}</span> <span style='${lc};font-weight:600'>${l}</span> <span style='color:#cbd5e1'>${m.substring(0,120)}</span></div>`;
+                }).join('');
+            } else {
+                html+=`<div style='font-size:.72rem;color:#475569'>Sem entradas visiveis no console para este padrao. Tente carregar mais logs ou ajustar o filtro.</div>`;
+            }
+            html+=`<div style='margin-top:.5rem'><button onclick='verLogsDoAlerta(this)' data-desc='${(card.querySelector('.pattern-desc')?.textContent||'').replace(/'/g,"&#39;").substring(0,40)}' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #1e3a5f;background:#0f172a;color:#60a5fa;border-radius:.3rem;cursor:pointer'>&#128269; Ver no console de logs</button></div>`;
+            panel.innerHTML=html;
+            panel.style.display='block';
+            showToast('Investigando — mostrando entradas relacionadas.','info');
+        }
+        function verLogsDoAlerta(btn){
+            const desc=btn.dataset.desc||'';
+            if(!desc)return;
+            // Navegar para aba de logs e aplicar filtro
+            document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+            const logsPanel=document.getElementById('tab-logs');
+            if(logsPanel)logsPanel.classList.add('active');
+            document.querySelectorAll('.tab').forEach(t=>{if(t.textContent.includes('Logs'))t.classList.add('active');});
+            const filterInput=document.getElementById('logFilter');
+            if(filterInput){filterInput.value=desc;filterInput.dispatchEvent(new Event('input'));}
+            startLiveLogs();
+            showToast('Filtro aplicado: '+desc,'info');
+        }
+        async function loadAckStatuses(){
+            const cards=[...document.querySelectorAll('.pattern-item[data-alerta-id]')];
+            if(!cards.length)return;
+            const ids=cards.map(c=>c.dataset.alertaId).filter(Boolean).join(',');
+            if(!ids)return;
+            try{
+                const r=await fetch('/api/diagnostico/alertas/acks?ids='+encodeURIComponent(ids));
+                if(!r.ok)return;
+                const d=await r.json();
+                (d.acks||[]).forEach(ack=>{
+                    const card=document.querySelector(`.pattern-item[data-alerta-id='${ack.alertaId}']`);
+                    if(!card)return;
+                    const btn=card.querySelector(`.ack-btn[data-status='${ack.status}']`);
+                    if(btn){btn.style.opacity='1';btn.style.outline='2px solid currentColor';btn.style.outlineOffset='2px';}
+                    card.querySelectorAll('.ack-btn').forEach(b=>{if(b!==btn)b.style.opacity='.5';});
+                    const lbl=card.querySelector('.ack-status-label');
+                    if(lbl)lbl.textContent='✓ '+ack.status.replace('_',' ');
+                    if(ack.status==='em_investigacao')card.classList.add('investigating');
+                    if(ack.status==='resolvido'){card.classList.add('resolved');card.classList.remove('investigating');}
+                });
+            }catch{}
         }
 
         // Charts
@@ -1739,7 +2014,38 @@ public sealed class DiagnosticoController(
             scales:{x:{ticks:{color:'#64748b',maxTicksLimit:24,font:{size:10} },grid:{color:'#1e293b'} },
                     y:{beginAtZero:true,suggestedMax:5,ticks:{color:'#64748b',font:{size:10} },grid:{color:'#1e293b'} } } };
 
-        var _dbChart=null,_redisChart=null,_errChart=null,_volChart=null;
+        var _dbChart=null,_redisChart=null,_errChart=null,_volChart=null,_timelineChart=null;
+        function initErrorTimeline(){
+            const canvas=document.getElementById('errorTimelineChart');
+            if(!canvas)return;
+            if(_timelineChart){return;} // already initialized
+            if(typeof volLabels==='undefined'||typeof errHData==='undefined')return;
+            // Color bars by error count
+            const colors=errHData.map(v=>v===0?'rgba(22,163,74,0.6)':v<=2?'rgba(245,158,11,0.7)':'rgba(239,68,68,0.8)');
+            const borderColors=errHData.map(v=>v===0?'#16a34a':v<=2?'#f59e0b':'#ef4444');
+            _timelineChart=new Chart(canvas,{
+                type:'bar',
+                data:{labels:volLabels,datasets:[
+                    {label:'Erros/hora',data:errHData,backgroundColor:colors,borderColor:borderColors,borderWidth:1,borderRadius:3},
+                ]},
+                options:{
+                    responsive:true,maintainAspectRatio:false,
+                    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.parsed.y+' erro(s)';} } } },
+                    scales:{
+                        x:{ticks:{color:'#475569',maxTicksLimit:12,font:{size:9} },grid:{color:'#1e293b'} },
+                        y:{beginAtZero:true,ticks:{color:'#475569',font:{size:9},stepSize:1},grid:{color:'#1e293b'} }
+                    },
+                    onClick:function(evt,items){
+                        if(!items.length)return;
+                        const lbl=volLabels[items[0].index];
+                        const fi=document.getElementById('logFilter');
+                        const info=document.getElementById('timelineFilterInfo');
+                        if(fi){fi.value=lbl;fi.dispatchEvent(new Event('input'));}
+                        if(info)info.textContent='Filtrando logs da hora: '+lbl+' — clique novamente para limpar';
+                    }
+                }
+            });
+        }
         function initHealthCharts(){
             if(typeof cLabels==='undefined')return;
             if(_dbChart){_dbChart.data.labels=cLabels;_dbChart.data.datasets[0].data=dbData;_dbChart.update();

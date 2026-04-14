@@ -52,6 +52,48 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
         await fileClient.DeleteIfExistsAsync(cancellationToken: ct);
     }
 
+    public async Task<IReadOnlyList<StoredFileInfo>> ListAsync(string bucketPath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(_opts.ConnectionString) || _opts.ConnectionString.Contains("<"))
+            return Array.Empty<StoredFileInfo>();
+
+        var serviceClient = new ShareServiceClient(_opts.ConnectionString);
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
+        var dirClient = shareClient.GetDirectoryClient(bucketPath.Trim('/'));
+
+        var result = new List<StoredFileInfo>();
+        await foreach (var item in dirClient.GetFilesAndDirectoriesAsync(cancellationToken: ct))
+        {
+            if (!item.IsDirectory)
+            {
+                var storageKey = (bucketPath.Trim('/') + "/" + item.Name).Trim('/');
+                var fileClient = dirClient.GetFileClient(item.Name);
+                var props = await fileClient.GetPropertiesAsync(ct);
+                result.Add(new StoredFileInfo(
+                    storageKey,
+                    item.Name,
+                    props.Value.ContentLength,
+                    props.Value.LastModified));
+            }
+        }
+        return result.OrderByDescending(f => f.LastModified).ToList();
+    }
+
+    public async Task<byte[]> DownloadAsync(string storageKey, CancellationToken ct = default)
+    {
+        var serviceClient = new ShareServiceClient(_opts.ConnectionString);
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
+        var parts = storageKey.Split('/');
+        var dirPath = string.Join("/", parts[..^1]);
+        var fileName = parts[^1];
+        var dirClient = shareClient.GetDirectoryClient(dirPath);
+        var fileClient = dirClient.GetFileClient(fileName);
+        var download = await fileClient.DownloadAsync(cancellationToken: ct);
+        using var ms = new MemoryStream();
+        await download.Value.Content.CopyToAsync(ms, ct);
+        return ms.ToArray();
+    }
+
     private string GenerateSasUri(ShareFileClient fileClient, string storageKey)
     {
         var connParts = _opts.ConnectionString

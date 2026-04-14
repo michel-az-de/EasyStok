@@ -50,6 +50,40 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
         }, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<StoredFileInfo>> ListAsync(string bucketPath, CancellationToken cancellationToken = default)
+    {
+        var client = GetClient();
+        var prefix = bucketPath.Trim('/') + "/";
+        var request = new ListObjectsV2Request
+        {
+            BucketName = _options.S3.BucketName,
+            Prefix = prefix
+        };
+        var response = await client.ListObjectsV2Async(request, cancellationToken);
+        return response.S3Objects
+            .Where(o => !o.Key.EndsWith('/'))
+            .OrderByDescending(o => o.LastModified)
+            .Select(o => new StoredFileInfo(
+                o.Key,
+                o.Key.Split('/').Last(),
+                o.Size,
+                new DateTimeOffset(o.LastModified, TimeSpan.Zero)))
+            .ToList();
+    }
+
+    public async Task<byte[]> DownloadAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        var client = GetClient();
+        var response = await client.GetObjectAsync(new GetObjectRequest
+        {
+            BucketName = _options.S3.BucketName,
+            Key = storageKey
+        }, cancellationToken);
+        using var ms = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(ms, cancellationToken);
+        return ms.ToArray();
+    }
+
     private AmazonS3Client GetClient()
     {
         if (_client is not null)
