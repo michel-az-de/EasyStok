@@ -3,6 +3,11 @@ name: Deploy to Azure App Service
 on:
   push:
     branches: [ master, main ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: easystock-api
+  DOTNET_VERSION: '9.x'
 
 jobs:
   build-and-deploy:
@@ -13,7 +18,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
         run: dotnet restore EasyStock.Api/EasyStock.Api.csproj
@@ -24,6 +29,6 @@ jobs:
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'easystock-api-dfdjgsfwaqhkgvf9'
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./publish
