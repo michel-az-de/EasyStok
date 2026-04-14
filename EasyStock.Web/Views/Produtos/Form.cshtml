@@ -180,7 +180,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tipo</label>
-                    <select name="Tipo" x-model.number="tipo"
+                    <select name="Tipo" x-model.number="tipo" @@change="_tipoManuallySet = true"
                             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                         @if (Model.Tipo == 0) { <option value="0" selected>Físico</option> } else { <option value="0">Físico</option> }
                         @if (Model.Tipo == 1) { <option value="1" selected>Alimento</option> } else { <option value="1">Alimento</option> }
@@ -455,7 +455,7 @@
 
         <!-- Dimensoes -->
         <div class="ws" x-data="{ open: @(Model.DimensoesPeso.HasValue || Model.DimensoesLargura.HasValue ? "true" : "false") }">
-            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between cursor-pointer py-3">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-sky-50 text-sky-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -566,7 +566,7 @@
 
         <!-- Caracteristicas -->
         <div class="ws" x-data="{ open: @(Model.Caracteristicas.Any() ? "true" : "false") }">
-            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between cursor-pointer py-3">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-rose-50 text-rose-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,7 +625,7 @@
 
         <!-- Embalagens -->
         <div class="ws" x-data="{ open: @(Model.Embalagens.Any() ? "true" : "false") }">
-            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between">
+            <button type="button" @@click="open = !open" class="w-full flex items-center justify-between cursor-pointer py-3">
                 <div class="section-hd mb-0">
                     <div class="section-hd-icon bg-teal-50 text-teal-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -736,14 +736,12 @@
 
                 <!-- Foto principal -->
                 <div class="product-review-card__media relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
-                    <template x-if="previews.length > 0"><img :src="previews[0]" class="w-full h-full object-cover object-top" /></template>
-                    <template x-if="previews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover object-top" /></template>
-                    <template x-if="previews.length === 0 && existingPhotos.length === 0">
-                        <div class="text-center p-6">
-                            <svg class="w-12 h-12 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            <p class="text-xs text-slate-300 mt-2">Sem foto</p>
-                        </div>
-                    </template>
+                    <img x-show="previews.length > 0" :src="previews[0]" class="w-full h-full object-cover object-top" />
+                    <img x-show="previews.length === 0 && existingPhotos.length > 0" :src="existingPhotos[0]?.url" class="w-full h-full object-cover object-top" />
+                    <div x-show="previews.length === 0 && existingPhotos.length === 0" class="text-center p-6">
+                        <svg class="w-12 h-12 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <p class="text-xs text-slate-300 mt-2">Sem foto</p>
+                    </div>
                     <!-- Photo count badge -->
                     <div x-show="(_pondFileCount + existingPhotos.length) > 1" x-cloak
                          class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
@@ -1139,6 +1137,14 @@
                     };
                     document.addEventListener('click', this._clickHandler);
 
+                    // Auto-aplicar tipo "Alimento" quando categoria sugere
+                    this.$watch('categoriaId', () => {
+                        if (!this._tipoManuallySet && this.tipoSugerido !== null) {
+                            this.tipo = this.tipoSugerido;
+                            this.controlaValidade = (this.tipoSugerido === 1);
+                        }
+                    });
+
                     // Inicializar FilePond (guard contra dupla inicialização)
                     this.$nextTick(() => {
                         if (this._pond) return;
@@ -1322,6 +1328,7 @@
                 eanAviso: '',
                 skuStatus: '', // '', 'verificando', 'disponivel', 'indisponivel'
                 tipo: @Model.Tipo,
+                _tipoManuallySet: @(isEdit ? "true" : "false"),
                 controlaValidade: @(Model.ControlaValidade ? "true" : "false"),
 
                 categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
