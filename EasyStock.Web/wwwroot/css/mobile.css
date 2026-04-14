@@ -391,31 +391,35 @@
     }
 
     form[novalidate] .premium-photo-section,
-    form[novalidate] .premium-uploader,
+    form[novalidate] .photo-upload-container,
     form[novalidate] .product-review-card,
     form[novalidate] .product-review-footer {
         background: rgba(255, 255, 255, 0.04) !important;
         border-color: rgba(255, 255, 255, 0.08) !important;
     }
 
-    form[novalidate] .premium-uploader {
-        padding: 14px !important;
-        border-radius: 20px !important;
+    form[novalidate] .photo-upload-container {
+        padding: 12px !important;
+        border-radius: 12px !important;
     }
 
-    form[novalidate] .premium-uploader .filepond--drop-label {
-        min-height: 180px !important;
+    form[novalidate] .photo-upload-container .filepond--drop-label {
+        min-height: 140px !important;
     }
 
-    form[novalidate] .premium-uploader__footer {
-        display: grid;
-        gap: 12px;
+    /* Touch targets maiores para botoes do FilePond no mobile */
+    form[novalidate] .photo-upload-container .filepond--file-action-button {
+        width: 32px;
+        height: 32px;
     }
 
-    form[novalidate] .premium-uploader__status {
+    form[novalidate] .photo-upload-hint {
+        justify-content: center;
+    }
+
+    form[novalidate] .photo-upload-status {
         width: 100%;
         justify-content: center;
-        white-space: normal;
     }
 
     .product-review-card {
@@ -607,7 +611,7 @@
     html.theme-dark textarea,
     html.theme-dark .ws,
     html.theme-dark .bg-white,
-    html.theme-dark .premium-uploader,
+    html.theme-dark .photo-upload-container,
     html.theme-dark .product-review-card,
     html.theme-dark .product-review-footer {
         background-color: rgba(9, 17, 31, 0.92) !important;
