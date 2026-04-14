@@ -27,7 +27,7 @@
                class="ui-field flex-1 min-w-48" />
         <button type="submit"
                 class="app-primary-btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
-            Filtrar
+            Buscar
         </button>
     </form>
 </div>
@@ -78,7 +78,16 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="text-right font-semibold">@((p.PrecoReferencia?.Valor ?? 0).ToString("C", ptBR))</td>
+                        <td class="text-right font-semibold">
+                            @if (p.PrecoReferencia?.Valor is > 0)
+                            {
+                                @p.PrecoReferencia.Valor.ToString("C", ptBR)
+                            }
+                            else
+                            {
+                                <span class="text-slate-400 text-xs font-normal">Sem preço</span>
+                            }
+                        </td>
                         <td class="text-center">
                             @{
                                 var badgeClass = p.StatusNome.ToLower() switch

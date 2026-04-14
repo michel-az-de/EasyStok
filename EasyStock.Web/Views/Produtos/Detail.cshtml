@@ -191,7 +191,7 @@
                                 <span class="barcode-label__caption">Etiqueta pronta para leitura</span>
                             </div>
                             <div class="barcode-label__paper">
-                                <svg id="barcode-svg" class="barcode-label__svg" aria-label="CÃ³digo de barras do produto"></svg>
+                                <svg id="barcode-svg" class="barcode-label__svg" aria-label="Código de barras do produto"></svg>
                             </div>
                         </div>
                     </div>
@@ -210,14 +210,14 @@
                         <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Peso:0.##} kg")</p>
                     </div>
                     <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100">
-                        <p class="text-[11px] text-slate-400 font-medium mb-0.5">Dimensoes</p>
+                        <p class="text-[11px] text-slate-400 font-medium mb-0.5">Dimensões</p>
                         <p class="text-sm font-mono text-slate-700">@($"{p.Dimensoes.Largura:F1} x {p.Dimensoes.Altura:F1} x {p.Dimensoes.Comprimento:F1} cm")</p>
                     </div>
                 }
             </div>
 
             <!-- Integrity bar -->
-            <div class="produto-score-card bg-slate-50 rounded-xl p-3 border border-slate-100" title="A porcentagem resume o quanto do cadastro ja esta preenchido: fotos, descricao, custo, preco, codigo de barras, variacoes, marca, dimensoes, nome e categoria.">
+            <div class="produto-score-card bg-slate-50 rounded-xl p-3 border border-slate-100" title="A porcentagem resume o quanto do cadastro já está preenchido: fotos, descrição, custo, preço, código de barras, variações, marca, dimensões, nome e categoria.">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div class="h-2 rounded-full @barCss transition-all" style="width: @score%"></div>
@@ -279,17 +279,17 @@
     </div>
 
     <!-- ═══ TABS ═══ -->
-    <div class="produto-detail-tabs flex gap-0.5 border-b border-slate-200 mb-4">
+    <div class="produto-detail-tabs flex gap-0.5 border-b border-slate-200 mb-4 overflow-x-auto">
         <button @@click="tab='variacoes'"
                 :class="tab==='variacoes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
+                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
             Variações
             <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                   :class="tab==='variacoes' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'">@p.Variacoes.Count</span>
         </button>
         <button @@click="tab='fotos'"
                 :class="tab==='fotos' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
+                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
             Fotos
             <span x-show="photos.length > 0"
                   class="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
@@ -301,13 +301,13 @@
         </button>
         <button @@click="tab='estoque'"
                 :class="tab==='estoque' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors">Estoque</button>
+                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Estoque</button>
         <button @@click="tab='historico'; loadHistorico()"
                 :class="tab==='historico' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors">Histórico</button>
+                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Histórico</button>
         <button @@click="tab='detalhes'"
                 :class="tab==='detalhes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="px-4 py-2.5 text-sm transition-colors">Detalhes</button>
+                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Detalhes</button>
     </div>
 
 <!-- ═══ TAB: VARIACOES ═══ -->
@@ -676,10 +676,10 @@
         <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
             <h3 class="font-bold text-slate-900 text-lg mb-2">Excluir produto?</h3>
             <p class="text-slate-500 text-sm mb-3">
-                Esta acao e irreversivel. O produto <strong>@p.Nome</strong> sera excluido permanentemente.
+                Esta ação é irreversível. O produto <strong>@p.Nome</strong> será excluído permanentemente.
             </p>
             <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-                <strong>Atencao:</strong> se o produto possui estoque, e necessario zerar o estoque antes de exclui-lo.
+                <strong>Atenção:</strong> se o produto possui estoque, é necessário zerar o estoque antes de excluí-lo.
             </div>
             <div class="flex gap-3 justify-end">
                 <button @@click="showExcluir=false"
@@ -690,7 +690,7 @@
                     @Html.AntiForgeryToken()
                     <button type="submit"
                             class="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
-                        Confirmar exclusao
+                        Confirmar exclusão
                     </button>
                 </form>
             </div>
@@ -728,7 +728,7 @@
                 },
 
                 // ── Photos management (custom upload) ──
-                photos: initialPhotos.map(f => ({ ...f, toDelete: false })),
+                photos: Array.isArray(initialPhotos) ? initialPhotos.map(f => ({ ...f, toDelete: false })) : [],
                 _uploading: false,
                 _uploadPct: 0,
                 _previewUrl: null,
@@ -793,6 +793,7 @@
                     const xhr = new XMLHttpRequest();
                     this._uploadXhr = xhr;
                     xhr.open('POST', '/produtos/' + prodId + '/fotos/ajax');
+                    xhr.timeout = 30000;
 
                     xhr.upload.onprogress = (e) => {
                         if (e.lengthComputable)
@@ -820,6 +821,15 @@
                     xhr.onerror = () => {
                         window.showToast('Erro de conexão ao enviar foto.', 'error');
                         this._uploading = false;
+                        this._uploadPct = 0;
+                        this._previewUrl = null;
+                        this._uploadXhr = null;
+                    };
+
+                    xhr.ontimeout = () => {
+                        window.showToast('Tempo esgotado ao enviar foto. Tente novamente.', 'error');
+                        this._uploading = false;
+                        this._uploadPct = 0;
                         this._previewUrl = null;
                         this._uploadXhr = null;
                     };

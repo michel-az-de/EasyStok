@@ -36,18 +36,18 @@
                         <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-lg shadow-indigo-950/15 text-lg font-extrabold">ES</span>
                         <span class="text-3xl font-extrabold tracking-tight text-white">EasyStock</span>
                     </div>
-                    <p class="text-sm uppercase tracking-[0.35em] text-white/65 mb-4">Operacao em tempo real</p>
-                    <h1 class="text-4xl font-extrabold leading-tight text-white max-w-md">Controle estoque, validade e saida em um fluxo mais claro.</h1>
-                    <p class="mt-4 max-w-lg text-base leading-7 text-white/78">Uma entrada mais alinhada ao restante do produto, com foco em rotina, leitura rapida e confianca para quem opera o dia inteiro.</p>
+                    <p class="text-sm uppercase tracking-[0.35em] text-white/65 mb-4">Operação em tempo real</p>
+                    <h1 class="text-4xl font-extrabold leading-tight text-white max-w-md">Controle estoque, validade e saída em um fluxo mais claro.</h1>
+                    <p class="mt-4 max-w-lg text-base leading-7 text-white/78">Uma entrada mais alinhada ao restante do produto, com foco em rotina, leitura rápida e confiança para quem opera o dia inteiro.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-sm text-white/78">
                     <div class="auth-login-brand-stat">
-                        <span class="auth-login-brand-stat__value">Visao</span>
-                        <span class="auth-login-brand-stat__label">Dashboards, alertas e historico num unico lugar</span>
+                        <span class="auth-login-brand-stat__value">Visão</span>
+                        <span class="auth-login-brand-stat__label">Dashboards, alertas e histórico num único lugar</span>
                     </div>
                     <div class="auth-login-brand-stat">
-                        <span class="auth-login-brand-stat__value">Execucao</span>
-                        <span class="auth-login-brand-stat__label">Entradas e saidas com menos atrito operacional</span>
+                        <span class="auth-login-brand-stat__value">Execução</span>
+                        <span class="auth-login-brand-stat__label">Entradas e saídas com menos atrito operacional</span>
                     </div>
                 </div>
             </section>
@@ -59,8 +59,7 @@
                             <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 text-lg font-extrabold">ES</span>
                             <span class="text-3xl font-extrabold tracking-tight auth-title">EasyStock</span>
                         </div>
-                        <h2 class="text-3xl font-extrabold tracking-tight auth-title">Entrar</h2>
-                        <p class="auth-subtitle text-sm mt-2">Acesse sua conta para continuar a operacao</p>
+                        <p class="auth-subtitle text-sm mt-2">Acesse sua conta para continuar a operação</p>
                     </div>
 
             @if (sessionExpired)
@@ -69,7 +68,7 @@
                     <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/>
                     </svg>
-                    <span>Sua sessao expirou. Faca login novamente para continuar.</span>
+                    <span>Sua sessão expirou. Faça login novamente para continuar.</span>
                 </div>
             }
 
@@ -79,7 +78,7 @@
                     <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
                     </svg>
-                    <span>Servico temporariamente indisponivel. Tente novamente em alguns instantes.</span>
+                    <span>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</span>
                 </div>
             }
 
@@ -103,7 +102,7 @@
 
                     <div class="mb-4">
                         <label asp-for="Email" class="block text-sm font-semibold auth-label mb-1.5">E-mail</label>
-                        <input asp-for="Email" type="email" autocomplete="email"
+                        <input asp-for="Email" type="email" autocomplete="email" required
                                class="auth-input w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all"
                                placeholder="seu@email.com"
                                :disabled="loading" />
@@ -116,7 +115,7 @@
                             <a href="/auth/esqueci-senha" class="text-xs text-indigo-500 hover:text-indigo-400">Esqueceu a senha?</a>
                         </div>
                         <div class="relative">
-                            <input asp-for="Senha" autocomplete="current-password"
+                            <input asp-for="Senha" autocomplete="current-password" required
                                    x-bind:type="showPass ? 'text' : 'password'"
                                    class="auth-input w-full px-4 py-3 pr-11 rounded-xl text-sm focus:outline-none transition-all"
                                    placeholder="Sua senha"
@@ -164,8 +163,8 @@
             </div>
 
                     <p class="text-center text-sm auth-subtitle mt-4 lg:text-left">
-                Nao tem conta?
-                <a href="/auth/registrar" class="text-indigo-500 hover:text-indigo-400 font-medium">Criar conta gratis</a>
+                Não tem conta?
+                <a href="/auth/registrar" class="text-indigo-500 hover:text-indigo-400 font-medium">Criar conta grátis</a>
             </p>
 
                     <p class="text-center text-xs auth-footer mt-4 lg:text-left">
@@ -184,8 +183,13 @@
                 showPass: false,
                 handleSubmit(e) {
                     if (this.loading) return;
+                    const form = e.target;
+                    if (!form.checkValidity()) {
+                        form.reportValidity();
+                        return;
+                    }
                     this.loading = true;
-                    e.target.submit();
+                    form.submit();
                 }
             };
         }
