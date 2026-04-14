@@ -319,7 +319,17 @@
                             </button>
                         </div>
                     </template>
+                    <!-- Botão adicionar mais fotos (quando < 5) -->
+                    <button x-show="totalPhotoCount < 5" type="button" @@click="_pond && _pond.browse()"
+                            class="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span class="text-[9px] text-slate-400 font-medium">Adicionar</span>
+                    </button>
                 </div>
+                <p class="text-xs text-slate-400 mt-2">
+                    Máx. 5 fotos · JPEG, PNG, WebP · 10 MB cada · A 1ª foto é a capa.
+                    <span x-text="'(' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' slot disponível)' : ' slots disponíveis)')"></span>
+                </p>
             </div>
 
             <!-- Área de upload: slots visuais quando vazio (BUG A fix: grid-cols-5 uniforme) -->
@@ -343,12 +353,8 @@
                 <p class="text-center text-xs text-slate-400 mt-3">Toque em qualquer slot para adicionar · JPEG, PNG, WebP · 10 MB</p>
             </div>
 
-            <!-- FilePond (só visível quando 1-4 fotos; BUG B fix: oculto quando 0 ou >= 5) -->
-            <div class="photo-upload-container" x-show="totalPhotoCount > 0 && totalPhotoCount < 5">
-                <p class="text-xs text-slate-400 mb-3">
-                    Máx. 5 fotos · JPEG, PNG, WebP · 10 MB cada · A 1ª foto é a capa.
-                    <span x-text="'(' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' slot disponível)' : ' slots disponíveis)')"></span>
-                </p>
+            <!-- FilePond: no DOM para funcionalidade, visualmente colapsado -->
+            <div class="photo-upload-container" style="height:0;overflow:hidden;margin:0;padding:0;border:none;">
                 <input type="file" x-ref="pondInput" />
             </div>
         </div>
