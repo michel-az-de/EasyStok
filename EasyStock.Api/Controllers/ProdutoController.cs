@@ -33,8 +33,8 @@ public class ProdutoController(
         [FromQuery] Guid empresaId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? sort = "nome",
-        [FromQuery] string? order = "asc")
+        [FromQuery] string? sort = "criadoem",
+        [FromQuery] string? order = "desc")
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;

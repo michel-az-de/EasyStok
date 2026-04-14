@@ -73,10 +73,10 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
-            Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
+            Guid empresaId, int page = 1, int pageSize = 20, string? sort = "criadoem", string? order = "desc")
         {
-            var sortNorm  = (sort  ?? "nome").ToLowerInvariant();
-            var orderNorm = (order ?? "asc").ToLowerInvariant();
+            var sortNorm  = (sort  ?? "criadoem").ToLowerInvariant();
+            var orderNorm = (order ?? "desc").ToLowerInvariant();
 
             var versao   = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
             var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sortNorm}_{orderNorm}";

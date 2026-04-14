@@ -32,7 +32,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var total = await query.CountAsync();
             var usuarios = await query
-                .OrderBy(u => u.Nome)
+                .OrderByDescending(u => u.CriadoEm)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

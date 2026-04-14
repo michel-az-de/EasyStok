@@ -21,7 +21,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             await dbContext.ProdutosVariacao
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId && v.ProdutoId == produtoId)
-                .OrderBy(v => v.Nome)
+                .OrderByDescending(v => v.CriadoEm)
                 .ToListAsync();
 
         public Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null)

@@ -33,8 +33,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var totalCount = await query.CountAsync();
             var items = await query
-                .OrderBy(n => n.Severidade)
-                .ThenByDescending(n => n.CriadaEm)
+                .OrderByDescending(n => n.CriadaEm)
+                .ThenBy(n => n.Severidade)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -47,8 +47,8 @@ namespace EasyStock.Infra.Postgre.Repositories
             return await dbContext.Notificacoes
                 .AsNoTracking()
                 .Where(n => n.EmpresaId == empresaId && !n.Lida)
-                .OrderBy(n => n.Severidade)
-                .ThenByDescending(n => n.CriadaEm)
+                .OrderByDescending(n => n.CriadaEm)
+                .ThenBy(n => n.Severidade)
                 .Take(limit)
                 .ToListAsync();
         }

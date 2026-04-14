@@ -17,7 +17,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             await dbContext.Lojas
                 .AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId)
-                .OrderBy(l => l.Nome)
+                .OrderByDescending(l => l.CriadoEm)
                 .ToListAsync();
 
         public Task<int> CountByEmpresaAsync(Guid empresaId) =>

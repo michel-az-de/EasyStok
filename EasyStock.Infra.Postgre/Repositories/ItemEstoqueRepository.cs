@@ -127,7 +127,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var items = await query
                 .Include(i => i.Produto)
                 .Include(i => i.ProdutoVariacao)
-                .OrderBy(i => i.ProdutoId)
+                .OrderByDescending(i => i.EntradaEm)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

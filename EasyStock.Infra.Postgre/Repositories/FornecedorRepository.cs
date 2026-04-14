@@ -16,7 +16,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Fornecedor>, int total)> GetByEmpresaAsync(
             Guid empresaId, int page, int pageSize,
             bool? ativo = null, string? search = null,
-            string? sort = "nome", string? order = "asc")
+            string? sort = "criadoem", string? order = "desc")
         {
             var query = dbContext.Fornecedores
                 .AsNoTracking()

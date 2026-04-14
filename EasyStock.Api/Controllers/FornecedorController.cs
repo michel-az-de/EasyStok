@@ -44,8 +44,8 @@ public class FornecedorController(
         [FromQuery] int pageSize = 20,
         [FromQuery] bool? ativo = null,
         [FromQuery] string? search = null,
-        [FromQuery] string? sort = "nome",
-        [FromQuery] string? order = "asc")
+        [FromQuery] string? sort = "criadoem",
+        [FromQuery] string? order = "desc")
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
         var (normPage, normSize) = NormalisePage(page, pageSize);
