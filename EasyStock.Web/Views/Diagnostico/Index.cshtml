@@ -218,40 +218,45 @@
         </div>
 
         <!-- SLO Strip -->
-        <div x-show="slo" x-cloak class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-icons-round text-base text-emerald-500">verified</span>
                 <h3 class="text-sm font-semibold text-slate-700">SLO — Últimas 24h</h3>
-                <span class="text-xs text-slate-400 ml-auto" x-text="slo?.snapshotsAnalisados ? slo.snapshotsAnalisados + ' snapshots' : ''"></span>
+                <span x-show="!slo" class="ml-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span class="material-icons-round text-xs animate-spin">hourglass_empty</span>carregando...
+                </span>
+                <span class="text-xs text-slate-400 ml-auto" x-show="slo" x-text="slo?.snapshotsAnalisados ? slo.snapshotsAnalisados + ' snapshots' : ''"></span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                 <div>
                     <div class="text-2xl font-bold"
-                        :class="slo?.uptime24h >= 99.9 ? 'text-green-600' : slo?.uptime24h >= 99 ? 'text-yellow-600' : slo?.uptime24h != null ? 'text-red-600' : 'text-slate-400'"
-                        x-text="slo?.uptime24h != null ? slo.uptime24h.toFixed(1) + '%' : 'N/D'"></div>
+                        :class="slo?.uptime24h >= 99.9 ? 'text-green-600' : slo?.uptime24h >= 99 ? 'text-yellow-600' : slo?.uptime24h != null ? 'text-red-600' : 'text-slate-300'"
+                        x-text="slo?.uptime24h != null ? slo.uptime24h.toFixed(1) + '%' : '—'"></div>
                     <div class="text-xs text-slate-500">Uptime</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-bold text-indigo-600"
-                        x-text="slo?.avgResponseTimeMs != null ? Math.round(slo.avgResponseTimeMs) + 'ms' : 'N/D'"></div>
+                    <div class="text-2xl font-bold"
+                        :class="slo?.avgResponseTimeMs != null ? 'text-indigo-600' : 'text-slate-300'"
+                        x-text="slo?.avgResponseTimeMs != null ? Math.round(slo.avgResponseTimeMs) + 'ms' : '—'"></div>
                     <div class="text-xs text-slate-500">Resp. Média</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-bold text-orange-500"
-                        x-text="slo?.p95ResponseTimeMs != null ? Math.round(slo.p95ResponseTimeMs) + 'ms' : 'N/D'"></div>
+                    <div class="text-2xl font-bold"
+                        :class="slo?.p95ResponseTimeMs != null ? 'text-orange-500' : 'text-slate-300'"
+                        x-text="slo?.p95ResponseTimeMs != null ? Math.round(slo.p95ResponseTimeMs) + 'ms' : '—'"></div>
                     <div class="text-xs text-slate-500">P95</div>
                 </div>
                 <div>
                     <div class="text-2xl font-bold"
-                        :class="slo?.errorRate < 0.01 ? 'text-green-600' : 'text-red-600'"
-                        x-text="slo?.errorRate != null ? (slo.errorRate * 100).toFixed(2) + '%' : 'N/D'"></div>
+                        :class="slo?.errorRate != null ? (slo.errorRate < 0.01 ? 'text-green-600' : 'text-red-600') : 'text-slate-300'"
+                        x-text="slo?.errorRate != null ? (slo.errorRate * 100).toFixed(2) + '%' : '—'"></div>
                     <div class="text-xs text-slate-500">Taxa de Erro</div>
                 </div>
             </div>
         </div>
 
         <!-- Queries SQL Lentas -->
-        <div x-show="queriesLentas" x-cloak class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
                     <span class="material-icons-round text-base text-orange-500">query_stats</span>
@@ -259,7 +264,10 @@
                 </h3>
                 <button @@click="fetchQueriesLentas()" class="text-xs text-indigo-600 hover:underline">Atualizar</button>
             </div>
-            <div x-show="!queriesLentas?.disponivel" class="text-xs text-slate-500 italic" x-text="queriesLentas?.motivo"></div>
+            <div x-show="!queriesLentas" class="text-xs text-slate-400 flex items-center gap-1">
+                <span class="material-icons-round text-xs animate-spin">hourglass_empty</span>carregando...
+            </div>
+            <div x-show="queriesLentas && !queriesLentas?.disponivel" class="text-xs text-slate-500 italic" x-text="queriesLentas?.motivo"></div>
             <div x-show="queriesLentas?.instrucoesPgStatStatements"
                 class="text-xs bg-amber-50 border border-amber-200 rounded p-2 mt-1 font-mono"
                 x-text="queriesLentas?.instrucoesPgStatStatements"></div>
