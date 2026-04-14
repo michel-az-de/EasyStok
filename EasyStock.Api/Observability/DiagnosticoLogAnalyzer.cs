@@ -32,6 +32,18 @@ public static class DiagnosticoLogAnalyzer
         @"""CorrelationId""\s*:\s*""([^""]+)""",
         RegexOptions.Compiled);
 
+    private static readonly Regex ClientIpRegex = new(
+        @"""ClientIP""\s*:\s*""([^""]+)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex UserIdRegex = new(
+        @"""UserId""\s*:\s*""([^""]+)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex EmpresaIdRegex = new(
+        @"""EmpresaId""\s*:\s*""([^""]+)""",
+        RegexOptions.Compiled);
+
     private static readonly Regex[] SensitivePatterns =
     [
         new Regex(@"(?i)(password|senha|secret|apikey|api_key|token|connectionstring)\s*[=:]\s*\S+", RegexOptions.Compiled),
@@ -107,14 +119,24 @@ public static class DiagnosticoLogAnalyzer
                 var levelStr = NormalizeLevel(match.Groups[2].Value.ToUpperInvariant());
                 var rawMessage = match.Groups[3].Value;
 
-                // Extract CorrelationId
-                string? correlationId = null;
+                // Extract structured properties (CorrelationId, ClientIP, UserId, EmpresaId)
+                string? correlationId = null, clientIp = null, userId = null, empresaId = null;
                 var propsMatch = PropertiesRegex.Match(rawMessage);
                 if (propsMatch.Success)
                 {
-                    var corrMatch = CorrelationIdRegex.Match(propsMatch.Value);
+                    var propsText = propsMatch.Value;
+                    var corrMatch = CorrelationIdRegex.Match(propsText);
                     if (corrMatch.Success)
                         correlationId = corrMatch.Groups[1].Value;
+                    var ipMatch = ClientIpRegex.Match(propsText);
+                    if (ipMatch.Success)
+                        clientIp = ipMatch.Groups[1].Value;
+                    var uidMatch = UserIdRegex.Match(propsText);
+                    if (uidMatch.Success)
+                        userId = uidMatch.Groups[1].Value;
+                    var empMatch = EmpresaIdRegex.Match(propsText);
+                    if (empMatch.Success)
+                        empresaId = empMatch.Groups[1].Value;
                     rawMessage = rawMessage[..propsMatch.Index].TrimEnd();
                 }
 
@@ -131,7 +153,10 @@ public static class DiagnosticoLogAnalyzer
                     Timestamp = new DateTimeOffset(ts, TimeSpan.Zero),
                     Level = levelStr,
                     Message = rawMessage,
-                    CorrelationId = correlationId
+                    CorrelationId = correlationId,
+                    ClientIp = clientIp,
+                    UserId = userId,
+                    EmpresaId = empresaId
                 };
 
                 var httpMatch = HttpRequestRegex.Match(rawMessage);

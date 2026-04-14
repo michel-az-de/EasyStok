@@ -103,7 +103,7 @@ public sealed class DiagnosticoController(
             }
             catch (Exception ex) { logger.LogDebug(ex, "Log parsing failed — dashboard will render without log data."); }
 
-            return Content(RenderHtml(result, snapshots, enhancedLogs), "text/html; charset=utf-8");
+            return Content(RenderHtml(result, snapshots, enhancedLogs, GetLogDirectory()), "text/html; charset=utf-8");
         }
 
         return Ok(result);
@@ -483,6 +483,74 @@ public sealed class DiagnosticoController(
             arquivosExcluidos = excluidos,
             mensagem = $"Lixeira esvaziada: {excluidos} arquivo(s) excluído(s).",
             erros
+        });
+    }
+
+    [HttpPost("logs/expurgar")]
+    public IActionResult ExpurgarLogs([FromQuery] int diasManter = 3)
+    {
+        diasManter = Math.Clamp(diasManter, 1, 30);
+        var cutoff = DateTime.UtcNow.AddDays(-diasManter);
+        var logsDir = GetLogDirectory();
+        var excluidos = 0;
+        long bytesLiberados = 0;
+        var detalhes = new List<string>();
+
+        if (Directory.Exists(logsDir))
+        {
+            // Expurgar logs antigos
+            var logFiles = new DirectoryInfo(logsDir)
+                .GetFiles("easystock-*.log")
+                .Where(f => f.LastWriteTimeUtc < cutoff)
+                .ToList();
+
+            foreach (var f in logFiles)
+            {
+                try
+                {
+                    bytesLiberados += f.Length;
+                    f.Delete();
+                    excluidos++;
+                    detalhes.Add($"Excluído: {f.Name} ({f.Length / 1024}KB)");
+                }
+                catch (Exception ex)
+                {
+                    detalhes.Add($"Erro ao excluir {f.Name}: {ex.Message}");
+                }
+            }
+
+            // Expurgar lixeira antiga
+            var lixeiraDir = Path.Combine(logsDir, "lixeira");
+            if (Directory.Exists(lixeiraDir))
+            {
+                var trashFiles = new DirectoryInfo(lixeiraDir)
+                    .GetFiles()
+                    .Where(f => f.LastWriteTimeUtc < cutoff)
+                    .ToList();
+                foreach (var f in trashFiles)
+                {
+                    try
+                    {
+                        bytesLiberados += f.Length;
+                        f.Delete();
+                        excluidos++;
+                        detalhes.Add($"Lixeira excluída: {f.Name}");
+                    }
+                    catch { /* ignore */ }
+                }
+            }
+        }
+
+        return Ok(new
+        {
+            success = true,
+            arquivosExcluidos = excluidos,
+            espacoLiberadoMb = Math.Round(bytesLiberados / (1024.0 * 1024.0), 2),
+            diasMantidos = diasManter,
+            mensagem = excluidos > 0
+                ? $"Expurgados {excluidos} arquivo(s), liberados {bytesLiberados / 1024}KB."
+                : $"Nenhum arquivo com mais de {diasManter} dia(s) encontrado.",
+            detalhes
         });
     }
 
@@ -1231,7 +1299,7 @@ public sealed class DiagnosticoController(
     // ──────────────────────────────────────────────────────────────────────
     // HTML rendering (fallback simples para Accept: text/html)
     // ──────────────────────────────────────────────────────────────────────
-    private static string RenderHtml(DiagnosticoResult r, IReadOnlyList<HealthSnapshot> snapshots, EnhancedLogsResult? logs)
+    private static string RenderHtml(DiagnosticoResult r, IReadOnlyList<HealthSnapshot> snapshots, EnhancedLogsResult? logs, string logsDir)
     {
         static string Badge(string status) => status switch
         {
@@ -1311,28 +1379,54 @@ public sealed class DiagnosticoController(
                     _ => ""
                 };
                 var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
-                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "..." : e.Message);
-                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
+                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 300 ? e.Message[..300] + "..." : e.Message);
+                var excRaw = e.Exception != null ? System.Net.WebUtility.HtmlEncode(e.Exception.Length > 2000 ? e.Exception[..2000] + "\n...truncado..." : e.Exception) : null;
+                var exc = excRaw != null ? $"<div class='log-exception collapsed' onclick='this.classList.toggle(\"collapsed\")'>{excRaw}</div>" : "";
+                var ctx = "";
+                if (e.Level is "ERROR" or "FATAL")
+                {
+                    var badges = new System.Text.StringBuilder("<span class='log-ctx'>");
+                    if (!string.IsNullOrEmpty(e.CorrelationId))
+                        badges.Append($"<span title='{e.CorrelationId}' style='cursor:pointer' onclick='document.getElementById(\"logFilter\").value=\"{e.CorrelationId[..Math.Min(8, e.CorrelationId.Length)]}\";filterLogs()'>CID:{e.CorrelationId[..Math.Min(8, e.CorrelationId.Length)]}</span>");
+                    if (!string.IsNullOrEmpty(e.ClientIp))
+                        badges.Append($"<span>IP:{e.ClientIp}</span>");
+                    if (!string.IsNullOrEmpty(e.UserId))
+                        badges.Append($"<span>User:{e.UserId[..Math.Min(8, e.UserId.Length)]}</span>");
+                    if (!string.IsNullOrEmpty(e.EmpresaId))
+                        badges.Append($"<span>Emp:{e.EmpresaId[..Math.Min(8, e.EmpresaId.Length)]}</span>");
+                    badges.Append("</span>");
+                    if (badges.Length > "<span class='log-ctx'></span>".Length) ctx = badges.ToString();
+                }
                 return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
                        $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
                        $"<span class='log-level'>{e.Level}</span>" +
-                       $"{cat}{elapsed}" +
+                       $"{cat}{elapsed}{ctx}" +
                        $"<span class='log-msg'>{msg}</span>{exc}</div>";
             });
             logEntriesHtml = string.Join("\n", rows);
         }
 
-        // Log summary stats
+        // Log summary stats + total size
         var logStatsHtml = "";
         if (logs?.Disponivel == true)
         {
+            var logFilesForSize = Directory.Exists(logsDir)
+                ? new DirectoryInfo(logsDir).GetFiles("easystock-*.log")
+                : [];
+            var totalSizeBytes = logFilesForSize.Sum(f => f.Length);
+            var sizeLabel = totalSizeBytes < 1024 * 1024
+                ? $"{totalSizeBytes / 1024}KB"
+                : $"{totalSizeBytes / (1024.0 * 1024.0):F1}MB";
+            var fileCount = logFilesForSize.Length;
+
             logStatsHtml = $"""
-                <div class="stats-grid">
+                <div class="stats-grid" style="grid-template-columns:repeat(6,1fr)">
                     <div class="stat-box"><div class="stat-num">{logs.TotalEntries}</div><div class="stat-label">Total Entradas</div></div>
                     <div class="stat-box"><div class="stat-num">{logs.Resumo.TotalRequests}</div><div class="stat-label">Requests HTTP</div></div>
                     <div class="stat-box err"><div class="stat-num">{logs.Resumo.TotalErrors}</div><div class="stat-label">Erros</div></div>
                     <div class="stat-box warn"><div class="stat-num">{logs.Resumo.TotalWarnings}</div><div class="stat-label">Warnings</div></div>
                     <div class="stat-box"><div class="stat-num">{logs.Resumo.AvgResponseTimeMs:F0}ms</div><div class="stat-label">Tempo Medio</div></div>
+                    <div class="stat-box"><div class="stat-num">{sizeLabel}</div><div class="stat-label">{fileCount} arquivo(s)</div></div>
                 </div>
                 """;
         }
@@ -1443,7 +1537,11 @@ public sealed class DiagnosticoController(
             .cat-startup{background:#064e3b;color:#34d399}.cat-error{background:#450a0a;color:#f87171}
             .cat-db{background:#422006;color:#fbbf24}
             .log-elapsed{color:#94a3b8;font-size:.7rem}.log-msg{color:#cbd5e1;flex:1;word-break:break-word}
-            .log-exception{color:#fca5a5;font-size:.7rem;padding:.25rem 0 0 60px;white-space:pre-wrap;word-break:break-all}
+            .log-exception{color:#fca5a5;font-size:.7rem;white-space:pre-wrap;word-break:break-all;width:100%;margin-top:.25rem;max-height:120px;overflow-y:auto;border-radius:.25rem;padding:.35rem .5rem;background:#1a0505;border:1px solid #450a0a;cursor:pointer}
+            .log-exception.collapsed{max-height:2.4rem;overflow:hidden;position:relative}
+            .log-exception.collapsed::after{content:'... clique para expandir';position:absolute;bottom:0;right:.5rem;background:#1a0505;color:#94a3b8;font-size:.6rem;padding:0 .25rem}
+            .log-ctx{display:inline-flex;gap:.3rem;margin-left:.25rem}
+            .log-ctx span{font-size:.6rem;padding:.1rem .35rem;border-radius:.2rem;background:#1e293b;color:#64748b;border:1px solid #334155}
             .patterns-list{display:flex;flex-direction:column;gap:.75rem}
             .pattern-item{padding:.75rem;background:#0f172a;border-radius:.5rem;font-size:.85rem;border:1px solid #334155}
             .pattern-count{color:#94a3b8;font-size:.8rem}.pattern-desc{color:#cbd5e1}
@@ -1610,6 +1708,7 @@ public sealed class DiagnosticoController(
                 <a href='/api/diagnostico/logs/exportar' download style='padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;font-size:.75rem;text-decoration:none;white-space:nowrap;cursor:pointer'>&#11015; Exportar</a>
                 <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>&#128465; Mover p/ lixeira</button>
                 <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>&#128465; Esvaziar lixeira</button>
+                <button onclick='expurgarLogs()' style='background:#1e3a5f;color:#60a5fa;border-color:#2563eb'>&#128465; Expurgar antigos</button>
                 <span id='lixeiraBadge' style='font-size:.72rem;color:#94a3b8;white-space:nowrap'></span>
             </div>
             <div class='log-console' id='logConsole'>
@@ -1686,7 +1785,7 @@ public sealed class DiagnosticoController(
             document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
-            if(name==='health'){fetchEventos().then(()=>setTimeout(initHealthCharts,50));}
+            if(name==='health'){setTimeout(initHealthCharts,50);fetchEventos().then(()=>{if(_dbChart)_dbChart.update();});}
             if(name==='logs'){startLiveLogs();setTimeout(initErrorTimeline,50);reloadLixeiraInfo();}
             else stopLiveLogs();
         }
@@ -1805,6 +1904,18 @@ public sealed class DiagnosticoController(
                     showToast(d.mensagem||'Logs movidos para lixeira.','success');
                     await reloadLixeiraInfo();
                 } else { showToast(d.mensagem||'Nenhum arquivo movido.','info'); }
+            }catch(e){showToast('Erro: '+e.message,'error');}
+        }
+        async function expurgarLogs(){
+            const dias=prompt('Manter logs dos últimos quantos dias? (excluir mais antigos)',3);
+            if(!dias||isNaN(dias)||dias<1)return;
+            if(!confirm('Excluir permanentemente logs com mais de '+dias+' dia(s)?'))return;
+            showToast('Expurgando logs antigos...','info');
+            try{
+                const r=await fetch('/api/diagnostico/logs/expurgar?diasManter='+dias,{method:'POST'});
+                const d=await r.json();
+                showToast(d.mensagem||'Expurgo concluído.', d.arquivosExcluidos>0?'success':'info');
+                if(d.arquivosExcluidos>0)setTimeout(()=>location.reload(),1500);
             }catch(e){showToast('Erro: '+e.message,'error');}
         }
         async function esvaziarLixeira(){
@@ -2080,7 +2191,7 @@ public sealed class DiagnosticoController(
                         }
                     });
                     if(bestIdx<0)return;
-                    const x=xAxis.getPixelForIndex(bestIdx);
+                    const x=xAxis.getPixelForValue(bestIdx);
                     const color=ev.tipo==='deploy'?'rgba(56,189,248,0.8)':ev.tipo==='error_spike'?'rgba(239,68,68,0.8)':'rgba(251,191,36,0.8)';
                     const icon=ev.tipo==='deploy'?'🚀':ev.tipo==='error_spike'?'⚡':'⚠';
                     ctx.strokeStyle=color;
@@ -2258,6 +2369,9 @@ public sealed class EnhancedLogEntry
     public double? ElapsedMs { get; set; }
     public string? Exception { get; set; }
     public string Categoria { get; set; } = "general";
+    public string? ClientIp { get; set; }
+    public string? UserId { get; set; }
+    public string? EmpresaId { get; set; }
 }
 
 public sealed class LogSummary
