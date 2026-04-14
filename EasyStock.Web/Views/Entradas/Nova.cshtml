@@ -31,7 +31,7 @@
                     </div>
                     @if (!isLast)
                     {
-                        <div class="flex-1 mx-3 h-0.5 bg-slate-200" :class="step > @stepNum ? 'bg-indigo-500' : ''"></div>
+                        <div class="step-connector flex-1 mx-3" :class="step > @stepNum ? 'step-connector--done' : ''"></div>
                     }
                 </div>
             }

@@ -53,7 +53,7 @@
                                 @if (p.PrimeiraFotoUrl is not null)
                                 {
                                     <div class="product-list-thumb">
-                                        <img src="@p.PrimeiraFotoUrl" alt="@p.Nome" class="w-full h-full object-cover flex-shrink-0"
+                                        <img src="@p.PrimeiraFotoUrl" alt="@p.Nome" class="w-full h-full object-cover object-top flex-shrink-0"
                                              onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
                                         <div class="product-list-thumb__placeholder hidden">
                                             <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

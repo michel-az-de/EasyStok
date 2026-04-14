@@ -1219,6 +1219,16 @@ html.theme-dark .pedido-modal__footer {
     box-shadow: var(--green-glow);
 }
 
+.step-connector {
+    height: 2px;
+    border-radius: 1px;
+    background: #e2e8f0;
+    transition: background var(--transition);
+}
+.step-connector--done {
+    background: #6366F1;
+}
+
 /* ─── Loading spinner ────────────────────────────────────────── */
 .spinner {
     display: inline-block;
