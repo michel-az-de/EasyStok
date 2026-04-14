@@ -912,7 +912,17 @@
                 async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
-                    if (this.skuStatus === 'indisponivel') { this.step = 1; window.showToast('O SKU informado já está em uso. Altere antes de salvar.', 'warning'); return; }
+                    if (this.skuStatus === 'indisponivel') {
+                        this.step = 1;
+                        window.showToast('SKU já em uso — gerando um novo automaticamente…', 'warning');
+                        await this.gerarSku(true);
+                        if (this.skuStatus === 'indisponivel') {
+                            window.showToast('Não foi possível gerar um SKU único. Edite o campo SKU manualmente.', 'warning');
+                        } else {
+                            window.showToast('Novo SKU gerado. Revise e clique em Criar produto novamente.', 'success');
+                        }
+                        return;
+                    }
                     if (this.skuStatus === 'verificando') { window.showToast('Aguarde a verificação do SKU.', 'info'); return; }
                     if (this.saving) return;
                     this.saving = true;
@@ -1042,7 +1052,7 @@
                     this.codigoBarras = ts + check;
                     this.eanAviso = '';
                 },
-                gerarSku() {
+                _buildSkuCandidate() {
                     const base = this.nome || '';
                     const words = base.trim().toUpperCase().split(/\s+/).filter(w => w.length > 0);
                     const parts = words.slice(0, 3).map(w => w.substring(0, 3).replace(/[^A-Z0-9]/g, ''));
@@ -1050,9 +1060,19 @@
                     let rnd = '';
                     for (let i = 0; i < 4; i++) rnd += chars[Math.floor(Math.random() * chars.length)];
                     const prefix = parts.filter(Boolean).join('-');
-                    this.sku = prefix ? prefix + '-' + rnd : rnd;
-                    this.skuStatus = '';
-                    this.checkSkuDisponivel();
+                    return prefix ? prefix + '-' + rnd : rnd;
+                },
+                async gerarSku(silent = false) {
+                    const MAX = 3;
+                    for (let attempt = 1; attempt <= MAX; attempt++) {
+                        this.sku = this._buildSkuCandidate();
+                        this.skuStatus = '';
+                        await this.checkSkuDisponivel();
+                        if (this.skuStatus !== 'indisponivel') break;
+                        if (attempt === MAX) {
+                            if (!silent) window.showToast('Não foi possível gerar um SKU único automaticamente. Edite manualmente.', 'warning');
+                        }
+                    }
                 },
                 _skuAbort: null,
                 async checkSkuDisponivel() {
