@@ -6,11 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: easystock-api
   DOTNET_VERSION: '9.x'
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,15 +19,36 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
-        run: dotnet restore EasyStock.Api/EasyStock.Api.csproj
+      - name: Restore & Publish API
+        run: |
+          dotnet restore EasyStock.Api/EasyStock.Api.csproj
+          dotnet publish EasyStock.Api/EasyStock.Api.csproj -c Release -o ./publish-api --no-restore
 
-      - name: Build & Publish
-        run: dotnet publish EasyStock.Api/EasyStock.Api.csproj -c Release -o ./publish --no-restore
-
-      - name: Deploy to Azure App Service
+      - name: Deploy API to Azure
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          app-name: easystock-api
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./publish
+          package: ./publish-api
+
+  build-and-deploy-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Publish Web
+        run: |
+          dotnet restore EasyStock.Web/EasyStock.Web.csproj
+          dotnet publish EasyStock.Web/EasyStock.Web.csproj -c Release -o ./publish-web --no-restore
+
+      - name: Deploy Web to Azure
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: easystock-web
+          publish-profile: ${{ secrets.AZURE_WEB_PUBLISH_PROFILE }}
+          package: ./publish-web
