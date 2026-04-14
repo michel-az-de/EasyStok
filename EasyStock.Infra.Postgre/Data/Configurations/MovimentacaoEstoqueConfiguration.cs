@@ -14,7 +14,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(m => m.Tipo).HasConversion<string>().IsRequired().HasMaxLength(50);
             builder.Property(m => m.Natureza).HasConversion<string>().IsRequired().HasMaxLength(50);
             builder.Property(m => m.Quantidade)
-                .HasConversion(q => q.Value, value => Quantidade.From(value));
+                .HasConversion(
+                    q => q == null ? 0 : q.Value,
+                    value => value >= 0 ? Quantidade.From(value) : Quantidade.Zero);
             builder.Property(m => m.ValorUnitario)
                 .HasConversion(
                     d => d == null ? (decimal?)null : d.Valor,

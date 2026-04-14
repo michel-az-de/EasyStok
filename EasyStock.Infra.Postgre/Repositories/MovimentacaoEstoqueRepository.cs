@@ -66,12 +66,20 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = BuildFilteredQuery(empresaId, de, ate, tipo, natureza);
 
-            var totalUnidades = await query.Select(m => m.Quantidade.Value).SumAsync();
-            var receitaTotal = await query
-                .Where(m => m.ValorTotal != null)
-                .SumAsync(m => m.ValorTotal!.Valor);
-            var totalVendas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
-            var totalPerdas = await query.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda);
+            // Projeção com campos primitivos para garantir tradução SQL pelo EF Core
+            var aggregated = await query
+                .Select(m => new
+                {
+                    Quantidade = (int)m.Quantidade,
+                    ValorTotal = (decimal?)m.ValorTotal,
+                    m.Natureza
+                })
+                .ToListAsync();
+
+            var totalUnidades = aggregated.Sum(m => m.Quantidade);
+            var receitaTotal = aggregated.Sum(m => m.ValorTotal ?? 0m);
+            var totalVendas = aggregated.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+            var totalPerdas = aggregated.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda);
 
             return new KpisMovimentacao(totalUnidades, receitaTotal, totalVendas, totalPerdas);
         }
@@ -125,7 +133,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (produtoId.HasValue)
                 query = query.Where(m => m.ProdutoId == produtoId.Value);
 
-            var totalSaidas = await query.Select(m => m.Quantidade.Value).SumAsync();
+            var totalSaidas = await query.Select(m => (int)m.Quantidade).SumAsync();
             var dias = Math.Max(1, (ate - de).Days);
             return (decimal)totalSaidas / dias;
         }
@@ -145,7 +153,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                             m.Tipo == TipoMovimentacaoEstoque.Saida &&
                             m.DataMovimentacao >= de &&
                             m.DataMovimentacao <= ate)
-                .Select(m => new { m.ProdutoId, Quantidade = m.Quantidade.Value })
+                .Select(m => new { m.ProdutoId, Quantidade = (int)m.Quantidade })
                 .GroupBy(m => m.ProdutoId)
                 .Select(g => new
                 {
@@ -171,8 +179,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(m => new
                 {
                     m.DataMovimentacao,
-                    Quantidade = m.Quantidade.Value,
-                    ValorTotal = m.ValorTotal != null ? m.ValorTotal.Valor : 0m
+                    Quantidade = (int)m.Quantidade,
+                    ValorTotal = (decimal?)m.ValorTotal ?? 0m
                 })
                 .GroupBy(m => new { m.DataMovimentacao.Year, m.DataMovimentacao.Month })
                 .Select(g => new

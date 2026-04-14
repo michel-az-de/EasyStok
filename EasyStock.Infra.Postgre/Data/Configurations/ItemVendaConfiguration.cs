@@ -13,12 +13,18 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasKey(iv => iv.Id);
             builder.Property(iv => iv.VariacaoSnapshot).HasMaxLength(180);
             builder.Property(iv => iv.Quantidade)
-                .HasConversion(q => q.Value, value => Quantidade.From(value));
+                .HasConversion(
+                    q => q == null ? 0 : q.Value,
+                    value => value >= 0 ? Quantidade.From(value) : Quantidade.Zero);
             builder.Property(iv => iv.PrecoUnitario)
-                .HasConversion(d => d.Valor, value => Dinheiro.FromDecimal(value))
+                .HasConversion(
+                    d => d == null ? 0m : d.Valor,
+                    value => value >= 0 ? Dinheiro.FromDecimal(value) : Dinheiro.Zero)
                 .HasColumnType("decimal(18,2)");
             builder.Property(iv => iv.PrecoTotal)
-                .HasConversion(d => d.Valor, value => Dinheiro.FromDecimal(value))
+                .HasConversion(
+                    d => d == null ? 0m : d.Valor,
+                    value => value >= 0 ? Dinheiro.FromDecimal(value) : Dinheiro.Zero)
                 .HasColumnType("decimal(18,2)");
 
             builder.HasOne(iv => iv.Venda).WithMany(v => v.ItensVenda).HasForeignKey(iv => iv.VendaId);

@@ -160,7 +160,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     v.DataVenda.Year,
                     v.DataVenda.Month,
                     ValorTotal = (decimal)v.ValorTotal,
-                    v.ItensVenda
+                    TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
                 })
                 .ToListAsync();
 
@@ -170,7 +170,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     var totalVendas = g.Count();
                     var receita = g.Sum(v => v.ValorTotal);
-                    var totalItens = g.Sum(v => v.ItensVenda?.Sum(i => i.Quantidade.Value) ?? 0);
+                    var totalItens = g.Sum(v => v.TotalItens);
                     return new ReceitaPorPeriodo(
                         Ano: g.Key.Year,
                         Mes: g.Key.Month,
@@ -209,13 +209,20 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Join(dbContext.Produtos.AsNoTracking(),
                     m => m.ProdutoId,
                     p => p.Id,
-                    (m, p) => new
+                    (m, p) => new { m, p })
+                .GroupJoin(dbContext.ItensEstoque.AsNoTracking(),
+                    x => x.m.ItemEstoqueId,
+                    ie => ie.Id,
+                    (x, ies) => new { x.m, x.p, ies })
+                .SelectMany(
+                    x => x.ies.DefaultIfEmpty(),
+                    (x, ie) => new
                     {
-                        m.ProdutoId,
-                        NomeProduto = p.Nome,
-                        CustoUnitario = m.ItemEstoque != null ? (decimal)m.ItemEstoque.CustoUnitario : (p.CustoReferencia != null ? (decimal)p.CustoReferencia : 0m),
-                        PrecoVenda = (decimal)m.ValorUnitario!,
-                        Quantidade = (int)m.Quantidade
+                        x.m.ProdutoId,
+                        NomeProduto = x.p.Nome,
+                        CustoUnitario = ie != null ? (decimal)ie.CustoUnitario : (x.p.CustoReferencia != null ? (decimal)x.p.CustoReferencia : 0m),
+                        PrecoVenda = (decimal)x.m.ValorUnitario!,
+                        Quantidade = (int)x.m.Quantidade
                     })
                 .ToListAsync();
 
@@ -635,7 +642,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     v.Canal,
                     ValorTotal = (decimal)v.ValorTotal,
-                    v.ItensVenda
+                    TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
                 })
                 .ToListAsync();
 
@@ -647,7 +654,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     var totalVendas = g.Count();
                     var receita = g.Sum(v => v.ValorTotal);
-                    var totalItens = g.Sum(v => v.ItensVenda?.Sum(i => i.Quantidade.Value) ?? 0);
+                    var totalItens = g.Sum(v => v.TotalItens);
                     return new VendaPorCanal(
                         Canal: g.Key,
                         TotalVendas: totalVendas,
