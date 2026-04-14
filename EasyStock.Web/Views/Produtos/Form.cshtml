@@ -960,14 +960,22 @@
                 async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    // No modo edição, se o SKU não foi alterado, ignorar status "indisponivel"
+                    if (isEdit && this.sku === this._originalSku && this.skuStatus === 'indisponivel') {
+                        this.skuStatus = '';
+                    }
                     if (this.skuStatus === 'indisponivel') {
                         this.step = 1;
-                        window.showToast('SKU já em uso — gerando um novo automaticamente…', 'warning');
-                        await this.gerarSku(true);
-                        if (this.skuStatus === 'indisponivel') {
-                            window.showToast('Não foi possível gerar um SKU único. Edite o campo SKU manualmente.', 'warning');
+                        if (isEdit) {
+                            window.showToast('SKU já em uso por outro produto. Altere o SKU manualmente.', 'warning');
                         } else {
-                            window.showToast('Novo SKU gerado. Revise e clique em Criar produto novamente.', 'success');
+                            window.showToast('SKU já em uso — gerando um novo automaticamente…', 'warning');
+                            await this.gerarSku(true);
+                            if (this.skuStatus === 'indisponivel') {
+                                window.showToast('Não foi possível gerar um SKU único. Edite o campo SKU manualmente.', 'warning');
+                            } else {
+                                window.showToast('Novo SKU gerado. Revise e clique em Criar produto novamente.', 'success');
+                            }
                         }
                         return;
                     }
@@ -1381,6 +1389,7 @@
                 descricao: @Html.Raw(JsonSerializer.Serialize(Model.DescricaoBase ?? "")),
                 marca: @Html.Raw(JsonSerializer.Serialize(Model.Marca ?? "")),
                 sku: @Html.Raw(JsonSerializer.Serialize(ViewData.ModelState.ContainsKey("SkuBase") && ViewData.ModelState["SkuBase"]!.Errors.Count > 0 ? "" : (Model.SkuBase ?? ""))),
+                _originalSku: @Html.Raw(JsonSerializer.Serialize(Model.SkuBase ?? "")),
                 codigoBarras: @Html.Raw(JsonSerializer.Serialize(Model.CodigoBarras ?? "")),
                 eanAviso: '',
                 skuStatus: '', // '', 'verificando', 'disponivel', 'indisponivel'
