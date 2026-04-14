@@ -36,6 +36,20 @@ using EasyStock.Api.Observability;
 using EasyStock.Api.Observability.HealthChecks;
 using Swashbuckle.AspNetCore.Annotations;
 
+// Handler global para exceções não tratadas que derrubam o processo
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+{
+    Log.Fatal("UNHANDLED EXCEPTION (processo encerrando={IsTerminating}): {Exception}",
+        e.IsTerminating, e.ExceptionObject);
+    Log.CloseAndFlush();
+};
+
+TaskScheduler.UnobservedTaskException += (_, e) =>
+{
+    Log.Error("UNOBSERVED TASK EXCEPTION: {Exception}", e.Exception);
+    e.SetObserved(); // evita crash do processo por Task não observada
+};
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Garantir que diretório de logs existe antes do Serilog iniciar
@@ -559,6 +573,41 @@ app.UseSerilogRequestLogging(options =>
             diagnosticContext.Set("EmpresaId", empresaId);
     };
 });
+
+// Middleware de cache em memória para os JSON docs do Swagger (TTL 1h, evita ~1900ms por request)
+{
+    var swaggerCache = new System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Body, string ContentType, DateTimeOffset CachedAt)>();
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path.Value ?? "";
+        var isSwaggerJson = path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase)
+                         && path.EndsWith("/swagger.json", StringComparison.OrdinalIgnoreCase)
+                         && context.Request.Method == "GET";
+
+        if (!isSwaggerJson) { await next(); return; }
+
+        if (swaggerCache.TryGetValue(path, out var cached) &&
+            DateTimeOffset.UtcNow - cached.CachedAt < TimeSpan.FromHours(1))
+        {
+            context.Response.ContentType = cached.ContentType;
+            context.Response.Headers["X-Swagger-Cache"] = "HIT";
+            await context.Response.Body.WriteAsync(cached.Body);
+            return;
+        }
+
+        var originalBody = context.Response.Body;
+        using var buffer = new System.IO.MemoryStream();
+        context.Response.Body = buffer;
+        await next();
+        buffer.Position = 0;
+        var body = buffer.ToArray();
+        var contentType = context.Response.ContentType ?? "application/json";
+        swaggerCache[path] = (body, contentType, DateTimeOffset.UtcNow);
+        context.Response.Headers["X-Swagger-Cache"] = "MISS";
+        context.Response.Body = originalBody;
+        await originalBody.WriteAsync(body);
+    });
+}
 
 // Swagger disponivel em todos os ambientes para facilitar operacao
 app.UseSwagger();

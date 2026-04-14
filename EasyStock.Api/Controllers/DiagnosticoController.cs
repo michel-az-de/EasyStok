@@ -36,18 +36,24 @@ public sealed class DiagnosticoController(
     [HttpGet]
     public async Task<IActionResult> Diagnostico(CancellationToken ct)
     {
+        // Executar checks de infra em paralelo para reduzir latência
+        var bancoTask   = GetBancoStatusAsync(ct);
+        var redisTask   = GetRedisStatusAsync(ct);
+        var storageTask = GetStorageStatusAsync(ct);
+        await Task.WhenAll(bancoTask, redisTask, storageTask);
+
         var result = new DiagnosticoResult
         {
-            Status = "ok",
-            Timestamp = DateTimeOffset.UtcNow,
-            Ambiente = infraState.Environment,
-            Uptime = FormatUptime(DateTimeOffset.UtcNow - infraState.StartupTime),
-            Versao = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
-            Banco = await GetBancoStatusAsync(ct),
-            Redis = await GetRedisStatusAsync(ct),
-            Smtp = GetSmtpStatus(),
-            Storage = await GetStorageStatusAsync(ct),
-            Ia = GetIaStatus(),
+            Status        = "ok",
+            Timestamp     = DateTimeOffset.UtcNow,
+            Ambiente      = infraState.Environment,
+            Uptime        = FormatUptime(DateTimeOffset.UtcNow - infraState.StartupTime),
+            Versao        = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
+            Banco         = bancoTask.Result,
+            Redis         = redisTask.Result,
+            Smtp          = GetSmtpStatus(),
+            Storage       = storageTask.Result,
+            Ia            = GetIaStatus(),
             Configuracoes = GetConfiguracoesStatus()
         };
 

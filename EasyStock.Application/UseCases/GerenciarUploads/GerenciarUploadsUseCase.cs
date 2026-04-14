@@ -38,8 +38,10 @@ public sealed class GerenciarUploadsUseCase(
         if (fotos.Count >= 5)
             throw new UseCaseValidationException("O produto ja possui o limite maximo de 5 fotos.");
 
-        // Otimizar: redimensiona para max 1920px e converte para WebP
-        var (optimized, optContentType, optExt) = imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85);
+        // Otimizar em thread de pool para não bloquear a thread async do request
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
 
         var fotoId = Guid.NewGuid();
         var stored = await fileStorage.UploadAsync(

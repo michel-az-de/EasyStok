@@ -73,6 +73,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(x => x.FornecedorId).HasColumnType("uuid");
             builder.HasOne(x => x.Loja).WithMany(l => l.Itens).HasForeignKey(x => x.LojaId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             builder.HasOne(x => x.Fornecedor).WithMany().HasForeignKey(x => x.FornecedorId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+
+            // Índices para queries de estoque baixo, vencimento e itens parados
+            builder.HasIndex(i => new { i.EmpresaId, i.QuantidadeAtual })
+                .HasDatabaseName("ix_itens_estoque_empresa_quantidade");
+            builder.HasIndex(i => new { i.EmpresaId, i.UltimaMovimentacaoEm })
+                .HasDatabaseName("ix_itens_estoque_empresa_ultima_mov");
         }
     }
 }

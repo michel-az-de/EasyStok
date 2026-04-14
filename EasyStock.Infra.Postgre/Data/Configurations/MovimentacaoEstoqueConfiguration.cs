@@ -38,6 +38,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(m => m.EstornadaEm);
             builder.HasOne(m => m.MovimentacaoEstornada).WithMany().HasForeignKey(m => m.MovimentacaoEstornadaId).IsRequired(false);
             builder.HasIndex(m => m.MovimentacaoEstornadaId).HasFilter("\"MovimentacaoEstornadaId\" IS NOT NULL");
+
+            // Índices para queries de KPI, analytics e filtros mais comuns
+            builder.HasIndex(m => new { m.EmpresaId, m.Tipo, m.DataMovimentacao })
+                .HasDatabaseName("ix_movimentacoes_empresa_tipo_data");
+            builder.HasIndex(m => new { m.EmpresaId, m.Natureza })
+                .HasDatabaseName("ix_movimentacoes_empresa_natureza");
         }
     }
 }

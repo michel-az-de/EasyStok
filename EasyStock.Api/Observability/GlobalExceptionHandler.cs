@@ -37,13 +37,19 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 correlationId, requestMethod, requestPath,
                 exception.GetType().FullName, exception.Message);
 
-        // Incluir detalhes completos do erro na resposta (útil para diagnóstico)
+        // Em produção, nunca expor detalhes de exceção 5xx ao cliente (vaza informações sensíveis)
         var errorDetail = detail;
         if (statusCode >= 500)
         {
-            errorDetail = $"{exception.GetType().Name}: {exception.Message}";
-            if (exception.InnerException is not null)
-                errorDetail += $" → {exception.InnerException.GetType().Name}: {exception.InnerException.Message}";
+            var isDevelopment = httpContext.RequestServices
+                .GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false;
+
+            errorDetail = isDevelopment
+                ? $"{exception.GetType().Name}: {exception.Message}" +
+                  (exception.InnerException is not null
+                      ? $" → {exception.InnerException.GetType().Name}: {exception.InnerException.Message}"
+                      : string.Empty)
+                : "Ocorreu um erro inesperado. Use o CorrelationId para rastreamento.";
         }
 
         var envelope = new ApiErrorResponse(new ApiError(code, title, errorDetail, correlationId));

@@ -31,6 +31,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasOne(iv => iv.ItemEstoque).WithMany(i => i.ItensVenda).HasForeignKey(iv => iv.ItemEstoqueId);
             builder.HasOne(iv => iv.Produto).WithMany(p => p.ItensVenda).HasForeignKey(iv => iv.ProdutoId);
             builder.HasOne(iv => iv.ProdutoVariacao).WithMany(v => v.ItensVenda).HasForeignKey(iv => iv.ProdutoVariacaoId).IsRequired(false);
+
+            // Índice para cálculo de receita por período (analytics)
+            builder.HasIndex(iv => iv.VendaId)
+                .HasDatabaseName("ix_itens_venda_venda_id");
         }
     }
 }
