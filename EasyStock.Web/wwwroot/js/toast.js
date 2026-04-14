@@ -75,6 +75,7 @@
         if (type === 'error') {
             wrapper.setAttribute('role', 'alert');
             wrapper.setAttribute('aria-live', 'assertive');
+            wrapper.setAttribute('aria-atomic', 'true');
         }
 
         // Body

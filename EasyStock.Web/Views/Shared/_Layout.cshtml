@@ -144,6 +144,7 @@
             }
 
             async function poll() {
+                if (document.hidden) return;
                 try {
                     var r = await fetch('/notificacoes/resumo');
                     if (!r.ok) return;
@@ -182,9 +183,18 @@
                 } catch (e) { /* silent */ }
             }
 
+            var timerId = null;
+            function startPolling() { if (!timerId) timerId = setInterval(poll, INTERVAL); }
+            function stopPolling()  { clearInterval(timerId); timerId = null; }
+
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) { stopPolling(); }
+                else { poll(); startPolling(); }
+            });
+
             document.addEventListener('DOMContentLoaded', function () {
                 poll();
-                setInterval(poll, INTERVAL);
+                startPolling();
             });
         })();
     </script>

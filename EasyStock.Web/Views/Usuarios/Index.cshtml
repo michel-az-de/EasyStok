@@ -3,12 +3,7 @@
 @{
     ViewBag.Title = "Usuários";
     Layout = "_Layout";
-    // Hardcoded profile IDs matching API's Perfil enum/table
-    var perfis = new[] {
-        ("Admin", "Administrador"),
-        ("Gerente", "Gerente"),
-        ("Operador", "Operador")
-    };
+    var perfis = UsuariosViewModel.PerfisDisponiveis;
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -50,19 +45,7 @@
                         <td>
                             <div x-show="!editando">
                                 @{
-                                    var badgeClass = u.Role switch
-                                    {
-                                        "SuperAdmin" or "Admin" => "bg-indigo-100 text-indigo-700",
-                                        "Gerente" => "bg-amber-100 text-amber-700",
-                                        _ => "bg-slate-100 text-slate-600"
-                                    };
-                                    var roleLabel = u.Role switch
-                                    {
-                                        "SuperAdmin" => "Super Admin",
-                                        "Admin" => "Administrador",
-                                        "Gerente" => "Gerente",
-                                        _ => "Operador"
-                                    };
+                                    var (roleLabel, badgeClass) = UsuariosViewModel.GetPerfilDisplay(u.Role);
                                 }
                                 <span class="px-2 py-0.5 rounded-full text-xs font-medium @badgeClass">
                                     @roleLabel
@@ -97,7 +80,7 @@
                                 @Html.AntiForgeryToken()
                                 <select name="perfilId"
                                         class="ui-select w-full border border-slate-300 rounded px-2 py-1 text-xs">
-                                    @foreach (var (val, label) in perfis)
+                                    @foreach (var (val, label, _) in perfis)
                                     {
                                         if (u.Role == val)
                                         {
@@ -216,7 +199,7 @@
                     <label class="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
                     <select name="PerfilId"
                             class="ui-select w-full text-sm">
-                        @foreach (var (val, label) in perfis)
+                        @foreach (var (val, label, _) in perfis)
                         {
                             if (val == "Operador")
                             {

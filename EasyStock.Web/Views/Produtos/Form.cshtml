@@ -15,6 +15,7 @@
 
 <div class="flex items-center gap-3 mb-6">
     <a href="@(isEdit ? $"/produtos/{Model.Id}" : "/produtos")"
+       aria-label="Voltar"
        class="text-slate-400 hover:text-slate-600 transition-colors">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -854,6 +855,8 @@
                 async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    if (this.skuStatus === 'indisponivel') { this.step = 1; window.showToast('O SKU informado já está em uso. Altere antes de salvar.', 'warning'); return; }
+                    if (this.skuStatus === 'verificando') { window.showToast('Aguarde a verificação do SKU.', 'info'); return; }
                     if (this.saving) return;
                     this.saving = true;
                     try { sessionStorage.removeItem(this._draftKey); } catch(e) {}
@@ -1329,7 +1332,7 @@ previews: [],      // URLs de preview locais dos arquivos no FilePond
                                 if (line.startsWith('data: ')) this.descricao += line.slice(6);
                             }
                         }
-                    } catch (e) { console.error('[EasyStock]', e); }
+                    } catch (e) { console.error('[EasyStock]', e); window.showToast('Erro ao gerar descrição com IA.', 'error'); }
                     this.aiGenerating = false;
                 },
 

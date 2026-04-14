@@ -925,7 +925,7 @@ function diagApp() {
             try {
                 const r = await fetch('/diagnostico/api/endpoints');
                 if (r.ok) this.endpoints = await r.json();
-            } catch (e) { console.error('endpoints fetch error', e); }
+            } catch (e) { console.error('endpoints fetch error', e); window.showToast && window.showToast('Erro ao carregar endpoints.', 'error'); }
             this.loadingEndpoints = false;
         },
 
@@ -936,14 +936,14 @@ function diagApp() {
                     this.healthHistory = await r.json();
                     this.$nextTick(() => this.renderHealthChart());
                 }
-            } catch (e) { console.error('historico fetch error', e); }
+            } catch (e) { console.error('historico fetch error', e); window.showToast && window.showToast('Erro ao carregar histórico.', 'error'); }
         },
 
         async fetchSlo() {
             try {
                 const r = await fetch('/diagnostico/api/slo?hours=24');
                 if (r.ok) this.slo = await r.json();
-            } catch (e) { console.error('slo fetch error', e); }
+            } catch (e) { console.error('slo fetch error', e); window.showToast && window.showToast('Erro ao carregar SLO.', 'error'); }
         },
 
         async fetchEventos() {
@@ -953,14 +953,14 @@ function diagApp() {
                     this.eventos = await r.json();
                     this.$nextTick(() => this.renderHealthChart());
                 }
-            } catch (e) { console.error('eventos fetch error', e); }
+            } catch (e) { console.error('eventos fetch error', e); window.showToast && window.showToast('Erro ao carregar eventos.', 'error'); }
         },
 
         async fetchQueriesLentas() {
             try {
                 const r = await fetch('/diagnostico/api/queries-lentas');
                 if (r.ok) this.queriesLentas = await r.json();
-            } catch (e) { console.error('queries-lentas fetch error', e); }
+            } catch (e) { console.error('queries-lentas fetch error', e); window.showToast && window.showToast('Erro ao carregar queries lentas.', 'error'); }
         },
 
         async fetchAcks() {
@@ -975,7 +975,7 @@ function diagApp() {
                     (data.acks || []).forEach(a => { map[a.alertaId] = a; });
                     this.acks = map;
                 }
-            } catch (e) { console.error('acks fetch error', e); }
+            } catch (e) { console.error('acks fetch error', e); window.showToast && window.showToast('Erro ao carregar alertas.', 'error'); }
         },
 
         async fetchEmpresasHealth() {
@@ -983,7 +983,7 @@ function diagApp() {
             try {
                 const r = await fetch('/diagnostico/api/health/empresas');
                 if (r.ok) this.empresasHealth = await r.json();
-            } catch (e) { console.error('empresas health fetch error', e); }
+            } catch (e) { console.error('empresas health fetch error', e); window.showToast && window.showToast('Erro ao carregar saúde das empresas.', 'error'); }
             this.loadingEmpresasHealth = false;
         },
 
@@ -1022,7 +1022,7 @@ function diagApp() {
                     // Carregar acks dos padrões detectados
                     this.$nextTick(() => this.fetchAcks());
                 }
-            } catch (e) { console.error('enhanced logs fetch error', e); }
+            } catch (e) { console.error('enhanced logs fetch error', e); window.showToast && window.showToast('Erro ao carregar logs.', 'error'); }
             this.loadingLogs = false;
         },
 
