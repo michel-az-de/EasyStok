@@ -87,7 +87,7 @@
                             <span class="badge @naturezaBadge px-2 py-0.5 rounded-full text-xs font-semibold">@naturezaLabel</span>
                         </td>
                         <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
-                        <td class="text-slate-500">@(e.ProdutoVariacao?.Nome ?? "-")</td>
+                        <td class="text-slate-400 text-xs">@(e.ProdutoVariacao?.Nome ?? "")</td>
                         <td class="text-center font-mono">@e.Qty</td>
                         <td class="text-right font-mono text-slate-600 whitespace-nowrap">
                             @(e.Custo.HasValue ? e.Custo.Value.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")

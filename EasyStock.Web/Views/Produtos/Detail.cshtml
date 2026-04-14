@@ -99,6 +99,7 @@
                             class="produto-thumb w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden border-2 transition-all"
                             :class="selectedPhotoIdx === idx ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'">
                         <img :src="foto.url" class="w-full h-full object-cover object-top"
+                             onload="if(this.naturalWidth===0){this.onerror&&this.onerror();}"
                              onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
                         <span class="produto-thumb__placeholder hidden">
                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +252,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                     </svg>
-                    Saida
+                    Saída
                 </a>
                 <div x-data="{ open: false }" class="relative">
                     <button @@click="open = !open" @@click.away="open = false"
@@ -306,7 +307,7 @@
     </div>
 
 <!-- ═══ TAB: VARIACOES ═══ -->
-<div x-show="tab==='variacoes'">
+<div x-show="tab==='variacoes'" x-cloak>
     <div class="ws produto-detail-tab-card">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-bold text-slate-800">Variações (@p.Variacoes.Count)</h3>
@@ -382,7 +383,7 @@
     </div>
 
     <!-- ═══ TAB: FOTOS ═══ -->
-    <div x-show="tab==='fotos'">
+    <div x-show="tab==='fotos'" x-cloak>
         <div class="ws produto-detail-tab-card produto-detail-photos-card">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -472,7 +473,7 @@
     </div>
 
     <!-- ═══ TAB: ESTOQUE ═══ -->
-    <div x-show="tab==='estoque'">
+    <div x-show="tab==='estoque'" x-cloak>
         <div class="ws produto-detail-tab-card">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="font-bold text-slate-800">Estoque por variação</h3>
@@ -546,7 +547,7 @@
     </div>
 
     <!-- ═══ TAB: HISTORICO ═══ -->
-    <div x-show="tab==='historico'">
+    <div x-show="tab==='historico'" x-cloak>
         <div class="ws produto-detail-tab-card">
             <h3 class="font-bold text-slate-800 mb-4">Histórico de movimentações</h3>
 
@@ -576,7 +577,7 @@
                             <th>Tipo</th>
                             <th class="text-center">Qtd</th>
                             <th class="text-right">Valor</th>
-                            <th>Observacao</th>
+                            <th>Observação</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -605,7 +606,7 @@
     </div>
 
     <!-- ═══ TAB: DETALHES (Caracteristicas + Embalagens) ═══ -->
-    <div x-show="tab==='detalhes'">
+    <div x-show="tab==='detalhes'" x-cloak>
         @if (!p.Caracteristicas.Any() && !p.Embalagens.Any())
         {
             <div class="ws produto-detail-tab-card text-center py-10 text-slate-400">
@@ -739,6 +740,9 @@
                         this.tab = t;
                         if (t === 'historico') this.loadHistorico();
                     }
+                    this.$watch('tab', val => {
+                        if (val === 'historico' && !this._hlLoaded) this.loadHistorico();
+                    });
                 },
 
                 handleFileSelect(e) {
