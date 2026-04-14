@@ -44,7 +44,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                 altura = vm.DimensoesAltura ?? 0m,
                 comprimento = vm.DimensoesComprimento ?? 0m
             } : null,
-            caracteristicas = vm.Caracteristicas
+            caracteristicas = (vm.Caracteristicas ?? [])
                 .Where(c => !string.IsNullOrWhiteSpace(c.Nome))
                 .Select((c, i) => new
                 {
@@ -54,7 +54,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                     variacaoPadrao = c.VariacaoPadrao,
                     ordemExibicao = i
                 }).ToArray(),
-            embalagens = vm.Embalagens
+            embalagens = (vm.Embalagens ?? [])
                 .Where(e => !string.IsNullOrWhiteSpace(e.Nome))
                 .Select(e => new
                 {
@@ -69,7 +69,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                     } : (object?)null,
                     padrao = e.Padrao
                 }).ToArray(),
-            variacoes = vm.VariacoesRich
+            variacoes = (vm.VariacoesRich ?? [])
                 .Where(v => !string.IsNullOrWhiteSpace(v.Nome))
                 .Select(v => new
                 {
@@ -108,7 +108,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                 altura = vm.DimensoesAltura ?? 0m,
                 comprimento = vm.DimensoesComprimento ?? 0m
             } : null,
-            caracteristicas = vm.Caracteristicas
+            caracteristicas = (vm.Caracteristicas ?? [])
                 .Where(c => !string.IsNullOrWhiteSpace(c.Nome))
                 .Select((c, i) => new
                 {
@@ -118,7 +118,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                     variacaoPadrao = c.VariacaoPadrao,
                     ordemExibicao = i
                 }).ToArray(),
-            embalagens = vm.Embalagens
+            embalagens = (vm.Embalagens ?? [])
                 .Where(e => !string.IsNullOrWhiteSpace(e.Nome))
                 .Select(e => new
                 {
@@ -133,7 +133,7 @@ public class ProdutosService(ApiClient api, SessionService session)
                     } : (object?)null,
                     padrao = e.Padrao
                 }).ToArray(),
-            variacoes = vm.VariacoesRich
+            variacoes = (vm.VariacoesRich ?? [])
                 .Where(v => !string.IsNullOrWhiteSpace(v.Nome))
                 .Select(v => new
                 {

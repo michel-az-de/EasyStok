@@ -895,7 +895,7 @@
                                 } else {
                                     window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
                                 }
-                            } catch {
+                            } catch (e) { console.error('[EasyStock]', e);
                                 window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
                             }
                             return;
@@ -964,7 +964,7 @@
                         const r = await fetch('/produtos/marcas-sugestoes?q=' + encodeURIComponent(this.marca || ''));
                         if (r.ok) this.marcaSugestoes = (await r.json()).filter(m => m !== this.marca);
                         else this.marcaSugestoes = [];
-                    } catch { this.marcaSugestoes = []; }
+                    } catch (e) { console.error('[EasyStock]', e); this.marcaSugestoes = []; }
                 },
                 selecionarMarca(m) { this.marca = m; this.marcaSugestoes = []; },
 
@@ -979,7 +979,7 @@
                             margin: 4,
                             displayValue: true
                         });
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
                 gerarCodigoBarras() {
                     const ts = Date.now().toString().slice(-12).padStart(12, '0');
@@ -1083,6 +1083,7 @@
                             const files = self._pond.getFiles();
                             self._pondFileCount = files.length;
                             // Gerar previews locais para a step 4 (revisão)
+                            self.previews.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { console.error('[EasyStock]', e); } });
                             self.previews = [];
                             files.forEach(f => {
                                 if (f.file && f.file.type?.startsWith('image/')) {
@@ -1116,7 +1117,7 @@
                             variacoes: this.variacoes, caracteristicas: this.caracteristicas,
                             embalagens: this.embalagens, savedAt: Date.now()
                         }));
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
                 _applyDraft(d) {
                     if (d.nome) this.nome = d.nome;
@@ -1155,7 +1156,7 @@
                             return;
                         }
                         this._applyDraft(d);
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
                 _clearDraft() {
                     clearTimeout(this._draftTimer);
@@ -1163,10 +1164,10 @@
                         sessionStorage.removeItem(this._draftKey);
                         // Marca o momento do submit para ignorar rascunhos residuais (ex: bfcache)
                         sessionStorage.setItem(this._draftKey + '_cleared', Date.now().toString());
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
                 hasDraft() {
-                    try { return !!sessionStorage.getItem(this._draftKey); } catch { return false; }
+                    try { return !!sessionStorage.getItem(this._draftKey); } catch (e) { console.error('[EasyStock]', e); return false; }
                 },
                 limparRascunho() {
                     if (!confirm('Limpar rascunho e começar do zero?')) return;
@@ -1233,7 +1234,7 @@
                                     try {
                                         const obj = JSON.parse(raw);
                                         if (obj.texto) this.descricao += obj.texto;
-                                    } catch {}
+                                    } catch (e) { console.error('[EasyStock]', e); }
                                 }
                             }
                         } catch (e) {
@@ -1359,7 +1360,7 @@ previews: [],      // URLs de preview locais dos arquivos no FilePond
                                 if (line.startsWith('data: ')) this.descricao += line.slice(6);
                             }
                         }
-                    } catch { /* silently fail */ }
+                    } catch (e) { console.error('[EasyStock]', e); }
                     this.aiGenerating = false;
                 },
 

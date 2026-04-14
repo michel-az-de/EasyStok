@@ -167,19 +167,21 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId)
         {
-            var query = dbContext.ItensEstoque
-                .Where(i => i.EmpresaId == empresaId &&
-                            i.ProdutoId == produtoId &&
-                            (int)i.QuantidadeAtual > 0);
+            // FOR UPDATE garante serialização: requests concorrentes aguardam o lock
+            // antes de ler a quantidade, evitando estoque negativo.
+            var varFilter = produtoVariacaoId.HasValue
+                ? $"AND \"ProdutoVariacaoId\" = '{produtoVariacaoId.Value}'"
+                : "AND \"ProdutoVariacaoId\" IS NULL";
 
-            if (produtoVariacaoId.HasValue)
-                query = query.Where(i => i.ProdutoVariacaoId == produtoVariacaoId.Value);
-            else
-                query = query.Where(i => i.ProdutoVariacaoId == null);
-
-            return await query
-                .OrderBy(i => i.EntradaEm)
-                .ThenBy(i => i.CriadoEm)
+            return await dbContext.ItensEstoque
+                .FromSqlRaw($@"
+                    SELECT * FROM itens_estoque
+                    WHERE ""EmpresaId"" = {{0}}
+                      AND ""ProdutoId"" = {{1}}
+                      AND ""QuantidadeAtual"" > 0
+                      {varFilter}
+                    ORDER BY ""EntradaEm"", ""CriadoEm""
+                    FOR UPDATE", empresaId, produtoId)
                 .ToListAsync();
         }
 

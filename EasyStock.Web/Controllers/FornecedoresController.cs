@@ -35,8 +35,8 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
             FiltroStatus = status
         };
 
-        if (result.Success)
-            vm.Items = result.Data!;
+        if (result.Success && result.Data is not null)
+            vm.Items = result.Data;
 
         return View(vm);
     }
@@ -59,16 +59,17 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         var result = await svc.ObterAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
-        var vm = new FornecedorDetailViewModel { Fornecedor = result.Data! };
+        if (result.Data is null) return RedirectToAction(nameof(Index));
+        var vm = new FornecedorDetailViewModel { Fornecedor = result.Data };
 
         var historicoResult = await svc.ObterHistoricoAsync(id);
-        if (historicoResult.Success)
-            vm.Historico = historicoResult.Data!;
+        if (historicoResult.Success && historicoResult.Data is not null)
+            vm.Historico = historicoResult.Data;
 
         var estatisticasResult = await svc.ObterEstatisticasAsync(id);
-        if (estatisticasResult.Success)
+        if (estatisticasResult.Success && estatisticasResult.Data is not null)
         {
-            var stats = estatisticasResult.Data!;
+            var stats = estatisticasResult.Data;
             vm.TotalGasto = stats.TotalGasto;
             vm.LeadRealMedio = stats.LeadTimeRealMedioDias;
             vm.QuantidadePedidos = stats.QuantidadePedidos;
@@ -92,7 +93,7 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         Toast("success", "Fornecedor criado com sucesso!");
-        return RedirectToAction(nameof(Detail), new { id = result.Data!.Id });
+        return RedirectToAction(nameof(Detail), new { id = result.Data?.Id });
     }
 
     [HttpPost("/fornecedores/json")]
@@ -110,7 +111,7 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (!result.Success)
             return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar fornecedor." });
 
-        return Ok(new { success = true, id = result.Data!.Id });
+        return Ok(new { success = true, id = result.Data?.Id });
     }
 
     [HttpPost("/fornecedores/{id}")]

@@ -123,5 +123,5 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
     }
 
     private static string Csv(string? value) =>
-        value is null ? "" : $"\"{value.Replace("\"", "\"\"")}\"";
+        value is null ? "" : $"\"{value.Replace("\"", "\"\"").Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ")}\"";
 }

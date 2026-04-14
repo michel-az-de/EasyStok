@@ -10,6 +10,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task InsertAsync(MovimentacaoEstoque movimentacao);
         Task InsertRangeAsync(IEnumerable<MovimentacaoEstoque> movimentacoes);
         Task<MovimentacaoEstoque?> GetByIdAsync(Guid id);
+        /// <summary>Busca movimentação com lock pessimista (FOR UPDATE) para evitar duplo estorno.</summary>
+        Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id);
         Task UpdateAsync(MovimentacaoEstoque movimentacao);
         Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(
             Guid empresaId,
@@ -26,7 +28,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
             TipoMovimentacaoEstoque? tipo = null,
             NaturezaMovimentacaoEstoque? natureza = null);
         Task<IEnumerable<MovimentacaoEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
-        Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId);
+        Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid empresaId, Guid itemEstoqueId);
         Task<decimal> GetTaxaSaidaDiariaAsync(Guid empresaId, Guid? produtoId, DateTime de, DateTime ate);
         Task<IReadOnlyDictionary<Guid, decimal>> GetTaxaSaidaDiariaPorProdutoAsync(Guid empresaId, IEnumerable<Guid> produtoIds, DateTime de, DateTime ate);
         Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(Guid empresaId, Guid produtoId, int meses = 12);

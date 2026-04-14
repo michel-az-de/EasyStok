@@ -31,7 +31,8 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             if (command.MovimentacaoId == Guid.Empty)
                 throw new UseCaseValidationException("MovimentacaoId é obrigatório.");
 
-            var original = await movimentacaoRepository.GetByIdAsync(command.MovimentacaoId)
+            // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
+            var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)
                 ?? throw new UseCaseValidationException("Movimentacao nao encontrada.");
 
             if (original.EmpresaId != command.EmpresaId)

@@ -23,6 +23,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(m => m.ItemEstoque)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
+        public async Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id) =>
+            await dbContext.MovimentacoesEstoque
+                .FromSqlRaw("SELECT * FROM movimentacoes_estoque WHERE \"Id\" = {0} FOR UPDATE", id)
+                .FirstOrDefaultAsync();
+
         public Task UpdateAsync(MovimentacaoEstoque movimentacao)
         {
             dbContext.MovimentacoesEstoque.Update(movimentacao);
@@ -94,10 +99,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             return query;
         }
 
-        public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId) =>
+        public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid empresaId, Guid itemEstoqueId) =>
             await dbContext.MovimentacoesEstoque
                 .AsNoTracking()
-                .Where(m => m.ItemEstoqueId == itemEstoqueId)
+                .Where(m => m.EmpresaId == empresaId && m.ItemEstoqueId == itemEstoqueId)
                 .OrderByDescending(m => m.DataMovimentacao)
                 .ToListAsync();
 

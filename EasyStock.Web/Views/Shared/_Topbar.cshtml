@@ -191,7 +191,7 @@
                         this.results = Array.isArray(data) ? data : [];
                         this.semResultados = this.results.length === 0;
                         this.activeIdx = 0;
-                    } catch {
+                    } catch (e) { console.error('[EasyStock]', e);
                         this.results = [];
                         this.semResultados = true;
                     } finally {
@@ -398,7 +398,7 @@
                         ]);
                         this.items = Array.isArray(rItems) ? rItems : [];
                         this.resumo = rResumo;
-                    } catch { this.items = []; this.erro = true; }
+                    } catch (e) { console.error('[EasyStock]', e); this.items = []; this.erro = true; }
                     this.loading = false;
                 },
                 async marcarLida(id) {
@@ -416,7 +416,7 @@
                             if (c > 0) { badge.textContent = c > 99 ? '99+' : c; }
                             else { badge.classList.add('hidden'); }
                         }
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
                 severidadeBorder(s) {
                     const m = { Critica: 'border-l-4 border-red-500', Alta: 'border-l-4 border-orange-500', Media: 'border-l-4 border-yellow-400', Informativa: 'border-l-4 border-slate-300' };
@@ -500,7 +500,7 @@
                         },
                         body: form.toString()
                     });
-                } catch { }
+                } catch (e) { console.error('[EasyStock]', e); }
             },
             refreshToggle(theme) {
                 const isDark = theme === 'dark';
@@ -529,7 +529,7 @@
                 const c = data.totalNaoLidas || 0;
                 if (c > 0) { badge.textContent = c > 99 ? '99+' : c; badge.classList.remove('hidden'); }
                 else { badge.classList.add('hidden'); }
-            }).catch(() => {});
+            }).catch((e) => { console.error('[EasyStock]', e); });
         });
     </script>
 

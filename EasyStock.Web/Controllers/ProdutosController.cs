@@ -8,6 +8,8 @@ namespace EasyStock.Web.Controllers;
 
 public class ProdutosController(ProdutosService svc, SessionService session) : BaseController(session)
 {
+    private const int PageSize = 20;
+
     [HttpGet("/produtos")]
     public async Task<IActionResult> Index(int page = 1, string? search = null, string? categoria = null, string? status = null)
     {
@@ -25,11 +27,11 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         }
         else
         {
-            var result = await svc.ListarAsync(page, 21);
+            var result = await svc.ListarAsync(page, PageSize + 1);
             if (HasError(result)) return View(new ProdutosListViewModel());
             items = result.Data!;
-            hasMore = items.Count > 20;
-            if (hasMore) items = items.Take(20).ToList();
+            hasMore = items.Count > PageSize;
+            if (hasMore) items = items.Take(PageSize).ToList();
         }
 
         var vm = new ProdutosListViewModel
@@ -292,7 +294,20 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (!uploadResult.Success)
             return Json(new { ok = false, erro = uploadResult.ErrorMessage ?? "Erro ao enviar foto." });
 
-        // Re-busca o produto para obter URL e ID da foto recém-enviada
+        // Extrair fotoId e url diretamente do resultado da API (evita re-fetch com race condition)
+        if (uploadResult.Data is System.Text.Json.JsonElement je)
+        {
+            var fotoId = je.TryGetProperty("fileId", out var fid) ? fid.GetString()
+                       : je.TryGetProperty("FileId", out var fid2) ? fid2.GetString()
+                       : null;
+            var url = je.TryGetProperty("url", out var u) ? u.GetString()
+                    : je.TryGetProperty("Url", out var u2) ? u2.GetString()
+                    : null;
+            if (fotoId is not null && url is not null)
+                return Json(new { ok = true, fotoId, url });
+        }
+
+        // Fallback: re-busca o produto (menos seguro para uploads concorrentes)
         var prod = await svc.ObterAsync(id);
         if (prod.Success && prod.Data?.Fotos.Count > 0)
         {
@@ -346,13 +361,4 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Categorias = cats.Success ? cats.Data : [];
     }
 
-    private static string GerarSkuUnico(string? nome)
-    {
-        var words = (nome ?? "PRD").Trim().ToUpper().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var parts = words.Take(3).Select(w => new string(w.Where(char.IsLetterOrDigit).Take(3).ToArray())).Where(p => p.Length > 0);
-        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        var suffix = new string(Enumerable.Range(0, 6).Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
-        var prefix = string.Join("-", parts);
-        return string.IsNullOrEmpty(prefix) ? suffix : $"{prefix}-{suffix}";
-    }
 }

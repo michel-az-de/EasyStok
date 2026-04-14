@@ -42,7 +42,7 @@ internal static class FotoJsonHelper
                 return u2.GetString();
             return null;
         }
-        catch { return null; }
+        catch (JsonException) { return null; }
     }
 }
 

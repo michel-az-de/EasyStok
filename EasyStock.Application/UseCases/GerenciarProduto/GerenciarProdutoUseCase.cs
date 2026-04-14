@@ -217,6 +217,7 @@ public sealed class GerenciarProdutoUseCase(
                         Descricao = input.Descricao?.Trim(),
                         QuantidadeReferencia = input.QuantidadeReferencia,
                         VariacaoPadrao = input.VariacaoPadrao?.Trim(),
+                        VariacaoId = input.VariacaoId,
                         OrdemExibicao = input.OrdemExibicao,
                         CriadoEm = agora,
                         AlteradoEm = agora
@@ -436,7 +437,14 @@ public sealed class GerenciarProdutoUseCase(
         if (string.IsNullOrWhiteSpace(fotosJson))
             return [];
 
-        return JsonSerializer.Deserialize<List<ProdutoFotoMetadata>>(fotosJson) ?? [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProdutoFotoMetadata>>(fotosJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     internal static string SerializarFotos(IEnumerable<ProdutoFotoMetadata> fotos) =>

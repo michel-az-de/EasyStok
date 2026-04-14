@@ -107,6 +107,6 @@ public class MovimentacaoController(
         if (item is null)
             return DataNotFound();
 
-        return DataOk(await movimentacaoRepository.GetByItemEstoqueAsync(itemEstoqueId));
+        return DataOk(await movimentacaoRepository.GetByItemEstoqueAsync(resolvedEmpresaId, itemEstoqueId));
     }
 }

@@ -284,7 +284,7 @@
                         this.controlaValidade = d.controlaValidade || false;
                         this.calcularTotal();
                         this.step = 2;
-                    } catch {}
+                    } catch (e) { console.error('[EasyStock]', e); }
                 },
 
                 async buscarProduto() {
@@ -334,7 +334,7 @@
                         } else {
                             window.showToast('Erro ao carregar detalhes do produto. Tente novamente.', 'error');
                         }
-                    } catch {
+                    } catch (e) { console.error('[EasyStock]', e);
                         window.showToast('Não foi possível conectar ao servidor.', 'error');
                     }
                     if (detailOk) {
@@ -377,7 +377,7 @@
                             this.erroMsg = data.errorMessage || 'Erro ao registrar entrada. Tente novamente.';
                             window.showToast(this.erroMsg, 'error', 4000);
                         }
-                    } catch {
+                    } catch (e) { console.error('[EasyStock]', e);
                         this.erroMsg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
                         window.showToast(this.erroMsg, 'error', 4000);
                     } finally {

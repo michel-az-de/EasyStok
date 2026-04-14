@@ -195,6 +195,9 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
     public async Task<MovimentacaoEstoque?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
+    // MongoDB não suporta FOR UPDATE; lock implementado apenas em PostgreSQL
+    public Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id) => GetByIdAsync(id);
+
     public Task UpdateAsync(MovimentacaoEstoque movimentacao)
     {
         EnqueueReplace(Collection, movimentacao.Id, movimentacao);
@@ -224,8 +227,8 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
         return (items, total);
     }
 
-    public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid itemEstoqueId) =>
-        await Collection.Find(x => x.ItemEstoqueId == itemEstoqueId)
+    public async Task<IEnumerable<MovimentacaoEstoque>> GetByItemEstoqueAsync(Guid empresaId, Guid itemEstoqueId) =>
+        await Collection.Find(x => x.EmpresaId == empresaId && x.ItemEstoqueId == itemEstoqueId)
             .SortByDescending(x => x.DataMovimentacao)
             .ToListAsync();
 
