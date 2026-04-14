@@ -381,47 +381,93 @@
         </div>
     </div>
 
-    <!-- ═══ TAB: FOTOS (auto-save) ═══ -->
+    <!-- ═══ TAB: FOTOS ═══ -->
     <div x-show="tab==='fotos'">
         <div class="ws produto-detail-tab-card produto-detail-photos-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="font-bold text-slate-800">Fotos do produto</h3>
-                <span class="text-xs text-slate-400" x-text="photos.length + '/5'"></span>
+                <div>
+                    <h3 class="font-bold text-slate-800">Fotos do produto</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">A primeira foto é usada como capa. Máx. 5 fotos (JPEG, PNG, WebP — 10 MB cada).</p>
+                </div>
+                <span class="text-sm font-semibold tabular-nums"
+                      :class="photos.length===0?'text-slate-300':photos.length>=5?'text-emerald-600':'text-slate-500'"
+                      x-text="photos.length + '/5'"></span>
             </div>
 
-            <!-- Grid de fotos existentes -->
-            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 mb-3">
-                <template x-for="foto in photos" :key="foto.fotoId">
-                    <div class="relative group aspect-square rounded-xl overflow-hidden border-2 border-slate-200 hover:border-slate-300 transition-all">
-                        <img :src="foto.url" class="w-full h-full object-cover"
-                             onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                        <div class="w-full h-full items-center justify-center bg-slate-100 text-slate-400" style="display:none;">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
+<!-- Grade de fotos + slot de upload integrado -->
+<div class="grid grid-cols-3 sm:grid-cols-5 gap-3"
+     @@dragover.prevent="_dragOver=true"
+     @@dragleave="_dragOver=false"
+     @@drop.prevent="handleDrop($event)">
+
+    <!-- Fotos existentes -->
+    <template x-for="(foto, idx) in photos" :key="foto.fotoId">
+        <div class="relative group aspect-square rounded-xl overflow-hidden ring-2 transition-all"
+             :class="idx===0 ? 'ring-indigo-400 shadow-md shadow-indigo-100' : 'ring-slate-200 hover:ring-slate-300'">
+            <img :src="foto.url" class="w-full h-full object-cover" />
+            <!-- Capa badge -->
+            <span x-show="idx===0"
+                  class="absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-wide bg-indigo-600 text-white px-1.5 py-0.5 rounded-full shadow">
+                Capa
+            </span>
+            <!-- Overlay hover -->
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                <button type="button" @@click="deletePhoto(foto.fotoId)"
+                        :disabled="_deletingPhoto"
+                        class="opacity-0 group-hover:opacity-100 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95"
+                        title="Remover foto">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </template>
                         </div>
-                        <button type="button" @@click="deletePhoto(foto.fotoId)"
-                                class="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500/90 text-white rounded-full text-[11px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-sm transition-all"
-                                title="Remover foto">
-                            x
-                        </button>
                     </div>
                 </template>
+
+                <!-- Slot de upload em progresso -->
+                <div x-show="_uploading" class="relative aspect-square rounded-xl overflow-hidden bg-slate-100 ring-2 ring-indigo-200">
+                    <img x-show="_previewUrl" :src="_previewUrl" class="w-full h-full object-cover opacity-30" />
+                    <div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <svg class="animate-spin w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        <span class="text-[11px] font-semibold text-indigo-600" x-text="_uploadPct < 100 ? _uploadPct + '%' : 'Salvando...'"></span>
+                    </div>
+                    <!-- Barra de progresso na base -->
+                    <div class="absolute bottom-0 left-0 h-1 bg-indigo-500 transition-all duration-200 rounded-b-xl"
+                         :style="'width:' + _uploadPct + '%'"></div>
+                </div>
+
+                <!-- Botão "Adicionar" (slot vazio) -->
+                <button type="button" x-show="photos.length < 5 && !_uploading"
+                        @@click="$refs.photoInput.click()"
+                        :class="_dragOver ? 'border-indigo-400 bg-indigo-50 scale-[1.02]' : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50'"
+                        class="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all group cursor-pointer">
+                    <div class="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center transition-colors">
+                        <svg class="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[11px] font-medium text-slate-400 group-hover:text-indigo-500 transition-colors">Adicionar</span>
+                </button>
             </div>
 
-            <!-- FilePond upload (abaixo do grid) -->
-            <div x-show="photos.length < 5" class="produto-detail-upload mb-2">
-                <input type="file" x-ref="pondInputDetail" />
-            </div>
+<!-- Input oculto -->
+<input type="file" x-ref="photoInput" accept="image/jpeg,image/png,image/webp"
+       class="sr-only" @@change="handleFileSelect($event)" />
 
-            <!-- Empty state -->
-            <div x-show="photos.length===0" class="text-center py-10 text-slate-400">
-                <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <p class="text-sm font-medium text-slate-500 mb-1">Nenhuma foto cadastrada</p>
-                <p class="text-xs">Arraste fotos acima ou clique para selecionar (JPEG, PNG, WebP — max. 10 MB cada)</p>
-            </div>
+            <!-- Dica de drag & drop -->
+            <p x-show="photos.length < 5 && !_uploading" class="text-center text-xs text-slate-300 mt-3 select-none">
+                ↑ Ou arraste uma foto diretamente nesta área
+            </p>
+            <!-- Limite atingido -->
+            <p x-show="photos.length >= 5" class="text-center text-xs text-emerald-500 font-medium mt-3">
+                ✓ Limite de 5 fotos atingido
+            </p>
         </div>
     </div>
 
@@ -651,23 +697,7 @@
 
 </div>
 
-@section Styles {
-    <link href="https://unpkg.com/filepond@@^4/dist/filepond.min.css" rel="stylesheet" />
-    <link href="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.css" rel="stylesheet" />
-}
-
 @section Scripts {
-    <script src="https://unpkg.com/filepond-plugin-image-preview@@^4/dist/filepond-plugin-image-preview.min.js"></script>
-    <script src="https://unpkg.com/filepond-plugin-file-validate-type@@^1/dist/filepond-plugin-file-validate-type.min.js"></script>
-    <script src="https://unpkg.com/filepond-plugin-file-validate-size@@^2/dist/filepond-plugin-file-validate-size.min.js"></script>
-    <script src="https://unpkg.com/filepond@@^4/dist/filepond.min.js"></script>
-    <script>
-        FilePond.registerPlugin(
-            FilePondPluginImagePreview,
-            FilePondPluginFileValidateType,
-            FilePondPluginFileValidateSize
-        );
-    </script>
     @if (!string.IsNullOrEmpty(p.CodigoBarras))
     {
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -695,10 +725,13 @@
                     return this.photos[idx]?.url ?? '';
                 },
 
-                // ── Photos management (FilePond) ──
+                // ── Photos management (custom upload) ──
                 photos: initialPhotos.map(f => ({ ...f, toDelete: false })),
-                _pond: null,
-                _uploadedUrls: {},
+                _uploading: false,
+                _uploadPct: 0,
+                _previewUrl: null,
+                _dragOver: false,
+                _uploadXhr: null,
 
                 init() {
                     const t = new URLSearchParams(window.location.search).get('tab');
@@ -706,100 +739,85 @@
                         this.tab = t;
                         if (t === 'historico') this.loadHistorico();
                     }
+                },
 
-                    // Inicializar FilePond na aba de fotos (guard contra dupla inicialização)
-                    this.$nextTick(() => {
-                        if (this._pond) return;
-                        const self = this;
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                handleFileSelect(e) {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) this.uploadFile(file);
+                },
 
-                        this._pond = FilePond.create(this.$refs.pondInputDetail, {
-                            allowMultiple: true,
-                            maxFiles: 5 - this.photos.length,
-                            acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
-                            maxFileSize: '10MB',
-                            labelIdle: 'Arraste novas fotos ou <span class="filepond--label-action">selecione</span>',
-                            labelMaxFileSizeExceeded: 'Arquivo muito grande',
-                            labelMaxFileSize: 'Tamanho maximo: {filesize}',
-                            labelFileTypeNotAllowed: 'Tipo nao permitido',
-                            fileValidateTypeLabelExpectedTypes: 'Aceitos: JPEG, PNG, WebP',
-                            labelFileProcessingComplete: 'Enviada!',
-                            labelTapToCancel: 'toque para cancelar',
-                            labelTapToRetry: 'toque para tentar novamente',
-                            labelTapToUndo: 'toque para desfazer',
-                            credits: false,
+                handleDrop(e) {
+                    this._dragOver = false;
+                    if (this._uploading || this.photos.length >= 5) return;
+                    const file = [...(e.dataTransfer?.files ?? [])].find(f =>
+                        ['image/jpeg','image/png','image/webp'].includes(f.type));
+                    if (!file) { window.showToast('Tipo não aceito. Use JPEG, PNG ou WebP.', 'warning'); return; }
+                    if (file.size > 10 * 1024 * 1024) { window.showToast('Arquivo muito grande (máx. 10 MB).', 'warning'); return; }
+                    this.uploadFile(file);
+                },
 
-                            server: {
-                                process: (fieldName, file, metadata, load, error, progress, abort) => {
-                                    const fd = new FormData();
-                                    fd.append('foto', file);
-                                    fd.append('__RequestVerificationToken', csrfToken);
+                uploadFile(file) {
+                    if (this._uploading || this.photos.length >= 5) return;
 
-                                    const xhr = new XMLHttpRequest();
-                                    xhr.open('POST', '/produtos/' + prodId + '/fotos/ajax');
+                    // Validações client-side
+                    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+                        window.showToast('Tipo não aceito. Use JPEG, PNG ou WebP.', 'warning');
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        window.showToast('Arquivo muito grande (máx. 10 MB).', 'warning');
+                        return;
+                    }
 
-                                    xhr.upload.onprogress = (e) => {
-                                        progress(e.lengthComputable, e.loaded, e.total);
-                                    };
+                    // Preview local imediato
+                    const reader = new FileReader();
+                    reader.onload = (e) => { this._previewUrl = e.target.result; };
+                    reader.readAsDataURL(file);
 
-                                    xhr.onload = function () {
-                                        if (xhr.status >= 200 && xhr.status < 300) {
-                                            try {
-                                                const data = JSON.parse(xhr.responseText);
-                                                if (data.ok) {
-                                                    self._uploadedUrls[data.fotoId] = data.url;
-                                                    load(data.fotoId);
-                                                } else {
-                                                    error(data.erro || 'Erro ao enviar foto');
-                                                }
-                                            } catch { error('Resposta invalida do servidor'); }
-                                        } else {
-                                            error('Erro no servidor (' + xhr.status + ')');
-                                        }
-                                    };
+                    this._uploading = true;
+                    this._uploadPct = 0;
 
-                                    xhr.onerror = () => error('Erro de conexao');
-                                    xhr.send(fd);
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                    const fd = new FormData();
+                    fd.append('foto', file);
+                    fd.append('__RequestVerificationToken', token);
 
-                                    return { abort: () => { xhr.abort(); abort(); } };
-                                },
+                    const xhr = new XMLHttpRequest();
+                    this._uploadXhr = xhr;
+                    xhr.open('POST', '/produtos/' + prodId + '/fotos/ajax');
 
-                                revert: (uniqueFileId, load, error) => {
-                                    const fd = new FormData();
-                                    fd.append('__RequestVerificationToken', csrfToken);
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable)
+                            this._uploadPct = Math.round((e.loaded / e.total) * 95); // para em 95% até o servidor responder
+                    };
 
-                                    fetch('/produtos/' + prodId + '/fotos/' + uniqueFileId + '/remover', {
-                                        method: 'POST', body: fd
-                                    })
-                                    .then(r => r.json())
-                                    .then(data => {
-                                        if (data.ok) {
-                                            self.photos = self.photos.filter(p => p.fotoId !== uniqueFileId);
-                                            if (self._pond) self._pond.maxFiles = 5 - self.photos.length;
-                                            load();
-                                        } else {
-                                            error(data.erro || 'Erro ao remover');
-                                        }
-                                    })
-                                    .catch(() => error('Erro de conexao'));
-                                }
-                            }
-                        });
-
-                        // Quando upload completa → adicionar foto à galeria
-                        this._pond.on('processfile', (err, file) => {
-                            if (!err && file.serverId) {
-                                const fotoId = file.serverId;
-                                const url = self._uploadedUrls[fotoId] || '';
-                                delete self._uploadedUrls[fotoId];
-                                self.photos = [...self.photos, { fotoId, url, toDelete: false }];
-                                if (self._pond) self._pond.maxFiles = 5 - self.photos.length;
-                                // Remover item do FilePond após delay (já está na galeria)
-                                setTimeout(() => { try { self._pond.removeFile(file.id); } catch {} }, 500);
+                    xhr.onload = () => {
+                        this._uploadPct = 100;
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+                                this.photos = [...this.photos, { fotoId: data.fotoId, url: data.url, toDelete: false }];
                                 window.showToast('Foto adicionada!', 'success');
+                            } else {
+                                window.showToast(data.erro || 'Erro ao enviar foto.', 'error');
                             }
-                        });
-                    });
+                        } catch {
+                            window.showToast('Resposta inválida do servidor.', 'error');
+                        }
+                        this._uploading = false;
+                        this._previewUrl = null;
+                        this._uploadXhr = null;
+                    };
+
+                    xhr.onerror = () => {
+                        window.showToast('Erro de conexão ao enviar foto.', 'error');
+                        this._uploading = false;
+                        this._previewUrl = null;
+                        this._uploadXhr = null;
+                    };
+
+                    xhr.send(fd);
                 },
 
                 _deletingPhoto: false,
@@ -816,7 +834,6 @@
                         if (!d.ok) throw new Error(d.erro ?? 'Erro');
                         this.photos = this.photos.filter(x => x.fotoId !== fotoId);
                         if (this.selectedPhotoIdx >= this.photos.length) this.selectedPhotoIdx = Math.max(0, this.photos.length - 1);
-                        if (this._pond) this._pond.maxFiles = 5 - this.photos.length;
                         window.showToast('Foto removida.', 'success');
                     } catch (err) {
                         window.showToast('Erro ao remover foto.', 'error');
@@ -838,7 +855,7 @@
                 },
 
                 destroy() {
-                    if (this._pond) this._pond.destroy();
+                    if (this._uploadXhr) { this._uploadXhr.abort(); }
                 },
             };
         }
