@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums;
@@ -26,9 +27,14 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
     {
         public async Task<AutenticarUsuarioResult> ExecuteAsync(AutenticarUsuarioCommand command)
         {
+            var swTotal = Stopwatch.StartNew();
             logger.LogDebug("Tentativa de autenticacao para o email: {Email}", command.Email);
 
+            // --- etapa 1: query do usuário
+            var swDb = Stopwatch.StartNew();
             var usuario = await usuarioRepository.GetByEmailAsync(command.Email);
+            swDb.Stop();
+            logger.LogDebug("Login etapa DB query: {ElapsedMs}ms", swDb.ElapsedMilliseconds);
 
             if (usuario is null || !usuario.Ativo)
                 throw new CredenciaisInvalidasException();
@@ -39,7 +45,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(command.Senha, usuario.SenhaHash))
+            // --- etapa 2: verificação bcrypt (CPU-bound ~200-800ms dependendo do work factor)
+            var swHash = Stopwatch.StartNew();
+            var senhaOk = BCrypt.Net.BCrypt.Verify(command.Senha, usuario.SenhaHash);
+            swHash.Stop();
+            logger.LogDebug("Login etapa bcrypt verify: {ElapsedMs}ms", swHash.ElapsedMilliseconds);
+
+            if (!senhaOk)
             {
                 usuario.IncrementarTentativasFalha();
                 if (usuario.FailedLoginAttempts >= 5)
@@ -85,10 +97,18 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 }
             }
 
+            // --- etapa 3: atualizar último acesso
+            var swUpdate = Stopwatch.StartNew();
             usuario.AtualizarUltimoAcesso();
             await usuarioRepository.UpdateAsync(usuario);
+            await unitOfWork.CommitAsync();
+            swUpdate.Stop();
 
-            logger.LogInformation("Autenticacao bem-sucedida para o usuario: {UsuarioId}", usuario.Id);
+            swTotal.Stop();
+            logger.LogInformation(
+                "Autenticacao bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms update={UpdateMs}ms)",
+                usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds,
+                swHash.ElapsedMilliseconds, swUpdate.ElapsedMilliseconds);
 
             return new AutenticarUsuarioResult(
                 UsuarioId: usuario.Id,

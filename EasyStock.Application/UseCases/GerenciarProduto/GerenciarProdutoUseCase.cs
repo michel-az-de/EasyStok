@@ -315,11 +315,22 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task<ProdutoDetalheResult> ObterDetalheAsync(Guid empresaId, Guid produtoId)
     {
+        // Cache de 5 minutos — detalhe de produto inclui fotos, variações e itens de estoque (queries pesadas)
+        if (cacheService is not null)
+        {
+            var cached = await cacheService.GetAsync<ProdutoDetalheResult>(CacheKeys.Produto(empresaId, produtoId));
+            if (cached is not null) return cached;
+        }
+
         var produto = await produtoRepository.GetDetalheAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
-        var itens = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
-        var variacoes = await produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
+        // Executa as duas queries em paralelo
+        var itensTask    = itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
+        var variacoesTask = produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
+        await Task.WhenAll(itensTask, variacoesTask);
+        var itens    = await itensTask;
+        var variacoes = await variacoesTask;
         var fotos = DesserializarFotos(produto.FotosJson);
 
         var variacoesResult = variacoes
@@ -376,6 +387,11 @@ public sealed class GerenciarProdutoUseCase(
             variacoesResult,
             caracteristicasResult,
             embalagensResult);
+
+        if (cacheService is not null)
+            await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));
+
+        return result;
     }
 
     public async Task<IReadOnlyCollection<ProdutoHistoricoItemResult>> ObterHistoricoAsync(Guid empresaId, Guid produtoId)

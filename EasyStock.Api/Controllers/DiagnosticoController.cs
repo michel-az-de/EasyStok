@@ -229,71 +229,124 @@ public sealed class DiagnosticoController(
         }
     }
 
+    /// <summary>
+    /// SSE stream de logs em tempo real. O cliente conecta uma única vez e recebe
+    /// eventos "log-batch" a cada 3 segundos com apenas os logs novos (delta).
+    /// Substitui o polling HTTP que gerava 29+ alertas de slow_endpoint.
+    /// </summary>
     [HttpGet("logs/live")]
-    public IActionResult LiveLogs([FromQuery] string? since = null)
+    public async Task LiveLogs([FromQuery] string? since = null, CancellationToken ct = default)
     {
-        var cutoff = DateTimeOffset.TryParse(since, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
-            ? parsed.UtcDateTime
-            : DateTime.UtcNow.AddMinutes(-5);
-
         var logsDir = GetLogDirectory();
-        if (!Directory.Exists(logsDir))
-            return Ok(new { rows = Array.Empty<string>(), count = 0 });
 
-        try
+        Response.ContentType  = "text/event-stream";
+        Response.Headers["Cache-Control"]     = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no"; // desabilita buffer do nginx/proxy
+
+        var cursor = DateTimeOffset.TryParse(since, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+            ? parsed.UtcDateTime
+            : DateTime.UtcNow.AddMinutes(-2);
+
+        // Envia comentário keep-alive para o cliente saber que a conexão está viva
+        await Response.WriteAsync(": connected\n\n", ct);
+        await Response.Body.FlushAsync(ct);
+
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+
+        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            var dir = new DirectoryInfo(logsDir);
-            var logFiles = dir.GetFiles("easystock-*.log")
-                .Where(f => f.LastWriteTimeUtc >= cutoff.AddHours(-1))
-                .OrderBy(f => f.Name)
-                .ToList();
-
-            var allEntries = new List<EnhancedLogEntry>();
-            foreach (var file in logFiles)
+            try
             {
-                allEntries.AddRange(DiagnosticoLogAnalyzer.ParseEnhancedLogFile(file.FullName, cutoff));
-                if (allEntries.Count > 200) break;
+                if (!Directory.Exists(logsDir))
+                {
+                    await Response.WriteAsync(": no-log-dir\n\n", ct);
+                    await Response.Body.FlushAsync(ct);
+                    continue;
+                }
+
+                var dir        = new DirectoryInfo(logsDir);
+                var logFiles   = dir.GetFiles("easystock-*.log")
+                    .Where(f => f.LastWriteTimeUtc >= cursor.AddHours(-1))
+                    .OrderBy(f => f.Name)
+                    .ToList();
+
+                var newEntries = new List<EnhancedLogEntry>();
+                foreach (var file in logFiles)
+                {
+                    newEntries.AddRange(DiagnosticoLogAnalyzer.ParseEnhancedLogFile(file.FullName, cursor));
+                    if (newEntries.Count >= 100) break;
+                }
+
+                newEntries = newEntries.TakeLast(100).ToList();
+
+                if (newEntries.Count > 0)
+                {
+                    cursor = newEntries.Max(e => e.Timestamp).AddMilliseconds(1);
+
+                    var rows = newEntries.Select(e =>
+                    {
+                        var levelClass = e.Level switch
+                        {
+                            "ERROR" or "FATAL" => "log-error",
+                            "WARN"             => "log-warn",
+                            "DEBUG"            => "log-debug",
+                            _                  => "log-info"
+                        };
+                        var cat = e.Categoria switch
+                        {
+                            "http_request" => $"<span class='log-cat cat-http'>{e.HttpMethod} {e.StatusCode}</span>",
+                            "migration"    => "<span class='log-cat cat-migration'>MIGRATION</span>",
+                            "startup"      => "<span class='log-cat cat-startup'>STARTUP</span>",
+                            "error"        => "<span class='log-cat cat-error'>ERROR</span>",
+                            "db_operation" => "<span class='log-cat cat-db'>DB</span>",
+                            _              => ""
+                        };
+                        var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
+                        var msg     = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "…" : e.Message);
+                        var exc     = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
+                        return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
+                               $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
+                               $"<span class='log-level'>{e.Level}</span>" +
+                               $"{cat}{elapsed}" +
+                               $"<span class='log-msg'>{msg}</span>{exc}</div>";
+                    }).ToArray();
+
+                    var json    = System.Text.Json.JsonSerializer.Serialize(new { rows, count = rows.Length, cursor = cursor.ToString("O") });
+                    await Response.WriteAsync($"event: log-batch\ndata: {json}\n\n", ct);
+                }
+                else
+                {
+                    // keep-alive a cada tick sem dados novos
+                    await Response.WriteAsync($": heartbeat {DateTimeOffset.UtcNow:HH:mm:ss}\n\n", ct);
+                }
+
+                await Response.Body.FlushAsync(ct);
             }
-
-            var rows = allEntries.TakeLast(200).Select(e =>
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
             {
-                var levelClass = e.Level switch
-                {
-                    "ERROR" or "FATAL" => "log-error",
-                    "WARN" => "log-warn",
-                    "DEBUG" => "log-debug",
-                    _ => "log-info"
-                };
-                var cat = e.Categoria switch
-                {
-                    "http_request" => $"<span class='log-cat cat-http'>{e.HttpMethod} {e.StatusCode}</span>",
-                    "migration" => "<span class='log-cat cat-migration'>MIGRATION</span>",
-                    "startup" => "<span class='log-cat cat-startup'>STARTUP</span>",
-                    "error" => "<span class='log-cat cat-error'>ERROR</span>",
-                    "db_operation" => "<span class='log-cat cat-db'>DB</span>",
-                    _ => ""
-                };
-                var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
-                var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "..." : e.Message);
-                var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
-                return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
-                       $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
-                       $"<span class='log-level'>{e.Level}</span>" +
-                       $"{cat}{elapsed}" +
-                       $"<span class='log-msg'>{msg}</span>{exc}</div>";
-            }).ToArray();
-
-            return Ok(new { rows, count = rows.Length });
-        }
-        catch
-        {
-            return Ok(new { rows = Array.Empty<string>(), count = 0 });
+                logger.LogDebug(ex, "SSE logs/live: erro ao ler logs.");
+                try { await Response.WriteAsync($": error {ex.GetType().Name}\n\n", ct); await Response.Body.FlushAsync(ct); } catch { }
+            }
         }
     }
 
     [HttpGet("endpoints")]
     public async Task<IActionResult> TestEndpoints(CancellationToken ct)
     {
+        // Cache de 60s — o próprio teste consome ~4s; rodar a cada request degradaria a API
+        const string cacheKey = "diag:endpoints:v1";
+        try
+        {
+            var cached = await cache.GetStringAsync(cacheKey, ct);
+            if (cached is not null)
+            {
+                var cachedObj = System.Text.Json.JsonSerializer.Deserialize<object>(cached);
+                return Ok(cachedObj);
+            }
+        }
+        catch { /* cache indisponível — continua sem cache */ }
+
         // Determine self base URL
         var request = HttpContext.Request;
         var baseUrl = $"{request.Scheme}://{request.Host}";
@@ -367,14 +420,27 @@ public sealed class DiagnosticoController(
         var slow = results.Count(r => r.Status is "slow" or "very_slow");
         var failed = results.Count(r => r.Status is "error" or "timeout");
 
-        return Ok(new EndpointsTestResponse
+        var response = new EndpointsTestResponse
         {
             Resultados = results.ToArray(),
             Saudaveis = healthy,
             Lentos = slow,
             Falhas = failed,
             TestadoEm = DateTimeOffset.UtcNow
-        });
+        };
+
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(response);
+            await cache.SetStringAsync(cacheKey, json,
+                new Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+                }, ct);
+        }
+        catch { /* falha silenciosa no cache */ }
+
+        return Ok(response);
     }
 
     [HttpGet("historico")]

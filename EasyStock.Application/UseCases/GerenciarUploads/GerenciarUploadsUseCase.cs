@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.Common;
@@ -18,7 +19,8 @@ public sealed class GerenciarUploadsUseCase(
     IProdutoRepository produtoRepository,
     IUsuarioRepository usuarioRepository,
     ILojaRepository lojaRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICacheService? cacheService = null)
 {
     private static readonly HashSet<string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -59,6 +61,9 @@ public sealed class GerenciarUploadsUseCase(
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
 
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
+
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size, fotoId);
     }
 
@@ -80,6 +85,9 @@ public sealed class GerenciarUploadsUseCase(
 
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
     }
 
     public async Task<UploadedFileResult> UploadAvatarUsuarioAsync(Guid usuarioId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)

@@ -15,6 +15,7 @@ public static class BackgroundJobServiceCollectionExtensions
         services.TryAddSingleton<IPedidoFornecedorRecebimentoProcessor, NoOpPedidoFornecedorRecebimentoProcessor>();
 
         services.AddHostedService<AnalisadorEstoqueBackgroundService>();
+        services.AddHostedService<CacheWarmupService>();
 
         // Health snapshot service (singleton para ser injetado no DiagnosticoController)
         services.AddSingleton<HealthSnapshotService>();
