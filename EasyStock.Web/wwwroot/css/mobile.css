@@ -343,13 +343,8 @@
     }
 
     form[novalidate] .product-stepper-sticky {
-        position: sticky;
-        top: calc(var(--topbar-h) + env(safe-area-inset-top) + 10px);
+        position: relative;
         padding: 14px 16px !important;
-        background: rgba(9, 17, 31, 0.9) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
     }
 
     form[novalidate] .step-circle {
