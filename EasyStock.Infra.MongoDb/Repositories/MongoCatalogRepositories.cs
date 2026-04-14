@@ -249,6 +249,18 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
         EnqueueDelete(Collection, id);
         return Task.CompletedTask;
     }
+
+    public Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId)
+    {
+        var filter = Builders<ProdutoVariacao>.Filter.And(
+            Builders<ProdutoVariacao>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<ProdutoVariacao>.Filter.Eq(x => x.ProdutoId, produtoId));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? Collection.DeleteManyAsync(filter, ct)
+                : Collection.DeleteManyAsync(session, filter, null, ct));
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ProdutoCaracteristicaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -278,6 +290,18 @@ public sealed class ProdutoCaracteristicaRepository(MongoEasyStockContext contex
         EnqueueDelete(Collection, id);
         return Task.CompletedTask;
     }
+
+    public Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId)
+    {
+        var filter = Builders<ProdutoCaracteristica>.Filter.And(
+            Builders<ProdutoCaracteristica>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<ProdutoCaracteristica>.Filter.Eq(x => x.ProdutoId, produtoId));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? Collection.DeleteManyAsync(filter, ct)
+                : Collection.DeleteManyAsync(session, filter, null, ct));
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ProdutoEmbalagemRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -305,6 +329,18 @@ public sealed class ProdutoEmbalagemRepository(MongoEasyStockContext context, Mo
     public Task DeleteAsync(Guid id)
     {
         EnqueueDelete(Collection, id);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteByProdutoAsync(Guid empresaId, Guid produtoId)
+    {
+        var filter = Builders<ProdutoEmbalagem>.Filter.And(
+            Builders<ProdutoEmbalagem>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<ProdutoEmbalagem>.Filter.Eq(x => x.ProdutoId, produtoId));
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? Collection.DeleteManyAsync(filter, ct)
+                : Collection.DeleteManyAsync(session, filter, null, ct));
         return Task.CompletedTask;
     }
 }

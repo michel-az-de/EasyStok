@@ -37,7 +37,7 @@
 
 @Html.AntiForgeryToken()
 
-<div x-data="produtoHub()" x-init="init()" class="produto-detail-page">
+<div x-data="produtoHub()" x-init="init()" class="produto-detail-page produto-detail-page--compact">
 
     <!-- ═══ BACK + BREADCRUMB ═══ -->
     <div class="flex items-center gap-2 mb-4 text-sm text-slate-500">
@@ -52,12 +52,12 @@
     </div>
 
     <!-- ═══ HERO: GALLERY + PRODUCT INFO ═══ -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="produto-detail-hero grid grid-cols-1 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)] gap-5 mb-5 items-start">
 
         <!-- ── LEFT: IMAGE GALLERY ── -->
-        <div class="space-y-3">
+        <div class="produto-detail-gallery space-y-2.5">
             <!-- Main image -->
-            <div class="produto-gallery-card aspect-square bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group">
+            <div class="produto-gallery-card produto-gallery-card--hero bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group">
                 <template x-if="photos.length > 0">
                     <img :src="mainPhoto" :key="mainPhoto" alt="@p.Nome"
                          class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
@@ -111,7 +111,7 @@
         </div>
 
         <!-- ── RIGHT: PRODUCT INFO ── -->
-        <div class="space-y-5">
+        <div class="produto-detail-summary space-y-4">
             <!-- Title + badges -->
             <div>
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
@@ -126,7 +126,7 @@
                         <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
                     }
                 </div>
-                <h1 class="text-2xl font-extrabold text-slate-900 leading-tight mb-1">@p.Nome</h1>
+                <h1 class="produto-detail-title text-2xl font-extrabold text-slate-900 leading-tight mb-1">@p.Nome</h1>
                 @if (!string.IsNullOrEmpty(p.SkuBase))
                 {
                     <p class="text-xs font-mono text-slate-400">SKU: @p.SkuBase</p>
@@ -140,11 +140,11 @@
             <!-- Price block -->
             @if (temPreco || temCusto)
             {
-                <div class="produto-price-card bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+                <div class="produto-price-card bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 border border-slate-200">
                     @if (temPreco)
                     {
                         <div class="flex items-baseline gap-2 mb-1">
-                            <span class="text-3xl font-extrabold text-slate-900">@p.PrecoReferencia!.Value.ToString("C", ptBR)</span>
+                            <span class="produto-price-card__value text-3xl font-extrabold text-slate-900">@p.PrecoReferencia!.Value.ToString("C", ptBR)</span>
                         </div>
                     }
                     @if (temCusto)
@@ -176,7 +176,7 @@
             }
 
             <!-- Details grid -->
-            <div class="grid grid-cols-2 gap-3">
+            <div class="produto-detail-meta-grid grid grid-cols-2 gap-2.5">
                 @if (!string.IsNullOrEmpty(p.CodigoBarras))
                 {
                     <div class="produto-meta-card bg-slate-50 rounded-xl p-3 border border-slate-100 col-span-2">
@@ -231,23 +231,23 @@
             </div>
 
             <!-- Action buttons -->
-            <div class="flex flex-wrap gap-2">
+            <div class="produto-detail-actions flex flex-wrap gap-2">
                 <a href="/produtos/@p.ProdutoId/editar"
-                   class="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+                   class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                     </svg>
                     Editar
                 </a>
                 <a href="/entradas/nova?produtoId=@p.ProdutoId"
-                   class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     Entrada
                 </a>
                 <a href="/saidas/nova?produtoId=@p.ProdutoId"
-                   class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                     </svg>
@@ -278,7 +278,7 @@
     </div>
 
     <!-- ═══ TABS ═══ -->
-    <div class="flex gap-0.5 border-b border-slate-200 mb-5">
+    <div class="produto-detail-tabs flex gap-0.5 border-b border-slate-200 mb-4">
         <button @@click="tab='variacoes'"
                 :class="tab==='variacoes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
@@ -307,7 +307,7 @@
 
 <!-- ═══ TAB: VARIACOES ═══ -->
 <div x-show="tab==='variacoes'">
-    <div class="ws">
+    <div class="ws produto-detail-tab-card">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-bold text-slate-800">Variações (@p.Variacoes.Count)</h3>
             <button @@click="showAddVariacao = !showAddVariacao"
@@ -383,14 +383,14 @@
 
     <!-- ═══ TAB: FOTOS (auto-save) ═══ -->
     <div x-show="tab==='fotos'">
-        <div class="ws">
+        <div class="ws produto-detail-tab-card produto-detail-photos-card">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="font-bold text-slate-800">Fotos do produto</h3>
                 <span class="text-xs text-slate-400" x-text="photos.length + '/5'"></span>
             </div>
 
             <!-- Grid de fotos existentes -->
-            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-4">
+            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 mb-3">
                 <template x-for="foto in photos" :key="foto.fotoId">
                     <div class="relative group aspect-square rounded-xl overflow-hidden border-2 border-slate-200 hover:border-slate-300 transition-all">
                         <img :src="foto.url" class="w-full h-full object-cover"
@@ -410,7 +410,7 @@
             </div>
 
             <!-- FilePond upload (abaixo do grid) -->
-            <div x-show="photos.length < 5" class="mb-4">
+            <div x-show="photos.length < 5" class="produto-detail-upload mb-2">
                 <input type="file" x-ref="pondInputDetail" />
             </div>
 
@@ -427,7 +427,7 @@
 
     <!-- ═══ TAB: ESTOQUE ═══ -->
     <div x-show="tab==='estoque'">
-        <div class="ws">
+        <div class="ws produto-detail-tab-card">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="font-bold text-slate-800">Estoque por variação</h3>
                 <div class="flex items-center gap-2">
@@ -501,7 +501,7 @@
 
     <!-- ═══ TAB: HISTORICO ═══ -->
     <div x-show="tab==='historico'">
-        <div class="ws">
+        <div class="ws produto-detail-tab-card">
             <h3 class="font-bold text-slate-800 mb-4">Histórico de movimentações</h3>
 
             <div x-show="historico===null" class="text-center py-10 text-slate-400 flex items-center justify-center gap-2">
@@ -522,7 +522,7 @@
                 </div>
             </div>
 
-            <div x-show="historico!==null && historico.length>0" class="overflow-x-auto">
+            <div x-show="historico!==null && historico.length>0" class="overflow-x-auto produto-detail-table-wrap">
                 <table class="tbl-full">
                     <thead>
                         <tr>
@@ -562,7 +562,7 @@
     <div x-show="tab==='detalhes'">
         @if (!p.Caracteristicas.Any() && !p.Embalagens.Any())
         {
-            <div class="ws text-center py-10 text-slate-400">
+            <div class="ws produto-detail-tab-card text-center py-10 text-slate-400">
                 <div class="text-3xl mb-2">📋</div>
                 <p class="text-sm font-medium text-slate-500">Nenhum detalhe técnico cadastrado.</p>
                 <p class="text-xs mt-1">Edite o produto para adicionar características ou embalagens.</p>
@@ -570,7 +570,7 @@
         }
         @if (p.Caracteristicas.Any())
         {
-            <div class="ws mb-5">
+            <div class="ws produto-detail-tab-card mb-4">
                 <h3 class="font-bold text-slate-800 mb-3">Características (@p.Caracteristicas.Count)</h3>
                 <div class="overflow-x-auto">
                     <table class="tbl-full">
@@ -593,7 +593,7 @@
 
         @if (p.Embalagens.Any())
         {
-            <div class="ws">
+            <div class="ws produto-detail-tab-card">
                 <h3 class="font-bold text-slate-800 mb-3">Embalagens (@p.Embalagens.Count)</h3>
                 <div class="overflow-x-auto">
                     <table class="tbl-full">
