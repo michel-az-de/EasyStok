@@ -697,9 +697,9 @@
                         </div>
                     </template>
                     <!-- Photo count badge -->
-                    <div x-show="(pendingFiles.length + existingPhotos.length) > 1" x-cloak
+                    <div x-show="(_pondFileCount + existingPhotos.length) > 1" x-cloak
                          class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                        <span x-text="(pendingFiles.length + existingPhotos.length)"></span> fotos
+                        <span x-text="(_pondFileCount + existingPhotos.length)"></span> fotos
                     </div>
                 </div>
 
@@ -878,39 +878,34 @@
                         // === FASE 1: Criar/Atualizar produto (sem fotos) ===
                         const r = await fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' });
 
-                        if (!r.ok && !r.redirected) {
+                        // Se o controller fez redirect (sucesso), r.redirected === true
+                        // Se re-renderizou o form (erros de validação), r.redirected === false
+                        if (!r.redirected) {
                             this.saving = false;
-                            const ct = r.headers.get('content-type') || '';
-                            if (ct.includes('text/html')) {
-                                // Renderiza a página de erro do servidor num iframe embutido
-                                // para preservar o histórico e os scripts Alpine já carregados
-                                try {
-                                    const html = await r.text();
-                                    // Tenta extrair mensagens de validação do HTML retornado
-                                    const tmp = document.createElement('div');
-                                    tmp.innerHTML = html;
-                                    const erros = [...tmp.querySelectorAll('.text-red-500,.field-validation-error,[data-valmsg-for]')]
-                                        .map(el => el.textContent.trim())
-                                        .filter(Boolean)
-                                        .slice(0, 3);
-                                    if (erros.length) {
-                                        erros.forEach(msg => window.showToast(msg, 'error'));
-                                    } else {
-                                        window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
-                                    }
-                                } catch {
+                            try {
+                                const html = await r.text();
+                                const tmp = document.createElement('div');
+                                tmp.innerHTML = html;
+                                const erros = [...tmp.querySelectorAll('.text-red-500,.field-validation-error,[data-valmsg-for],.text-danger')]
+                                    .map(el => el.textContent.trim())
+                                    .filter(Boolean)
+                                    .slice(0, 3);
+                                if (erros.length) {
+                                    erros.forEach(msg => window.showToast(msg, 'error'));
+                                } else {
                                     window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
                                 }
-                            } else {
-                                window.showToast('Erro ao salvar produto.', 'error');
+                            } catch {
+                                window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
                             }
                             return;
                         }
 
-                        // Extrair ID do produto do redirect URL
+                        // === Sucesso: extrair productId ===
+                        // Em edição já temos o ID; em criação, extraímos da URL de redirect
                         const redirectUrl = r.url;
                         const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
-                        const productId = match ? match[1] : null;
+                        const productId = this.productId || (match ? match[1] : null);
 
                         // === FASE 2: Upload de fotos via AJAX ===
                         const pondFiles = this._pond ? this._pond.getFiles().map(f => f.file).filter(Boolean) : [];
@@ -921,11 +916,15 @@
                         window.location.href = redirectUrl || '/produtos';
                     } catch (e) {
                         this.saving = false;
+                        console.error('[EasyStock] submitForm error:', e);
                         window.showToast('Erro de conexão ao salvar.', 'error');
                     }
                 },
                 async _uploadPhotosAfterSave(productId, files) {
-                    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                    // Token CSRF: tenta meta tag e fallback para hidden input do form
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content
+                               || document.querySelector('[name=__RequestVerificationToken]')?.value
+                               || '';
                     this.uploadPhase = true;
                     this.uploadQueue = files.map(f => ({ name: f.name, status: 'uploading', message: '' }));
 
@@ -936,6 +935,7 @@
                             fd.append('foto', files[i]);
                             fd.append('__RequestVerificationToken', token);
                             const resp = await fetch('/produtos/' + productId + '/fotos/ajax', { method: 'POST', body: fd });
+                            if (!resp.ok) throw new Error('Servidor retornou status ' + resp.status);
                             const data = await resp.json();
                             if (!data.ok) throw new Error(data.erro || 'Erro no servidor');
                             this.uploadQueue[i].status = 'done';
@@ -943,6 +943,7 @@
                         } catch (err) {
                             this.uploadQueue[i].status = 'error';
                             this.uploadQueue[i].message = err.message;
+                            console.error('[EasyStock] Upload foto falhou:', err);
                         }
                         this.uploadQueue = [...this.uploadQueue]; // forçar reatividade Alpine
                     }
@@ -1078,8 +1079,20 @@
                             labelTapToRetry: 'Toque para tentar novamente',
                             credits: false,
                         });
-                        this._pond.on('addfile', () => { self._pondFileCount = self._pond.getFiles().length; });
-                        this._pond.on('removefile', () => { self._pondFileCount = self._pond.getFiles().length; });
+                        const updatePondState = () => {
+                            const files = self._pond.getFiles();
+                            self._pondFileCount = files.length;
+                            // Gerar previews locais para a step 4 (revisão)
+                            self.previews = [];
+                            files.forEach(f => {
+                                if (f.file && f.file.type?.startsWith('image/')) {
+                                    const url = URL.createObjectURL(f.file);
+                                    self.previews.push(url);
+                                }
+                            });
+                        };
+                        this._pond.on('addfile', updatePondState);
+                        this._pond.on('removefile', updatePondState);
                     });
                 },
                 destroy() {
@@ -1087,6 +1100,7 @@
                     if (this._clickHandler) { document.removeEventListener('click', this._clickHandler); this._clickHandler = null; }
                     if (this._pageshowHandler) { window.removeEventListener('pageshow', this._pageshowHandler); this._pageshowHandler = null; }
                     if (this._skuAbort) { this._skuAbort.abort(); this._skuAbort = null; }
+                    this.previews.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
                     clearTimeout(this._draftTimer);
                 },
                 _saveDraft() {
@@ -1313,12 +1327,13 @@
                 _pond: null,
                 _pondFileCount: 0,
                 existingPhotos: @Html.Raw(existingPhotosJson),
-                get totalPhotoCount() {
-                    return this._pondFileCount + this.existingPhotos.length;
-                },
-                get remainingPhotoSlots() {
-                    return Math.max(0, 5 - this.totalPhotoCount);
-                },
+get totalPhotoCount() {
+    return this._pondFileCount + this.existingPhotos.length;
+},
+get remainingPhotoSlots() {
+    return Math.max(0, 5 - this.totalPhotoCount);
+},
+previews: [],      // URLs de preview locais dos arquivos no FilePond
 
                 // ── AI ──
                 aiGenerating: false,

@@ -112,6 +112,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     // ── Novos proxies ──────────────────────────────────────────────────────
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/logs/lixeira")]
     public async Task<IActionResult> ProxyLixeira()
     {
@@ -121,6 +122,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/lixeira/esvaziar")]
     public async Task<IActionResult> ProxyEsvaziarLixeira()
@@ -131,6 +133,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/eventos")]
     public async Task<IActionResult> ProxyEventos([FromQuery] int hours = 48)
     {
@@ -140,6 +143,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/slo")]
     public async Task<IActionResult> ProxySlo([FromQuery] int hours = 24)
     {
@@ -149,6 +153,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/alertas/{alertaId}/ack")]
     public async Task<IActionResult> ProxyAckAlerta(string alertaId, [FromBody] object body)
@@ -159,6 +164,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/alertas/acks")]
     public async Task<IActionResult> ProxyGetAcks([FromQuery] string? ids = null)
     {
@@ -168,6 +174,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/queries-lentas")]
     public async Task<IActionResult> ProxyQueriesLentas()
     {
@@ -177,6 +184,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [HttpGet]
     [Route("diagnostico/api/health/empresas")]
     public async Task<IActionResult> ProxyHealthEmpresas()
     {

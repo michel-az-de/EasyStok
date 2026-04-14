@@ -1215,20 +1215,7 @@ public sealed class DiagnosticoController(
                 logs.Resumo.ErrorsByHour.TryGetValue(h, out var v) ? v.ToString() : "0"));
         }
 
-        // Patterns HTML
         var patternsHtml = "";
-        if (logs?.Padroes.Length > 0)
-        {
-            patternsHtml = "<div class='card'><h2>&#128270; Padroes Detectados</h2><div class='patterns-list'>" +
-                string.Join("", logs.Padroes.Select(p =>
-                    $"<div class='pattern-item'>{SevBadge(p.Severidade)} <strong>{p.Tipo}</strong> " +
-                    $"<span class='pattern-count'>({p.Ocorrencias}x)</span><br>" +
-                    $"<span class='pattern-desc'>{p.Descricao}</span><br>" +
-                    $"<em class='pattern-tip'>{p.Sugestao}</em>" +
-                    (p.UltimaOcorrencia.HasValue ? $"<br><small>Ultima: {p.UltimaOcorrencia:HH:mm:ss}</small>" : "") +
-                    "</div>")) +
-                "</div></div>";
-        }
 
         // Log entries HTML
         var logEntriesHtml = "";
@@ -1277,6 +1264,57 @@ public sealed class DiagnosticoController(
                     <div class="stat-box"><div class="stat-num">{logs.Resumo.AvgResponseTimeMs:F0}ms</div><div class="stat-label">Tempo Medio</div></div>
                 </div>
                 """;
+        }
+
+        // SLO strip data
+        double? sloUptime = snapshots.Count > 0
+            ? Math.Round(snapshots.Count(s => s.OverallStatus != "critical") * 100.0 / snapshots.Count, 1)
+            : null;
+        var httpElapsed = logs?.Disponivel == true
+            ? logs.Entradas.Where(e => e.ElapsedMs.HasValue).Select(e => e.ElapsedMs!.Value).OrderBy(v => v).ToList()
+            : null;
+        var sloAvg = httpElapsed?.Count > 0 ? Math.Round(httpElapsed.Average(), 0) : (double?)null;
+        var sloP95 = httpElapsed?.Count > 0 ? Math.Round(httpElapsed[(int)(httpElapsed.Count * 0.95)], 0) : (double?)null;
+        var sloErrRate = logs?.Resumo.TotalRequests > 0
+            ? Math.Round(100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests, 2)
+            : (double?)null;
+        string SloNum(double? v, string suffix, double? warnAbove = null, double? critAbove = null) =>
+            v == null ? "<span style='color:#475569'>—</span>"
+            : $"<span style='color:{( critAbove.HasValue && v > critAbove ? "#ef4444" : warnAbove.HasValue && v > warnAbove ? "#f59e0b" : "#22c55e")}'>{v}{suffix}</span>";
+        var sloHtml = $"""
+            <div class='card' style='margin-bottom:1rem'>
+                <h2 style='margin-bottom:.75rem'>&#128200; SLO — Periodo Analisado</h2>
+                <div class='stats-grid' style='grid-template-columns:repeat(4,1fr)'>
+                    <div class='stat-box'><div class='stat-num'>{SloNum(sloUptime, "%", 99, 95)}</div><div class='stat-label'>Uptime ({snapshots.Count} snaps)</div></div>
+                    <div class='stat-box'><div class='stat-num'>{SloNum(sloAvg, "ms", 200, 1000)}</div><div class='stat-label'>Resp. Media</div></div>
+                    <div class='stat-box'><div class='stat-num'>{SloNum(sloP95, "ms", 500, 2000)}</div><div class='stat-label'>P95</div></div>
+                    <div class='stat-box {(sloErrRate > 5 ? "err" : sloErrRate > 1 ? "warn" : "")}'><div class='stat-num'>{SloNum(sloErrRate, "%", 1, 5)}</div><div class='stat-label'>Taxa de Erro</div></div>
+                </div>
+            </div>
+            """;
+
+        // Patterns HTML with ack buttons
+        var patternsHtmlAck = "";
+        if (logs?.Padroes.Length > 0)
+        {
+            patternsHtmlAck = "<div class='card'><h2>&#128270; Padroes Detectados</h2><div class='patterns-list'>" +
+                string.Join("", logs.Padroes.Select(p =>
+                    $"<div class='pattern-item' data-alerta-id='{p.AlertaId}'>{SevBadge(p.Severidade)} <strong>{p.Tipo}</strong> " +
+                    $"<span class='pattern-count'>({p.Ocorrencias}x)</span><br>" +
+                    $"<span class='pattern-desc'>{p.Descricao}</span><br>" +
+                    $"<em class='pattern-tip'>{p.Sugestao}</em>" +
+                    (p.UltimaOcorrencia.HasValue ? $"<br><small>Ultima: {p.UltimaOcorrencia:HH:mm:ss}</small>" : "") +
+                    (!string.IsNullOrEmpty(p.AlertaId) ? $"""
+                    <div class='ack-row' style='margin-top:.5rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap'>
+                        <span style='font-size:.7rem;color:#64748b'>Marcar:</span>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='visto' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.3rem;cursor:pointer'>Visto</button>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='em_investigacao' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #78350f;background:#1c1917;color:#f59e0b;border-radius:.3rem;cursor:pointer'>Investigando</button>
+                        <button class='ack-btn' data-id='{p.AlertaId}' data-status='resolvido' onclick='doAck(this)' style='padding:.2rem .5rem;font-size:.7rem;border:1px solid #052e16;background:#0f172a;color:#22c55e;border-radius:.3rem;cursor:pointer'>Resolvido</button>
+                        <span class='ack-status-label' style='font-size:.7rem;color:#64748b;margin-left:.25rem'></span>
+                    </div>
+                    """ : "") +
+                    "</div>")) +
+                "</div></div>";
         }
 
         return $$"""
@@ -1365,6 +1403,7 @@ public sealed class DiagnosticoController(
         <div class="panel active" id="tab-overview">
         <div class="overall" style="font-size:1.25rem;margin-bottom:1rem">Status geral: {{Badge(r.Status)}}</div>
         {{causasHtml}}
+        {{sloHtml}}
         <div class="grid-2">
             <div class="card"><h2>&#128451; Banco de Dados</h2><table>
                 <tr><td>Provider</td><td>{{r.Banco.Provider}}</td></tr>
@@ -1399,6 +1438,16 @@ public sealed class DiagnosticoController(
                 <tr><td>Connection String</td><td>{{BoolBadge(r.Configuracoes.ConnectionStringPresente)}}</td></tr>
                 <tr><td>CORS Origins</td><td style="font-size:.8rem">{{string.Join(", ", r.Configuracoes.CorsOrigins)}}</td></tr>
             </table></div>
+        </div>
+        <!-- Queries Lentas -->
+        <div class='card' style='margin-top:1rem'>
+            <h2>&#128269; Queries SQL Lentas (pg_stat_statements) <button onclick='loadQueriesLentas()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Carregar</button></h2>
+            <div id='queriesLentasResult'><span style='color:#475569;font-size:.85rem'>Clique em Carregar para buscar as queries mais lentas do PostgreSQL.</span></div>
+        </div>
+        <!-- Saude por Empresa -->
+        <div class='card' style='margin-top:1rem'>
+            <h2>&#128188; Saude por Empresa (sintetico) <button onclick='loadEmpresasHealth()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Verificar</button></h2>
+            <div id='empresasHealthResult'><span style='color:#475569;font-size:.85rem'>Clique em Verificar para testar conectividade por empresa.</span></div>
         </div>
         </div>
 
@@ -1446,7 +1495,9 @@ public sealed class DiagnosticoController(
                 <button onclick='toggleLevel(this,""ERROR"")'>Erros</button>
                 <button onclick='toggleLevel(this,""WARN"")'>Warnings</button>
                 <button onclick='toggleLevel(this,""INFO"")'>Info</button>
-                <button onclick='clearLogs()' style='margin-left:auto;background:#334155;color:#f1f5f9'>Limpar</button>
+                <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>Mover p/ lixeira</button>
+                <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>Esvaziar lixeira</button>
+                <div id='lixeiraMsg' style='font-size:.75rem;color:#94a3b8'></div>
             </div>
             <div class='log-console' id='logConsole'>
                 {logEntriesHtml}
@@ -1458,7 +1509,7 @@ public sealed class DiagnosticoController(
 
         <!-- PATTERNS TAB -->
         <div class="panel" id="tab-patterns">
-        {{(patternsHtml.Length > 0 ? patternsHtml : "<div class='card' style='border-color:#052e16'><div class='section-empty' style='color:#16a34a'>&#10003; Nenhum padrao anomalo detectado nas ultimas 48h.</div></div>")}}
+        {{(patternsHtmlAck.Length > 0 ? patternsHtmlAck : "<div class='card' style='border-color:#052e16'><div class='section-empty' style='color:#16a34a'>&#10003; Nenhum padrao anomalo detectado nas ultimas 48h.</div></div>")}}
 
         {{(logs?.Disponivel == true ? $@"
         <div class='grid-2'>
@@ -1599,6 +1650,73 @@ public sealed class DiagnosticoController(
                 const matchText=!q||row.textContent.toLowerCase().includes(q);
                 row.style.display=matchLevel&&matchText?'':'none';
             });
+        }
+
+        async function moverParaLixeira(){
+            if(!confirm('Mover todos os logs para a lixeira?'))return;
+            const msg=document.getElementById('lixeiraMsg');
+            if(msg)msg.textContent='Movendo...';
+            try{
+                const r=await fetch('/api/diagnostico/logs/limpar',{method:'POST'});
+                const d=await r.json();
+                if(msg)msg.textContent=d.mensagem||'Logs movidos para lixeira.';
+            }catch(e){if(msg)msg.textContent='Erro: '+e.message;}
+        }
+        async function esvaziarLixeira(){
+            if(!confirm('Excluir permanentemente todos os logs da lixeira?'))return;
+            const msg=document.getElementById('lixeiraMsg');
+            if(msg)msg.textContent='Esvaziando...';
+            try{
+                const r=await fetch('/api/diagnostico/logs/lixeira/esvaziar',{method:'POST'});
+                const d=await r.json();
+                if(msg)msg.textContent=d.mensagem||'Lixeira esvaziada.';
+            }catch(e){if(msg)msg.textContent='Erro: '+e.message;}
+        }
+        async function loadQueriesLentas(){
+            const el=document.getElementById('queriesLentasResult');
+            if(!el)return;
+            el.innerHTML="<span style='color:#94a3b8'>Carregando...</span>";
+            try{
+                const r=await fetch('/api/diagnostico/queries-lentas');
+                const d=await r.json();
+                if(!d.disponivel){el.innerHTML=`<span style='color:#f59e0b;font-size:.85rem'>${d.motivo||'Extensao nao disponivel'}</span>${d.instrucoesPgStatStatements?`<pre style='font-size:.75rem;color:#94a3b8;margin-top:.5rem;white-space:pre-wrap'>${d.instrucoesPgStatStatements}</pre>`:''}`;return;}
+                if(!d.queries||!d.queries.length){el.innerHTML="<span style='color:#22c55e'>Nenhuma query lenta encontrada ✓</span>";return;}
+                el.innerHTML="<table style='width:100%;border-collapse:collapse;font-size:.8rem;margin-top:.5rem'><thead><tr style='color:#64748b;border-bottom:1px solid #334155'><th style='text-align:left;padding:.3rem .5rem'>Query</th><th style='padding:.3rem .5rem'>Calls</th><th style='padding:.3rem .5rem'>Avg ms</th><th style='padding:.3rem .5rem'>P95 ms</th><th style='padding:.3rem .5rem'>Rows</th></tr></thead><tbody>"
+                    +d.queries.map(q=>`<tr style='border-bottom:1px solid #1e293b'><td style='font-family:monospace;font-size:.75rem;padding:.25rem .5rem;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='${q.query||""}'>${(q.query||"").substring(0,70)}${q.query&&q.query.length>70?"...":""}</td><td style='text-align:right;padding:.25rem .5rem'>${q.calls}</td><td style='text-align:right;padding:.25rem .5rem;color:${q.avgMs>1000?"#ef4444":q.avgMs>200?"#f59e0b":"#22c55e"}'>${(q.avgMs||0).toFixed(1)}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.p95Ms?q.p95Ms.toFixed(1):"—"}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.avgRows?(q.avgRows).toFixed(0):"—"}</td></tr>`).join("")
+                    +"</tbody></table>";
+            }catch(e){el.innerHTML=`<span style='color:#ef4444'>Erro: ${e.message}</span>`;}
+        }
+        async function loadEmpresasHealth(){
+            const el=document.getElementById('empresasHealthResult');
+            if(!el)return;
+            el.innerHTML="<span style='color:#94a3b8'>Verificando...</span>";
+            try{
+                const r=await fetch('/api/diagnostico/health/empresas');
+                const d=await r.json();
+                if(!d.empresas||!d.empresas.length){el.innerHTML="<span style='color:#94a3b8'>Nenhuma empresa encontrada.</span>";return;}
+                el.innerHTML=`<div style='font-size:.75rem;color:#94a3b8;margin-bottom:.5rem'>Total: ${d.totalAnalisadas} | <span style='color:#22c55e'>OK: ${d.ok}</span>${d.degraded>0?` | <span style='color:#ef4444'>Falha: ${d.degraded}</span>`:""} | ${d.duracaoMs}ms</div>`
+                    +"<div style='display:flex;flex-wrap:wrap;gap:.4rem'>"
+                    +d.empresas.map(e=>`<div style='border:1px solid ${e.status==="ok"?"#052e16":"#450a0a"};background:${e.status==="ok"?"#020617":"#1c1917"};border-radius:.4rem;padding:.4rem .6rem;font-size:.75rem'><div style='color:#f1f5f9;font-weight:600'>${e.nome}</div><div style='color:${e.status==="ok"?"#22c55e":"#ef4444"}'>${e.status==="ok"?"✓ OK":"✗ "+( e.erro||"Falha")} ${e.latenciaMs?e.latenciaMs+"ms":""}</div></div>`).join("")
+                    +"</div>";
+            }catch(e){el.innerHTML=`<span style='color:#ef4444'>Erro: ${e.message}</span>`;}
+        }
+        async function doAck(btn){
+            const id=btn.dataset.id, status=btn.dataset.status;
+            if(!id)return;
+            btn.disabled=true;
+            try{
+                const r=await fetch('/api/diagnostico/alertas/'+id+'/ack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,observacao:''})});
+                if(r.ok){
+                    const card=btn.closest('.pattern-item');
+                    if(card){
+                        card.querySelectorAll('.ack-btn').forEach(b=>{b.style.opacity='.5';b.style.outline='none';});
+                        btn.style.opacity='1';btn.style.outline='2px solid currentColor';btn.style.outlineOffset='2px';
+                        const lbl=card.querySelector('.ack-status-label');
+                        if(lbl)lbl.textContent='✓ '+status.replace('_',' ');
+                    }
+                }
+            }catch{}
+            btn.disabled=false;
         }
 
         // Charts
