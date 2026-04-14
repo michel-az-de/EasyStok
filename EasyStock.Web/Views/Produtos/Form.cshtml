@@ -62,8 +62,8 @@
 
     <!-- ══════════════ STEP 1: ESSENCIAL ══════════════ -->
     <div x-show="step === 1" x-transition:enter.duration.200ms>
-        <div class="ws">
-            <div class="section-hd">
+        <div class="ws premium-photo-section">
+            <div class="section-hd premium-photo-section__head">
                 <div class="section-hd-icon bg-indigo-50 text-indigo-500">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -260,16 +260,23 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800">Fotos do produto</h3>
-                <span class="text-xs text-slate-400 ml-auto" x-text="(existingPhotos.length + _pondFileCount) + '/5'"></span>
+                <div class="premium-photo-section__title">
+                    <h3 class="font-bold text-slate-800">Fotos do produto</h3>
+                    <p class="premium-photo-section__subtitle">Uma capa forte melhora leitura, confiança e percepção de qualidade.</p>
+                </div>
+                <span class="premium-photo-counter ml-auto" x-text="totalPhotoCount + '/5'"></span>
             </div>
 
             <!-- Fotos existentes (edit mode) -->
-            <div x-show="existingPhotos.length > 0" x-transition class="mb-3">
+            <div x-show="existingPhotos.length > 0" x-transition class="premium-photo-rail">
                 <p class="text-xs text-slate-500 mb-2" x-text="existingPhotos.length + ' foto(s) já cadastrada(s) — gerencie na página do produto'"></p>
+                <div class="premium-photo-rail__head">
+                    <p class="premium-photo-rail__title">Já no catálogo</p>
+                    <p class="premium-photo-rail__note" x-text="existingPhotos.length + ' foto(s) publicadas — as novas entram ao salvar'"></p>
+                </div>
                 <div class="grid grid-cols-5 sm:grid-cols-6 gap-2">
                     <template x-for="foto in existingPhotos" :key="foto.fotoId">
-                        <div class="aspect-square rounded-lg overflow-hidden border border-slate-200">
+                        <div class="premium-photo-thumb aspect-square rounded-lg overflow-hidden border border-slate-200">
                             <img :src="foto.url" class="w-full h-full object-cover" />
                         </div>
                     </template>
@@ -277,7 +284,24 @@
             </div>
 
             <!-- FilePond (fotos ficam locais até o submit) -->
-            <input type="file" x-ref="pondInput" />
+            <div class="premium-uploader" :class="{ 'premium-uploader--has-files': _pondFileCount > 0 }">
+                <div class="premium-uploader__badges">
+                    <span class="premium-uploader__badge" x-text="remainingPhotoSlots + ' vaga(s)'"></span>
+                    <span class="premium-uploader__badge">JPEG, PNG, WebP</span>
+                    <span class="premium-uploader__badge">até 10 MB</span>
+                    <span class="premium-uploader__badge premium-uploader__badge--soft">1ª foto vira capa</span>
+                </div>
+                <input type="file" x-ref="pondInput" />
+                <div class="premium-uploader__footer">
+                    <div>
+                        <p class="premium-uploader__footer-title">Seleção inteligente de imagens</p>
+                        <p class="premium-uploader__footer-copy">Use fotos limpas, bem iluminadas e centralizadas. As imagens só são enviadas quando você salvar o produto.</p>
+                    </div>
+                    <div class="premium-uploader__status" :class="totalPhotoCount > 0 ? 'premium-uploader__status--ready' : ''">
+                        <span class="premium-uploader__status-dot"></span>
+                        <span x-text="totalPhotoCount > 0 ? totalPhotoCount + ' imagem(ns) pronta(s)' : 'Nenhuma imagem selecionada'"></span>
+                    </div>
+                </div>
             <p class="text-xs text-slate-400 mt-2">JPEG, PNG ou WebP. Max. 10 MB cada. As fotos serão enviadas ao salvar o produto.</p>
         </div>
 
@@ -659,11 +683,11 @@
     <div x-show="step === 4" x-transition:enter.duration.200ms>
 
         <!-- Product Card — layout e-commerce -->
-        <div class="bg-white rounded-2xl shadow-lg shadow-slate-200/60 overflow-hidden border border-slate-100">
-            <div class="grid grid-cols-1 sm:grid-cols-[280px_1fr]">
+        <div class="product-review-card bg-white rounded-2xl shadow-lg shadow-slate-200/60 overflow-hidden border border-slate-100">
+            <div class="product-review-card__grid grid grid-cols-1 sm:grid-cols-[280px_1fr]">
 
                 <!-- Foto principal -->
-                <div class="relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
+                <div class="product-review-card__media relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
                     <template x-if="previews.length > 0"><img :src="previews[0]" class="w-full h-full object-cover" /></template>
                     <template x-if="previews.length === 0 && existingPhotos.length > 0"><img :src="existingPhotos[0].url" class="w-full h-full object-cover" /></template>
                     <template x-if="previews.length === 0 && existingPhotos.length === 0">
@@ -680,9 +704,9 @@
                 </div>
 
                 <!-- Info panel -->
-                <div class="p-5 sm:p-6 flex flex-col">
+                <div class="product-review-card__body p-5 sm:p-6 flex flex-col">
                     <!-- Tags -->
-                    <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                    <div class="product-review-card__chips flex flex-wrap items-center gap-1.5 mb-2">
                         <span x-show="categoriaNome" x-cloak class="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-semibold" x-text="categoriaNome"></span>
                         <span x-show="marca" x-cloak class="text-[11px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full" x-text="marca"></span>
                         <span class="text-[11px] bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full"
@@ -690,10 +714,10 @@
                     </div>
 
                     <!-- Nome -->
-                    <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight" x-text="nome || 'Nome do produto'"></h2>
+                    <h2 class="product-review-card__title text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight" x-text="nome || 'Nome do produto'"></h2>
 
                     <!-- SKU -->
-                    <div x-show="sku" x-cloak class="mt-1">
+                    <div x-show="sku" x-cloak class="product-review-card__sku mt-1">
                         <span class="text-xs font-mono text-slate-400">SKU: </span>
                         <span class="text-xs font-mono text-slate-500 font-medium" x-text="sku"></span>
                     </div>
@@ -702,7 +726,7 @@
                     <p class="text-sm text-slate-500 mt-3 line-clamp-2 flex-grow" x-text="descricao || 'Sem descrição'" :class="{ 'italic text-slate-300': !descricao }"></p>
 
                     <!-- Preco destaque -->
-                    <div class="mt-4 pt-4 border-t border-slate-100">
+                    <div class="product-review-card__pricing mt-4 pt-4 border-t border-slate-100">
                         <div class="flex items-end gap-3 flex-wrap">
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
                                   x-text="preco > 0 ? 'R$ ' + preco.toFixed(2).replace('.', ',') : 'Preço não definido'"
@@ -718,7 +742,7 @@
             </div>
 
             <!-- Details row -->
-            <div class="border-t border-slate-100 px-5 sm:px-6 py-3 flex flex-wrap gap-4 text-xs text-slate-500 bg-slate-50/50">
+            <div class="product-review-card__meta border-t border-slate-100 px-5 sm:px-6 py-3 flex flex-wrap gap-4 text-xs text-slate-500 bg-slate-50/50">
                 <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     <span x-text="variacoes.filter(v => v.nome).length + ' variação(ões)'"></span>
@@ -1041,7 +1065,10 @@
                             maxFiles: maxNew,
                             acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
                             maxFileSize: '10MB',
-                            labelIdle: 'Arraste fotos aqui ou <span class="filepond--label-action">selecione</span>',
+                            imagePreviewHeight: 220,
+                            itemInsertLocation: 'after',
+                            stylePanelLayout: 'integrated',
+                            labelIdle: '<span class="premium-uploader__idle-icon">+</span><span class="premium-uploader__idle-title">Arraste fotos aqui ou <span class="filepond--label-action">selecione do computador</span></span><span class="premium-uploader__idle-copy">Monte uma galeria limpa para o produto. A primeira imagem vira a capa.</span>',
                             labelMaxFileSizeExceeded: 'Arquivo muito grande',
                             labelMaxFileSize: 'Tamanho maximo: {filesize}',
                             labelFileTypeNotAllowed: 'Tipo nao permitido',
@@ -1286,6 +1313,12 @@
                 _pond: null,
                 _pondFileCount: 0,
                 existingPhotos: @Html.Raw(existingPhotosJson),
+                get totalPhotoCount() {
+                    return this._pondFileCount + this.existingPhotos.length;
+                },
+                get remainingPhotoSlots() {
+                    return Math.max(0, 5 - this.totalPhotoCount);
+                },
 
                 // ── AI ──
                 aiGenerating: false,

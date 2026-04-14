@@ -42,6 +42,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/app.css" />
+    <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" />
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] text-slate-900 antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
@@ -70,6 +71,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <script src="~/js/toast.js"></script>
+    <script>
+        (function () {
+            function bindTopbarScrollState() {
+                var scroller = document.querySelector('.app-main');
+                var topbar = document.querySelector('.app-topbar');
+                if (!scroller || !topbar) return;
+
+                var sync = function () {
+                    topbar.classList.toggle('app-topbar--scrolled', scroller.scrollTop > 20);
+                };
+
+                sync();
+                scroller.addEventListener('scroll', sync, { passive: true });
+            }
+
+            document.addEventListener('DOMContentLoaded', bindTopbarScrollState);
+            window.addEventListener('pageshow', bindTopbarScrollState);
+        })();
+    </script>
     <script>
         /* ── Decimal separator normalizer (BR locale: vírgula → ponto) ──
            Intercepts comma keypresses on number inputs and converts to period,
