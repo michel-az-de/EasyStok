@@ -20,6 +20,17 @@ public sealed class HealthSnapshotService(
 
     public IReadOnlyList<HealthSnapshot> GetSnapshots() => _snapshots.ToArray();
 
+    /// <summary>
+    /// Descarta todo o histórico de snapshots em memória e no Redis.
+    /// Útil para obter uma linha de base limpa após deploy ou correção de problemas.
+    /// </summary>
+    public async Task ZerarHistoricoAsync(CancellationToken ct = default)
+    {
+        while (_snapshots.TryDequeue(out _)) { }
+        try { await cache.RemoveAsync(RedisHistoryKey, ct); } catch { /* best-effort */ }
+        logger.LogInformation("Histórico de health snapshots zerado manualmente.");
+    }
+
     private string GetLogDirectory() =>
         configuration["LogSettings:LogDirectory"] is { Length: > 0 } configured
             ? configured

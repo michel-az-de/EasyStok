@@ -551,18 +551,29 @@ app.Use(async (context, next) =>
 // Serilog Request Logging
 app.UseSerilogRequestLogging(options =>
 {
-    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath}{QueryString} responded {StatusCode} in {Elapsed:0.0000} ms";
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms";
+
+    // Suprimir logs de endpoints de infraestrutura (health checks, ping, swagger, arquivos estáticos)
+    // — esses são chamados constantemente e não carregam informação de negócio
+    options.GetLevel = (ctx, _, ex) =>
+    {
+        if (ex is not null || ctx.Response.StatusCode >= 500)
+            return Serilog.Events.LogEventLevel.Error;
+
+        var path = ctx.Request.Path.Value ?? "";
+        if (path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/diagnostico/ping", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/files/", StringComparison.OrdinalIgnoreCase))
+            return Serilog.Events.LogEventLevel.Debug; // suprimido — Debug está desativado em produção
+
+        return Serilog.Events.LogEventLevel.Information;
+    };
+
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
         diagnosticContext.Set("CorrelationId", httpContext.Items["CorrelationId"]);
-        diagnosticContext.Set("Endpoint", httpContext.Request.Path);
-        diagnosticContext.Set("QueryString", httpContext.Request.QueryString.ToString());
-        diagnosticContext.Set("MetodoHttp", httpContext.Request.Method);
         diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
-        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-        if (httpContext.Request.ContentLength is > 0)
-            diagnosticContext.Set("RequestSize", httpContext.Request.ContentLength);
-        diagnosticContext.Set("ResponseSize", httpContext.Response.ContentLength ?? 0);
         var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                   ?? httpContext.User?.FindFirst("sub")?.Value;
         if (userId is not null)

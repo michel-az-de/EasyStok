@@ -455,6 +455,18 @@ public sealed class DiagnosticoController(
         });
     }
 
+    /// <summary>
+    /// Zera o histórico de health snapshots (gráficos e contadores do dashboard).
+    /// Use após um deploy ou correção de problemas para obter uma linha de base limpa.
+    /// </summary>
+    [HttpPost("historico/zerar")]
+    public async Task<IActionResult> ZerarHistorico(CancellationToken ct)
+    {
+        await healthSnapshotService.ZerarHistoricoAsync(ct);
+        logger.LogInformation("Histórico de health snapshots zerado via endpoint.");
+        return Ok(new { success = true, mensagem = "Histórico zerado. Novos snapshots começarão a ser coletados em até 60 segundos.", zeradoEm = DateTimeOffset.UtcNow });
+    }
+
     [HttpPost("logs/limpar")]
     public IActionResult LimparLogs()
     {
@@ -1709,6 +1721,10 @@ public sealed class DiagnosticoController(
         <!-- HEALTH TAB -->
         <div class="panel" id="tab-health">
         {{(snapshots.Count > 0 ? $@"
+        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem'>
+            <span style='font-size:.8rem;color:#94a3b8'>&#128200; Histórico de saúde — últimas 2h (snapshots a cada 60s)</span>
+            <button onclick='zerarMedidores()' style='padding:.35rem .8rem;font-size:.75rem;background:#1e3a2f;border:1px solid #166534;color:#4ade80;border-radius:.4rem;cursor:pointer'>&#9654; Zerar medidores</button>
+        </div>
         <div class='stats-grid' style='grid-template-columns:repeat(4,1fr);margin-bottom:1rem'>
             <div class='stat-box'><div class='stat-num' id='kpiDb'>{(snapshots.Count > 0 ? snapshots[^1].DbLatencyMs + "ms" : "—")}</div><div class='stat-label'>DB Latencia (ultimo)</div></div>
             <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? "" : "")}'><div class='stat-num'>{(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? snapshots[^1].RedisLatencyMs + "ms" : "N/C")}</div><div class='stat-label'>Redis Latencia (ultimo)</div></div>
@@ -1964,6 +1980,18 @@ public sealed class DiagnosticoController(
                 const badge=document.getElementById('lixeiraBadge');
                 if(badge) badge.textContent=d.total>0?`Lixeira: ${d.total} arquivo(s)`:'Lixeira vazia';
             }catch{}
+        }
+        async function zerarMedidores(){
+            if(!confirm('Zerar o histórico de health snapshots (gráficos e contadores)?\n\nOs dados atuais serão descartados e a coleta recomeçará do zero.'))return;
+            showToast('Zerando medidores...','info');
+            try{
+                const r=await fetch('/api/diagnostico/historico/zerar',{method:'POST'});
+                const d=await r.json();
+                if(d.success){
+                    showToast(d.mensagem||'Medidores zerados com sucesso.','success');
+                    setTimeout(()=>location.reload(),2000);
+                } else { showToast('Erro ao zerar medidores.','error'); }
+            }catch(e){showToast('Erro: '+e.message,'error');}
         }
         async function moverParaLixeira(){
             if(!confirm('Mover todos os logs para a lixeira?'))return;
