@@ -30,7 +30,7 @@
 <form action="@formAction" method="post" enctype="multipart/form-data" novalidate
       x-data="produtoForm()"
       @@submit.prevent="submitForm()"
-      class="max-w-3xl">
+      class="max-w-3xl pb-24 sm:pb-8">
     @Html.AntiForgeryToken()
     @if (isEdit)
     {
@@ -51,6 +51,10 @@
                     <div class="ml-2 hidden sm:block">
                         <div class="text-xs font-semibold cursor-pointer" :class="step === @sn ? 'text-indigo-600' : 'text-slate-400'"
                              @@click="goToStep(@sn)">@stepNames[i]</div>
+                    </div>
+                    @* Mobile: mostrar nome da etapa ativa abaixo do círculo *@
+                    <div x-show="step === @sn" class="ml-1 sm:hidden" x-cloak>
+                        <div class="text-[10px] font-semibold text-indigo-600 leading-tight whitespace-nowrap">@stepNames[i]</div>
                     </div>
                     @if (!last)
                     {
@@ -207,9 +211,8 @@
                               placeholder="Descreva o produto em poucas palavras..."
                               class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
                     <div class="flex items-center gap-3 mt-1.5">
-                        <button type="button" :disabled="aiGenerating || !nome || !productId"
+                        <button type="button" :disabled="aiGenerating || !nome"
                                 @@click="generateDescription()"
-                                :title="!productId ? 'Disponível após salvar o produto' : ''"
                                 class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -217,7 +220,6 @@
                             <span x-show="!aiGenerating">Gerar com IA</span>
                             <span x-show="aiGenerating" x-cloak class="inline-flex items-center gap-1"><span class="spinner"></span> Gerando...</span>
                         </button>
-                        <span x-show="!productId" class="text-[11px] text-slate-400 italic">IA disponível após salvar</span>
                     </div>
                 </div>
             </div>
@@ -314,12 +316,12 @@
 
             <!-- FilePond (hidden, controlado via API) -->
             <div class="photo-upload-container" :class="totalPhotoCount >= 5 ? 'hidden' : ''">
-                <div class="flex items-center gap-2 mb-3 flex-wrap">
-                    <span class="photo-upload-badge"
-                          x-text="remainingPhotoSlots > 0 ? 'Você pode adicionar mais ' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' foto' : ' fotos') : 'Limite atingido'"></span>
-                    <span class="photo-upload-badge">JPEG, PNG, WebP</span>
-                    <span class="photo-upload-badge">até 10 MB</span>
-                </div>
+                <p class="text-xs text-slate-400 mb-3">
+                    Máx. 5 fotos · JPEG, PNG, WebP · 10 MB cada · A 1ª foto será a capa.
+                    <span x-show="remainingPhotoSlots > 0" x-cloak
+                          x-text="'(' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' slot disponível)' : ' slots disponíveis)')"></span>
+                    <span x-show="remainingPhotoSlots === 0" x-cloak class="text-emerald-600 font-medium">· Limite atingido ✓</span>
+                </p>
                 <input type="file" x-ref="pondInput" />
             </div>
         </div>
@@ -377,7 +379,8 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Margem</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-0.5">Margem</label>
+                    <p class="text-[11px] text-slate-400 mb-1.5">% sobre o preço de venda — ex: custo R$8 com 30% → venda R$11,43</p>
                     <div class="relative">
                         <input type="number" step="0.1"
                                x-model.number="margem" @@input="onMargemInput()"
@@ -401,7 +404,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço venda</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
                         <input type="number" step="0.01" min="0"
@@ -1422,15 +1425,28 @@ removePondFile(idx) {
                 // ── AI ──
                 aiGenerating: false,
                 async generateDescription() {
-                    if (this.aiGenerating || !this.productId) return;
+                    if (this.aiGenerating || !this.nome) return;
                     this.aiGenerating = true;
                     try {
-                        const params = new URLSearchParams({
-                            produtoId: this.productId, canal: 'descricao', tom: 'profissional',
-                            foco: 'beneficios',
-                            contexto: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases) para usar no cadastro do produto. Nao use listas. Nao use titulo.'
-                        });
-                        const res = await fetch('/anuncios/gerar?' + params.toString());
+                        let res;
+                        if (this.productId) {
+                            // Produto já salvo: usa endpoint com contexto completo
+                            const params = new URLSearchParams({
+                                produtoId: this.productId, canal: 'descricao', tom: 'profissional',
+                                foco: 'beneficios',
+                                contexto: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases) para usar no cadastro do produto. Nao use listas. Nao use titulo.'
+                            });
+                            res = await fetch('/anuncios/gerar?' + params.toString());
+                        } else {
+                            // Novo produto: usa endpoint de completar com dados do formulário
+                            const params = new URLSearchParams({
+                                nome: this.nome,
+                                categoria: this.categoriaNome ?? '',
+                                marca: this.marca ?? '',
+                                instrucoes: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases). Nao use listas. Nao use titulo.'
+                            });
+                            res = await fetch('/anuncios/completar-produto?' + params.toString());
+                        }
                         if (!res.ok) throw new Error();
                         const reader = res.body.getReader();
                         const decoder = new TextDecoder();
@@ -1450,14 +1466,15 @@ removePondFile(idx) {
                 // ── Margem sugestoes ──
                 get margemSugestoes() {
                     if (!this.custo || this.custo <= 0) return [];
+                    // Fórmula: margem sobre preço de venda → preço = custo / (1 - pct/100)
                     return [30, 50, 100].map(pct => ({
                         pct,
-                        preco: (this.custo * (1 + pct / 100)).toFixed(2).replace('.', ',')
+                        preco: (this.custo / (1 - pct / 100)).toFixed(2).replace('.', ',')
                     }));
                 },
                 aplicarMargem(pct) {
                     this.margem = pct;
-                    if (this.custo > 0) this.preco = parseFloat((this.custo * (1 + pct / 100)).toFixed(2));
+                    if (this.custo > 0) this.preco = parseFloat((this.custo / (1 - pct / 100)).toFixed(2));
                 },
 
                 // ── Completion (mesmos critérios ponderados da página do produto) ──
