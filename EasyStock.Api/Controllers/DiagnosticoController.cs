@@ -1546,7 +1546,9 @@ public sealed class DiagnosticoController(
             <div class='stat-box'><div class='stat-num' id='kpiSnap'>{snapshots.Count} snapshots</div><div class='stat-label'>Historico (max 120 = 2h)</div></div>
         </div>
         <div class='card'><h2>&#128200; Latencia do Banco de Dados</h2>
+            <div id='eventosLegenda' style='display:none;flex-wrap:wrap;gap:.25rem;margin-bottom:.5rem;padding:.4rem .5rem;background:#0f172a;border-radius:.3rem'></div>
             <div class='chart-box'><canvas id='dbChart'></canvas></div>
+            <div style='font-size:.65rem;color:#475569;margin-top:.3rem'>🚀 Deploy &nbsp; ⚡ Error Spike &nbsp; (linhas aparecem quando eventos sao detectados nos logs)</div>
         </div>
         <div class='grid-2'>
             <div class='card'><h2>&#128200; Latencia Redis</h2>
@@ -1669,12 +1671,22 @@ public sealed class DiagnosticoController(
         let _liveTimer=null;
         let _lastPollTime=new Date().toISOString();
 
+        var _timelineEventos=[];
+        async function fetchEventos(){
+            try{
+                const r=await fetch('/api/diagnostico/eventos?hours=2');
+                if(!r.ok)return;
+                const d=await r.json();
+                _timelineEventos=d.eventos||[];
+            }catch{}
+        }
+
         function showTab(name){
             document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
             document.getElementById('tab-'+name).classList.add('active');
             event.target.classList.add('active');
-            if(name==='health'){setTimeout(initHealthCharts,50);}
+            if(name==='health'){fetchEventos().then(()=>setTimeout(initHealthCharts,50));}
             if(name==='logs'){startLiveLogs();setTimeout(initErrorTimeline,50);reloadLixeiraInfo();}
             else stopLiveLogs();
         }
@@ -2046,6 +2058,45 @@ public sealed class DiagnosticoController(
                 }
             });
         }
+        // Plugin inline para linhas verticais de eventos na timeline
+        const eventLinesPlugin={
+            id:'eventLines',
+            afterDraw(chart){
+                if(!_timelineEventos||!_timelineEventos.length)return;
+                const ctx=chart.ctx, xAxis=chart.scales.x, yAxis=chart.scales.y;
+                if(!xAxis||!yAxis)return;
+                ctx.save();
+                _timelineEventos.forEach(ev=>{
+                    const evTime=new Date(ev.timestamp);
+                    const evLabel=evTime.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+                    // Encontrar índice mais próximo
+                    const labels=chart.data.labels||[];
+                    let bestIdx=-1,bestDiff=Infinity;
+                    labels.forEach((l,i)=>{
+                        const diff=Math.abs(l.localeCompare(evLabel));
+                        if(diff<bestDiff){
+                            bestDiff=diff;
+                            bestIdx=i;
+                        }
+                    });
+                    if(bestIdx<0)return;
+                    const x=xAxis.getPixelForIndex(bestIdx);
+                    const color=ev.tipo==='deploy'?'rgba(56,189,248,0.8)':ev.tipo==='error_spike'?'rgba(239,68,68,0.8)':'rgba(251,191,36,0.8)';
+                    const icon=ev.tipo==='deploy'?'🚀':ev.tipo==='error_spike'?'⚡':'⚠';
+                    ctx.strokeStyle=color;
+                    ctx.lineWidth=1.5;
+                    ctx.setLineDash([4,3]);
+                    ctx.beginPath();ctx.moveTo(x,yAxis.top);ctx.lineTo(x,yAxis.bottom);ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle=color;
+                    ctx.font='11px system-ui';
+                    ctx.fillText(icon,x-6,yAxis.top+12);
+                });
+                ctx.restore();
+            }
+        };
+        Chart.register(eventLinesPlugin);
+
         function initHealthCharts(){
             if(typeof cLabels==='undefined')return;
             if(_dbChart){_dbChart.data.labels=cLabels;_dbChart.data.datasets[0].data=dbData;_dbChart.update();
@@ -2068,6 +2119,15 @@ public sealed class DiagnosticoController(
                         {label:'Requests',data:reqData,backgroundColor:'rgba(56,189,248,0.5)',borderColor:'#38bdf8',borderWidth:1,borderRadius:2},
                         {label:'Erros',data:errHData,backgroundColor:'rgba(239,68,68,0.7)',borderColor:'#ef4444',borderWidth:1,borderRadius:2}
                     ]},options:COzL});
+            }
+            // Legenda dos eventos
+            if(_timelineEventos&&_timelineEventos.length){
+                const leg=document.getElementById('eventosLegenda');
+                if(leg){
+                    leg.style.display='flex';
+                    leg.innerHTML='<span style="font-size:.7rem;color:#64748b;margin-right:.5rem">Eventos:</span>'
+                        +_timelineEventos.map(e=>`<span style="font-size:.7rem;margin-right:.75rem">${e.tipo==='deploy'?'🚀':e.tipo==='error_spike'?'⚡':'⚠'} ${e.label||e.tipo} <span style="color:#475569">${new Date(e.timestamp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span></span>`).join('');
+                }
             }
         }
         </script>
