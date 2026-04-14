@@ -284,15 +284,23 @@
             <!-- Grid de previews (existentes + novas) -->
             <div x-show="totalPhotoCount > 0" x-transition class="mb-4">
                 <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                    <!-- Fotos existentes -->
+                    <!-- Fotos existentes (BUG C fix: badge Capa em idx===0 sempre) -->
                     <template x-for="(foto, idx) in existingPhotos" :key="'ex-' + foto.fotoId">
                         <div class="relative aspect-square rounded-xl overflow-hidden border-2 group"
-                             :class="idx === 0 && previews.length === 0 ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'">
+                             :class="idx === 0 ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'">
                             <img :src="foto.url" class="w-full h-full object-cover object-top" />
-                            <span x-show="idx === 0 && previews.length === 0"
+                            <span x-show="idx === 0"
                                   class="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Capa</span>
                             <span class="absolute bottom-1.5 left-1.5 text-[10px] font-semibold text-white bg-black/50 backdrop-blur px-1.5 py-0.5 rounded"
                                   x-text="'Foto ' + (idx + 1)"></span>
+                            <!-- BUG D: botão remover foto existente (só em modo edição) -->
+                            <template x-if="productId">
+                                <button type="button" @@click="deleteExistingPhoto(foto.fotoId)"
+                                        aria-label="Remover foto"
+                                        class="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-white/90 hover:bg-red-500 hover:text-white text-slate-500 rounded-full shadow-sm text-xs font-bold opacity-0 group-hover:opacity-100 transition-all">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </template>
                         </div>
                     </template>
                     <!-- Previews de novas fotos -->
@@ -314,18 +322,16 @@
                 </div>
             </div>
 
-            <!-- Área de upload: slots visuais quando vazio -->
+            <!-- Área de upload: slots visuais quando vazio (BUG A fix: grid-cols-5 uniforme) -->
             <div x-show="totalPhotoCount === 0" x-cloak class="mb-4">
                 <div class="grid grid-cols-5 gap-2">
-                    <!-- Slot Capa (destaque) -->
+                    <!-- Slot 1: Capa (destaque indigo, mesmo tamanho dos outros) -->
                     <button type="button" @@click="_pond && _pond.browse()"
-                            class="col-span-2 aspect-square rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 hover:bg-indigo-50 flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer group">
-                        <div class="w-8 h-8 rounded-full bg-indigo-100 group-hover:bg-indigo-200 flex items-center justify-center transition-colors">
-                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        </div>
-                        <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">Capa</span>
+                            class="aspect-square rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer group">
+                        <svg class="w-5 h-5 text-indigo-400 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-wide">Capa</span>
                     </button>
-                    <!-- Slots secundários 2-5 -->
+                    <!-- Slots 2-5 -->
                     <template x-for="n in [2,3,4,5]" :key="n">
                         <button type="button" @@click="_pond && _pond.browse()"
                                 class="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
@@ -334,15 +340,14 @@
                         </button>
                     </template>
                 </div>
-                <p class="text-center text-xs text-slate-400 mt-3">Toque em qualquer slot para adicionar fotos · JPEG, PNG, WebP · 10 MB</p>
+                <p class="text-center text-xs text-slate-400 mt-3">Toque em qualquer slot para adicionar · JPEG, PNG, WebP · 10 MB</p>
             </div>
 
-            <!-- FilePond (hidden input + drop zone, aparece ao ter pelo menos 1 foto) -->
-            <div class="photo-upload-container" :class="totalPhotoCount >= 5 ? 'hidden' : ''">
-                <p x-show="totalPhotoCount > 0" x-cloak class="text-xs text-slate-400 mb-3">
-                    Máx. 5 fotos · JPEG, PNG, WebP · 10 MB cada · A 1ª foto será a capa.
-                    <span x-show="remainingPhotoSlots > 0"
-                          x-text="'(' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' slot disponível)' : ' slots disponíveis)')"></span>
+            <!-- FilePond (só visível quando 1-4 fotos; BUG B fix: oculto quando 0 ou >= 5) -->
+            <div class="photo-upload-container" x-show="totalPhotoCount > 0 && totalPhotoCount < 5">
+                <p class="text-xs text-slate-400 mb-3">
+                    Máx. 5 fotos · JPEG, PNG, WebP · 10 MB cada · A 1ª foto é a capa.
+                    <span x-text="'(' + remainingPhotoSlots + (remainingPhotoSlots === 1 ? ' slot disponível)' : ' slots disponíveis)')"></span>
                 </p>
                 <input type="file" x-ref="pondInput" />
             </div>
@@ -1462,6 +1467,28 @@ removePondFile(idx) {
     const files = this._pond.getFiles();
     if (files[idx]) {
         this._pond.removeFile(files[idx].id);
+    }
+},
+async deleteExistingPhoto(fotoId) {
+    if (!this.productId) return;
+    if (!confirm('Remover esta foto do produto?')) return;
+    try {
+        const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
+        const resp = await fetch(`/produtos/${this.productId}/fotos/${fotoId}/remover`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            this.existingPhotos = this.existingPhotos.filter(f => f.fotoId !== fotoId);
+            window.showToast('Foto removida.', 'success');
+        } else {
+            window.showToast(data.erro || 'Erro ao remover foto.', 'error');
+        }
+    } catch (e) {
+        console.error('[EasyStock] deleteExistingPhoto:', e);
+        window.showToast('Erro de conexão ao remover foto.', 'error');
     }
 },
 
