@@ -1,9 +1,29 @@
+using EasyStock.Web.Models.Api;
+
 namespace EasyStock.Web.Services;
 
 public class AnunciosService(ApiClient api, SessionService session)
 {
     private Guid GetEmpresaId() =>
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
+
+    public Task<ApiResult<List<AnuncioIaApi>>> ListarSalvosAsync(string produtoId) =>
+        api.GetAsync<List<AnuncioIaApi>>($"ia/anuncios/{produtoId}?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> SalvarAnuncioAsync(string produtoId, string? variacaoId, string titulo, string conteudo, string? instrucoes) =>
+        api.PostAsync<object>("ia/anuncio/salvar", new
+        {
+            empresaId = GetEmpresaId(),
+            produtoId = Guid.TryParse(produtoId, out var pid) ? pid : Guid.Empty,
+            produtoVariacaoId = Guid.TryParse(variacaoId, out var vid) ? (Guid?)vid : null,
+            titulo,
+            conteudo,
+            instrucoesUsadas = instrucoes,
+            tokensConsumidos = 0
+        });
+
+    public Task<ApiResult<bool>> DeletarAnuncioAsync(string id) =>
+        api.DeleteAsync($"ia/anuncios/{id}?empresaId={GetEmpresaId()}");
 
     public async Task<(bool Success, Stream? Stream, string? Error)> GerarStreamAsync(
         string produtoId, string canal, string tom, string foco, string? varId, string? contexto)

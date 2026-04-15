@@ -71,7 +71,13 @@
                     var isEntrada = m.Tipo.Contains("entrada", StringComparison.OrdinalIgnoreCase);
                     var tipoIcon = isEntrada ? "↑" : "↓";
                     var tipoColor = isEntrada ? "text-green-600" : "text-red-500";
-                    <tr>
+                    @{
+                        var dataStr = m.Data.ToString("yyyy-MM-dd");
+                        var tipoParam = isEntrada ? "entrada" : "saida";
+                    }
+                    <tr class="cursor-pointer hover:bg-slate-50 transition-colors"
+                        @@click="window.location.href='/analytics/movimentacoes?de=@dataStr&ate=@dataStr&tipo=@tipoParam'"
+                        title="Ver detalhes de @m.Data.ToString("dd/MM/yyyy")">
                         <td>
                             <span class="font-medium @tipoColor">@tipoIcon</span>
                             <span class="text-sm text-slate-600 ml-1 capitalize">@m.Tipo</span>
@@ -90,7 +96,12 @@
                                 <span class="text-slate-400">—</span>
                             }
                         </td>
-                        <td class="text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                        <td class="text-slate-500">
+                            @m.Data.ToString("dd/MM/yyyy")
+                            <svg class="w-3 h-3 inline ml-1 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </td>
                     </tr>
                 }
             </tbody>

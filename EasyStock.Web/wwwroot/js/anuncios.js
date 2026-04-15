@@ -36,13 +36,13 @@ function anuncioForm() {
             this.busca = p.nome;
             this.showResults = false;
             this.resultados = [];
+            window.dispatchEvent(new CustomEvent('produto-selecionado', { detail: { produtoId: p.id } }));
         },
 
         gerarAnuncio() {
             if (!this.produtoId) return;
             this.gerando = true;
 
-            // Dispatch event to resultado component
             window.dispatchEvent(new CustomEvent('anuncio-gerar', {
                 detail: {
                     produtoId: this.produtoId,
@@ -62,16 +62,20 @@ function anuncioResultado() {
         resultado: '',
         gerando: false,
         copiado: false,
+        salvando: false,
+        _produtoId: '',
+        _instrucoes: '',
         _source: null,
 
         init() {
             window.addEventListener('anuncio-gerar', (e) => {
+                this._produtoId = e.detail.produtoId;
+                this._instrucoes = [e.detail.canal, e.detail.tom, e.detail.foco, e.detail.contexto].filter(Boolean).join('. ');
                 this.iniciarStream(e.detail);
             });
         },
 
         iniciarStream({ produtoId, canal, tom, foco, contexto }) {
-            // Close previous stream if any
             if (this._source) {
                 this._source.close();
                 this._source = null;
@@ -88,16 +92,11 @@ function anuncioResultado() {
                 ...(contexto ? { contexto } : {})
             });
 
-            const url = `/anuncios/gerar?${params}`;
-
-            // Use fetch with ReadableStream for SSE
-            fetch(url)
+            fetch(`/anuncios/gerar?${params}`)
                 .then(res => {
                     if (!res.ok) {
                         this.resultado = 'Erro ao gerar anúncio. Tente novamente.';
                         this.gerando = false;
-
-                        // Notify parent form
                         window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                         return;
                     }
@@ -144,11 +143,8 @@ function anuncioResultado() {
                     window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                 });
 
-            // Listen for completion to reset the form's gerando state
             window.addEventListener('anuncio-concluido', () => {
-                // Notify parent form component
-                const event = new CustomEvent('anuncio-finalizado');
-                window.dispatchEvent(event);
+                window.dispatchEvent(new CustomEvent('anuncio-finalizado'));
             }, { once: true });
         },
 
@@ -160,19 +156,94 @@ function anuncioResultado() {
             });
         },
 
-        salvarRascunho() {
-            if (!this.resultado) return;
-            const key = `anuncio_rascunho_${Date.now()}`;
-            localStorage.setItem(key, JSON.stringify({
-                texto: this.resultado,
-                savedAt: new Date().toISOString()
-            }));
-            window.showToast('Rascunho salvo localmente!', 'success');
+        async salvarRascunho() {
+            if (!this.resultado || !this._produtoId) return;
+            this.salvando = true;
+            const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
+            const titulo = this.resultado.substring(0, 80).replace(/\n/g, ' ').trim();
+            try {
+                const res = await fetch('/anuncios/salvar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
+                    },
+                    body: new URLSearchParams({
+                        produtoId: this._produtoId,
+                        titulo,
+                        conteudo: this.resultado,
+                        instrucoes: this._instrucoes
+                    })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    window.showToast('Anúncio salvo!', 'success');
+                    window.dispatchEvent(new CustomEvent('anuncio-salvo', { detail: { produtoId: this._produtoId } }));
+                } else {
+                    window.showToast(data.erro || 'Erro ao salvar.', 'error');
+                }
+            } catch {
+                window.showToast('Erro ao salvar.', 'error');
+            } finally {
+                this.salvando = false;
+            }
         }
     };
 }
 
-// Reset gerando state when anuncio finalizado
-window.addEventListener('anuncio-finalizado', () => {
-    // Alpine components handle their own state via events
-});
+// Alpine.js component for saved ads panel
+function anunciosSalvos() {
+    return {
+        produtoId: '',
+        itens: [],
+        carregando: false,
+
+        init() {
+            window.addEventListener('produto-selecionado', (e) => {
+                this.produtoId = e.detail.produtoId;
+                this.carregar();
+            });
+            window.addEventListener('anuncio-salvo', (e) => {
+                if (e.detail.produtoId === this.produtoId) this.carregar();
+            });
+        },
+
+        async carregar() {
+            if (!this.produtoId) return;
+            this.carregando = true;
+            try {
+                const res = await fetch(`/anuncios/salvos?produtoId=${this.produtoId}`);
+                this.itens = res.ok ? await res.json() : [];
+            } catch {
+                this.itens = [];
+            } finally {
+                this.carregando = false;
+            }
+        },
+
+        copiarItem(conteudo) {
+            navigator.clipboard.writeText(conteudo).then(() => {
+                window.showToast('Copiado!', 'success');
+            });
+        },
+
+        async deletar(id) {
+            const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
+            try {
+                const res = await fetch(`/anuncios/${id}/deletar`, {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': token }
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    this.itens = this.itens.filter(i => i.id !== id);
+                    window.showToast('Anúncio removido.', 'success');
+                } else {
+                    window.showToast(data.erro || 'Erro ao remover.', 'error');
+                }
+            } catch {
+                window.showToast('Erro ao remover.', 'error');
+            }
+        }
+    };
+}

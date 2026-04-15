@@ -24,6 +24,42 @@ public class AnunciosController(
         return View(vm);
     }
 
+    [HttpGet("/anuncios/salvos")]
+    public async Task<IActionResult> ListarSalvos(string produtoId)
+    {
+        if (string.IsNullOrWhiteSpace(produtoId)) return Json(Array.Empty<object>());
+        var result = await anunciosSvc.ListarSalvosAsync(produtoId);
+        if (!result.Success) return Json(Array.Empty<object>());
+        return Json(result.Data!.Select(a => new
+        {
+            id = a.Id,
+            titulo = a.Titulo,
+            conteudo = a.Conteudo,
+            criadoEm = a.CriadoEm.ToString("dd/MM/yyyy HH:mm")
+        }));
+    }
+
+    [HttpPost("/anuncios/salvar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Salvar(
+        string produtoId, string? variacaoId, string titulo, string conteudo, string? instrucoes)
+    {
+        var result = await anunciosSvc.SalvarAnuncioAsync(produtoId, variacaoId, titulo, conteudo, instrucoes);
+        if (!result.Success)
+            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao salvar." });
+        return Json(new { ok = true });
+    }
+
+    [HttpPost("/anuncios/{id}/deletar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Deletar(string id)
+    {
+        var result = await anunciosSvc.DeletarAnuncioAsync(id);
+        if (!result.Success)
+            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao deletar." });
+        return Json(new { ok = true });
+    }
+
     // GET is intentional — SSE streams never need anti-forgery
     [HttpGet("/anuncios/completar-produto")]
     public async Task CompletarProduto(

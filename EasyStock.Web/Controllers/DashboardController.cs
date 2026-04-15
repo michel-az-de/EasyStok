@@ -9,10 +9,12 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
 {
     [HttpGet("/dashboard")]
     [HttpGet("/")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int meses = 6)
     {
         ViewBag.Title = "Dashboard";
         ViewBag.ActiveMenuItem = "Dashboard";
+        if (meses is not (3 or 6 or 12)) meses = 6;
+        ViewBag.MesesGrafico = meses;
 
         var vm = new DashboardViewModel();
 
@@ -20,7 +22,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
-        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>("analytics/receita?meses=6");
+        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>($"analytics/receita?meses={meses}");
 
         await Task.WhenAll(dashTask, reposTask, movsTask, receitaTask);
 

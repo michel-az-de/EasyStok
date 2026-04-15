@@ -49,7 +49,7 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ confirm: false, menuOpen: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
+                    <tr x-data="{ confirm: false, menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)
@@ -85,7 +85,10 @@
                             }
                             else
                             {
-                                <span class="text-slate-400 text-xs font-normal">Sem preço</span>
+                                <button type="button" @@click.stop="precoModal = true; precoVal = ''"
+                                        class="text-indigo-500 hover:text-indigo-700 text-xs font-medium underline underline-offset-2">
+                                    Definir preço →
+                                </button>
                             }
                         </td>
                         <td class="text-center">
@@ -162,6 +165,46 @@
                                                 Excluir
                                             </button>
                                         </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Modal definir preço -->
+                            <div x-show="precoModal" x-cloak @@click.stop
+                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                                 @@click.self="precoModal = false">
+                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
+                                    <h3 class="font-semibold text-slate-900 mb-1">Definir preço</h3>
+                                    <p class="text-sm text-slate-500 mb-4">@p.Nome</p>
+                                    <div class="mb-4">
+                                        <label class="block text-xs text-slate-500 mb-1">Preço de referência (R$)</label>
+                                        <input type="number" step="0.01" min="0" x-model="precoVal" @@click.stop
+                                               @@keydown.enter.prevent="if(precoVal > 0) $refs.btnSalvarPreco_@(p.Id.ToString().Replace("-","")).click()"
+                                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                                               placeholder="0,00" autofocus />
+                                    </div>
+                                    <div class="flex justify-end gap-3">
+                                        <button type="button" @@click.stop="precoModal = false"
+                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
+                                            Cancelar
+                                        </button>
+                                        <button type="button" x-ref="btnSalvarPreco_@(p.Id.ToString().Replace("-",""))"
+                                                :disabled="precoSaving || !precoVal || precoVal <= 0"
+                                                :class="{ 'opacity-50 cursor-not-allowed': precoSaving || !precoVal || precoVal <= 0 }"
+                                                @@click.stop="
+                                                    precoSaving = true;
+                                                    fetch('/produtos/@p.Id/preco-rapido', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'RequestVerificationToken': document.querySelector('[name=__RequestVerificationToken]')?.value ?? '' },
+                                                        body: 'preco=' + encodeURIComponent(precoVal)
+                                                    }).then(r => r.json()).then(d => {
+                                                        if(d.ok) { window.showToast('Preço atualizado!', 'success'); location.reload(); }
+                                                        else { window.showToast(d.erro || 'Erro ao salvar.', 'error'); precoSaving = false; }
+                                                    }).catch(() => { window.showToast('Erro ao salvar.', 'error'); precoSaving = false; })
+                                                "
+                                                class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+                                            <span x-show="!precoSaving">Salvar</span>
+                                            <span x-show="precoSaving" x-cloak class="flex items-center gap-1"><span class="spinner"></span> Salvando...</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

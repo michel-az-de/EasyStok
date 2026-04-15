@@ -141,7 +141,19 @@
     </div>
 
     <div class="ws dashboard-chart-card">
-        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos @Model.GraficoLabels.Count @(Model.GraficoLabels.Count == 1 ? "mês" : "meses")</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-slate-800">Receita Bruta</h2>
+            <div class="flex gap-1">
+                @foreach (var (m, label) in new[] { (3, "3m"), (6, "6m"), (12, "12m") })
+                {
+                    var isActive = (ViewBag.MesesGrafico as int? ?? 6) == m;
+                    <a href="/dashboard?meses=@m"
+                       class="px-2.5 py-1 text-xs font-medium rounded-lg @(isActive ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100")">
+                        @label
+                    </a>
+                }
+            </div>
+        </div>
         @if (Model.GraficoLabels.Any())
         {
             <div class="dashboard-chart-wrap">
@@ -206,24 +218,26 @@
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false } },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                            }
+                        }
+                    },
                     scales: {
                         x: {
-                            ticks: {
-                                color: '#64748B'
-                            },
-                            grid: {
-                                display: false
-                            }
+                            ticks: { color: '#64748B' },
+                            grid: { display: false }
                         },
                         y: {
                             ticks: {
                                 color: '#64748B',
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')
                             },
-                            grid: {
-                                color: 'rgba(148, 163, 184, 0.18)'
-                            }
+                            grid: { color: 'rgba(148, 163, 184, 0.18)' }
                         }
                     }
                 }

@@ -158,7 +158,19 @@ else
 @if (Model.GraficoLabels.Any())
 {
     <div class="ws mb-6">
-        <h2 class="font-semibold text-slate-900 mb-4">Receita Bruta — últimos meses</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-slate-900">Receita Bruta</h2>
+            <div class="flex gap-1">
+                @foreach (var (m, label) in new[] { (3, "3m"), (6, "6m"), (12, "12m") })
+                {
+                    var isActive = (ViewBag.MesesGrafico as int? ?? 6) == m;
+                    <a href="/analytics?meses=@m"
+                       class="px-2.5 py-1 text-xs font-medium rounded-lg @(isActive ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100")">
+                        @label
+                    </a>
+                }
+            </div>
+        </div>
         <canvas id="grafico-receita-analytics" height="120"></canvas>
     </div>
 }
@@ -182,12 +194,18 @@ else
                     },
                     options: {
                         responsive: true,
-                        plugins: { legend: { display: false } },
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                                }
+                            }
+                        },
                         scales: {
                             y: {
-                                ticks: {
-                                    callback: v => 'R$ ' + v.toLocaleString('pt-BR')
-                                }
+                                ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') }
                             }
                         }
                     }

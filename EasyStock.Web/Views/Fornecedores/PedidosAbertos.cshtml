@@ -221,7 +221,7 @@ else
             <div class="pedido-form grid grid-cols-2 gap-4">
                 <div class="col-span-2">
                     <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Fornecedor *</label>
-                    <select name="fornecedorId" required class="ui-select">
+                    <select name="fornecedorId" required class="ui-select" id="select-fornecedor-pedido">
                         <option value="">Selecione...</option>
                         @foreach (var f in Model.Fornecedores)
                         {
@@ -272,3 +272,21 @@ else
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    (function () {
+        const params = new URLSearchParams(location.search);
+        if (params.get('novo') === '1') {
+            const fornId = params.get('fornecedorId');
+            document.addEventListener('alpine:init', () => {}, { once: true });
+            // Dispatch after Alpine has initialised the modal
+            setTimeout(() => {
+                const sel = document.getElementById('select-fornecedor-pedido');
+                if (sel && fornId) sel.value = fornId;
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'novo-pedido' }));
+            }, 50);
+        }
+    })();
+</script>
+}

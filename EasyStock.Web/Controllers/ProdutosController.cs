@@ -343,6 +343,16 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return Json(new { ok = true });
     }
 
+    [HttpPost("/produtos/{id}/preco-rapido")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PrecoRapido(string id, decimal preco)
+    {
+        var result = await svc.AtualizarPrecoAsync(id, preco);
+        if (!result.Success)
+            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao atualizar preço." });
+        return Json(new { ok = true });
+    }
+
     [HttpGet("/produtos/marcas-sugestoes")]
     public async Task<IActionResult> MarcasSugestoes(string? q)
     {

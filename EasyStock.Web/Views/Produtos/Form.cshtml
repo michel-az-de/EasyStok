@@ -988,7 +988,7 @@
                 productId: '@(Model.Id ?? "")',
 
                 // ── Wizard ──
-                step: 1,
+                step: isEdit ? (parseInt(new URLSearchParams(location.search).get('step') ?? '1') || 1) : 1,
                 maxStepReached: isEdit ? 4 : 1,
 
                 nextStep() {

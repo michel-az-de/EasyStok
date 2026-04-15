@@ -147,6 +147,14 @@ public class ProdutosService(ApiClient api, SessionService session)
                 }).ToArray()
         });
 
+    public Task<ApiResult<object>> AtualizarPrecoAsync(string id, decimal preco) =>
+        api.PatchAsync<object>($"produtos/{id}", new
+        {
+            empresaId = GetEmpresaId(),
+            produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
+            precoReferencia = preco
+        });
+
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
         api.DeleteAsync($"produtos/{id}?empresaId={GetEmpresaId()}");
 

@@ -8,10 +8,12 @@ namespace EasyStock.Web.Controllers;
 public class AnalyticsController(AnalyticsService svc, SessionService session) : BaseController(session)
 {
     [HttpGet("/analytics")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int meses = 6)
     {
         ViewBag.Title = "Analytics";
         ViewBag.ActiveMenuItem = "Analytics";
+        if (meses is not (3 or 6 or 12)) meses = 6;
+        ViewBag.MesesGrafico = meses;
 
         var vm = new AnalyticsViewModel();
 
@@ -19,7 +21,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
             svc.DashboardAsync(),
             svc.ReposicaoAsync(),
             svc.AlertasAsync(),
-            svc.ReceitaAsync()
+            svc.ReceitaAsync(meses)
         );
         var (dashResult, reposResult, alertasResult, receitaResult) =
             (await dashTask, await reposTask, await alertasTask, await receitaTask);
