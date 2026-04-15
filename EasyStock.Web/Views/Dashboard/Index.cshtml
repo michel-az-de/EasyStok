@@ -81,7 +81,10 @@
 
 <div class="grid grid-cols-1 gap-6 mb-6">
     <div class="ws">
-        <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-slate-800">Movimentações recentes</h2>
+            <a href="/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
+        </div>
         @if (Model.MovimentacoesRecentes.Any())
         {
             <div class="overflow-x-auto">
@@ -98,7 +101,8 @@
                     <tbody>
                         @foreach (var m in Model.MovimentacoesRecentes)
                         {
-                            <tr>
+                            var tipoParam = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
+                            <tr class="cursor-pointer hover:bg-slate-50" onclick="location.href='/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam'">
                                 <td>
                                     @{
                                         var badgeClass = m.Tipo switch
@@ -178,7 +182,7 @@
             var acoes = new[]
             {
                 new { Icon = "📥", Label = "Nova entrada", Href = "/entradas/nova" },
-                new { Icon = "📤", Label = "Nova saída", Href = "/saidas/nova" },
+                new { Icon = "📤", Label = "Registrar Saída", Href = "/saidas/nova" },
                 new { Icon = "🔄", Label = "Repor estoque", Href = "/entradas/reposicao" },
                 new { Icon = "📦", Label = "Ver estoque", Href = "/estoque" },
                 new { Icon = "🤖", Label = "Gerar anúncio", Href = "/anuncios" },

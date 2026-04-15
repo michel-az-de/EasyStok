@@ -1,12 +1,12 @@
 @model SaidaFormViewModel
 @{
-    ViewBag.Title = "Nova Saída";
+    ViewBag.Title = "Registrar Saída";
     Layout = "_Layout";
 }
 
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
-        <h1>Nova Saída</h1>
+        <h1>Registrar Saída</h1>
         <p>Registre uma saída ou venda de produto</p>
     </div>
     <a asp-action="Historico" asp-controller="Saidas"
@@ -166,7 +166,7 @@
                 Cancelar
             </a>
             <button type="submit"
-                    @@click="if (produtoId && estoqueAtual === 0) { $event.preventDefault(); window.showToast('Não há estoque disponível para este produto.', 'error'); return; } if (produtoId && qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } loading = true;"
+                    @@click="if (produtoId && estoqueAtual === 0) { $event.preventDefault(); window.showToast('Não há estoque disponível para este produto.', 'error'); return; } if (produtoId && qty > estoqueAtual) { $event.preventDefault(); window.showToast('Quantidade excede o estoque disponível (' + estoqueAtual + ').', 'error'); return; } if (valorUnit === 0 && !confirm('Deseja registrar uma saída com valor R$ 0,00?')) { $event.preventDefault(); return; } loading = true;"
                     :disabled="loading"
                     :class="{ 'opacity-50 cursor-not-allowed': loading }"
                     class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
@@ -227,6 +227,8 @@ function saidaForm() {
                     this.varId = '';
                     this.estoqueAtual = d.estoqueTotal || 0;
                 }
+                this.valorUnit = d.precoReferencia || 0;
+                this.calcularTotal();
             } catch {
                 this.variacoes = [];
                 this.estoqueAtual = 0;

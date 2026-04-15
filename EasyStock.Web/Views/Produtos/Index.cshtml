@@ -25,10 +25,6 @@
                @@input.debounce.400ms="$el.closest('form').submit()"
                value="@Model.Search" placeholder="Buscar por nome ou SKU..."
                class="ui-field flex-1 min-w-48" />
-        <button type="submit"
-                class="app-primary-btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
-            Buscar
-        </button>
     </form>
 </div>
 
@@ -220,14 +216,11 @@
         {
             <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                 <span class="text-sm text-slate-500">
-                    @if (Model.Paginacao.HasNext)
-                    {
-                        <text>Página @Model.Paginacao.Page — mais resultados →</text>
+                    @{
+                        var from = (Model.Paginacao.Page - 1) * Model.Paginacao.Limit + 1;
+                        var to = Math.Min(Model.Paginacao.Page * Model.Paginacao.Limit, Model.Paginacao.Total);
                     }
-                    else
-                    {
-                        <text>Página @Model.Paginacao.Page (última)</text>
-                    }
+                    Mostrando @from–@to de @Model.Paginacao.Total produto@(Model.Paginacao.Total == 1 ? "" : "s")
                 </span>
                 <div class="flex gap-2">
                     @if (Model.Paginacao.HasPrevious)

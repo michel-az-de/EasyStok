@@ -283,7 +283,7 @@
                 <span>📥</span> Nova entrada
             </a>
             <a href="/saidas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📤</span> Nova saída
+                <span>📤</span> Registrar Saída
             </a>
             <a href="/entradas/reposicao" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                 <span>🔄</span> Repor estoque
@@ -322,9 +322,14 @@
                         <span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full text-xs font-medium" x-text="resumo.totalNaoLidas"></span>
                     </template>
                 </div>
-                <template x-if="resumo && resumo.criticas > 0">
-                    <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' crítica' + (resumo.criticas > 1 ? 's' : '')"></span>
-                </template>
+                <div class="flex items-center gap-2">
+                    <template x-if="resumo && resumo.criticas > 0">
+                        <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' crítica' + (resumo.criticas > 1 ? 's' : '')"></span>
+                    </template>
+                    <template x-if="resumo && resumo.totalNaoLidas > 0">
+                        <button @@click="marcarTodas()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">Marcar todas como lidas</button>
+                    </template>
+                </div>
             </div>
 
             <!-- Items -->
@@ -407,6 +412,20 @@
                         }
                     } catch (e) { console.error('[EasyStock]', e); this.items = []; this.erro = true; }
                     this.loading = false;
+                },
+                async marcarTodas() {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                    try {
+                        await fetch('/notificacoes/marcar-todas', {
+                            method: 'POST',
+                            headers: { 'RequestVerificationToken': token || '' }
+                        });
+                        this.items = [];
+                        if (this.resumo) this.resumo.totalNaoLidas = 0;
+                        const badge = document.getElementById('topbar-notif-badge');
+                        if (badge) badge.classList.add('hidden');
+                        window.showToast && window.showToast('Todas as notificações foram marcadas como lidas.', 'success');
+                    } catch (e) { console.error('[EasyStock]', e); window.showToast && window.showToast('Erro ao marcar notificações.', 'error'); }
                 },
                 async marcarLida(id) {
                     const token = document.querySelector('meta[name="csrf-token"]')?.content;
