@@ -325,12 +325,10 @@ public sealed class GerenciarProdutoUseCase(
         var produto = await produtoRepository.GetDetalheAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
-        // Executa as duas queries em paralelo
-        var itensTask    = itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
-        var variacoesTask = produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
-        await Task.WhenAll(itensTask, variacoesTask);
-        var itens    = await itensTask;
-        var variacoes = await variacoesTask;
+        // Queries sequenciais — repositórios compartilham o mesmo DbContext (Scoped),
+        // Task.WhenAll em paralelo causaria "A second operation was started on this context instance".
+        var itens     = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
+        var variacoes = await produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
         var fotos = DesserializarFotos(produto.FotosJson);
 
         var variacoesResult = variacoes
