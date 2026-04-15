@@ -155,6 +155,9 @@
                     updateBadge('topbar-notif-badge', count);
                     updateBadge('notif-badge',        count);
 
+                    // Expor resumo para reutilização (ex: dropdown de notificações)
+                    window.__notifResumo = { data: data, ts: Date.now() };
+
                     if (lastCount === -1) {
                         lastCount    = count;
                         lastCritical = critical;
