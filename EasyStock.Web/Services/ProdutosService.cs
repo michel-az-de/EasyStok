@@ -161,6 +161,9 @@ public class ProdutosService(ApiClient api, SessionService session)
     public Task<ApiResult<object>> HistoricoAsync(string id) =>
         api.GetAsync<object>($"produtos/{id}/historico?empresaId={GetEmpresaId()}");
 
+    public Task<ApiResult<List<ProdutoAlteracaoApi>>> AlteracoesAsync(string id) =>
+        api.GetAsync<List<ProdutoAlteracaoApi>>($"produtos/{id}/alteracoes?empresaId={GetEmpresaId()}");
+
     public async Task<ApiResult<object>> UploadFotoAsync(string id, IFormFile foto)
     {
         using var form = new MultipartFormDataContent();

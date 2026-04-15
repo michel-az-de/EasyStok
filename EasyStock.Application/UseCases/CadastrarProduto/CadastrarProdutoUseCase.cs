@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -27,7 +28,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         string? FotosJson,
         IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
         IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
-        IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes);
+        IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes,
+        Guid UsuarioId = default);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -42,7 +44,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IProdutoEmbalagemRepository embalagemRepository,
         IProdutoVariacaoRepository variacaoRepository,
         IUnitOfWork unitOfWork,
-        ILogger<CadastrarProdutoUseCase> logger)
+        ILogger<CadastrarProdutoUseCase> logger,
+        IProdutoAlteracaoRepository? alteracaoRepository = null)
     {
         public async Task<CadastrarProdutoResult> ExecuteAsync(CadastrarProdutoCommand command)
         {
@@ -183,6 +186,19 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
 
                     await variacaoRepository.InsertAsync(entity);
                     variacoesIds.Add(entity.Id);
+                }
+
+                if (alteracaoRepository is not null && command.UsuarioId != Guid.Empty)
+                {
+                    await alteracaoRepository.AddAsync(new ProdutoAlteracao
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = command.EmpresaId,
+                        ProdutoId = produto.Id,
+                        UsuarioId = command.UsuarioId,
+                        Acao = "cadastrado",
+                        AlteradoEm = DateTime.UtcNow
+                    });
                 }
 
                 await unitOfWork.CommitAsync();

@@ -321,6 +321,14 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return Json(result.Data);
     }
 
+    [HttpGet("/produtos/{id}/alteracoes-json")]
+    public async Task<IActionResult> AlteracoesJson(string id)
+    {
+        var result = await svc.AlteracoesAsync(id);
+        if (!result.Success) return Json(Array.Empty<object>());
+        return Json(result.Data);
+    }
+
     /// <summary>Upload de foto via AJAX — retorna JSON {ok, fotoId, url}</summary>
     [HttpPost("/produtos/{id}/fotos/ajax")]
     [ValidateAntiForgeryToken]

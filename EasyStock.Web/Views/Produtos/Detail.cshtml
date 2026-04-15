@@ -334,7 +334,7 @@
         <button @@click="tab='estoque'"
                 :class="tab==='estoque' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Estoque</button>
-        <button @@click="tab='historico'; loadHistorico()"
+        <button @@click="tab='historico'; loadHistorico(); loadAlteracoes()"
                 :class="tab==='historico' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Histórico</button>
         <button @@click="tab='detalhes'"
@@ -588,6 +588,68 @@
 
     <!-- ═══ TAB: HISTORICO ═══ -->
     <div x-show="tab==='historico'" x-cloak>
+
+        <!-- Alterações do cadastro -->
+        <div class="ws produto-detail-tab-card mb-4">
+            <h3 class="font-bold text-slate-800 mb-4">Alterações do cadastro</h3>
+
+            <div x-show="alteracoes===null" class="text-center py-6 text-slate-400 flex items-center justify-center gap-2">
+                <span class="spinner"></span>
+                <span class="text-sm">Carregando...</span>
+            </div>
+
+            <div x-show="alteracoes!==null && alteracoes.length===0" class="text-center py-6 text-slate-400">
+                <p class="text-sm">Nenhuma alteração registrada.</p>
+            </div>
+
+            <div x-show="alteracoes!==null && alteracoes.length>0" class="overflow-x-auto produto-detail-table-wrap">
+                <table class="tbl-full">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Ação</th>
+                            <th>Usuário</th>
+                            <th>Campos alterados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(alt, i) in alteracoes" :key="i">
+                            <tr>
+                                <td class="text-sm text-slate-600 whitespace-nowrap"
+                                    x-text="alt.alteradoEm ? new Date(alt.alteradoEm).toLocaleString('pt-BR') : '-'"></td>
+                                <td>
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                          :class="{
+                                              'bg-emerald-50 text-emerald-700': alt.acao==='cadastrado'||alt.acao==='restaurado',
+                                              'bg-blue-50 text-blue-700': alt.acao==='atualizado',
+                                              'bg-red-50 text-red-600': alt.acao==='inativado'
+                                          }"
+                                          x-text="alt.acao"></span>
+                                </td>
+                                <td class="text-sm text-slate-600" x-text="alt.usuarioNome ?? '-'"></td>
+                                <td class="text-sm text-slate-500">
+                                    <template x-if="alt.alteracoesJson">
+                                        <ul class="list-none space-y-0.5">
+                                            <template x-for="(m, j) in JSON.parse(alt.alteracoesJson)" :key="j">
+                                                <li>
+                                                    <span class="font-medium text-slate-700" x-text="m.campo"></span>:
+                                                    <span class="line-through text-slate-400" x-text="m.de ?? '—'"></span>
+                                                    → <span class="text-slate-700" x-text="m.para ?? '—'"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </template>
+                                    <template x-if="!alt.alteracoesJson">
+                                        <span>—</span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="ws produto-detail-tab-card">
             <h3 class="font-bold text-slate-800 mb-4">Histórico de movimentações</h3>
 
@@ -806,10 +868,10 @@
                     const t = new URLSearchParams(window.location.search).get('tab');
                     if (['variacoes','fotos','estoque','historico','detalhes'].includes(t)) {
                         this.tab = t;
-                        if (t === 'historico') this.loadHistorico();
+                        if (t === 'historico') { this.loadHistorico(); this.loadAlteracoes(); }
                     }
                     this.$watch('tab', val => {
-                        if (val === 'historico' && !this._hlLoaded) this.loadHistorico();
+                        if (val === 'historico') { if (!this._hlLoaded) this.loadHistorico(); if (!this._altLoaded) this.loadAlteracoes(); }
                     });
                 },
 
@@ -957,6 +1019,18 @@
                         const r = await fetch('/produtos/' + prodId + '/historico-json');
                         this.historico = r.ok ? await r.json() : [];
                     } catch { this.historico = []; }
+                },
+
+                // ── Alterações do cadastro (lazy) ──
+                alteracoes: null,
+                _altLoaded: false,
+                async loadAlteracoes() {
+                    if (this._altLoaded) return;
+                    this._altLoaded = true;
+                    try {
+                        const r = await fetch('/produtos/' + prodId + '/alteracoes-json');
+                        this.alteracoes = r.ok ? await r.json() : [];
+                    } catch { this.alteracoes = []; }
                 },
 
                 destroy() {

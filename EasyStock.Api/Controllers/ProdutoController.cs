@@ -19,6 +19,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/produtos")]
 public class ProdutoController(
     IProdutoRepository produtoRepository,
+    IProdutoAlteracaoRepository produtoAlteracaoRepository,
     CadastrarProdutoUseCase cadastrarProdutoUseCase,
     GerenciarProdutoUseCase gerenciarProdutoUseCase,
     GerenciarVariacaoProdutoUseCase gerenciarVariacaoProdutoUseCase,
@@ -103,7 +104,7 @@ public class ProdutoController(
         if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var result = await cadastrarProdutoUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId });
+        var result = await cadastrarProdutoUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId, UsuarioId = currentUser.UsuarioId });
         return DataCreated($"/api/produtos/{result.ProdutoId}", result);
     }
 
@@ -121,7 +122,7 @@ public class ProdutoController(
         if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        await gerenciarProdutoUseCase.AtualizarAsync(command with { EmpresaId = resolvedEmpresaId });
+        await gerenciarProdutoUseCase.AtualizarAsync(command with { EmpresaId = resolvedEmpresaId, UsuarioId = currentUser.UsuarioId });
         return NoContent();
     }
 
@@ -137,7 +138,7 @@ public class ProdutoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        await gerenciarProdutoUseCase.RemoverAsync(resolvedEmpresaId, id);
+        await gerenciarProdutoUseCase.RemoverAsync(resolvedEmpresaId, id, currentUser.UsuarioId);
         return NoContent();
     }
 
@@ -151,7 +152,7 @@ public class ProdutoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        await gerenciarProdutoUseCase.RestaurarAsync(resolvedEmpresaId, id);
+        await gerenciarProdutoUseCase.RestaurarAsync(resolvedEmpresaId, id, currentUser.UsuarioId);
         return DataOk(new { restaurado = true });
     }
 
@@ -307,5 +308,18 @@ public class ProdutoController(
 
         await gerenciarProdutoUseCase.ReordenarFotosAsync(resolvedEmpresaId, id, novaOrdem);
         return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "Get product change history (audit log)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("{id}/alteracoes")]
+    public async Task<IActionResult> GetAlteracoes(Guid id, [FromQuery] Guid empresaId, [FromQuery] int limit = 100)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var alteracoes = await produtoAlteracaoRepository.GetByProdutoAsync(resolvedEmpresaId, id, Math.Min(limit, 500));
+        return DataOk(alteracoes);
     }
 }

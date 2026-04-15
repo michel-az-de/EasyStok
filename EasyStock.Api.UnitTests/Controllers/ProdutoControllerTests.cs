@@ -21,6 +21,7 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class ProdutoControllerTests
 {
     private readonly IProdutoRepository _produtoRepository = Substitute.For<IProdutoRepository>();
+    private readonly IProdutoAlteracaoRepository _produtoAlteracaoRepository = Substitute.For<IProdutoAlteracaoRepository>();
     private readonly ICategoriaRepository _categoriaRepository = Substitute.For<ICategoriaRepository>();
     private readonly IProdutoCaracteristicaRepository _produtoCaracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
     private readonly IProdutoEmbalagemRepository _produtoEmbalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
@@ -72,7 +73,7 @@ public class ProdutoControllerTests
             _lojaRepository,
             _unitOfWork);
 
-        _controller = new ProdutoController(_produtoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase, _currentUser);
+        _controller = new ProdutoController(_produtoRepository, _produtoAlteracaoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase, _currentUser);
     }
 
     [Fact]
