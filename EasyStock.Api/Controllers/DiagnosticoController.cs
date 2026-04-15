@@ -1855,8 +1855,7 @@ public sealed class DiagnosticoController(
         </div>
 
         <script>
-        let _liveTimer=null;
-        let _lastPollTime=new Date().toISOString();
+        // _liveEs declarado próximo à função startLiveLogs
 
         var _timelineEventos=[];
         async function fetchEventos(){
@@ -1884,40 +1883,46 @@ public sealed class DiagnosticoController(
             loadAckStatuses();
         });
 
+        var _liveEs=null; // EventSource ativo
         function startLiveLogs(){
-            if(_liveTimer)return;
+            if(_liveEs)return; // já conectado
             const dot=document.getElementById('liveDot');
             if(dot)dot.style.display='inline-block';
-            _liveTimer=setInterval(pollLiveLogs,5000);
+            _liveEs=new EventSource('/api/diagnostico/logs/live');
+            _liveEs.addEventListener('log-batch',function(e){
+                try{
+                    const d=JSON.parse(e.data);
+                    if(d.count>0){
+                        const console_=document.getElementById('logConsole');
+                        if(console_){
+                            const tmp=document.createElement('div');
+                            tmp.innerHTML=d.rows.join('');
+                            Array.from(tmp.children).reverse().forEach(el=>console_.prepend(el));
+                            filterLogs();
+                        }
+                    }
+                    const ts=document.getElementById('liveTimestamp');
+                    if(ts)ts.textContent='• '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                }catch{}
+            });
+            _liveEs.onerror=function(){
+                // Reconecta automaticamente após erro (EventSource faz isso por padrão)
+                const ts=document.getElementById('liveTimestamp');
+                if(ts)ts.textContent='(reconectando...)';
+            };
         }
         function stopLiveLogs(){
-            if(_liveTimer){clearInterval(_liveTimer);_liveTimer=null;}
+            if(_liveEs){_liveEs.close();_liveEs=null;}
             const dot=document.getElementById('liveDot');
             if(dot)dot.style.display='none';
-        }
-        async function pollLiveLogs(){
-            try{
-                const r=await fetch('/api/diagnostico/logs/live?since='+encodeURIComponent(_lastPollTime));
-                if(!r.ok)return;
-                const d=await r.json();
-                if(d.count>0){
-                    const console_=document.getElementById('logConsole');
-                    if(console_){
-                        const tmp=document.createElement('div');
-                        tmp.innerHTML=d.rows.join('');
-                        Array.from(tmp.children).reverse().forEach(el=>console_.prepend(el));
-                        filterLogs();
-                    }
-                }
-                _lastPollTime=new Date().toISOString();
-                const ts=document.getElementById('liveTimestamp');
-                if(ts)ts.textContent='• '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-            }catch{}
         }
         function clearLogs(){
             const c=document.getElementById('logConsole');
             if(c)c.innerHTML='';
-            _lastPollTime=new Date().toISOString();
+        }
+        function clearLogs(){
+            const c=document.getElementById('logConsole');
+            if(c)c.innerHTML='';
         }
 
         // Auto-refresh
