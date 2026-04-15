@@ -54,15 +54,20 @@ public sealed class RecalcularVelocidadesJob(
         CancellationToken cancellationToken)
     {
         var (itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, 1, 1000);
+        if (!itens.Any()) return;
+
+        var de = DateTime.UtcNow.AddDays(-30);
+        var ate = DateTime.UtcNow;
+
+        // Busca todas as taxas de saída em uma única query em vez de 1 por item
+        var produtoIds = itens.Select(i => i.ProdutoId).Distinct();
+        var taxasPorProduto = await movimentacaoRepo.GetTaxaSaidaDiariaPorProdutoAsync(empresa.Id, produtoIds, de, ate);
 
         foreach (var item in itens)
         {
             try
             {
-                var de = DateTime.UtcNow.AddDays(-30);
-                var ate = DateTime.UtcNow;
-                var velocidade = await movimentacaoRepo.GetTaxaSaidaDiariaAsync(empresa.Id, item.ProdutoId, de, ate);
-
+                var velocidade = taxasPorProduto.GetValueOrDefault(item.ProdutoId, 0m);
                 item.AtualizarVelocidadeSaida(velocidade, DateTime.UtcNow);
                 await itemEstoqueRepo.UpdateAsync(item);
 
@@ -77,6 +82,6 @@ public sealed class RecalcularVelocidadesJob(
             }
         }
 
-        logger.LogInformation("Velocidades recalculadas para empresa {EmpresaId}", empresa.Id);
+        logger.LogInformation("Velocidades recalculadas para {Total} itens da empresa {EmpresaId}", itens.Count(), empresa.Id);
     }
 }

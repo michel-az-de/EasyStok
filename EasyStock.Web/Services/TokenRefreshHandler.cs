@@ -137,9 +137,13 @@ public class TokenRefreshHandler(
         }
     }
 
-    private static Uri? AddQueryString(Uri? uri, string key, string value)
+    internal static Uri? AddQueryString(Uri? uri, string key, string value)
     {
         if (uri is null) return null;
+
+        // Evita duplicar parâmetros que o serviço já incluiu na URL
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (query[key] is not null) return uri;
 
         var updated = QueryHelpers.AddQueryString(uri.ToString(), key, value);
         return new Uri(updated, uri.IsAbsoluteUri ? UriKind.Absolute : UriKind.Relative);

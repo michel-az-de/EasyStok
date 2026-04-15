@@ -281,7 +281,7 @@ public sealed class DiagnosticoController(
 
                 if (newEntries.Count > 0)
                 {
-                    cursor = newEntries.Max(e => e.Timestamp).AddMilliseconds(1);
+                    cursor = newEntries.Max(e => e.Timestamp).UtcDateTime.AddMilliseconds(1);
 
                     var rows = newEntries.Select(e =>
                     {
@@ -385,10 +385,10 @@ public sealed class DiagnosticoController(
             try
             {
                 var sw = Stopwatch.StartNew();
-                var response = await client.GetAsync(baseUrl + route, ct);
+                var httpResp = await client.GetAsync(baseUrl + route, ct);
                 sw.Stop();
 
-                result.StatusCode = (int)response.StatusCode;
+                result.StatusCode = (int)httpResp.StatusCode;
                 result.LatenciaMs = sw.ElapsedMilliseconds;
 
                 // Auth-protected endpoints returning 401 are "alive"
