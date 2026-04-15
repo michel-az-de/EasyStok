@@ -259,6 +259,11 @@
                         class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
                     Próximo &rarr;
                 </button>
+                <button x-show="isEdit" x-cloak type="submit" :disabled="saving"
+                        class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-500/25 disabled:opacity-50 flex items-center gap-2">
+                    <template x-if="!saving"><span>Salvar alterações</span></template>
+                    <template x-if="saving"><span class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span></template>
+                </button>
             </div>
         </div>
     </div>
@@ -481,6 +486,11 @@
             <button type="button" @@click="nextStep()"
                     class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
                 Próximo &rarr;
+            </button>
+            <button x-show="isEdit" x-cloak type="submit" :disabled="saving"
+                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-500/25 disabled:opacity-50 flex items-center gap-2">
+                <template x-if="!saving"><span>Salvar alterações</span></template>
+                <template x-if="saving"><span class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span></template>
             </button>
         </div>
     </div>
@@ -764,6 +774,11 @@
                     class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/25">
                 Revisar &rarr;
             </button>
+            <button x-show="isEdit" x-cloak type="submit" :disabled="saving"
+                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-500/25 disabled:opacity-50 flex items-center gap-2">
+                <template x-if="!saving"><span>Salvar alterações</span></template>
+                <template x-if="saving"><span class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span></template>
+            </button>
         </div>
     </div>
 
@@ -1038,28 +1053,26 @@
 
                     try {
                         // === FASE 1: Criar/Atualizar produto (sem fotos) ===
-                        const r = await fetch(form.action, { method: 'POST', body: fd, redirect: 'follow' });
+                        const r = await fetch(form.action, {
+                            method: 'POST',
+                            body: fd,
+                            redirect: 'follow',
+                            headers: { 'X-Fetch': '1' }
+                        });
 
                         // Se o controller fez redirect (sucesso), r.redirected === true
-                        // Se re-renderizou o form (erros de validação), r.redirected === false
+                        // Se retornou JSON de erro (400), r.redirected === false e Content-Type é application/json
                         if (!r.redirected) {
                             this.saving = false;
+                            let msg = 'Erro ao salvar. Verifique os campos e tente novamente.';
                             try {
-                                const html = await r.text();
-                                const tmp = document.createElement('div');
-                                tmp.innerHTML = html;
-                                const erros = [...tmp.querySelectorAll('.text-red-500,.field-validation-error,[data-valmsg-for],.text-danger')]
-                                    .map(el => el.textContent.trim())
-                                    .filter(Boolean)
-                                    .slice(0, 3);
-                                if (erros.length) {
-                                    erros.forEach(msg => window.showToast(msg, 'error'));
-                                } else {
-                                    window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
+                                const ct = r.headers.get('Content-Type') ?? '';
+                                if (ct.includes('application/json')) {
+                                    const data = await r.json();
+                                    if (data?.erro) msg = data.erro;
                                 }
-                            } catch (e) { console.error('[EasyStock]', e);
-                                window.showToast('Erro ao salvar. Verifique os campos e tente novamente.', 'error');
-                            }
+                            } catch (e) { console.error('[EasyStock] parse error response', e); }
+                            window.showToast(msg, 'error');
                             return;
                         }
 

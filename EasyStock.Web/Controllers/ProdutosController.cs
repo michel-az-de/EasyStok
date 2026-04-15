@@ -191,8 +191,19 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm)
     {
+        var isFetch = Request.Headers["X-Fetch"] == "1";
+
         if (!ModelState.IsValid)
         {
+            if (isFetch)
+            {
+                var msg = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m))
+                    ?? "Dados inválidos.";
+                return BadRequest(new { erro = msg });
+            }
             ViewBag.Title = "Editar Produto";
             ViewBag.ActiveMenuItem = "Produtos";
             await LoadCategoriasAsync();
@@ -201,8 +212,12 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         vm.Id = id;
         var result = await svc.EditarAsync(id, vm);
-        if (HasError(result))
+        if (!result.Success)
         {
+            var msg = result.ErrorMessage ?? "Ocorreu um erro inesperado.";
+            if (isFetch)
+                return BadRequest(new { erro = msg });
+            Toast("error", msg);
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
