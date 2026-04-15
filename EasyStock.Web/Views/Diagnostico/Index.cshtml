@@ -705,6 +705,24 @@
                     <p>Carregando logs...</p>
                 </div>
 
+                <!-- Error / empty states -->
+                <div x-show="!loadingLogs && !enhancedLogs" class="text-center py-12 text-slate-400">
+                    <span class="material-icons-round text-4xl mb-2">cloud_off</span>
+                    <p class="font-semibold text-slate-600">Não foi possível carregar os logs</p>
+                    <p class="text-sm mt-1">Verifique a conexão com a API ou tente novamente.</p>
+                    <button @@click="fetchEnhancedLogs()"
+                            class="mt-3 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                        Tentar novamente
+                    </button>
+                </div>
+
+                <div x-show="!loadingLogs && enhancedLogs && !enhancedLogs.disponivel && enhancedLogs.motivo" x-cloak
+                     class="text-center py-12 text-slate-400">
+                    <span class="material-icons-round text-4xl mb-2">info</span>
+                    <p class="font-semibold text-slate-600">Logs indisponíveis</p>
+                    <p class="text-sm mt-1" x-text="enhancedLogs.motivo"></p>
+                </div>
+
                 <!-- Log Entries -->
                 <div x-show="!loadingLogs && enhancedLogs" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div class="max-h-[600px] overflow-y-auto">
@@ -1208,8 +1226,11 @@ function diagApp() {
 
         async fetchEnhancedLogs() {
             this.loadingLogs = true;
+            const ac = new AbortController();
+            const timeout = setTimeout(() => ac.abort(), 15000);
             try {
-                const r = await fetch('/diagnostico/api/logs-enhanced?hours=48');
+                const r = await fetch('/diagnostico/api/logs-enhanced?hours=48', { signal: ac.signal });
+                clearTimeout(timeout);
                 if (r.ok) {
                     this.enhancedLogs = await r.json();
                     if (this.enhancedLogs?.entradas) {
@@ -1219,10 +1240,15 @@ function diagApp() {
                         this.renderErrorsChart();
                         this.renderLogVolumeChart();
                     });
-                    // Carregar acks dos padrões detectados
                     this.$nextTick(() => this.fetchAcks());
+                } else {
+                    this.enhancedLogs = null;
                 }
-            } catch (e) { console.error('enhanced logs fetch error', e); window.showToast && window.showToast('Erro ao carregar logs.', 'error'); }
+            } catch (e) {
+                clearTimeout(timeout);
+                console.error('enhanced logs fetch error', e);
+                this.enhancedLogs = null;
+            }
             this.loadingLogs = false;
         },
 

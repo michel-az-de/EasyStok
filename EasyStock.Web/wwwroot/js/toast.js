@@ -57,10 +57,11 @@
         return container;
     }
 
-    window.showToast = function (message, type, duration) {
+    window.showToast = function (message, type, duration, undoAction) {
         type = type || 'info';
         const cfg = CONFIG[type] || CONFIG.info;
-        const dur = (duration != null) ? duration : (DURATION[type] || 3500);
+        // Force 5s minimum when undo is available so user has time to react
+        const dur = undoAction ? 5000 : ((duration != null) ? duration : (DURATION[type] || 3500));
         const c = getContainer();
 
         // Wrapper handles animation
@@ -126,6 +127,30 @@
 
         body.appendChild(iconEl);
         body.appendChild(msgEl);
+
+        if (undoAction) {
+            const undoBtn = document.createElement('button');
+            undoBtn.textContent = 'Desfazer';
+            Object.assign(undoBtn.style, {
+                background:    'rgba(255,255,255,.22)',
+                border:        '1px solid rgba(255,255,255,.45)',
+                color:         '#ffffff',
+                fontSize:      '12px',
+                fontWeight:    '600',
+                lineHeight:    '1',
+                cursor:        'pointer',
+                padding:       '4px 9px',
+                borderRadius:  '6px',
+                flexShrink:    '0',
+                whiteSpace:    'nowrap',
+            });
+            undoBtn.onclick = function () {
+                dismiss();
+                undoAction();
+            };
+            body.appendChild(undoBtn);
+        }
+
         body.appendChild(closeBtn);
 
         // Progress bar track
@@ -187,5 +212,15 @@
             var msg  = sep >= 0 ? toastData.slice(sep + 1) : toastData;
             window.showToast(msg, type);
         }
+
+        // Cross-page toasts via sessionStorage (for fetch-based form submissions)
+        try {
+            var stored = sessionStorage.getItem('easystok_toast');
+            if (stored) {
+                sessionStorage.removeItem('easystok_toast');
+                var t = JSON.parse(stored);
+                if (t && t.msg) window.showToast(t.msg, t.type || 'success');
+            }
+        } catch(e) {}
     });
 })();

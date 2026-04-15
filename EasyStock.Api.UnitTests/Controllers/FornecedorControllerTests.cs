@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
+using EasyStock.Application.UseCases.ReativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Application.UseCases.Pedido;
@@ -32,6 +33,7 @@ public class FornecedorControllerTests
         var criar = new CriarFornecedorUseCase(_fornecedorRepository, _assinaturaRepository, _unitOfWork, Substitute.For<ILogger<CriarFornecedorUseCase>>());
         var atualizar = new AtualizarFornecedorUseCase(_fornecedorRepository, _unitOfWork, Substitute.For<ILogger<AtualizarFornecedorUseCase>>());
         var desativar = new DesativarFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<DesativarFornecedorUseCase>>());
+        var reativar = new ReativarFornecedorUseCase(_fornecedorRepository, _unitOfWork, Substitute.For<ILogger<ReativarFornecedorUseCase>>());
         var listar = new ListarFornecedoresUseCase(_fornecedorRepository);
         var detalhe = new ObterFornecedorDetalheUseCase(_fornecedorRepository);
         var historico = new ObterHistoricoFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
@@ -42,7 +44,7 @@ public class FornecedorControllerTests
         var cancelarPedido = new CancelarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CancelarPedidoFornecedorUseCase>>());
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new FornecedorController(criar, atualizar, desativar, listar, detalhe, historico, estatisticas, pedidosAbertos, criarPedido, receberPedido, cancelarPedido, _currentUser);
+        _controller = new FornecedorController(criar, atualizar, desativar, reativar, listar, detalhe, historico, estatisticas, pedidosAbertos, criarPedido, receberPedido, cancelarPedido, _currentUser);
     }
 
     [Fact]

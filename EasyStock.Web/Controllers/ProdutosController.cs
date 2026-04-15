@@ -17,21 +17,25 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.ActiveMenuItem = "Produtos";
 
         List<ProdutoResumo> items;
-        bool hasMore = false;
+        int totalItems = 0;
+        int totalPages = 1;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchResult = await svc.BuscarAsync(search.Trim(), 100);
             if (HasError(searchResult)) return View(new ProdutosListViewModel());
             items = searchResult.Data!;
+            totalItems = items.Count;
+            totalPages = 1;
         }
         else
         {
-            var result = await svc.ListarAsync(page, PageSize + 1);
+            var result = await svc.ListarAsync(page, PageSize);
             if (HasError(result)) return View(new ProdutosListViewModel());
-            items = result.Data!;
-            hasMore = items.Count > PageSize;
-            if (hasMore) items = items.Take(PageSize).ToList();
+            var paged = result.Data!;
+            items = paged.Data;
+            totalItems = paged.Meta.Total;
+            totalPages = paged.Meta.Pages;
         }
 
         var vm = new ProdutosListViewModel
@@ -43,9 +47,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             Paginacao = new PaginationViewModel
             {
                 Page = page,
-                Pages = hasMore ? page + 1 : page,
-                Total = items.Count,
-                Limit = 20
+                Pages = totalPages,
+                Total = totalItems,
+                Limit = PageSize
             }
         };
         return View(vm);
@@ -238,8 +242,19 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             return RedirectToAction(nameof(Detail), new { id });
         }
 
-        Toast("success", "Produto excluído com sucesso!");
+        Toast("success", "Produto excluído.", $"/produtos/{id}/restaurar");
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("/produtos/{id}/restaurar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restaurar(string id)
+    {
+        var result = await svc.RestaurarAsync(id);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Produto restaurado.");
+        return RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpPost("/produtos/{id}/foto")]
@@ -283,7 +298,18 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var result = await svc.RemoverVariacaoAsync(id, vid);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
-        Toast("success", "Variação removida!");
+        Toast("success", "Variação removida.", $"/produtos/{id}/variacoes/{vid}/restaurar");
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpPost("/produtos/{id}/variacoes/{vid}/restaurar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestaurarVariacao(string id, string vid)
+    {
+        var result = await svc.RestaurarVariacaoAsync(id, vid);
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
+        Toast("success", "Variação restaurada.");
         return RedirectToAction(nameof(Detail), new { id });
     }
 

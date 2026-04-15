@@ -313,6 +313,21 @@ public sealed class GerenciarProdutoUseCase(
             await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
     }
 
+    public async Task RestaurarAsync(Guid empresaId, Guid produtoId)
+    {
+        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+            ?? throw new UseCaseValidationException("Produto nao encontrado.");
+
+        produto.Status = StatusProduto.Ativo;
+        produto.AlteradoEm = DateTime.UtcNow;
+
+        await produtoRepository.UpdateAsync(produto);
+        await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
+    }
+
     public async Task<ProdutoDetalheResult> ObterDetalheAsync(Guid empresaId, Guid produtoId)
     {
         // Cache de 5 minutos — detalhe de produto inclui fotos, variações e itens de estoque (queries pesadas)

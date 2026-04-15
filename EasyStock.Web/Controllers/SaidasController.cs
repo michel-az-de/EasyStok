@@ -20,16 +20,31 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(SaidaFormViewModel vm)
     {
+        var isFetch = Request.Headers["X-Fetch"] == "1";
+
         if (!ModelState.IsValid)
         {
+            if (isFetch)
+            {
+                var msg = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m))
+                    ?? "Dados inválidos.";
+                return BadRequest(new { erro = msg });
+            }
             ViewBag.Title = "Nova Saída";
             ViewBag.ActiveMenuItem = "Saidas";
             return View("Nova", vm);
         }
 
         var result = await svc.CriarAsync(vm);
-        if (HasError(result))
+        if (!result.Success)
         {
+            var erro = result.ErrorMessage ?? "Erro ao registrar saída.";
+            if (isFetch)
+                return BadRequest(new { erro });
+            Toast("error", erro);
             ViewBag.Title = "Nova Saída";
             ViewBag.ActiveMenuItem = "Saidas";
             return View("Nova", vm);

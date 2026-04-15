@@ -88,7 +88,9 @@
                                                 class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
                                             Cancelar
                                         </button>
-                                        <form action="/categorias/@c.Id/excluir" method="post">
+                                        <form action="/categorias/@c.Id/excluir" method="post"
+                                              class="cat-delete-form"
+                                              data-cat-nome="@c.Nome">
                                             @Html.AntiForgeryToken()
                                             <button type="submit"
                                                     class="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
@@ -135,3 +137,52 @@
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.cat-delete-form').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var nome = form.dataset.catNome || 'esta categoria';
+            var timer = null;
+            var cancelled = false;
+
+            // Close the confirm modal via Alpine if possible
+            var row = form.closest('tr');
+            if (row && row._x_dataStack) {
+                try { row._x_dataStack[0].confirmando = false; } catch(ex) {}
+            }
+
+            function submitNow() {
+                if (!cancelled) {
+                    var clone = document.createElement('form');
+                    clone.method = form.method;
+                    clone.action = form.action;
+                    form.querySelectorAll('input[type="hidden"]').forEach(function (inp) {
+                        var copy = inp.cloneNode(true);
+                        clone.appendChild(copy);
+                    });
+                    document.body.appendChild(clone);
+                    clone.submit();
+                }
+            }
+
+            timer = setTimeout(submitNow, 5000);
+
+            if (window.showToast) {
+                window.showToast(
+                    '"' + nome + '" será removida.',
+                    'warning',
+                    5000,
+                    function () {
+                        cancelled = true;
+                        clearTimeout(timer);
+                    }
+                );
+            } else {
+                submitNow();
+            }
+        });
+    });
+});
+</script>

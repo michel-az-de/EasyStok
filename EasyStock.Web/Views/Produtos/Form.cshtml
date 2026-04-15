@@ -199,7 +199,8 @@
                 <div class="sm:col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="hidden" name="ControlaValidade" value="false" />
-                        <input name="ControlaValidade" type="checkbox" value="true" @(Model.ControlaValidade ? "checked" : "")
+                        <input name="ControlaValidade" type="checkbox" value="true"
+                               :checked="controlaValidade"
                                @@change="controlaValidade = $el.checked"
                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
                         <span class="text-sm text-slate-700">Controla validade</span>
@@ -397,7 +398,7 @@
                 </div>
                 <div>
                     <h3 class="font-bold text-slate-800">Preços e margem</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Preencha custo ou margem para calcular automaticamente.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Preencha dois campos e o terceiro será calculado automaticamente.</p>
                 </div>
             </div>
             <!-- Hidden inputs: valor vazio quando zero (ASP.NET trata como null para nullable decimal) -->
@@ -410,8 +411,10 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input type="number" step="0.01" min="0"
-                               x-model.number="custo" @@input="onCustoInput()"
+                        <input type="text" inputmode="decimal"
+                               :value="$el === document.activeElement ? undefined : (custo > 0 ? custo.toFixed(2).replace('.', ',') : '')"
+                               @@input="custo = parseDecimal($el.value); onCustoInput()"
+                               @@blur="$el.value = custo > 0 ? custo.toFixed(2).replace('.', ',') : ''"
                                :class="{ 'field-calculated': lastEdited === 'margem' && custo > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -424,8 +427,10 @@
                         </span>
                     </label>
                     <div class="relative">
-                        <input type="number" step="0.1"
-                               x-model.number="margem" @@input="onMargemInput()"
+                        <input type="text" inputmode="decimal"
+                               :value="$el === document.activeElement ? undefined : (margem > 0 ? margem.toFixed(1).replace('.', ',') : '')"
+                               @@input="margem = parseDecimal($el.value); onMargemInput()"
+                               @@blur="$el.value = margem > 0 ? margem.toFixed(1).replace('.', ',') : ''"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
@@ -449,8 +454,10 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input type="number" step="0.01" min="0"
-                               x-model.number="preco" @@input="onPrecoInput()"
+                        <input type="text" inputmode="decimal"
+                               :value="$el === document.activeElement ? undefined : (preco > 0 ? preco.toFixed(2).replace('.', ',') : '')"
+                               @@input="preco = parseDecimal($el.value); onPrecoInput()"
+                               @@blur="$el.value = preco > 0 ? preco.toFixed(2).replace('.', ',') : ''"
                                :class="{ 'field-calculated': lastEdited === 'margem' && preco > 0 }"
                                class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
@@ -1082,6 +1089,14 @@
                         const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
                         const productId = this.productId || (match ? match[1] : null);
 
+                        // Toast client-side (TempData é consumido pelo fetch redirect)
+                        try {
+                            sessionStorage.setItem('easystok_toast', JSON.stringify({
+                                msg: this.productId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!',
+                                type: 'success'
+                            }));
+                        } catch(e) {}
+
                         // === FASE 2: Upload de fotos via AJAX ===
                         const pondFiles = this._pond ? this._pond.getFiles().map(f => f.file).filter(Boolean) : [];
                         if (productId && pondFiles.length > 0) {
@@ -1484,6 +1499,10 @@
                 margem: @(Model.MargemEstimada?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
                 lastEdited: 'none',
 
+                parseDecimal(val) {
+                    if (typeof val === 'number') return val;
+                    return parseFloat(String(val).replace(',', '.')) || 0;
+                },
                 onPrecoInput() {
                     this.lastEdited = 'preco';
                     if (this.preco > 0 && this.custo > 0)
@@ -1598,9 +1617,18 @@ async deleteExistingPhoto(fotoId) {
                         while (true) {
                             const { done, value } = await reader.read();
                             if (done) break;
-                            const text = decoder.decode(value);
+                            const text = decoder.decode(value, { stream: true });
                             for (const line of text.split('\n')) {
-                                if (line.startsWith('data: ')) this.descricao += line.slice(6);
+                                if (!line.startsWith('data: ')) continue;
+                                const chunk = line.slice(6).trim();
+                                if (chunk === '[DONE]') continue;
+                                try {
+                                    const json = JSON.parse(chunk);
+                                    if (json.texto) this.descricao += json.texto;
+                                    else if (json.error) throw new Error(json.error);
+                                } catch (e) {
+                                    if (!chunk.startsWith('{')) this.descricao += chunk;
+                                }
                             }
                         }
                     } catch (e) { console.error('[EasyStock]', e); window.showToast('Erro ao gerar descrição com IA.', 'error'); }

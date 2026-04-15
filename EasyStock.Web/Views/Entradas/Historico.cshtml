@@ -1,13 +1,13 @@
 ﻿@model EntradasHistoricoViewModel
 @{
-    ViewBag.Title = "Histórico de Movimentações";
-    var tiposOpcoes = new[] { ("", "Todos"), ("entrada", "Entradas"), ("saida", "Saídas"), ("reposicao", "Reposições") };
+    ViewBag.Title = "Histórico de Entradas";
+    var tiposOpcoes = new[] { ("", "Todas"), ("entrada", "Compras"), ("reposicao", "Reposições") };
 }
 
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
-        <h1>Histórico de Movimentações</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "movimentação encontrada" : "movimentações encontradas")</p>
+        <h1>Histórico de Entradas</h1>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "entrada encontrada" : "entradas encontradas")</p>
     </div>
     <a href="/entradas/exportar-csv?tipo=@Model.Tipo&periodoInicio=@Model.PeriodoInicio&periodoFim=@Model.PeriodoFim"
        class="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-300 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors">
@@ -125,7 +125,7 @@
     {
         <div class="text-center py-12 text-slate-400">
             <div class="text-5xl mb-3">📋</div>
-            <p class="font-semibold text-slate-600">Nenhuma movimentação encontrada</p>
+            <p class="font-semibold text-slate-600">Nenhuma entrada encontrada</p>
             <p class="text-sm mt-1">Tente ajustar os filtros ou registre uma <a href="/entradas/nova" class="text-indigo-600 hover:underline">nova entrada</a>.</p>
         </div>
     }

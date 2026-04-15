@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AtualizarLoja;
 using EasyStock.Application.UseCases.CriarLoja;
 using EasyStock.Application.UseCases.DesativarLoja;
+using EasyStock.Application.UseCases.ReativarLoja;
 using EasyStock.Application.UseCases.ListarLojas;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +21,7 @@ public class LojaController(
     CriarLojaUseCase criarUseCase,
     AtualizarLojaUseCase atualizarUseCase,
     DesativarLojaUseCase desativarUseCase,
+    ReativarLojaUseCase reativarUseCase,
     ListarLojasUseCase listarUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
@@ -84,5 +86,19 @@ public class LojaController(
 
         await desativarUseCase.ExecuteAsync(new DesativarLojaCommand(id, empresaId));
         return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "Reactivate store (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPost("{id}/reativar")]
+    public async Task<IActionResult> Reativar(Guid id, [FromQuery] Guid empresaId)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
+        await reativarUseCase.ExecuteAsync(new ReativarLojaCommand(id, empresaId));
+        return DataOk(new { reativado = true });
     }
 }

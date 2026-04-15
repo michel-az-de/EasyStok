@@ -18,7 +18,7 @@ public class AnunciosController(
         var result = await produtosSvc.ListarAsync(1, 50);
         var vm = new AnunciosViewModel
         {
-            Produtos = result.Success ? result.Data! : []
+            Produtos = result.Success ? result.Data!.Data : []
         };
 
         return View(vm);

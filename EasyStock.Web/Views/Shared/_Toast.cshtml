@@ -3,14 +3,43 @@
 }
 @if (!string.IsNullOrEmpty(toastRaw))
 {
-    var sep      = toastRaw.IndexOf('|');
-    var toastType = sep >= 0 ? toastRaw[..sep] : toastRaw;
-    var toastMsg  = sep >= 0 ? toastRaw[(sep + 1)..] : toastRaw;
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.showToast) {
-                window.showToast(@Json.Serialize(toastMsg), @Json.Serialize(toastType));
-            }
-        }, { once: true });
-    </script>
+    var parts     = toastRaw.Split('|', 3);
+    var toastType = parts[0];
+    var toastMsg  = parts.Length > 1 ? parts[1] : toastRaw;
+    var undoUrl   = parts.Length > 2 ? parts[2] : null;
+
+    if (undoUrl is not null)
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (!window.showToast) return;
+                function __undoToast() {
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = @Json.Serialize(undoUrl);
+                    var tok = document.querySelector('[name="__RequestVerificationToken"]');
+                    if (tok) {
+                        var inp = document.createElement('input');
+                        inp.type = 'hidden';
+                        inp.name = '__RequestVerificationToken';
+                        inp.value = tok.value;
+                        form.appendChild(inp);
+                    }
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+                window.showToast(@Json.Serialize(toastMsg), @Json.Serialize(toastType), 5000, __undoToast);
+            }, { once: true });
+        </script>
+    }
+    else
+    {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (window.showToast) {
+                    window.showToast(@Json.Serialize(toastMsg), @Json.Serialize(toastType));
+                }
+            }, { once: true });
+        </script>
+    }
 }

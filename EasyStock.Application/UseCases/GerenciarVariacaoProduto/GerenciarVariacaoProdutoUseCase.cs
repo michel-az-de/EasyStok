@@ -136,6 +136,21 @@ public sealed class GerenciarVariacaoProdutoUseCase(
         logger.LogInformation("Variacao {VariacaoId} inativada com sucesso.", variacaoId);
     }
 
+    public async Task RestaurarVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId)
+    {
+        logger.LogInformation("Restaurando variacao {VariacaoId} do produto {ProdutoId}. EmpresaId: {EmpresaId}.", variacaoId, produtoId, empresaId);
+
+        var variacao = await produtoVariacaoRepository.GetByIdAsync(empresaId, produtoId, variacaoId)
+            ?? throw new UseCaseValidationException("Variacao nao encontrada.");
+
+        variacao.Ativa = true;
+        variacao.AlteradoEm = DateTime.UtcNow;
+        await produtoVariacaoRepository.UpdateAsync(variacao);
+        await unitOfWork.CommitAsync();
+
+        logger.LogInformation("Variacao {VariacaoId} restaurada com sucesso.", variacaoId);
+    }
+
     private async Task<Produto> ValidarProdutoAtivoAsync(Guid empresaId, Guid produtoId)
     {
         if (empresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");

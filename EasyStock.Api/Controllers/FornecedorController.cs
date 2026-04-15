@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
+using EasyStock.Application.UseCases.ReativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Application.UseCases.Pedido;
@@ -23,6 +24,7 @@ public class FornecedorController(
     CriarFornecedorUseCase criarUseCase,
     AtualizarFornecedorUseCase atualizarUseCase,
     DesativarFornecedorUseCase desativarUseCase,
+    ReativarFornecedorUseCase reativarUseCase,
     ListarFornecedoresUseCase listarUseCase,
     ObterFornecedorDetalheUseCase obterDetalheUseCase,
     ObterHistoricoFornecedorUseCase obterHistoricoUseCase,
@@ -179,6 +181,18 @@ public class FornecedorController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
         await desativarUseCase.ExecuteAsync(new DesativarFornecedorCommand(id, resolvedEmpresaId));
         return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "Reactivate supplier (Admin only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id}/reativar")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> Reativar(Guid id, [FromQuery] Guid? empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var err)) return err!;
+        await reativarUseCase.ExecuteAsync(new ReativarFornecedorCommand(id, resolvedEmpresaId));
+        return DataOk(new { reativado = true });
     }
 }
 

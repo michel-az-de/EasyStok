@@ -141,6 +141,20 @@ public class ProdutoController(
         return NoContent();
     }
 
+    [SwaggerOperation(Summary = "Restore product (Admin only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Admin")]
+    [HttpPost("{id}/restaurar")]
+    public async Task<IActionResult> Restaurar(Guid id, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarProdutoUseCase.RestaurarAsync(resolvedEmpresaId, id);
+        return DataOk(new { restaurado = true });
+    }
+
     [SwaggerOperation(Summary = "Get product stock movement history")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -218,6 +232,20 @@ public class ProdutoController(
 
         await gerenciarVariacaoProdutoUseCase.RemoverAsync(resolvedEmpresaId, id, vid);
         return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "Restore product variant (Admin only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Admin")]
+    [HttpPost("{id}/variacoes/{vid}/restaurar")]
+    public async Task<IActionResult> RestaurarVariacao(Guid id, Guid vid, [FromQuery] Guid empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarVariacaoProdutoUseCase.RestaurarVariacaoAsync(resolvedEmpresaId, id, vid);
+        return DataOk(new { restaurado = true });
     }
 
     [SwaggerOperation(Summary = "Upload product photo (Gerente only)")]

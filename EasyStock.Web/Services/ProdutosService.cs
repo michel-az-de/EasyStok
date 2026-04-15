@@ -8,8 +8,8 @@ public class ProdutosService(ApiClient api, SessionService session)
     private Guid GetEmpresaId() =>
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    public Task<ApiResult<List<ProdutoResumo>>> ListarAsync(int page = 1, int limit = 20) =>
-        api.GetAsync<List<ProdutoResumo>>($"produtos?empresaId={GetEmpresaId()}&page={page}&pageSize={limit}");
+    public Task<ApiResult<PagedResult<ProdutoResumo>>> ListarAsync(int page = 1, int limit = 20) =>
+        api.GetAsync<PagedResult<ProdutoResumo>>($"produtos?empresaId={GetEmpresaId()}&page={page}&pageSize={limit}");
 
     public Task<ApiResult<List<ProdutoResumo>>> BuscarAsync(string termo, int limite = 10) =>
         api.GetAsync<List<ProdutoResumo>>(
@@ -183,6 +183,12 @@ public class ProdutosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> RemoverVariacaoAsync(string id, string vid) =>
         api.DeleteAsync($"produtos/{id}/variacoes/{vid}?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> RestaurarAsync(string id) =>
+        api.PostAsync<object>($"produtos/{id}/restaurar?empresaId={GetEmpresaId()}", new { });
+
+    public Task<ApiResult<object>> RestaurarVariacaoAsync(string id, string vid) =>
+        api.PostAsync<object>($"produtos/{id}/variacoes/{vid}/restaurar?empresaId={GetEmpresaId()}", new { });
 
     public Task<ApiResult<bool>> RemoverFotoAsync(string produtoId, string fotoId) =>
         api.DeleteAsync($"produtos/{produtoId}/fotos/{fotoId}?empresaId={GetEmpresaId()}");

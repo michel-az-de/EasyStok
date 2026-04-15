@@ -139,8 +139,19 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         var result = await svc.ExcluirAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
-        Toast("success", "Fornecedor desativado com sucesso!");
+        Toast("success", "Fornecedor desativado.", $"/fornecedores/{id}/reativar");
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("/fornecedores/{id}/reativar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reativar(string id)
+    {
+        var result = await svc.ReativarAsync(id);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Fornecedor reativado.");
+        return RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpGet("/fornecedores/pedidos-abertos")]

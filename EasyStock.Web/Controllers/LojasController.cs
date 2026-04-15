@@ -58,7 +58,18 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         var result = await svc.ExcluirAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
-        Toast("success", "Loja desativada.");
+        Toast("success", "Loja desativada.", $"/lojas/{id}/reativar");
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("/lojas/{id}/reativar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reativar(string id)
+    {
+        var result = await svc.ReativarAsync(id);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Loja reativada.");
         return RedirectToAction(nameof(Index));
     }
 }

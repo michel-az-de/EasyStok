@@ -72,6 +72,7 @@ public class NotificacoesController(NotificacoesService svc, SessionService sess
     public async Task<IActionResult> MarcarLida(string id)
     {
         await svc.MarcarLidaAsync(id);
+        Toast("success", "Notificação marcada como lida.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -96,6 +97,7 @@ public class NotificacoesController(NotificacoesService svc, SessionService sess
     public async Task<IActionResult> Excluir(string id)
     {
         await svc.RemoverAsync(id);
+        Toast("success", "Notificação removida.");
         return RedirectToAction(nameof(Index));
     }
 }

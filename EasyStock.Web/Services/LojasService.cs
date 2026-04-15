@@ -37,4 +37,7 @@ public class LojasService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
         api.DeleteAsync($"lojas/{id}?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> ReativarAsync(string id) =>
+        api.PostAsync<object>($"lojas/{id}/reativar?empresaId={GetEmpresaId()}", new { });
 }

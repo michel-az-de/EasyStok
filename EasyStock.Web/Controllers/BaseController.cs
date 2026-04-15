@@ -9,8 +9,8 @@ namespace EasyStock.Web.Controllers;
 [Authorize]
 public abstract class BaseController(SessionService session) : Controller
 {
-    protected void Toast(string type, string message) =>
-        TempData["Toast"] = $"{type}|{message}";
+    protected void Toast(string type, string message, string? undoUrl = null) =>
+        TempData["Toast"] = undoUrl is not null ? $"{type}|{message}|{undoUrl}" : $"{type}|{message}";
 
     protected bool HasError<T>(ApiResult<T> result)
     {

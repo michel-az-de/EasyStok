@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarLoja;
 using EasyStock.Application.UseCases.CriarLoja;
 using EasyStock.Application.UseCases.DesativarLoja;
+using EasyStock.Application.UseCases.ReativarLoja;
 using EasyStock.Application.UseCases.ListarLojas;
 using EasyStock.Application.UseCases.Loja;
 using EasyStock.Domain.Entities;
@@ -38,10 +39,11 @@ public class LojaControllerTests
         _criarUseCase = new CriarLojaUseCase(_lojaRepository, _assinaturaRepository, _unitOfWork, _criarLogger);
         _atualizarUseCase = new AtualizarLojaUseCase(_lojaRepository, _unitOfWork, _atualizarLogger);
         _desativarUseCase = new DesativarLojaUseCase(_lojaRepository, _unitOfWork, _desativarLogger);
+        var reativarUseCase = new ReativarLojaUseCase(_lojaRepository, _unitOfWork, Substitute.For<ILogger<ReativarLojaUseCase>>());
         _listarUseCase = new ListarLojasUseCase(_lojaRepository);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new LojaController(_criarUseCase, _atualizarUseCase, _desativarUseCase, _listarUseCase, _currentUser);
+        _controller = new LojaController(_criarUseCase, _atualizarUseCase, _desativarUseCase, reativarUseCase, _listarUseCase, _currentUser);
     }
 
     [Fact]

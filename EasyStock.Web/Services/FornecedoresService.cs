@@ -63,6 +63,9 @@ public class FornecedoresService(ApiClient api, SessionService session)
         return api.DeleteAsync($"fornecedores/{id}?empresaId={empresaId}");
     }
 
+    public Task<ApiResult<object>> ReativarAsync(string id) =>
+        api.PostAsync<object>($"fornecedores/{id}/reativar?empresaId={GetEmpresaId()}", new { });
+
     public Task<ApiResult<List<FornecedorHistoricoItem>>> ObterHistoricoAsync(string id) =>
         api.GetAsync<List<FornecedorHistoricoItem>>($"fornecedores/{id}/historico?empresaId={GetEmpresaId()}");
 
