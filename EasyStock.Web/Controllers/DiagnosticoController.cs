@@ -176,6 +176,23 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [HttpPost]
+    [Route("diagnostico/api/alertas/acks")]
+    public async Task<IActionResult> ProxyPostAcks([FromBody] AcksBatchRequest request)
+    {
+        if (request?.Ids is null || request.Ids.Count == 0)
+            return Json(new { acks = Array.Empty<object>() });
+
+        // Deduplicar e limitar server-side (defesa em profundidade)
+        var ids = request.Ids.Distinct().Take(200).ToList();
+        var csv = string.Join(",", ids);
+        var result = await diagnosticoService.FetchAcksAsync(csv);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
     [HttpGet]
     [Route("diagnostico/api/queries-lentas")]
     public async Task<IActionResult> ProxyQueriesLentas()
@@ -238,4 +255,9 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
         if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }
+}
+
+public class AcksBatchRequest
+{
+    public List<string> Ids { get; set; } = new();
 }

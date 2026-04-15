@@ -1069,10 +1069,17 @@ function diagApp() {
 
         async fetchAcks() {
             if (!this.patterns.length) return;
-            const ids = this.patterns.map(p => p.alertaId).filter(Boolean).join(',');
-            if (!ids) return;
+            // Deduplicar IDs antes do envio
+            const ids = [...new Set(this.patterns.map(p => p.alertaId).filter(Boolean))];
+            if (!ids.length) return;
+            // Limitar a 200 IDs por request
+            const batch = ids.slice(0, 200);
             try {
-                const r = await fetch(`/diagnostico/api/alertas/acks?ids=${encodeURIComponent(ids)}`);
+                const r = await fetch('/diagnostico/api/alertas/acks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: batch })
+                });
                 if (r.ok) {
                     const data = await r.json();
                     const map = {};
