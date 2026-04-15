@@ -331,7 +331,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var raw = await query
                 .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => x.i.ValidadeEm!.DataValidade)
+                .OrderBy(x => (DateTime?)x.i.ValidadeEm)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new
@@ -341,7 +341,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     NomeProduto = x.p.Nome,
                     x.i.CodigoInterno,
                     Quantidade = (int)x.i.QuantidadeAtual,
-                    DataValidade = x.i.ValidadeEm!.DataValidade,
+                    DataValidade = (DateTime)x.i.ValidadeEm!,
                     Custo = (decimal)x.i.CustoUnitario
                 })
                 .ToListAsync();

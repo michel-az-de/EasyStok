@@ -1925,9 +1925,10 @@ public sealed class DiagnosticoController(
             if(c)c.innerHTML='';
         }
 
-        // Auto-refresh
+        // Auto-refresh desabilitado — SSE (logs/live) + health chart polling (60s) já atualizam tudo.
+        // O reload total matava a conexão SSE e gerava ruído de polling.
         document.getElementById('autoRefresh').addEventListener('change',function(){
-            if(this.checked){this._timer=setInterval(()=>location.reload(),30000)}
+            if(this.checked){this._timer=setInterval(()=>location.reload(),300000)} // 5min
             else{clearInterval(this._timer)}
         });
 

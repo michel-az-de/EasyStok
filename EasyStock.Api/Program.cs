@@ -551,7 +551,7 @@ app.Use(async (context, next) =>
 // Serilog Request Logging
 app.UseSerilogRequestLogging(options =>
 {
-    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms";
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms ({ResponseSize} bytes)";
 
     // Suprimir logs de endpoints de infraestrutura (health checks, ping, swagger, arquivos estáticos)
     // — esses são chamados constantemente e não carregam informação de negócio
@@ -563,6 +563,10 @@ app.UseSerilogRequestLogging(options =>
         var path = ctx.Request.Path.Value ?? "";
         if (path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/diagnostico/ping", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/diagnostico/logs/live", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/diagnostico/historico", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/files/", StringComparison.OrdinalIgnoreCase))
             return Serilog.Events.LogEventLevel.Debug; // suprimido — Debug está desativado em produção
@@ -574,6 +578,20 @@ app.UseSerilogRequestLogging(options =>
     {
         diagnosticContext.Set("CorrelationId", httpContext.Items["CorrelationId"]);
         diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        diagnosticContext.Set("ResponseSize", httpContext.Response.ContentLength ?? 0);
+
+        var reqPath = httpContext.Request.Path.Value ?? "";
+        var trafficType = reqPath switch
+        {
+            _ when reqPath.StartsWith("/health", StringComparison.OrdinalIgnoreCase)
+                || reqPath.Contains("/ping", StringComparison.OrdinalIgnoreCase) => "infra",
+            _ when reqPath.Contains("/diagnostico", StringComparison.OrdinalIgnoreCase)
+                || reqPath.Contains("/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) => "polling",
+            _ when reqPath.Contains("/logs/live", StringComparison.OrdinalIgnoreCase) => "sse",
+            _ => "business"
+        };
+        diagnosticContext.Set("TrafficType", trafficType);
+
         var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                   ?? httpContext.User?.FindFirst("sub")?.Value;
         if (userId is not null)
