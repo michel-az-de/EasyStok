@@ -60,11 +60,21 @@
                     <template x-for="p in resultados" :key="p.id">
                         <button type="button" @@click="selecionarProduto(p)"
                                 class="dropdown-item w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left">
-                            <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
-                                 x-text="p.emoji || '📦'"></div>
+                            <div class="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                <template x-if="p.fotoUrl">
+                                    <img :src="p.fotoUrl" class="w-full h-full object-cover object-top" />
+                                </template>
+                                <template x-if="!p.fotoUrl">
+                                    <span class="text-xl">📦</span>
+                                </template>
+                            </div>
                             <div class="flex-1 min-w-0">
                                 <div class="font-semibold text-slate-900 truncate" x-text="p.nome"></div>
-                                <div class="text-xs font-mono" :class="p.sku ? 'text-slate-400' : 'text-slate-300'" x-text="p.sku || 'Sem SKU'"></div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-mono" :class="p.sku ? 'text-slate-400' : 'text-slate-300'" x-text="p.sku || 'Sem SKU'"></span>
+                                    <span x-show="p.marca" class="text-xs text-slate-300">·</span>
+                                    <span x-show="p.marca" class="text-xs text-slate-400" x-text="p.marca"></span>
+                                </div>
                             </div>
                         </button>
                     </template>
@@ -89,6 +99,7 @@
                     <div x-show="variacoes.length > 1" class="mb-4">
                         <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Variação</label>
                         <select x-model="varId"
+                                @@change="const v = variacoes.find(x => x.id === varId); if (v && v.quantidadeEmEstoque !== undefined) { estoqueAtual = v.quantidadeEmEstoque; produtoUltimaEntrada = v.ultimaEntradaEm || null; produtoCodigoBarras = v.codigoBarras || produtoCodigoBarras; }"
                                 class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                             <template x-for="v in variacoes" :key="v.id">
                                 <option :value="v.id" x-text="v.nome"></option>
@@ -153,25 +164,73 @@
                 </div>
 
                 <!-- Painel lateral: Produto selecionado + total -->
-                <div class="ws h-fit">
-                    <h4 class="font-bold text-slate-800 mb-3">Produto selecionado</h4>
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="text-2xl" x-text="produtoEmoji || '📦'"></span>
-                        <div>
-                            <div class="font-semibold text-sm text-slate-900" x-text="produtoNome"></div>
-                            <div class="text-xs font-mono" :class="produtoSku ? 'text-slate-400' : 'text-slate-300'" x-text="produtoSku || 'Sem SKU'"></div>
+                <div class="ws h-fit space-y-4">
+                    <h4 class="font-bold text-slate-800">Produto selecionado</h4>
+
+                    <!-- Foto + identidade -->
+                    <div class="flex items-start gap-3">
+                        <a :href="'/produtos/' + produtoId" target="_blank" class="flex-shrink-0 block rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-indigo-400 transition-all" title="Ver produto">
+                            <template x-if="produtoFotoUrl">
+                                <img :src="produtoFotoUrl" alt="" class="w-16 h-16 object-cover object-top" />
+                            </template>
+                            <template x-if="!produtoFotoUrl">
+                                <div class="w-16 h-16 bg-slate-100 flex items-center justify-center text-2xl">📦</div>
+                            </template>
+                        </a>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-sm text-slate-900 leading-snug" x-text="produtoNome"></p>
+                            <p class="text-xs font-mono mt-0.5" :class="produtoSku ? 'text-slate-400' : 'text-slate-300'" x-text="produtoSku || 'Sem SKU'"></p>
+                            <p x-show="produtoMarca" class="text-xs text-slate-400 mt-0.5" x-text="produtoMarca"></p>
+                            <a :href="'/produtos/' + produtoId" target="_blank"
+                               class="text-xs text-indigo-500 hover:text-indigo-700 hover:underline mt-1 inline-block">↗ Ver cadastro completo</a>
                         </div>
                     </div>
-                    <div class="border-t border-slate-100 pt-3 space-y-2">
-                        <div class="flex justify-between text-sm">
+
+                    <!-- Variação confirmada -->
+                    <div x-show="variacoes.length > 1 && variacaoNome" class="flex items-center gap-2 text-xs bg-slate-50 rounded-lg px-3 py-2">
+                        <span class="text-slate-500">Variação:</span>
+                        <span class="font-semibold text-slate-800" x-text="variacaoNome"></span>
+                    </div>
+
+                    <!-- Estoque + código de barras + última entrada -->
+                    <div class="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Estoque atual</span>
+                            <span class="font-semibold"
+                                  :class="estoqueAtual === 0 ? 'text-red-500' : estoqueAtual < 5 ? 'text-amber-500' : 'text-slate-800'"
+                                  x-text="estoqueAtual + ' un.'"></span>
+                        </div>
+                        <div x-show="produtoCodigoBarras" class="flex justify-between text-xs">
+                            <span class="text-slate-400">Cód. barras</span>
+                            <span class="font-mono text-slate-500" x-text="produtoCodigoBarras"></span>
+                        </div>
+                        <div x-show="produtoUltimaEntrada" class="flex justify-between text-xs">
+                            <span class="text-slate-400">Última entrada</span>
+                            <span class="text-slate-500" x-text="fmtData(produtoUltimaEntrada)"></span>
+                        </div>
+                        <div x-show="!produtoUltimaEntrada" class="text-xs text-slate-300 text-right">
+                            Primeira entrada
+                        </div>
+                    </div>
+
+                    <!-- Resumo da operação -->
+                    <div class="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                        <div class="flex justify-between">
                             <span class="text-slate-500">Qtd</span>
                             <span class="font-semibold" x-text="qty || 0"></span>
                         </div>
-                        <div class="flex justify-between text-sm">
+                        <div class="flex justify-between">
                             <span class="text-slate-500">Custo unit.</span>
                             <span class="font-semibold" x-text="'R$ ' + (custo || 0).toFixed(2).replace('.', ',')"></span>
                         </div>
-                        <div class="flex justify-between text-sm font-bold border-t border-slate-100 pt-2">
+                        <!-- Margem em tempo real -->
+                        <div x-show="margemRealtime !== null" class="flex justify-between text-xs">
+                            <span class="text-slate-400">Margem s/ preço ref.</span>
+                            <span class="font-semibold"
+                                  :class="margemRealtime < 10 ? 'text-red-500' : margemRealtime < 30 ? 'text-amber-500' : 'text-emerald-600'"
+                                  x-text="margemRealtime !== null ? margemRealtime.toFixed(1) + '%' : ''"></span>
+                        </div>
+                        <div class="flex justify-between font-bold border-t border-slate-100 pt-2">
                             <span>Total</span>
                             <span class="text-indigo-600" x-text="'R$ ' + total.toFixed(2).replace('.', ',')"></span>
                         </div>
@@ -252,6 +311,10 @@
                 produtoNome: '',
                 produtoSku: '',
                 produtoEmoji: '',
+                produtoFotoUrl: '',
+                produtoMarca: '',
+                produtoCodigoBarras: '',
+                produtoUltimaEntrada: null,
                 estoqueAtual: 0,
                 variacoes: [],
                 varId: '',
@@ -267,6 +330,32 @@
                 controlaValidade: false,
                 erroMsg: '',
                 submitting: false,
+                get variacaoNome() {
+                    if (!this.varId || this.variacoes.length === 0) return '';
+                    return this.variacoes.find(v => v.id === this.varId)?.nome || '';
+                },
+                get margemRealtime() {
+                    if (!this.custo || !this.preco || this.preco <= 0) return null;
+                    return ((this.preco - this.custo) / this.preco * 100);
+                },
+                fmtData(iso) {
+                    if (!iso) return '';
+                    try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+                    catch { return ''; }
+                },
+                _setProdutoDetalhe(d) {
+                    this.variacoes = d.variacoes || [];
+                    this.estoqueAtual = d.estoqueTotal || 0;
+                    this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+                    if (d.custoReferencia) this.custo = d.custoReferencia;
+                    if (d.precoReferencia) this.preco = d.precoReferencia;
+                    this.controlaValidade = d.controlaValidade || false;
+                    this.produtoFotoUrl = d.fotoUrl || '';
+                    this.produtoMarca = d.marca || '';
+                    this.produtoCodigoBarras = d.codigoBarras || '';
+                    this.produtoUltimaEntrada = d.ultimaEntradaEm || null;
+                    this.calcularTotal();
+                },
 
                 async init() {
                     const preId = '@(ViewBag.PreSelProdutoId ?? "")';
@@ -278,14 +367,7 @@
                         this.produtoId = d.id;
                         this.produtoNome = d.nome;
                         this.produtoSku = d.sku || '';
-                        this.produtoEmoji = '📦';
-                        this.variacoes = d.variacoes || [];
-                        this.estoqueAtual = d.estoqueTotal || 0;
-                        this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
-                        if (d.custoReferencia) this.custo = d.custoReferencia;
-                        if (d.precoReferencia) this.preco = d.precoReferencia;
-                        this.controlaValidade = d.controlaValidade || false;
-                        this.calcularTotal();
+                        this._setProdutoDetalhe(d);
                         this.step = 2;
                     } catch (e) { console.error('[EasyStock]', e); window.showToast('Erro ao carregar produto pré-selecionado.', 'error'); }
                 },
@@ -315,8 +397,8 @@
                 async selecionarProduto(p) {
                     this.produtoId = p.id;
                     this.produtoNome = p.nome;
-                    this.produtoSku = p.sku;
-                    this.produtoEmoji = p.emoji || '📦';
+                    this.produtoSku = p.sku || '';
+                    this.produtoFotoUrl = '';
                     this.variacoes = [];
                     this.estoqueAtual = 0;
                     this.varId = '';
@@ -327,12 +409,7 @@
                         const dr = await fetch('/estoque/produto-detalhe/' + p.id);
                         if (dr.ok) {
                             const d = await dr.json();
-                            this.variacoes = d.variacoes || [];
-                            this.estoqueAtual = d.estoqueTotal || 0;
-                            this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
-                            if (d.custoReferencia) this.custo = d.custoReferencia;
-                            if (d.precoReferencia) this.preco = d.precoReferencia;
-                            this.controlaValidade = d.controlaValidade || false;
+                            this._setProdutoDetalhe(d);
                             detailOk = true;
                         } else {
                             window.showToast('Erro ao carregar detalhes do produto. Tente novamente.', 'error');
@@ -340,14 +417,12 @@
                     } catch (e) { console.error('[EasyStock]', e);
                         window.showToast('Não foi possível conectar ao servidor.', 'error');
                     }
-                    if (detailOk) {
-                        this.calcularTotal();
-                        this.step = 2;
-                    }
+                    if (detailOk) this.step = 2;
                 },
 
                 calcularTotal() {
                     this.total = (this.qty || 0) * (this.custo || 0);
+                    // Margem é calculada como getter reativo, não precisa de atualização manual
                 },
 
                 async submitEntrada() {

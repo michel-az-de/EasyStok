@@ -133,14 +133,26 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
             id = p.ProdutoId,
             nome = p.Nome,
             sku = p.SkuBase,
+            codigoBarras = p.CodigoBarras,
+            marca = p.Marca,
+            fotoUrl = p.Fotos.FirstOrDefault()?.Url,
             estoqueTotal = p.QuantidadeTotalEstoque,
             custoReferencia = p.CustoReferencia,
             precoReferencia = p.PrecoReferencia,
             controlaValidade = p.ControlaValidade,
             margemEstimada = p.MargemEstimada,
+            ultimaEntradaEm = p.UltimaEntradaEm,
             variacoes = p.Variacoes
                 .Where(v => v.Ativa)
-                .Select(v => new { id = v.VariacaoId, nome = v.Nome, quantidadeEmEstoque = v.QuantidadeEmEstoque })
+                .Select(v => new
+                {
+                    id = v.VariacaoId,
+                    nome = v.Nome,
+                    sku = v.Sku,
+                    codigoBarras = v.CodigoBarras,
+                    quantidadeEmEstoque = v.QuantidadeEmEstoque,
+                    ultimaEntradaEm = v.UltimaEntradaEm
+                })
         });
     }
 
