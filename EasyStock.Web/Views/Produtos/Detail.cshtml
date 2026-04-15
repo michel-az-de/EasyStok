@@ -71,14 +71,23 @@
                          class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
                 </template>
                 <template x-if="photos.length === 0">
-                    <div class="w-full h-full flex items-center justify-center flex-col gap-3 text-slate-300">
-                        <svg class="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                        </svg>
-                        <p class="text-sm text-slate-400">Nenhuma foto cadastrada</p>
-                        <button @@click="tab='fotos'" class="text-xs font-semibold text-indigo-600 hover:underline">
-                            Adicionar fotos →
-                        </button>
+                    <div class="w-full h-full flex items-center justify-center flex-col gap-3 cursor-pointer select-none transition-colors"
+                         :class="_dragOver ? 'bg-indigo-50' : 'bg-slate-50'"
+                         @@click="$refs.photoInput.click()"
+                         @@dragover.prevent="_dragOver = true"
+                         @@dragleave="_dragOver = false"
+                         @@drop.prevent="handleDrop($event)">
+                        <div class="w-16 h-16 rounded-2xl flex items-center justify-center transition-colors"
+                             :class="_dragOver ? 'bg-indigo-100' : 'bg-slate-100'">
+                            <svg class="w-8 h-8 transition-colors" :class="_dragOver ? 'text-indigo-500' : 'text-slate-300'"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-semibold transition-colors" :class="_dragOver ? 'text-indigo-600' : 'text-slate-400'"
+                           x-text="_dragOver ? 'Solte para enviar' : 'Adicionar fotos'"></p>
+                        <p class="text-xs text-slate-300">Arraste ou clique · JPEG, PNG, WebP · máx. 10 MB cada</p>
                     </div>
                 </template>
                 <!-- Photo counter -->
@@ -430,8 +439,15 @@
 
     <!-- Fotos existentes -->
     <template x-for="(foto, idx) in photos" :key="foto.fotoId">
-        <div class="relative group aspect-square rounded-xl overflow-hidden ring-2 transition-all"
-             :class="idx===0 ? 'ring-indigo-400 shadow-md shadow-indigo-100' : 'ring-slate-200 hover:ring-slate-300'">
+        <div class="relative group aspect-square rounded-xl overflow-hidden ring-2 transition-all cursor-grab active:cursor-grabbing"
+             :class="[idx===0 ? 'ring-indigo-400 shadow-md shadow-indigo-100' : 'ring-slate-200 hover:ring-slate-300', _dragSrcIdx===idx ? 'opacity-40 scale-95' : '']"
+             draggable="true"
+             @@dragstart="if (!_uploading) { _dragSrcIdx = idx; }"
+             @@dragend="_dragSrcIdx = null; _dragOverIdx = null; document.querySelectorAll('.foto-reorder-target').forEach(e=>e.classList.remove('foto-reorder-target'));"
+             @@dragover.prevent="if (_dragSrcIdx !== null && _dragSrcIdx !== idx) { _dragOverIdx = idx; $el.classList.add('foto-reorder-target'); }"
+             @@dragleave="$el.classList.remove('foto-reorder-target')"
+             @@drop.prevent="movePhoto(_dragSrcIdx, idx); $el.classList.remove('foto-reorder-target');"
+             title="Arraste para reordenar">
             <img :src="foto.url" class="w-full h-full object-cover object-top" />
             <!-- Capa badge -->
             <span x-show="idx===0"
@@ -483,7 +499,7 @@
 
 <!-- Input oculto -->
 <input type="file" x-ref="photoInput" accept="image/jpeg,image/png,image/webp"
-       class="sr-only" @@change="handleFileSelect($event)" />
+       multiple class="sr-only" @@change="handleFileSelect($event)" />
 
             <!-- Dica de drag & drop -->
             <p x-show="photos.length < 5 && !_uploading" class="text-center text-xs text-slate-300 mt-3 select-none">
@@ -742,6 +758,9 @@
 </div>
 
 @section Scripts {
+    <style>
+        .foto-reorder-target { outline: 2px solid #6366f1; outline-offset: 2px; border-radius: 0.75rem; }
+    </style>
     @if (!string.IsNullOrEmpty(p.CodigoBarras))
     {
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -778,6 +797,10 @@
                 _previewUrl: null,
                 _dragOver: false,
                 _uploadXhr: null,
+                _uploadQueue: [],
+                _queueProcessing: false,
+                _dragSrcIdx: null,
+                _dragOverIdx: null,
 
                 init() {
                     const t = new URLSearchParams(window.location.search).get('tab');
@@ -791,94 +814,113 @@
                 },
 
                 handleFileSelect(e) {
-                    const file = e.target.files?.[0];
+                    const files = [...(e.target.files ?? [])];
                     e.target.value = '';
-                    if (file) this.uploadFile(file);
+                    const remaining = 5 - this.photos.length - this._uploadQueue.length;
+                    const valid = files
+                        .filter(f => ['image/jpeg','image/png','image/webp'].includes(f.type) && f.size <= 10*1024*1024)
+                        .slice(0, Math.max(0, remaining));
+                    if (valid.length < files.length)
+                        window.showToast('Algumas fotos foram ignoradas (tipo inválido, muito grande ou limite atingido).', 'warning');
+                    valid.forEach(f => this._uploadQueue.push(f));
+                    this._processQueue();
                 },
 
                 handleDrop(e) {
                     this._dragOver = false;
-                    if (this.photos.length >= 5) { window.showToast('Limite de 5 fotos atingido.', 'warning'); return; }
-                    if (this._uploading || this._deletingPhoto) return;
-                    const file = [...(e.dataTransfer?.files ?? [])].find(f =>
-                        ['image/jpeg','image/png','image/webp'].includes(f.type));
-                    if (!file) { window.showToast('Tipo não aceito. Use JPEG, PNG ou WebP.', 'warning'); return; }
-                    if (file.size > 10 * 1024 * 1024) { window.showToast('Arquivo muito grande (máx. 10 MB).', 'warning'); return; }
-                    this.uploadFile(file);
+                    const remaining = 5 - this.photos.length - this._uploadQueue.length;
+                    if (remaining <= 0) { window.showToast('Limite de 5 fotos atingido.', 'warning'); return; }
+                    const files = [...(e.dataTransfer?.files ?? [])]
+                        .filter(f => ['image/jpeg','image/png','image/webp'].includes(f.type) && f.size <= 10*1024*1024)
+                        .slice(0, remaining);
+                    if (!files.length) { window.showToast('Tipo não aceito. Use JPEG, PNG ou WebP (máx. 10 MB).', 'warning'); return; }
+                    files.forEach(f => this._uploadQueue.push(f));
+                    this._processQueue();
                 },
 
-                uploadFile(file) {
-                    if (this.photos.length >= 5) { window.showToast('Limite de 5 fotos atingido.', 'warning'); return; }
-                    if (this._uploading || this._deletingPhoto) return;
-
-                    // Validações client-side
-                    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
-                        window.showToast('Tipo não aceito. Use JPEG, PNG ou WebP.', 'warning');
-                        return;
+                async _processQueue() {
+                    if (this._queueProcessing || this._uploadQueue.length === 0) return;
+                    this._queueProcessing = true;
+                    while (this._uploadQueue.length > 0) {
+                        if (this.photos.length >= 5) { this._uploadQueue = []; break; }
+                        const file = this._uploadQueue.shift();
+                        await this._uploadOne(file);
                     }
-                    if (file.size > 10 * 1024 * 1024) {
-                        window.showToast('Arquivo muito grande (máx. 10 MB).', 'warning');
-                        return;
-                    }
+                    this._queueProcessing = false;
+                },
 
-                    // Preview local imediato
-                    const reader = new FileReader();
-                    reader.onload = (e) => { this._previewUrl = e.target.result; };
-                    reader.readAsDataURL(file);
+                _uploadOne(file) {
+                    return new Promise(resolve => {
+                        // Preview local imediato
+                        const reader = new FileReader();
+                        reader.onload = (ev) => { this._previewUrl = ev.target.result; };
+                        reader.readAsDataURL(file);
 
-                    this._uploading = true;
-                    this._uploadPct = 0;
-
-                    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-                    const fd = new FormData();
-                    fd.append('foto', file);
-                    fd.append('__RequestVerificationToken', token);
-
-                    const xhr = new XMLHttpRequest();
-                    this._uploadXhr = xhr;
-                    xhr.open('POST', '/produtos/' + prodId + '/fotos/ajax');
-                    xhr.timeout = 30000;
-
-                    xhr.upload.onprogress = (e) => {
-                        if (e.lengthComputable)
-                            this._uploadPct = Math.round((e.loaded / e.total) * 95); // para em 95% até o servidor responder
-                    };
-
-                    xhr.onload = () => {
-                        this._uploadPct = 100;
-                        try {
-                            const data = JSON.parse(xhr.responseText);
-                            if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
-                                this.photos = [...this.photos, { fotoId: data.fotoId, url: data.url, toDelete: false }];
-                                window.showToast('Foto adicionada!', 'success');
-                            } else {
-                                window.showToast(data.erro || 'Erro ao enviar foto.', 'error');
-                            }
-                        } catch {
-                            window.showToast('Resposta inválida do servidor.', 'error');
-                        }
-                        this._uploading = false;
-                        this._previewUrl = null;
-                        this._uploadXhr = null;
-                    };
-
-                    xhr.onerror = () => {
-                        window.showToast('Erro de conexão ao enviar foto.', 'error');
-                        this._uploading = false;
+                        this._uploading = true;
                         this._uploadPct = 0;
-                        this._previewUrl = null;
-                        this._uploadXhr = null;
-                    };
 
-                    xhr.ontimeout = () => {
-                        window.showToast('Tempo esgotado ao enviar foto. Tente novamente.', 'error');
-                        this._uploading = false;
-                        this._uploadPct = 0;
-                        this._previewUrl = null;
-                        this._uploadXhr = null;
-                    };
+                        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                        const fd = new FormData();
+                        fd.append('foto', file);
+                        fd.append('__RequestVerificationToken', token);
 
-                    xhr.send(fd);
+                        const xhr = new XMLHttpRequest();
+                        this._uploadXhr = xhr;
+                        xhr.open('POST', '/produtos/' + prodId + '/fotos/ajax');
+                        xhr.timeout = 30000;
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable)
+                                this._uploadPct = Math.round((e.loaded / e.total) * 95);
+                        };
+
+                        const done = (ok, msg) => {
+                            if (msg) window.showToast(msg, ok ? 'success' : 'error');
+                            this._uploading = false;
+                            this._uploadPct = 0;
+                            this._previewUrl = null;
+                            this._uploadXhr = null;
+                            resolve();
+                        };
+
+                        xhr.onload = () => {
+                            this._uploadPct = 100;
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+                                    this.photos = [...this.photos, { fotoId: data.fotoId, url: data.url, toDelete: false }];
+                                    done(true, this._uploadQueue.length === 0 ? 'Foto adicionada!' : null);
+                                } else {
+                                    done(false, data.erro || 'Erro ao enviar foto.');
+                                }
+                            } catch { done(false, 'Resposta inválida do servidor.'); }
+                        };
+                        xhr.onerror = () => done(false, 'Erro de conexão ao enviar foto.');
+                        xhr.ontimeout = () => done(false, 'Tempo esgotado ao enviar foto.');
+                        xhr.send(fd);
+                    });
+                },
+
+                async movePhoto(fromIdx, toIdx) {
+                    if (fromIdx === null || fromIdx === toIdx) return;
+                    const updated = [...this.photos];
+                    const [moved] = updated.splice(fromIdx, 1);
+                    updated.splice(toIdx, 0, moved);
+                    this.photos = updated;
+                    this.selectedPhotoIdx = 0;
+                    const novaOrdem = this.photos.map(f => f.fotoId);
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content
+                               || document.querySelector('[name=__RequestVerificationToken]')?.value
+                               || '';
+                    try {
+                        const r = await fetch('/produtos/' + prodId + '/fotos/reordenar', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                            body: JSON.stringify(novaOrdem)
+                        });
+                        const d = await r.json();
+                        if (!d.ok) window.showToast(d.erro || 'Não foi possível salvar a nova ordem.', 'warning');
+                    } catch { window.showToast('Erro ao salvar ordem.', 'warning'); }
                 },
 
                 _deletingPhoto: false,

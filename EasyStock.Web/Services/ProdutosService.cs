@@ -193,6 +193,9 @@ public class ProdutosService(ApiClient api, SessionService session)
     public Task<ApiResult<bool>> RemoverFotoAsync(string produtoId, string fotoId) =>
         api.DeleteAsync($"produtos/{produtoId}/fotos/{fotoId}?empresaId={GetEmpresaId()}");
 
+    public Task<ApiResult<object>> ReordenarFotosAsync(string id, Guid[] novaOrdem) =>
+        api.PatchAsync<object>($"produtos/{id}/fotos/reorder?empresaId={GetEmpresaId()}", novaOrdem);
+
     public Task<ApiResult<List<string>>> ListarMarcasAsync(string? q = null) =>
         api.GetAsync<List<string>>($"produtos/marcas?empresaId={GetEmpresaId()}{(string.IsNullOrWhiteSpace(q) ? "" : $"&q={Uri.EscapeDataString(q)}")}");
 

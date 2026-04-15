@@ -369,6 +369,17 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         return Json(new { ok = true });
     }
 
+    /// <summary>Reordenação de fotos via AJAX — retorna JSON {ok}</summary>
+    [HttpPost("/produtos/{id}/fotos/reordenar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReordenarFotos(string id, [FromBody] Guid[] novaOrdem)
+    {
+        var result = await svc.ReordenarFotosAsync(id, novaOrdem);
+        if (!result.Success)
+            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao reordenar fotos." });
+        return Json(new { ok = true });
+    }
+
     [HttpPost("/produtos/{id}/preco-rapido")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PrecoRapido(string id, decimal preco)

@@ -477,7 +477,30 @@ public sealed class GerenciarProdutoUseCase(
     }
 
     internal static string SerializarFotos(IEnumerable<ProdutoFotoMetadata> fotos) =>
-        JsonSerializer.Serialize(fotos.OrderByDescending(f => f.CriadoEm));
+        JsonSerializer.Serialize(fotos);
+
+    public async Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
+    {
+        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+            ?? throw new UseCaseValidationException("Produto nao encontrado.");
+
+        var fotos = DesserializarFotos(produto.FotosJson).ToList();
+        var reordenadas = novaOrdem
+            .Select(id => fotos.FirstOrDefault(f => f.FotoId == id))
+            .Where(f => f is not null)
+            .Select(f => f!)
+            .ToList();
+        // Garante que fotos ausentes da lista não sejam perdidas
+        reordenadas.AddRange(fotos.Where(f => !novaOrdem.Contains(f.FotoId)));
+
+        produto.FotosJson = SerializarFotos(reordenadas);
+        produto.AlteradoEm = DateTime.UtcNow;
+        await produtoRepository.UpdateAsync(produto);
+        await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
+    }
 
     private static string? Normalizar(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

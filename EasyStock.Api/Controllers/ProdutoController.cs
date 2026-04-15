@@ -294,4 +294,18 @@ public class ProdutoController(
         await gerenciarUploadsUseCase.RemoverFotoProdutoAsync(resolvedEmpresaId, id, fotoId, cancellationToken);
         return NoContent();
     }
+
+    [SwaggerOperation(Summary = "Reorder product photos")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPatch("{id:guid}/fotos/reorder")]
+    public async Task<IActionResult> ReorderFotos(Guid id, [FromQuery] Guid empresaId, [FromBody] Guid[] novaOrdem, CancellationToken cancellationToken)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarProdutoUseCase.ReordenarFotosAsync(resolvedEmpresaId, id, novaOrdem);
+        return NoContent();
+    }
 }
