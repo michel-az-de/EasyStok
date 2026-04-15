@@ -49,7 +49,7 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ confirm: false, menuOpen: false }">
+                    <tr x-data="{ confirm: false, menuOpen: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)
@@ -102,7 +102,7 @@
                         <td>
                             <div class="relative flex items-center justify-end">
                                 <button type="button"
-                                        @@click="menuOpen = !menuOpen"
+                                        @@click.stop="menuOpen = !menuOpen"
                                         class="grid-action-btn grid-action-btn--ghost product-row-menu-btn"
                                         title="Abrir ações do produto"
                                         aria-label="Abrir ações do produto">
@@ -110,7 +110,7 @@
                                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                     </svg>
                                 </button>
-                                <div x-show="menuOpen" x-cloak @@click.outside="menuOpen = false"
+                                <div x-show="menuOpen" x-cloak @@click.outside="menuOpen = false" @@click.stop
                                      class="product-row-menu">
                                     <a href="/produtos/@p.Id" class="product-row-menu__item">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,7 +142,7 @@
                             </div>
 
                             <!-- Modal confirmar exclusão -->
-                            <div x-show="confirm" x-cloak
+                            <div x-show="confirm" x-cloak @@click.stop
                                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                                  @@click.self="confirm = false">
                                 <div class="ui-modal bg-white rounded-xl p-6 w-80 shadow-xl">

@@ -320,7 +320,7 @@
                         </div>
                     </template>
                     <!-- Botão adicionar mais fotos (quando < 5) -->
-                    <button x-show="totalPhotoCount < 5" type="button" @@click="_pond && _pond.browse()"
+                    <button x-show="totalPhotoCount < 5" :disabled="totalPhotoCount >= 5" type="button" @@click="_pond && _pond.browse()"
                             class="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         <span class="text-[9px] text-slate-400 font-medium">Adicionar</span>
@@ -412,8 +412,12 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-0.5">Margem</label>
-                    <p class="text-[11px] text-slate-400 mb-1.5">% sobre o preço de venda — ex: custo R$8 com 30% → venda R$11,43</p>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Margem
+                        <span class="inline-block ml-1 text-slate-300 cursor-help align-middle" title="% sobre o preço de venda — ex: custo R$8 com 30% → venda R$11,43">
+                            <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </span>
+                    </label>
                     <div class="relative">
                         <input type="number" step="0.1"
                                x-model.number="margem" @@input="onMargemInput()"
@@ -784,19 +788,20 @@
         <div class="product-review-card bg-white rounded-2xl shadow-lg shadow-slate-200/60 overflow-hidden border border-slate-100">
             <div class="product-review-card__grid grid grid-cols-1 sm:grid-cols-[280px_1fr]">
 
-                <!-- Foto principal -->
-                <div class="product-review-card__media relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px]">
-                    <img x-show="previews.length > 0" :src="previews[0]" class="w-full h-full object-cover object-top" />
-                    <img x-show="previews.length === 0 && existingPhotos.length > 0" :src="existingPhotos[0]?.url" class="w-full h-full object-cover object-top" />
-                    <div x-show="previews.length === 0 && existingPhotos.length === 0" class="text-center p-6">
+                <!-- Foto principal (navegável) -->
+                <div class="product-review-card__media relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center sm:min-h-[280px] min-h-[200px] overflow-hidden group cursor-pointer"
+                     @@click="reviewLightbox = totalPhotoCount > 0">
+                    <template x-if="totalPhotoCount > 0">
+                        <img :src="reviewPhotoIdx < existingPhotos.length ? existingPhotos[reviewPhotoIdx].url : previews[reviewPhotoIdx - existingPhotos.length]"
+                             class="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105" />
+                    </template>
+                    <div x-show="totalPhotoCount === 0" class="text-center p-6">
                         <svg class="w-12 h-12 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         <p class="text-xs text-slate-300 mt-2">Sem foto</p>
                     </div>
-                    <!-- Photo count badge -->
-                    <div x-show="(_pondFileCount + existingPhotos.length) > 1" x-cloak
-                         class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                        <span x-text="(_pondFileCount + existingPhotos.length)"></span> fotos
-                    </div>
+                    <div x-show="totalPhotoCount > 1" x-cloak
+                         class="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                         x-text="(reviewPhotoIdx + 1) + '/' + totalPhotoCount"></div>
                 </div>
 
                 <!-- Info panel -->
@@ -835,6 +840,20 @@
                         <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2).replace('.', ',')"></div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Thumbnails strip -->
+            <div x-show="totalPhotoCount > 1" class="px-5 py-2 flex gap-2 overflow-x-auto border-t border-slate-100 bg-slate-50/30">
+                <template x-for="(foto, idx) in existingPhotos" :key="'rt-ex-' + idx">
+                    <img :src="foto.url" @@click.stop="reviewPhotoIdx = idx"
+                         class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border-2 cursor-pointer transition-all"
+                         :class="reviewPhotoIdx === idx ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200 opacity-60 hover:opacity-100'" />
+                </template>
+                <template x-for="(url, idx) in previews" :key="'rt-nw-' + idx">
+                    <img :src="url" @@click.stop="reviewPhotoIdx = existingPhotos.length + idx"
+                         class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border-2 cursor-pointer transition-all"
+                         :class="reviewPhotoIdx === (existingPhotos.length + idx) ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200 opacity-60 hover:opacity-100'" />
+                </template>
             </div>
 
             <!-- Details row -->
@@ -900,6 +919,27 @@
             </button>
         </div>
     </div>
+
+    <!-- Lightbox (review step 4) -->
+    <div x-show="reviewLightbox" x-cloak x-transition.opacity
+         class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+         @@click.self="reviewLightbox = false" @@keydown.escape.window="reviewLightbox = false">
+        <button @@click="reviewLightbox = false" class="absolute top-4 right-4 text-white/70 hover:text-white z-10">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <button x-show="totalPhotoCount > 1" @@click="reviewPhotoIdx = (reviewPhotoIdx - 1 + totalPhotoCount) % totalPhotoCount"
+                class="absolute left-4 text-white/70 hover:text-white z-10">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <img x-show="totalPhotoCount > 0"
+             :src="reviewPhotoIdx < existingPhotos.length ? existingPhotos[reviewPhotoIdx].url : previews[reviewPhotoIdx - existingPhotos.length]"
+             class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+        <button x-show="totalPhotoCount > 1" @@click="reviewPhotoIdx = (reviewPhotoIdx + 1) % totalPhotoCount"
+                class="absolute right-4 text-white/70 hover:text-white z-10">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div x-show="totalPhotoCount > 1" class="absolute bottom-4 text-white/60 text-sm" x-text="(reviewPhotoIdx + 1) + ' / ' + totalPhotoCount"></div>
+    </div>
 </form>
 
 @section Styles {
@@ -940,6 +980,10 @@
                     if (this.step === 1 && !this.step1Valid) {
                         if (!this.nome) window.showToast('Informe o nome do produto.', 'warning');
                         else window.showToast('Selecione uma categoria.', 'warning');
+                        return;
+                    }
+                    if (this.step === 1 && this.skuStatus === 'indisponivel') {
+                        window.showToast('SKU em uso. Altere antes de continuar.', 'warning');
                         return;
                     }
                     if (this.step < 4) {
@@ -1171,7 +1215,7 @@
                 },
 
                 // ── Draft persistence (sessionStorage) ──
-                _draftKey: 'easystock_produto_draft' + (isEdit ? '_edit' : '_new'),
+                _draftKey: 'easystock_produto_draft_' + (isEdit ? 'edit_' + '@(Model.Id ?? "")' : 'new'),
                 _clickHandler: null,
 
                 init() {
@@ -1264,7 +1308,7 @@
                 salvarRascunho() {
                     try {
                         sessionStorage.setItem(this._draftKey, JSON.stringify({
-                            nome: this.nome, sku: this.sku, marca: this.marca,
+                            nome: this.nome, sku: this.sku, _originalSku: this._originalSku, marca: this.marca,
                             codigoBarras: this.codigoBarras,
                             descricao: this.descricao, categoriaId: this.categoriaId,
                             subcategoriaId: this.subcategoriaId, tipo: this.tipo,
@@ -1390,6 +1434,8 @@
                 marca: @Html.Raw(JsonSerializer.Serialize(Model.Marca ?? "")),
                 sku: @Html.Raw(JsonSerializer.Serialize(ViewData.ModelState.ContainsKey("SkuBase") && ViewData.ModelState["SkuBase"]!.Errors.Count > 0 ? "" : (Model.SkuBase ?? ""))),
                 _originalSku: @Html.Raw(JsonSerializer.Serialize(Model.SkuBase ?? "")),
+                reviewPhotoIdx: 0,
+                reviewLightbox: false,
                 codigoBarras: @Html.Raw(JsonSerializer.Serialize(Model.CodigoBarras ?? "")),
                 eanAviso: '',
                 skuStatus: '', // '', 'verificando', 'disponivel', 'indisponivel'
@@ -1532,7 +1578,7 @@ async deleteExistingPhoto(fotoId) {
                             });
                             res = await fetch('/anuncios/completar-produto?' + params.toString());
                         }
-                        if (!res.ok) throw new Error();
+                        if (!res || !res.ok || !res.body) throw new Error('Resposta inválida');
                         const reader = res.body.getReader();
                         const decoder = new TextDecoder();
                         this.descricao = '';
@@ -1552,12 +1598,13 @@ async deleteExistingPhoto(fotoId) {
                 get margemSugestoes() {
                     if (!this.custo || this.custo <= 0) return [];
                     // Fórmula: margem sobre preço de venda → preço = custo / (1 - pct/100)
-                    return [30, 50, 100].map(pct => ({
+                    return [30, 50, 80].map(pct => ({
                         pct,
                         preco: (this.custo / (1 - pct / 100)).toFixed(2).replace('.', ',')
                     }));
                 },
                 aplicarMargem(pct) {
+                    if (pct >= 100) return;
                     this.margem = pct;
                     if (this.custo > 0) this.preco = parseFloat((this.custo / (1 - pct / 100)).toFixed(2));
                 },
