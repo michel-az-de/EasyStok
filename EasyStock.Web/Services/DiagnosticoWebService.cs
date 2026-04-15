@@ -294,6 +294,50 @@ public sealed class DiagnosticoWebService(HttpClient httpClient, IConfiguration 
         }
         catch { return null; }
     }
+
+    public async Task<object?> ZerarHistoricoAsync()
+    {
+        try
+        {
+            var r = await httpClient.PostAsync("diagnostico/historico/zerar", null);
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> ExpurgarLogsAsync(int diasManter = 3)
+    {
+        try
+        {
+            var r = await httpClient.PostAsync($"diagnostico/logs/expurgar?diasManter={diasManter}", null);
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> FetchStorageFilesAsync()
+    {
+        try
+        {
+            var r = await httpClient.GetAsync("diagnostico/logs/storage");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
+
+    public async Task<object?> FetchStorageFileContentAsync(string file)
+    {
+        try
+        {
+            var r = await httpClient.GetAsync($"diagnostico/logs/storage/conteudo?file={Uri.EscapeDataString(file)}");
+            if (!r.IsSuccessStatusCode) return null;
+            return JsonSerializer.Deserialize<object>(await r.Content.ReadAsStringAsync(), JsonOptions);
+        }
+        catch { return null; }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -34,6 +34,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (i.Cor != null && EF.Functions.ILike(i.Cor, pattern)) ||
                      (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern)) ||
                      (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern))))
+                .OrderBy(i => i.ChavePesquisa)
+                .ThenBy(i => i.Id)
                 .Take(maxResults)
                 .ToListAsync();
         }

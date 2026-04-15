@@ -77,6 +77,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/limpar")]
     public async Task<IActionResult> ProxyLimparLogs()
@@ -99,6 +100,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/salvar-storage")]
     public async Task<IActionResult> ProxySalvarStorage()
@@ -189,6 +191,50 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService, Ses
     public async Task<IActionResult> ProxyHealthEmpresas()
     {
         var result = await diagnosticoService.FetchHealthEmpresasAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [HttpPost]
+    [Route("diagnostico/api/historico/zerar")]
+    public async Task<IActionResult> ProxyZerarHistorico()
+    {
+        var result = await diagnosticoService.ZerarHistoricoAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [HttpPost]
+    [Route("diagnostico/api/logs/expurgar")]
+    public async Task<IActionResult> ProxyExpurgarLogs([FromQuery] int diasManter = 3)
+    {
+        var result = await diagnosticoService.ExpurgarLogsAsync(diasManter);
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [HttpGet]
+    [Route("diagnostico/api/logs/storage")]
+    public async Task<IActionResult> ProxyStorageFiles()
+    {
+        var result = await diagnosticoService.FetchStorageFilesAsync();
+        if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
+        return base.Json(result);
+    }
+
+    [AllowAnonymous]
+    [HttpGet]
+    [Route("diagnostico/api/logs/storage/conteudo")]
+    public async Task<IActionResult> ProxyStorageFileContent([FromQuery] string file)
+    {
+        if (string.IsNullOrWhiteSpace(file))
+            return BadRequest(new { error = "Parâmetro 'file' é obrigatório." });
+        var result = await diagnosticoService.FetchStorageFileContentAsync(file);
         if (result is null) return StatusCode(502, new { error = "Não foi possível conectar à API" });
         return base.Json(result);
     }

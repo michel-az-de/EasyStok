@@ -180,7 +180,23 @@
                         <span class="material-icons-round text-base text-indigo-500">show_chart</span>
                         Saude da API & Banco
                     </h3>
-                    <span class="text-xs text-slate-400" x-text="healthHistory ? healthHistory.total + ' snapshots' : ''"></span>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-slate-400" x-text="healthHistory ? healthHistory.total + ' snapshots' : ''"></span>
+                        <button @@click="zerarMedidores()" :disabled="zerandoMedidores"
+                            class="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm" :class="zerandoMedidores ? 'animate-spin' : ''">
+                                <template x-if="zerandoMedidores">sync</template>
+                                <template x-if="!zerandoMedidores">restart_alt</template>
+                            </span>
+                            <span x-text="zerandoMedidores ? 'Zerando...' : 'Zerar Medidores'"></span>
+                        </button>
+                    </div>
+                </div>
+                <div x-show="zerarMsg" x-cloak x-transition
+                    class="mb-2 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
+                    :class="zerarOk ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                    <span class="material-icons-round text-sm" x-text="zerarOk ? 'check_circle' : 'error'"></span>
+                    <span x-text="zerarMsg"></span>
                 </div>
                 <div class="h-52 relative">
                     <canvas id="healthChart"></canvas>
@@ -572,11 +588,23 @@
                             </span>
                             <span x-text="clearingLogs ? 'Movendo...' : 'Mover para lixeira'"></span>
                         </button>
+                        <button @@click="expurgarLogs()" :disabled="expurgandoLogs"
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm" :class="expurgandoLogs ? 'animate-spin' : ''">
+                                <template x-if="expurgandoLogs">sync</template>
+                                <template x-if="!expurgandoLogs">auto_delete</template>
+                            </span>
+                            <span x-text="expurgandoLogs ? 'Expurgando...' : 'Expurgar antigos'"></span>
+                        </button>
                         <button @@click="esvaziarLixeira()" :disabled="clearingLogs"
                             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
                             <span class="material-icons-round text-sm">delete_forever</span>
                             <span>Esvaziar lixeira</span>
                         </button>
+                        <span x-show="lixeiraFiles.length > 0" class="text-xs text-slate-500 flex items-center gap-1">
+                            <span class="material-icons-round text-sm text-orange-400">folder_delete</span>
+                            <span x-text="lixeiraFiles.length + ' na lixeira (' + (lixeiraTotalBytes / 1024 / 1024).toFixed(1) + ' MB)'"></span>
+                        </span>
                     </div>
                 </div>
                 <!-- Limpar resultado -->
@@ -593,12 +621,75 @@
                     <span class="material-icons-round text-base" x-text="esvaziarLixeiraOk ? 'check_circle' : 'error'"></span>
                     <span x-text="esvaziarLixeiraMsg"></span>
                 </div>
+                <!-- Expurgar resultado -->
+                <div x-show="expurgarMsg" x-cloak x-transition
+                    class="mb-2 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                    :class="expurgarOk ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                    <span class="material-icons-round text-base" x-text="expurgarOk ? 'check_circle' : 'error'"></span>
+                    <span x-text="expurgarMsg"></span>
+                </div>
                 <!-- Storage resultado -->
                 <div x-show="saveStorageMsg" x-cloak x-transition
                     class="mb-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
                     :class="saveStorageOk ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-red-50 text-red-700 border border-red-200'">
                     <span class="material-icons-round text-base" x-text="saveStorageOk ? 'cloud_done' : 'error'"></span>
                     <span x-text="saveStorageMsg"></span>
+                </div>
+
+                <!-- Storage Browser -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                            <span class="material-icons-round text-base text-teal-500">cloud</span>
+                            Arquivos no Storage
+                        </h4>
+                        <button @@click="loadStorageFiles()" :disabled="loadingStorageFiles"
+                            class="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition">
+                            <span class="material-icons-round text-sm" :class="loadingStorageFiles ? 'animate-spin' : ''">
+                                <template x-if="loadingStorageFiles">sync</template>
+                                <template x-if="!loadingStorageFiles">refresh</template>
+                            </span>
+                            Listar
+                        </button>
+                    </div>
+                    <template x-if="storageFiles.length > 0">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <select x-model="selectedStorageFile"
+                                    class="flex-1 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-200 focus:border-teal-400 outline-none">
+                                    <option value="">Selecione um arquivo...</option>
+                                    <template x-for="f in storageFiles" :key="f.storageKey">
+                                        <option :value="f.storageKey" x-text="f.nome + ' (' + (f.tamanhoBytes / 1024).toFixed(0) + ' KB)'"></option>
+                                    </template>
+                                </select>
+                                <button @@click="loadStorageFileContent(selectedStorageFile)" :disabled="!selectedStorageFile || loadingStorageContent"
+                                    class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition">
+                                    <span class="material-icons-round text-sm" :class="loadingStorageContent ? 'animate-spin' : ''">
+                                        <template x-if="loadingStorageContent">sync</template>
+                                        <template x-if="!loadingStorageContent">visibility</template>
+                                    </span>
+                                    Carregar
+                                </button>
+                            </div>
+                            <div x-show="storageFileContent" x-cloak class="bg-slate-50 rounded-lg border border-slate-200 p-3 max-h-60 overflow-y-auto">
+                                <div class="text-xs text-slate-500 mb-2" x-show="storageFileContent?.resumo">
+                                    <span x-text="'Total: ' + (storageFileContent?.totalEntries ?? 0) + ' entradas'"></span>
+                                    <span x-show="storageFileContent?.resumo?.totalErrors > 0" class="text-red-600 ml-2" x-text="'| ' + storageFileContent.resumo.totalErrors + ' erros'"></span>
+                                </div>
+                                <template x-for="(entry, i) in (storageFileContent?.entradas ?? []).slice(0, 200)" :key="i">
+                                    <div class="text-xs font-mono py-0.5 border-b border-slate-100"
+                                        :class="{ 'text-red-600': entry.level === 'ERROR' || entry.level === 'FATAL', 'text-yellow-600': entry.level === 'WARN', 'text-slate-600': entry.level === 'INFO' }">
+                                        <span class="text-slate-400" x-text="entry.timestamp?.substring(11, 19) ?? ''"></span>
+                                        <span class="font-semibold ml-1" x-text="entry.level"></span>
+                                        <span class="ml-1" x-text="entry.message?.substring(0, 150)"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="storageFiles.length === 0 && !loadingStorageFiles" class="text-xs text-slate-400 text-center py-2">
+                        Clique em "Listar" para ver arquivos no storage.
+                    </div>
                 </div>
 
                 <!-- Log Volume Mini Chart -->
@@ -800,6 +891,19 @@ function diagApp() {
         saveStorageOk: true,
         esvaziarLixeiraMsg: '',
         esvaziarLixeiraOk: true,
+        zerandoMedidores: false,
+        zerarMsg: '',
+        zerarOk: true,
+        expurgandoLogs: false,
+        expurgarMsg: '',
+        expurgarOk: true,
+        lixeiraFiles: [],
+        lixeiraTotalBytes: 0,
+        storageFiles: [],
+        loadingStorageFiles: false,
+        selectedStorageFile: '',
+        storageFileContent: null,
+        loadingStorageContent: false,
 
         // Log filters
         logFilter: { level: 'ALL', search: '', groupByCorrelation: false },
@@ -901,7 +1005,7 @@ function diagApp() {
             this.fetchSlo();
             this.fetchEventos();
             this.fetchQueriesLentas();
-            if (this.isAdmin) this.fetchEnhancedLogs();
+            if (this.isAdmin) { this.fetchEnhancedLogs(); this.loadLixeira(); }
 
             // Auto-refresh health history every 60s
             setInterval(() => this.fetchHealthHistory(), 60000);
@@ -1004,6 +1108,95 @@ function diagApp() {
                 this.esvaziarLixeiraMsg = 'Erro de rede.';
             }
             setTimeout(() => { this.esvaziarLixeiraMsg = ''; }, 5000);
+            this.loadLixeira();
+        },
+
+        async zerarMedidores() {
+            if (!confirm('Zerar todos os medidores e gráficos de health? Novos dados começarão a ser coletados em até 60s.')) return;
+            this.zerandoMedidores = true;
+            this.zerarMsg = '';
+            try {
+                const r = await fetch('/diagnostico/api/historico/zerar', { method: 'POST' });
+                if (r.ok) {
+                    const data = await r.json();
+                    this.zerarOk = data.success !== false;
+                    this.zerarMsg = data.mensagem ?? 'Medidores zerados.';
+                    this.healthHistory = null;
+                    await this.fetchHealthHistory();
+                } else {
+                    this.zerarOk = false;
+                    this.zerarMsg = 'Erro ao zerar medidores (' + r.status + ').';
+                }
+            } catch (e) {
+                this.zerarOk = false;
+                this.zerarMsg = 'Erro de rede.';
+            }
+            this.zerandoMedidores = false;
+            setTimeout(() => { this.zerarMsg = ''; }, 5000);
+        },
+
+        async expurgarLogs() {
+            const dias = prompt('Quantos dias de logs manter? (1-30, padrão 3)', '3');
+            if (dias === null) return;
+            const n = parseInt(dias) || 3;
+            if (n < 1 || n > 30) { alert('Valor deve ser entre 1 e 30.'); return; }
+            if (!confirm(`Excluir permanentemente logs com mais de ${n} dia(s)?`)) return;
+            this.expurgandoLogs = true;
+            this.expurgarMsg = '';
+            try {
+                const r = await fetch(`/diagnostico/api/logs/expurgar?diasManter=${n}`, { method: 'POST' });
+                if (r.ok) {
+                    const data = await r.json();
+                    this.expurgarOk = data.success !== false;
+                    this.expurgarMsg = data.mensagem ?? 'Expurgo concluído.';
+                    await this.fetchEnhancedLogs();
+                    this.loadLixeira();
+                } else {
+                    this.expurgarOk = false;
+                    this.expurgarMsg = 'Erro ao expurgar (' + r.status + ').';
+                }
+            } catch (e) {
+                this.expurgarOk = false;
+                this.expurgarMsg = 'Erro de rede.';
+            }
+            this.expurgandoLogs = false;
+            setTimeout(() => { this.expurgarMsg = ''; }, 5000);
+        },
+
+        async loadLixeira() {
+            try {
+                const r = await fetch('/diagnostico/api/logs/lixeira');
+                if (r.ok) {
+                    const data = await r.json();
+                    this.lixeiraFiles = data.arquivos ?? [];
+                    this.lixeiraTotalBytes = data.tamanhoTotalBytes ?? 0;
+                }
+            } catch (e) { console.error('lixeira fetch error', e); }
+        },
+
+        async loadStorageFiles() {
+            this.loadingStorageFiles = true;
+            try {
+                const r = await fetch('/diagnostico/api/logs/storage');
+                if (r.ok) {
+                    const data = await r.json();
+                    this.storageFiles = data.arquivos ?? [];
+                }
+            } catch (e) { console.error('storage files fetch error', e); }
+            this.loadingStorageFiles = false;
+        },
+
+        async loadStorageFileContent(key) {
+            if (!key) return;
+            this.loadingStorageContent = true;
+            this.storageFileContent = null;
+            try {
+                const r = await fetch(`/diagnostico/api/logs/storage/conteudo?file=${encodeURIComponent(key)}`);
+                if (r.ok) {
+                    this.storageFileContent = await r.json();
+                }
+            } catch (e) { console.error('storage content fetch error', e); }
+            this.loadingStorageContent = false;
         },
 
         async fetchEnhancedLogs() {
@@ -1031,16 +1224,14 @@ function diagApp() {
             this.clearingLogs = true;
             this.clearLogsMsg = '';
             try {
-                const r = await fetch('/diagnostico/api/logs/limpar', {
-                    method: 'POST',
-                    headers: { 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
-                });
+                const r = await fetch('/diagnostico/api/logs/limpar', { method: 'POST' });
                 if (r.ok) {
                     const data = await r.json();
                     this.clearLogsOk = data.success !== false;
                     this.clearLogsMsg = data.mensagem ?? 'Logs movidos para lixeira.';
                     this.enhancedLogs = null;
                     await this.fetchEnhancedLogs();
+                    this.loadLixeira();
                 } else if (r.status === 401 || r.status === 403) {
                     this.clearLogsOk = false;
                     this.clearLogsMsg = 'Sem permissão.';
@@ -1061,10 +1252,7 @@ function diagApp() {
             this.savingStorage = true;
             this.saveStorageMsg = '';
             try {
-                const r = await fetch('/diagnostico/api/logs/salvar-storage', {
-                    method: 'POST',
-                    headers: { 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
-                });
+                const r = await fetch('/diagnostico/api/logs/salvar-storage', { method: 'POST' });
                 if (r.ok) {
                     const data = await r.json();
                     this.saveStorageOk = data.success !== false;

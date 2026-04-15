@@ -64,6 +64,50 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
     }
 
     [Fact]
+    public async Task SearchAsync_deve_retornar_ordem_deterministica_em_chamadas_consecutivas()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Paginacao", Documento = "777", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto { Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId, Nome = "Produto Test", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+
+        for (var i = 1; i <= 5; i++)
+        {
+            context.ItensEstoque.Add(new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                CodigoInterno = $"SKU-{i:D3}",
+                ChavePesquisa = $"sku teste item {i:D3}",
+                QuantidadeInicial = Quantidade.From(i),
+                QuantidadeAtual = Quantidade.From(i),
+                CustoUnitario = Dinheiro.FromDecimal(10m * i),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        var primeira = (await repository.SearchAsync(empresaId, "sku teste", maxResults: 3)).Select(i => i.CodigoInterno).ToList();
+        var segunda  = (await repository.SearchAsync(empresaId, "sku teste", maxResults: 3)).Select(i => i.CodigoInterno).ToList();
+
+        primeira.Should().HaveCount(3);
+        primeira.Should().Equal(segunda, "chamadas consecutivas devem retornar a mesma ordem determinística");
+    }
+
+    [Fact]
     public async Task Deve_persistir_value_objects_do_item_estoque()
     {
         if (!fixture.IsAvailable) return;

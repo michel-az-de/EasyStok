@@ -364,7 +364,7 @@ public sealed class GerenciarProdutoUseCase(
                 e.Padrao))
             .ToArray();
 
-        return new ProdutoDetalheResult(
+        var result = new ProdutoDetalheResult(
             produto.Id,
             produto.EmpresaId,
             produto.CategoriaId,
