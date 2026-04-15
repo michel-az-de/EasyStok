@@ -155,6 +155,7 @@ public class InteligenciaController(
             {
                 itemEstoqueId = item.Id,
                 produtoId = item.ProdutoId,
+                nomeProduto = item.Produto?.Nome ?? item.CodigoInterno,
                 codigoInterno = item.CodigoInterno,
                 quantidadeAtual = item.QuantidadeAtual.Value,
                 taxaSaidaDiaria = Math.Round(taxaDiaria, 2),

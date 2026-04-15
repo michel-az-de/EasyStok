@@ -41,7 +41,7 @@ else
         {
             <div class="ws">
                 <div class="kpi-lbl">Melhor loja</div>
-                <div class="text-lg font-bold text-emerald-600 truncate">@Model.MelhorLoja.NomeLoja</div>
+                <div class="text-lg font-bold text-emerald-600 truncate" title="@Model.MelhorLoja.NomeLoja">@Model.MelhorLoja.NomeLoja</div>
                 <div class="text-sm text-slate-500">Score @Model.MelhorLoja.HealthScore.ToString("F0")/100</div>
             </div>
         }
@@ -50,7 +50,7 @@ else
             var corPior = Model.PiorLoja.HealthScore >= 60 ? "text-blue-600" : Model.PiorLoja.HealthScore >= 40 ? "text-amber-600" : "text-red-600";
             <div class="ws">
                 <div class="kpi-lbl">Loja com mais risco</div>
-                <div class="text-lg font-bold @corPior truncate">@Model.PiorLoja.NomeLoja</div>
+                <div class="text-lg font-bold @corPior truncate" title="@Model.PiorLoja.NomeLoja">@Model.PiorLoja.NomeLoja</div>
                 <div class="text-sm text-slate-500">Score @Model.PiorLoja.HealthScore.ToString("F0")/100</div>
             </div>
         }
@@ -79,7 +79,7 @@ else
             var barWidth = Math.Max(5, (int)loja.HealthScore);
             <a href="/inteligencia-lojas/@loja.LojaId?periodo=@Model.PeriodoDias" class="ws hover:border-indigo-300 transition-colors group block">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="font-semibold text-slate-800 group-hover:text-indigo-700 truncate">@loja.NomeLoja</h3>
+                    <h3 class="font-semibold text-slate-800 group-hover:text-indigo-700 truncate" title="@loja.NomeLoja">@loja.NomeLoja</h3>
                     <span class="px-2 py-0.5 rounded-full text-xs font-bold text-white @bgScore">@loja.HealthScore.ToString("F0")</span>
                 </div>
                 <!-- Health bar -->

@@ -64,7 +64,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             // Estoque
             var estoqueQuery = dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId);
+                .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido);
             if (lojaId.HasValue)
                 estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
 
@@ -91,8 +91,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
             var alertasVencimento = await validadeQuery.CountAsync();
 
-            // Alertas parados (90 dias)
-            var cutoffParado = DateTime.UtcNow.AddDays(-90);
+            // Alertas parados (30 dias)
+            var cutoffParado = DateTime.UtcNow.AddDays(-30);
             var paradosQuery = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&

@@ -76,7 +76,7 @@
                     var rowClass = dias.HasValue && dias.Value <= 7 ? "bg-red-50" :
                                   dias.HasValue && dias.Value <= 30 ? "bg-amber-50" : "";
                     <tr class="@rowClass">
-                        <td class="font-medium text-sm">@(r.CodigoInterno ?? r.ProdutoId.ToString("N")[..8].ToUpper())</td>
+                        <td class="font-medium text-sm">@(r.NomeProduto ?? r.CodigoInterno ?? r.ProdutoId.ToString("N")[..8].ToUpper())</td>
                         <td>@r.QuantidadeAtual.ToString("N0", ptBR)</td>
                         <td class="text-slate-500">@r.TaxaSaidaDiaria.ToString("N2", ptBR)</td>
                         <td>

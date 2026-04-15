@@ -40,7 +40,7 @@
                 {
                     <tr x-data="{ editando: false, confirmando: false, nomeEdit: @Json.Serialize(c.Nome) }">
                         <td>
-                            <div x-show="!editando" class="font-medium text-slate-900">@c.Nome</div>
+                            <div x-show="!editando" class="font-medium text-slate-900">@(string.IsNullOrWhiteSpace(c.Nome) ? "(sem nome)" : c.Nome)</div>
                             <form action="/categorias/@c.Id/editar" method="post"
                                   x-show="editando" x-cloak class="flex gap-2 items-center">
                                 @Html.AntiForgeryToken()

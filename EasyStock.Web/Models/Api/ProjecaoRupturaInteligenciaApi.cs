@@ -4,6 +4,7 @@ public record ProjecaoRupturaInteligenciaApi
 {
     public Guid ItemEstoqueId { get; init; }
     public Guid ProdutoId { get; init; }
+    public string? NomeProduto { get; init; }
     public string? CodigoInterno { get; init; }
     public decimal QuantidadeAtual { get; init; }
     public decimal TaxaSaidaDiaria { get; init; }

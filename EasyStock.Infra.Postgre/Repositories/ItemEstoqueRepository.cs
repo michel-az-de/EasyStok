@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -141,11 +142,11 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var resumo = await dbContext.ItensEstoque
                 .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId)
+                .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido)
                 .Select(i => new
                 {
                     Quantidade = (int)i.QuantidadeAtual,
-                    ValorTotal = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
+                    ValorTotal = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual,
                     PrecoReferencia = (decimal?)i.PrecoVendaSugerido
                         ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido
                 })
