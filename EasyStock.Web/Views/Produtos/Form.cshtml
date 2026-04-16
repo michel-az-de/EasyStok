@@ -1160,18 +1160,27 @@
                     }
                     if (this.skuStatus === 'verificando') { window.showToast('Aguarde a verificação do SKU.', 'info'); return; }
                     if (this.saving) return;
-                    this.saving = true;
+
+                    // Captura referência ao componente Alpine fora de closures para garantir acesso
+                    const self = this;
+                    self.saving = true;
+                    console.log('[EasyStock] submitForm iniciado, action=', this.$el?.action);
                     try { sessionStorage.removeItem(this._draftKey); } catch(e) {}
 
-                    // Fallback: força reset após 35s independente do fetch (belt-and-suspenders)
+                    // Belt-and-suspenders: reseta após 20s independente do que aconteça
                     const savingGuard = setTimeout(() => {
-                        if (this.saving) {
-                            this.saving = false;
-                            window.showToast('O servidor não respondeu. Tente novamente.', 'error');
-                        }
-                    }, 35000);
+                        console.warn('[EasyStock] savingGuard disparado — resetando saving');
+                        self.saving = false;
+                        window.showToast('O servidor não respondeu. Tente novamente.', 'error');
+                    }, 20000);
 
                     const form = this.$el;
+                    if (!form) {
+                        console.error('[EasyStock] $el não encontrado');
+                        clearTimeout(savingGuard);
+                        self.saving = false;
+                        return;
+                    }
                     const fd = new FormData(form);
                     // Remover campos de arquivo — FilePond pode ter adicionado inputs hidden
                     fd.delete('fotos');
@@ -1187,9 +1196,13 @@
                     }
 
                     const abortCtrl = new AbortController();
-                    const abortTimeout = setTimeout(() => abortCtrl.abort(), 30000);
+                    const abortTimeout = setTimeout(() => {
+                        console.warn('[EasyStock] AbortController disparado após 20s');
+                        abortCtrl.abort();
+                    }, 20000);
 
                     try {
+                        console.log('[EasyStock] fetch iniciando para', form.action);
                         // === FASE 1: Criar/Atualizar produto (sem fotos) ===
                         const r = await fetch(form.action, {
                             method: 'POST',
@@ -1199,6 +1212,7 @@
                             signal: abortCtrl.signal
                         });
                         clearTimeout(abortTimeout);
+                        console.log('[EasyStock] fetch respondeu: status=', r.status, 'redirected=', r.redirected, 'url=', r.url);
 
                         // Se o controller fez redirect (sucesso), r.redirected === true
                         // Se retornou JSON de erro (400), r.redirected === false e Content-Type é application/json
@@ -1206,6 +1220,7 @@
                             let msg = 'Erro ao salvar. Verifique os campos e tente novamente.';
                             try {
                                 const ct = r.headers.get('Content-Type') ?? '';
+                                console.log('[EasyStock] erro sem redirect, Content-Type=', ct, 'status=', r.status);
                                 if (ct.includes('application/json')) {
                                     const data = await r.json();
                                     if (data?.erro) msg = data.erro;
@@ -1220,6 +1235,7 @@
                         const redirectUrl = r.url;
                         const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
                         const productId = this.productId || (match ? match[1] : null);
+                        console.log('[EasyStock] sucesso, redirectUrl=', redirectUrl, 'productId=', productId);
 
                         // Toast client-side (TempData é consumido pelo fetch redirect)
                         try {
@@ -1238,7 +1254,7 @@
                         window.location.href = redirectUrl || '/produtos';
                     } catch (e) {
                         clearTimeout(abortTimeout);
-                        console.error('[EasyStock] submitForm error:', e);
+                        console.error('[EasyStock] submitForm catch:', e.name, e.message);
                         if (e.name === 'AbortError') {
                             window.showToast('O servidor demorou para responder. Tente novamente.', 'error');
                         } else {
@@ -1246,7 +1262,8 @@
                         }
                     } finally {
                         clearTimeout(savingGuard);
-                        this.saving = false;
+                        self.saving = false;
+                        console.log('[EasyStock] finally executado, saving=false');
                     }
                 },
                 async _uploadPhotosAfterSave(productId, files) {
