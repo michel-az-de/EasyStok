@@ -27,7 +27,7 @@
     </div>
 </div>
 
-<form action="@formAction" method="post" enctype="multipart/form-data" novalidate
+<form id="produto-form" action="@formAction" method="post" enctype="multipart/form-data" novalidate
       x-data="produtoForm()"
       @@submit.prevent="isEdit ? abrirModalConfirmacao() : submitForm()"
       class="max-w-3xl pb-24 sm:pb-8">
@@ -1174,9 +1174,9 @@
                         window.showToast('O servidor não respondeu. Tente novamente.', 'error');
                     }, 20000);
 
-                    const form = this.$el;
+                    const form = document.getElementById('produto-form');
                     if (!form) {
-                        console.error('[EasyStock] $el não encontrado');
+                        console.error('[EasyStock] form#produto-form não encontrado');
                         clearTimeout(savingGuard);
                         self.saving = false;
                         return;
