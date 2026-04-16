@@ -192,18 +192,16 @@ else
                                     </button>
                                 </form>
                             }
-                            <form asp-action="Excluir" asp-controller="Notificacoes"
-                                  asp-route-id="@n.Id" method="post">
-                                @Html.AntiForgeryToken()
-                                <button type="submit"
-                                        title="Excluir"
-                                        aria-label="Excluir notificação"
-                                        class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </form>
+                            <button type="button"
+                                    x-data
+                                    title="Excluir"
+                                    aria-label="Excluir notificação"
+                                    @@click="$dispatch('confirm-action', { titulo: 'Excluir notificação', mensagem: 'Excluir esta notificação? Esta ação não pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '@Url.Action("Excluir", "Notificacoes", new { id = n.Id })' })"
+                                    class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -38,7 +38,7 @@
             <tbody>
                 @foreach (var l in Model)
                 {
-                    <tr x-data="{ editando: false, confirm: false, nomeEdit: '@l.Nome' }">
+                    <tr x-data="{ editando: false, nomeEdit: '@l.Nome' }">
                         <td>
                             <div x-show="!editando" class="font-medium text-slate-900">@l.Nome</div>
                             <form action="/lojas/@l.Id/editar" method="post"
@@ -86,7 +86,8 @@
                                 </button>
                                 @if (l.Ativa)
                                 {
-                                    <button type="button" @@click="confirm = true"
+                                    <button type="button"
+                                            @@click="$dispatch('confirm-action', { titulo: 'Desativar loja', mensagem: 'Desativar <strong>' + @Json.Serialize(l.Nome) + '</strong>? Itens de estoque nessa loja não aparecerão mais.', textoBotao: 'Desativar', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/lojas/@l.Id/excluir' })"
                                             class="grid-action-btn grid-action-btn--danger">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M6.343 6.343l11.314 11.314" />
@@ -96,30 +97,6 @@
                                 }
                             </div>
 
-                            <!-- Modal confirmar desativação -->
-                            <div x-show="confirm" x-cloak
-                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                 @@click.self="confirm = false">
-                                <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
-                                    <h3 class="font-semibold text-slate-900 mb-2">Desativar loja</h3>
-                                    <p class="text-sm text-slate-600 mb-4">
-                                        Desativar <strong>@l.Nome</strong>? Itens de estoque nessa loja não aparecerão mais.
-                                    </p>
-                                    <div class="flex justify-end gap-3">
-                                        <button type="button" @@click="confirm = false"
-                                                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
-                                            Cancelar
-                                        </button>
-                                        <form action="/lojas/@l.Id/excluir" method="post">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
-                                                Desativar
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
                         </td>
                     </tr>
                 }
