@@ -76,12 +76,6 @@ public class GerenciarProdutoUseCaseTests
             Nome = "Categoria"
         });
 
-        var caracExistente = new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Antiga" };
-        _caracteristicaRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { caracExistente });
-
-        var embExistente = new ProdutoEmbalagem { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Antiga" };
-        _embalagemRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { embExistente });
-
         var command = new AtualizarProdutoCommand(
             empresaId, produtoId, categoriaId, null, "Produto Atualizado",
             null, null, TipoProduto.Fisico, null, null, false, null,
@@ -92,9 +86,9 @@ public class GerenciarProdutoUseCaseTests
 
         await useCase.AtualizarAsync(command);
 
-        // Old ones deleted
-        await _caracteristicaRepository.Received(1).DeleteAsync(caracExistente.Id);
-        await _embalagemRepository.Received(1).DeleteAsync(embExistente.Id);
+        // Old ones batch-deleted by produto
+        await _caracteristicaRepository.Received(1).DeleteByProdutoAsync(empresaId, produtoId);
+        await _embalagemRepository.Received(1).DeleteByProdutoAsync(empresaId, produtoId);
 
         // New ones inserted
         await _caracteristicaRepository.Received(1).InsertAsync(Arg.Is<ProdutoCaracteristica>(c => c.Nome == "Material"));

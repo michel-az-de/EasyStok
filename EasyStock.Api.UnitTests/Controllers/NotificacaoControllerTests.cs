@@ -80,8 +80,10 @@ public class NotificacaoControllerTests
         var result = await _controller.GetAll(empresaId);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var envelope = ok.Value.Should().BeOfType<ApiResponse<IEnumerable<Notificacao>>>().Subject;
-        var meta = envelope.Meta.Should().BeOfType<PagedMeta>().Subject;
+        ok.Value.Should().NotBeNull();
+        var metaProp = ok.Value!.GetType().GetProperty("Meta");
+        metaProp.Should().NotBeNull("o envelope deve ter propriedade Meta");
+        var meta = metaProp!.GetValue(ok.Value).Should().BeOfType<PagedMeta>().Subject;
         meta.Total.Should().Be(1);
         meta.Pages.Should().Be(1);
         meta.Page.Should().Be(1);

@@ -41,7 +41,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         var errorDetail = detail;
         if (statusCode >= 500)
         {
-            var isDevelopment = httpContext.RequestServices
+            var isDevelopment = httpContext.RequestServices?
                 .GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false;
 
             errorDetail = isDevelopment

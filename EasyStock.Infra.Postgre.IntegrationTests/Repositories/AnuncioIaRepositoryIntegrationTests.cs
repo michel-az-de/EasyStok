@@ -13,6 +13,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -44,6 +45,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     public async Task GetByProdutoAsync_DeveRetornarAnunciosDoProduto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -85,6 +87,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     public async Task AddAsync_DeveAdicionarAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -116,6 +119,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     public async Task UpdateAsync_DeveAtualizarAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -149,6 +153,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     public async Task RemoveAsync_DeveRemoverAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 

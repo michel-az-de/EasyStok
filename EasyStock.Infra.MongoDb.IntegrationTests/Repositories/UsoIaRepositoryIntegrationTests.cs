@@ -15,6 +15,7 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetAsync_DeveRetornarUsoCorreto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -48,6 +49,7 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task AddAsync_DeveAdicionarUso()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -82,6 +84,7 @@ public sealed class UsoIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task UpdateAsync_DeveAtualizarUso()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();

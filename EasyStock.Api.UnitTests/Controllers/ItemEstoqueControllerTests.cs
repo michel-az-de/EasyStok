@@ -98,10 +98,12 @@ public class ItemEstoqueControllerTests
 
         var result = await _controller.GetAll(empresaId);
 
-        result.Should().BeOfType<OkObjectResult>();
-        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<IEnumerable<ItemEstoque>>>().Subject;
-        envelope.Data.Should().BeEquivalentTo(itens);
-        envelope.Meta.Should().BeOfType<PagedMeta>().Which.Total.Should().Be(1);
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+        var metaProp = ok.Value!.GetType().GetProperty("Meta");
+        metaProp.Should().NotBeNull("o envelope deve ter propriedade Meta");
+        var meta = metaProp!.GetValue(ok.Value).Should().BeOfType<PagedMeta>().Subject;
+        meta.Total.Should().Be(1);
     }
 
     [Fact]

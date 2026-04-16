@@ -88,7 +88,7 @@ public class FornecedorControllerTests
     public async Task GetAll_DeveRetornarPagedEnvelope()
     {
         var empresaId = Guid.NewGuid();
-        _fornecedorRepository.GetByEmpresaAsync(empresaId, 1, 20, null, null, "nome", "asc")
+        _fornecedorRepository.GetByEmpresaAsync(empresaId, 1, 20, null, null, "criadoem", "desc")
             .Returns((new List<Fornecedor>
             {
                 new() { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Fornecedor A", Ativo = true }

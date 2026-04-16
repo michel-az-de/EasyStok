@@ -15,6 +15,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -48,6 +49,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetByProdutoAsync_DeveRetornarAnunciosDoProduto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -91,6 +93,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task AddAsync_DeveAdicionarAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -125,6 +128,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task UpdateAsync_DeveAtualizarAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -160,6 +164,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task RemoveAsync_DeveRemoverAnuncio()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();

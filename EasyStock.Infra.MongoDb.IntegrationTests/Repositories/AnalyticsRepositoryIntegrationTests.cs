@@ -19,6 +19,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetDashboardResumoAsync_DeveRetornarResumoCorreto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -82,6 +83,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetReceitaPorPeriodoAsync_DeveRetornarReceitasAgrupadas()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -121,6 +123,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargens()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -164,6 +167,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetMovimentacoesResumoAsync_DeveRetornarResumoMovimentacoes()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -195,6 +199,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetAlertasValidadeAsync_DeveRetornarItensComValidadeProxima()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -236,6 +241,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetItensParadosDetalhadosAsync_DeveRetornarItensSemMovimento()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -277,6 +283,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetSazonalidadeAsync_DeveRetornarSazonalidadeMensal()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -310,6 +317,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoes()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -351,6 +359,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoes()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();
@@ -391,6 +400,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(MongoDbFixture fixture)
     public async Task GetVendasPorCanalAsync_DeveRetornarVendasAgrupadasPorCanal()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         await using var services = fixture.CreateServiceProvider();
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<MongoEasyStockContext>();

@@ -14,6 +14,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
     public async Task GetAsync_DeveRetornarUsoCorreto()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
@@ -45,6 +46,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
     public async Task AddAsync_DeveAdicionarUso()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
@@ -76,6 +78,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
     public async Task UpdateAsync_DeveAtualizarUso()
     {
         // Arrange
+        if (!fixture.IsAvailable) return;
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 

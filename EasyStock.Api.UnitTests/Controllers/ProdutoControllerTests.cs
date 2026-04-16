@@ -81,7 +81,7 @@ public class ProdutoControllerTests
     {
         var empresaId = Guid.NewGuid();
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto1" } };
-        _produtoRepository.GetProdutosPaginadosAsync(empresaId, 1, 20).Returns((produtos, 1));
+        _produtoRepository.GetProdutosPaginadosAsync(empresaId, 1, 20, "criadoem", "desc").Returns((produtos, 1));
 
         var result = await _controller.GetAll(empresaId);
 

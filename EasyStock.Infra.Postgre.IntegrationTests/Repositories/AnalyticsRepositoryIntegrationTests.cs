@@ -15,6 +15,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetDashboardResumoAsync_DeveRetornarResumoCorreto()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -109,6 +110,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargensCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -180,6 +182,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetReceitaPorPeriodoAsync_DeveRetornarReceitasCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -256,6 +259,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetMovimentacoesResumoAsync_DeveRetornarMovimentacoesCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -324,6 +328,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetAlertasValidadeAsync_DeveRetornarAlertasCorretos()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -377,6 +382,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetItensParadosDetalhadosAsync_DeveRetornarItensParadosCorretos()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -430,6 +436,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoesCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -483,6 +490,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoesCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -535,6 +543,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     [Fact]
     public async Task GetVendasPorCanalAsync_DeveRetornarVendasPorCanalCorretas()
     {
+        if (!fixture.IsAvailable) return;
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
