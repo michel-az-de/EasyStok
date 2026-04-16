@@ -107,17 +107,53 @@ public class ItemEstoqueControllerTests
     }
 
     [Fact]
-    public async Task GetById_DeveRetornarOk_QuandoItemEncontrado()
+    public async Task GetById_DeveRetornarOk_ComDtoNoFormatoEstoqueSku()
     {
         var empresaId = Guid.NewGuid();
-        var item = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, QuantidadeAtual = Quantidade.From(10) };
-        _itemEstoqueRepository.GetByIdAsync(empresaId, item.Id).Returns(item);
+        var produtoId = Guid.NewGuid();
+        var item = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(50m),
+            Status = EasyStock.Domain.Enums.StatusItemEstoque.Ok,
+            EntradaEm = DateTime.UtcNow.AddDays(-5),
+            Produto = new Produto
+            {
+                Id = produtoId,
+                EmpresaId = empresaId,
+                Nome = "Produto Teste",
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CategoriaId = Guid.NewGuid()
+            }
+        };
+        _itemEstoqueRepository.GetItemComProdutoAsync(empresaId, item.Id).Returns(item);
 
         var result = await _controller.GetById(item.Id, empresaId);
 
         result.Should().BeOfType<OkObjectResult>();
-        var envelope = ((OkObjectResult)result).Value.Should().BeOfType<ApiResponse<ItemEstoque>>().Subject;
-        envelope.Data.Should().Be(item);
+        var envelope = ((OkObjectResult)result).Value!;
+        // Response is ApiResponse<T> — access .Data to get the DTO
+        var dataProp = envelope.GetType().GetProperty("Data");
+        dataProp.Should().NotBeNull();
+        var dto = dataProp!.GetValue(envelope)!;
+
+        // GetById now returns the same DTO shape as GetAll (EstoqueSku-compatible)
+        var idProp = dto.GetType().GetProperty("id");
+        idProp.Should().NotBeNull("o DTO deve ter campo 'id'");
+        idProp!.GetValue(dto).Should().Be(item.Id.ToString());
+
+        var qtyProp = dto.GetType().GetProperty("qty");
+        qtyProp.Should().NotBeNull("o DTO deve ter campo 'qty'");
+        qtyProp!.GetValue(dto).Should().Be(10);
+
+        var statusProp = dto.GetType().GetProperty("status");
+        statusProp.Should().NotBeNull("o DTO deve ter campo 'status'");
+        statusProp!.GetValue(dto).Should().Be("ok");
     }
 
     [Fact]
@@ -125,7 +161,7 @@ public class ItemEstoqueControllerTests
     {
         var empresaId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        _itemEstoqueRepository.GetByIdAsync(empresaId, id).Returns((ItemEstoque?)null);
+        _itemEstoqueRepository.GetItemComProdutoAsync(empresaId, id).Returns((ItemEstoque?)null);
 
         var result = await _controller.GetById(id, empresaId);
 

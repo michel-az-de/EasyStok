@@ -41,41 +41,43 @@ public class ItemEstoqueController(
         var (p, ps) = NormalisePage(page, pageSize);
         var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps);
 
-        var dtos = itens.Select(i => new
-        {
-            id = i.Id.ToString(),
-            produtoId = i.ProdutoId.ToString(),
-            varId = (i.ProdutoVariacaoId ?? Guid.Empty).ToString(),
-            sku = i.Produto != null ? (i.Produto.SkuBase?.Value ?? "") : (i.CodigoInterno ?? ""),
-            qty = (int)i.QuantidadeAtual,
-            entryDate = DateOnly.FromDateTime(i.EntradaEm),
-            lastMov = new DateTimeOffset(i.UltimaMovimentacaoEm ?? i.EntradaEm, TimeSpan.Zero),
-            validade = i.ValidadeEm != null ? DateOnly.FromDateTime(i.ValidadeEm.DataValidade) : (DateOnly?)null,
-            lote = i.CodigoLote?.Value,
-            vel = i.VelocidadeSaidaDiaria,
-            stopped = i.DiasSemMovimentacao,
-            status = MapStatus(i.Status),
-            custoUnitario = (decimal)i.CustoUnitario,
-            precoVendaSugerido = i.PrecoVendaSugerido != null ? (decimal?)i.PrecoVendaSugerido : null,
-            produto = i.Produto != null ? new
-            {
-                id = i.Produto.Id.ToString(),
-                sku = i.Produto.SkuBase?.Value ?? "",
-                nome = i.Produto.Nome,
-                emoji = (string?)null,
-                categoria = i.Produto.CategoriaId.ToString(),
-                status = i.Produto.Status.ToString()
-            } : null,
-            variacao = i.ProdutoVariacao != null ? new
-            {
-                id = i.ProdutoVariacao.Id.ToString(),
-                produtoId = i.ProdutoVariacao.ProdutoId.ToString(),
-                nome = i.ProdutoVariacao.Nome
-            } : null
-        });
+        var dtos = itens.Select(MapItemToDto);
 
         return DataPaged(dtos, totalCount, p, ps);
     }
+
+    private static object MapItemToDto(EasyStock.Domain.Entities.ItemEstoque i) => new
+    {
+        id = i.Id.ToString(),
+        produtoId = i.ProdutoId.ToString(),
+        varId = (i.ProdutoVariacaoId ?? Guid.Empty).ToString(),
+        sku = i.Produto != null ? (i.Produto.SkuBase?.Value ?? "") : (i.CodigoInterno ?? ""),
+        qty = (int)i.QuantidadeAtual,
+        entryDate = DateOnly.FromDateTime(i.EntradaEm),
+        lastMov = new DateTimeOffset(i.UltimaMovimentacaoEm ?? i.EntradaEm, TimeSpan.Zero),
+        validade = i.ValidadeEm != null ? DateOnly.FromDateTime(i.ValidadeEm.DataValidade) : (DateOnly?)null,
+        lote = i.CodigoLote?.Value,
+        vel = i.VelocidadeSaidaDiaria,
+        stopped = i.DiasSemMovimentacao,
+        status = MapStatus(i.Status),
+        custoUnitario = (decimal)i.CustoUnitario,
+        precoVendaSugerido = i.PrecoVendaSugerido != null ? (decimal?)i.PrecoVendaSugerido : null,
+        produto = i.Produto != null ? new
+        {
+            id = i.Produto.Id.ToString(),
+            sku = i.Produto.SkuBase?.Value ?? "",
+            nome = i.Produto.Nome,
+            emoji = (string?)null,
+            categoria = i.Produto.CategoriaId.ToString(),
+            status = i.Produto.Status.ToString()
+        } : null,
+        variacao = i.ProdutoVariacao != null ? new
+        {
+            id = i.ProdutoVariacao.Id.ToString(),
+            produtoId = i.ProdutoVariacao.ProdutoId.ToString(),
+            nome = i.ProdutoVariacao.Nome
+        } : null
+    };
 
     private static string MapStatus(EasyStock.Domain.Enums.StatusItemEstoque status) => status switch
     {
@@ -114,8 +116,8 @@ public class ItemEstoqueController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var item = await itemEstoqueRepository.GetByIdAsync(resolvedEmpresaId, id);
-        return item is null ? DataNotFound() : DataOk(item);
+        var item = await itemEstoqueRepository.GetItemComProdutoAsync(resolvedEmpresaId, id);
+        return item is null ? DataNotFound() : DataOk(MapItemToDto(item));
     }
 
     [SwaggerOperation(Summary = "Register stock entry", Description = "Adds quantity to stock and creates a movement record. Updates running cost average.")]
@@ -155,7 +157,7 @@ public class ItemEstoqueController(
             return error!;
 
         var items = await itemEstoqueRepository.GetByProdutoAsync(resolvedEmpresaId, produtoId);
-        return DataOk(items);
+        return DataOk(items.Select(MapItemToDto));
     }
 
     [SwaggerOperation(Summary = "Get stock item replenishment data")]

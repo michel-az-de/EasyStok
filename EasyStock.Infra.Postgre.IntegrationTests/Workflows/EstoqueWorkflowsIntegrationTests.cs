@@ -840,4 +840,145 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             item.QuantidadeAtual.Value.Should().Be(10 - (vendas.Single().ItensVenda ?? []).Sum(iv => iv.Quantidade.Value));
         }
     }
+
+    /// <summary>
+    /// Fluxo ponta a ponta: Entrada aumenta estoque → Saída baixa estoque →
+    /// Analytics reflete quantidade, movimentações e receita corretamente.
+    /// </summary>
+    [Fact]
+    public async Task FluxoPontaAPonta_Entrada_Saida_Estoque_Analytics_devem_ser_coerentes()
+    {
+        if (!fixture.IsAvailable) return;
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        // ── 1. Seed produto ────────────────────────────────────────────────
+        await using (var ctx = fixture.CreateDbContext())
+            await SeedProdutoAsync(ctx, empresaId, categoriaId, produtoId);
+
+        // ── 2. Registrar Entrada (10 unidades a R$ 50) ─────────────────────
+        Guid itemEstoqueId;
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var entradaUseCase = new RegistrarEntradaEstoqueUseCase(
+                new ProdutoRepository(ctx),
+                new ProdutoVariacaoRepository(ctx),
+                new ItemEstoqueRepository(ctx),
+                new MovimentacaoEstoqueRepository(ctx),
+                ctx,
+                NullLogger<RegistrarEntradaEstoqueUseCase>.Instance);
+
+            var result = await entradaUseCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
+                EmpresaId: empresaId,
+                ProdutoId: produtoId,
+                ProdutoVariacaoId: null,
+                Quantidade: 10,
+                CustoUnitario: 50m,
+                PrecoVendaSugerido: 100m,
+                DataEntrada: new DateTime(2026, 4, 10, 9, 0, 0, DateTimeKind.Utc),
+                Natureza: NaturezaMovimentacaoEstoque.Compra,
+                CodigoInterno: null, CodigoLote: null, CodigoMarketplace: null,
+                VariacaoDescricao: null, Cor: null, Tamanho: null, FornecedorNome: null,
+                Validade: null, Observacoes: null, DescricaoAnuncio: null,
+                DocumentoReferencia: null, DimensoesReais: null,
+                InstrucoesGeracaoDescricao: null));
+
+            itemEstoqueId = result.ItemEstoqueId;
+        }
+
+        // ── 3. Verificar estoque após entrada ──────────────────────────────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var item = await ctx.ItensEstoque.SingleAsync(i => i.Id == itemEstoqueId);
+            item.QuantidadeAtual.Value.Should().Be(10, "entrada de 10 deve aumentar estoque para 10");
+            item.ProdutoId.Should().Be(produtoId);
+            item.EmpresaId.Should().Be(empresaId);
+
+            var movEntrada = await ctx.MovimentacoesEstoque.SingleAsync();
+            movEntrada.Tipo.Should().Be(TipoMovimentacaoEstoque.Entrada);
+            movEntrada.Quantidade.Value.Should().Be(10);
+            movEntrada.ValorTotal!.Valor.Should().Be(500m); // 10 * 50
+        }
+
+        // ── 4. Registrar Saída (4 unidades a R$ 100) ──────────────────────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var saidaUseCase = new RegistrarSaidaEstoqueUseCase(
+                new ProdutoRepository(ctx),
+                new ItemEstoqueRepository(ctx),
+                new VendaRepository(ctx),
+                new ItemVendaRepository(ctx),
+                new MovimentacaoEstoqueRepository(ctx),
+                ctx,
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+
+            await saidaUseCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+                EmpresaId: empresaId,
+                Itens: [new RegistrarSaidaEstoqueItemCommand(itemEstoqueId, 4, 100m, "Venda ponta-a-ponta")],
+                DataVenda: new DateTime(2026, 4, 12, 10, 0, 0, DateTimeKind.Utc),
+                DataSaida: new DateTime(2026, 4, 12, 10, 5, 0, DateTimeKind.Utc),
+                DataEnvio: null,
+                NotaFiscal: "NF-E2E",
+                Natureza: NaturezaMovimentacaoEstoque.Venda,
+                Canal: CanalVenda.MercadoLivre,
+                Observacoes: "Teste e2e"));
+        }
+
+        // ── 5. Verificar estoque após saída ────────────────────────────────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var item = await ctx.ItensEstoque.SingleAsync(i => i.Id == itemEstoqueId);
+            item.QuantidadeAtual.Value.Should().Be(6, "saída de 4 deve deixar 6 em estoque");
+
+            var movs = await ctx.MovimentacoesEstoque.OrderBy(m => m.Tipo).ToListAsync();
+            movs.Should().HaveCount(2);
+            movs.Should().Contain(m => m.Tipo == TipoMovimentacaoEstoque.Entrada && m.Quantidade.Value == 10);
+            movs.Should().Contain(m => m.Tipo == TipoMovimentacaoEstoque.Saida && m.Quantidade.Value == 4);
+
+            var saida = movs.Single(m => m.Tipo == TipoMovimentacaoEstoque.Saida);
+            saida.ValorTotal!.Valor.Should().Be(400m, "4 * R$100 = R$400 de receita");
+            saida.Natureza.Should().Be(NaturezaMovimentacaoEstoque.Venda);
+
+            var venda = await ctx.Vendas.SingleAsync();
+            venda.EmpresaId.Should().Be(empresaId);
+            venda.ValorTotal.Valor.Should().Be(400m);
+        }
+
+        // ── 6. Analytics: dashboard deve refletir estoque e receita ────────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var analytics = new AnalyticsRepository(ctx);
+            var dashboard = await analytics.GetDashboardResumoAsync(empresaId, periodoDias: 30);
+
+            dashboard.QuantidadeTotalEmEstoque.Should().Be(6, "dashboard deve mostrar 6 unidades restantes");
+            dashboard.ReceitaEstimadaPeriodo.Should().Be(400m, "dashboard deve mostrar receita da saída");
+            dashboard.TotalSkus.Should().Be(1);
+        }
+
+        // ── 7. Analytics: movimentações devem listar entrada e saída ───────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var analytics = new AnalyticsRepository(ctx);
+            var movs = await analytics.GetMovimentacoesResumoAsync(
+                empresaId,
+                de: new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+                ate: new DateTime(2026, 4, 30, 23, 59, 59, DateTimeKind.Utc));
+
+            movs.Should().Contain(m => m.Tipo == TipoMovimentacaoEstoque.Entrada && m.QuantidadeTotal == 10);
+            movs.Should().Contain(m => m.Tipo == TipoMovimentacaoEstoque.Saida && m.QuantidadeTotal == 4);
+            movs.Should().Contain(m => m.Tipo == TipoMovimentacaoEstoque.Saida && m.ValorTotal == 400m);
+        }
+
+        // ── 8. Analytics: receita por período deve refletir a venda ────────
+        await using (var ctx = fixture.CreateDbContext())
+        {
+            var analytics = new AnalyticsRepository(ctx);
+            var receita = await analytics.GetReceitaPorPeriodoAsync(empresaId, meses: 12);
+
+            receita.Should().Contain(r => r.Ano == 2026 && r.Mes == 4 && r.TotalItensVendidos == 4);
+        }
+    }
 }

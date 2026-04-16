@@ -164,6 +164,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId) =>
             await dbContext.ItensEstoque
                 .AsNoTracking()
+                .Include(i => i.Produto)
+                .Include(i => i.ProdutoVariacao)
                 .Where(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId)
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync();
