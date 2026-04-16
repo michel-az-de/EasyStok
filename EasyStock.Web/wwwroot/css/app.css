@@ -322,53 +322,41 @@ html.theme-dark .badge-slow {
 .vel-seg.r { background: #DC2626; }
 
 /* ─── Sidebar nav ────────────────────────────────────────────── */
-.nav-section {
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(148, 163, 184, .45);
-    letter-spacing: 1.4px;
-    text-transform: uppercase;
-    padding: 10px 16px 4px;
+.nav-sep {
+    height: 1px;
+    background: rgba(255, 255, 255, .05);
+    margin: 6px 4px;
 }
 .ni {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 14px;
+    gap: 9px;
+    padding: 7px 12px;
     font-size: 13px;
     font-weight: 450;
-    color: #94A3B8;
+    color: #64748B;
     cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: background .18s var(--ease-smooth), color .18s var(--ease-smooth), padding-left .18s var(--ease-spring), transform .18s var(--ease-spring);
+    border-radius: 8px;
+    transition: background .15s ease, color .15s ease;
     text-decoration: none;
-    position: relative;
-    overflow: hidden;
-}
-.ni::before,
-.ni-sub::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 4px;
-    bottom: 4px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: linear-gradient(180deg, #818CF8, #6366F1);
-    transform: scaleY(0);
-    transform-origin: center;
-    transition: transform .2s var(--ease-spring);
 }
 .ni:hover {
-    background: rgba(99, 102, 241, .09);
-    color: #A5B4FC;
-    padding-left: 17px;
+    background: rgba(255, 255, 255, .05);
+    color: #CBD5E1;
 }
 .ni.active {
-    background: linear-gradient(90deg, rgba(99, 102, 241, .18) 0%, rgba(99, 102, 241, .06) 100%);
+    background: rgba(99, 102, 241, .18);
     color: #A5B4FC;
-    box-shadow: inset 3px 0 0 #818CF8;
     font-weight: 600;
+}
+/* Mantido para compatibilidade mas não usado no novo menu */
+.nav-section {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(148, 163, 184, .35);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    padding: 10px 12px 4px;
 }
 .ni-sub {
     display: block;
@@ -376,22 +364,13 @@ html.theme-dark .badge-slow {
     font-size: 12px;
     color: rgba(148, 163, 184, .72);
     cursor: pointer;
-    border-radius: var(--radius-xs);
-    transition: background .18s var(--ease-smooth), color .18s var(--ease-smooth), padding-left .18s var(--ease-spring);
+    border-radius: 6px;
+    transition: background .15s ease, color .15s ease;
     text-decoration: none;
-    position: relative;
-    overflow: hidden;
 }
 .ni-sub:hover, .ni-sub.active {
     color: #C7D2FE;
     background: rgba(255, 255, 255, .04);
-    padding-left: 58px;
-}
-.ni:hover::before,
-.ni.active::before,
-.ni-sub:hover::before,
-.ni-sub.active::before {
-    transform: scaleY(1);
 }
 
 /* ─── Tables ─────────────────────────────────────────────────── */
@@ -665,30 +644,13 @@ html:not(.theme-dark) .app-sidebar {
     box-shadow: 18px 0 34px rgba(15, 23, 42, .12), inset -1px 0 0 rgba(255, 255, 255, .04);
 }
 
-html:not(.theme-dark) .ni {
-    color: rgba(226, 232, 240, .84);
-}
-
-html:not(.theme-dark) .ni:hover {
-    background: rgba(99, 102, 241, .12);
-    color: #FFFFFF;
-}
-
-html:not(.theme-dark) .ni.active {
-    background: linear-gradient(90deg, rgba(99, 102, 241, .20) 0%, rgba(99, 102, 241, .10) 100%);
-    color: #FFFFFF;
-    box-shadow: inset 3px 0 0 #A5B4FC;
-}
-
-html:not(.theme-dark) .ni-sub {
-    color: rgba(203, 213, 225, .78);
-}
-
+/* Sidebar sempre dark — regras de tema claro herdadas da base */
+html:not(.theme-dark) .ni { color: rgba(226, 232, 240, .75); }
+html:not(.theme-dark) .ni:hover { background: rgba(255,255,255,.06); color: #E2E8F0; }
+html:not(.theme-dark) .ni.active { background: rgba(99,102,241,.20); color: #C7D2FE; }
+html:not(.theme-dark) .ni-sub { color: rgba(203,213,225,.7); }
 html:not(.theme-dark) .ni-sub:hover,
-html:not(.theme-dark) .ni-sub.active {
-    color: #E2E8F0;
-    background: rgba(255, 255, 255, .06);
-}
+html:not(.theme-dark) .ni-sub.active { color: #E2E8F0; background: rgba(255,255,255,.05); }
 
 html:not(.theme-dark) .app-topbar .app-primary-btn,
 html:not(.theme-dark) .app-topbar .theme-toggle-btn,

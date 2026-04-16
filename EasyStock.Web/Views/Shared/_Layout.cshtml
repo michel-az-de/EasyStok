@@ -43,6 +43,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/app.css" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" />
+    <style>
+        /* Previne flash de dropdowns antes do Alpine.js inicializar */
+        .app-dropdown { display: none; }
+    </style>
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] text-slate-900 antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
