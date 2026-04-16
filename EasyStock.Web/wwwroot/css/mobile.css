@@ -455,6 +455,11 @@
         padding: 14px 16px !important;
     }
 
+    /* Preservar padding-left para inputs com prefixo R$ posicionado absolutamente */
+    form[novalidate] .relative > input.pl-9 {
+        padding-left: 36px !important;
+    }
+
     form[novalidate] textarea {
         min-height: 100px;
         resize: none;

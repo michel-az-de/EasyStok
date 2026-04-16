@@ -1178,19 +1178,23 @@
                         fd.set('ObservacaoInterna', this.observacaoInterna || '');
                     }
 
+                    const abortCtrl = new AbortController();
+                    const abortTimeout = setTimeout(() => abortCtrl.abort(), 30000);
+
                     try {
                         // === FASE 1: Criar/Atualizar produto (sem fotos) ===
                         const r = await fetch(form.action, {
                             method: 'POST',
                             body: fd,
                             redirect: 'follow',
-                            headers: { 'X-Fetch': '1' }
+                            headers: { 'X-Fetch': '1' },
+                            signal: abortCtrl.signal
                         });
+                        clearTimeout(abortTimeout);
 
                         // Se o controller fez redirect (sucesso), r.redirected === true
                         // Se retornou JSON de erro (400), r.redirected === false e Content-Type é application/json
                         if (!r.redirected) {
-                            this.saving = false;
                             let msg = 'Erro ao salvar. Verifique os campos e tente novamente.';
                             try {
                                 const ct = r.headers.get('Content-Type') ?? '';
@@ -1225,9 +1229,15 @@
 
                         window.location.href = redirectUrl || '/produtos';
                     } catch (e) {
-                        this.saving = false;
+                        clearTimeout(abortTimeout);
                         console.error('[EasyStock] submitForm error:', e);
-                        window.showToast('Erro de conexão ao salvar.', 'error');
+                        if (e.name === 'AbortError') {
+                            window.showToast('O servidor demorou para responder. Tente novamente.', 'error');
+                        } else {
+                            window.showToast('Erro de conexão ao salvar.', 'error');
+                        }
+                    } finally {
+                        this.saving = false;
                     }
                 },
                 async _uploadPhotosAfterSave(productId, files) {
@@ -1240,19 +1250,23 @@
 
                     let successCount = 0;
                     for (let i = 0; i < files.length; i++) {
+                        const uploadCtrl = new AbortController();
+                        const uploadTimeout = setTimeout(() => uploadCtrl.abort(), 15000);
                         try {
                             const fd = new FormData();
                             fd.append('foto', files[i]);
                             fd.append('__RequestVerificationToken', token);
-                            const resp = await fetch('/produtos/' + productId + '/fotos/ajax', { method: 'POST', body: fd });
+                            const resp = await fetch('/produtos/' + productId + '/fotos/ajax', { method: 'POST', body: fd, signal: uploadCtrl.signal });
+                            clearTimeout(uploadTimeout);
                             if (!resp.ok) throw new Error('Servidor retornou status ' + resp.status);
                             const data = await resp.json();
                             if (!data.ok) throw new Error(data.erro || 'Erro no servidor');
                             this.uploadQueue[i].status = 'done';
                             successCount++;
                         } catch (err) {
+                            clearTimeout(uploadTimeout);
                             this.uploadQueue[i].status = 'error';
-                            this.uploadQueue[i].message = err.message;
+                            this.uploadQueue[i].message = err.name === 'AbortError' ? 'Upload demorou demais' : err.message;
                             console.error('[EasyStock] Upload foto falhou:', err);
                         }
                         this.uploadQueue = [...this.uploadQueue]; // forçar reatividade Alpine

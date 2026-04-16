@@ -9,10 +9,12 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
 {
     [HttpGet("/saidas")]
     [HttpGet("/saidas/nova")]
-    public IActionResult Nova()
+    public IActionResult Nova(string? produtoId = null)
     {
         ViewBag.Title = "Nova Saída";
         ViewBag.ActiveMenuItem = "Saidas";
+        if (!string.IsNullOrEmpty(produtoId))
+            ViewBag.PreSelProdutoId = produtoId;
         return View(new SaidaFormViewModel());
     }
 

@@ -15,167 +15,292 @@
     </a>
 </div>
 
-<div class="ws max-w-2xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
+<div class="max-w-5xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
     <form asp-action="Criar" asp-controller="Saidas" method="post" @@submit.prevent="submitSaida()">
         @Html.AntiForgeryToken()
 
-        <!-- Produto -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-slate-700 mb-1">Produto *</label>
-            <div class="relative">
-                <input type="text" placeholder="Buscar produto..." x-model="busca"
-                       @@input="buscarProduto()" @@focus="showResults = true; if (busca.length >= 2 && resultados.length === 0) buscarProduto()"
-                       class="ui-field w-full text-sm" />
-                <input type="hidden" name="ProdutoId" x-model="produtoId" />
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- ══════ Left column: Form ══════ -->
+            <div class="lg:col-span-2 ws">
+                <!-- Produto -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Produto *</label>
+                    <div class="relative">
+                        <input type="text" placeholder="Buscar produto..." x-model="busca"
+                               @@input="buscarProduto()" @@focus="showResults = true; if (busca.length >= 2 && resultados.length === 0) buscarProduto()"
+                               class="ui-field w-full text-sm" />
+                        <input type="hidden" name="ProdutoId" x-model="produtoId" />
 
-                <div x-show="showResults && resultados.length > 0"
-                     class="dropdown-list absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
-                     x-cloak>
-                    <template x-for="p in resultados" :key="p.id">
-                        <button type="button"
-                                @@click="selecionarProduto(p)"
-                                class="dropdown-item w-full text-left px-3 py-2 hover:bg-slate-50 text-sm flex items-center gap-2">
-                            <span x-text="p.nome" class="font-medium"></span>
-                            <span x-text="p.sku" class="text-slate-400 text-xs"></span>
-                        </button>
-                    </template>
+                        <div x-show="showResults && resultados.length > 0"
+                             class="dropdown-list absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"
+                             x-cloak>
+                            <template x-for="p in resultados" :key="p.id">
+                                <button type="button"
+                                        @@click="selecionarProduto(p)"
+                                        class="dropdown-item w-full text-left px-3 py-2 hover:bg-slate-50 text-sm flex items-center gap-3">
+                                    <template x-if="p.fotoUrl">
+                                        <img :src="p.fotoUrl" alt="" class="w-8 h-8 rounded object-cover flex-shrink-0" />
+                                    </template>
+                                    <template x-if="!p.fotoUrl">
+                                        <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-sm flex-shrink-0">📦</div>
+                                    </template>
+                                    <div class="min-w-0">
+                                        <span x-text="p.nome" class="font-medium block truncate"></span>
+                                        <span x-text="p.sku" class="text-slate-400 text-xs"></span>
+                                    </div>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Variação (se houver produto selecionado com variações) -->
-        <div class="mb-4" x-show="variacoes.length > 0" x-cloak>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Variação</label>
-            <select name="VarId" x-model="varId" @@change="atualizarEstoqueVariacao()"
-                    class="ui-select w-full text-sm">
-                <option value="">Sem variação</option>
-                <template x-for="v in variacoes" :key="v.id">
-                    <option :value="v.id" x-text="v.nome"></option>
-                </template>
-            </select>
-        </div>
+                <!-- Variação (se houver produto selecionado com variações) -->
+                <div class="mb-4" x-show="variacoes.length > 0" x-cloak>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Variação</label>
+                    <div class="ui-select-shell">
+                        <select name="VarId" x-model="varId" @@change="atualizarEstoqueVariacao()"
+                                class="ui-select ui-select--plain w-full text-sm">
+                            <option value="">Sem variação</option>
+                            <template x-for="v in variacoes" :key="v.id">
+                                <option :value="v.id" x-text="v.nome"></option>
+                            </template>
+                        </select>
+                        <span class="ui-select-shell__icon" aria-hidden="true">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
 
-        <!-- Natureza e Quantidade -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Natureza *</label>
-                <div class="ui-select-shell">
-                <select asp-for="Natureza"
-                        class="ui-select ui-select--plain w-full text-sm">
-                    <option value="venda">Venda</option>
-                    <option value="perda">Perda</option>
-                    <option value="prejuizo">Prejuízo</option>
-                    <option value="doacao">Doação</option>
-                    <option value="uso_interno">Uso Interno</option>
-                    <option value="devolucao">Devolução</option>
-                    <option value="ajuste">Ajuste</option>
-                </select>
-                    <span class="ui-select-shell__icon" aria-hidden="true">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 9l-7 7-7-7" />
-                        </svg>
+                <!-- Natureza e Quantidade -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Natureza *</label>
+                        <div class="ui-select-shell">
+                        <select asp-for="Natureza"
+                                class="ui-select ui-select--plain w-full text-sm">
+                            <option value="venda">Venda</option>
+                            <option value="perda">Perda</option>
+                            <option value="prejuizo">Prejuízo</option>
+                            <option value="doacao">Doação</option>
+                            <option value="uso_interno">Uso Interno</option>
+                            <option value="devolucao">Devolução</option>
+                            <option value="ajuste">Ajuste</option>
+                        </select>
+                            <span class="ui-select-shell__icon" aria-hidden="true">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </span>
+                        </div>
+                        <span asp-validation-for="Natureza" class="text-red-600 text-xs"></span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Quantidade *</label>
+                        <input asp-for="Qty" type="number" min="1"
+                               x-model.number="qty"
+                               @@input="calcularTotal()"
+                               class="ui-field w-full text-sm" />
+                        <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
+                        <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
+                            Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Valor e Data -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
+                        <input asp-for="Valor" type="number" step="0.01" min="0"
+                               x-model.number="valorUnit"
+                               @@input="calcularTotal()"
+                               placeholder="0,00"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Data da Venda *</label>
+                        <input asp-for="DtVenda" type="date"
+                               class="ui-field w-full text-sm" />
+                        <span asp-validation-for="DtVenda" class="text-red-600 text-xs"></span>
+                    </div>
+                </div>
+
+                <!-- Total calculado -->
+                <div class="mb-4 p-3 bg-indigo-50 rounded-lg" x-show="total > 0" x-cloak>
+                    <span class="text-sm text-indigo-700 font-medium">
+                        Total: R$ <span x-text="total.toFixed(2).replace('.', ',')"></span>
                     </span>
                 </div>
-                <span asp-validation-for="Natureza" class="text-red-600 text-xs"></span>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Quantidade *</label>
-                <input asp-for="Qty" type="number" min="1"
-                       x-model.number="qty"
-                       @@input="calcularTotal()"
-                       class="ui-field w-full text-sm" />
-                <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
-                <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
-                    Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
-                </p>
-                <div x-show="produtoCriadoPor || produtoAlteradoPor" class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
-                    <span x-show="produtoCriadoPor" class="text-[11px] text-slate-400">Cadastrado por <span class="text-slate-500" x-text="produtoCriadoPor"></span></span>
-                    <span x-show="produtoAlteradoPor" class="text-[11px] text-slate-400">Últ. alteração por <span class="text-slate-500" x-text="produtoAlteradoPor"></span></span>
-                </div>
-            </div>
-        </div>
 
-        <!-- Valor e Data -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
-                <input asp-for="Valor" type="number" step="0.01" min="0"
-                       x-model.number="valorUnit"
-                       @@input="calcularTotal()"
-                       placeholder="0,00"
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Data da Venda *</label>
-                <input asp-for="DtVenda" type="date"
-                       class="ui-field w-full text-sm" />
-                <span asp-validation-for="DtVenda" class="text-red-600 text-xs"></span>
-            </div>
-        </div>
-
-        <!-- Total calculado -->
-        <div class="mb-4 p-3 bg-indigo-50 rounded-lg" x-show="total > 0" x-cloak>
-            <span class="text-sm text-indigo-700 font-medium">
-                Total: R$ <span x-text="total.toFixed(2).replace('.', ',')"></span>
-            </span>
-        </div>
-
-        <!-- Campos extras (colapsável) -->
-        <div x-data="{ open: false }">
-            <button type="button" @@click="open = !open"
-                    class="text-sm text-indigo-600 hover:text-indigo-700 mb-3 flex items-center gap-1">
-                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-90': open }"
-                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-                Campos extras (NF, Canal, etc.)
-            </button>
-            <div x-show="open" x-transition>
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Data da Saída</label>
-                        <input asp-for="DtSaida" type="date"
-                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                        <p class="text-xs text-slate-400 mt-0.5">Se diferente da data de venda</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Data de Envio</label>
-                        <input asp-for="DtEnvio" type="date"
-                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                <!-- Campos extras (colapsável) -->
+                <div x-data="{ open: false }">
+                    <button type="button" @@click="open = !open"
+                            class="text-sm text-indigo-600 hover:text-indigo-700 mb-3 flex items-center gap-1">
+                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-90': open }"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        Campos extras (NF, Canal, etc.)
+                    </button>
+                    <div x-show="open" x-transition>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Data da Saída</label>
+                                <input asp-for="DtSaida" type="date"
+                                       class="ui-field w-full text-sm" />
+                                <p class="text-xs text-slate-400 mt-0.5">Se diferente da data de venda</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Data de Envio</label>
+                                <input asp-for="DtEnvio" type="date"
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nota Fiscal</label>
+                                <input asp-for="NotaFiscal" type="text"
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Canal de Venda</label>
+                                <input asp-for="Canal" type="text" placeholder="Ex: ML, Shopee..."
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Descrição / Observação</label>
+                            <textarea asp-for="Descricao" rows="2"
+                                      class="ui-field w-full text-sm"></textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Nota Fiscal</label>
-                        <input asp-for="NotaFiscal" type="text"
-                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Canal de Venda</label>
-                        <input asp-for="Canal" type="text" placeholder="Ex: ML, Shopee..."
-                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Descrição / Observação</label>
-                    <textarea asp-for="Descricao" rows="2"
-                              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+
+                <div class="flex justify-end gap-3 pt-4 border-t">
+                    <a asp-action="Historico" asp-controller="Saidas"
+                       class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        Cancelar
+                    </a>
+                    <button type="submit"
+                            :disabled="loading || (produtoId && estoqueAtual === 0)"
+                            :class="{ 'opacity-50 cursor-not-allowed': loading || (produtoId && estoqueAtual === 0) }"
+                            class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                        <span x-show="!loading">Registrar Saída</span>
+                        <span x-show="loading" x-cloak>Registrando...</span>
+                    </button>
                 </div>
             </div>
-        </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t">
-            <a asp-action="Historico" asp-controller="Saidas"
-               class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                Cancelar
-            </a>
-            <button type="submit"
-                    :disabled="loading"
-                    :class="{ 'opacity-50 cursor-not-allowed': loading }"
-                    class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Registrar Saída</span>
-                <span x-show="loading" x-cloak>Registrando...</span>
-            </button>
+            <!-- ══════ Right column: Product card ══════ -->
+            <div x-show="produtoId" x-cloak x-transition
+                 class="ws h-fit space-y-4 lg:order-last order-first">
+                <h4 class="font-bold text-slate-800">Produto selecionado</h4>
+
+                <!-- Foto + identidade -->
+                <div class="flex items-start gap-3">
+                    <a :href="'/produtos/' + produtoId" target="_blank"
+                       class="flex-shrink-0 block rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-indigo-400 transition-all"
+                       title="Ver produto">
+                        <template x-if="produtoFotoUrl">
+                            <img :src="produtoFotoUrl" alt="" class="w-16 h-16 object-cover object-top" />
+                        </template>
+                        <template x-if="!produtoFotoUrl">
+                            <div class="w-16 h-16 bg-slate-100 flex items-center justify-center text-2xl">📦</div>
+                        </template>
+                    </a>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-semibold text-sm text-slate-900 leading-snug" x-text="produtoNome"></p>
+                        <p class="text-xs font-mono mt-0.5"
+                           :class="produtoSku ? 'text-slate-400' : 'text-slate-300'"
+                           x-text="produtoSku || 'Sem SKU'"></p>
+                        <p x-show="produtoMarca" class="text-xs text-slate-400 mt-0.5" x-text="produtoMarca"></p>
+                        <a :href="'/produtos/' + produtoId" target="_blank"
+                           class="text-xs text-indigo-500 hover:text-indigo-700 hover:underline mt-1 inline-block">
+                            ↗ Ver cadastro completo
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Variação confirmada -->
+                <div x-show="variacoes.length > 1 && variacaoNome"
+                     class="flex items-center gap-2 text-xs bg-slate-50 rounded-lg px-3 py-2">
+                    <span class="text-slate-500">Variação:</span>
+                    <span class="font-semibold text-slate-800" x-text="variacaoNome"></span>
+                </div>
+
+                <!-- Zero stock banner -->
+                <div x-show="estoqueAtual === 0" x-cloak
+                     class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-700 font-semibold flex items-center gap-2">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        Este produto não tem estoque disponível
+                    </p>
+                    <p class="text-xs text-red-500 mt-1">Registre uma entrada antes de fazer uma saída.</p>
+                </div>
+
+                <!-- Estoque + metadata -->
+                <div class="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Estoque atual</span>
+                        <span class="font-semibold"
+                              :class="estoqueAtual === 0 ? 'text-red-500' : estoqueAtual < 5 ? 'text-amber-500' : 'text-slate-800'"
+                              x-text="estoqueAtual + ' un.'"></span>
+                    </div>
+                    <div x-show="produtoCodigoBarras" class="flex justify-between text-xs">
+                        <span class="text-slate-400">Cód. barras</span>
+                        <span class="font-mono text-slate-500" x-text="produtoCodigoBarras"></span>
+                    </div>
+                    <div x-show="produtoUltimaEntrada" class="flex justify-between text-xs">
+                        <span class="text-slate-400">Última entrada</span>
+                        <span class="text-slate-500" x-text="fmtData(produtoUltimaEntrada)"></span>
+                    </div>
+                    <div x-show="!produtoUltimaEntrada" class="text-xs text-slate-300 text-right">
+                        Nenhuma entrada registrada
+                    </div>
+                    <div x-show="produtoCriadoPor" class="flex justify-between text-xs">
+                        <span class="text-slate-400">Cadastrado por</span>
+                        <span class="text-slate-500" x-text="produtoCriadoPor"></span>
+                    </div>
+                    <div x-show="produtoAlteradoPor" class="flex justify-between text-xs">
+                        <span class="text-slate-400">Últ. alteração por</span>
+                        <span class="text-slate-500" x-text="produtoAlteradoPor"></span>
+                    </div>
+                </div>
+
+                <!-- Margem estimada -->
+                <div x-show="margemEstimada !== null && margemEstimada > 0"
+                     class="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                    <div class="flex justify-between text-xs">
+                        <span class="text-slate-400">Margem estimada</span>
+                        <span class="font-semibold"
+                              :class="margemEstimada < 10 ? 'text-red-500' : margemEstimada < 30 ? 'text-amber-500' : 'text-emerald-600'"
+                              x-text="margemEstimada.toFixed(1) + '%'"></span>
+                    </div>
+                </div>
+
+                <!-- Resumo da operação -->
+                <div class="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Qtd</span>
+                        <span class="font-semibold" x-text="qty || 0"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Valor unit.</span>
+                        <span class="font-semibold"
+                              x-text="'R$ ' + (valorUnit || 0).toFixed(2).replace('.', ',')"></span>
+                    </div>
+                    <div class="flex justify-between font-bold border-t border-slate-100 pt-2">
+                        <span>Total</span>
+                        <span class="text-indigo-600"
+                              x-text="'R$ ' + total.toFixed(2).replace('.', ',')"></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </form>
 </div>
@@ -188,8 +313,15 @@ function saidaForm() {
         resultados: [],
         showResults: false,
         produtoId: '',
+        produtoNome: '',
+        produtoSku: '',
+        produtoFotoUrl: '',
+        produtoMarca: '',
+        produtoCodigoBarras: '',
+        produtoUltimaEntrada: null,
         produtoCriadoPor: '',
         produtoAlteradoPor: '',
+        margemEstimada: null,
         variacoes: [],
         varId: '',
         estoqueAtual: 0,
@@ -199,16 +331,58 @@ function saidaForm() {
         loading: false,
         _debounce: null,
 
-        init() {
-            this.$nextTick(() => {
-                const el = this.$el.querySelector('input[x-model="busca"]');
-                if (el && el.value && !this.busca) this.busca = el.value;
-            });
+        get variacaoNome() {
+            if (!this.varId || this.variacoes.length === 0) return '';
+            return this.variacoes.find(v => v.id === this.varId)?.nome || '';
+        },
+
+        fmtData(iso) {
+            if (!iso) return '';
+            try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+            catch { return ''; }
+        },
+
+        async init() {
+            const preId = '@(ViewBag.PreSelProdutoId ?? "")';
+            if (preId) {
+                try {
+                    const r = await fetch('/estoque/produto-detalhe/' + preId);
+                    if (r.ok) {
+                        const d = await r.json();
+                        this.produtoId = d.id;
+                        this.produtoNome = d.nome;
+                        this.produtoSku = d.sku || '';
+                        this.busca = d.nome;
+                        this._setProdutoDetalhe(d);
+                    }
+                } catch (e) {
+                    console.error('[EasyStock]', e);
+                    window.showToast('Erro ao carregar produto pré-selecionado.', 'error');
+                }
+            }
+        },
+
+        _setProdutoDetalhe(d) {
+            this.variacoes = d.variacoes || [];
+            this.estoqueAtual = d.estoqueTotal || 0;
+            this.varId = this.variacoes.length > 0 ? this.variacoes[0].id : '';
+            if (this.variacoes.length > 0 && this.variacoes[0].quantidadeEmEstoque !== undefined) {
+                this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque;
+            }
+            this.valorUnit = d.precoReferencia || 0;
+            this.produtoFotoUrl = d.fotoUrl || '';
+            this.produtoMarca = d.marca || '';
+            this.produtoCodigoBarras = d.codigoBarras || '';
+            this.produtoUltimaEntrada = d.ultimaEntradaEm || null;
+            this.produtoCriadoPor = d.criadoPorNome || '';
+            this.produtoAlteradoPor = d.alteradoPorNome || '';
+            this.margemEstimada = d.margemEstimada || null;
+            this.calcularTotal();
         },
 
         async submitSaida() {
             if (!this.produtoId) { window.showToast('Selecione um produto.', 'warning'); return; }
-            if (this.estoqueAtual === 0) { window.showToast('Não há estoque disponível para este produto.', 'error'); return; }
+            if (this.estoqueAtual === 0) { window.showToast('Este produto não tem estoque disponível.', 'error'); return; }
             if (this.qty > this.estoqueAtual) { window.showToast('Quantidade excede o estoque disponível (' + this.estoqueAtual + ').', 'error'); return; }
             if (this.valorUnit === 0 && !confirm('Deseja registrar uma saída com valor R$ 0,00?')) return;
 
@@ -216,13 +390,18 @@ function saidaForm() {
             const form = this.$el.closest('form');
             const fd = new FormData(form);
 
+            const abortCtrl = new AbortController();
+            const abortTimeout = setTimeout(() => abortCtrl.abort(), 30000);
+
             try {
                 const r = await fetch(form.action, {
                     method: 'POST',
                     body: fd,
                     redirect: 'follow',
-                    headers: { 'X-Fetch': '1' }
+                    headers: { 'X-Fetch': '1' },
+                    signal: abortCtrl.signal
                 });
+                clearTimeout(abortTimeout);
 
                 if (r.redirected) {
                     try { sessionStorage.setItem('easystok_toast', JSON.stringify({ msg: 'Saída registrada com sucesso!', type: 'success' })); } catch(e) {}
@@ -240,49 +419,48 @@ function saidaForm() {
                 } catch(e) {}
                 window.showToast(msg, 'error');
             } catch (e) {
+                clearTimeout(abortTimeout);
                 console.error('[EasyStock] submitSaida error:', e);
-                window.showToast('Erro de conexão. Tente novamente.', 'error');
+                if (e.name === 'AbortError') {
+                    window.showToast('O servidor demorou para responder. Tente novamente.', 'error');
+                } else {
+                    window.showToast('Erro de conexão. Tente novamente.', 'error');
+                }
+            } finally {
+                this.loading = false;
             }
-            this.loading = false;
         },
 
         buscarProduto() {
             clearTimeout(this._debounce);
             this._debounce = setTimeout(async () => {
                 if (this.busca.length < 2) { this.resultados = []; return; }
-                const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
-                this.resultados = res.ok ? await res.json() : [];
+                try {
+                    const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
+                    this.resultados = res.ok ? await res.json() : [];
+                } catch {
+                    this.resultados = [];
+                }
             }, 300);
         },
 
         async selecionarProduto(p) {
             this.produtoId = p.id;
+            this.produtoNome = p.nome;
+            this.produtoSku = p.sku || '';
             this.busca = p.nome;
             this.showResults = false;
             this.resultados = [];
+            this.produtoFotoUrl = '';
             this.variacoes = [];
             this.estoqueAtual = 0;
             this.varId = '';
+            this.margemEstimada = null;
             try {
                 const dr = await fetch('/estoque/produto-detalhe/' + p.id);
-                if (!dr.ok) {
-                    return;
+                if (dr.ok) {
+                    this._setProdutoDetalhe(await dr.json());
                 }
-
-                const d = await dr.json();
-                this.variacoes = d.variacoes || [];
-                // Use variation-specific stock if available, otherwise fall back to estoqueTotal
-                if (this.variacoes.length > 0) {
-                    this.varId = this.variacoes[0].id;
-                    this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque ?? d.estoqueTotal ?? 0;
-                } else {
-                    this.varId = '';
-                    this.estoqueAtual = d.estoqueTotal || 0;
-                }
-                this.valorUnit = d.precoReferencia || 0;
-                this.produtoCriadoPor = d.criadoPorNome || '';
-                this.produtoAlteradoPor = d.alteradoPorNome || '';
-                this.calcularTotal();
             } catch {
                 this.variacoes = [];
                 this.estoqueAtual = 0;
@@ -293,8 +471,10 @@ function saidaForm() {
         atualizarEstoqueVariacao() {
             if (!this.varId || this.variacoes.length === 0) return;
             const v = this.variacoes.find(x => x.id === this.varId);
-            if (v && v.quantidadeEmEstoque !== undefined) {
-                this.estoqueAtual = v.quantidadeEmEstoque;
+            if (v) {
+                if (v.quantidadeEmEstoque !== undefined) this.estoqueAtual = v.quantidadeEmEstoque;
+                this.produtoUltimaEntrada = v.ultimaEntradaEm || this.produtoUltimaEntrada;
+                if (v.codigoBarras) this.produtoCodigoBarras = v.codigoBarras;
             }
         },
 
