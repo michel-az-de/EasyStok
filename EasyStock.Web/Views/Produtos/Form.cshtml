@@ -1163,6 +1163,14 @@
                     this.saving = true;
                     try { sessionStorage.removeItem(this._draftKey); } catch(e) {}
 
+                    // Fallback: força reset após 35s independente do fetch (belt-and-suspenders)
+                    const savingGuard = setTimeout(() => {
+                        if (this.saving) {
+                            this.saving = false;
+                            window.showToast('O servidor não respondeu. Tente novamente.', 'error');
+                        }
+                    }, 35000);
+
                     const form = this.$el;
                     const fd = new FormData(form);
                     // Remover campos de arquivo — FilePond pode ter adicionado inputs hidden
@@ -1237,6 +1245,7 @@
                             window.showToast('Erro de conexão ao salvar.', 'error');
                         }
                     } finally {
+                        clearTimeout(savingGuard);
                         this.saving = false;
                     }
                 },

@@ -98,8 +98,19 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(ProdutoFormViewModel vm)
     {
+        var isFetch = Request.Headers["X-Fetch"] == "1";
+
         if (!ModelState.IsValid)
         {
+            if (isFetch)
+            {
+                var msg = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m))
+                    ?? "Dados inválidos.";
+                return BadRequest(new { erro = msg });
+            }
             ViewBag.Title = "Novo Produto";
             ViewBag.ActiveMenuItem = "Produtos";
             await LoadCategoriasAsync();
@@ -110,6 +121,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         if (!result.Success && result.HttpStatus is not (200 or 201))
         {
+            var erro = result.ErrorMessage ?? "Erro ao salvar produto.";
+            if (isFetch)
+                return BadRequest(new { erro });
             HasError(result);
             await LoadCategoriasAsync();
             return View("Form", vm);
