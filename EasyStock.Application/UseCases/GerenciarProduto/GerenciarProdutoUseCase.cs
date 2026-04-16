@@ -30,7 +30,10 @@ public sealed record AtualizarProdutoCommand(
     IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
     IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
     IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes,
-    Guid UsuarioId = default);
+    Guid UsuarioId = default,
+    string? Motivo = null,
+    string? Observacao = null,
+    string? ObservacaoInterna = null);
 
 public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
@@ -54,7 +57,14 @@ public sealed record ProdutoDetalheResult(
     IReadOnlyCollection<ProdutoFotoResult> Fotos,
     IReadOnlyCollection<ProdutoVariacaoDetalheResult> Variacoes,
     IReadOnlyCollection<ProdutoCaracteristicaDetalheResult> Caracteristicas,
-    IReadOnlyCollection<ProdutoEmbalagemDetalheResult> Embalagens);
+    IReadOnlyCollection<ProdutoEmbalagemDetalheResult> Embalagens,
+    Guid? CriadoPor = null,
+    Guid? AlteradoPor = null,
+    string? CriadoPorNome = null,
+    string? AlteradoPorNome = null,
+    string? ObservacaoInterna = null,
+    DateTime? CriadoEm = null,
+    DateTime? AlteradoEm = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -138,7 +148,8 @@ public sealed class GerenciarProdutoUseCase(
     IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
     IUnitOfWork unitOfWork,
     ICacheService? cacheService = null,
-    IProdutoAlteracaoRepository? alteracaoRepository = null)
+    IProdutoAlteracaoRepository? alteracaoRepository = null,
+    IUsuarioRepository? usuarioRepository = null)
 {
     public async Task AtualizarAsync(AtualizarProdutoCommand command)
     {
@@ -151,12 +162,16 @@ public sealed class GerenciarProdutoUseCase(
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         // Captura estado anterior para auditoria
-        var nomeAntes    = produto.Nome;
-        var marcaAntes   = produto.Marca;
-        var statusAntes  = produto.Status;
-        var precoAntes   = produto.PrecoReferencia?.Valor;
-        var custoAntes   = produto.CustoReferencia?.Valor;
-        var margemAntes  = produto.MargemEstimada;
+        var nomeAntes      = produto.Nome;
+        var marcaAntes     = produto.Marca;
+        var statusAntes    = produto.Status;
+        var precoAntes     = produto.PrecoReferencia?.Valor;
+        var custoAntes     = produto.CustoReferencia?.Valor;
+        var margemAntes    = produto.MargemEstimada;
+        var descricaoAntes = produto.DescricaoBase;
+        var skuAntes       = produto.SkuBase?.Value;
+        var codigoBarrasAntes = produto.CodigoBarras;
+        var observacaoAntes   = produto.ObservacaoInterna;
 
         var categoria = await categoriaRepository.GetByIdAsync(command.CategoriaId)
             ?? throw new UseCaseValidationException("Categoria nao encontrada.");
@@ -204,6 +219,8 @@ public sealed class GerenciarProdutoUseCase(
         produto.MargemEstimada = command.MargemEstimada;
         produto.AtributosJson = command.AtributosJson;
         produto.Status = command.Status;
+        produto.ObservacaoInterna = command.ObservacaoInterna;
+        produto.AlteradoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
 
         try
@@ -306,6 +323,14 @@ public sealed class GerenciarProdutoUseCase(
                     mudancas.Add(new { campo = "Custo", de = custoAntes, para = produto.CustoReferencia?.Valor });
                 if (produto.MargemEstimada != margemAntes)
                     mudancas.Add(new { campo = "Margem", de = margemAntes, para = produto.MargemEstimada });
+                if (produto.DescricaoBase != descricaoAntes)
+                    mudancas.Add(new { campo = "Descrição", de = descricaoAntes, para = produto.DescricaoBase });
+                if (produto.SkuBase?.Value != skuAntes)
+                    mudancas.Add(new { campo = "SKU", de = skuAntes, para = produto.SkuBase?.Value });
+                if (produto.CodigoBarras != codigoBarrasAntes)
+                    mudancas.Add(new { campo = "Código de barras", de = codigoBarrasAntes, para = produto.CodigoBarras });
+                if (produto.ObservacaoInterna != observacaoAntes)
+                    mudancas.Add(new { campo = "Observação interna", de = observacaoAntes, para = produto.ObservacaoInterna });
 
                 if (mudancas.Count > 0)
                 {
@@ -317,6 +342,8 @@ public sealed class GerenciarProdutoUseCase(
                         UsuarioId = command.UsuarioId,
                         Acao = "atualizado",
                         AlteracoesJson = JsonSerializer.Serialize(mudancas),
+                        Motivo = string.IsNullOrWhiteSpace(command.Motivo) ? null : command.Motivo.Trim(),
+                        Observacao = string.IsNullOrWhiteSpace(command.Observacao) ? null : command.Observacao.Trim(),
                         AlteradoEm = DateTime.UtcNow
                     });
                     await unitOfWork.CommitAsync();
@@ -346,6 +373,7 @@ public sealed class GerenciarProdutoUseCase(
             throw new UseCaseValidationException("Nao e permitido inativar produto com estoque disponivel.");
 
         produto.Status = StatusProduto.Inativo;
+        produto.AlteradoPor = usuarioId != Guid.Empty ? usuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
 
         await produtoRepository.UpdateAsync(produto);
@@ -375,6 +403,7 @@ public sealed class GerenciarProdutoUseCase(
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         produto.Status = StatusProduto.Ativo;
+        produto.AlteradoPor = usuarioId != Guid.Empty ? usuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
 
         await produtoRepository.UpdateAsync(produto);
@@ -447,6 +476,21 @@ public sealed class GerenciarProdutoUseCase(
                 e.Padrao))
             .ToArray();
 
+        // Resolver nomes de usuário para auditoria
+        string? criadoPorNome = null, alteradoPorNome = null;
+        if (usuarioRepository is not null)
+        {
+            if (produto.CriadoPor.HasValue && produto.CriadoPor != Guid.Empty)
+                criadoPorNome = (await usuarioRepository.GetByIdAsync(produto.CriadoPor.Value))?.Nome;
+            if (produto.AlteradoPor.HasValue && produto.AlteradoPor != Guid.Empty)
+            {
+                if (produto.AlteradoPor == produto.CriadoPor)
+                    alteradoPorNome = criadoPorNome;
+                else
+                    alteradoPorNome = (await usuarioRepository.GetByIdAsync(produto.AlteradoPor.Value))?.Nome;
+            }
+        }
+
         var result = new ProdutoDetalheResult(
             produto.Id,
             produto.EmpresaId,
@@ -469,7 +513,14 @@ public sealed class GerenciarProdutoUseCase(
             fotos.Select(f => new ProdutoFotoResult(f.FotoId, f.Url, f.CriadoEm)).ToArray(),
             variacoesResult,
             caracteristicasResult,
-            embalagensResult);
+            embalagensResult,
+            CriadoPor: produto.CriadoPor,
+            AlteradoPor: produto.AlteradoPor,
+            CriadoPorNome: criadoPorNome,
+            AlteradoPorNome: alteradoPorNome,
+            ObservacaoInterna: produto.ObservacaoInterna,
+            CriadoEm: produto.CriadoEm,
+            AlteradoEm: produto.AlteradoEm);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));

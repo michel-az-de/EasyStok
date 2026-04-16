@@ -142,6 +142,8 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
             controlaValidade = p.ControlaValidade,
             margemEstimada = p.MargemEstimada,
             ultimaEntradaEm = p.UltimaEntradaEm,
+            criadoPorNome = p.CriadoPorNome,
+            alteradoPorNome = p.AlteradoPorNome,
             variacoes = p.Variacoes
                 .Where(v => v.Ativa)
                 .Select(v => new

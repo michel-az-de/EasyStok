@@ -144,7 +144,10 @@ public class ProdutosService(ApiClient api, SessionService session)
                     sku = v.Sku,
                     codigoBarras = v.CodigoBarras,
                     ativa = v.Ativa
-                }).ToArray()
+                }).ToArray(),
+            motivo = vm.Motivo,
+            observacao = vm.Observacao,
+            observacaoInterna = vm.ObservacaoInterna
         });
 
     public Task<ApiResult<object>> AtualizarPrecoAsync(string id, decimal preco) =>

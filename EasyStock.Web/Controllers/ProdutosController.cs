@@ -185,6 +185,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
                 Comprimento = e.Dimensoes?.Comprimento,
                 Padrao = e.Padrao
             }).ToList(),
+            ObservacaoInterna = p.ObservacaoInterna,
             ExistingPhotos = p.Fotos
         };
         await LoadCategoriasAsync();

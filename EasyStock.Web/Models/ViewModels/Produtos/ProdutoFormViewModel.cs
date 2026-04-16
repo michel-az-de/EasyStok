@@ -53,6 +53,16 @@ public class ProdutoFormViewModel
     // Embalagens
     public List<EmbalagemFormItem> Embalagens { get; set; } = [];
 
+    // Auditoria (motivo e observação — usados na edição)
+    [MaxLength(100)]
+    public string? Motivo { get; set; }
+
+    [MaxLength(500)]
+    public string? Observacao { get; set; }
+
+    [MaxLength(1000)]
+    public string? ObservacaoInterna { get; set; }
+
     // Fotos existentes (populated on edit, not bound from form)
     [BindNever]
     public List<ProdutoFotoDetalhe> ExistingPhotos { get; set; } = [];

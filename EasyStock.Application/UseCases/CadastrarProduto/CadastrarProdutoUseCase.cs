@@ -113,7 +113,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 FotosJson = command.FotosJson,
                 Status = StatusProduto.Ativo,
                 CriadoEm = agora,
-                AlteradoEm = agora
+                AlteradoEm = agora,
+                CriadoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null,
+                AlteradoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null
             };
 
             var caracteristicasIds = new List<Guid>();

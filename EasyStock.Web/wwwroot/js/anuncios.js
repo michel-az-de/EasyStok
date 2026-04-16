@@ -228,6 +228,7 @@ function anunciosSalvos() {
         },
 
         async deletar(id) {
+            if (!confirm('Tem certeza que deseja excluir este anúncio?')) return;
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
             try {
                 const res = await fetch(`/anuncios/${id}/deletar`, {

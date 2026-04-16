@@ -211,6 +211,14 @@
                         <div x-show="!produtoUltimaEntrada" class="text-xs text-slate-300 text-right">
                             Primeira entrada
                         </div>
+                        <div x-show="produtoCriadoPor" class="flex justify-between text-xs">
+                            <span class="text-slate-400">Cadastrado por</span>
+                            <span class="text-slate-500" x-text="produtoCriadoPor"></span>
+                        </div>
+                        <div x-show="produtoAlteradoPor" class="flex justify-between text-xs">
+                            <span class="text-slate-400">Últ. alteração por</span>
+                            <span class="text-slate-500" x-text="produtoAlteradoPor"></span>
+                        </div>
                     </div>
 
                     <!-- Resumo da operação -->
@@ -315,6 +323,8 @@
                 produtoMarca: '',
                 produtoCodigoBarras: '',
                 produtoUltimaEntrada: null,
+                produtoCriadoPor: '',
+                produtoAlteradoPor: '',
                 estoqueAtual: 0,
                 variacoes: [],
                 varId: '',
@@ -354,6 +364,8 @@
                     this.produtoMarca = d.marca || '';
                     this.produtoCodigoBarras = d.codigoBarras || '';
                     this.produtoUltimaEntrada = d.ultimaEntradaEm || null;
+                    this.produtoCriadoPor = d.criadoPorNome || '';
+                    this.produtoAlteradoPor = d.alteradoPorNome || '';
                     this.calcularTotal();
                 },
 

@@ -43,6 +43,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnType("decimal(18,2)");
             builder.Property(p => p.MargemEstimada).HasColumnType("decimal(8,2)");
 
+            builder.Property(p => p.CriadoPor).HasColumnType("uuid");
+            builder.Property(p => p.AlteradoPor).HasColumnType("uuid");
+            builder.Property(p => p.ObservacaoInterna).HasMaxLength(1000).HasColumnType("character varying(1000)");
+
             builder.Property(p => p.AtributosJson).HasColumnType("jsonb");
             builder.Property(p => p.FotosJson).HasColumnType("jsonb");
             builder.Property(p => p.SugestaoDescricaoAnuncio).HasColumnType("text");

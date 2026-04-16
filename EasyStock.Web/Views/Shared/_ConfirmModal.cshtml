@@ -1,0 +1,76 @@
+@* Modal de confirmacao global para acoes destrutivas.
+   Uso: $dispatch('confirm-action', { titulo, mensagem, textoBotao, classBotao, formAction, method })
+*@
+<div x-data="confirmModal()" x-cloak
+     @@confirm-action.window="abrir($event.detail)"
+     @@keydown.escape.window="fechar()">
+
+    <template x-if="open">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+             @@click.self="fechar()" x-transition.opacity>
+            <div class="bg-white rounded-xl p-6 w-96 shadow-xl" @@click.stop>
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+                         :class="classBotao.includes('red') ? 'bg-red-100' : 'bg-indigo-100'">
+                        <svg class="w-5 h-5" :class="classBotao.includes('red') ? 'text-red-600' : 'text-indigo-600'"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-slate-900 text-base" x-text="titulo"></h3>
+                        <p class="text-sm text-slate-600 mt-1" x-html="mensagem"></p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-5">
+                    <button type="button" @@click="fechar()"
+                            class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                        Cancelar
+                    </button>
+                    <form :action="formAction" :method="method" x-ref="confirmForm">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" :disabled="loading"
+                                class="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50"
+                                :class="classBotao">
+                            <span x-show="!loading" x-text="textoBotao"></span>
+                            <span x-show="loading" class="inline-flex items-center gap-1.5">
+                                <span class="spinner"></span> Aguarde...
+                            </span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+    function confirmModal() {
+        return {
+            open: false,
+            loading: false,
+            titulo: '',
+            mensagem: '',
+            textoBotao: 'Confirmar',
+            classBotao: 'bg-red-600 hover:bg-red-700',
+            formAction: '',
+            method: 'POST',
+
+            abrir(detail) {
+                this.titulo = detail.titulo || 'Confirmar acao';
+                this.mensagem = detail.mensagem || 'Tem certeza?';
+                this.textoBotao = detail.textoBotao || 'Confirmar';
+                this.classBotao = detail.classBotao || 'bg-red-600 hover:bg-red-700';
+                this.formAction = detail.formAction || '';
+                this.method = detail.method || 'POST';
+                this.loading = false;
+                this.open = true;
+            },
+            fechar() {
+                this.open = false;
+            }
+        };
+    }
+</script>

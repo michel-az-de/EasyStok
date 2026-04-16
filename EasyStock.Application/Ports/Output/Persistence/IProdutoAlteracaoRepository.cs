@@ -8,7 +8,9 @@ public sealed record ProdutoAlteracaoResumo(
     Guid UsuarioId,
     string? UsuarioNome,
     string? AlteracoesJson,
-    DateTime AlteradoEm);
+    DateTime AlteradoEm,
+    string? Motivo,
+    string? Observacao);
 
 public interface IProdutoAlteracaoRepository
 {

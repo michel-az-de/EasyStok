@@ -8,4 +8,6 @@ public class ProdutoAlteracaoApi
     public string? UsuarioNome { get; set; }
     public string? AlteracoesJson { get; set; }
     public DateTime AlteradoEm { get; set; }
+    public string? Motivo { get; set; }
+    public string? Observacao { get; set; }
 }

@@ -36,6 +36,14 @@ public class ProdutoAlteracaoConfiguration : IEntityTypeConfiguration<ProdutoAlt
         builder.Property(a => a.AlteracoesJson)
             .HasColumnType("text");
 
+        builder.Property(a => a.Motivo)
+            .HasMaxLength(100)
+            .HasColumnType("character varying(100)");
+
+        builder.Property(a => a.Observacao)
+            .HasMaxLength(500)
+            .HasColumnType("character varying(500)");
+
         builder.Property(a => a.AlteradoEm)
             .HasColumnType("timestamp with time zone")
             .IsRequired();

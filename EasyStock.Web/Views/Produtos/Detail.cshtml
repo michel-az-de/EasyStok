@@ -200,6 +200,26 @@
                 </div>
             }
 
+            <!-- Audit info -->
+            <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-400 mt-1">
+                @if (!string.IsNullOrEmpty(p.CriadoPorNome))
+                {
+                    <span>Cadastrado por <span class="font-medium text-slate-600">@p.CriadoPorNome</span> em @(p.CriadoEm?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</span>
+                }
+                @if (!string.IsNullOrEmpty(p.AlteradoPorNome))
+                {
+                    <span>Alterado por <span class="font-medium text-slate-600">@p.AlteradoPorNome</span> em @(p.AlteradoEm?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(p.ObservacaoInterna))
+            {
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mt-2">
+                    <p class="text-[11px] text-amber-600 font-semibold mb-0.5">Observação interna</p>
+                    <p class="text-sm text-slate-700">@p.ObservacaoInterna</p>
+                </div>
+            }
+
             <!-- Details grid -->
             <div class="produto-detail-meta-grid grid grid-cols-2 gap-2.5">
                 @if (!string.IsNullOrEmpty(p.CodigoBarras))
@@ -610,6 +630,8 @@
                             <th>Ação</th>
                             <th>Usuário</th>
                             <th>Campos alterados</th>
+                            <th>Motivo</th>
+                            <th>Obs.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -643,6 +665,8 @@
                                         <span>—</span>
                                     </template>
                                 </td>
+                                <td class="text-sm text-slate-500 whitespace-nowrap" x-text="alt.motivo ?? '-'"></td>
+                                <td class="text-sm text-slate-500 max-w-[180px] truncate" x-text="alt.observacao ?? '-'" :title="alt.observacao"></td>
                             </tr>
                         </template>
                     </tbody>

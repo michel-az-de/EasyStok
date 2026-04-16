@@ -45,7 +45,7 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ confirm: false, menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
+                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)
@@ -130,38 +130,14 @@
                                         </svg>
                                         Registrar entrada
                                     </a>
-                                    <button type="button" @@click="menuOpen = false; confirm = true"
+                                    <button type="button"
+                                            @@click="menuOpen = false; $dispatch('confirm-action', { titulo: 'Excluir produto', mensagem: 'Excluir <strong>@(p.Nome.Replace("'", "\\'"))</strong>? O produto será inativado.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/produtos/@p.Id/excluir' })"
                                             class="product-row-menu__item product-row-menu__item--danger">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                         Excluir
                                     </button>
-                                </div>
-                            </div>
-
-                            <!-- Modal confirmar exclusão -->
-                            <div x-show="confirm" x-cloak @@click.stop
-                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                                 @@click.self="confirm = false">
-                                <div class="ui-modal bg-white rounded-xl p-6 w-80 shadow-xl">
-                                    <h3 class="font-semibold text-slate-900 mb-2">Excluir produto</h3>
-                                    <p class="text-sm text-slate-600 mb-4">
-                                        Excluir <strong>@p.Nome</strong>? Esta ação é irreversível.
-                                    </p>
-                                    <div class="flex justify-end gap-3">
-                                        <button type="button" @@click="confirm = false"
-                                                class="ui-secondary-btn px-3 py-1.5 text-sm border rounded-lg hover:bg-slate-50">
-                                            Cancelar
-                                        </button>
-                                        <form action="/produtos/@p.Id/excluir" method="post">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
-                                                Excluir
-                                            </button>
-                                        </form>
-                                    </div>
                                 </div>
                             </div>
                             <!-- Modal definir preço -->

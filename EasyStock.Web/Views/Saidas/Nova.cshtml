@@ -88,6 +88,10 @@
                 <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
                     Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
                 </p>
+                <div x-show="produtoCriadoPor || produtoAlteradoPor" class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                    <span x-show="produtoCriadoPor" class="text-[11px] text-slate-400">Cadastrado por <span class="text-slate-500" x-text="produtoCriadoPor"></span></span>
+                    <span x-show="produtoAlteradoPor" class="text-[11px] text-slate-400">Últ. alteração por <span class="text-slate-500" x-text="produtoAlteradoPor"></span></span>
+                </div>
             </div>
         </div>
 
@@ -184,6 +188,8 @@ function saidaForm() {
         resultados: [],
         showResults: false,
         produtoId: '',
+        produtoCriadoPor: '',
+        produtoAlteradoPor: '',
         variacoes: [],
         varId: '',
         estoqueAtual: 0,
@@ -274,6 +280,8 @@ function saidaForm() {
                     this.estoqueAtual = d.estoqueTotal || 0;
                 }
                 this.valorUnit = d.precoReferencia || 0;
+                this.produtoCriadoPor = d.criadoPorNome || '';
+                this.produtoAlteradoPor = d.alteradoPorNome || '';
                 this.calcularTotal();
             } catch {
                 this.variacoes = [];

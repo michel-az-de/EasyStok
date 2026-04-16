@@ -26,7 +26,9 @@ public class ProdutoAlteracaoRepository(EasyStockDbContext context) : IProdutoAl
                 a.UsuarioId,
                 a.Usuario != null ? a.Usuario.Nome : null,
                 a.AlteracoesJson,
-                a.AlteradoEm))
+                a.AlteradoEm,
+                a.Motivo,
+                a.Observacao))
             .ToListAsync();
     }
 }

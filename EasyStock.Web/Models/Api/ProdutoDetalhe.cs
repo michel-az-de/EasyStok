@@ -29,6 +29,14 @@ public record ProdutoDetalhe
     public List<ProdutoCaracteristicaDetalhe> Caracteristicas { get; init; } = [];
     public List<ProdutoEmbalagemDetalhe> Embalagens { get; init; } = [];
 
+    public Guid? CriadoPor { get; init; }
+    public Guid? AlteradoPor { get; init; }
+    public string? CriadoPorNome { get; init; }
+    public string? AlteradoPorNome { get; init; }
+    public string? ObservacaoInterna { get; init; }
+    public DateTime? CriadoEm { get; init; }
+    public DateTime? AlteradoEm { get; init; }
+
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 }
 

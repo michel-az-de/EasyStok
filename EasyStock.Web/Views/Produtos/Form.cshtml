@@ -932,13 +932,28 @@
                     class="px-5 py-3 border border-slate-300 text-slate-600 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors text-center">
                 &larr; Voltar
             </button>
-            <button type="submit"
-                    :disabled="saving"
-                    :class="{ 'opacity-50 cursor-not-allowed': saving }"
-                    class="flex-1 sm:flex-initial px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 text-center">
-                <span x-show="!saving">@(isEdit ? "Salvar alterações" : "Criar produto")</span>
-                <span x-show="saving" x-cloak class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
-            </button>
+            @if (isEdit)
+            {
+                <button type="button"
+                        @@click="abrirModalConfirmacao()"
+                        :disabled="saving"
+                        :class="{ 'opacity-50 cursor-not-allowed': saving }"
+                        class="flex-1 sm:flex-initial px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 text-center">
+                    <span x-show="!saving">Salvar alterações</span>
+                    <span x-show="saving" x-cloak class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
+                </button>
+            }
+            else
+            {
+                <button type="button"
+                        @@click="submitForm()"
+                        :disabled="saving"
+                        :class="{ 'opacity-50 cursor-not-allowed': saving }"
+                        class="flex-1 sm:flex-initial px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 text-center">
+                    <span x-show="!saving">Criar produto</span>
+                    <span x-show="saving" x-cloak class="inline-flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
+                </button>
+            }
         </div>
     </div>
 
@@ -962,6 +977,78 @@
         </button>
         <div x-show="totalPhotoCount > 1" class="absolute bottom-4 text-white/60 text-sm" x-text="(reviewPhotoIdx + 1) + ' / ' + totalPhotoCount"></div>
     </div>
+
+    @if (isEdit)
+    {
+        <!-- Modal de confirmacao de edicao com motivo/observacao -->
+        <div x-show="showConfirmModal" x-cloak x-transition.opacity
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+             @@click.self="showConfirmModal = false" @@keydown.escape.window="if(showConfirmModal) showConfirmModal = false">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-xl mx-4" @@click.stop>
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-slate-900">Confirmar alterações</h3>
+                        <p class="text-xs text-slate-400">Descreva o motivo da alteração antes de salvar.</p>
+                    </div>
+                </div>
+
+                <!-- Motivo -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Motivo da alteração</label>
+                    <select x-model="motivo" class="ui-select w-full">
+                        <option value="">Selecione um motivo</option>
+                        <option value="Cadastro incorreto">Cadastro incorreto</option>
+                        <option value="Descrição errada">Descrição errada</option>
+                        <option value="Preço ajustado">Preço ajustado</option>
+                        <option value="Correção de dados">Correção de dados</option>
+                        <option value="Atualização de informações">Atualização de informações</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+
+                <!-- Motivo customizado -->
+                <div x-show="motivo === 'Outro'" x-cloak class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Especifique o motivo</label>
+                    <input type="text" x-model="motivoOutro" maxlength="100"
+                           class="ui-field w-full" placeholder="Descreva o motivo..." />
+                </div>
+
+                <!-- Observacao -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Observação <span class="text-slate-400 font-normal">(opcional)</span></label>
+                    <textarea x-model="observacao" maxlength="500" rows="2"
+                              class="ui-field w-full resize-none" placeholder="Nota sobre esta alteração..."></textarea>
+                    <p class="text-[10px] text-slate-400 mt-0.5 text-right" x-text="observacao.length + '/500'"></p>
+                </div>
+
+                <!-- Observacao Interna do produto -->
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Observação interna do produto <span class="text-slate-400 font-normal">(persistente)</span></label>
+                    <textarea x-model="observacaoInterna" maxlength="1000" rows="2"
+                              class="ui-field w-full resize-none" placeholder="Notas internas que ficam salvas no produto..."></textarea>
+                    <p class="text-[10px] text-slate-400 mt-0.5 text-right" x-text="observacaoInterna.length + '/1000'"></p>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button type="button" @@click="showConfirmModal = false"
+                            class="px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" @@click="confirmarESalvar()"
+                            :disabled="saving"
+                            class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-indigo-500/25 disabled:opacity-50">
+                        <span x-show="!saving">Confirmar e salvar</span>
+                        <span x-show="saving" x-cloak class="inline-flex items-center gap-1.5"><span class="spinner"></span> Salvando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </form>
 
 @section Styles {
@@ -993,6 +1080,32 @@
             return {
                 isEdit,
                 productId: '@(Model.Id ?? "")',
+
+                // ── Confirmacao de edicao ──
+                showConfirmModal: false,
+                motivo: '',
+                motivoOutro: '',
+                observacao: '',
+                observacaoInterna: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ObservacaoInterna ?? "")),
+
+                abrirModalConfirmacao() {
+                    if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
+                    if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    if (this.skuStatus === 'indisponivel') {
+                        this.step = 1;
+                        window.showToast('SKU já em uso. Altere antes de continuar.', 'warning');
+                        return;
+                    }
+                    if (this.skuStatus === 'verificando') { window.showToast('Aguarde a verificação do SKU.', 'info'); return; }
+                    this.showConfirmModal = true;
+                },
+                confirmarESalvar() {
+                    this.showConfirmModal = false;
+                    if (this.motivo === 'Outro' && this.motivoOutro.trim()) {
+                        this.motivo = this.motivoOutro.trim();
+                    }
+                    this.submitForm();
+                },
 
                 // ── Wizard ──
                 step: isEdit ? (parseInt(new URLSearchParams(location.search).get('step') ?? '1') || 1) : 1,
@@ -1056,6 +1169,13 @@
                     fd.delete('fotos');
                     for (const key of [...fd.keys()]) {
                         if (key.startsWith('filepond')) fd.delete(key);
+                    }
+
+                    // Campos de auditoria (somente edicao)
+                    if (this.isEdit) {
+                        fd.set('Motivo', this.motivo || '');
+                        fd.set('Observacao', this.observacao || '');
+                        fd.set('ObservacaoInterna', this.observacaoInterna || '');
                     }
 
                     try {
