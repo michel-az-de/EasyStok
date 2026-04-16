@@ -491,6 +491,17 @@ html:not(.theme-dark) .dashboard-kpi-value--attention {
     box-shadow: 18px 0 34px rgba(15, 23, 42, .14);
 }
 
+/* Evita flash da sidebar no mobile antes do Alpine.js inicializar.
+   Antes do Alpine carregar não há nenhum transform aplicado, então a sidebar
+   aparece visível. Com esta regra ela já começa escondida.
+   Quando Alpine abre a sidebar ele adiciona a classe 'translate-x-0'
+   e o :not() deixa de bater, permitindo a transição normal. */
+@media (max-width: 1023px) {
+    .app-sidebar:not([class~="translate-x-0"]) {
+        transform: translateX(-100%) !important;
+    }
+}
+
 .app-sidebar > * {
     position: relative;
     z-index: 1;
