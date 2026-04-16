@@ -29,7 +29,7 @@
 
 <form action="@formAction" method="post" enctype="multipart/form-data" novalidate
       x-data="produtoForm()"
-      @@submit.prevent="submitForm()"
+      @@submit.prevent="isEdit ? abrirModalConfirmacao() : submitForm()"
       class="max-w-3xl pb-24 sm:pb-8">
     @Html.AntiForgeryToken()
     @if (isEdit)
