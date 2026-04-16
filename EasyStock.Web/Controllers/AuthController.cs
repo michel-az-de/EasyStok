@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class AuthController(ApiClient api, SessionService session) : Controller
+public class AuthController(ApiClient api, SessionService session, IWebHostEnvironment env) : Controller
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
@@ -100,6 +100,19 @@ public class AuthController(ApiClient api, SessionService session) : Controller
                 : DateTimeOffset.UtcNow.AddMinutes(480)
         };
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProps);
+
+        // Se "permanecer logado", persiste o refresh token num cookie HttpOnly para
+        // sobreviver a deploys (DistributedMemoryCache é zerada a cada restart)
+        if (vm.ManterLogado && !string.IsNullOrEmpty(refreshToken))
+        {
+            Response.Cookies.Append("_rt", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(30)
+            });
+        }
 
         if (string.IsNullOrEmpty(empresaId))
         {
@@ -250,6 +263,7 @@ public class AuthController(ApiClient api, SessionService session) : Controller
     {
         await api.PostAsync<object>("auth/logout", new { refreshToken = session.GetRefreshToken() ?? string.Empty });
         session.Clear();
+        Response.Cookies.Delete("_rt");
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction(nameof(Login));
     }

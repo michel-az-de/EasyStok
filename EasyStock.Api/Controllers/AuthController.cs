@@ -51,17 +51,30 @@ public class AuthController(
     {
         var resultado = await autenticarUseCase.ExecuteAsync(
             new AutenticarUsuarioCommand(request.Email, request.Senha, request.EmpresaId));
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
+
+        // Revogar sessões anteriores (login em novo dispositivo força logout nos outros)
+        var sessoesAnteriores = await refreshTokenRepository.GetByUsuarioIdAsync(resultado.UsuarioId);
+        var sessoesAtivas = sessoesAnteriores.Where(t => t.EstaValido()).ToList();
+        foreach (var sessaoAtiva in sessoesAtivas)
+        {
+            sessaoAtiva.Revogar();
+            await refreshTokenRepository.UpdateAsync(sessaoAtiva);
+        }
+
         var token = jwtService.GerarToken(resultado);
         var refreshTokenValue = jwtService.GerarRefreshToken();
         var refreshTokenHash = TokenHashHelper.ComputeSha256Hash(refreshTokenValue);
-        var expiraEm = DateTime.UtcNow.AddDays(7);
+        var expiraEm = DateTime.UtcNow.AddDays(30);
 
         var refreshToken = RefreshTokenEntity.Criar(
             resultado.UsuarioId,
             refreshTokenHash,
             expiraEm,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            HttpContext.Request.Headers.UserAgent);
+            ip,
+            userAgent);
 
         await refreshTokenRepository.AddAsync(refreshToken);
 
@@ -70,9 +83,22 @@ public class AuthController(
             "login",
             true,
             "Login realizado com sucesso",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            HttpContext.Request.Headers.UserAgent);
+            ip,
+            userAgent);
         await auditLogRepository.AddAsync(auditLog);
+
+        if (sessoesAtivas.Count > 0)
+        {
+            var auditNovoDispositivo = AuditLogEntity.Criar(
+                resultado.UsuarioId,
+                "login_novo_dispositivo",
+                true,
+                $"Login detectado em novo dispositivo. {sessoesAtivas.Count} sessão(ões) anterior(es) encerrada(s).",
+                ip,
+                userAgent);
+            await auditLogRepository.AddAsync(auditNovoDispositivo);
+        }
+
         await unitOfWork.CommitAsync();
 
         return DataOk(new LoginResponse(

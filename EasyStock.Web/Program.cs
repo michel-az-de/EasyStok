@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Net.Http.Headers;
 using EasyStock.Web.Infrastructure;
+using EasyStock.Web.Middleware;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -141,6 +142,7 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseSession();           // BEFORE Authentication
 app.UseAuthentication();
+app.UseMiddleware<SessionRestoreMiddleware>(); // Restaura sessão do _rt cookie após deploys
 app.UseAuthorization();
 
 app.MapControllerRoute(
