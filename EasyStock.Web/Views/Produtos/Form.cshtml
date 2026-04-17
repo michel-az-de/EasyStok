@@ -1427,6 +1427,18 @@
                     };
                     document.addEventListener('click', this._clickHandler);
 
+                    // Auto-gerar SKU ao digitar nome (apenas novos produtos com SKU ainda vazio)
+                    if (!isEdit) {
+                        this.$watch('nome', (val) => {
+                            if (!this.sku && val && val.length >= 3) {
+                                clearTimeout(this._skuDebounce);
+                                this._skuDebounce = setTimeout(() => {
+                                    if (!this.sku) this.gerarSku(true);
+                                }, 600);
+                            }
+                        });
+                    }
+
                     // Auto-aplicar tipo "Alimento" quando categoria sugere
                     this.$watch('categoriaId', () => {
                         if (!this._tipoManuallySet && this.tipoSugerido !== null) {

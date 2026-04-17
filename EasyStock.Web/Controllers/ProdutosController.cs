@@ -11,7 +11,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     private const int PageSize = 20;
 
     [HttpGet("/produtos")]
-    public async Task<IActionResult> Index(int page = 1, string? search = null, string? categoria = null, string? status = null)
+    public async Task<IActionResult> Index(int page = 1, string? search = null, string? categoria = null, string? status = null, bool semPreco = false)
     {
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
@@ -38,12 +38,38 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             totalPages = paged.Meta.Pages;
         }
 
+        // Filtros client-side (sobre os resultados já carregados)
+        if (!string.IsNullOrEmpty(status))
+            items = items.Where(p => p.StatusNome.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (semPreco)
+            items = items.Where(p => !(p.PrecoReferencia?.Valor > 0)).ToList();
+
+        // Categorias para o dropdown de filtro
+        var catsResult = await svc.ListarCategoriasAsync();
+        var categorias = catsResult.Data ?? [];
+
+        // Filtro por categoria (por nome)
+        if (!string.IsNullOrEmpty(categoria))
+        {
+            var catMatch = categorias.FirstOrDefault(c => c.Nome.Equals(categoria, StringComparison.OrdinalIgnoreCase));
+            if (catMatch is not null)
+                items = items.Where(p => p.CategoriaId == catMatch.Id).ToList();
+        }
+
+        if (semPreco || !string.IsNullOrEmpty(status) || !string.IsNullOrEmpty(categoria))
+        {
+            totalItems = items.Count;
+            totalPages = 1;
+        }
+
         var vm = new ProdutosListViewModel
         {
             Produtos = items,
             Search = search,
             Categoria = categoria,
             Status = status,
+            SemPreco = semPreco,
+            Categorias = categorias,
             Paginacao = new PaginationViewModel
             {
                 Page = page,

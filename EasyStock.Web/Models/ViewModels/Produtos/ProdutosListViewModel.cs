@@ -10,4 +10,6 @@ public class ProdutosListViewModel
     public string? Search { get; set; }
     public string? Categoria { get; set; }
     public string? Status { get; set; }
+    public bool SemPreco { get; set; }
+    public List<CategoriaApi> Categorias { get; set; } = [];
 }

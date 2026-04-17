@@ -14,21 +14,25 @@
 </div>
 
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="ws dashboard-kpi-card">
+    <div class="ws dashboard-kpi-card" title="Produtos distintos com ao menos uma unidade em estoque">
         <div class="kpi-lbl">SKUs em estoque</div>
         <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
+        <div class="text-xs text-slate-400 mt-1">produtos distintos</div>
     </div>
-    <div class="ws dashboard-kpi-card">
+    <div class="ws dashboard-kpi-card" title="Soma das quantidades de todas as unidades em estoque (todos os lotes)">
         <div class="kpi-lbl">Itens em estoque</div>
         <div class="kpi-val dashboard-kpi-value text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
+        <div class="text-xs text-slate-400 mt-1">unidades totais</div>
     </div>
-    <div class="ws dashboard-kpi-card">
+    <div class="ws dashboard-kpi-card" title="Valor de venda estimado de todo o estoque atual">
         <div class="kpi-lbl">Valor em estoque</div>
         <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-400 mt-1">preço de venda</div>
     </div>
-    <div class="ws dashboard-kpi-card">
+    <div class="ws dashboard-kpi-card" title="Receita gerada com saídas nos últimos 30 dias">
         <div class="kpi-lbl">Receita estimada</div>
         <div class="kpi-val dashboard-kpi-value text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-400 mt-1">últimos 30 dias</div>
     </div>
 </div>
 

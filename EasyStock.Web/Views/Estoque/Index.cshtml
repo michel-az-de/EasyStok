@@ -6,7 +6,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item no estoque" : "itens no estoque")</p>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item no estoque" : "itens no estoque") <span class="text-slate-400 text-xs font-normal">· por lote/entrada</span></p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"
@@ -145,7 +145,7 @@
                                 </span>
                             </td>
                             <td class="text-center hidden md:table-cell">
-                                <div class="vel-bar justify-center">
+                                <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias)">
                                     @for (int seg = 1; seg <= 5; seg++)
                                     {
                                         var segClass = seg <= velInt
@@ -190,14 +190,14 @@
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
                                        class="grid-action-btn grid-action-btn--primary">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m14.836 2A8.001 8.001 0 005.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-14.837-2m14.837 2H15" />
                                         </svg>
                                         Repor
                                     </a>
                                     <button @@click="openModal('@item.Id', '@(item.Produto?.Nome ?? item.Sku)'.replace(/'/g, ''), @item.Qty)"
                                             class="grid-action-btn grid-action-btn--danger">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
                                         </svg>
                                         Saída
@@ -213,18 +213,37 @@
             <!-- Paginação -->
             @if (Model.Paginacao.Pages > 1)
             {
+                var estPgStart = Math.Max(1, Model.Paginacao.Page - 2);
+                var estPgEnd = Math.Min(Model.Paginacao.Pages, Model.Paginacao.Page + 2);
                 <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                     <span class="text-sm text-slate-500">Página @Model.Paginacao.Page de @Model.Paginacao.Pages</span>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-1">
                         @if (Model.Paginacao.HasPrevious)
                         {
                             <a href="?page=@(Model.Paginacao.Page - 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
-                               class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">← Anterior</a>
+                               class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">←</a>
+                        }
+                        @if (estPgStart > 1)
+                        {
+                            <a href="?page=1&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                               class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">1</a>
+                            if (estPgStart > 2) { <span class="px-1 text-slate-400 text-sm">…</span> }
+                        }
+                        @for (int pg = estPgStart; pg <= estPgEnd; pg++)
+                        {
+                            <a href="?page=@pg&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                               class="px-2.5 py-1.5 text-sm border rounded-lg transition-colors @(pg == Model.Paginacao.Page ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-300 hover:bg-slate-50")">@pg</a>
+                        }
+                        @if (estPgEnd < Model.Paginacao.Pages)
+                        {
+                            if (estPgEnd < Model.Paginacao.Pages - 1) { <span class="px-1 text-slate-400 text-sm">…</span> }
+                            <a href="?page=@Model.Paginacao.Pages&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                               class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">@Model.Paginacao.Pages</a>
                         }
                         @if (Model.Paginacao.HasNext)
                         {
                             <a href="?page=@(Model.Paginacao.Page + 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
-                               class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Próximo →</a>
+                               class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">→</a>
                         }
                     </div>
                 </div>
