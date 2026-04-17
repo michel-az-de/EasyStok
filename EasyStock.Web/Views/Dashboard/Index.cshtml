@@ -87,7 +87,7 @@
     <div class="ws">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-bold text-slate-800">Movimentações recentes</h2>
-            <a href="/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
+            <a href="/analytics/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
         </div>
         @if (Model.MovimentacoesRecentes.Any())
         {
@@ -106,7 +106,7 @@
                         @foreach (var m in Model.MovimentacoesRecentes)
                         {
                             var tipoParam = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
-                            <tr class="cursor-pointer hover:bg-slate-50" onclick="location.href='/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam'">
+                            <tr class="cursor-pointer hover:bg-slate-50" onclick="location.href='/analytics/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam'">
                                 <td>
                                     @{
                                         var badgeClass = m.Tipo switch

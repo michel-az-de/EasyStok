@@ -388,6 +388,26 @@
                 erro: false,
                 items: [],
                 resumo: null,
+                async init() {
+                    // Eagerly populate the badge on Alpine init without waiting for the polling script
+                    try {
+                        const cached = window.__notifResumo;
+                        const data = (cached && (Date.now() - cached.ts) < 30000)
+                            ? cached.data
+                            : await fetch('/notificacoes/resumo').then(r => r.ok ? r.json() : null);
+                        if (!data) return;
+                        if (!cached || (Date.now() - cached.ts) >= 30000) {
+                            window.__notifResumo = { data, ts: Date.now() };
+                        }
+                        this.resumo = data;
+                        const c = data.totalNaoLidas || 0;
+                        const badge = document.getElementById('topbar-notif-badge');
+                        if (badge) {
+                            if (c > 0) { badge.textContent = c > 99 ? '99+' : String(c); badge.classList.remove('hidden'); }
+                            else { badge.classList.add('hidden'); }
+                        }
+                    } catch (e) { /* silent */ }
+                },
                 async toggle() {
                     this.open = !this.open;
                     if (this.open && this.items.length === 0 && !this.erro) await this.load();

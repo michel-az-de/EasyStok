@@ -78,7 +78,7 @@
                         title="Ver detalhes de @m.Data.ToString("dd/MM/yyyy")">
                         <td>
                             <span class="font-medium @tipoColor">@tipoIcon</span>
-                            <span class="text-sm text-slate-600 ml-1 capitalize">@m.Tipo</span>
+                            <span class="text-sm text-slate-600 ml-1">@(m.Tipo == "Saida" ? "Saída" : m.Tipo)</span>
                         </td>
                         <td>
                             <div class="font-medium text-slate-900 text-sm">@m.Resumo</div>
