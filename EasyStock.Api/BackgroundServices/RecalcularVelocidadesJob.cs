@@ -53,35 +53,48 @@ public sealed class RecalcularVelocidadesJob(
         IMovimentacaoEstoqueRepository movimentacaoRepo,
         CancellationToken cancellationToken)
     {
-        var (itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, 1, 1000);
-        if (!itens.Any()) return;
-
         var de = DateTime.UtcNow.AddDays(-30);
         var ate = DateTime.UtcNow;
 
-        // Busca todas as taxas de saída em uma única query em vez de 1 por item
-        var produtoIds = itens.Select(i => i.ProdutoId).Distinct();
-        var taxasPorProduto = await movimentacaoRepo.GetTaxaSaidaDiariaPorProdutoAsync(empresa.Id, produtoIds, de, ate);
+        const int pageSize = 500;
+        var page = 1;
+        var totalProcessados = 0;
+        IEnumerable<ItemEstoque> itens;
 
-        foreach (var item in itens)
+        do
         {
-            try
-            {
-                var velocidade = taxasPorProduto.GetValueOrDefault(item.ProdutoId, 0m);
-                item.AtualizarVelocidadeSaida(velocidade, DateTime.UtcNow);
-                await itemEstoqueRepo.UpdateAsync(item);
+            (itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, page, pageSize);
+            var itensList = itens.ToList();
+            if (itensList.Count == 0) break;
 
-                logger.LogDebug(
-                    "Velocidade atualizada para item {ItemId}: {Velocidade} unidades/dia",
-                    item.Id,
-                    velocidade);
-            }
-            catch (Exception ex)
+            // Busca todas as taxas de saída em uma única query em vez de 1 por item
+            var produtoIds = itensList.Select(i => i.ProdutoId).Distinct();
+            var taxasPorProduto = await movimentacaoRepo.GetTaxaSaidaDiariaPorProdutoAsync(empresa.Id, produtoIds, de, ate);
+
+            foreach (var item in itensList)
             {
-                logger.LogError(ex, "Erro ao recalcular velocidade para item {ItemId}", item.Id);
+                try
+                {
+                    var velocidade = taxasPorProduto.GetValueOrDefault(item.ProdutoId, 0m);
+                    item.AtualizarVelocidadeSaida(velocidade, DateTime.UtcNow);
+                    await itemEstoqueRepo.UpdateAsync(item);
+
+                    logger.LogDebug(
+                        "Velocidade atualizada para item {ItemId}: {Velocidade} unidades/dia",
+                        item.Id,
+                        velocidade);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Erro ao recalcular velocidade para item {ItemId}", item.Id);
+                }
             }
+
+            totalProcessados += itensList.Count;
+            page++;
         }
+        while (itens.Count() == pageSize);
 
-        logger.LogInformation("Velocidades recalculadas para {Total} itens da empresa {EmpresaId}", itens.Count(), empresa.Id);
+        logger.LogInformation("Velocidades recalculadas para {Total} itens da empresa {EmpresaId}", totalProcessados, empresa.Id);
     }
 }

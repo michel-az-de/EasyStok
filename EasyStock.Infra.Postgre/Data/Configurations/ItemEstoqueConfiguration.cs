@@ -79,6 +79,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ix_itens_estoque_empresa_quantidade");
             builder.HasIndex(i => new { i.EmpresaId, i.UltimaMovimentacaoEm })
                 .HasDatabaseName("ix_itens_estoque_empresa_ultima_mov");
+            builder.HasIndex(i => new { i.EmpresaId, i.ValidadeEm })
+                .HasDatabaseName("ix_itens_estoque_empresa_validade");
         }
     }
 }

@@ -9,6 +9,7 @@ namespace EasyStock.Infra.Postgre.Repositories
     {
         public Task<Usuario?> GetByIdAsync(Guid id) =>
             dbContext.Usuarios
+                .AsNoTracking()
                 .Include(u => u.Empresas)
                 .Include(u => u.Perfis!)
                 .ThenInclude(up => up.Perfil)
@@ -16,6 +17,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task<Usuario?> GetByEmailAsync(string email) =>
             dbContext.Usuarios
+                .AsNoTracking()
                 .Include(u => u.Empresas)
                 .Include(u => u.Perfis!)
                     .ThenInclude(up => up.Perfil)

@@ -23,9 +23,9 @@ public sealed class GeradorNotificacoesAutomaticas(
                 break;
 
             await ProcessarEmpresaAsync(empresa, ct);
+            await unitOfWork.CommitAsync();
         }
 
-        await unitOfWork.CommitAsync();
         logger.LogInformation("Geração automática de notificações concluída para {TotalEmpresas} empresa(s).", empresas.Count());
     }
 
