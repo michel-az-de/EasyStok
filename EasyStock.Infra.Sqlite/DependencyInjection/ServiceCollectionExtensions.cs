@@ -21,7 +21,8 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddDbContext<EasyStockDbContext>(options =>
-            options.UseSqlite(connectionString));
+            options.UseSqlite(connectionString, sqlite =>
+                sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
         services.AddScoped<ICategoriaRepository, CategoriaRepository>();
