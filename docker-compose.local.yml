@@ -1,0 +1,119 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  EasyStock — Stack local completa (sem Azure, sem Redis externo)
+#
+#  Uso:
+#    docker compose -f docker-compose.local.yml up --build
+#
+#  Acesso após subir:
+#    Web  → http://localhost:8081
+#    API  → http://localhost:8080   (Swagger: http://localhost:8080/swagger)
+#
+#  Credenciais padrão do admin:
+#    E-mail : admin@easystock.local
+#    Senha  : Admin@123
+#
+#  Para customizar, crie um arquivo .env.local na raiz com:
+#    SEED_ADMIN_EMAIL=seuemail@empresa.com
+#    SEED_ADMIN_PASSWORD=SuaSenhaForte123
+#    SEED_ADMIN_NOME=Seu Nome
+#    SEED_EMPRESA_NOME=Nome da Empresa
+#    SEED_EMPRESA_DOCUMENTO=00.000.000/0001-00
+#    SEED_LOJA_NOME=Nome da Loja
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  easystock-local:
+    driver: bridge
+
+volumes:
+  pg-local-data:
+  uploads-local:
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: easystock-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: easystock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-local-data:/var/lib/postgresql/data
+    networks:
+      - easystock-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d easystock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API ─────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: easystock-api-local:latest
+    container_name: easystock-local-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Provider: PostgreSql
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=easystock;Username=postgres;Password=postgres;SSL Mode=Disable"
+      # Redis desativado — usa cache em memória automaticamente
+      ConnectionStrings__Redis: ""
+      Jwt__Issuer: EasyStock
+      Jwt__Audience: EasyStock
+      Jwt__SecretKey: "EasyStock-Local-Dev-SuperSecretKey-32+"
+      Jwt__ExpirationMinutes: "480"
+      Anthropic__Enabled: "false"
+      OpenAI__Enabled: "false"
+      FileStorage__Provider: Local
+      # Seed limpo — zero dados, apenas 1 admin
+      SEED_DEMO_DATA: "false"
+      SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@easystock.local}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-Admin@123}"
+      SEED_ADMIN_NOME: "${SEED_ADMIN_NOME:-Administrador}"
+      SEED_EMPRESA_NOME: "${SEED_EMPRESA_NOME:-Minha Empresa}"
+      SEED_EMPRESA_DOCUMENTO: "${SEED_EMPRESA_DOCUMENTO:-00.000.000/0001-00}"
+      SEED_LOJA_NOME: "${SEED_LOJA_NOME:-Loja Principal}"
+    volumes:
+      - uploads-local:/app/uploaded-files
+    networks:
+      - easystock-local
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ── Web (MVC) ───────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.Web
+    image: easystock-web-local:latest
+    container_name: easystock-local-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Aponta para o container da API via rede interna Docker
+      ApiSettings__BaseUrl: "http://api:8080/api"
+      ApiSettings__TimeoutSeconds: "30"
+    networks:
+      - easystock-local
