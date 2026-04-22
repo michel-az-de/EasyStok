@@ -1,3 +1,4 @@
+using EasyStock.Web.Constants;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Produtos;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -124,7 +125,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(ProdutoFormViewModel vm)
     {
-        var isFetch = Request.Headers["X-Fetch"] == "1";
+        var isFetch = Request.Headers[CustomHeaders.FetchRequest] == CustomHeaders.FetchRequestEnabled;
 
         if (!ModelState.IsValid)
         {
@@ -236,7 +237,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Atualizar(string id, ProdutoFormViewModel vm)
     {
-        var isFetch = Request.Headers["X-Fetch"] == "1";
+        var isFetch = Request.Headers[CustomHeaders.FetchRequest] == CustomHeaders.FetchRequestEnabled;
 
         if (!ModelState.IsValid)
         {

@@ -1,4 +1,5 @@
 using System.Text;
+using EasyStock.Web.Constants;
 using EasyStock.Web.Models.ViewModels.Saidas;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +23,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(SaidaFormViewModel vm)
     {
-        var isFetch = Request.Headers["X-Fetch"] == "1";
+        var isFetch = Request.Headers[CustomHeaders.FetchRequest] == CustomHeaders.FetchRequestEnabled;
 
         if (!ModelState.IsValid)
         {

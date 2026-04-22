@@ -2,7 +2,13 @@ using EasyStock.Domain.Entities;
 
 namespace EasyStock.Domain.Specifications;
 
-public class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
+/// <summary>
+/// Specification que avalia se um <see cref="ItemEstoque"/> está vencido em
+/// relação a uma data de referência. Usado indiretamente por
+/// <see cref="ItemEstoqueDisponivelParaSaidaSpecification"/> para bloquear
+/// saídas de lotes expirados.
+/// </summary>
+public sealed class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
 {
     private readonly DateTime _dataReferencia;
 
@@ -12,7 +18,5 @@ public class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)
-    {
-        return item.ValidadeEm?.DataValidade.Date < _dataReferencia;
-    }
+        => item.ValidadeEm?.DataValidade.Date < _dataReferencia;
 }
