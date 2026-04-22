@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class DiagnosticoController(DiagnosticoWebService diagnosticoService, SessionService session) : Controller
+public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
     [AllowAnonymous]
     [Route("diagnostico")]
