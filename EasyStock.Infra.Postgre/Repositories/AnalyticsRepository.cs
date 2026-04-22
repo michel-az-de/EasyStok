@@ -10,11 +10,18 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     /// <summary>
     /// Implements aggregated analytics queries against PostgreSQL with optional Redis distributed cache (5–10 min TTL).
+    /// Delegates to specialised query classes; store-intelligence methods live here.
     /// </summary>
     public sealed class AnalyticsRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
         : IAnalyticsRepository
     {
-        // Cache helpers
+        // ── Specialised query objects ────────────────────────────────────────
+
+        private readonly DashboardAnalyticsQueries _dashboard = new(dbContext, cache);
+        private readonly ReceitaAnalyticsQueries   _receita   = new(dbContext, cache);
+        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache);
+
+        // ── Cache helpers (used only by store-intelligence methods below) ────
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -38,639 +45,51 @@ namespace EasyStock.Infra.Postgre.Repositories
             });
         }
 
-        private static readonly TimeSpan DashboardTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ReceitaTtl = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan MargemTtl = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan MovimentacaoTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ValidadeTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ParadosTtl = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan SazonalidadeTtl = TimeSpan.FromMinutes(10);
-        private static readonly TimeSpan ReposicaoTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ProjecaoTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan CanalTtl = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan ComparacaoTtl = TimeSpan.FromMinutes(5);
 
-        // Dashboard
+        // ── Delegation — Dashboard ───────────────────────────────────────────
 
-        public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:dashboard:{empresaId}:{periodoDias}:{lojaId}";
-            var cached = await GetCachedAsync<DashboardResumo>(cacheKey);
-            if (cached is not null) return cached;
+        public Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+            => _dashboard.GetDashboardResumoAsync(empresaId, periodoDias, lojaId);
 
-            var ate = DateTime.UtcNow;
-            var de = ate.AddDays(-periodoDias);
+        public Task<IReadOnlyList<MovimentacaoResumo>> GetMovimentacoesResumoAsync(
+            Guid empresaId, DateTime de, DateTime ate,
+            TipoMovimentacaoEstoque? tipo = null, Guid? lojaId = null)
+            => _dashboard.GetMovimentacoesResumoAsync(empresaId, de, ate, tipo, lojaId);
 
-            // Estoque
-            var estoqueQuery = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido);
-            if (lojaId.HasValue)
-                estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
+        // ── Delegation — Receita ─────────────────────────────────────────────
 
-            var estoqueData = await estoqueQuery.Select(i => new
-            {
-                Quantidade = (int)i.QuantidadeAtual,
-                ValorCusto = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
-                ValorVenda = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * 1.3m) * (int)i.QuantidadeAtual,
-                EstaAbaixoMinimo = (int)i.QuantidadeAtual < i.QuantidadeMinima
-            }).ToListAsync();
+        public Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
+            => _receita.GetReceitaPorPeriodoAsync(empresaId, meses, lojaId);
 
-            var totalSkus = await estoqueQuery.Select(i => i.ProdutoId).Distinct().CountAsync();
-            var totalQtd = estoqueData.Sum(e => e.Quantidade);
-            var valorCusto = estoqueData.Sum(e => e.ValorCusto);
-            var valorVenda = estoqueData.Sum(e => e.ValorVenda);
-            var alertasEstoqueBaixo = estoqueData.Count(e => e.EstaAbaixoMinimo);
+        public Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
+            => _receita.GetMargemPorProdutoAsync(empresaId, dias, page, pageSize, lojaId);
 
-            // Alertas vencimento (30 dias)
-            var cutoffValidade = DateTime.UtcNow.AddDays(30);
-            var validadeQuery = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade);
-            if (lojaId.HasValue)
-                validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
-            var alertasVencimento = await validadeQuery.CountAsync();
+        public Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+            => _receita.GetVendasPorCanalAsync(empresaId, de, ate, lojaId);
 
-            // Alertas parados (30 dias)
-            var cutoffParado = DateTime.UtcNow.AddDays(-30);
-            var paradosQuery = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId &&
-                    (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado));
-            if (lojaId.HasValue)
-                paradosQuery = paradosQuery.Where(i => i.LojaId == lojaId.Value);
-            var alertasParados = await paradosQuery.CountAsync();
+        // ── Delegation — Estoque ─────────────────────────────────────────────
 
-            // Vendas do período
-            var movQuery = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate);
-            if (lojaId.HasValue)
-                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var movData = await movQuery
-                .Select(m => new { Quantidade = (int)m.Quantidade, ValorTotal = (decimal?)m.ValorTotal ?? 0m })
-                .ToListAsync();
-
-            var totalSaidasQtd = movData.Sum(m => m.Quantidade);
-            var receitaEstimada = movData.Sum(m => m.ValorTotal);
-            var dias = Math.Max(1, periodoDias);
-            var mediaVendasDiaria = (decimal)totalSaidasQtd / dias;
-
-            var result = new DashboardResumo(
-                EmpresaId: empresaId,
-                Periodo: periodoDias,
-                TotalSkus: totalSkus,
-                QuantidadeTotalEmEstoque: totalQtd,
-                ValorTotalEstoque: Math.Round(valorVenda, 2),
-                ValorCustoEstoque: Math.Round(valorCusto, 2),
-                MediaVendasDiaria: Math.Round(mediaVendasDiaria, 2),
-                ProjecaoVendasPeriodo: Math.Round(mediaVendasDiaria * periodoDias, 0),
-                ReceitaEstimadaPeriodo: Math.Round(receitaEstimada, 2),
-                AlertasEstoqueBaixo: alertasEstoqueBaixo,
-                AlertasVencimento: alertasVencimento,
-                AlertasItensParados: alertasParados);
-
-            await SetCachedAsync(cacheKey, result, DashboardTtl);
-            return result;
-        }
-
-        // Receita
-
-        public async Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:receita:{empresaId}:{meses}:{lojaId}";
-            var cached = await GetCachedAsync<List<ReceitaPorPeriodo>>(cacheKey);
-            if (cached is not null) return cached;
-
-            var de = DateTime.UtcNow.AddMonths(-meses);
-
-            var vendasQuery = dbContext.Vendas
-                .AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de);
-            if (lojaId.HasValue)
-                vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
-
-            var raw = await vendasQuery
-                .Select(v => new
-                {
-                    v.DataVenda.Year,
-                    v.DataVenda.Month,
-                    ValorTotal = (decimal)v.ValorTotal,
-                    TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
-                })
-                .ToListAsync();
-
-            var result = raw
-                .GroupBy(v => new { v.Year, v.Month })
-                .Select(g =>
-                {
-                    var totalVendas = g.Count();
-                    var receita = g.Sum(v => v.ValorTotal);
-                    var totalItens = g.Sum(v => v.TotalItens);
-                    return new ReceitaPorPeriodo(
-                        Ano: g.Key.Year,
-                        Mes: g.Key.Month,
-                        ReceitaBruta: Math.Round(receita, 2),
-                        TotalVendas: totalVendas,
-                        TotalItensVendidos: totalItens,
-                        TicketMedio: totalVendas > 0 ? Math.Round(receita / totalVendas, 2) : 0m);
-                })
-                .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
-                .ToList();
-
-            await SetCachedAsync(cacheKey, result, ReceitaTtl);
-            return result;
-        }
-
-        // Margem
-
-        public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
-            var cached = await GetCachedAsync<List<MargemPorProduto>>(cacheKey);
-            if (cached is not null) return cached;
-
-            var de = DateTime.UtcNow.AddDays(-dias);
-
-            var movQuery = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de &&
-                    m.ValorUnitario != null);
-            if (lojaId.HasValue)
-                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var raw = await movQuery
-                .Join(dbContext.Produtos.AsNoTracking(),
-                    m => m.ProdutoId,
-                    p => p.Id,
-                    (m, p) => new { m, p })
-                .GroupJoin(dbContext.ItensEstoque.AsNoTracking(),
-                    x => x.m.ItemEstoqueId,
-                    ie => ie.Id,
-                    (x, ies) => new { x.m, x.p, ies })
-                .SelectMany(
-                    x => x.ies.DefaultIfEmpty(),
-                    (x, ie) => new
-                    {
-                        x.m.ProdutoId,
-                        NomeProduto = x.p.Nome,
-                        CustoUnitario = ie != null ? (decimal)ie.CustoUnitario : (x.p.CustoReferencia != null ? (decimal)x.p.CustoReferencia : 0m),
-                        PrecoVenda = (decimal)x.m.ValorUnitario!,
-                        Quantidade = (int)x.m.Quantidade
-                    })
-                .ToListAsync();
-
-            var result = raw
-                .GroupBy(x => new { x.ProdutoId, x.NomeProduto })
-                .Select(g =>
-                {
-                    var custoMedio = g.Average(x => x.CustoUnitario);
-                    var precoMedio = g.Average(x => x.PrecoVenda);
-                    var qtdVendida = g.Sum(x => x.Quantidade);
-                    var margemAbs = precoMedio - custoMedio;
-                    var margemPct = custoMedio > 0 ? margemAbs / custoMedio * 100m : 0m;
-                    return new MargemPorProduto(
-                        ProdutoId: g.Key.ProdutoId,
-                        NomeProduto: g.Key.NomeProduto,
-                        CustoMedio: Math.Round(custoMedio, 2),
-                        PrecoMedioVenda: Math.Round(precoMedio, 2),
-                        MargemAbsoluta: Math.Round(margemAbs, 2),
-                        MargemPercentual: Math.Round(margemPct, 2),
-                        QuantidadeVendida: qtdVendida);
-                })
-                .OrderByDescending(x => x.MargemPercentual)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            await SetCachedAsync(cacheKey, result, MargemTtl);
-            return result;
-        }
-
-        // Movimentacoes
-
-        public async Task<IReadOnlyList<MovimentacaoResumo>> GetMovimentacoesResumoAsync(
-            Guid empresaId,
-            DateTime de,
-            DateTime ate,
-            TipoMovimentacaoEstoque? tipo = null,
-            Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:movimentacoes:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{tipo}:{lojaId}";
-            var cached = await GetCachedAsync<List<MovimentacaoResumo>>(cacheKey);
-            if (cached is not null) return cached;
-
-            var query = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate);
-
-            if (tipo.HasValue)
-                query = query.Where(m => m.Tipo == tipo.Value);
-            if (lojaId.HasValue)
-                query = query.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var raw = await query
-                .Select(m => new
-                {
-                    m.DataMovimentacao.Year,
-                    m.DataMovimentacao.Month,
-                    m.DataMovimentacao.Day,
-                    m.Tipo,
-                    Quantidade = (int)m.Quantidade,
-                    Valor = (decimal?)m.ValorTotal ?? 0m
-                })
-                .ToListAsync();
-
-            var result = raw
-                .GroupBy(m => new { m.Year, m.Month, m.Day, m.Tipo })
-                .Select(g => new MovimentacaoResumo(
-                    Ano: g.Key.Year,
-                    Mes: g.Key.Month,
-                    Dia: g.Key.Day,
-                    Tipo: g.Key.Tipo,
-                    TotalMovimentacoes: g.Count(),
-                    QuantidadeTotal: g.Sum(m => m.Quantidade),
-                    ValorTotal: Math.Round(g.Sum(m => m.Valor), 2)))
-                .OrderBy(x => x.Ano).ThenBy(x => x.Mes).ThenBy(x => x.Dia).ThenBy(x => x.Tipo)
-                .ToList();
-
-            await SetCachedAsync(cacheKey, result, MovimentacaoTtl);
-            return result;
-        }
-
-        // Validade
-
-        public async Task<(IReadOnlyList<ValidadeAlerta> Items, int TotalCount)> GetAlertasValidadeAsync(
+        public Task<(IReadOnlyList<ValidadeAlerta> Items, int TotalCount)> GetAlertasValidadeAsync(
             Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:validade:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
-            var cached = await GetCachedAsync<(List<ValidadeAlerta>, int)>(cacheKey);
-            if (cached != default) return cached;
+            => _estoque.GetAlertasValidadeAsync(empresaId, dias, page, pageSize, lojaId);
 
-            var cutoff = DateTime.UtcNow.AddDays(dias);
-            var hoje = DateTime.UtcNow.Date;
-
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId &&
-                    i.ValidadeEm != null &&
-                    (DateTime?)i.ValidadeEm <= cutoff &&
-                    (int)i.QuantidadeAtual > 0);
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-
-            var raw = await query
-                .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => (DateTime?)x.i.ValidadeEm)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new
-                {
-                    x.i.Id,
-                    x.i.ProdutoId,
-                    NomeProduto = x.p.Nome,
-                    x.i.CodigoInterno,
-                    Quantidade = (int)x.i.QuantidadeAtual,
-                    DataValidade = (DateTime)x.i.ValidadeEm!,
-                    Custo = (decimal)x.i.CustoUnitario
-                })
-                .ToListAsync();
-
-            var items = raw.Select(x => new ValidadeAlerta(
-                ItemEstoqueId: x.Id,
-                ProdutoId: x.ProdutoId,
-                NomeProduto: x.NomeProduto,
-                CodigoInterno: x.CodigoInterno,
-                QuantidadeAtual: x.Quantidade,
-                DataValidade: x.DataValidade,
-                DiasAteVencimento: Math.Max(0, (x.DataValidade.Date - hoje).Days),
-                ValorEmRisco: Math.Round(x.Quantidade * x.Custo, 2)))
-                .ToList();
-
-            await SetCachedAsync(cacheKey, (items, totalCount), ValidadeTtl);
-            return (items, totalCount);
-        }
-
-        // Parados
-
-        public async Task<(IReadOnlyList<ItemParadoDetalhe> Items, int TotalCount)> GetItensParadosDetalhadosAsync(
+        public Task<(IReadOnlyList<ItemParadoDetalhe> Items, int TotalCount)> GetItensParadosDetalhadosAsync(
             Guid empresaId, int diasSemMovimento = 90, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:parados:{empresaId}:{diasSemMovimento}:{page}:{pageSize}:{lojaId}";
-            var cached = await GetCachedAsync<(List<ItemParadoDetalhe>, int)>(cacheKey);
-            if (cached != default) return cached;
+            => _estoque.GetItensParadosDetalhadosAsync(empresaId, diasSemMovimento, page, pageSize, lojaId);
 
-            var cutoff = DateTime.UtcNow.AddDays(-diasSemMovimento);
-            var hoje = DateTime.UtcNow;
+        public Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12, Guid? lojaId = null)
+            => _estoque.GetSazonalidadeAsync(empresaId, produtoId, meses, lojaId);
 
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId &&
-                    (int)i.QuantidadeAtual > 0 &&
-                    (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-
-            var raw = await query
-                .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => x.i.UltimaMovimentacaoEm ?? DateTime.MinValue)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new
-                {
-                    x.i.Id,
-                    x.i.ProdutoId,
-                    NomeProduto = x.p.Nome,
-                    x.i.CodigoInterno,
-                    Quantidade = (int)x.i.QuantidadeAtual,
-                    x.i.UltimaMovimentacaoEm,
-                    Custo = (decimal)x.i.CustoUnitario
-                })
-                .ToListAsync();
-
-            var items = raw.Select(x => new ItemParadoDetalhe(
-                ItemEstoqueId: x.Id,
-                ProdutoId: x.ProdutoId,
-                NomeProduto: x.NomeProduto,
-                CodigoInterno: x.CodigoInterno,
-                QuantidadeAtual: x.Quantidade,
-                UltimaMovimentacaoEm: x.UltimaMovimentacaoEm,
-                DiasSemMovimentacao: (int)(hoje - (x.UltimaMovimentacaoEm ?? hoje.AddDays(-diasSemMovimento))).TotalDays,
-                ValorParado: Math.Round(x.Quantidade * x.Custo, 2)))
-                .ToList();
-
-            await SetCachedAsync(cacheKey, (items, totalCount), ParadosTtl);
-            return (items, totalCount);
-        }
-
-        // Sazonalidade
-
-        public async Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:sazonalidade:{empresaId}:{produtoId}:{meses}:{lojaId}";
-            var cached = await GetCachedAsync<List<SazonalidadeMensal>>(cacheKey);
-            if (cached is not null) return cached;
-
-            var de = DateTime.UtcNow.AddMonths(-meses);
-
-            var movQuery = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.ProdutoId == produtoId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de);
-            if (lojaId.HasValue)
-                movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var raw = await movQuery
-                .Select(m => new
-                {
-                    m.DataMovimentacao.Year,
-                    m.DataMovimentacao.Month,
-                    Quantidade = (int)m.Quantidade,
-                    Valor = (decimal?)m.ValorTotal ?? 0m
-                })
-                .ToListAsync();
-
-            var agregados = raw
-                .GroupBy(m => new { m.Year, m.Month })
-                .Select(g => new
-                {
-                    Ano = g.Key.Year,
-                    Mes = g.Key.Month,
-                    TotalSaidas = g.Sum(m => m.Quantidade),
-                    ValorTotal = g.Sum(m => m.Valor)
-                })
-                .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
-                .ToList();
-
-            // Média móvel 3 meses
-            var result = agregados.Select((item, idx) =>
-            {
-                var janela = agregados.Skip(Math.Max(0, idx - 2)).Take(Math.Min(3, idx + 1));
-                var media = janela.Any() ? janela.Average(x => (double)x.TotalSaidas) : 0d;
-                return new SazonalidadeMensal(
-                    Ano: item.Ano,
-                    Mes: item.Mes,
-                    TotalSaidas: item.TotalSaidas,
-                    ValorTotal: Math.Round(item.ValorTotal, 2),
-                    MediaMovelTresMeses: Math.Round((decimal)media, 2));
-            }).ToList();
-
-            await SetCachedAsync(cacheKey, result, SazonalidadeTtl);
-            return result;
-        }
-
-        // Reposicao sugerida
-
-        public async Task<(IReadOnlyList<ReposicaoSugerida> Items, int TotalCount)> GetSugestaoReposicaoDetalhadaAsync(
+        public Task<(IReadOnlyList<ReposicaoSugerida> Items, int TotalCount)> GetSugestaoReposicaoDetalhadaAsync(
             Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:reposicao:{empresaId}:{diasHistorico}:{page}:{pageSize}:{lojaId}";
-            var cached = await GetCachedAsync<(List<ReposicaoSugerida>, int)>(cacheKey);
-            if (cached != default) return cached;
+            => _estoque.GetSugestaoReposicaoDetalhadaAsync(empresaId, diasHistorico, page, pageSize, lojaId);
 
-            var de = DateTime.UtcNow.AddDays(-diasHistorico);
-            var ate = DateTime.UtcNow;
-            var dias = Math.Max(1, diasHistorico);
-
-            // Taxa de saída por produto
-            var taxaQuery = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate);
-            if (lojaId.HasValue)
-                taxaQuery = taxaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var taxas = await taxaQuery
-                .GroupBy(m => m.ProdutoId)
-                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => (int)m.Quantidade) })
-                .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
-
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual < i.QuantidadeMinima);
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-
-            var raw = await query
-                .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => (int)x.i.QuantidadeAtual)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new
-                {
-                    x.i.Id,
-                    x.i.ProdutoId,
-                    NomeProduto = x.p.Nome,
-                    x.i.CodigoInterno,
-                    Quantidade = (int)x.i.QuantidadeAtual,
-                    x.i.QuantidadeMinima,
-                    Custo = (decimal)x.i.CustoUnitario
-                })
-                .ToListAsync();
-
-            var items = raw.Select(x =>
-            {
-                var taxa = taxas.TryGetValue(x.ProdutoId, out var t) ? t : 0m;
-                var diasAte = taxa > 0 ? (int?)Math.Floor(x.Quantidade / taxa) : null;
-                // Sugestão: repor para 30 dias de cobertura acima do mínimo
-                var coberturaSugerida = taxa > 0 ? (int)Math.Ceiling(taxa * 30) : x.QuantidadeMinima * 2;
-                var qtdRepor = Math.Max(0, coberturaSugerida - x.Quantidade);
-                return new ReposicaoSugerida(
-                    ItemEstoqueId: x.Id,
-                    ProdutoId: x.ProdutoId,
-                    NomeProduto: x.NomeProduto,
-                    CodigoInterno: x.CodigoInterno,
-                    QuantidadeAtual: x.Quantidade,
-                    QuantidadeMinima: x.QuantidadeMinima,
-                    QuantidadeSugeridaReposicao: qtdRepor,
-                    VelocidadeSaidaDiaria: Math.Round(taxa, 2),
-                    DiasAteRuptura: diasAte,
-                    CustoEstimadoReposicao: Math.Round(qtdRepor * x.Custo, 2));
-            }).ToList();
-
-            await SetCachedAsync(cacheKey, (items, totalCount), ReposicaoTtl);
-            return (items, totalCount);
-        }
-
-        // Projecao de ruptura
-
-        public async Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
+        public Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
             Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:projecao:{empresaId}:{diasHistorico}:{page}:{pageSize}:{lojaId}";
-            var cached = await GetCachedAsync<(List<ProjecaoRuptura>, int)>(cacheKey);
-            if (cached != default) return cached;
+            => _estoque.GetProjecaoRupturaAsync(empresaId, diasHistorico, page, pageSize, lojaId);
 
-            var de = DateTime.UtcNow.AddDays(-diasHistorico);
-            var ate = DateTime.UtcNow;
-            var dias = Math.Max(1, diasHistorico);
-
-            var taxaQuery = dbContext.MovimentacoesEstoque
-                .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId &&
-                    m.Tipo == TipoMovimentacaoEstoque.Saida &&
-                    m.DataMovimentacao >= de &&
-                    m.DataMovimentacao <= ate);
-            if (lojaId.HasValue)
-                taxaQuery = taxaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
-
-            var taxas = await taxaQuery
-                .GroupBy(m => m.ProdutoId)
-                .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => (int)m.Quantidade) })
-                .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
-
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual > 0);
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-
-            var raw = await query
-                .Join(dbContext.Produtos.AsNoTracking(), i => i.ProdutoId, p => p.Id, (i, p) => new { i, p })
-                .OrderBy(x => x.i.ProdutoId)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new
-                {
-                    x.i.Id,
-                    x.i.ProdutoId,
-                    NomeProduto = x.p.Nome,
-                    x.i.CodigoInterno,
-                    Quantidade = (int)x.i.QuantidadeAtual
-                })
-                .ToListAsync();
-
-            var agora = DateTime.UtcNow;
-
-            var items = raw.Select(x =>
-            {
-                var taxa = taxas.TryGetValue(x.ProdutoId, out var t) ? t : 0m;
-                var diasAte = taxa > 0 ? (int?)Math.Floor(x.Quantidade / taxa) : null;
-                return new ProjecaoRuptura(
-                    ItemEstoqueId: x.Id,
-                    ProdutoId: x.ProdutoId,
-                    NomeProduto: x.NomeProduto,
-                    CodigoInterno: x.CodigoInterno,
-                    QuantidadeAtual: x.Quantidade,
-                    TaxaSaidaDiaria: Math.Round(taxa, 2),
-                    DiasAteRuptura: diasAte,
-                    DataEstimadaRuptura: diasAte.HasValue ? agora.AddDays(diasAte.Value) : null);
-            })
-            .OrderBy(x => x.DiasAteRuptura ?? int.MaxValue)
-            .ToList();
-
-            await SetCachedAsync(cacheKey, (items, totalCount), ProjecaoTtl);
-            return (items, totalCount);
-        }
-
-        // Vendas por canal
-
-        public async Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
-        {
-            var cacheKey = $"analytics:canal:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{lojaId}";
-            var cached = await GetCachedAsync<List<VendaPorCanal>>(cacheKey);
-            if (cached is not null) return cached;
-
-            var vendasQuery = dbContext.Vendas
-                .AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate);
-            if (lojaId.HasValue)
-                vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
-
-            var raw = await vendasQuery
-                .Select(v => new
-                {
-                    v.Canal,
-                    ValorTotal = (decimal)v.ValorTotal,
-                    TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
-                })
-                .ToListAsync();
-
-            var totalReceita = raw.Sum(v => v.ValorTotal);
-
-            var result = raw
-                .GroupBy(v => v.Canal)
-                .Select(g =>
-                {
-                    var totalVendas = g.Count();
-                    var receita = g.Sum(v => v.ValorTotal);
-                    var totalItens = g.Sum(v => v.TotalItens);
-                    return new VendaPorCanal(
-                        Canal: g.Key,
-                        TotalVendas: totalVendas,
-                        TotalItensVendidos: totalItens,
-                        ReceitaTotal: Math.Round(receita, 2),
-                        TicketMedio: totalVendas > 0 ? Math.Round(receita / totalVendas, 2) : 0m,
-                        PercentualReceita: totalReceita > 0 ? Math.Round(receita / totalReceita * 100m, 2) : 0m);
-                })
-                .OrderByDescending(x => x.ReceitaTotal)
-                .ToList();
-
-            await SetCachedAsync(cacheKey, result, CanalTtl);
-            return result;
-        }
-
-        // ── Store Intelligence Methods ──────────────────────────────────────
+        // ── Store Intelligence ───────────────────────────────────────────────
 
         public async Task<IReadOnlyList<LojaComparacao>> GetComparacaoLojasAsync(Guid empresaId, int periodoDias = 30)
         {
@@ -788,7 +207,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .FirstOrDefaultAsync();
             if (loja is null) return null;
 
-            var dashboard = await GetDashboardResumoAsync(empresaId, periodoDias, lojaId);
+            var dashboard = await _dashboard.GetDashboardResumoAsync(empresaId, periodoDias, lojaId);
 
             var ate = DateTime.UtcNow;
             var de = ate.AddDays(-periodoDias);
@@ -1000,7 +419,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return result;
         }
 
-        // ── Health Score Calculation ─────────────────────────────────────
+        // ── Health Score Calculation ─────────────────────────────────────────
 
         private static (decimal Score, string Classificacao) CalcularHealthScore(
             int totalItens, int itensCriticos, int itensAbaixoMinimo,
