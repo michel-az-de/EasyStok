@@ -31,6 +31,8 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         {
             logger.LogInformation("Criando usuario para empresa {EmpresaId}", command.EmpresaId);
 
+            EmailValidator.EnsureValid(command.Email);
+
             var emailExistente = await usuarioRepository.GetByEmailAsync(command.Email);
             if (emailExistente is not null)
                 throw new UseCaseValidationException("Email ja cadastrado.");

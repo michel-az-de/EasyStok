@@ -107,11 +107,18 @@ public sealed class GerenciarUploadsUseCase(
                 optimized),
             cancellationToken);
 
+        // Best-effort: remove o avatar antigo após o novo estar persistido.
+        // Fica como último passo para não bloquear o upload caso a delete falhe
+        // (por exemplo, se a URL antiga for externa ou estiver inacessível).
+        var urlAntigo = usuario.AvatarUrl;
+
         usuario.AvatarUrl = stored.Url;
         usuario.AlteradoEm = DateTime.UtcNow;
 
         await usuarioRepository.UpdateAsync(usuario);
         await unitOfWork.CommitAsync();
+
+        await TryDeletePreviousAsync(urlAntigo, cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -136,13 +143,64 @@ public sealed class GerenciarUploadsUseCase(
                 optimized),
             cancellationToken);
 
+        var logoAntigo = loja.LogoUrl;
+
         loja.LogoUrl = stored.Url;
         loja.AlteradoEm = DateTime.UtcNow;
 
         await lojaRepository.UpdateAsync(loja);
         await unitOfWork.CommitAsync();
 
+        await TryDeletePreviousAsync(logoAntigo, cancellationToken);
+
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
+    }
+
+    /// <summary>
+    /// Tenta remover um arquivo anteriormente referenciado, a partir da URL
+    /// armazenada. Suporta URLs relativas locais (<c>/files/...</c>) e URLs
+    /// absolutas (<c>https://.../bucket/path</c>). Qualquer falha é silenciada
+    /// para não bloquear o fluxo de upload — limpeza residual pode ser feita
+    /// por um job de varredura de órfãos.
+    /// </summary>
+    private async Task TryDeletePreviousAsync(string? urlAntigo, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(urlAntigo)) return;
+
+        var storageKey = ExtractStorageKey(urlAntigo);
+        if (storageKey is null) return;
+
+        try
+        {
+            await fileStorage.DeleteAsync(storageKey, cancellationToken);
+        }
+        catch
+        {
+            // Silencioso: limpeza residual fica a cargo de job de GC de arquivos órfãos.
+        }
+    }
+
+    private static string? ExtractStorageKey(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        // URL relativa local: "/files/caminho/arquivo.jpg" → "caminho/arquivo.jpg"
+        const string filesPrefix = "/files/";
+        var idx = url.IndexOf(filesPrefix, StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
+            return url[(idx + filesPrefix.Length)..];
+
+        // URL absoluta: extrai PathAndQuery sem o primeiro segmento (bucket/container).
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var path = uri.AbsolutePath.TrimStart('/');
+            var firstSlash = path.IndexOf('/');
+            if (firstSlash > 0 && firstSlash < path.Length - 1)
+                return path[(firstSlash + 1)..];
+            return path;
+        }
+
+        return null;
     }
 
     private static void ValidarImagem(string fileName, string contentType, byte[] content, int maxSize)

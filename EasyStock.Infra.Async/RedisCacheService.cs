@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace EasyStock.Infra.Async;
@@ -9,9 +10,10 @@ namespace EasyStock.Infra.Async;
 /// Usa IDistributedCache do ASP.NET Core com serialização JSON.
 ///
 /// ⚠️ LIMITAÇÕES CONHECIDAS:
-/// - IncrementAsync não é atômico (devido a limitações do IDistributedCache)
-/// - SetExpiryAsync não é suportado
-/// - Para operações atômicas em produção, considere usar StackExchange.Redis diretamente
+/// - <see cref="IncrementAsync"/> usa lock local por chave: atômico dentro do mesmo
+///   processo mas NÃO entre instâncias. Para contador global exato em múltiplas
+///   réplicas, migrar para <c>IConnectionMultiplexer.StringIncrementAsync</c> nativo.
+/// - <see cref="SetExpiryAsync"/> não é suportado nativamente pelo IDistributedCache.
 /// </summary>
 public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 {
@@ -20,6 +22,13 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false
     };
+
+    // Locks por-chave para serialização do increment dentro do mesmo processo.
+    // Evita pior caso de race condition sem introduzir dependência do StackExchange.Redis.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> IncrementLocks = new();
+
+    private static SemaphoreSlim GetLock(string key) =>
+        IncrementLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
 
     /// <summary>Valida que a chave de cache não é nula ou vazia.</summary>
     private static void ValidarChave(string key)
@@ -68,30 +77,29 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
     {
         ValidarChave(key);
 
-        // ⚠️ LIMITAÇÃO CRÍTICA: IDistributedCache não suporta operações atômicas nativas
-        // Esta implementação NÃO é thread-safe e pode causar race conditions em ambientes concorrentes
-        // Para produção com alta concorrência, considere:
-        // 1. Usar IConnectionMultiplexer do StackExchange.Redis diretamente
-        // 2. Implementar lock distribuído (ex: Redis Lock)
-        // 3. Usar operações atômicas específicas do provedor
-
         if (value == 0)
             return (await GetAsync<long?>(key)) ?? 0L;
 
+        // Serializa o read-modify-write por chave dentro do processo.
+        // NOTA: em ambientes multi-instância (ex.: Kubernetes com HPA) isso não
+        // protege entre pods; substituir por StringIncrementAsync do
+        // StackExchange.Redis se a aplicação for escalada horizontalmente.
+        var semaphore = GetLock(key);
+        await semaphore.WaitAsync();
         try
         {
             var current = (await GetAsync<long?>(key)) ?? 0L;
-            var newValue = checked(current + value); // Previne overflow
-
-            // Não força TTL implícito durante incremento para evitar alteração inesperada
-            // no ciclo de vida da chave.
+            var newValue = checked(current + value);
             await SetAsync(key, newValue);
-
             return newValue;
         }
         catch (OverflowException)
         {
             throw new InvalidOperationException($"Incremento causaria overflow no counter '{key}'");
+        }
+        finally
+        {
+            semaphore.Release();
         }
     }
 

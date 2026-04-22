@@ -3,11 +3,23 @@ using EasyStock.Domain.Entities;
 using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Data
 {
-    public class EasyStockDbContext(DbContextOptions<EasyStockDbContext> options) : DbContext(options), IUnitOfWork
+    public class EasyStockDbContext : DbContext, IUnitOfWork
     {
+        private readonly ILogger<EasyStockDbContext>? _logger;
+
+        public EasyStockDbContext(DbContextOptions<EasyStockDbContext> options)
+            : base(options) { }
+
+        public EasyStockDbContext(DbContextOptions<EasyStockDbContext> options, ILogger<EasyStockDbContext> logger)
+            : base(options)
+        {
+            _logger = logger;
+        }
+
 
         // Domain DbSets
         public DbSet<Empresa> Empresas { get; set; } = null!;
@@ -41,7 +53,28 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Plano> Planos { get; set; } = null!;
         public DbSet<AssinaturaEmpresa> AssinaturasEmpresa { get; set; } = null!;
 
-        public Task<int> CommitAsync() => base.SaveChangesAsync();
+        public async Task<int> CommitAsync()
+        {
+            try
+            {
+                return await base.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger?.LogWarning(ex,
+                    "Conflito de concorrência ao persistir mudanças no EasyStockDbContext. Entidades afetadas: {Entities}",
+                    string.Join(", ", ex.Entries.Select(e => e.Entity.GetType().Name)));
+                throw;
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger?.LogError(ex,
+                    "Falha ao persistir mudanças no EasyStockDbContext. Inner: {Inner}. Entidades: {Entities}",
+                    ex.InnerException?.Message,
+                    string.Join(", ", ex.Entries.Select(e => e.Entity.GetType().Name)));
+                throw;
+            }
+        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

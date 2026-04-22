@@ -45,6 +45,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
             }
 
+            // Se a janela de lockout expirou, zera o contador de falhas para não
+            // bloquear o usuário na próxima falha "herdada" da sessão anterior.
+            if (usuario.LockoutEnd.HasValue && usuario.LockoutEnd.Value <= DateTime.UtcNow)
+            {
+                usuario.ResetarTentativasFalha();
+            }
+
             // --- etapa 2: verificação bcrypt (CPU-bound ~200-800ms dependendo do work factor)
             var swHash = Stopwatch.StartNew();
             var senhaOk = BCrypt.Net.BCrypt.Verify(command.Senha, usuario.SenhaHash);

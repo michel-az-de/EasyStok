@@ -361,6 +361,23 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         limiter.QueueLimit = 20;
     });
+
+    // Rate limit para endpoints sensíveis de autenticação (login, register,
+    // forgot/reset password). Particionado por IP do cliente para dificultar
+    // brute-force e spam de contas.
+    options.AddPolicy("auth", context =>
+    {
+        var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+        return System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {

@@ -73,11 +73,30 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
         {
             mailMessage.To.Add(recipient);
         }
+
+        // Anexos: criamos stream+attachment dentro de try/catch para garantir
+        // dispose se a construção do Attachment falhar (ContentType inválido etc).
+        // Após Add em mailMessage.Attachments, o dispose do MailMessage cascateia.
         foreach (var attachment in attachments)
         {
-            var mailAttachment = new Attachment(new MemoryStream(attachment.Content), attachment.FileName, attachment.ContentType);
-            mailMessage.Attachments.Add(mailAttachment);
+            MemoryStream? stream = null;
+            Attachment? mailAttachment = null;
+            try
+            {
+                stream = new MemoryStream(attachment.Content);
+                mailAttachment = new Attachment(stream, attachment.FileName, attachment.ContentType);
+                mailMessage.Attachments.Add(mailAttachment);
+                // Ownership transferido para o MailMessage neste ponto.
+                stream = null;
+                mailAttachment = null;
+            }
+            finally
+            {
+                mailAttachment?.Dispose();
+                stream?.Dispose();
+            }
         }
+
         await _smtpClient.SendMailAsync(mailMessage);
     }
 

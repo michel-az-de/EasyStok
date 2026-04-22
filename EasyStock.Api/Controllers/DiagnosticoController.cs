@@ -19,7 +19,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/diagnostico")]
 [Route("diagnostico")]
-[AllowAnonymous]
+[Authorize(Policy = "Admin")]
 [ApiExplorerSettings(GroupName = "v1-ptbr")]
 public sealed class DiagnosticoController(
     ResolvedInfrastructureState infraState,
@@ -31,16 +31,22 @@ public sealed class DiagnosticoController(
     ILogger<DiagnosticoController> logger) : ControllerBase
 {
     [HttpGet("ping")]
+    [AllowAnonymous]
     public IActionResult Ping() => Ok(new { pong = true, timestamp = DateTimeOffset.UtcNow });
 
     [HttpGet]
     public async Task<IActionResult> Diagnostico(CancellationToken ct)
     {
-        // Executar checks de infra em paralelo para reduzir latência
+        // Executar checks de infra em paralelo para reduzir latência.
+        // Usar await direto nas tasks iniciadas garante que qualquer exceção
+        // seja propagada sem bloquear thread via .Result.
         var bancoTask   = GetBancoStatusAsync(ct);
         var redisTask   = GetRedisStatusAsync(ct);
         var storageTask = GetStorageStatusAsync(ct);
-        await Task.WhenAll(bancoTask, redisTask, storageTask);
+
+        var banco   = await bancoTask;
+        var redis   = await redisTask;
+        var storage = await storageTask;
 
         var result = new DiagnosticoResult
         {
@@ -49,10 +55,10 @@ public sealed class DiagnosticoController(
             Ambiente      = infraState.Environment,
             Uptime        = FormatUptime(DateTimeOffset.UtcNow - infraState.StartupTime),
             Versao        = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
-            Banco         = bancoTask.Result,
-            Redis         = redisTask.Result,
+            Banco         = banco,
+            Redis         = redis,
             Smtp          = GetSmtpStatus(),
-            Storage       = storageTask.Result,
+            Storage       = storage,
             Ia            = GetIaStatus(),
             Configuracoes = GetConfiguracoesStatus()
         };

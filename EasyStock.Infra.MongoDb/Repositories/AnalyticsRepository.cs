@@ -137,7 +137,8 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
         var skuFilter = new BsonDocument("EmpresaId", new BsonBinaryData(empresaId, GuidRepresentation.Standard));
         AddLojaIdFilter(skuFilter, lojaId);
-        var totalSkus = await ItensEstoque.Distinct<Guid>("ProdutoId", skuFilter).ToListAsync().ContinueWith(t => t.Result.Count);
+        var totalSkusList = await ItensEstoque.Distinct<Guid>("ProdutoId", skuFilter).ToListAsync();
+        var totalSkus = totalSkusList.Count;
 
         // Alertas vencimento
         var cutoffValidade = DateTime.UtcNow.AddDays(30);

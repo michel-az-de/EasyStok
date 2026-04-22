@@ -19,8 +19,30 @@ namespace EasyStock.Api.BackgroundServices
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                await ExecutarComRetryAsync(stoppingToken);
-                await Task.Delay(_intervalo, stoppingToken);
+                try
+                {
+                    await ExecutarComRetryAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Defensivo: ExecutarComRetryAsync já captura exceções internas,
+                    // mas um bug futuro que deixe vazar erro não deve derrubar o serviço.
+                    logger.LogError(ex,
+                        "Exceção inesperada escapou do retry loop em AnalisadorEstoqueBackgroundService. Continuando após delay.");
+                }
+
+                try
+                {
+                    await Task.Delay(_intervalo, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
         }
 

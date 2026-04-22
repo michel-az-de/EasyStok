@@ -95,13 +95,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 var app = builder.Build();
 
-// Startup: verificar conectividade com a API (não-bloqueante)
+// Startup: verificar conectividade com a API (não-bloqueante).
+// Tudo envolto em try/catch externo porque falhas em GetRequiredService
+// (antes de entrar no try interno) senão seriam exceções não observadas em Task.Run.
 _ = Task.Run(async () =>
 {
-    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    ILogger? logger = null;
     var baseUrl = app.Configuration["ApiSettings:BaseUrl"];
     try
     {
+        logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
         using var scope = app.Services.CreateScope();
         var diag = scope.ServiceProvider.GetRequiredService<DiagnosticoWebService>();
         var reachable = await diag.PingApiAsync();
@@ -112,7 +115,11 @@ _ = Task.Run(async () =>
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Falha ao verificar conectividade com API — BaseUrl: {BaseUrl}", baseUrl);
+        // Se o logger já foi criado usa ele; senão imprime em stderr para não perder o traço
+        if (logger is not null)
+            logger.LogWarning(ex, "Falha ao verificar conectividade com API — BaseUrl: {BaseUrl}", baseUrl);
+        else
+            Console.Error.WriteLine($"[Startup] Falha ao verificar conectividade com API: {ex}");
     }
 });
 

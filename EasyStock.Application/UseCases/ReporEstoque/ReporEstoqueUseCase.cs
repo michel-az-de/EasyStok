@@ -39,6 +39,10 @@ namespace EasyStock.Application.UseCases.ReporEstoque
         {
             if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
             if (command.QuantidadeAdicional <= 0) throw new QuantidadeInvalidaException(command.QuantidadeAdicional);
+            if (command.NovoCustoUnitario is < 0)
+                throw new UseCaseValidationException("Custo unitário não pode ser negativo.");
+            if (command.NovoPrecoVendaSugerido is < 0)
+                throw new UseCaseValidationException("Preço de venda sugerido não pode ser negativo.");
 
             var item = await itemEstoqueRepository.GetByIdAsync(command.ItemEstoqueId)
                 ?? throw new UseCaseValidationException("Item de estoque nao encontrado.");

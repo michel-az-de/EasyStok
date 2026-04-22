@@ -18,17 +18,17 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
 
         var vm = new DashboardViewModel();
 
-        // Load all dashboard data in parallel — best-effort, show empty state on failure
+        // Load all dashboard data in parallel — best-effort, show empty state on failure.
+        // Usa await direto em cada task iniciada para evitar .Result bloqueando thread.
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
         var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>($"analytics/receita?meses={meses}");
 
-        await Task.WhenAll(dashTask, reposTask, movsTask, receitaTask);
-
-        var (dashResult, reposResult, movsResult, receitaResult) = (
-            dashTask.Result, reposTask.Result, movsTask.Result, receitaTask.Result
-        );
+        var dashResult = await dashTask;
+        var reposResult = await reposTask;
+        var movsResult = await movsTask;
+        var receitaResult = await receitaTask;
 
         if (dashResult.Success && dashResult.Data is { } d)
         {

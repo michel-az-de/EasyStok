@@ -24,6 +24,8 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
 
             if (!string.IsNullOrWhiteSpace(command.Email) && command.Email != usuario.Email)
             {
+                EmailValidator.EnsureValid(command.Email);
+
                 var emailExistente = await usuarioRepository.GetByEmailAsync(command.Email);
                 if (emailExistente is not null)
                     throw new UseCaseValidationException("Email ja cadastrado.");

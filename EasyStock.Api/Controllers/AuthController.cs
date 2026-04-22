@@ -43,9 +43,9 @@ public class AuthController(
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
     AlterarSenhaUseCase alterarSenhaUseCase) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited.")]
+    [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited by IP.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [EnableRateLimiting("ai")]
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -111,6 +111,7 @@ public class AuthController(
     [SwaggerOperation(Summary = "Register new user account")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [EnableRateLimiting("auth")]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] CadastrarUsuarioCommand command)
         => DataOk(await cadastrarUsuarioUseCase.ExecuteAsync(command));
@@ -130,12 +131,14 @@ public class AuthController(
 
     [SwaggerOperation(Summary = "Request password reset email")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [EnableRateLimiting("auth")]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaCommand command)
         => DataOk(await esqueciSenhaUseCase.ExecuteAsync(command));
 
     [SwaggerOperation(Summary = "Reset password using token from email")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [EnableRateLimiting("auth")]
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaCommand command)
         => DataOk(await resetarSenhaUseCase.ExecuteAsync(command));

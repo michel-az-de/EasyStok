@@ -9,10 +9,30 @@ namespace EasyStock.Infra.Async;
 /// </summary>
 public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
 {
+    /// <summary>Limite máximo em bytes por upload. Evita OOM em arquivos gigantes.</summary>
+    public const long MaxUploadSizeBytes = 50 * 1024 * 1024; // 50 MB
+
     public async Task<string> UploadAsync(string container, string fileName, Stream content, string contentType)
     {
+        // Validação precoce quando o stream expõe Length (a maioria dos uploads web expõe).
+        if (content.CanSeek && content.Length > MaxUploadSizeBytes)
+            throw new InvalidOperationException(
+                $"Arquivo excede o limite de {MaxUploadSizeBytes / (1024 * 1024)}MB. Tamanho recebido: {content.Length} bytes.");
+
+        // Para streams sem Length conhecido (ex.: chunked), copiar com limite dinâmico.
         using var ms = new MemoryStream();
-        await content.CopyToAsync(ms);
+        var buffer = new byte[81920];
+        long totalRead = 0;
+        int read;
+        while ((read = await content.ReadAsync(buffer)) > 0)
+        {
+            totalRead += read;
+            if (totalRead > MaxUploadSizeBytes)
+                throw new InvalidOperationException(
+                    $"Arquivo excede o limite de {MaxUploadSizeBytes / (1024 * 1024)}MB durante a leitura.");
+            await ms.WriteAsync(buffer.AsMemory(0, read));
+        }
+
         var request = new FileUploadRequest(
             BucketPath: container,
             FileName: fileName,
