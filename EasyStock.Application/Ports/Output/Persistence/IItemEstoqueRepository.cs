@@ -20,5 +20,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id);
         Task InsertAsync(ItemEstoque itemEstoque);
         Task UpdateAsync(ItemEstoque itemEstoque);
+
+        /// <summary>
+        /// Atualiza um conjunto de itens de estoque em batch (ex.: lotes tocados
+        /// por uma mesma saída FIFO). Implementações devem marcar todos os
+        /// itens como Modified e evitar round-trips individuais.
+        /// </summary>
+        Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque);
     }
 }

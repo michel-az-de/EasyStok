@@ -63,30 +63,44 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
 
     public async Task<(int QuantidadePedidos, decimal TotalGasto, decimal? LeadTimeRealMedioDias, decimal FrequenciaPedidosPorMes)> GetEstatisticasAsync(Guid empresaId, Guid fornecedorId)
     {
-        var pedidos = await dbContext.PedidosFornecedor
+        // Otimização: projetar apenas os campos necessários para os cálculos,
+        // evitando carregar a entidade completa com todas as relações.
+        // Os cálculos (média de leadtime, min/max, contagem) poderiam ir 100%
+        // ao SQL mas o provider Npgsql não traduz algumas operações de DateTime,
+        // então fazemos uma projeção enxuta e agregamos em memória.
+        var baseQuery = dbContext.PedidosFornecedor
             .AsNoTracking()
-            .Where(x => x.EmpresaId == empresaId && x.FornecedorId == fornecedorId)
+            .Where(x => x.EmpresaId == empresaId && x.FornecedorId == fornecedorId);
+
+        var projecao = await baseQuery
+            .Select(x => new
+            {
+                x.DataPedido,
+                x.DataRecebimento,
+                x.ValorEstimado,
+                x.Status
+            })
             .ToListAsync();
 
-        if (pedidos.Count == 0)
+        if (projecao.Count == 0)
             return (0, 0m, null, 0m);
 
-        var totalGasto = pedidos
+        var totalGasto = projecao
             .Where(x => x.Status != StatusPedidoFornecedor.Cancelado)
             .Sum(x => x.ValorEstimado ?? 0m);
 
-        var leadTimes = pedidos
+        var leadTimes = projecao
             .Where(x => x.DataRecebimento.HasValue && x.DataRecebimento.Value >= x.DataPedido)
             .Select(x => (decimal)(x.DataRecebimento!.Value.Date - x.DataPedido.Date).TotalDays)
             .ToList();
 
-        var primeiroPedido = pedidos.Min(x => x.DataPedido.Date);
-        var ultimoMarco = pedidos.Max(x => (x.DataRecebimento ?? x.DataPedido).Date);
+        var primeiroPedido = projecao.Min(x => x.DataPedido.Date);
+        var ultimoMarco = projecao.Max(x => (x.DataRecebimento ?? x.DataPedido).Date);
         var meses = Math.Max(1m, (decimal)(ultimoMarco - primeiroPedido).TotalDays / 30m);
-        var frequencia = decimal.Round(pedidos.Count / meses, 2);
+        var frequencia = decimal.Round(projecao.Count / meses, 2);
 
         return (
-            pedidos.Count,
+            projecao.Count,
             totalGasto,
             leadTimes.Count == 0 ? null : decimal.Round(leadTimes.Average(), 2),
             frequencia);

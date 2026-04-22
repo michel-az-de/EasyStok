@@ -158,6 +158,17 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         return Task.CompletedTask;
     }
 
+    public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
+    {
+        foreach (var item in itensEstoque)
+        {
+            item.Produto = null;
+            item.ProdutoVariacao = null;
+            EnqueueReplace(Collection, item.Id, item);
+        }
+        return Task.CompletedTask;
+    }
+
     private async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> PaginateAsync(
         FilterDefinition<ItemEstoque> filter,
         SortDefinition<ItemEstoque> sort,

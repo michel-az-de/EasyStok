@@ -222,5 +222,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.ItensEstoque.Update(itemEstoque);
             return Task.CompletedTask;
         }
+
+        public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
+        {
+            dbContext.ItensEstoque.UpdateRange(itensEstoque);
+            return Task.CompletedTask;
+        }
     }
 }

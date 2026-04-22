@@ -239,11 +239,17 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             var totalAnterior = taxaAnterior * janelaDias;
             var velocidadeAtualizada = (totalAnterior + quantidadeSaidaAtual) / janelaDias;
 
-            foreach (var lote in lotesTocados)
+            // Atualiza velocidade em memória e persiste em batch (1 round-trip)
+            // em vez de UpdateAsync individual por lote.
+            var lotesList = lotesTocados as IList<ItemEstoque> ?? lotesTocados.ToList();
+            if (lotesList.Count == 0) return;
+
+            foreach (var lote in lotesList)
             {
                 lote.AtualizarVelocidadeSaida(velocidadeAtualizada, dataSaida);
-                await itemEstoqueRepository.UpdateAsync(lote);
             }
+
+            await itemEstoqueRepository.UpdateRangeAsync(lotesList);
         }
     }
 }

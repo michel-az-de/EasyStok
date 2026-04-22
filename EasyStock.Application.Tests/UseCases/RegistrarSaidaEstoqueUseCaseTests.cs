@@ -89,13 +89,9 @@ public class RegistrarSaidaEstoqueUseCaseTests
         result.Itens.Should().HaveCount(2);
         result.Itens.Select(i => i.QuantidadeSaida).Should().BeEquivalentTo([10, 2]);
 
-        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
-            i.Id == loteAntigo.Id &&
-            i.QuantidadeAtual.Value == 0));
-
-        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
-            i.Id == loteNovo.Id &&
-            i.QuantidadeAtual.Value == 3));
+        await itemRepository.Received(1).UpdateRangeAsync(Arg.Is<IEnumerable<ItemEstoque>>(lotes =>
+            lotes.Any(l => l.Id == loteAntigo.Id && l.QuantidadeAtual.Value == 0) &&
+            lotes.Any(l => l.Id == loteNovo.Id && l.QuantidadeAtual.Value == 3)));
 
         await itemVendaRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<ItemVenda>>(x => x.Count() == 2));
         await movimentacaoRepository.Received(1).InsertRangeAsync(Arg.Is<IEnumerable<MovimentacaoEstoque>>(x => x.Count() == 2));
@@ -175,13 +171,11 @@ public class RegistrarSaidaEstoqueUseCaseTests
         result.Itens.Should().HaveCount(2);
         result.ValorTotal.Should().Be(1999.50m);
 
-        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
-            i.Id == item1.Id &&
-            i.QuantidadeAtual.Value == 7));
+        await itemRepository.Received(1).UpdateRangeAsync(Arg.Is<IEnumerable<ItemEstoque>>(lotes =>
+            lotes.Any(l => l.Id == item1.Id && l.QuantidadeAtual.Value == 7)));
 
-        await itemRepository.Received(1).UpdateAsync(Arg.Is<ItemEstoque>(i =>
-            i.Id == item2.Id &&
-            i.QuantidadeAtual.Value == 3));
+        await itemRepository.Received(1).UpdateRangeAsync(Arg.Is<IEnumerable<ItemEstoque>>(lotes =>
+            lotes.Any(l => l.Id == item2.Id && l.QuantidadeAtual.Value == 3)));
 
         await vendaRepository.Received(1).InsertAsync(Arg.Is<Venda>(v =>
             v.Id == result.VendaId &&
