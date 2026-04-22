@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -51,15 +52,8 @@ public class CriarPedidoFornecedorUseCase(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (command.EmpresaId == Guid.Empty)
-        {
-            throw new ArgumentException("EmpresaId deve ser informado e diferente de Guid.Empty.", nameof(command.EmpresaId));
-        }
-
-        if (command.FornecedorId == Guid.Empty)
-        {
-            throw new ArgumentException("FornecedorId deve ser informado e diferente de Guid.Empty.", nameof(command.FornecedorId));
-        }
+        UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(command.FornecedorId, "FornecedorId");
 
         if (command.DataPedido == default)
         {

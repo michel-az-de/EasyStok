@@ -220,8 +220,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
 
         private static void Validar(CadastrarProdutoCommand command)
         {
-            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
-            if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId é obrigatório.");
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+            UseCaseGuards.EnsureNotEmpty(command.CategoriaId, "CategoriaId");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
             if ((command.Embalagens ?? []).Count(e => e.Padrao) > 1) throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
 

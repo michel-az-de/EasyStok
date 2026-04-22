@@ -26,10 +26,8 @@ namespace EasyStock.Application.UseCases.EstornarSaida
     {
         public async Task<EstornarSaidaResult> ExecuteAsync(EstornarSaidaCommand command)
         {
-            if (command.EmpresaId == Guid.Empty)
-                throw new UseCaseValidationException("EmpresaId é obrigatório.");
-            if (command.MovimentacaoId == Guid.Empty)
-                throw new UseCaseValidationException("MovimentacaoId é obrigatório.");
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+            UseCaseGuards.EnsureNotEmpty(command.MovimentacaoId, "MovimentacaoId");
 
             // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
             var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)

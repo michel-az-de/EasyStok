@@ -77,7 +77,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
     {
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
-            if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
             if (command.Itens is null || command.Itens.Count == 0) throw new VendaSemItensException(Guid.Empty);
 
             logger.LogInformation("Iniciando registro de sa�da de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",

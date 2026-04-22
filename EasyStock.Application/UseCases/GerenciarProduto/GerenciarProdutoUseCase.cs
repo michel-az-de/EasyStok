@@ -153,8 +153,8 @@ public sealed class GerenciarProdutoUseCase(
 {
     public async Task AtualizarAsync(AtualizarProdutoCommand command)
     {
-        if (command.EmpresaId == Guid.Empty) throw new UseCaseValidationException("EmpresaId é obrigatório.");
-        if (command.ProdutoId == Guid.Empty) throw new UseCaseValidationException("ProdutoId é obrigatório.");
+        UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(command.ProdutoId, "ProdutoId");
         if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId é obrigatório.");
         if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
 

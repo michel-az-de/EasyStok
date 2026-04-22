@@ -17,20 +17,19 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
 
-        List<ProdutoResumo> items;
-        int totalItems = 0;
-        int totalPages = 1;
+        // Categorias para o dropdown de filtro (também usadas no match abaixo)
+        var catsResult = await svc.ListarCategoriasAsync();
+        var categorias = catsResult.Data ?? [];
 
-        if (!string.IsNullOrWhiteSpace(search))
+        var temFiltroLocal = !string.IsNullOrEmpty(status) || semPreco || !string.IsNullOrEmpty(categoria);
+
+        List<ProdutoResumo> items;
+        int totalItems;
+        int totalPages;
+
+        if (string.IsNullOrWhiteSpace(search) && !temFiltroLocal)
         {
-            var searchResult = await svc.BuscarAsync(search.Trim(), 100);
-            if (HasError(searchResult)) return View(new ProdutosListViewModel());
-            items = searchResult.Data!;
-            totalItems = items.Count;
-            totalPages = 1;
-        }
-        else
-        {
+            // Caminho rápido: paginação server-side pura.
             var result = await svc.ListarAsync(page, PageSize);
             if (HasError(result)) return View(new ProdutosListViewModel());
             var paged = result.Data!;
@@ -38,27 +37,35 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             totalItems = paged.Meta.Total;
             totalPages = paged.Meta.Pages;
         }
-
-        // Filtros client-side (sobre os resultados já carregados)
-        if (!string.IsNullOrEmpty(status))
-            items = items.Where(p => p.StatusNome.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (semPreco)
-            items = items.Where(p => !(p.PrecoReferencia?.Valor > 0)).ToList();
-
-        // Categorias para o dropdown de filtro
-        var catsResult = await svc.ListarCategoriasAsync();
-        var categorias = catsResult.Data ?? [];
-
-        // Filtro por categoria (por nome)
-        if (!string.IsNullOrEmpty(categoria))
+        else
         {
-            var catMatch = categorias.FirstOrDefault(c => c.Nome.Equals(categoria, StringComparison.OrdinalIgnoreCase));
-            if (catMatch is not null)
-                items = items.Where(p => p.CategoriaId == catMatch.Id).ToList();
-        }
+            // Caminho com busca ou filtros: carrega um conjunto maior (limitado)
+            // e filtra client-side. TODO: mover filtros status/categoria/semPreco
+            // para query params da API para paginação correta.
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchResult = await svc.BuscarAsync(search.Trim(), 100);
+                if (HasError(searchResult)) return View(new ProdutosListViewModel());
+                items = searchResult.Data!;
+            }
+            else
+            {
+                var result = await svc.ListarAsync(1, 200);
+                if (HasError(result)) return View(new ProdutosListViewModel());
+                items = result.Data!.Data;
+            }
 
-        if (semPreco || !string.IsNullOrEmpty(status) || !string.IsNullOrEmpty(categoria))
-        {
+            if (!string.IsNullOrEmpty(status))
+                items = items.Where(p => p.StatusNome.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (semPreco)
+                items = items.Where(p => !(p.PrecoReferencia?.Valor > 0)).ToList();
+            if (!string.IsNullOrEmpty(categoria))
+            {
+                var catMatch = categorias.FirstOrDefault(c => c.Nome.Equals(categoria, StringComparison.OrdinalIgnoreCase));
+                if (catMatch is not null)
+                    items = items.Where(p => p.CategoriaId == catMatch.Id).ToList();
+            }
+
             totalItems = items.Count;
             totalPages = 1;
         }

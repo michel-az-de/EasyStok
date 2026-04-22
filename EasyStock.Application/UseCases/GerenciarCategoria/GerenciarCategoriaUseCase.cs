@@ -33,8 +33,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
     {
         public async Task<CategoriaResult> CriarAsync(CriarCategoriaCommand command)
         {
-            if (command.EmpresaId == Guid.Empty)
-                throw new UseCaseValidationException("EmpresaId é obrigatório.");
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
             if (string.IsNullOrWhiteSpace(command.Nome))
                 throw new UseCaseValidationException("Nome da categoria é obrigatório.");
 
