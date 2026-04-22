@@ -275,7 +275,8 @@ public class ProdutoController(
         await file.CopyToAsync(memoryStream, cancellationToken);
 
         var result = await gerenciarUploadsUseCase.UploadFotoProdutoAsync(
-            resolvedEmpresaId, id, file.FileName, file.ContentType, memoryStream.ToArray(), cancellationToken);
+            resolvedEmpresaId, id, file.FileName, file.ContentType ?? "application/octet-stream",
+            memoryStream.ToArray(), cancellationToken);
 
         return DataOk(result);
     }

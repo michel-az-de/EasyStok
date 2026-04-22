@@ -174,19 +174,26 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             // FOR UPDATE garante serialização: requests concorrentes aguardam o lock
             // antes de ler a quantidade, evitando estoque negativo.
-            var varFilter = produtoVariacaoId.HasValue
-                ? $"AND \"ProdutoVariacaoId\" = '{produtoVariacaoId.Value}'"
+            // Usa dois templates separados para deixar o filtro de variacao como
+            // literal fixo e evitar interpolação de valor no SQL (avisos EF1002).
+            var variacaoFilter = produtoVariacaoId.HasValue
+                ? "AND \"ProdutoVariacaoId\" = {2}"
                 : "AND \"ProdutoVariacaoId\" IS NULL";
 
-            return await dbContext.ItensEstoque
-                .FromSqlRaw($@"
+            var sql = $@"
                     SELECT * FROM itens_estoque
                     WHERE ""EmpresaId"" = {{0}}
                       AND ""ProdutoId"" = {{1}}
                       AND ""QuantidadeAtual"" > 0
-                      {varFilter}
+                      {variacaoFilter}
                     ORDER BY ""EntradaEm"", ""CriadoEm""
-                    FOR UPDATE", empresaId, produtoId)
+                    FOR UPDATE";
+
+            var query = produtoVariacaoId.HasValue
+                ? dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId, produtoVariacaoId.Value)
+                : dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId);
+
+            return await query
                 .ToListAsync();
         }
 

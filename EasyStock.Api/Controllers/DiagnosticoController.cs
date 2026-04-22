@@ -1444,8 +1444,6 @@ public sealed class DiagnosticoController(
                 logs.Resumo.ErrorsByHour.TryGetValue(h, out var v) ? v.ToString() : "0"));
         }
 
-        var patternsHtml = "";
-
         // Log entries HTML
         var logEntriesHtml = "";
         if (logs?.Disponivel == true && logs.Entradas.Length > 0)
