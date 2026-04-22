@@ -154,7 +154,7 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
     {
         itemEstoque.Produto = null;
         itemEstoque.ProdutoVariacao = null;
-        EnqueueReplace(Collection, itemEstoque.Id, itemEstoque);
+        EnqueueReplaceScoped(Collection, itemEstoque.Id, itemEstoque.EmpresaId, itemEstoque);
         return Task.CompletedTask;
     }
 
@@ -164,7 +164,7 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         {
             item.Produto = null;
             item.ProdutoVariacao = null;
-            EnqueueReplace(Collection, item.Id, item);
+            EnqueueReplaceScoped(Collection, item.Id, item.EmpresaId, item);
         }
         return Task.CompletedTask;
     }
@@ -211,7 +211,7 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
 
     public Task UpdateAsync(MovimentacaoEstoque movimentacao)
     {
-        EnqueueReplace(Collection, movimentacao.Id, movimentacao);
+        EnqueueReplaceScoped(Collection, movimentacao.Id, movimentacao.EmpresaId, movimentacao);
         return Task.CompletedTask;
     }
 
@@ -482,7 +482,7 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
 
     public Task UpdateAsync(Notificacao notificacao)
     {
-        EnqueueReplace(Collection, notificacao.Id, notificacao);
+        EnqueueReplaceScoped(Collection, notificacao.Id, notificacao.EmpresaId, notificacao);
         return Task.CompletedTask;
     }
 
@@ -507,9 +507,9 @@ public sealed class NotificacaoRepository(MongoEasyStockContext context, MongoUn
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid empresaId, Guid id)
     {
-        EnqueueDelete(Collection, id);
+        EnqueueDeleteScoped(Collection, id, empresaId);
         return Task.CompletedTask;
     }
 }

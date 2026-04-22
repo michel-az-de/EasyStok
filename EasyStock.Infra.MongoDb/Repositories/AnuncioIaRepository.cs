@@ -28,13 +28,13 @@ public sealed class AnuncioIaRepository(MongoEasyStockContext context, MongoUnit
 
     public Task UpdateAsync(AnuncioIa anuncio)
     {
-        EnqueueReplace(Collection, anuncio.Id, anuncio);
+        EnqueueReplaceScoped(Collection, anuncio.Id, anuncio.EmpresaId, anuncio);
         return Task.CompletedTask;
     }
 
     public Task RemoveAsync(AnuncioIa anuncio)
     {
-        EnqueueDelete(Collection, anuncio.Id);
+        EnqueueDeleteScoped(Collection, anuncio.Id, anuncio.EmpresaId);
         return Task.CompletedTask;
     }
 }

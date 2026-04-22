@@ -100,7 +100,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (await categoriaRepository.ExisteProdutosNaCategoriaAsync(id))
                 throw new UseCaseValidationException("Nao e possivel remover uma categoria que possui produtos vinculados.");
 
-            await categoriaRepository.DeleteAsync(id);
+            await categoriaRepository.DeleteAsync(empresaId, id);
             await unitOfWork.CommitAsync();
         }
 

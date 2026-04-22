@@ -24,9 +24,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task DeleteAsync(Guid id)
+        public async Task DeleteAsync(Guid empresaId, Guid id)
         {
-            var entity = await dbContext.ProdutosCaracteristica.FindAsync(id);
+            // Defesa multi-tenant: só remove se pertencer à empresa.
+            var entity = await dbContext.ProdutosCaracteristica
+                .FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == empresaId);
             if (entity is not null)
                 dbContext.ProdutosCaracteristica.Remove(entity);
         }

@@ -9,6 +9,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<bool> ExisteProdutosNaCategoriaAsync(Guid categoriaId);
         Task AddAsync(Categoria categoria);
         Task UpdateAsync(Categoria categoria);
-        Task DeleteAsync(Guid id);
+        Task DeleteAsync(Guid empresaId, Guid id);
     }
 }

@@ -655,34 +655,43 @@ app.UseSerilogRequestLogging(options =>
     });
 }
 
-// Swagger disponivel em todos os ambientes para facilitar operacao
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Swagger habilitado apenas em Development/Staging. Em Production fica desligado
+// para reduzir superfície de ataque (evita expor esquema de endpoints, exemplos
+// e permitir autenticação persistida via UI para atacantes). Para expor o
+// swagger em Production deliberadamente, setar a flag "Swagger:EnableInProduction=true".
+var swaggerEnabled = app.Environment.IsDevelopment()
+    || app.Environment.IsStaging()
+    || builder.Configuration.GetValue<bool>("Swagger:EnableInProduction");
+if (swaggerEnabled)
 {
-    // ── Two language documents ────────────────────────────────────────
-    c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
-    c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        // ── Two language documents ────────────────────────────────────────
+        c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
+        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
 
-    // ── Custom route ──────────────────────────────────────────────────
-    c.RoutePrefix = "swagger";
+        // ── Custom route ──────────────────────────────────────────────────
+        c.RoutePrefix = "swagger";
 
-    // ── UI Behaviour ──────────────────────────────────────────────────
-    c.DocumentTitle        = "EasyStock API Docs";
-    c.DefaultModelsExpandDepth(1);       // show models collapsed by default
-    c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
-    c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
-    c.DisplayRequestDuration();
-    c.EnableDeepLinking();
-    c.EnableFilter();
-    c.EnablePersistAuthorization();
-    c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
-    c.ShowExtensions();
-    c.ShowCommonExtensions();
+        // ── UI Behaviour ──────────────────────────────────────────────────
+        c.DocumentTitle        = "EasyStock API Docs";
+        c.DefaultModelsExpandDepth(1);       // show models collapsed by default
+        c.DefaultModelExpandDepth(3);        // but expand 3 levels when opened
+        c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+        c.EnableFilter();
+        c.EnablePersistAuthorization();
+        c.EnableTryItOutByDefault();         // open "Try it out" by default on GET ops
+        c.ShowExtensions();
+        c.ShowCommonExtensions();
 
-    // ── Custom assets ─────────────────────────────────────────────────
-    c.InjectStylesheet("/swagger-ui/custom.css");
-    c.InjectJavascript("/swagger-ui/custom.js");
-});
+        // ── Custom assets ─────────────────────────────────────────────────
+        c.InjectStylesheet("/swagger-ui/custom.css");
+        c.InjectJavascript("/swagger-ui/custom.js");
+    });
+}
 
 app.UseHttpsRedirection();
 

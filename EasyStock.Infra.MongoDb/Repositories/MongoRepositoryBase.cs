@@ -34,4 +34,45 @@ public abstract class MongoRepositoryBase
             session is null
                 ? collection.DeleteOneAsync(Builders<TDocument>.Filter.Eq("Id", id), ct)
                 : collection.DeleteOneAsync(session, Builders<TDocument>.Filter.Eq("Id", id), null, ct));
+
+    /// <summary>
+    /// Variante multi-tenant de <see cref="EnqueueReplace{TDocument}"/>. O update só é aplicado
+    /// se o documento pertencer à empresa informada. Protege contra cross-tenant tampering:
+    /// mesmo que um atacante conheça o Id de outra empresa, o filtro composto impede a escrita.
+    /// Use este método em qualquer entidade que exponha <c>EmpresaId</c>.
+    /// </summary>
+    protected void EnqueueReplaceScoped<TDocument>(
+        IMongoCollection<TDocument> collection,
+        Guid id,
+        Guid empresaId,
+        TDocument document)
+    {
+        var filter = Builders<TDocument>.Filter.And(
+            Builders<TDocument>.Filter.Eq("Id", id),
+            Builders<TDocument>.Filter.Eq("EmpresaId", empresaId));
+
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? collection.ReplaceOneAsync(filter, document, cancellationToken: ct)
+                : collection.ReplaceOneAsync(session, filter, document, cancellationToken: ct));
+    }
+
+    /// <summary>
+    /// Variante multi-tenant de <see cref="EnqueueDelete{TDocument}"/>. O delete só é aplicado
+    /// se o documento pertencer à empresa informada.
+    /// </summary>
+    protected void EnqueueDeleteScoped<TDocument>(
+        IMongoCollection<TDocument> collection,
+        Guid id,
+        Guid empresaId)
+    {
+        var filter = Builders<TDocument>.Filter.And(
+            Builders<TDocument>.Filter.Eq("Id", id),
+            Builders<TDocument>.Filter.Eq("EmpresaId", empresaId));
+
+        UnitOfWork.Enqueue((session, ct) =>
+            session is null
+                ? collection.DeleteOneAsync(filter, ct)
+                : collection.DeleteOneAsync(session, filter, null, ct));
+    }
 }

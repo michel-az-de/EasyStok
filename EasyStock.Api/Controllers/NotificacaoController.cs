@@ -147,7 +147,7 @@ public class NotificacaoController(
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
         if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId) return DataNotFound();
 
-        await notificacaoRepository.DeleteAsync(id);
+        await notificacaoRepository.DeleteAsync(resolvedEmpresaId, id);
         await unitOfWork.CommitAsync();
         return NoContent();
     }

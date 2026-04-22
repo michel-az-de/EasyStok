@@ -48,13 +48,13 @@ public sealed class CategoriaRepository(MongoEasyStockContext context, MongoUnit
 
     public Task UpdateAsync(Categoria categoria)
     {
-        EnqueueReplace(Collection, categoria.Id, categoria);
+        EnqueueReplaceScoped(Collection, categoria.Id, categoria.EmpresaId, categoria);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid empresaId, Guid id)
     {
-        EnqueueDelete(Collection, id);
+        EnqueueDeleteScoped(Collection, id, empresaId);
         return Task.CompletedTask;
     }
 }
@@ -175,7 +175,7 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
 
     public Task UpdateAsync(Produto produto)
     {
-        EnqueueReplace(Collection, produto.Id, produto);
+        EnqueueReplaceScoped(Collection, produto.Id, produto.EmpresaId, produto);
         return Task.CompletedTask;
     }
 }
@@ -240,13 +240,13 @@ public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, Mon
 
     public Task UpdateAsync(ProdutoVariacao variacao)
     {
-        EnqueueReplace(Collection, variacao.Id, variacao);
+        EnqueueReplaceScoped(Collection, variacao.Id, variacao.EmpresaId, variacao);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid empresaId, Guid id)
     {
-        EnqueueDelete(Collection, id);
+        EnqueueDeleteScoped(Collection, id, empresaId);
         return Task.CompletedTask;
     }
 
@@ -281,13 +281,13 @@ public sealed class ProdutoCaracteristicaRepository(MongoEasyStockContext contex
 
     public Task UpdateAsync(ProdutoCaracteristica caracteristica)
     {
-        EnqueueReplace(Collection, caracteristica.Id, caracteristica);
+        EnqueueReplaceScoped(Collection, caracteristica.Id, caracteristica.EmpresaId, caracteristica);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid empresaId, Guid id)
     {
-        EnqueueDelete(Collection, id);
+        EnqueueDeleteScoped(Collection, id, empresaId);
         return Task.CompletedTask;
     }
 
@@ -322,13 +322,13 @@ public sealed class ProdutoEmbalagemRepository(MongoEasyStockContext context, Mo
 
     public Task UpdateAsync(ProdutoEmbalagem embalagem)
     {
-        EnqueueReplace(Collection, embalagem.Id, embalagem);
+        EnqueueReplaceScoped(Collection, embalagem.Id, embalagem.EmpresaId, embalagem);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid empresaId, Guid id)
     {
-        EnqueueDelete(Collection, id);
+        EnqueueDeleteScoped(Collection, id, empresaId);
         return Task.CompletedTask;
     }
 

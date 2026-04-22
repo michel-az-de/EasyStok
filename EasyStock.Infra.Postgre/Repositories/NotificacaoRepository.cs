@@ -121,10 +121,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                     .SetProperty(n => n.LidaEm, agora));
         }
 
-        public Task DeleteAsync(Guid id)
+        public async Task DeleteAsync(Guid empresaId, Guid id)
         {
-            dbContext.Notificacoes.Remove(new Notificacao { Id = id });
-            return Task.CompletedTask;
+            // Defesa multi-tenant: DELETE condicional via ExecuteDeleteAsync.
+            await dbContext.Notificacoes
+                .Where(n => n.Id == id && n.EmpresaId == empresaId)
+                .ExecuteDeleteAsync();
         }
     }
 }

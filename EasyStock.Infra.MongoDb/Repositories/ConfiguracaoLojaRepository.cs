@@ -24,6 +24,9 @@ public sealed class ConfiguracaoLojaRepository(MongoEasyStockContext context, Mo
 
     public Task UpdateAsync(ConfiguracaoLoja configuracao)
     {
+        // NOTA multi-tenant: ConfiguracaoLoja é escopada por LojaId (não EmpresaId).
+        // O use-case upstream deve verificar que lojaId pertence à empresa do chamador
+        // antes de invocar este método. Ver EnqueueReplaceScoped para entidades com EmpresaId.
         EnqueueReplace(Collection, configuracao.Id, configuracao);
         return Task.CompletedTask;
     }

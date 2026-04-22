@@ -31,7 +31,7 @@ public sealed class LojaRepository(MongoEasyStockContext context, MongoUnitOfWor
 
     public Task UpdateAsync(Loja loja)
     {
-        EnqueueReplace(Collection, loja.Id, loja);
+        EnqueueReplaceScoped(Collection, loja.Id, loja.EmpresaId, loja);
         return Task.CompletedTask;
     }
 
@@ -114,7 +114,7 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
 
     public Task UpdateAsync(Fornecedor fornecedor)
     {
-        EnqueueReplace(Collection, fornecedor.Id, fornecedor);
+        EnqueueReplaceScoped(Collection, fornecedor.Id, fornecedor.EmpresaId, fornecedor);
         return Task.CompletedTask;
     }
 }
@@ -135,7 +135,7 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
 
     public Task UpdateAsync(PedidoFornecedor pedido)
     {
-        EnqueueReplace(Collection, pedido.Id, pedido);
+        EnqueueReplaceScoped(Collection, pedido.Id, pedido.EmpresaId, pedido);
         return Task.CompletedTask;
     }
 
@@ -449,7 +449,7 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
     public Task UpdateAsync(AssinaturaEmpresa assinatura)
     {
         assinatura.Plano = null;
-        EnqueueReplace(Collection, assinatura.Id, assinatura);
+        EnqueueReplaceScoped(Collection, assinatura.Id, assinatura.EmpresaId, assinatura);
         return Task.CompletedTask;
     }
 
@@ -480,7 +480,7 @@ public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, Mong
 
     public Task UpdateAsync(UsuarioEmpresa usuarioEmpresa)
     {
-        EnqueueReplace(UsuariosEmpresas, usuarioEmpresa.Id, usuarioEmpresa);
+        EnqueueReplaceScoped(UsuariosEmpresas, usuarioEmpresa.Id, usuarioEmpresa.EmpresaId, usuarioEmpresa);
         return Task.CompletedTask;
     }
 }
@@ -504,7 +504,7 @@ public sealed class UsuarioPerfilRepository(MongoEasyStockContext context, Mongo
 
     public Task UpdateAsync(UsuarioPerfil usuarioPerfil)
     {
-        EnqueueReplace(UsuariosPerfis, usuarioPerfil.Id, usuarioPerfil);
+        EnqueueReplaceScoped(UsuariosPerfis, usuarioPerfil.Id, usuarioPerfil.EmpresaId, usuarioPerfil);
         return Task.CompletedTask;
     }
 }

@@ -21,7 +21,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);
         Task MarcarTodasComoLidasAsync(Guid empresaId);
-        Task DeleteAsync(Guid id);
+        Task DeleteAsync(Guid empresaId, Guid id);
     }
 
     public record NotificacaoResumo
