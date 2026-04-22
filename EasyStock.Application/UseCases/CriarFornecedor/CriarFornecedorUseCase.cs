@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Fornecedor;
 using Microsoft.Extensions.Logging;
 using FornecedorEntity = EasyStock.Domain.Entities.Fornecedor;
@@ -30,6 +31,10 @@ public class CriarFornecedorUseCase(
     public async Task<FornecedorResult> ExecuteAsync(CriarFornecedorCommand command)
     {
         _ = assinaturaRepository;
+        UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+        if (!string.IsNullOrWhiteSpace(command.Email))
+            EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
+
         var fornecedor = FornecedorEntity.Criar(command.EmpresaId, command.Nome.Trim());
         fornecedor.AtualizarCadastro(
             command.Nome,

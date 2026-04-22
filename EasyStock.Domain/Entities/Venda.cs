@@ -33,8 +33,16 @@ namespace EasyStock.Domain.Entities
             DateTime? dataEnvio,
             string? numeroNotaFiscal,
             string? observacoes,
-            DateTime criadoEm) =>
-            new()
+            DateTime criadoEm)
+        {
+            if (id == Guid.Empty) throw new ArgumentException("Id da venda é obrigatório.", nameof(id));
+            if (empresaId == Guid.Empty) throw new ArgumentException("EmpresaId é obrigatório.", nameof(empresaId));
+            if (dataVenda == default) throw new ArgumentException("DataVenda é obrigatória.", nameof(dataVenda));
+            if (dataEnvio.HasValue && dataEnvio.Value < dataVenda)
+                throw new ArgumentException("DataEnvio nao pode ser anterior a DataVenda.", nameof(dataEnvio));
+            if (criadoEm == default) criadoEm = DateTime.UtcNow;
+
+            return new Venda
             {
                 Id = id,
                 EmpresaId = empresaId,
@@ -48,6 +56,7 @@ namespace EasyStock.Domain.Entities
                 CriadoEm = criadoEm,
                 ItensVenda = new List<ItemVenda>()
             };
+        }
 
         public void AdicionarItem(ItemVenda item)
         {

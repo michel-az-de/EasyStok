@@ -165,9 +165,7 @@ public sealed class GerenciarUploadsUseCase(
     /// </summary>
     private async Task TryDeletePreviousAsync(string? urlAntigo, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(urlAntigo)) return;
-
-        var storageKey = ExtractStorageKey(urlAntigo);
+        var storageKey = StorageKeyExtractor.Extract(urlAntigo);
         if (storageKey is null) return;
 
         try
@@ -178,29 +176,6 @@ public sealed class GerenciarUploadsUseCase(
         {
             // Silencioso: limpeza residual fica a cargo de job de GC de arquivos órfãos.
         }
-    }
-
-    private static string? ExtractStorageKey(string url)
-    {
-        if (string.IsNullOrWhiteSpace(url)) return null;
-
-        // URL relativa local: "/files/caminho/arquivo.jpg" → "caminho/arquivo.jpg"
-        const string filesPrefix = "/files/";
-        var idx = url.IndexOf(filesPrefix, StringComparison.OrdinalIgnoreCase);
-        if (idx >= 0)
-            return url[(idx + filesPrefix.Length)..];
-
-        // URL absoluta: extrai PathAndQuery sem o primeiro segmento (bucket/container).
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
-            var path = uri.AbsolutePath.TrimStart('/');
-            var firstSlash = path.IndexOf('/');
-            if (firstSlash > 0 && firstSlash < path.Length - 1)
-                return path[(firstSlash + 1)..];
-            return path;
-        }
-
-        return null;
     }
 
     private static void ValidarImagem(string fileName, string contentType, byte[] content, int maxSize)

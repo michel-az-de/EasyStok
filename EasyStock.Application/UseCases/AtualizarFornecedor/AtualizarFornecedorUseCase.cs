@@ -27,8 +27,11 @@ public class AtualizarFornecedorUseCase(
 {
     public async Task ExecuteAsync(AtualizarFornecedorCommand command)
     {
+        UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
         if (string.IsNullOrWhiteSpace(command.Nome))
             throw new UseCaseValidationException("Nome do fornecedor é obrigatório.");
+        if (!string.IsNullOrWhiteSpace(command.Email))
+            EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 
         var fornecedor = await fornecedorRepository.GetByIdAsync(command.FornecedorId);
         if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)

@@ -106,8 +106,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
 
         public async Task<IReadOnlyCollection<CategoriaResult>> ListarAsync(Guid empresaId)
         {
-            if (empresaId == Guid.Empty)
-                throw new UseCaseValidationException("EmpresaId é obrigatório.");
+            UseCaseGuards.EnsureEmpresaId(empresaId);
 
             var categorias = await categoriaRepository.GetByEmpresaAsync(empresaId);
             return categorias.Select(ToResult).ToArray();
