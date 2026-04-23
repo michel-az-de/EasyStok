@@ -1743,6 +1743,12 @@ body {
         Exportar pra EasyStock
         <span class="hint">JSON</span>
       </button>
+      <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background:rgba(96,165,250,0.12);color:#60a5fa;border-color:rgba(96,165,250,0.3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar de arquivo
+        <span class="hint">backup</span>
+      </button>
+      <input type="file" id="importFile" class="hidden-file" accept="application/json,.json" onchange="importSnapshot(event)" />
       <div class="mov-filter" id="movFilter">
         <button data-f="all" class="active" onclick="setMovFilter('all')">Tudo</button>
         <button data-f="entry" onclick="setMovFilter('entry')">Entradas</button>
@@ -2737,6 +2743,97 @@ function exportSnapshot() {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 
   showToast(`Exportou ${mutations.length} registros — envie pro EasyStock.`);
+}
+
+// ================================================================
+// IMPORT JSON → restaura estado a partir de backup exportado
+// Merge por id (last-write-wins via ts/updatedAt). Útil para migrar
+// pra outro celular ou recuperar depois de reinstalar o APK.
+// ================================================================
+function importSnapshot(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!confirm('Importar dados deste arquivo? Registros serão mesclados com os locais (mais recente vence).')) {
+    event.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !Array.isArray(data.mutations)) {
+        showToast('Arquivo inválido: faltam mutations.');
+        return;
+      }
+      const result = applyImportedMutations(data.mutations);
+      persistAll();
+      renderProductGrid();
+      renderHome();
+      renderKanban();
+      renderRecents();
+      renderMovimentos();
+      showToast(`Importou ${result.applied} registros (${result.skipped} pulados).`);
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao ler arquivo: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function applyImportedMutations(mutations) {
+  let applied = 0, skipped = 0;
+  const upsertById = (arr, item, newerFn) => {
+    const idx = arr.findIndex(x => x.id === item.id);
+    if (idx < 0) { arr.push(item); applied++; return; }
+    if (newerFn(arr[idx], item)) { arr[idx] = { ...arr[idx], ...item }; applied++; }
+    else skipped++;
+  };
+
+  mutations.forEach(m => {
+    const p = m.payload || {};
+    switch (m.type) {
+      case 'product.upsert':
+        upsertById(products, {
+          id: p.id, name: p.name, emoji: p.emoji, category: p.category,
+          unit: p.unit, price: p.price, stock: p.stock ?? 0,
+          custom: !!p.custom, count: 0, photo: null
+        }, (cur, inc) => (m.ts || 0) >= 0); // sempre upserta produto
+        break;
+      case 'client.upsert':
+        upsertById(clients, {
+          id: p.id, name: p.name, apt: p.apt, address: p.address,
+          phone: p.phone, lastOrder: p.lastOrder, orderCount: p.orderCount || 0
+        }, (cur, inc) => (inc.lastOrder || 0) >= (cur.lastOrder || 0));
+        break;
+      case 'order.upsert':
+        upsertById(orders, {
+          id: p.id, clientId: p.clientId,
+          clientSnapshot: p.clientSnapshot || { name: 'Sem cliente', ref: null },
+          items: p.items || [], notes: p.notes,
+          total: p.total || 0, status: p.status || 'aguardando',
+          createdAt: p.createdAt, updatedAt: p.updatedAt || p.createdAt
+        }, (cur, inc) => (inc.updatedAt || 0) >= (cur.updatedAt || 0));
+        break;
+      case 'batch.upsert':
+        upsertById(batches, {
+          id: p.id, code: p.code, items: p.items || [],
+          batchPhoto: p.batchPhoto, createdAt: p.createdAt
+        }, () => false); // batches imutáveis — se já existe, skip
+        break;
+      case 'cashEntry.upsert':
+        upsertById(cashEntries, {
+          id: p.id, type: p.type, amount: p.amount,
+          description: p.description, createdAt: p.createdAt
+        }, () => false); // cash imutável
+        break;
+      default:
+        skipped++;
+    }
+  });
+  return { applied, skipped };
 }
 
 // ================================================================

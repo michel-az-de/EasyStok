@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+// versionCode dinâmico:
+//  - Em CI (GitHub Actions): usa github.run_number (sempre crescente).
+//  - Local: cai no timestamp em minutos desde epoch (também crescente).
+//  - Isso garante que cada APK nova tem versionCode > anterior, permitindo
+//    ao Android aceitar a atualização sem precisar desinstalar (preservando
+//    localStorage e dados do usuário).
+def dynamicVersionCode = {
+    def envRun = System.getenv("BUILD_VERSION_CODE")
+    if (envRun != null && envRun.toString().isInteger()) return envRun.toInteger()
+    // Fallback: minutos desde 2026-01-01 (cabe em int, cresce ~525k/ano)
+    return ((System.currentTimeMillis() / 60000) - 29437920).toInteger()
+}()
+
 android {
     namespace "com.casadababa.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +20,8 @@ android {
         applicationId "com.casadababa.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode dynamicVersionCode
+        versionName "1." + dynamicVersionCode
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +29,24 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Keystore FIXO versionado (cdb-debug.keystore) — garante que todas as
+    // APKs geradas (local, CI, qualquer máquina) tenham a MESMA assinatura.
+    // Sem isso, o Android recusa a atualização (conflito de assinatura) e
+    // o usuário teria que desinstalar, perdendo o localStorage.
+    signingConfigs {
+        debug {
+            storeFile file('cdb-debug.keystore')
+            storePassword 'android'
+            keyAlias 'cdb-debug'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
+            signingConfig signingConfigs.debug  // reusar o mesmo em debug-release (não é play-store)
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -68,6 +68,10 @@ jobs:
 
       - name: Build APK (debug)
         working-directory: casa-da-baba-mobile/apk/android
+        env:
+          # versionCode crescente — garante que Android aceita a atualização
+          # sem desinstalar. run_number = contador monotônico do workflow.
+          BUILD_VERSION_CODE: ${{ github.run_number }}
         # gradlew foi commitado do Windows; marca executável antes de rodar.
         run: |
           chmod +x ./gradlew
