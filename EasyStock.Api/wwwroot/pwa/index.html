@@ -1297,25 +1297,26 @@ body {
 }
 
 /* Bottom nav — altura FIXA mínima + safe-area (Android nav bar / notch).
-   Sem min-height, removendo height: 84px faz os ícones colapsarem. */
+   Removido backdrop-filter para compat máxima com Android WebView. */
 .nav {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   min-height: 64px;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
+  background: var(--bg-elev);                    /* sólido em vez de blur */
+  border-top: 1px solid var(--border-strong);
   display: flex;
   justify-content: space-around;
   align-items: flex-start;
   padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 10px));
   z-index: 30;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.15);      /* leve elevação */
 }
 .nav-btn {
   background: transparent;
   border: none;
-  color: var(--ink-mute);
+  color: var(--ink-dim);          /* mais claro que --ink-mute — melhor contraste */
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -1326,6 +1327,8 @@ body {
   cursor: pointer;
   font-family: inherit;
   padding: 4px 0;
+  /* garante opacidade mesmo em WebViews que "cinzam" botões estado raised */
+  opacity: 1;
 }
 .nav-btn .label {
   font-size: 10px;
@@ -1334,13 +1337,16 @@ body {
   white-space: nowrap;
 }
 .nav-btn svg {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;                 /* reserva a altura — evita colapsar */
   stroke: currentColor;
+  fill: none;
   display: block;
+  overflow: visible;              /* mostra mesmo que saia da box nominal */
 }
 .nav-btn.active { color: var(--accent); }
+.nav-btn.active svg { stroke: var(--accent); }
 
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
@@ -1932,23 +1938,23 @@ body {
   <!-- Bottom nav -->
   <div class="nav">
     <button class="nav-btn active" data-nav="home" onclick="go('home')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span class="label">Hoje</span>
     </button>
     <button class="nav-btn" data-nav="producao" onclick="go('producao')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       <span class="label">Produção</span>
     </button>
     <button class="nav-btn" data-nav="pedidos" onclick="go('pedidos')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <span class="label">Pedidos</span>
     </button>
     <button class="nav-btn" data-nav="movimentos" onclick="go('movimentos')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="11" x2="17" y2="11"/><polyline points="13 7 17 11 13 15"/><line x1="17" y1="17" x2="7" y2="17"/><polyline points="11 21 7 17 11 13"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       <span class="label">Movimento</span>
     </button>
     <button class="nav-btn" data-nav="compras" onclick="go('compras')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
       <span class="label">Comprar</span>
     </button>
   </div>
