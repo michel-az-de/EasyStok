@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Casa da Baba Mobile</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -85,6 +85,7 @@ body {
   width: 100%;
   max-width: 430px;
   height: 100vh;
+  height: 100dvh;           /* viewport dinâmico em mobile — exclui URL bar */
   max-height: 932px;
   background: var(--bg);
   position: relative;
@@ -92,6 +93,7 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow);
+  padding-top: env(safe-area-inset-top, 0px); /* notch */
 }
 @media (min-width: 500px) {
   .phone {
@@ -169,12 +171,12 @@ body {
 }
 .sync-chip.pending .dot { background: var(--gold); box-shadow: 0 0 8px rgba(214, 161, 51, 0.6); }
 
-/* Content */
+/* Content — padding-bottom inclui safe-area para não ser coberto pelo nav */
 .content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 22px 120px;
+  padding: 0 22px calc(120px + env(safe-area-inset-bottom, 0px));
   scrollbar-width: none;
 }
 .content::-webkit-scrollbar { display: none; }
@@ -1293,21 +1295,26 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Bottom nav */
+/* Bottom nav — respeita safe-area-inset-bottom (barra de navegação
+   do Android / notch). Sem isso, o nav fica coberto pelo sistema. */
 .nav {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 84px;
-  background: rgba(26, 20, 16, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg);
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
-  padding: 10px 12px 20px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 10px));
   z-index: 20;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .nav {
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
 }
 .nav-btn {
   background: transparent;
@@ -1994,8 +2001,14 @@ let cashType = 'expense';
 
 // ================================================================
 // OPERADOR (nome informado no primeiro boot; usado para auditoria)
+// Nota: usa localStorage.getItem DIRETO (sem load/save que fazem
+// JSON.parse). Salvar 'Felipe' cru e tentar JSON.parse quebra e devolve
+// string vazia — bug que fazia o welcome aparecer toda vez.
 // ================================================================
-let operatorName = load('cdb-operator-name', '') || '';
+let operatorName = (() => {
+  try { return localStorage.getItem('cdb-operator-name') || ''; }
+  catch (e) { return ''; }
+})();
 
 function saveOperatorName(name) {
   const clean = (name || '').trim().slice(0, 32);
@@ -2045,8 +2058,9 @@ function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   applyTheme(current === 'light' ? 'dark' : 'light');
 }
-// Aplica tema salvo antes de renderizar (evita flash)
-applyTheme(load('cdb-theme', 'dark') || 'dark');
+// Aplica tema salvo antes de renderizar (evita flash) — getItem direto
+// para não passar por JSON.parse do load().
+applyTheme((() => { try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; } })());
 
 // ================================================================
 // TUTORIAL / ONBOARDING (4 steps, mostrado só na primeira abertura)
@@ -3527,7 +3541,10 @@ window.CDB_OPERATOR = operatorName;
   const input   = document.getElementById('welcomeName');
   const btn     = document.getElementById('welcomeContinue');
   const hasName = operatorName && operatorName.trim().length > 0;
-  const hasTour = load('cdb-onboarding-done', null) === '1';
+  const hasTour = (() => {
+    try { return localStorage.getItem('cdb-onboarding-done') === '1'; }
+    catch (e) { return false; }
+  })();
 
   input.addEventListener('input', () => { btn.disabled = input.value.trim().length === 0; });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btn.disabled) btn.click(); });
