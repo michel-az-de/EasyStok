@@ -46,8 +46,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: casa-da-baba-mobile/apk/package-lock.json
+        # Sem cache: package-lock.json não é versionado (está no .gitignore)
+        # e npm install do Capacitor é rápido (~10s).
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
