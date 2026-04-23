@@ -114,4 +114,12 @@ VALUES
     ('bolonhesa', 'Molho Bolonhesa',            '🥩', 'molho', '250ml', 18.00, 0, FALSE)
 ON CONFLICT (id) DO NOTHING;
 
+-- ===== Auditoria: LastOperatorName (adicionado em versão posterior) =====
+-- Idempotente: só adiciona se a coluna ainda não existe. Preserva dados.
+ALTER TABLE mobile_products     ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
+ALTER TABLE mobile_clients      ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
+ALTER TABLE mobile_orders       ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
+ALTER TABLE mobile_batches      ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
+ALTER TABLE mobile_cash_entries ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
+
 COMMIT;

@@ -46,7 +46,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         {
             try
             {
-                await ApplyMutation(m, req.DeviceId);
+                await ApplyMutation(m, req.DeviceId, req.OperatorName);
                 accepted.Add(m.Id);
             }
             catch (Exception ex)
@@ -108,23 +108,23 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     // Apply mutation por tipo
     // ──────────────────────────────────────────────────────────────────────
 
-    private async Task ApplyMutation(MutationDto m, string deviceId)
+    private async Task ApplyMutation(MutationDto m, string deviceId, string? operatorName)
     {
         var parts = m.Type.Split('.');
         if (parts.Length != 2) throw new ArgumentException($"Tipo invalido: {m.Type}");
 
         switch (parts[0])
         {
-            case "product":   await ApplyProduct(m, deviceId);   break;
-            case "client":    await ApplyClient(m, deviceId);    break;
-            case "order":     await ApplyOrder(m, deviceId);     break;
-            case "batch":     await ApplyBatch(m, deviceId);     break;
-            case "cashEntry": await ApplyCashEntry(m, deviceId); break;
+            case "product":   await ApplyProduct(m, deviceId, operatorName);   break;
+            case "client":    await ApplyClient(m, deviceId, operatorName);    break;
+            case "order":     await ApplyOrder(m, deviceId, operatorName);     break;
+            case "batch":     await ApplyBatch(m, deviceId, operatorName);     break;
+            case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName); break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
 
-    private async Task ApplyProduct(MutationDto m, string deviceId)
+    private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName)
     {
         var dto = m.Payload.Deserialize<ProductDto>(JsonOpts)!;
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
@@ -134,7 +134,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             {
                 Id = dto.Id, Name = dto.Name, Emoji = dto.Emoji, Category = dto.Category,
                 Unit = dto.Unit, Price = dto.Price, Stock = dto.Stock,
-                IsCustom = dto.Custom ?? false, LastDeviceId = deviceId
+                IsCustom = dto.Custom ?? false,
+                LastDeviceId = deviceId,
+                LastOperatorName = operatorName
             });
         }
         else
@@ -149,10 +151,11 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.Stock = dto.Stock;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
+            existing.LastOperatorName = operatorName;
         }
     }
 
-    private async Task ApplyClient(MutationDto m, string deviceId)
+    private async Task ApplyClient(MutationDto m, string deviceId, string? operatorName)
     {
         var dto = m.Payload.Deserialize<ClientDto>(JsonOpts)!;
         var existing = await _db.Set<Client>().FindAsync(dto.Id);
@@ -163,7 +166,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             {
                 Id = dto.Id, Name = dto.Name, Apt = dto.Apt, Address = dto.Address,
                 Phone = dto.Phone, LastOrder = lastOrderDate, OrderCount = dto.OrderCount,
-                LastDeviceId = deviceId
+                LastDeviceId = deviceId,
+                LastOperatorName = operatorName
             });
         }
         else
@@ -176,10 +180,11 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.OrderCount = dto.OrderCount;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
+            existing.LastOperatorName = operatorName;
         }
     }
 
-    private async Task ApplyOrder(MutationDto m, string deviceId)
+    private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName)
     {
         var dto = m.Payload.Deserialize<OrderDto>(JsonOpts)!;
         var existing = await _db.Set<Order>().Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == dto.Id);
@@ -199,7 +204,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 Status = dto.Status,
                 CreatedAt = createdAt,
                 UpdatedAt = updatedAt,
-                LastDeviceId = deviceId
+                LastDeviceId = deviceId,
+                LastOperatorName = operatorName
             };
             foreach (var i in dto.Items)
                 order.Items.Add(new OrderItem
@@ -221,6 +227,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.Total = dto.Total;
             existing.UpdatedAt = updatedAt;
             existing.LastDeviceId = deviceId;
+            existing.LastOperatorName = operatorName;
             // Substitui os itens (simplificação — em produção, faça diff item-a-item).
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)
@@ -259,7 +266,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         }
     }
 
-    private async Task ApplyBatch(MutationDto m, string deviceId)
+    private async Task ApplyBatch(MutationDto m, string deviceId, string? operatorName)
     {
         var dto = m.Payload.Deserialize<BatchDto>(JsonOpts)!;
         var existing = await _db.Set<Batch>().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == dto.Id);
@@ -269,7 +276,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         var batch = new Batch
         {
             Id = dto.Id, Code = dto.Code, BatchPhoto = dto.BatchPhoto,
-            CreatedAt = createdAt, LastDeviceId = deviceId
+            CreatedAt = createdAt,
+            LastDeviceId = deviceId,
+            LastOperatorName = operatorName
         };
         foreach (var i in dto.Items)
         {
@@ -285,7 +294,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         _db.Add(batch);
     }
 
-    private async Task ApplyCashEntry(MutationDto m, string deviceId)
+    private async Task ApplyCashEntry(MutationDto m, string deviceId, string? operatorName)
     {
         var dto = m.Payload.Deserialize<CashEntryDto>(JsonOpts)!;
         var existing = await _db.Set<CashEntry>().FindAsync(dto.Id);
@@ -296,7 +305,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         {
             Id = dto.Id, Type = dto.Type, Amount = dto.Amount,
             Description = dto.Description, CreatedAt = createdAt,
-            LastDeviceId = deviceId
+            LastDeviceId = deviceId,
+            LastOperatorName = operatorName
         });
     }
 

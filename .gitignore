@@ -371,3 +371,4 @@ FodyWeavers.xsd
 # Worktrees de ferramentas de IA
 .claude/
 .claire/
+builds/

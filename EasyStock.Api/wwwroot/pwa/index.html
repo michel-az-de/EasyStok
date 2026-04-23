@@ -31,6 +31,33 @@
   --border: rgba(244, 237, 226, 0.08);
   --border-strong: rgba(244, 237, 226, 0.14);
   --shadow: 0 12px 40px rgba(0,0,0,0.5);
+  /* Aliases usados nos componentes novos */
+  --surface: var(--bg-elev);
+  --line:    var(--border-strong);
+  --page-bg: #0d0906;
+}
+
+/* ========== Tema claro ========== */
+[data-theme="light"] {
+  --bg: #fcfaf5;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f5f0e6;
+  --ink: #1f1a14;
+  --ink-dim: #6b5a4a;
+  --ink-mute: #9c8b79;
+  --accent: #c44a2f;
+  --accent-soft: rgba(196, 74, 47, 0.1);
+  --basil: #5f7c3c;
+  --basil-soft: rgba(95, 124, 60, 0.1);
+  --gold: #b88a20;
+  --gold-soft: rgba(184, 138, 32, 0.12);
+  --cream: #c9a76a;
+  --border: rgba(31, 26, 20, 0.08);
+  --border-strong: rgba(31, 26, 20, 0.16);
+  --shadow: 0 8px 28px rgba(0,0,0,0.08);
+  --surface: var(--bg-elev);
+  --line:    var(--border-strong);
+  --page-bg: #f0ebe0;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -38,7 +65,7 @@
 html, body {
   height: 100%;
   font-family: 'Manrope', -apple-system, sans-serif;
-  background: #0d0906;
+  background: var(--page-bg);
   color: var(--ink);
   overflow: hidden;
 }
@@ -50,7 +77,7 @@ body {
   background:
     radial-gradient(ellipse at top left, rgba(214, 80, 51, 0.08), transparent 50%),
     radial-gradient(ellipse at bottom right, rgba(122, 154, 79, 0.05), transparent 50%),
-    #0d0906;
+    var(--page-bg);
 }
 
 /* Phone frame */
@@ -1301,9 +1328,143 @@ body {
 
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+
+/* ========== Login / boas-vindas ========== */
+.welcome {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 32px 24px; z-index: 10000;
+  animation: fadeIn 0.3s ease;
+}
+.welcome.hidden { display: none; }
+.welcome h1 { font-family: 'Fraunces', serif; font-size: 32px; color: var(--ink); margin: 0 0 8px; text-align: center; }
+.welcome p  { color: var(--ink-mute); font-size: 14px; text-align: center; margin: 0 0 32px; max-width: 280px; line-height: 1.5; }
+.welcome .emoji { font-size: 56px; margin-bottom: 16px; }
+.welcome input {
+  width: 100%; max-width: 300px; padding: 14px 16px;
+  border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface);
+  font-size: 16px; color: var(--ink); margin-bottom: 16px; font-family: inherit;
+}
+.welcome input:focus { outline: none; border-color: var(--accent); }
+.welcome button {
+  width: 100%; max-width: 300px; padding: 14px;
+  background: var(--accent); color: white; border: 0; border-radius: 12px;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
+  cursor: pointer; font-family: inherit;
+}
+.welcome button:disabled { opacity: 0.5; cursor: not-allowed; }
+.welcome .hint { font-size: 12px; color: var(--ink-mute); margin-top: 16px; text-align: center; }
+
+/* ========== Badge do operador ========== */
+.op-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 10px;
+  background: rgba(212, 175, 55, 0.12); color: var(--gold);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.op-badge:hover { background: rgba(212, 175, 55, 0.18); }
+.op-badge svg { width: 10px; height: 10px; }
+
+/* ========== Tutorial overlay ========== */
+.tour {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9500;
+  display: flex; justify-content: center; align-items: center; padding: 24px;
+  animation: fadeIn 0.25s ease;
+}
+.tour.hidden { display: none; }
+.tour-card {
+  background: var(--surface); border-radius: 16px; padding: 24px 20px;
+  max-width: 360px; width: 100%;
+  border: 1px solid var(--line);
+}
+.tour-card .emoji { font-size: 48px; text-align: center; margin-bottom: 12px; }
+.tour-card h2 { font-family: 'Fraunces', serif; font-size: 22px; color: var(--ink); margin: 0 0 8px; text-align: center; }
+.tour-card p { color: var(--ink-mute); font-size: 14px; line-height: 1.6; margin: 0 0 16px; }
+.tour-card .dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
+.tour-card .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.tour-card .dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
+.tour-card .actions { display: flex; gap: 8px; }
+.tour-card .actions button {
+  flex: 1; padding: 12px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.tour-card .btn-skip { background: transparent; color: var(--ink-mute); border: 1px solid var(--line); }
+.tour-card .btn-next { background: var(--accent); color: white; border: 0; }
+
+/* ========== Botões +/- nos tiles de produção ========== */
+.product-tile .qty-controls {
+  display: flex; gap: 4px; align-items: center;
+  background: rgba(0,0,0,0.25); border-radius: 10px; padding: 3px;
+  margin-top: 8px; width: fit-content;
+}
+[data-theme="light"] .product-tile .qty-controls { background: rgba(31,26,20,0.06); }
+.product-tile .qty-btn {
+  width: 30px; height: 30px; border: 0; background: transparent;
+  font-size: 18px; font-weight: 800; cursor: pointer; border-radius: 8px;
+  line-height: 1; display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.product-tile .qty-btn:active { transform: scale(0.9); }
+.product-tile .qty-btn.minus { color: #ef6b6b; }
+.product-tile .qty-btn.plus  { color: var(--gold); }
+.product-tile .qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ========== Movimentação (timeline) ========== */
+.mov-filter { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+.mov-filter button {
+  padding: 6px 12px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-mute); font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.mov-filter button.active { background: var(--accent); color: white; border-color: var(--accent); }
+.mov-item {
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+}
+.mov-item.entry { border-left-color: #4ade80; }
+.mov-item.exit  { border-left-color: #ef6b6b; }
+.mov-item.adjust { border-left-color: #60a5fa; }
+.mov-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-mute); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.mov-type { font-weight: 700; }
+.mov-type.entry { color: #4ade80; }
+.mov-type.exit  { color: #ef6b6b; }
+.mov-type.adjust { color: #60a5fa; }
+.mov-items { font-size: 14px; color: var(--ink); margin-bottom: 4px; }
+.mov-items .qty { font-weight: 700; color: var(--gold); }
+.mov-ref { font-size: 12px; color: var(--ink-mute); }
+.mov-ref .op { color: var(--gold); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
 </head>
 <body>
+
+<!-- Boas-vindas / login com nome do operador -->
+<div class="welcome hidden" id="welcomeScreen">
+  <div class="emoji">👋</div>
+  <h1>Bem-vindo à Casa da Baba</h1>
+  <p>Para começar, me conta seu nome. Ele vai aparecer nos lotes e pedidos que você registrar — é como você "assina" o que fez.</p>
+  <input type="text" id="welcomeName" placeholder="Seu nome" maxlength="32" autocomplete="off" />
+  <button id="welcomeContinue" disabled>Começar</button>
+  <div class="hint">Você pode trocar depois tocando no seu nome no topo.</div>
+</div>
+
+<!-- Tutorial / onboarding (4 steps) -->
+<div class="tour hidden" id="tourOverlay">
+  <div class="tour-card" id="tourCard">
+    <div class="emoji" id="tourEmoji">🏠</div>
+    <h2 id="tourTitle">Hoje</h2>
+    <p id="tourBody">A tela inicial mostra pedidos em aberto, caixa do dia e atalhos. Você começa tudo por aqui.</p>
+    <div class="dots" id="tourDots"></div>
+    <div class="actions">
+      <button class="btn-skip" onclick="endTour()">Pular tour</button>
+      <button class="btn-next" id="tourNext" onclick="nextTour()">Próximo</button>
+    </div>
+  </div>
+</div>
 
 <div class="phone">
 
@@ -1318,11 +1479,20 @@ body {
 
   <!-- Header -->
   <div class="header">
-    <div class="greeting">Bom dia, Felipe</div>
+    <div class="greeting">
+      <span id="greetingText">Olá</span>
+      <button class="op-badge" id="opBadge" onclick="changeOperator()" title="Trocar operador">
+        <span id="opName">–</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
+      </button>
+      <button class="op-badge" id="themeToggle" onclick="toggleTheme()" title="Alternar tema" style="margin-left:6px">
+        <span id="themeIcon">🌙</span>
+      </button>
+    </div>
     <div class="title">Casa da <span class="accent">Baba</span></div>
     <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
       <span class="dot"></span>
-      <span id="syncText">3 itens pra sincronizar</span>
+      <span id="syncText">Tudo sincronizado</span>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
     </button>
   </div>
@@ -1454,6 +1624,17 @@ body {
           <div class="meta">✓ 07:15</div>
         </div>
       </div>
+    </div>
+
+    <!-- MOVIMENTAÇÃO -->
+    <div class="screen" data-screen="movimentos">
+      <div class="section-label">Movimentação do estoque</div>
+      <div class="mov-filter" id="movFilter">
+        <button data-f="all" class="active" onclick="setMovFilter('all')">Tudo</button>
+        <button data-f="entry" onclick="setMovFilter('entry')">Entradas</button>
+        <button data-f="exit" onclick="setMovFilter('exit')">Saídas</button>
+      </div>
+      <div id="movList"></div>
     </div>
 
   </div>
@@ -1620,6 +1801,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <span class="label">Pedidos</span>
     </button>
+    <button class="nav-btn" data-nav="movimentos" onclick="go('movimentos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="11" x2="17" y2="11"/><polyline points="13 7 17 11 13 15"/><line x1="17" y1="17" x2="7" y2="17"/><polyline points="11 21 7 17 11 13"/></svg>
+      <span class="label">Movimento</span>
+    </button>
     <button class="nav-btn" data-nav="compras" onclick="go('compras')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
       <span class="label">Comprar</span>
@@ -1633,64 +1818,23 @@ body {
 // STATE
 // =========================
 
+// Catálogo oficial (não é dado fictício — é o menu da Casa da Baba).
+// Stock inicia em 0. Usuário produz lotes pra popular o estoque.
 const defaultProducts = [
-  { id: 'talharim',  name: 'Talharim Fresco',            emoji: '🍝', category: 'massa', unit: '300g',  price: 12, stock: 3 },
-  { id: 'lasanha',   name: 'Lasanha Bolonhesa',          emoji: '🍲', category: 'massa', unit: '300g',  price: 30, stock: 2 },
-  { id: 'rav-muss',  name: 'Ravioli Mussarela & Limão',  emoji: '🍋', category: 'massa', unit: '300g',  price: 28, stock: 1 },
-  { id: 'rav-esp',   name: 'Ravioli Espinafre & Ricota', emoji: '🥬', category: 'massa', unit: '300g',  price: 28, stock: 2 },
-  { id: 'pomodoro',  name: 'Molho Pomodoro',             emoji: '🍅', category: 'molho', unit: '250ml', price: 15, stock: 4 },
-  { id: 'bechamel',  name: 'Molho Bechamel',             emoji: '🥛', category: 'molho', unit: '250ml', price: 15, stock: 3 },
-  { id: 'bolonhesa', name: 'Molho Bolonhesa',            emoji: '🥩', category: 'molho', unit: '250ml', price: 18, stock: 3 }
+  { id: 'talharim',  name: 'Talharim Fresco',            emoji: '🍝', category: 'massa', unit: '300g',  price: 12, stock: 0 },
+  { id: 'lasanha',   name: 'Lasanha Bolonhesa',          emoji: '🍲', category: 'massa', unit: '300g',  price: 30, stock: 0 },
+  { id: 'rav-muss',  name: 'Ravioli Mussarela & Limão',  emoji: '🍋', category: 'massa', unit: '300g',  price: 28, stock: 0 },
+  { id: 'rav-esp',   name: 'Ravioli Espinafre & Ricota', emoji: '🥬', category: 'massa', unit: '300g',  price: 28, stock: 0 },
+  { id: 'pomodoro',  name: 'Molho Pomodoro',             emoji: '🍅', category: 'molho', unit: '250ml', price: 15, stock: 0 },
+  { id: 'bechamel',  name: 'Molho Bechamel',             emoji: '🥛', category: 'molho', unit: '250ml', price: 15, stock: 0 },
+  { id: 'bolonhesa', name: 'Molho Bolonhesa',            emoji: '🥩', category: 'molho', unit: '250ml', price: 18, stock: 0 }
 ];
 
-const defaultClients = [
-  { id: 'c1', name: 'Lurde',      apt: '204', address: null, phone: null, lastOrder: Date.now() - 1*3600000, orderCount: 4 },
-  { id: 'c2', name: 'Pedro',      apt: '105', address: null, phone: null, lastOrder: Date.now() - 2*3600000, orderCount: 2 },
-  { id: 'c3', name: 'Dona Célia', apt: '312', address: null, phone: null, lastOrder: Date.now() - 2*86400000, orderCount: 1 },
-  { id: 'c4', name: 'Rafael',     apt: '81B', address: null, phone: null, lastOrder: Date.now() - 7*86400000, orderCount: 1 }
-];
-
-// Pedidos iniciais mock (uso como exemplo)
-function seedOrders() {
-  const now = Date.now();
-  return [
-    {
-      id: 'o1',
-      clientId: 'c1',
-      clientSnapshot: { name: 'Lurde', ref: 'apto 204' },
-      items: [{ productId: 'lasanha', name: 'Lasanha Bolonhesa', emoji: '🍲', qty: 2, unitPrice: 30 }],
-      notes: 'pra gratinar, retira 18h30',
-      total: 60,
-      status: 'aguardando',
-      createdAt: now - 2*3600000,
-      updatedAt: now - 2*3600000
-    },
-    {
-      id: 'o2',
-      clientId: 'c2',
-      clientSnapshot: { name: 'Pedro', ref: 'apto 105' },
-      items: [
-        { productId: 'rav-muss', name: 'Ravioli Mussarela & Limão', emoji: '🍋', qty: 1, unitPrice: 28 },
-        { productId: 'pomodoro', name: 'Molho Pomodoro', emoji: '🍅', qty: 1, unitPrice: 15 }
-      ],
-      notes: 'entrega 12h',
-      total: 43,
-      status: 'entregue',
-      createdAt: now - 4*3600000,
-      updatedAt: now - 30*60000
-    }
-  ];
-}
-
-function seedCash() {
-  return [
-    { id: 'x1', type: 'expense', amount: 45, description: 'Farinha 00, 5kg', createdAt: Date.now() - 5*3600000 }
-  ];
-}
-
-function seedBatches() {
-  return [];
-}
+// Clientes/pedidos/caixa começam vazios. Tudo que aparece veio do próprio usuário.
+const defaultClients = [];
+function seedOrders()  { return []; }
+function seedCash()    { return []; }
+function seedBatches() { return []; }
 
 function load(key, fallback) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch(e) { return fallback; }
@@ -1722,6 +1866,120 @@ let selectedCat = 'massa';
 let selectedEmoji = '🍝';
 let cashType = 'expense';
 
+// ================================================================
+// OPERADOR (nome informado no primeiro boot; usado para auditoria)
+// ================================================================
+let operatorName = load('cdb-operator-name', '') || '';
+
+function saveOperatorName(name) {
+  const clean = (name || '').trim().slice(0, 32);
+  operatorName = clean;
+  try { localStorage.setItem('cdb-operator-name', clean); } catch (e) {}
+  renderOperatorBadge();
+  // Expõe para sync.js injetar no header do POST
+  window.CDB_OPERATOR = clean;
+}
+
+function renderOperatorBadge() {
+  const el = document.getElementById('opName');
+  const greet = document.getElementById('greetingText');
+  if (el) el.textContent = operatorName || 'operador';
+  if (greet) {
+    const h = new Date().getHours();
+    greet.textContent = h < 12 ? 'Bom dia,' : h < 18 ? 'Boa tarde,' : 'Boa noite,';
+  }
+}
+
+function showWelcome() {
+  document.getElementById('welcomeScreen').classList.remove('hidden');
+  setTimeout(() => document.getElementById('welcomeName').focus(), 200);
+}
+function hideWelcome() {
+  document.getElementById('welcomeScreen').classList.add('hidden');
+}
+function changeOperator() {
+  const newName = prompt('Seu nome:', operatorName);
+  if (newName !== null && newName.trim()) {
+    saveOperatorName(newName);
+    showToast('Nome atualizado');
+  }
+}
+
+// ================================================================
+// TEMA CLARO/ESCURO
+// ================================================================
+function applyTheme(theme) {
+  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
+  try { localStorage.setItem('cdb-theme', theme); } catch (e) {}
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+// Aplica tema salvo antes de renderizar (evita flash)
+applyTheme(load('cdb-theme', 'dark') || 'dark');
+
+// ================================================================
+// TUTORIAL / ONBOARDING (4 steps, mostrado só na primeira abertura)
+// ================================================================
+const TOUR_STEPS = [
+  {
+    emoji: '🏠',
+    title: 'Tela Hoje',
+    body: 'Veja pedidos em aberto, caixa do dia e atalhos. É sua base de comando.'
+  },
+  {
+    emoji: '🍝',
+    title: 'Produção',
+    body: 'Toque num produto para contar o que saiu do forno. Use os botões − e + para ajustar. Ao confirmar, vira um lote e entra no estoque.'
+  },
+  {
+    emoji: '📋',
+    title: 'Pedidos',
+    body: 'Crie pedidos: escolha o cliente (ou "avulso"), adicione itens e salve. Avance o status: Aguardando → Preparando → Pronto → Entregue. "Pronto" desconta do estoque.'
+  },
+  {
+    emoji: '📦',
+    title: 'Movimento',
+    body: 'Acompanhe toda entrada e saída de estoque num só lugar. Clique em "Movimento" no menu inferior pra ver o extrato.'
+  }
+];
+let tourStep = 0;
+
+function startTour() {
+  tourStep = 0;
+  document.getElementById('tourOverlay').classList.remove('hidden');
+  renderTour();
+}
+function renderTour() {
+  const s = TOUR_STEPS[tourStep];
+  document.getElementById('tourEmoji').textContent = s.emoji;
+  document.getElementById('tourTitle').textContent = s.title;
+  document.getElementById('tourBody').textContent  = s.body;
+  // Dots
+  const dots = document.getElementById('tourDots');
+  dots.innerHTML = '';
+  TOUR_STEPS.forEach((_, i) => {
+    const d = document.createElement('span');
+    d.className = 'dot' + (i === tourStep ? ' active' : '');
+    dots.appendChild(d);
+  });
+  document.getElementById('tourNext').textContent =
+    tourStep === TOUR_STEPS.length - 1 ? 'Começar' : 'Próximo';
+}
+function nextTour() {
+  tourStep++;
+  if (tourStep >= TOUR_STEPS.length) { endTour(); return; }
+  renderTour();
+}
+function endTour() {
+  document.getElementById('tourOverlay').classList.add('hidden');
+  try { localStorage.setItem('cdb-onboarding-done', '1'); } catch (e) {}
+}
+
 function persistAll() {
   // Salva catálogo sem contadores (são runtime)
   const toSaveProducts = products.map(({count, photo, ...rest}) => rest);
@@ -1743,8 +2001,9 @@ function go(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.nav === screen));
   document.getElementById('content').scrollTop = 0;
-  if (screen === 'home') renderHome();
-  if (screen === 'pedidos') renderOrdersFeed();
+  if (screen === 'home')       renderHome();
+  if (screen === 'pedidos')    renderOrdersFeed();
+  if (screen === 'movimentos') renderMovimentos();
 }
 
 // =========================
@@ -1904,6 +2163,7 @@ function advanceOrder(id) {
 
   o.status = nextStatus;
   o.updatedAt = Date.now();
+  o.lastOperatorName = operatorName || null;
   persistAll();
   pendingSync++;
   updateSync();
@@ -1935,6 +2195,7 @@ function cancelOrder(id) {
   }
   o.status = 'cancelado';
   o.updatedAt = Date.now();
+  o.lastOperatorName = operatorName || null;
   persistAll();
   pendingSync++;
   updateSync();
@@ -2006,7 +2267,7 @@ function renderProductGrid() {
 
     items.forEach(p => {
       if (p.count > 0) anyCounted = true;
-      const tile = document.createElement('button');
+      const tile = document.createElement('div');
       tile.className = 'product-tile' + (p.count > 0 ? ' counted' : '') + (p.custom ? ' custom' : '');
       const hasPhoto = p.photo ? ' has-photo' : '';
       tile.innerHTML = `
@@ -2017,6 +2278,10 @@ function renderProductGrid() {
             ${escapeHtml(p.unit || '')}
             <span class="stock-badge ${p.stock <= 0 ? 'empty' : ''}">${p.stock} no estoque</span>
           </div>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct('${p.id}')" aria-label="Diminuir">−</button>
+          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct('${p.id}')" aria-label="Aumentar">+</button>
         </div>
         <div class="pcount">${p.count}</div>
         <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor('${p.id}')" aria-label="Foto">
@@ -2155,6 +2420,107 @@ function removeBatchPhoto() {
   renderBatchPhotoPreview();
 }
 
+// ================================================================
+// MOVIMENTAÇÃO (timeline de entradas + saídas)
+// ================================================================
+let movFilter = 'all'; // 'all' | 'entry' | 'exit'
+
+function setMovFilter(f) {
+  movFilter = f;
+  document.querySelectorAll('#movFilter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === f);
+  });
+  renderMovimentos();
+}
+
+/**
+ * Monta timeline unificada:
+ *  - Entradas: cada Batch produzido (stock+)
+ *  - Saídas: cada Order que foi para 'pronto' ou 'entregue' (stock-)
+ *             (exclui cancelados e que ainda não desceram estoque)
+ * Ordena por data desc.
+ */
+function buildMovimentos() {
+  const events = [];
+
+  batches.forEach(b => {
+    events.push({
+      type: 'entry',
+      at: b.createdAt,
+      label: 'Lote ' + (b.code || b.id),
+      ref: b.code || b.id,
+      items: b.items.map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
+      opName: b.lastOperatorName || null
+    });
+  });
+
+  orders.forEach(o => {
+    // Só contam como saída de estoque pedidos que passaram por 'pronto' ou 'entregue'
+    if (o.status !== 'pronto' && o.status !== 'entregue') return;
+    events.push({
+      type: 'exit',
+      at: o.updatedAt || o.createdAt,
+      label: (o.clientSnapshot?.name || 'Pedido') + (o.clientSnapshot?.ref ? ' — ' + o.clientSnapshot.ref : ''),
+      ref: '#' + (o.id || '').slice(-6),
+      items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
+      status: o.status,
+      opName: o.lastOperatorName || null
+    });
+  });
+
+  return events.sort((a, b) => b.at - a.at);
+}
+
+function renderMovimentos() {
+  const list = document.getElementById('movList');
+  if (!list) return;
+  const all = buildMovimentos();
+  const filtered = movFilter === 'all' ? all : all.filter(e => e.type === movFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty"><span class="big">📦</span>Nenhuma movimentação ainda.<br><span style="font-size:12px;color:var(--ink-mute)">Registre um lote em Produção ou marque um pedido como pronto.</span></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(e => {
+    const dt = new Date(e.at);
+    const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
+      String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+    const typeLabel = e.type === 'entry' ? '↑ Entrada no estoque' : '↓ Saída do estoque';
+    const sign = e.type === 'entry' ? '+' : '−';
+    const itemsLine = (e.items || []).map(i =>
+      `<span class="qty">${sign}${i.qty}</span> ${escapeHtml(i.emoji || '')} ${escapeHtml(i.name)}${i.unit ? ' (' + escapeHtml(i.unit) + ')' : ''}`
+    ).join(' · ');
+    const opLine = e.opName ? `<span class="op">por ${escapeHtml(e.opName)}</span> · ` : '';
+    return `
+      <div class="mov-item ${e.type}">
+        <div class="mov-head">
+          <span class="mov-type ${e.type}">${typeLabel}</span>
+          <span>${dateStr}</span>
+        </div>
+        <div class="mov-items">${itemsLine}</div>
+        <div class="mov-ref">${opLine}${escapeHtml(e.label)} · ${escapeHtml(e.ref)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Botões +/- explícitos nos tiles de produção
+function incProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  p.count = (p.count || 0) + 1;
+  renderProductGrid();
+  haptic();
+}
+function decProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p || (p.count || 0) <= 0) return;
+  p.count = p.count - 1;
+  renderProductGrid();
+  haptic();
+}
+
 function confirmProduction() {
   const items = products.filter(p => p.count > 0).map(p => ({
     productId: p.id,
@@ -2178,7 +2544,8 @@ function confirmProduction() {
     code,
     items,
     batchPhoto: currentPhotoDataUrl,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    lastOperatorName: operatorName || null
   };
   batches.push(batch);
   persistAll();
@@ -2481,7 +2848,8 @@ function saveOrder() {
     total,
     status: 'aguardando',
     createdAt: Date.now(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    lastOperatorName: operatorName || null
   };
   orders.unshift(order);
   persistAll();
@@ -2617,7 +2985,8 @@ function saveCashEntry() {
     type: cashType,
     amount,
     description: desc,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    lastOperatorName: operatorName || null
   });
   persistAll();
   pendingSync++;
@@ -2702,13 +3071,40 @@ renderOrderItems();
 renderHome();
 renderOrdersFeed();
 updateSync();
+renderOperatorBadge();
+window.CDB_OPERATOR = operatorName;
+
+// Welcome flow: se ainda não informou o nome, bloqueia o app até preencher.
+// Depois, se é primeira vez (sem flag onboarding), inicia o tour.
+(function bootstrapOnboarding() {
+  const input   = document.getElementById('welcomeName');
+  const btn     = document.getElementById('welcomeContinue');
+  const hasName = operatorName && operatorName.trim().length > 0;
+  const hasTour = load('cdb-onboarding-done', null) === '1';
+
+  input.addEventListener('input', () => { btn.disabled = input.value.trim().length === 0; });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btn.disabled) btn.click(); });
+  btn.addEventListener('click', () => {
+    saveOperatorName(input.value);
+    hideWelcome();
+    if (!hasTour) startTour();
+  });
+
+  if (!hasName) {
+    showWelcome();
+  } else if (!hasTour) {
+    // Já tem nome mas nunca viu tour (ex: atualizou o app) → mostra tour.
+    startTour();
+  }
+})();
 
 // Exposição pro sync.js
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
-  markAllSynced: () => { pendingSync = 0; updateSync(); }
+  markAllSynced: () => { pendingSync = 0; updateSync(); },
+  getOperator: () => operatorName
 };
 </script>
 

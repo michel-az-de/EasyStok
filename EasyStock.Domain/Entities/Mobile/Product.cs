@@ -52,4 +52,8 @@ public class Product
     /// <summary>Id do device que criou/alterou por último. Para reconciliação de conflito.</summary>
     [Column("last_device_id"), MaxLength(64)]
     public string? LastDeviceId { get; set; }
+
+    /// <summary>Nome do operador (informado no PWA) que fez a última alteração. Auditoria.</summary>
+    [Column("last_operator_name"), MaxLength(64)]
+    public string? LastOperatorName { get; set; }
 }

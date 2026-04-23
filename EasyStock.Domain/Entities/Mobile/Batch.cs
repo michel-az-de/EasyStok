@@ -29,6 +29,9 @@ public class Batch
     [Column("last_device_id"), MaxLength(64)]
     public string? LastDeviceId { get; set; }
 
+    [Column("last_operator_name"), MaxLength(64)]
+    public string? LastOperatorName { get; set; }
+
     public List<BatchItem> Items { get; set; } = new();
 }
 

@@ -114,10 +114,15 @@
     flushing = true;
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
+      // Operador lido dinamicamente a cada sync — se o usuário trocar o nome
+      // no header, as próximas sincronizações já carregam o nome atualizado.
+      const operatorName = (window.cdbApp && window.cdbApp.getOperator)
+        ? window.cdbApp.getOperator()
+        : (localStorage.getItem('cdb-operator-name') || null);
       const resp = await fetch(url, {
         method: 'POST',
         headers: baseHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ deviceId, mutations: queue })
+        body: JSON.stringify({ deviceId, operatorName, mutations: queue })
       });
 
       if (!resp.ok) {

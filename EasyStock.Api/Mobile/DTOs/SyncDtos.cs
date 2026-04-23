@@ -2,8 +2,16 @@ using System.Text.Json;
 
 namespace EasyStock.Api.Mobile.DTOs;
 
-/// <summary>Payload enviado pelo app a cada sync (batch de mutations).</summary>
-public record SyncPushRequest(string DeviceId, List<MutationDto> Mutations);
+/// <summary>
+/// Payload enviado pelo app a cada sync (batch de mutations).
+/// <para>
+/// <c>OperatorName</c> (opcional): nome do operador informado no PWA
+/// (ex.: "Felipe", "Thati"). Usado para auditoria server-side — gravado em
+/// <c>LastOperatorName</c> de cada entidade alterada. Se vazio, só
+/// <c>DeviceId</c> é usado.
+/// </para>
+/// </summary>
+public record SyncPushRequest(string DeviceId, List<MutationDto> Mutations, string? OperatorName = null);
 
 /// <summary>
 /// Uma única mudança de estado. <c>Type</c> é "entidade.operacao" (ex: "order.upsert").
