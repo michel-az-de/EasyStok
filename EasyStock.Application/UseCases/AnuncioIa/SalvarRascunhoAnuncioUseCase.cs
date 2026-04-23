@@ -26,6 +26,8 @@ namespace EasyStock.Application.UseCases.AnuncioIa
     {
         public async Task<SalvarRascunhoAnuncioResult> ExecuteAsync(SalvarRascunhoAnuncioCommand command)
         {
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+
             var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
                 ?? throw new UseCaseValidationException("Produto nao encontrado.");
 

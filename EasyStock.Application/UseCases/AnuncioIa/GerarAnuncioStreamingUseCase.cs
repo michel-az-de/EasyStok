@@ -24,6 +24,8 @@ namespace EasyStock.Application.UseCases.AnuncioIa
             GerarAnuncioStreamingCommand command,
             [EnumeratorCancellation] CancellationToken ct = default)
         {
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+
             var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
                 ?? throw new UseCaseValidationException("Produto nao encontrado.");
 

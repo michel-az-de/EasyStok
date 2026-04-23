@@ -11,6 +11,8 @@ namespace EasyStock.Application.UseCases.AnuncioIa
     {
         public async Task ExecuteAsync(ExcluirAnuncioCommand command)
         {
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+
             var anuncio = await anuncioIaRepository.GetByIdAsync(command.EmpresaId, command.AnuncioId)
                 ?? throw new UseCaseValidationException("Anuncio nao encontrado.");
 

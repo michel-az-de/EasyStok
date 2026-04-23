@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.AnuncioIa
 {
@@ -19,6 +20,8 @@ namespace EasyStock.Application.UseCases.AnuncioIa
     {
         public async Task<UsoIaResult> ExecuteAsync(ObterUsoIaQuery query)
         {
+            UseCaseGuards.EnsureEmpresaId(query.EmpresaId);
+
             var agora = DateTime.UtcNow;
             var uso = await usoIaRepository.GetAsync(query.EmpresaId, agora.Year, agora.Month);
 

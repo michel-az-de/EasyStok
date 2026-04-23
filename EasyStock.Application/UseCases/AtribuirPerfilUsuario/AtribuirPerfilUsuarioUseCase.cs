@@ -16,6 +16,8 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
     {
         public async Task ExecuteAsync(AtribuirPerfilUsuarioCommand command)
         {
+            UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+
             logger.LogInformation("Atribuindo perfil {PerfilId} ao usuario {UsuarioId}", command.PerfilId, command.UsuarioId);
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)

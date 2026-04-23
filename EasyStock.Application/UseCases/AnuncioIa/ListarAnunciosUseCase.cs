@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.AnuncioIa
 {
@@ -18,6 +19,8 @@ namespace EasyStock.Application.UseCases.AnuncioIa
     {
         public async Task<IReadOnlyList<AnuncioIaResult>> ExecuteAsync(ListarAnunciosQuery query)
         {
+            UseCaseGuards.EnsureEmpresaId(query.EmpresaId);
+
             var anuncios = await anuncioIaRepository.GetByProdutoAsync(query.EmpresaId, query.ProdutoId);
 
             return anuncios

@@ -9,11 +9,15 @@ namespace EasyStock.Infra.Async;
 /// Implementação Redis do serviço de cache distribuído.
 /// Usa IDistributedCache do ASP.NET Core com serialização JSON.
 ///
-/// ⚠️ LIMITAÇÕES CONHECIDAS:
+/// ⚠️ LIMITAÇÕES CONHECIDAS (DOCUMENTADAS, SEM CALLER EM PRODUÇÃO HOJE):
 /// - <see cref="IncrementAsync"/> usa lock local por chave: atômico dentro do mesmo
 ///   processo mas NÃO entre instâncias. Para contador global exato em múltiplas
-///   réplicas, migrar para <c>IConnectionMultiplexer.StringIncrementAsync</c> nativo.
-/// - <see cref="SetExpiryAsync"/> não é suportado nativamente pelo IDistributedCache.
+///   réplicas, introduzir dependência em <c>StackExchange.Redis</c> e usar
+///   <c>IDatabase.StringIncrementAsync</c>. No estado atual essa API é apenas
+///   exposta pelo port; nenhum use case em produção a consome — se passar a
+///   haver contador crítico, MIGRAR antes de escalar horizontalmente.
+/// - <see cref="SetExpiryAsync"/> não é suportado nativamente pelo IDistributedCache
+///   (re-serialização do valor atual como workaround — ver implementação).
 /// </summary>
 public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
 {

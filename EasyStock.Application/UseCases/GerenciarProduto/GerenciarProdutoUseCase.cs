@@ -366,6 +366,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task RemoverAsync(Guid empresaId, Guid produtoId, Guid usuarioId = default)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
@@ -399,6 +402,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task RestaurarAsync(Guid empresaId, Guid produtoId, Guid usuarioId = default)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
@@ -429,6 +435,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task<ProdutoDetalheResult> ObterDetalheAsync(Guid empresaId, Guid produtoId)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         // Cache de 5 minutos — detalhe de produto inclui fotos, variações e itens de estoque (queries pesadas)
         if (cacheService is not null)
         {
@@ -530,6 +539,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task<IReadOnlyCollection<ProdutoHistoricoItemResult>> ObterHistoricoAsync(Guid empresaId, Guid produtoId)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         _ = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
@@ -550,6 +562,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task<ProdutoEstatisticasResult> ObterEstatisticasAsync(Guid empresaId, Guid produtoId)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
@@ -602,6 +617,9 @@ public sealed class GerenciarProdutoUseCase(
 
     public async Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
     {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
