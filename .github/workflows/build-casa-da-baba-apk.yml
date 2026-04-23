@@ -68,7 +68,10 @@ jobs:
 
       - name: Build APK (debug)
         working-directory: casa-da-baba-mobile/apk/android
-        run: ./gradlew assembleDebug --no-daemon
+        # gradlew foi commitado do Windows; marca executável antes de rodar.
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
