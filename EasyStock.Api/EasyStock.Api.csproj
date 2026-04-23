@@ -51,4 +51,11 @@
     <ProjectReference Include="..\EasyStock.Infra.Async\EasyStock.Infra.Async.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Módulo Casa da Baba Mobile: schema SQL aplicado no startup por MobileSchemaInitializer. -->
+    <None Update="Mobile\Schema\001_CreateMobileSchema.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

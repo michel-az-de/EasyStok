@@ -3,6 +3,7 @@ using EasyStock.Domain.Entities;
 using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Data
@@ -82,6 +83,11 @@ namespace EasyStock.Infra.Postgre.Data
 
             // Apply all IEntityTypeConfiguration implementations in this assembly
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+
+            // Módulo Casa da Baba Mobile — entidades prefixadas com mobile_*,
+            // schema aplicado via SQL raw (MobileSchemaInitializer), mas o EF
+            // precisa conhecer as entidades para queries via Set<T>().
+            modelBuilder.RegisterMobileModels();
         }
     }
 }

@@ -203,6 +203,16 @@ if (resolvedProvider is "postgresql")
     {
         app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
     }
+
+    // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).
+    try
+    {
+        await EasyStock.Api.Mobile.Schema.MobileSchemaInitializer.InitializeAsync(app.Services, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+    }
 }
 
 // ── Startup hardening ─────────────────────────────────────────────────────────
@@ -387,6 +397,9 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
         });
     }
 }
+
+// Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
+EasyStock.Api.Mobile.MobileModule.UseMobilePwa(app);
 
 app.UseCors();
 app.UseRateLimiter();
