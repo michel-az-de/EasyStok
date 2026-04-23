@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.AtualizarFornecedor;
@@ -37,11 +38,16 @@ public class AtualizarFornecedorUseCase(
         if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
+        // Normalização via VOs: se o formato for válido, armazena só os dígitos;
+        // se for inválido, mantém o input original (tolerância para dados legados).
+        var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
+        var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
+
         fornecedor.AtualizarCadastro(
             command.Nome,
-            command.Documento,
+            documentoNormalizado,
             command.Email,
-            command.Telefone,
+            telefoneNormalizado,
             command.Contato,
             command.Categoria,
             command.Tipo,

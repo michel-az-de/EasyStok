@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Fornecedor;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using FornecedorEntity = EasyStock.Domain.Entities.Fornecedor;
 
@@ -35,12 +36,18 @@ public class CriarFornecedorUseCase(
         if (!string.IsNullOrWhiteSpace(command.Email))
             EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 
+        // Normalização via VOs: se o formato for válido, armazena só os dígitos;
+        // se for inválido, mantém o input original (tolerância para dados legados
+        // ou fornecedores estrangeiros que não batem com CPF/CNPJ brasileiro).
+        var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
+        var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
+
         var fornecedor = FornecedorEntity.Criar(command.EmpresaId, command.Nome.Trim());
         fornecedor.AtualizarCadastro(
             command.Nome,
-            command.Documento,
+            documentoNormalizado,
             command.Email,
-            command.Telefone,
+            telefoneNormalizado,
             command.Contato,
             command.Categoria,
             command.Tipo,

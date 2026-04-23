@@ -19,6 +19,16 @@ public sealed class EsqueciSenhaUseCase(
     {
         logger.LogInformation("Iniciando esqueci senha para email {Email}", command.Email);
 
+        // Formato inválido é tratado da mesma forma que email inexistente:
+        // retorna sucesso sem efeito colateral, para não vazar informação
+        // sobre formato aceito vs contas cadastradas (mesma classe de leak
+        // que user enumeration).
+        if (!EmailValidator.IsValid(command.Email))
+        {
+            logger.LogWarning("Tentativa de esqueci senha com email em formato invalido.");
+            return new EsqueciSenhaResult(true);
+        }
+
         var usuario = await usuarioRepository.GetByEmailAsync(command.Email);
         if (usuario == null || !usuario.Ativo)
         {

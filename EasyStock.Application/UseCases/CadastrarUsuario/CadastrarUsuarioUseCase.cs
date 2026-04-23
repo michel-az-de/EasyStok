@@ -14,6 +14,8 @@ public sealed class CadastrarUsuarioUseCase(
 {
     public async Task<CadastrarUsuarioResult> ExecuteAsync(CadastrarUsuarioCommand command)
     {
+        EmailValidator.EnsureValid(command.Email);
+
         logger.LogInformation("Iniciando cadastro de usuario com email {Email}", command.Email);
 
         var usuarioExistente = await usuarioRepository.GetByEmailAsync(command.Email);
