@@ -1,0 +1,14 @@
+{
+  "appId": "com.casadababa.app",
+  "appName": "Casa da Baba",
+  "webDir": "web",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#1a1410"
+  },
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

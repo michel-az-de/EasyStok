@@ -1,38 +1,35 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
-using EasyStock.Api.Mobile.DTOs;
-using EasyStock.Domain.Entities.Mobile;
-using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
+using System.Threading.Tasks;
+using EasyStock.Mobile.DTOs;
+using EasyStock.Mobile.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace EasyStock.Api.Mobile.Controllers;
+namespace EasyStock.Mobile.Controllers;
 
 /// <summary>
-/// Endpoint unificado de sincronização do módulo Casa da Baba Mobile.
-/// Recebe mutations do PWA e espelha no banco via last-write-wins com
-/// <c>LastDeviceId</c> para auditoria.
+/// Endpoint unificado de sincronizacao. Recebe mutations do PWA e espelha no banco.
+/// Estrategia: last-write-wins por timestamp, com DeviceId registrado pra auditoria.
 ///
 /// Rotas:
-/// <list type="bullet">
-///   <item>POST /api/mobile/sync         — envia mutations pendentes</item>
-///   <item>GET  /api/mobile/sync/pull    — busca mudanças feitas por outros devices</item>
-/// </list>
-///
-/// Proteção: <c>[MobileApiKey]</c> exige header <c>X-Mobile-Api-Key</c>
-/// válido (configurado em <c>Mobile:ApiKey</c>). Atualmente desabilitado —
-/// ver comentário no atributo <c>[AllowAnonymous]</c> abaixo.
+///   POST /api/mobile/sync         - envia mutations pendentes
+///   GET  /api/mobile/sync/pull    - busca mudancas feitas por outros devices
 /// </summary>
 [ApiController]
 [Route("api/mobile/sync")]
-// [MobileApiKey] — DESABILITADO temporariamente para facilitar testes iniciais
-// do PWA/APK. Reativar quando a ferramenta estiver estável e a API for
-// exposta fora da rede local. Ver também MobileApiKeyAttribute.cs.
-[AllowAnonymous]
-[ApiExplorerSettings(IgnoreApi = true)]
-public class SyncController(EasyStockDbContext db) : ControllerBase
+public class SyncController : ControllerBase
 {
-    private readonly EasyStockDbContext _db = db;
+    // IMPORTANTE: Substitua "ApplicationDbContext" pelo DbContext real do EasyStock.
+    // Ver CLAUDE.md, passo 3 pra integracao com o DbContext existente.
+    private readonly ApplicationDbContext _db;
+
+    public SyncController(ApplicationDbContext db)
+    {
+        _db = db;
+    }
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -62,6 +59,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     [HttpGet("pull")]
     public async Task<ActionResult<SyncPullResponse>> Pull([FromQuery] long since, [FromQuery] string deviceId)
     {
+        // Busca entidades alteradas apos "since" por outros devices
         var sinceDate = DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime;
 
         var mutations = new List<MutationDto>();
@@ -104,10 +102,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         return Ok(new SyncPullResponse(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), mutations));
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Apply mutation por tipo
-    // ──────────────────────────────────────────────────────────────────────
-
+    // ---- Apply mutation por tipo ----
     private async Task ApplyMutation(MutationDto m, string deviceId)
     {
         var parts = m.Type.Split('.');
@@ -115,10 +110,10 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
 
         switch (parts[0])
         {
-            case "product":   await ApplyProduct(m, deviceId);   break;
-            case "client":    await ApplyClient(m, deviceId);    break;
-            case "order":     await ApplyOrder(m, deviceId);     break;
-            case "batch":     await ApplyBatch(m, deviceId);     break;
+            case "product":  await ApplyProduct(m, deviceId); break;
+            case "client":   await ApplyClient(m, deviceId); break;
+            case "order":    await ApplyOrder(m, deviceId); break;
+            case "batch":    await ApplyBatch(m, deviceId); break;
             case "cashEntry": await ApplyCashEntry(m, deviceId); break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
@@ -139,8 +134,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         }
         else
         {
-            // Last-write-wins: sempre aplica. Conflict resolution seria aqui
-            // se desejado (comparar existing.UpdatedAt com m.Ts).
+            // Last-write-wins: sempre aplica. Se quiser conflict resolution,
+            // compare existing.UpdatedAt com m.Ts.
             existing.Name = dto.Name;
             existing.Emoji = dto.Emoji;
             existing.Category = dto.Category;
@@ -221,7 +216,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.Total = dto.Total;
             existing.UpdatedAt = updatedAt;
             existing.LastDeviceId = deviceId;
-            // Substitui os itens (simplificação — em produção, faça diff item-a-item).
+            // Substitui os itens (simplificacao - em producao, faca diff item-a-item)
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)
                 existing.Items.Add(new OrderItem
@@ -233,12 +228,12 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     }
 
     /// <summary>
-    /// Regra de estoque central: o app já desconta localmente, mas o backend
-    /// é fonte da verdade ao conciliar com outros devices.
+    /// Regra de estoque central: o app ja desconta localmente, mas o backend
+    /// e fonte da verdade ao conciliar com outros devices. Espelha a mesma logica.
     /// </summary>
     private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items)
     {
-        // Transição para "pronto"/"entregue": desconta
+        // Transicao pra "pronto": desconta
         if (oldStatus != "pronto" && oldStatus != "entregue"
             && (newStatus == "pronto" || newStatus == "entregue"))
         {
@@ -248,7 +243,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 if (p != null) p.Stock -= i.Qty;
             }
         }
-        // Cancelamento de pedido que já havia reservado: devolve
+        // Cancelamento de pedido que ja havia reservado: devolve
         if ((oldStatus == "pronto" || oldStatus == "entregue") && newStatus == "cancelado")
         {
             foreach (var i in items)
@@ -263,7 +258,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     {
         var dto = m.Payload.Deserialize<BatchDto>(JsonOpts)!;
         var existing = await _db.Set<Batch>().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == dto.Id);
-        if (existing != null) return; // Batches são imutáveis — ignora re-envio
+        if (existing != null) return; // Batches sao imutaveis - ignora re-envio
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var batch = new Batch
@@ -289,7 +284,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     {
         var dto = m.Payload.Deserialize<CashEntryDto>(JsonOpts)!;
         var existing = await _db.Set<CashEntry>().FindAsync(dto.Id);
-        if (existing != null) return; // imutável
+        if (existing != null) return; // imutavel
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         _db.Add(new CashEntry
@@ -300,18 +295,15 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         });
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // DTO conversores para pull
-    // ──────────────────────────────────────────────────────────────────────
-
-    private static ProductDto ToDto(Product p) =>
+    // ---- DTO conversores pra pull ----
+    private ProductDto ToDto(Product p) =>
         new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom);
 
-    private static ClientDto ToDto(Client c) =>
+    private ClientDto ToDto(Client c) =>
         new(c.Id, c.Name, c.Apt, c.Address, c.Phone,
             new DateTimeOffset(c.LastOrder).ToUnixTimeMilliseconds(), c.OrderCount);
 
-    private static OrderDto ToDto(Order o) =>
+    private OrderDto ToDto(Order o) =>
         new(o.Id, o.ClientId,
             new ClientSnapshotDto(o.ClientSnapshotName, o.ClientSnapshotRef),
             o.Items.Select(i => new OrderItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).ToList(),
@@ -319,13 +311,13 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             new DateTimeOffset(o.CreatedAt).ToUnixTimeMilliseconds(),
             new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds());
 
-    private static BatchDto ToDto(Batch b) =>
+    private BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
             b.Items.Select(i => new BatchItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.Photo)).ToList(),
             b.BatchPhoto,
             new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds());
 
-    private static CashEntryDto ToDto(CashEntry c) =>
+    private CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,
             new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds());
 

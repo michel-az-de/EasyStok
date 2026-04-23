@@ -1,19 +1,23 @@
 // Service Worker - Casa da Baba PWA
-// Estrategia: cache-first para estaticos, network-only para API.
+// Estratégia: cache-first para estáticos, network-only para API.
+// Offline-first: tudo necessário para o app rodar fica pre-cacheado no install.
 
-const CACHE_VERSION = 'cdb-v1';
+const CACHE_VERSION = 'cdb-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './sync.js',
+  './icons/favicon.png',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_VERSION)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -27,37 +31,38 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Só intercepta GET — POSTs/PUTs/DELETEs (ex: /api/mobile/sync) passam direto.
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
-  // Bypass total pra requests de API (sincronizacao de dados)
-  if (url.pathname.includes('/api/mobile/') || url.pathname.includes('/api/')) {
-    return; // deixa a rede cuidar, sem cache
+  // Bypass total para requests da API (sync de dados — precisa estar online).
+  if (url.pathname.includes('/api/')) {
+    return;
   }
 
-  // Bypass pras fontes do Google (cacheadas pelo browser)
+  // Google Fonts: deixa o browser cachear nativamente (cross-origin).
   if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) {
     return;
   }
 
-  // Cache-first pros estaticos
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((resp) => {
-          // Cacheia o que for do mesmo origin e deu 200
-          if (resp.ok && url.origin === self.location.origin) {
-            const copy = resp.clone();
-            caches.open(CACHE_VERSION).then((c) => c.put(event.request, copy));
-          }
-          return resp;
-        }).catch(() => {
-          // Fallback offline: volta pra index.html se for navegacao
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-        });
-      })
-    );
-  }
+  // Cache-first para estáticos do mesmo origin (e requests do PWA).
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((resp) => {
+        // Cacheia somente respostas OK do mesmo origin (evita cachear erros / cross-origin opacos).
+        if (resp.ok && url.origin === self.location.origin) {
+          const copy = resp.clone();
+          caches.open(CACHE_VERSION).then((c) => c.put(event.request, copy));
+        }
+        return resp;
+      }).catch(() => {
+        // Offline sem cache: se é navegação (html), serve index.html; senão, undefined (erro normal).
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
+    })
+  );
 });
