@@ -1316,19 +1316,29 @@ body {
 .nav-btn {
   background: transparent;
   border: none;
-  color: var(--ink-dim);          /* mais claro que --ink-mute — melhor contraste */
+  color: var(--ink-dim);
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 4px;
+  gap: 2px;
   cursor: pointer;
   font-family: inherit;
   padding: 4px 0;
-  /* garante opacidade mesmo em WebViews que "cinzam" botões estado raised */
-  opacity: 1;
+}
+.nav-icon {
+  font-size: 22px;
+  line-height: 1;
+  display: block;
+  /* monocromático no inativo pra combinar com o label discreto */
+  filter: grayscale(0.6) opacity(0.75);
+  transition: filter 0.15s ease;
+}
+.nav-btn.active .nav-icon {
+  filter: none;                  /* ativo mostra cor cheia do emoji */
+  transform: scale(1.05);
 }
 .nav-btn .label {
   font-size: 10px;
@@ -1336,17 +1346,7 @@ body {
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.nav-btn svg {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;                 /* reserva a altura — evita colapsar */
-  stroke: currentColor;
-  fill: none;
-  display: block;
-  overflow: visible;              /* mostra mesmo que saia da box nominal */
-}
 .nav-btn.active { color: var(--accent); }
-.nav-btn.active svg { stroke: var(--accent); }
 
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
@@ -1938,23 +1938,23 @@ body {
   <!-- Bottom nav -->
   <div class="nav">
     <button class="nav-btn active" data-nav="home" onclick="go('home')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="nav-icon" aria-hidden="true">🏠</span>
       <span class="label">Hoje</span>
     </button>
     <button class="nav-btn" data-nav="producao" onclick="go('producao')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="nav-icon" aria-hidden="true">🍝</span>
       <span class="label">Produção</span>
     </button>
     <button class="nav-btn" data-nav="pedidos" onclick="go('pedidos')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span class="nav-icon" aria-hidden="true">📋</span>
       <span class="label">Pedidos</span>
     </button>
     <button class="nav-btn" data-nav="movimentos" onclick="go('movimentos')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <span class="nav-icon" aria-hidden="true">📦</span>
       <span class="label">Movimento</span>
     </button>
     <button class="nav-btn" data-nav="compras" onclick="go('compras')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+      <span class="nav-icon" aria-hidden="true">🛒</span>
       <span class="label">Comprar</span>
     </button>
   </div>
