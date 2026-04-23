@@ -1438,6 +1438,115 @@ body {
 .mov-ref .op { color: var(--gold); }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ========== Botão Export ========== */
+.export-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 12px 14px;
+  background: var(--gold-soft); color: var(--gold);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 12px; font-size: 13px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  margin-bottom: 12px;
+}
+.export-btn:active { transform: scale(0.98); }
+.export-btn svg { width: 16px; height: 16px; }
+.export-btn .hint { margin-left: auto; font-size: 10px; font-weight: 500; color: var(--ink-mute); }
+
+/* ========== Kanban (esteira) ========== */
+.kanban-col {
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.kanban-col-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; background: var(--bg-elev-2);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.kanban-col-header .count {
+  background: var(--bg-elev); color: var(--ink);
+  padding: 2px 8px; border-radius: 10px; font-size: 11px;
+}
+.kanban-col.col-aguardando .kanban-col-header { color: #cf8a3a; border-bottom: 2px solid rgba(207,138,58,0.4); }
+.kanban-col.col-preparando .kanban-col-header { color: #60a5fa; border-bottom: 2px solid rgba(96,165,250,0.4); }
+.kanban-col.col-pronto     .kanban-col-header { color: #4ade80; border-bottom: 2px solid rgba(74,222,128,0.4); }
+.kanban-col-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 20px; }
+.kanban-col-empty { padding: 12px; text-align: center; color: var(--ink-mute); font-size: 12px; font-style: italic; }
+
+.k-card {
+  position: relative;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px;
+}
+.k-card .k-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.k-card .k-who { font-weight: 700; font-size: 14px; color: var(--ink); }
+.k-card .k-who .apt { font-weight: 400; font-size: 12px; color: var(--ink-mute); margin-left: 4px; }
+.k-card .k-time { font-size: 11px; color: var(--ink-mute); white-space: nowrap; }
+.k-card .k-items { font-size: 12px; color: var(--ink-dim); margin-bottom: 6px; }
+.k-card .k-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 8px; gap: 8px;
+}
+.k-card .k-total { font-weight: 700; font-size: 14px; color: var(--gold); }
+.k-card .k-advance {
+  flex: 1;
+  padding: 8px 12px; background: var(--accent); color: white;
+  border: 0; border-radius: 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.k-card .k-advance:active { transform: scale(0.97); }
+.k-card .k-cancel {
+  width: 28px; height: 28px; border: 0; background: transparent;
+  color: var(--ink-mute); font-size: 18px; cursor: pointer; border-radius: 6px;
+  font-family: inherit;
+}
+.k-card .k-cancel:hover { color: #ef6b6b; background: rgba(239,107,107,0.1); }
+.k-card.blink {
+  animation: blinkHighlight 1.5s ease-in-out 0s 2;
+}
+@keyframes blinkHighlight {
+  0%, 100% { border-color: var(--line); box-shadow: none; }
+  50% { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+}
+
+/* ========== Progress dots ========== */
+.progress-dots {
+  display: inline-flex; align-items: center; gap: 4px; margin: 4px 0;
+}
+.progress-dots .pd { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.progress-dots .pd.done   { background: var(--gold); }
+.progress-dots .pd.active { background: var(--gold); box-shadow: 0 0 0 2px var(--gold-soft); }
+.progress-dots .pd-sep { width: 10px; height: 1px; background: var(--line); }
+.progress-dots .pd-sep.done { background: var(--gold); }
+.progress-dots .pd-label { font-size: 10px; color: var(--ink-mute); margin-left: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ========== Action toast (multi-botão) ========== */
+.action-toast {
+  position: fixed;
+  left: 50%; transform: translateX(-50%) translateY(120%);
+  bottom: 80px;
+  background: var(--bg-elev-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; max-width: 360px; width: calc(100% - 32px);
+  box-shadow: var(--shadow); z-index: 9000;
+  transition: transform 0.3s ease;
+}
+.action-toast.show { transform: translateX(-50%) translateY(0); }
+.action-toast .at-msg { font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+.action-toast .at-msg .hi { color: var(--gold); font-weight: 700; }
+.action-toast .at-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.action-toast .at-actions button {
+  flex: 1; min-width: 90px; padding: 8px 10px;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  border-radius: 8px; cursor: pointer;
+}
+.action-toast .at-primary { background: var(--accent); color: white; border: 0; }
+.action-toast .at-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.action-toast .at-primary:active, .action-toast .at-secondary:active { transform: scale(0.97); }
 </style>
 </head>
 <body>
@@ -1590,8 +1699,8 @@ body {
         <button class="cta-btn primary" id="saveOrderBtn" onclick="saveOrder()" disabled>Salvar pedido</button>
       </div>
 
-      <div class="today-divider">pedidos de hoje</div>
-      <div id="ordersFeed"></div>
+      <div class="today-divider" id="kanbanDivider">esteira de produção</div>
+      <div id="kanban"></div>
     </div>
 
     <!-- COMPRAR -->
@@ -1629,6 +1738,11 @@ body {
     <!-- MOVIMENTAÇÃO -->
     <div class="screen" data-screen="movimentos">
       <div class="section-label">Movimentação do estoque</div>
+      <button class="export-btn" onclick="exportSnapshot()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar pra EasyStock
+        <span class="hint">JSON</span>
+      </button>
       <div class="mov-filter" id="movFilter">
         <button data-f="all" class="active" onclick="setMovFilter('all')">Tudo</button>
         <button data-f="entry" onclick="setMovFilter('entry')">Entradas</button>
@@ -1785,6 +1899,12 @@ body {
   <div class="toast" id="toast">
     <div class="msg" id="toastMsg">Feito</div>
     <button class="undo" onclick="undoLast()">desfazer</button>
+  </div>
+
+  <!-- Action toast (aparece após criar pedido, com próximas ações) -->
+  <div class="action-toast" id="actionToast" role="status" aria-live="polite">
+    <div class="at-msg" id="actionToastMsg"></div>
+    <div class="at-actions" id="actionToastActions"></div>
   </div>
 
   <!-- Bottom nav -->
@@ -2122,8 +2242,8 @@ function renderOpenOrders() {
       </div>
       <div class="oo-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
       ${o.notes ? `<div class="oo-notes">${escapeHtml(o.notes)}</div>` : ''}
+      ${renderProgressDots(o.status, { showLabel: true })}
       <div class="oo-foot">
-        <span class="status-pill ${o.status}"><span class="dot"></span>${STATE_LABEL[o.status]}</span>
         <span class="oo-total">${money(o.total)}</span>
       </div>
       ${nextLabel ? `<button class="oo-advance" onclick="advanceOrder('${o.id}')">${nextLabel}</button>` : ''}
@@ -2505,6 +2625,239 @@ function renderMovimentos() {
   }).join('');
 }
 
+// ================================================================
+// EXPORT JSON → formato POST /api/mobile/sync do EasyStock
+// ================================================================
+function exportSnapshot() {
+  const ts = Date.now();
+  const deviceId = localStorage.getItem('cdb-device-id') || 'export';
+  const mutations = [];
+
+  products.forEach(p => {
+    mutations.push({
+      id: 'exp-p-' + p.id, deviceId, type: 'product.upsert',
+      payload: {
+        id: p.id, name: p.name, emoji: p.emoji ?? null,
+        category: p.category, unit: p.unit ?? null,
+        price: p.price ?? null, stock: p.stock ?? 0,
+        custom: !!p.custom
+      },
+      ts
+    });
+  });
+
+  clients.forEach(c => {
+    mutations.push({
+      id: 'exp-c-' + c.id, deviceId, type: 'client.upsert',
+      payload: {
+        id: c.id, name: c.name,
+        apt: c.apt ?? null, address: c.address ?? null, phone: c.phone ?? null,
+        lastOrder: c.lastOrder ?? ts, orderCount: c.orderCount || 0
+      },
+      ts
+    });
+  });
+
+  orders.forEach(o => {
+    mutations.push({
+      id: 'exp-o-' + o.id, deviceId, type: 'order.upsert',
+      payload: {
+        id: o.id, clientId: o.clientId ?? null,
+        clientSnapshot: {
+          name: o.clientSnapshot?.name || '',
+          ref:  o.clientSnapshot?.ref  || null
+        },
+        items: (o.items || []).map(i => ({
+          productId: i.productId, name: i.name,
+          emoji: i.emoji ?? null, unit: i.unit ?? null,
+          qty: i.qty, unitPrice: i.unitPrice
+        })),
+        notes: o.notes ?? null, total: o.total || 0,
+        status: o.status,
+        createdAt: o.createdAt, updatedAt: o.updatedAt
+      },
+      ts
+    });
+  });
+
+  batches.forEach(b => {
+    mutations.push({
+      id: 'exp-b-' + b.id, deviceId, type: 'batch.upsert',
+      payload: {
+        id: b.id, code: b.code,
+        items: (b.items || []).map(i => ({
+          productId: i.productId, name: i.name,
+          emoji: i.emoji ?? null, unit: i.unit ?? null,
+          qty: i.qty, photo: i.photo ?? null
+        })),
+        batchPhoto: b.batchPhoto ?? null,
+        createdAt: b.createdAt
+      },
+      ts
+    });
+  });
+
+  cashEntries.forEach(c => {
+    mutations.push({
+      id: 'exp-cash-' + c.id, deviceId, type: 'cashEntry.upsert',
+      payload: {
+        id: c.id, type: c.type, amount: c.amount,
+        description: c.description, createdAt: c.createdAt
+      },
+      ts
+    });
+  });
+
+  if (mutations.length === 0) {
+    showToast('Nada para exportar ainda.');
+    return;
+  }
+
+  const payload = {
+    deviceId,
+    operatorName: operatorName || null,
+    exportedAt: ts,
+    mutations
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const d = new Date();
+  const stamp = d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0') + '-' +
+    String(d.getHours()).padStart(2, '0') +
+    String(d.getMinutes()).padStart(2, '0');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `casa-da-baba-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+
+  showToast(`Exportou ${mutations.length} registros — envie pro EasyStock.`);
+}
+
+// ================================================================
+// KANBAN da esteira de produção (substitui renderOrdersFeed)
+// ================================================================
+const KANBAN_COLS = [
+  { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' },
+  { key: 'preparando', label: 'Preparando', next: 'Marcar pronto' },
+  { key: 'pronto',     label: 'Pronto',     next: 'Marcar entregue' }
+];
+
+let highlightOrderId = null; // id do pedido que acabou de ser criado (pisca)
+
+function renderKanban() {
+  const root = document.getElementById('kanban');
+  if (!root) return;
+
+  const openItems = orders.filter(o =>
+    o.status === 'aguardando' || o.status === 'preparando' || o.status === 'pronto'
+  );
+
+  if (openItems.length === 0) {
+    root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div>';
+    return;
+  }
+
+  // Por coluna, ordenar por createdAt asc (mais antigo primeiro — fila natural)
+  const byStatus = { aguardando: [], preparando: [], pronto: [] };
+  openItems.forEach(o => { byStatus[o.status].push(o); });
+  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) => a.createdAt - b.createdAt));
+
+  root.innerHTML = KANBAN_COLS.map(col => {
+    const list = byStatus[col.key];
+    const body = list.length === 0
+      ? '<div class="kanban-col-empty">— vazio —</div>'
+      : list.map(o => renderKanbanCard(o, col)).join('');
+    return `
+      <div class="kanban-col col-${col.key}">
+        <div class="kanban-col-header">
+          <span>${col.label}</span>
+          <span class="count">${list.length}</span>
+        </div>
+        <div class="kanban-col-body">${body}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderKanbanCard(o, col) {
+  const isHighlight = highlightOrderId === o.id;
+  const itemsLine = (o.items || []).map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+  return `
+    <div class="k-card ${isHighlight ? 'blink' : ''}">
+      <div class="k-head">
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
+        <div class="k-time">${timeOf(o.createdAt)}</div>
+      </div>
+      <div class="k-items">${itemsLine}${o.notes ? ' · <em>' + escapeHtml(o.notes) + '</em>' : ''}</div>
+      ${renderProgressDots(o.status, { small: true, showLabel: false })}
+      <div class="k-foot">
+        <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next} →</button>
+        <span class="k-total">${money(o.total)}</span>
+        <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
+      </div>
+    </div>
+  `;
+}
+
+// Mantemos a antiga renderOrdersFeed apontando para renderKanban para
+// não quebrar quem chama pelo nome antigo.
+function renderOrdersFeed() { renderKanban(); }
+
+// ================================================================
+// Progress dots (status visual 4-etapas) — usado na Home e no Kanban
+// ================================================================
+function renderProgressDots(currentStatus, opts) {
+  opts = opts || {};
+  const stages = ORDER_FLOW; // aguardando, preparando, pronto, entregue
+  const idx = stages.indexOf(currentStatus);
+  const parts = [];
+  stages.forEach((st, i) => {
+    const cls = i < idx ? 'pd done' : (i === idx ? 'pd active' : 'pd');
+    parts.push(`<span class="${cls}" title="${st}"></span>`);
+    if (i < stages.length - 1) {
+      parts.push(`<span class="pd-sep${i < idx ? ' done' : ''}"></span>`);
+    }
+  });
+  const label = opts.showLabel !== false
+    ? `<span class="pd-label">${STATE_LABEL[currentStatus] || currentStatus}</span>`
+    : '';
+  return `<div class="progress-dots">${parts.join('')}${label}</div>`;
+}
+
+// ================================================================
+// Action Toast (pós criar pedido, com próximas ações)
+// ================================================================
+let actionToastTimer = null;
+function showActionToast(msgHtml, actions) {
+  const el   = document.getElementById('actionToast');
+  const msg  = document.getElementById('actionToastMsg');
+  const btns = document.getElementById('actionToastActions');
+  if (!el) return;
+
+  msg.innerHTML = msgHtml;
+  btns.innerHTML = '';
+  actions.forEach((a, i) => {
+    const b = document.createElement('button');
+    b.className = i === 0 ? 'at-primary' : 'at-secondary';
+    b.textContent = a.label;
+    b.onclick = () => { hideActionToast(); try { a.fn(); } catch (e) { console.warn(e); } };
+    btns.appendChild(b);
+  });
+
+  el.classList.add('show');
+  clearTimeout(actionToastTimer);
+  actionToastTimer = setTimeout(hideActionToast, 6000);
+}
+function hideActionToast() {
+  document.getElementById('actionToast').classList.remove('show');
+}
+
 // Botões +/- explícitos nos tiles de produção
 function incProduct(id) {
   const p = products.find(x => x.id === id);
@@ -2860,42 +3213,39 @@ function saveOrder() {
   clearClient();
   renderOrderItems();
   updateSaveOrderBtn();
-  renderOrdersFeed();
+
+  // Esteira: destaca o card recém-criado por ~3s
+  highlightOrderId = order.id;
+  renderKanban();
+  setTimeout(() => { highlightOrderId = null; renderKanban(); }, 3200);
 
   pendingSync++;
   updateSync();
+
+  // Toast com as 3 próximas ações possíveis
+  const nomeCli = snapshot.name || 'cliente';
+  showActionToast(
+    `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`,
+    [
+      { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
+      { label: 'Fazer outro',     fn: () => {
+          const s = document.getElementById('clientSearch');
+          if (s) s.focus();
+      }},
+      { label: 'Ver esteira',     fn: () => {
+          go('pedidos');
+          setTimeout(() => {
+            const el = document.querySelector('.col-aguardando');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 150);
+      }}
+    ]
+  );
   lastAction = { type: 'pedido' };
-  showToast('Pedido salvo em "aguardando"');
 }
 
-function renderOrdersFeed() {
-  const feed = document.getElementById('ordersFeed');
-  if (!feed) return;
-  const today = orders.filter(o => isToday(o.createdAt));
-  feed.innerHTML = '';
-  if (today.length === 0) {
-    feed.innerHTML = '<div class="empty">Nenhum pedido hoje ainda</div>';
-    return;
-  }
-  today.sort((a,b) => b.createdAt - a.createdAt);
-  today.forEach(o => {
-    const card = document.createElement('div');
-    card.className = 'order-card';
-    const itemsLine = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(', ');
-    card.innerHTML = `
-      <div class="oc-head">
-        <div class="oc-who">${escapeHtml(o.clientSnapshot.name)} <span class="apt">${escapeHtml(o.clientSnapshot.ref || '')}</span></div>
-        <div class="oc-time">${timeOf(o.createdAt)}</div>
-      </div>
-      <div class="oc-body">${itemsLine}${o.notes ? ' · ' + escapeHtml(o.notes) : ''}</div>
-      <div class="oc-foot">
-        <span class="status-pill ${o.status}"><span class="dot"></span>${STATE_LABEL[o.status]}</span>
-        <span class="oc-total">${money(o.total)}</span>
-      </div>
-    `;
-    feed.appendChild(card);
-  });
-}
+// (Antiga renderOrdersFeed removida — substituída pelo kanban via alias
+//  definido junto com renderKanban, que renderiza no #kanban.)
 
 // =========================
 // MODAL NOVO PRODUTO
