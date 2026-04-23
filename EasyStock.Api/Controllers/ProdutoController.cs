@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,9 @@ public class ProdutoController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "List products (paginated)", Description = "Returns a paginated list of products for the given company. Supports sorting by nome, marca, status.")]
+    [SwaggerOperation(
+        Summary = "List products (paginated)",
+        Description = "Returns a paginated list of products for the given company. Supports sorting by nome, marca, status and server-side filtering by status, categoria and semPreco.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet]
@@ -35,14 +38,18 @@ public class ProdutoController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? sort = "criadoem",
-        [FromQuery] string? order = "desc")
+        [FromQuery] string? order = "desc",
+        [FromQuery] StatusProduto? status = null,
+        [FromQuery] bool semPreco = false,
+        [FromQuery] Guid? categoriaId = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
         var (p, ps) = NormalisePage(page, pageSize);
         var (produtos, totalCount) = await produtoRepository.GetProdutosPaginadosAsync(
-            resolvedEmpresaId, p, ps, sort, NormaliseOrder(order));
+            resolvedEmpresaId, p, ps, sort, NormaliseOrder(order),
+            status, semPreco, categoriaId);
         return DataPaged(produtos, totalCount, p, ps);
     }
 

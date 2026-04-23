@@ -1,5 +1,6 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.MongoDb.Data;
 using MongoDB.Driver;
 
@@ -127,9 +128,34 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
     }
 
     public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
-        Guid empresaId, int page = 1, int pageSize = 20, string? sort = "nome", string? order = "asc")
+        Guid empresaId,
+        int page = 1,
+        int pageSize = 20,
+        string? sort = "nome",
+        string? order = "asc",
+        StatusProduto? status = null,
+        bool semPreco = false,
+        Guid? categoriaId = null)
     {
-        var filter = Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId);
+        var b = Builders<Produto>.Filter;
+        var clauses = new List<FilterDefinition<Produto>> { b.Eq(x => x.EmpresaId, empresaId) };
+
+        if (status.HasValue)
+            clauses.Add(b.Eq(x => x.Status, status.Value));
+
+        if (categoriaId.HasValue)
+            clauses.Add(b.Eq(x => x.CategoriaId, categoriaId.Value));
+
+        if (semPreco)
+        {
+            // Produto sem PrecoReferencia OU com Valor == 0. PrecoReferencia é Dinheiro (sub-doc),
+            // então checamos ambos os casos para cobrir legacy/novos documentos.
+            clauses.Add(b.Or(
+                b.Eq(x => x.PrecoReferencia, null),
+                b.Eq("PrecoReferencia.Valor", 0m)));
+        }
+
+        var filter = b.And(clauses);
         var total = (int)await Collection.CountDocumentsAsync(filter);
 
         var items = await Collection.Find(filter)

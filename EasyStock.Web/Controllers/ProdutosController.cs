@@ -17,57 +17,51 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         ViewBag.Title = "Produtos";
         ViewBag.ActiveMenuItem = "Produtos";
 
-        // Categorias para o dropdown de filtro (também usadas no match abaixo)
+        // Categorias para o dropdown de filtro (também usadas para resolver nome→id no filtro).
         var catsResult = await svc.ListarCategoriasAsync();
         var categorias = catsResult.Data ?? [];
 
-        var temFiltroLocal = !string.IsNullOrEmpty(status) || semPreco || !string.IsNullOrEmpty(categoria);
+        // Nome da categoria vindo do form resolvido para Guid antes de ir pra API.
+        Guid? categoriaId = null;
+        if (!string.IsNullOrEmpty(categoria))
+        {
+            var catMatch = categorias.FirstOrDefault(c => c.Nome.Equals(categoria, StringComparison.OrdinalIgnoreCase));
+            categoriaId = catMatch?.Id;
+        }
 
         List<ProdutoResumo> items;
         int totalItems;
         int totalPages;
 
-        if (string.IsNullOrWhiteSpace(search) && !temFiltroLocal)
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            // Caminho rápido: paginação server-side pura.
-            var result = await svc.ListarAsync(page, PageSize);
-            if (HasError(result)) return View(new ProdutosListViewModel());
-            var paged = result.Data!;
-            items = paged.Data;
-            totalItems = paged.Meta.Total;
-            totalPages = paged.Meta.Pages;
-        }
-        else
-        {
-            // Caminho com busca ou filtros: carrega um conjunto maior (limitado)
-            // e filtra client-side. TODO: mover filtros status/categoria/semPreco
-            // para query params da API para paginação correta.
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var searchResult = await svc.BuscarAsync(search.Trim(), 100);
-                if (HasError(searchResult)) return View(new ProdutosListViewModel());
-                items = searchResult.Data!;
-            }
-            else
-            {
-                var result = await svc.ListarAsync(1, 200);
-                if (HasError(result)) return View(new ProdutosListViewModel());
-                items = result.Data!.Data;
-            }
+            // Busca textual via endpoint /search (full-text scan com ILIKE no servidor).
+            // Os filtros de status/categoria/semPreco ainda podem ser combinados
+            // client-side porque /search não os aceita — é uma superfície menor
+            // (limite de 100 resultados) que não justifica estender a API agora.
+            var searchResult = await svc.BuscarAsync(search.Trim(), 100);
+            if (HasError(searchResult)) return View(new ProdutosListViewModel());
+            items = searchResult.Data!;
 
             if (!string.IsNullOrEmpty(status))
                 items = items.Where(p => p.StatusNome.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
             if (semPreco)
                 items = items.Where(p => !(p.PrecoReferencia?.Valor > 0)).ToList();
-            if (!string.IsNullOrEmpty(categoria))
-            {
-                var catMatch = categorias.FirstOrDefault(c => c.Nome.Equals(categoria, StringComparison.OrdinalIgnoreCase));
-                if (catMatch is not null)
-                    items = items.Where(p => p.CategoriaId == catMatch.Id).ToList();
-            }
+            if (categoriaId.HasValue)
+                items = items.Where(p => p.CategoriaId == categoriaId.Value).ToList();
 
             totalItems = items.Count;
             totalPages = 1;
+        }
+        else
+        {
+            // Paginação 100% server-side: filtros vão pra API, inclusive status/categoria/semPreco.
+            var result = await svc.ListarAsync(page, PageSize, status, semPreco, categoriaId);
+            if (HasError(result)) return View(new ProdutosListViewModel());
+            var paged = result.Data!;
+            items = paged.Data;
+            totalItems = paged.Meta.Total;
+            totalPages = paged.Meta.Pages;
         }
 
         var vm = new ProdutosListViewModel

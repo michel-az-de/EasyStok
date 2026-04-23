@@ -1,5 +1,6 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
@@ -73,13 +74,22 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         public async Task<(IEnumerable<Produto> Produtos, int TotalCount)> GetProdutosPaginadosAsync(
-            Guid empresaId, int page = 1, int pageSize = 20, string? sort = "criadoem", string? order = "desc")
+            Guid empresaId,
+            int page = 1,
+            int pageSize = 20,
+            string? sort = "criadoem",
+            string? order = "desc",
+            StatusProduto? status = null,
+            bool semPreco = false,
+            Guid? categoriaId = null)
         {
             var sortNorm  = (sort  ?? "criadoem").ToLowerInvariant();
             var orderNorm = (order ?? "desc").ToLowerInvariant();
 
+            // Cache key inclui os filtros para evitar hit incorreto entre combinações distintas.
             var versao   = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
-            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sortNorm}_{orderNorm}";
+            var filterKey = $"s={status?.ToString() ?? "_"}_np={(semPreco ? "1" : "0")}_c={categoriaId?.ToString() ?? "_"}";
+            var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sortNorm}_{orderNorm}_{filterKey}";
 
             if (cache is not null)
             {
@@ -99,6 +109,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             var query = dbContext.Produtos
                 .AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId);
+
+            // Filtros server-side — aplicados ANTES do Count para total consistente
+            // com a paginação entregue ao cliente.
+            if (status.HasValue)
+                query = query.Where(p => p.Status == status.Value);
+
+            if (categoriaId.HasValue)
+                query = query.Where(p => p.CategoriaId == categoriaId.Value);
+
+            if (semPreco)
+                query = query.Where(p => p.PrecoReferencia == null || p.PrecoReferencia.Valor == 0m);
 
             var totalCount = await query.CountAsync();
 

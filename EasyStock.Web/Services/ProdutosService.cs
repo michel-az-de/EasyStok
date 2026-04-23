@@ -8,8 +8,23 @@ public class ProdutosService(ApiClient api, SessionService session)
     private Guid GetEmpresaId() =>
         Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    public Task<ApiResult<PagedResult<ProdutoResumo>>> ListarAsync(int page = 1, int limit = 20) =>
-        api.GetAsync<PagedResult<ProdutoResumo>>($"produtos?empresaId={GetEmpresaId()}&page={page}&pageSize={limit}");
+    public Task<ApiResult<PagedResult<ProdutoResumo>>> ListarAsync(
+        int page = 1,
+        int limit = 20,
+        string? status = null,
+        bool semPreco = false,
+        Guid? categoriaId = null)
+    {
+        var url = $"produtos?empresaId={GetEmpresaId()}&page={page}&pageSize={limit}";
+        if (!string.IsNullOrEmpty(status))
+            url += $"&status={Uri.EscapeDataString(status)}";
+        if (semPreco)
+            url += "&semPreco=true";
+        if (categoriaId.HasValue && categoriaId.Value != Guid.Empty)
+            url += $"&categoriaId={categoriaId.Value}";
+
+        return api.GetAsync<PagedResult<ProdutoResumo>>(url);
+    }
 
     public Task<ApiResult<List<ProdutoResumo>>> BuscarAsync(string termo, int limite = 10) =>
         api.GetAsync<List<ProdutoResumo>>(
