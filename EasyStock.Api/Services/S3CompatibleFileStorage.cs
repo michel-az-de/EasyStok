@@ -4,6 +4,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Services;
@@ -15,8 +16,12 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
     {
+        // Fail-fast: valida filename (path traversal) e MIME antes de qualquer chamada S3.
+        var safeFileName = UploadSecurityValidator.SanitizeFileName(request.FileName);
+        UploadSecurityValidator.EnsureValidMime(request.ContentType);
+
         var client = GetClient();
-        var key = $"{request.BucketPath.Trim('/')}/{request.FileName}".Trim('/');
+        var key = $"{request.BucketPath.Trim('/')}/{safeFileName}".Trim('/');
 
         await using var memoryStream = new MemoryStream(request.Content);
         var putRequest = new PutObjectRequest

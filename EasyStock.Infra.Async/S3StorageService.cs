@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.GerenciarUploads;
 
 namespace EasyStock.Infra.Async;
 
@@ -14,6 +15,11 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
 
     public async Task<string> UploadAsync(string container, string fileName, Stream content, string contentType)
     {
+        // Fail-fast: valida filename (path traversal) e MIME — defense-in-depth, o IFileStorage
+        // subjacente também valida, mas erros precoces evitam carregar o stream inteiro em memória.
+        var safeFileName = UploadSecurityValidator.SanitizeFileName(fileName);
+        UploadSecurityValidator.EnsureValidMime(contentType);
+
         // Validação precoce quando o stream expõe Length (a maioria dos uploads web expõe).
         if (content.CanSeek && content.Length > MaxUploadSizeBytes)
             throw new InvalidOperationException(
@@ -35,7 +41,7 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
 
         var request = new FileUploadRequest(
             BucketPath: container,
-            FileName: fileName,
+            FileName: safeFileName,
             ContentType: contentType,
             Content: ms.ToArray(),
             IsPublic: true);
@@ -60,9 +66,13 @@ public sealed class S3StorageService(IFileStorage fileStorage) : IStorageService
         throw new NotSupportedException("GetPublicUrl requer storage key, nao implementado nesta adaptacao");
     }
 
-    public Task DeleteAsync(string container, string fileName) =>
+    public Task DeleteAsync(string container, string fileName)
+    {
+        // Sanitiza fileName para impedir path traversal via delete.
+        var safeFileName = UploadSecurityValidator.SanitizeFileName(fileName);
         // Assumindo que o storage key e container/filename.
-        fileStorage.DeleteAsync($"{container}/{fileName}");
+        return fileStorage.DeleteAsync($"{container}/{safeFileName}");
+    }
 
     public Task<bool> ExistsAsync(string container, string fileName)
     {

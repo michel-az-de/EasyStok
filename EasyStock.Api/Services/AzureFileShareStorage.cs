@@ -3,6 +3,7 @@ using Azure.Storage.Files.Shares;
 using Azure.Storage.Sas;
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Services;
@@ -13,6 +14,10 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken ct = default)
     {
+        // Fail-fast: valida filename (path traversal) e MIME antes de qualquer chamada Azure.
+        var safeFileName = UploadSecurityValidator.SanitizeFileName(request.FileName);
+        UploadSecurityValidator.EnsureValidMime(request.ContentType);
+
         if (string.IsNullOrWhiteSpace(_opts.ConnectionString) || _opts.ConnectionString.Contains("<"))
             throw new InvalidOperationException("Azure File Share não está configurado. Verifique appsettings.Production.json.");
 
@@ -29,12 +34,12 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
             await dirClient.CreateIfNotExistsAsync(cancellationToken: ct);
         }
 
-        var fileClient = dirClient.GetFileClient(request.FileName);
+        var fileClient = dirClient.GetFileClient(safeFileName);
         using var stream = new MemoryStream(request.Content);
         await fileClient.CreateAsync(stream.Length, cancellationToken: ct);
         await fileClient.UploadRangeAsync(new Azure.HttpRange(0, stream.Length), stream, cancellationToken: ct);
 
-        var storageKey = (request.BucketPath.Trim('/') + "/" + request.FileName).Trim('/');
+        var storageKey = (request.BucketPath.Trim('/') + "/" + safeFileName).Trim('/');
         var sasUri = GenerateSasUri(fileClient, storageKey);
 
         return new StoredFileResult(storageKey, sasUri, request.ContentType, request.Content.LongLength);

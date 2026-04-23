@@ -1,5 +1,6 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Services;
@@ -10,16 +11,16 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IWebH
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
     {
+        // Fail-fast: valida filename (path traversal) e MIME antes de qualquer IO.
+        var safeFileName = UploadSecurityValidator.SanitizeFileName(request.FileName);
+        UploadSecurityValidator.EnsureValidMime(request.ContentType);
+
         var relativePath = request.BucketPath.Replace('\\', '/').Trim('/');
         var rootPath = Path.GetFullPath(GetRootPath());
         var targetDirectory = Path.GetFullPath(Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
         if (!targetDirectory.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Caminho de upload invalido.");
         Directory.CreateDirectory(targetDirectory);
-
-        var safeFileName = Path.GetFileName(request.FileName);
-        if (string.IsNullOrWhiteSpace(safeFileName))
-            throw new ArgumentException("O nome do arquivo nao pode ser vazio.", nameof(request));
 
         var filePath = Path.Combine(targetDirectory, safeFileName);
         await File.WriteAllBytesAsync(filePath, request.Content, cancellationToken);
