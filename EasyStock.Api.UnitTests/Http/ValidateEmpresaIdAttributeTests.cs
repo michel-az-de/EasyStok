@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Http;
@@ -123,6 +125,35 @@ public class ValidateEmpresaIdAttributeTests
         ctx.Result.Should().BeNull();
     }
 
+    // ── Guid? EmpresaId (nullable) ───────────────────────────────────────────
+
+    public sealed class CommandComEmpresaIdNullable
+    {
+        public Guid? EmpresaId { get; set; }
+    }
+
+    [Fact]
+    public async Task ActionArgument_dto_com_EmpresaId_nullable_diferente_retorna_Forbid()
+    {
+        var command = new CommandComEmpresaIdNullable { EmpresaId = OtherEmpresa };
+        var ctx = BuildContext(actionArgs: new() { ["command"] = command });
+
+        await ExecuteFilter(ctx, UserEmpresa, NivelAcesso.Admin);
+
+        ctx.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task ActionArgument_dto_com_EmpresaId_nullable_null_e_ignorado()
+    {
+        var command = new CommandComEmpresaIdNullable { EmpresaId = null };
+        var ctx = BuildContext(actionArgs: new() { ["command"] = command });
+
+        await ExecuteFilter(ctx, UserEmpresa, NivelAcesso.Admin);
+
+        ctx.Result.Should().BeNull();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static async Task ExecuteFilter(
@@ -137,7 +168,12 @@ public class ValidateEmpresaIdAttributeTests
         // Acesso ao tipo internal ValidateEmpresaIdFilter via reflection — mantemos encapsulado.
         var filterType = typeof(ValidateEmpresaIdAttribute).Assembly
             .GetType("EasyStock.Api.Http.ValidateEmpresaIdFilter")!;
-        var filter = (IAsyncActionFilter)Activator.CreateInstance(filterType, accessor)!;
+
+        // ILogger<ValidateEmpresaIdFilter> via NullLogger<>.Instance (typed correctly).
+        var nullLoggerType = typeof(NullLogger<>).MakeGenericType(filterType);
+        var logger = nullLoggerType.GetField("Instance")!.GetValue(null);
+
+        var filter = (IAsyncActionFilter)Activator.CreateInstance(filterType, accessor, logger)!;
 
         await filter.OnActionExecutionAsync(ctx,
             () => Task.FromResult(Substitute.For<ActionExecutedContext>(

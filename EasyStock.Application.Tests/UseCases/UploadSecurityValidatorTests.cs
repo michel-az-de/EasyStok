@@ -58,6 +58,29 @@ public class UploadSecurityValidatorTests
             .WithMessage("*255*");
     }
 
+    [Theory]
+    [InlineData(".")]
+    [InlineData("..")]
+    public void SanitizeFileName_rejeita_apenas_pontos(string input)
+    {
+        var act = () => UploadSecurityValidator.SanitizeFileName(input);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("arquivo<html>.jpg")]
+    [InlineData("arquivo>script.jpg")]
+    [InlineData("arq:uivo.jpg")]
+    [InlineData("arq|uivo.jpg")]
+    [InlineData("arq?uivo.jpg")]
+    [InlineData("arq*uivo.jpg")]
+    public void SanitizeFileName_rejeita_caracteres_invalidos_windows(string input)
+    {
+        var act = () => UploadSecurityValidator.SanitizeFileName(input);
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*caractere invalido*");
+    }
+
     // ── EnsureValidMime — aceitos ────────────────────────────────────────────
 
     [Theory]

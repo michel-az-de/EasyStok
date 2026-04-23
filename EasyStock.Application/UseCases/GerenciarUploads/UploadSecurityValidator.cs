@@ -51,12 +51,18 @@ public static class UploadSecurityValidator
         if (string.IsNullOrWhiteSpace(normalized))
             throw new ArgumentException("Nome do arquivo invalido apos sanitizacao.", nameof(fileName));
 
+        // Rejeita nomes de diretório tipo "." ou ".." (mesmo após sanitize).
+        // Nome precisa de algum conteudo antes do ponto.
+        if (normalized is "." or "..")
+            throw new ArgumentException("Nome do arquivo invalido (apenas pontos).", nameof(fileName));
+
         // Comprimento defensivo: 255 é o limite comum de filesystems; nomes muito longos sugerem ataque.
         if (normalized.Length > 255)
             throw new ArgumentException("Nome do arquivo excede 255 caracteres.", nameof(fileName));
 
-        // Caracteres invalidos em qualquer plataforma sensata
-        foreach (var invalid in Path.GetInvalidFileNameChars())
+        // Caracteres invalidos em qualquer plataforma sensata (pegamos ambos sets Windows+Unix
+        // pra coerencia cross-platform; no Linux Path.GetInvalidFileNameChars retorna só \0).
+        foreach (var invalid in WindowsInvalidChars)
         {
             if (normalized.Contains(invalid))
                 throw new ArgumentException(
@@ -65,6 +71,17 @@ public static class UploadSecurityValidator
 
         return normalized;
     }
+
+    // Uniao dos caracteres invalidos em Windows (mais restritivo) — aplicado
+    // em todas as plataformas para comportamento consistente.
+    private static readonly char[] WindowsInvalidChars =
+    [
+        '\0', '\u0001', '\u0002', '\u0003', '\u0004', '\u0005', '\u0006', '\u0007',
+        '\u0008', '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u000E', '\u000F',
+        '\u0010', '\u0011', '\u0012', '\u0013', '\u0014', '\u0015', '\u0016', '\u0017',
+        '\u0018', '\u0019', '\u001A', '\u001B', '\u001C', '\u001D', '\u001E', '\u001F',
+        '<', '>', ':', '"', '/', '\\', '|', '?', '*'
+    ];
 
     /// <summary>
     /// Verifica se <paramref name="contentType"/> consta em <see cref="AllowedMimeTypes"/>.
