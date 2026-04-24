@@ -44,7 +44,12 @@ public record OrderDto(
     decimal Total,
     string Status,
     long CreatedAt,
-    long UpdatedAt
+    long UpdatedAt,
+    // Campos opcionais (adicionados em versão posterior — defaults pra compat).
+    System.Text.Json.JsonElement? History = null,
+    string? ConfirmedBy = null,
+    long? ConfirmedAt = null,
+    long? FactAt = null
 );
 
 public record BatchItemDto(

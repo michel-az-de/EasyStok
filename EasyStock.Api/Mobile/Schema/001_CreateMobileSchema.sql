@@ -122,4 +122,13 @@ ALTER TABLE mobile_orders       ADD COLUMN IF NOT EXISTS last_operator_name VARC
 ALTER TABLE mobile_batches      ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
 ALTER TABLE mobile_cash_entries ADD COLUMN IF NOT EXISTS last_operator_name VARCHAR(64);
 
+-- ===== Pedidos: histórico completo + conferência + fact_at (retroativo) =====
+-- history: JSONB com array [{ at, op, action, change }] — auditoria detalhada.
+-- confirmed_by / confirmed_at: quem revisou ao marcar entregue.
+-- fact_at: quando o pedido aconteceu de fato (pode ser < created_at em pedidos retroativos).
+ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS history          JSONB;
+ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS confirmed_by     VARCHAR(64);
+ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS confirmed_at     TIMESTAMP;
+ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS fact_at          TIMESTAMP;
+
 COMMIT;

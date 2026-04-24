@@ -50,6 +50,28 @@ public class Order
     [Column("last_operator_name"), MaxLength(64)]
     public string? LastOperatorName { get; set; }
 
+    /// <summary>
+    /// JSON com array de eventos de auditoria: [{ at, op, action, change }].
+    /// Mantido como string crua no domain — tipo concreto é problema da API.
+    /// </summary>
+    [Column("history", TypeName = "jsonb")]
+    public string? HistoryJson { get; set; }
+
+    /// <summary>Operador que conferiu o pedido na transição para 'entregue'.</summary>
+    [Column("confirmed_by"), MaxLength(64)]
+    public string? ConfirmedBy { get; set; }
+
+    /// <summary>Momento da conferência (quando o operador clicou "Confere e finalizar").</summary>
+    [Column("confirmed_at")]
+    public DateTime? ConfirmedAt { get; set; }
+
+    /// <summary>
+    /// Momento em que o pedido aconteceu de fato. Pode ser anterior a CreatedAt
+    /// (pedido retroativo cadastrado depois). NULL = igual a CreatedAt (caso normal).
+    /// </summary>
+    [Column("fact_at")]
+    public DateTime? FactAt { get; set; }
+
     public List<OrderItem> Items { get; set; } = new();
 }
 

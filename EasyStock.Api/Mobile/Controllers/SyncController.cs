@@ -191,6 +191,15 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
+        // Auditoria/conferência/retroativo: campos opcionais — só persiste se vier no DTO.
+        var historyJson = dto.History.HasValue ? dto.History.Value.GetRawText() : null;
+        var confirmedAt = dto.ConfirmedAt.HasValue
+            ? DateTimeOffset.FromUnixTimeMilliseconds(dto.ConfirmedAt.Value).UtcDateTime
+            : (DateTime?)null;
+        var factAt = dto.FactAt.HasValue
+            ? DateTimeOffset.FromUnixTimeMilliseconds(dto.FactAt.Value).UtcDateTime
+            : (DateTime?)null;
+
         if (existing == null)
         {
             var order = new Order
@@ -205,7 +214,11 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 CreatedAt = createdAt,
                 UpdatedAt = updatedAt,
                 LastDeviceId = deviceId,
-                LastOperatorName = operatorName
+                LastOperatorName = operatorName,
+                HistoryJson = historyJson,
+                ConfirmedBy = dto.ConfirmedBy,
+                ConfirmedAt = confirmedAt,
+                FactAt = factAt
             };
             foreach (var i in dto.Items)
                 order.Items.Add(new OrderItem
@@ -228,6 +241,11 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.UpdatedAt = updatedAt;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
+            // Atualiza só se o cliente enviou — preserva valores legados se omitir.
+            if (historyJson is not null) existing.HistoryJson = historyJson;
+            if (dto.ConfirmedBy is not null) existing.ConfirmedBy = dto.ConfirmedBy;
+            if (confirmedAt.HasValue) existing.ConfirmedAt = confirmedAt;
+            if (factAt.HasValue) existing.FactAt = factAt;
             // Substitui os itens (simplificação — em produção, faça diff item-a-item).
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)

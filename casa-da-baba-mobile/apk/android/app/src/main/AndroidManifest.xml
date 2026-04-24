@@ -38,4 +38,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Bluetooth para impressora térmica Hipertech WTP05 (ESC/POS via SPP).
+         BLUETOOTH/BLUETOOTH_ADMIN cobrem Android < 12 (API < 31).
+         BLUETOOTH_CONNECT é exigido a partir de Android 12 (API 31+) para
+         conectar a dispositivos JÁ pareados. BLUETOOTH_SCAN não é necessário
+         porque o app não escaneia — só lista pareados (bs.list()). -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 </manifest>

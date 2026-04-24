@@ -1430,6 +1430,222 @@ body {
 }
 .btn-cobrar:active { transform: scale(0.96); }
 
+/* Botão "Imprimir" inline */
+.btn-imprimir {
+  padding: 8px 10px;
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 8px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-imprimir:active { transform: scale(0.96); }
+
+/* Botão "Histórico" inline (fica discreto) */
+.btn-historico {
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+/* ========== Tela de Ajustes ========== */
+.ajustes-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; z-index: 9300;
+  align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.ajustes-overlay.show { display: flex; }
+.ajustes-sheet {
+  background: var(--bg-elev); color: var(--ink);
+  width: 100%; max-width: 430px;
+  border-radius: 20px 20px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.3);
+  animation: slideUp 0.3s ease;
+}
+.ajustes-section { margin-bottom: 20px; }
+.ajustes-section h4 {
+  font-family: 'Fraunces', serif; font-size: 16px;
+  margin: 0 0 4px; color: var(--gold);
+}
+.ajustes-section .hint { font-size: 11px; color: var(--ink-mute); margin: 0 0 8px; }
+.ajustes-section .field { margin-bottom: 10px; }
+.ajustes-section label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.ajustes-section input {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink); font-size: 14px;
+  font-family: inherit;
+}
+.ajustes-section input:focus { outline: none; border-color: var(--accent); }
+.ajustes-section .printer-status {
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--bg-elev-2); font-size: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.ajustes-section .printer-status.ok { color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+.ajustes-section .printer-status.none { color: var(--ink-mute); border: 1px dashed var(--line); }
+.ajustes-section button {
+  padding: 10px 14px;
+  border: 0; border-radius: 8px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.btn-ajustes-save {
+  background: var(--accent); color: white;
+  width: 100%; padding: 14px !important;
+}
+.btn-ajustes-printer { background: var(--gold-soft); color: var(--gold); }
+
+/* ========== Modal de Conferência ========== */
+.confer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: none; z-index: 9400;
+  align-items: center; justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.2s ease;
+}
+.confer-overlay.show { display: flex; }
+.confer-sheet {
+  background: var(--bg-elev); color: var(--ink);
+  width: 100%; max-width: 380px;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.confer-sheet h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 22px; margin: 0 0 4px; text-align: center;
+  color: var(--gold);
+}
+.confer-sheet .who {
+  text-align: center; font-size: 14px; color: var(--ink-dim);
+  margin-bottom: 16px;
+}
+.confer-items {
+  background: var(--bg-elev-2);
+  border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.confer-items .ci-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px dashed var(--line);
+  font-size: 15px;
+}
+.confer-items .ci-row:last-child { border-bottom: 0; }
+.confer-items .ci-qty {
+  font-weight: 800; color: var(--gold); font-size: 18px;
+  min-width: 36px;
+}
+.confer-items .ci-name { flex: 1; padding: 0 10px; }
+.confer-total {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 16px; padding: 10px 14px;
+  background: var(--gold-soft); border-radius: 10px;
+  margin-bottom: 16px;
+}
+.confer-total .ct-value { font-weight: 800; color: var(--gold); font-size: 20px; }
+.confer-actions { display: flex; gap: 8px; }
+.confer-actions button {
+  flex: 1; padding: 14px;
+  border: 0; border-radius: 10px;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.btn-confer-cancel { background: transparent; color: var(--ink-dim); border: 1px solid var(--line) !important; }
+.btn-confer-ok { background: var(--accent); color: white; }
+.btn-confer-ok:active, .btn-confer-cancel:active { transform: scale(0.97); }
+
+/* ========== Modal Histórico ========== */
+.historico-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; z-index: 9350;
+  align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.historico-overlay.show { display: flex; }
+.historico-sheet {
+  background: var(--bg-elev); width: 100%; max-width: 430px;
+  border-radius: 20px 20px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  max-height: 75vh; overflow-y: auto;
+}
+.historico-event {
+  display: flex; gap: 10px; padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.historico-event:last-child { border-bottom: 0; }
+.he-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+.he-body { flex: 1; }
+.he-action { font-size: 13px; font-weight: 600; color: var(--ink); }
+.he-meta { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
+.he-meta .op { color: var(--gold); }
+.he-change { font-size: 12px; color: var(--ink-dim); margin-top: 4px; font-style: italic; }
+
+/* ========== Pedido retroativo (link no form) ========== */
+.retroactive-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-dim);
+  cursor: pointer; padding: 6px 10px;
+  border: 1px dashed var(--line); border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  margin-bottom: 12px;
+}
+.retroactive-toggle.active {
+  background: var(--accent-soft); color: var(--accent);
+  border-color: rgba(214, 80, 51, 0.4); border-style: solid;
+}
+.retroactive-fields {
+  display: none;
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px;
+  margin-bottom: 12px;
+}
+.retroactive-fields.show { display: block; }
+.retroactive-fields label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.retroactive-fields input {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink); font-size: 14px;
+  font-family: inherit;
+}
+.retroactive-fields .hint { font-size: 11px; color: var(--ink-mute); margin-top: 6px; }
+
+/* ========== Print: etiqueta 58mm térmica ========== */
+.print-area {
+  display: none;
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area {
+    display: block !important;
+    position: fixed !important; left: 0; top: 0;
+    width: 58mm; padding: 4mm 2mm;
+    color: #000 !important; background: #fff !important;
+    font-family: 'Courier New', 'Roboto Mono', monospace !important;
+    font-size: 11pt; line-height: 1.3;
+  }
+  .print-area .pa-title { text-align: center; font-size: 13pt; font-weight: 800; margin-bottom: 6px; }
+  .print-area .pa-sep { text-align: center; margin: 4px 0; letter-spacing: 1px; }
+  .print-area .pa-row { display: flex; justify-content: space-between; }
+  .print-area .pa-bold { font-weight: 800; }
+  .print-area .pa-large { font-size: 14pt; font-weight: 800; }
+  .print-area .pa-center { text-align: center; }
+  .print-area .pa-item { display: flex; justify-content: space-between; padding: 2px 0; }
+  .print-area .pa-item .pi-qty { font-weight: 800; }
+  @page { size: 58mm auto; margin: 0; }
+}
+
 /* ========== Login / boas-vindas ========== */
 .welcome {
   position: fixed; inset: 0; background: var(--bg);
@@ -1717,6 +1933,9 @@ body {
       <button class="op-badge" id="themeToggle" onclick="toggleTheme()" title="Alternar tema" style="margin-left:6px">
         <span id="themeIcon">🌙</span>
       </button>
+      <button class="op-badge" id="ajustesBtn" onclick="openAjustes()" title="Ajustes" style="margin-left:6px">
+        <span>⚙️</span>
+      </button>
     </div>
     <div class="title">Casa da <span class="accent">Baba</span></div>
     <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
@@ -1821,6 +2040,15 @@ body {
       <div class="section-label">Observação (opcional)</div>
       <div class="input-box">
         <textarea id="orderNotes" rows="2" placeholder="ex: pra gratinar, retira 19h, sem cebola"></textarea>
+      </div>
+
+      <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
+        🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
+      </button>
+      <div class="retroactive-fields" id="retroFields">
+        <label>Quando aconteceu?</label>
+        <input type="datetime-local" id="retroDatetime" />
+        <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
       </div>
 
       <div class="cta-row">
@@ -2040,6 +2268,83 @@ body {
     <div class="at-msg" id="actionToastMsg"></div>
     <div class="at-actions" id="actionToastActions"></div>
   </div>
+
+  <!-- Tela de Ajustes (PIX, telefone, impressora) -->
+  <div class="ajustes-overlay" id="ajustesModal" role="dialog" aria-modal="true">
+    <div class="ajustes-sheet">
+      <div class="cobranca-head">
+        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Ajustes</h3>
+        <button class="cobranca-close" onclick="closeAjustes()" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="ajustes-section">
+        <h4>👤 Operador</h4>
+        <p class="hint">Nome que aparece nos pedidos e cobranças.</p>
+        <div class="field">
+          <label>Seu nome</label>
+          <input type="text" id="ajusteOperator" maxlength="32" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="ajustes-section">
+        <h4>💳 PIX</h4>
+        <p class="hint">Aparece na cobrança que você compartilha pelo WhatsApp e na etiqueta impressa.</p>
+        <div class="field">
+          <label>Chave PIX</label>
+          <input type="text" id="ajustePixKey" autocomplete="off" placeholder="11975739992" />
+        </div>
+        <div class="field">
+          <label>Nome do titular</label>
+          <input type="text" id="ajustePixHolder" autocomplete="off" placeholder="Casa da Baba" />
+        </div>
+      </div>
+
+      <div class="ajustes-section">
+        <h4>🖨️ Impressora térmica</h4>
+        <p class="hint">Hipertech WTP05 ou outra ESC/POS Bluetooth 58mm. Pareie pelo Android antes.</p>
+        <div class="printer-status none" id="printerStatus">
+          <span id="printerStatusLabel">Nenhuma impressora selecionada</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn-ajustes-printer" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
+          <button class="btn-ajustes-printer" onclick="testPrint()" style="flex:1">Testar impressão</button>
+        </div>
+      </div>
+
+      <button class="btn-ajustes-save" onclick="saveAjustes()">Salvar</button>
+    </div>
+  </div>
+
+  <!-- Modal de Conferência (antes de marcar entregue) -->
+  <div class="confer-overlay" id="conferModal" role="dialog" aria-modal="true">
+    <div class="confer-sheet">
+      <h3>Confere o pedido?</h3>
+      <div class="who" id="conferWho">cliente</div>
+      <div class="confer-items" id="conferItems"></div>
+      <div class="confer-total">
+        <span>Total</span>
+        <span class="ct-value" id="conferTotal">R$ 0,00</span>
+      </div>
+      <div class="confer-actions">
+        <button class="btn-confer-cancel" onclick="closeConfer()">Cancelar</button>
+        <button class="btn-confer-ok" onclick="confirmConfer()">Confere e finalizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Histórico (eventos do pedido) -->
+  <div class="historico-overlay" id="historicoModal" role="dialog" aria-modal="true">
+    <div class="historico-sheet">
+      <div class="cobranca-head">
+        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Histórico</h3>
+        <button class="cobranca-close" onclick="closeHistorico()" aria-label="Fechar">×</button>
+      </div>
+      <div id="historicoEvents"></div>
+    </div>
+  </div>
+
+  <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
+  <div class="print-area" id="printArea"></div>
 
   <!-- Modal de Cobrança (mensagem WhatsApp + PIX) -->
   <div class="cobranca-overlay" id="cobrancaModal" role="dialog" aria-modal="true" aria-labelledby="cobrancaTitle">
@@ -2411,6 +2716,8 @@ function renderOpenOrders() {
       ${renderProgressDots(o.status, { showLabel: true })}
       <div class="oo-foot">
         <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">💳 Cobrar</button>
+        <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">🖨️</button>
+        <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">🕐</button>
         <span class="oo-total">${money(o.total)}</span>
       </div>
       ${nextLabel ? `<button class="oo-advance" onclick="advanceOrder('${o.id}')">${nextLabel}</button>` : ''}
@@ -2465,43 +2772,22 @@ function advanceOrder(id) {
   if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
   const nextStatus = ORDER_FLOW[idx + 1];
 
-  // Desconto de estoque ao virar "pronto"
-  let negatives = [];
-  if (nextStatus === 'pronto') {
-    o.items.forEach(it => {
-      const p = products.find(x => x.id === it.productId);
-      if (p) {
-        p.stock = (p.stock || 0) - it.qty;
-        if (p.stock < 0) negatives.push(`${p.name} (${p.stock})`);
-      }
-    });
+  // Antes de marcar como "entregue", o pedido precisa ser CONFERIDO.
+  // Abre modal de revisão e aborta — confirmConfer() vai chamar
+  // applyAdvanceTransition() depois que o operador confere.
+  if (nextStatus === 'entregue') {
+    openConfer(id);
+    return;
   }
 
-  o.status = nextStatus;
-  o.updatedAt = Date.now();
-  o.lastOperatorName = operatorName || null;
-  persistAll();
-  pendingSync++;
-  updateSync();
-  renderHome();
-  renderOrdersFeed();
-  haptic();
-
-  if (o.status === 'entregue') {
-    showToast('Pedido entregue, entrou no caixa');
-  } else if (o.status === 'pronto' && negatives.length > 0) {
-    showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
-  } else if (o.status === 'pronto') {
-    showToast('Marcado como pronto');
-  } else if (o.status === 'preparando') {
-    showToast('Preparo iniciado');
-  }
+  applyAdvanceTransition(id, nextStatus);
 }
 
 function cancelOrder(id) {
   if (!confirm('Cancelar esse pedido?')) return;
   const o = orders.find(x => x.id === id);
   if (!o) return;
+  const prev = o.status;
   // Se já havia descontado (pronto ou entregue), devolve ao estoque
   if (o.status === 'pronto' || o.status === 'entregue') {
     o.items.forEach(it => {
@@ -2512,6 +2798,7 @@ function cancelOrder(id) {
   o.status = 'cancelado';
   o.updatedAt = Date.now();
   o.lastOperatorName = operatorName || null;
+  addHistoryEvent(o, 'cancelado', prev + ' → cancelado');
   persistAll();
   pendingSync++;
   updateSync();
@@ -3085,6 +3372,8 @@ function renderKanbanCard(o, col) {
       ${renderProgressDots(o.status, { small: true, showLabel: false })}
       <div class="k-foot">
         <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">💳 Cobrar</button>
+        <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">🖨️</button>
+        <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">🕐</button>
         <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next} →</button>
         <span class="k-total">${money(o.total)}</span>
         <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
@@ -3308,6 +3597,360 @@ function fallbackCopy(text, successMsg) {
   try { document.execCommand('copy'); showToast(successMsg || 'Copiado'); }
   catch (e) { showToast('Não consegui copiar — selecione manualmente'); }
   finally { document.body.removeChild(ta); }
+}
+
+// ================================================================
+// AJUSTES — operador, PIX, impressora térmica
+// ================================================================
+function openAjustes() {
+  document.getElementById('ajusteOperator').value = operatorName || '';
+  document.getElementById('ajustePixKey').value   = getPixKey();
+  document.getElementById('ajustePixHolder').value = getPixHolder();
+  renderPrinterStatus();
+  document.getElementById('ajustesModal').classList.add('show');
+}
+function closeAjustes() {
+  document.getElementById('ajustesModal').classList.remove('show');
+}
+function saveAjustes() {
+  const op     = (document.getElementById('ajusteOperator').value || '').trim().slice(0,32);
+  const key    = (document.getElementById('ajustePixKey').value || '').trim();
+  const holder = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
+  if (op) saveOperatorName(op);
+  if (key)    localStorage.setItem('cdb-pix-key',    key);
+  if (holder) localStorage.setItem('cdb-pix-holder', holder);
+  closeAjustes();
+  showToast('Ajustes salvos');
+}
+
+function getSavedPrinter() {
+  try { const raw = localStorage.getItem('cdb-printer'); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function setSavedPrinter(p) {
+  try {
+    if (p) localStorage.setItem('cdb-printer', JSON.stringify(p));
+    else   localStorage.removeItem('cdb-printer');
+  } catch (e) {}
+  renderPrinterStatus();
+}
+function renderPrinterStatus() {
+  const el  = document.getElementById('printerStatus');
+  const lab = document.getElementById('printerStatusLabel');
+  const p   = getSavedPrinter();
+  if (!el || !lab) return;
+  if (p && p.address) {
+    el.classList.remove('none'); el.classList.add('ok');
+    lab.textContent = '✓ ' + (p.name || p.address);
+  } else {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.textContent = 'Nenhuma impressora selecionada';
+  }
+}
+function pickPrinter() {
+  const bs = window.bluetoothSerial;
+  if (!bs || !bs.list) {
+    showToast('Bluetooth não disponível neste dispositivo (use o APK Android)');
+    return;
+  }
+  bs.list((devices) => {
+    if (!devices || devices.length === 0) {
+      showToast('Nenhum dispositivo pareado. Pareie pelo Android primeiro.');
+      return;
+    }
+    const labels = devices.map((d, i) => `${i+1}. ${d.name || d.id}`).join('\n');
+    const choice = prompt('Escolha a impressora (digite o número):\n\n' + labels);
+    const n = parseInt(choice, 10);
+    if (isNaN(n) || n < 1 || n > devices.length) return;
+    const dev = devices[n-1];
+    setSavedPrinter({ address: dev.address || dev.id, name: dev.name || dev.id });
+    showToast('Impressora selecionada');
+  }, (err) => {
+    showToast('Erro listando bluetooth: ' + (err && err.message || err));
+  });
+}
+function testPrint() {
+  const bytes = generateEscPosBytes({
+    title: 'TESTE',
+    lines: ['Casa da Baba', 'Hipertech WTP05', 'Impressao OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)]
+  });
+  printViaBluetooth(bytes, () => {
+    showToast('Bluetooth indisponível — usando impressão do sistema');
+    printAreaHtml('<div style="font-family:monospace"><h2 style="text-align:center">TESTE</h2><p>Casa da Baba<br>Hipertech WTP05<br>Sistema fallback</p></div>');
+  });
+}
+
+// ================================================================
+// HISTÓRICO — auditoria de eventos por pedido
+// Estrutura: order.history = [{ at: ms, op: 'Felipe', action: 'criado'|'preparando'|..., change: '...' }]
+// ================================================================
+function ensureHistory(order) {
+  if (!Array.isArray(order.history)) order.history = [];
+  return order.history;
+}
+function addHistoryEvent(order, action, change) {
+  const arr = ensureHistory(order);
+  arr.push({
+    at: Date.now(),
+    op: operatorName || null,
+    action: action,
+    change: change || null
+  });
+  if (arr.length > 200) arr.splice(0, arr.length - 200);
+}
+function openHistorico(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  renderHistorico(o);
+  document.getElementById('historicoModal').classList.add('show');
+}
+function closeHistorico() {
+  document.getElementById('historicoModal').classList.remove('show');
+}
+function renderHistorico(order) {
+  const host = document.getElementById('historicoEvents');
+  if (!host) return;
+  const events = ensureHistory(order).slice().reverse();
+  if (events.length === 0) {
+    host.innerHTML = '<p class="hint" style="padding:12px">Sem eventos registrados ainda.</p>';
+    return;
+  }
+  const ICONS = {
+    criado: '🆕', preparando: '👨‍🍳', pronto: '📦',
+    entregue: '✅', conferido: '🔍', cancelado: '❌'
+  };
+  host.innerHTML = events.map(ev => {
+    const when = new Date(ev.at).toLocaleString('pt-BR');
+    const op   = ev.op ? `<span class="op">${escapeHtml(ev.op)}</span>` : '';
+    const ico  = ICONS[ev.action] || '🕐';
+    const ch   = ev.change ? `<div class="he-change">${escapeHtml(ev.change)}</div>` : '';
+    return `<div class="historico-event">
+      <div class="he-icon">${ico}</div>
+      <div class="he-body">
+        <div class="he-action">${escapeHtml(ev.action || '?')}</div>
+        <div class="he-meta">${when}${op ? ' · ' + op : ''}</div>
+        ${ch}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+// RETROATIVO — toggle de pedido já realizado
+// ================================================================
+function toggleRetroactive() {
+  const fields = document.getElementById('retroFields');
+  const toggle = document.getElementById('retroToggle');
+  const label  = document.getElementById('retroToggleLabel');
+  if (!fields || !toggle) return;
+  const willShow = !fields.classList.contains('show');
+  fields.classList.toggle('show', willShow);
+  toggle.classList.toggle('active', willShow);
+  if (label) label.textContent = willShow
+    ? '🕐 Pedido retroativo ATIVO — clique para desativar'
+    : '🕐 Pedido já realizado? (cadastrar retroativo)';
+  if (willShow) {
+    const dt = document.getElementById('retroDatetime');
+    if (dt && !dt.value) {
+      const now = new Date(Date.now() - 60*60*1000); // 1h atrás como default
+      const off = now.getTimezoneOffset() * 60000;
+      dt.value = new Date(now - off).toISOString().slice(0,16);
+    }
+  }
+}
+
+// ================================================================
+// CONFERÊNCIA — antes de marcar entregue, abre modal de revisão
+// ================================================================
+let pendingConferOrderId = null;
+function openConfer(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
+  pendingConferOrderId = orderId;
+  document.getElementById('conferWho').textContent =
+    (o.clientSnapshot?.name || 'Sem cliente') + (o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '');
+  document.getElementById('conferTotal').textContent = money(o.total);
+  const itemsEl = document.getElementById('conferItems');
+  itemsEl.innerHTML = (o.items || []).map(it =>
+    `<div class="ci-row"><span>${it.qty}× ${escapeHtml(it.name)}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
+  ).join('');
+  document.getElementById('conferModal').classList.add('show');
+}
+function closeConfer() {
+  pendingConferOrderId = null;
+  document.getElementById('conferModal').classList.remove('show');
+}
+function confirmConfer() {
+  const id = pendingConferOrderId;
+  closeConfer();
+  if (!id) return;
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  o.confirmedBy = operatorName || null;
+  o.confirmedAt = Date.now();
+  addHistoryEvent(o, 'conferido', 'finalizou e conferiu');
+  applyAdvanceTransition(id, 'entregue');
+}
+
+// Extraído do advanceOrder original para permitir intercepção da conferência.
+function applyAdvanceTransition(id, nextStatus) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  let negatives = [];
+  if (nextStatus === 'pronto') {
+    o.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) {
+        p.stock = (p.stock || 0) - it.qty;
+        if (p.stock < 0) negatives.push(`${p.name} (${p.stock})`);
+      }
+    });
+  }
+  const prev = o.status;
+  o.status = nextStatus;
+  o.updatedAt = Date.now();
+  o.lastOperatorName = operatorName || null;
+  addHistoryEvent(o, nextStatus, prev + ' → ' + nextStatus);
+  persistAll();
+  pendingSync++;
+  updateSync();
+  renderHome();
+  renderOrdersFeed();
+  haptic();
+  if (nextStatus === 'entregue') showToast('Pedido entregue, entrou no caixa');
+  else if (nextStatus === 'pronto' && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
+  else if (nextStatus === 'pronto') showToast('Marcado como pronto');
+  else if (nextStatus === 'preparando') showToast('Preparo iniciado');
+}
+
+// ================================================================
+// IMPRESSÃO TÉRMICA — Hipertech WTP05 (58mm, 32 cols, ESC/POS)
+// Estratégia: tenta Bluetooth (cordova-plugin-bluetooth-serial); se
+// indisponível, cai pra window.print() formatado a 58mm via @media print.
+// ================================================================
+const PRINT_COLS = 32;
+
+function asciiNorm(s) {
+  // Remove acentos pra evitar problema de encoding na térmica.
+  return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+}
+function padLine(left, right) {
+  left  = asciiNorm(left);
+  right = asciiNorm(right);
+  const space = Math.max(1, PRINT_COLS - left.length - right.length);
+  if (left.length + right.length >= PRINT_COLS) {
+    // Quebra: se a soma exceder, joga right na próxima linha alinhado
+    return left.slice(0, PRINT_COLS) + '\n' + ' '.repeat(Math.max(0, PRINT_COLS - right.length)) + right;
+  }
+  return left + ' '.repeat(space) + right;
+}
+function center(s) {
+  s = asciiNorm(s);
+  if (s.length >= PRINT_COLS) return s.slice(0, PRINT_COLS);
+  const pad = Math.floor((PRINT_COLS - s.length) / 2);
+  return ' '.repeat(pad) + s;
+}
+function divider() { return '-'.repeat(PRINT_COLS); }
+
+function generateEscPosBytes(payload) {
+  // payload: { title, lines: [string], order? } — se passar order, monta etiqueta completa.
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const out = [];
+  const push = (...b) => b.forEach(x => out.push(x));
+  const text = (s) => { const enc = new TextEncoder().encode(asciiNorm(s)); enc.forEach(b => out.push(b)); };
+
+  push(ESC, 0x40);            // init
+  push(ESC, 0x61, 0x01);      // center
+  push(ESC, 0x21, 0x10);      // double height
+  if (payload.title) { text(payload.title); push(LF); }
+  push(ESC, 0x21, 0x00);      // normal
+  push(LF);
+
+  if (payload.order) {
+    const o = payload.order;
+    push(ESC, 0x61, 0x00);    // left
+    text(divider()); push(LF);
+    text('Pedido: ' + (o.id || '').slice(-8)); push(LF);
+    text('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente')); push(LF);
+    if (o.clientSnapshot?.ref) { text(o.clientSnapshot.ref); push(LF); }
+    text(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR')); push(LF);
+    text(divider()); push(LF);
+    (o.items || []).forEach(it => {
+      text(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice))); push(LF);
+    });
+    text(divider()); push(LF);
+    push(ESC, 0x21, 0x10); text(padLine('TOTAL', money(o.total))); push(LF);
+    push(ESC, 0x21, 0x00);
+    if (o.notes) { text('Obs: ' + o.notes); push(LF); }
+    text(divider()); push(LF);
+    text('PIX: ' + getPixKey()); push(LF);
+    text(getPixHolder()); push(LF);
+    if (o.confirmedBy) { text('Conferido por: ' + o.confirmedBy); push(LF); }
+  } else if (payload.lines) {
+    push(ESC, 0x61, 0x01);    // center
+    payload.lines.forEach(l => { text(l); push(LF); });
+  }
+
+  push(LF, LF, LF, LF);       // espaço pra cortar
+  return new Uint8Array(out);
+}
+
+function printViaBluetooth(bytes, onFallback) {
+  const bs = window.bluetoothSerial;
+  const printer = getSavedPrinter();
+  if (!bs || !printer || !printer.address) {
+    if (typeof onFallback === 'function') onFallback();
+    return;
+  }
+  const send = () => {
+    bs.write(bytes,
+      () => showToast('Enviado pra impressora'),
+      (err) => showToast('Erro imprimir: ' + (err && err.message || err))
+    );
+  };
+  bs.isConnected(send, () => {
+    bs.connect(printer.address, send, (err) => {
+      showToast('Não conectou: ' + (err && err.message || err));
+      if (typeof onFallback === 'function') onFallback();
+    });
+  });
+}
+
+function printAreaHtml(html) {
+  const area = document.getElementById('printArea');
+  if (!area) return;
+  area.innerHTML = html;
+  setTimeout(() => { try { window.print(); } catch (e) { showToast('Print indisponível'); } }, 80);
+}
+
+function printEtiqueta(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  const bytes = generateEscPosBytes({ title: 'CASA DA BABA', order: o });
+  printViaBluetooth(bytes, () => {
+    // Fallback: monta HTML pra @media print
+    const items = (o.items || []).map(it =>
+      `<tr><td>${it.qty}× ${escapeHtml(it.name)}</td><td style="text-align:right">${money(it.qty*it.unitPrice)}</td></tr>`
+    ).join('');
+    const html = `
+      <div style="font-family:monospace;width:58mm;font-size:11pt">
+        <h2 style="text-align:center;margin:0">CASA DA BABA</h2>
+        <p style="text-align:center;margin:4px 0">Pedido ${escapeHtml((o.id||'').slice(-8))}</p>
+        <hr>
+        <p>Cliente: ${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<br>
+           ${escapeHtml(o.clientSnapshot?.ref || '')}<br>
+           ${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</p>
+        <hr>
+        <table style="width:100%">${items}</table>
+        <hr>
+        <p style="text-align:right"><b>TOTAL ${money(o.total)}</b></p>
+        ${o.notes ? `<p>Obs: ${escapeHtml(o.notes)}</p>` : ''}
+        <hr>
+        <p>PIX: ${escapeHtml(getPixKey())}<br>${escapeHtml(getPixHolder())}</p>
+        ${o.confirmedBy ? `<p>Conferido por: ${escapeHtml(o.confirmedBy)}</p>` : ''}
+      </div>`;
+    printAreaHtml(html);
+  });
 }
 
 // Botões +/- explícitos nos tiles de produção
@@ -3644,21 +4287,65 @@ function saveOrder() {
     selectedClient.orderCount = (selectedClient.orderCount || 0) + 1;
   }
 
+  // Retroativo: se o toggle estiver ativo e a data for válida e <= agora,
+  // o pedido entra direto como "entregue" (sem passar pela esteira) e o
+  // estoque é descontado imediatamente. factAt guarda quando o pedido
+  // realmente aconteceu; createdAt fica como "quando foi cadastrado".
+  const retroFields = document.getElementById('retroFields');
+  const isRetro = retroFields && retroFields.classList.contains('show');
+  let retroAtMs = null;
+  if (isRetro) {
+    const dtRaw = (document.getElementById('retroDatetime')?.value || '').trim();
+    if (dtRaw) {
+      const t = new Date(dtRaw).getTime();
+      if (!isNaN(t) && t <= Date.now()) retroAtMs = t;
+    }
+  }
+
+  const initialStatus = retroAtMs ? 'entregue' : 'aguardando';
+  const nowMs = Date.now();
+
   const order = {
-    id: 'o-' + Date.now(),
+    id: 'o-' + nowMs,
     clientId: selectedClient === 'avulso' ? null : selectedClient.id,
     clientSnapshot: snapshot,
     items: currentOrderItems.map(i => ({...i})),
     notes,
     total,
-    status: 'aguardando',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    lastOperatorName: operatorName || null
+    status: initialStatus,
+    createdAt: nowMs,
+    updatedAt: nowMs,
+    lastOperatorName: operatorName || null,
+    history: [],
+    factAt: retroAtMs || null,
+    confirmedBy: retroAtMs ? (operatorName || null) : null,
+    confirmedAt: retroAtMs ? nowMs : null
   };
+  addHistoryEvent(order, 'criado', isRetro
+    ? 'pedido retroativo (' + new Date(retroAtMs).toLocaleString('pt-BR') + ') já entregue'
+    : 'pedido criado');
+
+  // Se for retroativo, desconta estoque imediatamente (pulou a esteira).
+  if (retroAtMs) {
+    order.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) p.stock = (p.stock || 0) - it.qty;
+    });
+  }
+
   orders.unshift(order);
   persistAll();
   renderRecents();
+
+  // Reseta o toggle de retroativo pra próximo pedido começar limpo.
+  if (isRetro) {
+    retroFields.classList.remove('show');
+    document.getElementById('retroToggle')?.classList.remove('active');
+    const lab = document.getElementById('retroToggleLabel');
+    if (lab) lab.textContent = '🕐 Pedido já realizado? (cadastrar retroativo)';
+    const dt = document.getElementById('retroDatetime');
+    if (dt) dt.value = '';
+  }
 
   currentOrderItems = [];
   document.getElementById('orderNotes').value = '';
@@ -3676,21 +4363,33 @@ function saveOrder() {
 
   // Toast com as próximas ações possíveis — a cobrança é destaque
   // porque é a primeira coisa que o operador quer fazer ao criar um pedido.
+  // Para retroativo, oferece imprimir/cobrar (já está entregue, não tem esteira).
   const nomeCli = snapshot.name || 'cliente';
-  showActionToast(
-    `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`,
-    [
-      { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
-      { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
-      { label: 'Ver esteira',     fn: () => {
-          go('pedidos');
-          setTimeout(() => {
-            const el = document.querySelector('.col-aguardando');
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, 150);
-      }}
-    ]
-  );
+  if (retroAtMs) {
+    showActionToast(
+      `<span class="hi">✓ Pedido retroativo</span> pra ${escapeHtml(nomeCli)} · ${money(total)} · já entregue`,
+      [
+        { label: '🖨️ Imprimir',     fn: () => printEtiqueta(order.id) },
+        { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+        { label: 'Ver caixa',       fn: () => go('movimento') }
+      ]
+    );
+  } else {
+    showActionToast(
+      `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`,
+      [
+        { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+        { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
+        { label: 'Ver esteira',     fn: () => {
+            go('pedidos');
+            setTimeout(() => {
+              const el = document.querySelector('.col-aguardando');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 150);
+        }}
+      ]
+    );
+  }
   lastAction = { type: 'pedido' };
 }
 
