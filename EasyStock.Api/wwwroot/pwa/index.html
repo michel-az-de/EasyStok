@@ -1351,6 +1351,85 @@ body {
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 
+/* ========== Modal de Cobrança (mensagem WhatsApp + PIX) ========== */
+.cobranca-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  display: none; z-index: 9200;
+  align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.cobranca-overlay.show { display: flex; }
+.cobranca-sheet {
+  background: var(--bg-elev); color: var(--ink);
+  width: 100%; max-width: 430px;
+  border-radius: 20px 20px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.3);
+  animation: slideUp 0.3s ease;
+}
+.cobranca-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.cobranca-head h3 { font-family: 'Fraunces', serif; font-size: 20px; margin: 0; }
+.cobranca-close {
+  width: 32px; height: 32px; border: 0; background: transparent;
+  color: var(--ink-dim); font-size: 22px; cursor: pointer;
+  border-radius: 8px; font-family: inherit;
+}
+.cobranca-preview {
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px;
+  font-size: 13px; line-height: 1.55; color: var(--ink);
+  white-space: pre-wrap; word-break: break-word;
+  font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+  margin-bottom: 12px;
+}
+.cobranca-pix {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--gold-soft); border: 1px solid rgba(214,161,51,0.3);
+  border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.cobranca-pix .pix-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); font-weight: 700; }
+.cobranca-pix .pix-value { font-size: 14px; font-weight: 700; color: var(--ink); font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace; }
+.cobranca-pix .pix-holder { font-size: 11px; color: var(--ink-dim); }
+.cobranca-pix .pix-copy {
+  margin-left: auto;
+  padding: 8px 12px; background: var(--gold); color: #1a1410;
+  border: 0; border-radius: 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  white-space: nowrap;
+}
+.cobranca-pix .pix-copy:active { transform: scale(0.96); }
+.cobranca-actions { display: flex; flex-direction: column; gap: 8px; }
+.cobranca-actions .btn-share {
+  padding: 14px; background: #25D366; color: white;      /* verde WhatsApp */
+  border: 0; border-radius: 12px;
+  font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.cobranca-actions .btn-copy {
+  padding: 12px; background: transparent; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 12px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.cobranca-actions button:active { transform: scale(0.98); }
+
+/* Botão "Cobrar" inline nos cards (kanban + home) */
+.btn-cobrar {
+  padding: 8px 10px;
+  background: rgba(37, 211, 102, 0.12);
+  color: #25D366;
+  border: 1px solid rgba(37, 211, 102, 0.3);
+  border-radius: 8px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-cobrar:active { transform: scale(0.96); }
+
 /* ========== Login / boas-vindas ========== */
 .welcome {
   position: fixed; inset: 0; background: var(--bg);
@@ -1962,6 +2041,31 @@ body {
     <div class="at-actions" id="actionToastActions"></div>
   </div>
 
+  <!-- Modal de Cobrança (mensagem WhatsApp + PIX) -->
+  <div class="cobranca-overlay" id="cobrancaModal" role="dialog" aria-modal="true" aria-labelledby="cobrancaTitle">
+    <div class="cobranca-sheet">
+      <div class="cobranca-head">
+        <h3 id="cobrancaTitle">Cobrança</h3>
+        <button class="cobranca-close" onclick="closeCobranca()" aria-label="Fechar">×</button>
+      </div>
+      <div class="cobranca-preview" id="cobrancaPreview"></div>
+      <div class="cobranca-pix">
+        <div>
+          <div class="pix-label">💳 PIX — celular</div>
+          <div class="pix-value" id="cobrancaPixValue">—</div>
+          <div class="pix-holder" id="cobrancaPixHolder">Casa da Baba</div>
+        </div>
+        <button class="pix-copy" onclick="copyPixKey()">Copiar</button>
+      </div>
+      <div class="cobranca-actions">
+        <button class="btn-share" onclick="shareCobranca()">
+          <span>📤</span> Compartilhar no WhatsApp
+        </button>
+        <button class="btn-copy" onclick="copyCobranca()">Copiar mensagem toda</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Bottom nav -->
   <div class="nav">
     <button class="nav-btn active" data-nav="home" onclick="go('home')">
@@ -2306,6 +2410,7 @@ function renderOpenOrders() {
       ${o.notes ? `<div class="oo-notes">${escapeHtml(o.notes)}</div>` : ''}
       ${renderProgressDots(o.status, { showLabel: true })}
       <div class="oo-foot">
+        <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">💳 Cobrar</button>
         <span class="oo-total">${money(o.total)}</span>
       </div>
       ${nextLabel ? `<button class="oo-advance" onclick="advanceOrder('${o.id}')">${nextLabel}</button>` : ''}
@@ -2979,6 +3084,7 @@ function renderKanbanCard(o, col) {
       <div class="k-items">${itemsLine}${o.notes ? ' · <em>' + escapeHtml(o.notes) + '</em>' : ''}</div>
       ${renderProgressDots(o.status, { small: true, showLabel: false })}
       <div class="k-foot">
+        <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">💳 Cobrar</button>
         <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next} →</button>
         <span class="k-total">${money(o.total)}</span>
         <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
@@ -3038,6 +3144,170 @@ function showActionToast(msgHtml, actions) {
 }
 function hideActionToast() {
   document.getElementById('actionToast').classList.remove('show');
+}
+
+// ================================================================
+// COBRANÇA — gera mensagem de WhatsApp + PIX pra o cliente pagar
+// Config: chave PIX e nome do titular ficam em localStorage,
+// com defaults abaixo. Dá pra trocar via window.cdbSetPix().
+// ================================================================
+const DEFAULT_PIX_KEY = '1197573992';
+const DEFAULT_PIX_HOLDER = 'Casa da Baba';
+
+function getPixKey() {
+  try { return localStorage.getItem('cdb-pix-key') || DEFAULT_PIX_KEY; }
+  catch (e) { return DEFAULT_PIX_KEY; }
+}
+function getPixHolder() {
+  try { return localStorage.getItem('cdb-pix-holder') || DEFAULT_PIX_HOLDER; }
+  catch (e) { return DEFAULT_PIX_HOLDER; }
+}
+// Helper pra trocar por console se precisar: cdbSetPix('11999998888', 'Fulano')
+window.cdbSetPix = function (key, holder) {
+  if (key) localStorage.setItem('cdb-pix-key', String(key));
+  if (holder) localStorage.setItem('cdb-pix-holder', String(holder));
+  console.log('[PIX] atualizado:', getPixKey(), '·', getPixHolder());
+};
+
+/**
+ * Formata uma chave PIX celular (11 dígitos) como "(11) 97573-9992".
+ * Se não bater, devolve como veio.
+ */
+function formatPixCelular(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 11) {
+    return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+  }
+  return raw;
+}
+
+/**
+ * Monta a mensagem de cobrança em texto puro (boa pra WhatsApp).
+ * Shape: cabeçalho + itens + total + obs + chave PIX + assinatura.
+ */
+function buildCobrancaMessage(order) {
+  const nome = order.clientSnapshot?.name || 'Cliente';
+  const ref  = order.clientSnapshot?.ref ? ` (${order.clientSnapshot.ref})` : '';
+  const total = Number(order.total) || 0;
+  const itensLinhas = (order.items || [])
+    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}`)
+    .join('\n');
+  const obsBloco = order.notes ? `\n📝 Obs: ${order.notes}\n` : '';
+  const pixDisplay = formatPixCelular(getPixKey());
+  const pixHolder  = getPixHolder();
+
+  return (
+    `🍝 *Casa da Baba*\n\n` +
+    `Oi *${nome}*${ref}! Seu pedido está anotado:\n\n` +
+    `${itensLinhas}\n\n` +
+    `💰 *Total: ${money(total)}*` +
+    `${obsBloco}` +
+    `\n💳 *Pagamento via PIX*\n` +
+    `Chave (celular): *${pixDisplay}*\n` +
+    `Nome: ${pixHolder}\n\n` +
+    `Por favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n` +
+    `_Pedido ${order.id}_`
+  );
+}
+
+/**
+ * Etiqueta curta (impressão/colar embalagem). Formato: cliente, itens,
+ * total, horário, número do pedido. Sem PIX.
+ */
+function buildEtiqueta(order) {
+  const nome = order.clientSnapshot?.name || 'Cliente';
+  const ref  = order.clientSnapshot?.ref || '';
+  const itensLinhas = (order.items || [])
+    .map(i => `${i.qty}× ${i.name}`)
+    .join('\n');
+  const horario = timeOf(order.createdAt);
+  const obs = order.notes ? `\nObs: ${order.notes}` : '';
+  return (
+    `== CASA DA BABA ==\n` +
+    `Cliente: ${nome}${ref ? ' · ' + ref : ''}\n` +
+    `${itensLinhas}\n` +
+    `Total: ${money(Number(order.total) || 0)}\n` +
+    `Horário: ${horario}${obs}\n` +
+    `#${order.id.slice(-6)}`
+  );
+}
+
+let currentCobrancaOrderId = null;
+
+function openCobranca(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
+  currentCobrancaOrderId = orderId;
+
+  const msg = buildCobrancaMessage(o);
+  document.getElementById('cobrancaPreview').textContent = msg;
+  document.getElementById('cobrancaPixValue').textContent  = formatPixCelular(getPixKey());
+  document.getElementById('cobrancaPixHolder').textContent = getPixHolder();
+  document.getElementById('cobrancaModal').classList.add('show');
+}
+function closeCobranca() {
+  document.getElementById('cobrancaModal').classList.remove('show');
+  currentCobrancaOrderId = null;
+}
+
+/**
+ * Compartilha via Web Share API (se disponível — quase sempre no Android).
+ * Fallback: abre URL wa.me em nova janela.
+ */
+async function shareCobranca() {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  const msg = buildCobrancaMessage(o);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Casa da Baba — Pedido', text: msg });
+      return;
+    }
+    // Fallback: wa.me/?text=... abre o WhatsApp direto
+    const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+    window.open(url, '_blank');
+  } catch (e) {
+    // Usuário cancelou o share — silencioso
+    if (e && e.name !== 'AbortError') console.warn('Share falhou:', e);
+  }
+}
+
+function copyCobranca() {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  const msg = buildCobrancaMessage(o);
+  copyToClipboard(msg, 'Mensagem copiada — cole no WhatsApp');
+}
+
+function copyPixKey() {
+  // Copia a chave em formato "puro" (só dígitos) pra cliente colar no banco.
+  const raw = String(getPixKey()).replace(/\D/g, '');
+  copyToClipboard(raw, 'Chave PIX copiada: ' + formatPixCelular(raw));
+}
+
+function copyToClipboard(text, successMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast(successMsg || 'Copiado'),
+      () => fallbackCopy(text, successMsg)
+    );
+  } else {
+    fallbackCopy(text, successMsg);
+  }
+}
+function fallbackCopy(text, successMsg) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showToast(successMsg || 'Copiado'); }
+  catch (e) { showToast('Não consegui copiar — selecione manualmente'); }
+  finally { document.body.removeChild(ta); }
 }
 
 // Botões +/- explícitos nos tiles de produção
@@ -3404,16 +3674,14 @@ function saveOrder() {
   pendingSync++;
   updateSync();
 
-  // Toast com as 3 próximas ações possíveis
+  // Toast com as próximas ações possíveis — a cobrança é destaque
+  // porque é a primeira coisa que o operador quer fazer ao criar um pedido.
   const nomeCli = snapshot.name || 'cliente';
   showActionToast(
     `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`,
     [
+      { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
       { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
-      { label: 'Fazer outro',     fn: () => {
-          const s = document.getElementById('clientSearch');
-          if (s) s.focus();
-      }},
       { label: 'Ver esteira',     fn: () => {
           go('pedidos');
           setTimeout(() => {
