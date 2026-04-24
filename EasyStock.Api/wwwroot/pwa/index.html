@@ -1676,16 +1676,24 @@ body {
       <div class="section-label">Caixa de hoje</div>
       <div class="cash-card">
         <div class="cash-row in">
-          <div class="l">Vendido</div>
-          <div class="v" id="cashIn">R$ 0</div>
+          <div class="l">Vendas de pedidos</div>
+          <div class="v" id="cashSold">R$ 0,00</div>
+        </div>
+        <div class="cash-row in" id="cashReceivableRow" style="display:none">
+          <div class="l">A receber (prontos)</div>
+          <div class="v" id="cashReceivable">R$ 0,00</div>
+        </div>
+        <div class="cash-row in">
+          <div class="l">Entradas extras</div>
+          <div class="v" id="cashExtraIn">R$ 0,00</div>
         </div>
         <div class="cash-row out">
           <div class="l">Saídas</div>
-          <div class="v" id="cashOut">R$ 0</div>
+          <div class="v" id="cashOut">R$ 0,00</div>
         </div>
         <div class="cash-row balance">
           <div class="l">Saldo</div>
-          <div class="v" id="cashBalance">R$ 0</div>
+          <div class="v" id="cashBalance">R$ 0,00</div>
         </div>
         <button class="cash-btn" onclick="openCashModal()">+ lançamento manual</button>
       </div>
@@ -1834,7 +1842,7 @@ body {
       <label class="modal-label">Preço</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="newProdPrice" type="number" inputmode="decimal" placeholder="25"></div>
+        <div class="input-box"><input id="newProdPrice" type="text" inputmode="decimal" placeholder="25,00" autocomplete="off"></div>
       </div>
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductModal()">Cancelar</button>
@@ -1932,7 +1940,7 @@ body {
       <label class="modal-label">Valor</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="cashAmount" type="number" inputmode="decimal" placeholder="45"></div>
+        <div class="input-box"><input id="cashAmount" type="text" inputmode="decimal" placeholder="45,00" autocomplete="off"></div>
       </div>
 
       <div class="modal-ctas">
@@ -2307,13 +2315,42 @@ function renderOpenOrders() {
 }
 
 function renderCash() {
-  const sold = orders.filter(o => o.status === 'entregue' && isToday(o.updatedAt)).reduce((s, o) => s + o.total, 0);
-  const extraIn = cashEntries.filter(c => c.type === 'income' && isToday(c.createdAt)).reduce((s, c) => s + c.amount, 0);
-  const out = cashEntries.filter(c => c.type === 'expense' && isToday(c.createdAt)).reduce((s, c) => s + c.amount, 0);
+  // Vendas: pedidos entregues hoje (o momento da entrega é quando o
+  // dinheiro entra de fato — o que vai pro saldo).
+  const sold = orders
+    .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
+    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+
+  // A receber: pedidos em "pronto" hoje (já produzidos, aguardando
+  // retirada/entrega). Estoque já foi descontado, falta só entrar
+  // o dinheiro. NÃO entra no saldo — é informativo.
+  const receivable = orders
+    .filter(o => o.status === 'pronto' && (isToday(o.updatedAt) || isToday(o.createdAt)))
+    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+
+  // Lançamentos manuais do dia.
+  const extraIn = cashEntries
+    .filter(c => c.type === 'income' && isToday(c.createdAt))
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const out = cashEntries
+    .filter(c => c.type === 'expense' && isToday(c.createdAt))
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
   const balance = (sold + extraIn) - out;
-  document.getElementById('cashIn').textContent = money(sold + extraIn);
-  document.getElementById('cashOut').textContent = money(out);
-  document.getElementById('cashBalance').textContent = money(balance);
+
+  document.getElementById('cashSold').textContent     = money(sold);
+  document.getElementById('cashExtraIn').textContent  = money(extraIn);
+  document.getElementById('cashOut').textContent      = money(out);
+  document.getElementById('cashBalance').textContent  = money(balance);
+
+  // Linha "A receber" só aparece quando há algo pra receber — senão polui.
+  const receivableRow = document.getElementById('cashReceivableRow');
+  if (receivable > 0) {
+    document.getElementById('cashReceivable').textContent = money(receivable);
+    receivableRow.style.display = '';
+  } else {
+    receivableRow.style.display = 'none';
+  }
 }
 
 function advanceOrder(id) {
@@ -3418,7 +3455,8 @@ function saveNewProduct() {
   if (!name) { document.getElementById('newProdName').focus(); return; }
   const unit = document.getElementById('newProdUnit').value.trim();
   const priceStr = document.getElementById('newProdPrice').value.trim();
-  const price = priceStr ? parseFloat(priceStr) : null;
+  const priceParsed = priceStr ? parseMoneyInput(priceStr) : NaN;
+  const price = isNaN(priceParsed) ? null : priceParsed;
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
@@ -3471,10 +3509,38 @@ function openCashModal() {
 function closeCashModal() {
   document.getElementById('cashEntryModal').classList.remove('show');
 }
+/**
+ * Parse robusto de valor monetário vindo do input (Android/pt-BR).
+ * Aceita "12", "12.5", "12,50", "R$ 12,50", "12.345,67".
+ * Retorna NaN se não conseguir extrair um número válido.
+ */
+function parseMoneyInput(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).trim();
+  if (!s) return NaN;
+  // Remove tudo que não for dígito, vírgula ou ponto (tira "R$", espaços).
+  s = s.replace(/[^\d.,-]/g, '');
+  // Se tem vírgula E ponto, assume formato pt-BR (1.234,56) → remove pontos, troca vírgula por ponto.
+  if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.indexOf(',') >= 0) {
+    // Só vírgula → separador decimal pt-BR
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
 function saveCashEntry() {
   const desc = document.getElementById('cashDesc').value.trim();
-  const amount = parseFloat(document.getElementById('cashAmount').value);
-  if (!desc || !amount || amount <= 0) return;
+  const amount = parseMoneyInput(document.getElementById('cashAmount').value);
+
+  if (!desc) { showToast('Informe a descrição.'); return; }
+  if (isNaN(amount) || amount <= 0) {
+    showToast('Valor inválido. Use 12 ou 12,50.');
+    return;
+  }
+
   cashEntries.push({
     id: 'cash-' + Date.now(),
     type: cashType,
