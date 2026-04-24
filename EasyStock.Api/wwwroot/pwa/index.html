@@ -1546,18 +1546,37 @@ body {
 .progress-dots .pd-sep.done { background: var(--gold); }
 .progress-dots .pd-label { font-size: 10px; color: var(--ink-mute); margin-left: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-/* ========== Action toast (multi-botão) ========== */
+/* ========== Action toast (multi-botão) ==========
+   Usa opacity+visibility+pointer-events em vez de só transform porque
+   translateY(120%) não era suficiente para esconder totalmente o elemento
+   (sobrava uma faixa visível acima do nav, cobrindo os emojis). */
 .action-toast {
   position: fixed;
-  left: 50%; transform: translateX(-50%) translateY(120%);
+  left: 50%;
   bottom: 80px;
+  transform: translateX(-50%) translateY(30px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   background: var(--bg-elev-2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 14px;
   padding: 14px 16px; max-width: 360px; width: calc(100% - 32px);
   box-shadow: var(--shadow); z-index: 9000;
-  transition: transform 0.3s ease;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    visibility 0s linear 0.25s;
 }
-.action-toast.show { transform: translateX(-50%) translateY(0); }
+.action-toast.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    visibility 0s linear 0s;
+}
 .action-toast .at-msg { font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
 .action-toast .at-msg .hi { color: var(--gold); font-weight: 700; }
 .action-toast .at-actions { display: flex; gap: 6px; flex-wrap: wrap; }
