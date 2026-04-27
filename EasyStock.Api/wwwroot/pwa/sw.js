@@ -1,6 +1,15 @@
 // Service Worker - Casa da Baba PWA
-// Estratégia: cache-first para estáticos, network-only para API.
-// Offline-first: tudo necessário para o app rodar fica pre-cacheado no install.
+//
+// Estrategia para suportar AUTO-UPDATE silencioso:
+// - index.html / navegacao: NETWORK-FIRST com timeout 1.5s
+//   (garante que update novo chega rapido se a rede estiver OK; cai pro cache se offline)
+// - Resto dos estaticos (CSS, JS, icones): STALE-WHILE-REVALIDATE
+//   (serve do cache rapido, atualiza em background)
+// - /api/*: bypass total (sync precisa estar online sempre)
+//
+// CACHE_VERSION e substituida pelo CI a cada deploy (cdb-<sha>) — isso garante
+// que o activate descarte caches antigos, forcando o conteudo cacheado a ser
+// re-baixado apos cada release.
 
 const CACHE_VERSION = 'cdb-v2';
 const STATIC_ASSETS = [
@@ -30,39 +39,63 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  // Só intercepta GET — POSTs/PUTs/DELETEs (ex: /api/mobile/sync) passam direto.
-  if (event.request.method !== 'GET') return;
+function networkFirstWithTimeout(req, ms) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      caches.match(req).then(c => {
+        if (settled) return;
+        if (c) { settled = true; resolve(c); }
+      });
+    }, ms);
+    fetch(req).then((resp) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      if (resp.ok && new URL(req.url).origin === self.location.origin) {
+        const copy = resp.clone();
+        caches.open(CACHE_VERSION).then(c => c.put(req, copy));
+      }
+      resolve(resp);
+    }).catch(() => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      caches.match(req).then(c => resolve(c || caches.match('./index.html')));
+    });
+  });
+}
 
+function staleWhileRevalidate(req, url) {
+  return caches.match(req).then((cached) => {
+    const network = fetch(req).then((resp) => {
+      if (resp.ok && url.origin === self.location.origin) {
+        const copy = resp.clone();
+        caches.open(CACHE_VERSION).then(c => c.put(req, copy));
+      }
+      return resp;
+    }).catch(() => undefined);
+    return cached || network;
+  });
+}
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Bypass total para requests da API (sync de dados — precisa estar online).
-  if (url.pathname.includes('/api/')) {
-    return;
-  }
+  // API: bypass (sync precisa de rede)
+  if (url.pathname.includes('/api/')) return;
 
-  // Google Fonts: deixa o browser cachear nativamente (cross-origin).
-  if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) {
-    return;
-  }
+  // Google Fonts: deixa o browser cachear nativamente
+  if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) return;
 
-  // Cache-first para estáticos do mesmo origin (e requests do PWA).
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((resp) => {
-        // Cacheia somente respostas OK do mesmo origin (evita cachear erros / cross-origin opacos).
-        if (resp.ok && url.origin === self.location.origin) {
-          const copy = resp.clone();
-          caches.open(CACHE_VERSION).then((c) => c.put(event.request, copy));
-        }
-        return resp;
-      }).catch(() => {
-        // Offline sem cache: se é navegação (html), serve index.html; senão, undefined (erro normal).
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
-  );
+  const isHtml = event.request.mode === 'navigate'
+              || url.pathname === '/'
+              || url.pathname.endsWith('/')
+              || url.pathname.endsWith('index.html');
+
+  if (isHtml) {
+    event.respondWith(networkFirstWithTimeout(event.request, 1500));
+  } else {
+    event.respondWith(staleWhileRevalidate(event.request, url));
+  }
 });

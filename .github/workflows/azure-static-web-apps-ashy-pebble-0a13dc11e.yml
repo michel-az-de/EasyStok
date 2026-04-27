@@ -19,6 +19,28 @@ jobs:
         with:
           submodules: true
           lfs: false
+
+      # Inject config.js apontando o apiBaseUrl pra API em produção (Azure App Service).
+      # A PWA serve da SWA mas faz fetch da API noutro origin — config.js diz pra onde ir.
+      - name: Inject config.js (apiBaseUrl)
+        run: |
+          echo 'window.CDB_CONFIG = { apiBaseUrl: "https://easystock-api.azurewebsites.net" };' \
+            > EasyStock.Api/wwwroot/pwa/config.js
+
+      # Garante que index.html carrega config.js antes de sync.js (idempotente).
+      - name: Wire config.js into index.html
+        run: |
+          if ! grep -q 'src="config.js"' EasyStock.Api/wwwroot/pwa/index.html; then
+            sed -i 's|<script src="sync.js"></script>|<script src="config.js"></script>\n<script src="sync.js"></script>|' \
+              EasyStock.Api/wwwroot/pwa/index.html
+          fi
+
+      # Cache busting: cada deploy substitui "cdb-v2" pelo SHA curto do commit.
+      # Isso faz o SW antigo descartar caches velhos no activate.
+      - name: Bump SW cache version
+        run: |
+          sed -i "s|cdb-v2|cdb-${GITHUB_SHA:0:7}|g" EasyStock.Api/wwwroot/pwa/sw.js
+
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1

@@ -5477,9 +5477,24 @@ window.cdbApp = {
 <script src="qrcode.min.js"></script>
 <script src="sync.js"></script>
 <script>
+// Auto-update silencioso: ao detectar novo SW assumindo controle, recarrega
+// a pagina sem pedir nada pro usuario. Combinado com network-first no sw.js,
+// cada git push -> deploy SWA -> proxima abertura do app ja tem versao nova.
 if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW falhou:', err));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Forca check de update toda vez que o app vira visivel
+      // (usuario abre o app, ou volta do background) — Felipe pediu "so ao abrir".
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch(err => console.warn('SW falhou:', err));
   });
 }
 </script>
