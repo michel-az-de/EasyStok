@@ -15,9 +15,11 @@
     "CapacitorUpdater": {
       "autoUpdate": true,
       "updateUrl": "https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/updates.json",
-      "directUpdate": "atInstall",
-      "responseTimeout": 10,
-      "appReadyTimeout": 15000
+      "directUpdate": "always",
+      "responseTimeout": 20,
+      "appReadyTimeout": 30000,
+      "autoDeleteFailed": true,
+      "resetWhenUpdate": false
     }
   }
 }

@@ -2543,6 +2543,14 @@ body {
         </div>
       </div>
 
+      <div class="ajustes-section">
+        <h4>🔄 Atualização do app</h4>
+        <p class="hint">O app atualiza sozinho ao reabrir, sem reinstalar APK. Se demorar, force aqui.</p>
+        <div style="display:flex;gap:6px;flex-direction:column">
+          <button class="btn-ajustes-printer" onclick="forceCheckUpdate()">🔄 Verificar atualizações agora</button>
+        </div>
+      </div>
+
       <button class="btn-ajustes-save" onclick="saveAjustes()">Salvar</button>
     </div>
   </div>
@@ -5722,17 +5730,77 @@ window.cdbApp = {
 <script src="sync.js"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
-// Sem isso, o plugin faz rollback automatico apos appReadyTimeout (15s).
+// Sem isso, o plugin faz rollback automatico apos appReadyTimeout (30s).
 // Roda logo no boot — antes de qualquer await/inicializacao pesada.
-(function notifyLiveUpdaterAppReady() {
+(function setupLiveUpdater() {
   try {
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) {
-      window.Capacitor.Plugins.CapacitorUpdater.notifyAppReady()
-        .then(() => console.log('[LiveUpdater] notifyAppReady OK'))
-        .catch(e => console.warn('[LiveUpdater] notifyAppReady falhou:', e));
+    var Plugin = window.Capacitor
+              && window.Capacitor.Plugins
+              && window.Capacitor.Plugins.CapacitorUpdater;
+    if (!Plugin) return; // browser: ignora
+    Plugin.notifyAppReady()
+      .then(() => console.log('[LiveUpdater] notifyAppReady OK'))
+      .catch(e => console.warn('[LiveUpdater] notifyAppReady falhou:', e));
+
+    // Listeners pra visibilidade do que o plugin esta fazendo. Toast leve
+    // apenas pra eventos importantes — operador nao deve se incomodar.
+    function showLiveToast(msg) {
+      try { showToast(msg); } catch (e) { console.log('[LiveUpdater]', msg); }
     }
-  } catch (e) { /* nao-Capacitor (browser) — ignora */ }
+    Plugin.addListener('downloadComplete', (info) => {
+      console.log('[LiveUpdater] downloadComplete:', info);
+      showLiveToast('Atualizacao baixada — abrindo nova versao...');
+    });
+    Plugin.addListener('updateAvailable', (info) => {
+      console.log('[LiveUpdater] updateAvailable:', info);
+    });
+    Plugin.addListener('updateFailed', (info) => {
+      console.warn('[LiveUpdater] updateFailed:', info);
+    });
+    Plugin.addListener('downloadFailed', (info) => {
+      console.warn('[LiveUpdater] downloadFailed:', info);
+    });
+    Plugin.addListener('noNeedUpdate', () => {
+      console.log('[LiveUpdater] noNeedUpdate (ja na versao mais nova)');
+    });
+  } catch (e) { /* nao-Capacitor — ignora */ }
 })();
+
+// Forca checagem manual de update (botao Ajustes > Verificar atualizacoes).
+// Util se o autoUpdate nao tiver disparado por algum motivo.
+function forceCheckUpdate() {
+  try {
+    var Plugin = window.Capacitor
+              && window.Capacitor.Plugins
+              && window.Capacitor.Plugins.CapacitorUpdater;
+    if (!Plugin) {
+      showToast('Disponivel apenas no APK Android');
+      return;
+    }
+    showToast('Verificando atualizacoes...');
+    // getLatest consulta updates.json e baixa se houver versao nova.
+    // Em seguida, set() ativa o bundle baixado pra proxima reabertura.
+    Plugin.getLatest().then(function (info) {
+      console.log('[LiveUpdater] getLatest:', info);
+      if (info && info.url) {
+        showToast('Baixando atualizacao...');
+        return Plugin.download({ url: info.url, version: info.version }).then(function (bundle) {
+          console.log('[LiveUpdater] download OK:', bundle);
+          return Plugin.set({ id: bundle.id }).then(function () {
+            showToast('Atualizacao instalada — reabra o app');
+          });
+        });
+      } else {
+        showToast('Voce ja esta na ultima versao');
+      }
+    }).catch(function (e) {
+      console.warn('[LiveUpdater] forceCheckUpdate falhou:', e);
+      showToast('Erro ao verificar: ' + (e && e.message ? e.message : 'desconhecido'));
+    });
+  } catch (e) {
+    showToast('Erro: ' + e.message);
+  }
+}
 
 // Modal "App atualizado": compara version do bundle atual com a ultima
 // vista pelo operador. Se mudou, mostra modal com release notes do commit.
