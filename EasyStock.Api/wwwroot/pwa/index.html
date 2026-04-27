@@ -1701,6 +1701,41 @@ body {
 }
 
 /* ========== Tela de preview de etiquetas (nova feature) ========== */
+/* Modal "Sem impressora" — substitui o confirm() cinza do Android */
+.np-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center;
+  z-index: 12500; padding: 24px; backdrop-filter: blur(4px);
+}
+.np-overlay.show { display: flex; }
+.np-sheet {
+  background: var(--bg-card, #2a2520); color: var(--ink, #f4eee5);
+  border: 1px solid var(--line, #3d362e); border-radius: 16px;
+  padding: 28px 24px; max-width: 360px; width: 100%;
+  text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  animation: upd-pop 0.25s ease-out;
+}
+.np-icon { font-size: 48px; margin-bottom: 8px; }
+.np-title {
+  font-family: 'Fraunces', serif; font-size: 22px; margin: 0 0 8px;
+  color: var(--ink, #f4eee5);
+}
+.np-text {
+  font-size: 14px; line-height: 1.5; color: var(--ink-mute, #b0a799);
+  margin: 0 0 20px;
+}
+.np-btn {
+  width: 100%; padding: 14px; border: 0; border-radius: 10px;
+  font-weight: 700; font-size: 15px; cursor: pointer;
+  margin-bottom: 8px;
+}
+.np-btn:active { opacity: 0.8; }
+.np-primary   { background: var(--gold, #d4af37); color: #000; }
+.np-secondary { background: rgba(255,255,255,0.08); color: var(--ink, #f4eee5);
+                border: 1px solid var(--line, #3d362e); }
+.np-tertiary  { background: transparent; color: var(--ink-mute, #b0a799);
+                margin-bottom: 0; }
+
 /* Modal "App atualizado" — aparece quando o LiveUpdater entrega bundle novo */
 .upd-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.7);
@@ -2587,6 +2622,20 @@ body {
 
   <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
   <div class="print-area" id="printArea"></div>
+
+  <!-- Modal "Sem impressora" — aparece quando o operador toca em Imprimir
+       sem ter pareado uma impressora termica. Substitui o confirm() do
+       Android (cinza, fora do tema). Estilo igual ao modal de update. -->
+  <div class="np-overlay" id="noPrinterModal" role="dialog" aria-modal="true">
+    <div class="np-sheet">
+      <div class="np-icon">🖨️</div>
+      <h3 class="np-title">Impressora não configurada</h3>
+      <p class="np-text">Você ainda não pareou uma impressora térmica. O que prefere fazer?</p>
+      <button class="np-btn np-primary"   onclick="closeNoPrinterModal(); openAjustes()">Configurar agora</button>
+      <button class="np-btn np-secondary" onclick="closeNoPrinterModal(); etqAction('share')">Compartilhar como imagem</button>
+      <button class="np-btn np-tertiary"  onclick="closeNoPrinterModal()">Cancelar</button>
+    </div>
+  </div>
 
   <!-- Modal "App atualizado" — aparece quando LiveUpdater entrega bundle
        com versao diferente da ultima vista pelo operador. -->
@@ -4923,30 +4972,45 @@ function showImageForSaving(dataUrl, filename) {
  * No browser, faz <a download> nativo (vai pra pasta Downloads do navegador).
  * Sem fallback de press-and-hold — o save tem que SALVAR.
  */
+/**
+ * Salva a imagem em Documentos via @capacitor/filesystem e abre no
+ * visualizador padrao via @capacitor-community/file-opener (galeria/Fotos).
+ * Fallback browser: <a download>.
+ */
 async function saveImageToDevice(blob, filename) {
-  // 1) Caminho preferencial no APK: plugin Filesystem
-  try {
-    const Plugin = window.Capacitor
-                && window.Capacitor.Plugins
-                && window.Capacitor.Plugins.Filesystem;
-    if (Plugin) {
+  const FS = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+  const FO = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FileOpener;
+
+  if (FS) {
+    try {
       const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
-      const result = await Plugin.writeFile({
-        path: filename,
-        data: base64,
-        directory: 'DOCUMENTS',
-        recursive: true
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'DOCUMENTS', recursive: true
       });
-      alert('Imagem salva em Documentos:\n\n' + filename
-            + (result && result.uri ? '\n\n' + result.uri : ''));
+      // Abre no app padrao (galeria/Fotos) se o plugin FileOpener estiver
+      // disponivel. Falha em abrir nao falha o save: a imagem ja esta salva.
+      if (FO && written && written.uri) {
+        showToast('Salvo · abrindo...');
+        try {
+          await FO.open({ filePath: written.uri, contentType: 'image/png' });
+          return true;
+        } catch (e) {
+          console.warn('[save] FileOpener falhou:', e);
+          alert('Salvo em Documentos:\n\n' + filename
+                + '\n\nNao foi possivel abrir automaticamente — abra pelo app Files.');
+          return true;
+        }
+      }
+      // Sem FileOpener (APK antigo ou browser): so confirma o save
+      alert('Imagem salva em Documentos:\n\n' + filename);
       return true;
+    } catch (e) {
+      console.warn('[save] Filesystem falhou:', e);
+      // cai pro fallback abaixo
     }
-  } catch (e) {
-    console.warn('[save] Filesystem plugin falhou:', e);
-    alert('Erro ao salvar via Filesystem:\n\n' + (e && e.message ? e.message : e)
-          + '\n\nTentando download do navegador...');
   }
-  // 2) Fallback browser: <a download>
+
+  // Fallback browser: <a download>
   try {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4962,24 +5026,55 @@ async function saveImageToDevice(blob, filename) {
 }
 
 /**
- * Compartilha a imagem via sheet nativa do Android (Web Share API).
- * Abre WhatsApp, Drive, Gmail, "Salvar em arquivos", etc.
- * Sem fallback de press-and-hold — se nao suporta, fala isso pro usuario.
+ * Compartilha a imagem via sheet nativa do Android usando o plugin
+ * @capacitor/share. Salva o PNG temporariamente em CACHE e passa o file://
+ * URI pro Share. Resultado: WhatsApp, Drive, Gmail, "Salvar nos arquivos"...
+ * Web Share API (navigator.share) e usada como fallback no browser.
  */
 async function shareImageNative(blob, filename) {
   if (!blob) { alert('Sem imagem pra compartilhar'); return false; }
+
+  const FS    = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+  const Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+
+  if (FS && Share) {
+    try {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      // CACHE: dados temporarios — Android limpa quando precisar de espaco.
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'CACHE', recursive: true
+      });
+      await Share.share({
+        title: 'Etiqueta',
+        files: [written.uri],
+        dialogTitle: 'Compartilhar etiqueta'
+      });
+      // Share resolve mesmo quando o usuario cancela — nao da pra distinguir
+      // confiavelmente, entao nao mostro toast "compartilhado" pra evitar
+      // confirmacao incorreta.
+      return true;
+    } catch (e) {
+      // "Share canceled" e similar nao sao erros reais
+      var msg = (e && e.message ? String(e.message) : '').toLowerCase();
+      if (msg.indexOf('cancel') >= 0 || msg.indexOf('dismiss') >= 0) return false;
+      console.warn('[share] plugin falhou:', e);
+      alert('Erro ao compartilhar:\n\n' + (e && e.message ? e.message : e));
+      return false;
+    }
+  }
+
+  // Fallback browser: Web Share API
   const file = new File([blob], filename, { type: blob.type || 'image/png' });
   if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
-    alert('Compartilhamento de arquivo nao suportado neste dispositivo.\n\n'
-          + 'Use o botao Salvar e depois compartilhe pelo gerenciador de arquivos.');
+    alert('Compartilhamento nao disponivel neste dispositivo.\n\n'
+          + 'Use o botao Salvar.');
     return false;
   }
   try {
     await navigator.share({ files: [file], title: filename });
-    showToast('Compartilhado');
     return true;
   } catch (e) {
-    if (e && e.name === 'AbortError') return false; // usuario cancelou — sem alert
+    if (e && e.name === 'AbortError') return false;
     alert('Erro ao compartilhar:\n\n' + (e && e.message ? e.message : e));
     return false;
   }
@@ -5002,9 +5097,9 @@ async function etqAction(action) {
       const printer = getSavedPrinter();
       const noBt = !bs || !printer || !printer.address;
       if (noBt) {
-        if (confirm('Sem impressora térmica configurada.\n\nQuer compartilhar como imagem (PNG)?\n(Configure a impressora em ⚙️ Ajustes pra imprimir direto.)')) {
-          return etqAction('share');
-        }
+        // Modal customizado alinhado com o tema do app (em vez do confirm()
+        // cinza do Android que quebrava a experiencia visual).
+        openNoPrinterModal();
         return;
       }
       if (currentEtiquetasKind === 'order') {
@@ -5857,6 +5952,11 @@ function forceCheckUpdate() {
     alert('Erro inesperado:\n\n' + e.message);
   }
 }
+
+// Modal "Sem impressora" — abre quando operador toca em Imprimir mas nao
+// tem impressora termica pareada. Substitui o confirm() cinza do Android.
+function openNoPrinterModal()  { document.getElementById('noPrinterModal').classList.add('show'); }
+function closeNoPrinterModal() { document.getElementById('noPrinterModal').classList.remove('show'); }
 
 // Modal "App atualizado": compara version do bundle atual com a ultima
 // vista pelo operador. Se mudou, mostra modal com release notes do commit.
