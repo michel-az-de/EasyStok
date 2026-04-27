@@ -2652,6 +2652,20 @@ body {
   <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
   <div class="print-area" id="printArea"></div>
 
+  <!-- Modal "Selecionar impressora" — aparece quando o operador toca em
+       Imprimir (sem ter selecionado uma) OU em Ajustes > Buscar impressora.
+       Lista os dispositivos Bluetooth ja pareados pelo Android. -->
+  <div class="np-overlay" id="printerPickerModal" role="dialog" aria-modal="true">
+    <div class="np-sheet">
+      <div class="np-icon">🖨️</div>
+      <h3 class="np-title">Selecionar impressora</h3>
+      <p class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</p>
+      <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
+      <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
+      <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
+    </div>
+  </div>
+
   <!-- Modal "Backup automatico" — aparece a cada 50 acoes ou 7 dias.
        Operador pode salvar agora (chama exportBackup) ou pular dessa vez. -->
   <div class="np-overlay" id="autoBackupModal" role="dialog" aria-modal="true">
@@ -3227,7 +3241,7 @@ function go(screen) {
   document.getElementById('content').scrollTop = 0;
   if (screen === 'home')       renderHome();
   if (screen === 'pedidos')    renderOrdersFeed();
-  if (screen === 'historico')  renderHistorico();
+  if (screen === 'historico')  renderHistoricoScreen();
 }
 
 // =========================
@@ -3750,12 +3764,12 @@ function setHistFilter(f) {
   document.querySelectorAll('#histFilter button').forEach(b => {
     b.classList.toggle('active', b.dataset.f === f);
   });
-  renderHistorico();
+  renderHistoricoScreen();
 }
 
 function histLoadMore() {
   histShown += histPageSize;
-  renderHistorico();
+  renderHistoricoScreen();
 }
 
 /**
@@ -3867,7 +3881,7 @@ function buildHistoryEvents() {
   return events.sort((a, b) => b.ts - a.ts);
 }
 
-function renderHistorico() {
+function renderHistoricoScreen() {
   const list = document.getElementById('histList');
   if (!list) return;
   const all = buildHistoryEvents();
@@ -4080,7 +4094,7 @@ function importSnapshot(event) {
       renderHome();
       renderKanban();
       renderRecents();
-      renderHistorico();
+      renderHistoricoScreen();
       showToast(`Importou ${result.applied} registros (${result.skipped} pulados).`);
     } catch (err) {
       console.error(err);
@@ -4673,35 +4687,100 @@ function renderPrinterStatus() {
   const lab = document.getElementById('printerStatusLabel');
   const p   = getSavedPrinter();
   if (!el || !lab) return;
-  if (p && p.address) {
-    el.classList.remove('none'); el.classList.add('ok');
-    lab.textContent = '✓ ' + (p.name || p.address);
-  } else {
-    el.classList.add('none'); el.classList.remove('ok');
-    lab.textContent = 'Nenhuma impressora selecionada';
-  }
-}
-function pickPrinter() {
+
   const bs = window.bluetoothSerial;
-  if (!bs || !bs.list) {
-    showToast('Bluetooth não disponível neste dispositivo (use o APK Android)');
+  if (!bs) {
+    // Plugin Cordova nao carregado: rodando no browser ou APK sem o plugin
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = '⚠️ Bluetooth indisponível<br><span style="font-size:10px;opacity:.7">Use o APK Android (não funciona no navegador)</span>';
     return;
   }
+
+  if (p && p.address) {
+    el.classList.remove('none'); el.classList.add('ok');
+    lab.innerHTML = '✓ ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:10px;opacity:.7">Bluetooth pronto</span>';
+  } else {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:10px;opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
+  }
+}
+// Callback chamado apos o operador selecionar uma impressora no modal.
+// Usado tanto pra Ajustes > Buscar impressora (callback null = so salvar)
+// quanto pra Imprimir direto (callback dispara a impressao).
+let printerPickerOnSelect = null;
+
+function pickPrinter() {
+  // Ajustes -> Buscar impressora: so seleciona, sem disparar impressao
+  printerPickerOnSelect = null;
+  openPrinterPicker();
+}
+
+function openPrinterPicker() {
+  const modal = document.getElementById('printerPickerModal');
+  modal.classList.add('show');
+  loadPrinterDevices();
+}
+
+function closePrinterPicker() {
+  document.getElementById('printerPickerModal').classList.remove('show');
+  printerPickerOnSelect = null;
+}
+
+// Lista os dispositivos Bluetooth ja pareados (bs.list — nao escaneia,
+// usa apenas o que ja foi pareado pelas configuracoes do Android).
+function loadPrinterDevices() {
+  const list = document.getElementById('printerPickerList');
+  const hint = document.getElementById('printerPickerHint');
+  list.innerHTML = '<div class="cat-empty">Buscando...</div>';
+
+  const bs = window.bluetoothSerial;
+  if (!bs || !bs.list) {
+    list.innerHTML = '';
+    hint.textContent = 'Bluetooth não disponível. Use o APK Android (não funciona no navegador).';
+    return;
+  }
+
   bs.list((devices) => {
+    list.innerHTML = '';
     if (!devices || devices.length === 0) {
-      showToast('Nenhum dispositivo pareado. Pareie pelo Android primeiro.');
+      hint.textContent = 'Nenhum dispositivo pareado. Pareie a impressora pelas Configurações do Android primeiro, depois volte aqui.';
       return;
     }
-    const labels = devices.map((d, i) => `${i+1}. ${d.name || d.id}`).join('\n');
-    const choice = prompt('Escolha a impressora (digite o número):\n\n' + labels);
-    const n = parseInt(choice, 10);
-    if (isNaN(n) || n < 1 || n > devices.length) return;
-    const dev = devices[n-1];
-    setSavedPrinter({ address: dev.address || dev.id, name: dev.name || dev.id });
-    showToast('Impressora selecionada');
+    hint.textContent = devices.length + ' dispositivo(s) pareado(s). Toque na impressora.';
+    const saved = getSavedPrinter();
+    devices.forEach((d) => {
+      const addr = d.address || d.id;
+      const name = d.name || addr;
+      const isSaved = saved && saved.address === addr;
+      const row = document.createElement('button');
+      row.className = 'np-btn ' + (isSaved ? 'np-primary' : 'np-secondary');
+      row.style.textAlign = 'left';
+      row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
+                    + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
+      row.onclick = () => selectPrinter({ address: addr, name });
+      list.appendChild(row);
+    });
   }, (err) => {
-    showToast('Erro listando bluetooth: ' + (err && err.message || err));
+    list.innerHTML = '';
+    hint.textContent = 'Erro Bluetooth: ' + (err && err.message ? err.message : err)
+                     + '. Verifique se o Bluetooth está ligado e se o app tem permissão.';
   });
+}
+
+function selectPrinter(printer) {
+  setSavedPrinter(printer);
+  showToast('Impressora: ' + printer.name);
+  logAction({
+    action: 'settings.update',
+    entityType: 'settings',
+    summary: 'Impressora selecionada · ' + printer.name
+  });
+  // Dispara impressao se o picker foi aberto pelo fluxo de Imprimir
+  const cb = printerPickerOnSelect;
+  closePrinterPicker();
+  if (typeof cb === 'function') {
+    setTimeout(() => cb(), 300);
+  }
 }
 function testPrint() {
   const bytes = escPosTextLines('TESTE', [
@@ -5469,11 +5548,14 @@ async function etqAction(action) {
     if (action === 'print') {
       const bs = window.bluetoothSerial;
       const printer = getSavedPrinter();
-      const noBt = !bs || !printer || !printer.address;
-      if (noBt) {
-        // Modal customizado alinhado com o tema do app (em vez do confirm()
-        // cinza do Android que quebrava a experiencia visual).
-        openNoPrinterModal();
+      // Sem plugin Bluetooth: rodando no browser, nao tem como imprimir
+      if (!bs) { openNoPrinterModal(); return; }
+      // Tem plugin mas operador nao selecionou impressora ainda: abre picker
+      // direto e SALVA a escolha no localStorage. Apos selecionar, dispara
+      // a impressao automaticamente (printerPickerOnSelect callback).
+      if (!printer || !printer.address) {
+        printerPickerOnSelect = () => etqAction('print');
+        openPrinterPicker();
         return;
       }
       if (currentEtiquetasKind === 'order') {
