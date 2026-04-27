@@ -3888,7 +3888,14 @@ function escPosOrderLabel(o) {
 }
 
 // Flag impede reentrância: spam de botão imprimir não dispara múltiplos connect.
+// Watchdog libera após 15s caso o plugin Bluetooth nunca dispare callback
+// (BT travado, dispositivo desligado mid-write) — evita app preso sem imprimir.
 let isPrinting = false;
+let printWatchdog = null;
+function releasePrinting() {
+  isPrinting = false;
+  if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
+}
 function printViaBluetooth(bytes, onFallback) {
   const bs = window.bluetoothSerial;
   const printer = getSavedPrinter();
@@ -3898,17 +3905,20 @@ function printViaBluetooth(bytes, onFallback) {
   }
   if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
   isPrinting = true;
-  const release = () => { isPrinting = false; };
+  printWatchdog = setTimeout(() => {
+    showToast('Impressora não respondeu — liberando');
+    releasePrinting();
+  }, 15000);
   const send = () => {
     bs.write(bytes,
-      () => { showToast('Enviado pra impressora'); release(); },
-      (err) => { showToast('Erro imprimir: ' + (err && err.message || err)); release(); }
+      () => { showToast('Enviado pra impressora'); releasePrinting(); },
+      (err) => { showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
     );
   };
   bs.isConnected(send, () => {
     bs.connect(printer.address, send, (err) => {
       showToast('Não conectou: ' + (err && err.message || err));
-      release();
+      releasePrinting();
       if (typeof onFallback === 'function') onFallback();
     });
   });
