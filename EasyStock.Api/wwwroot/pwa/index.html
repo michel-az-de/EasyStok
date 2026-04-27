@@ -2590,6 +2590,7 @@ body {
           <button class="btn-ajustes-printer" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
           <button class="btn-ajustes-printer" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
+        <button class="btn-ajustes-printer" onclick="printerDiagnostics()" style="margin-top:6px;width:100%;font-size:12px;opacity:.8">🔍 Diagnóstico (debug)</button>
       </div>
 
       <div class="ajustes-section">
@@ -4728,6 +4729,14 @@ function closePrinterPicker() {
 
 // Lista os dispositivos Bluetooth ja pareados (bs.list — nao escaneia,
 // usa apenas o que ja foi pareado pelas configuracoes do Android).
+//
+// IMPORTANTE: Android 12+ exige permissao runtime BLUETOOTH_CONNECT pra
+// listar pareados. O plugin cordova-plugin-bluetooth-serial 0.4.7 (2019)
+// NAO requisita essa permissao automaticamente — entao bs.list() lanca
+// SecurityException se o usuario nao concedeu manualmente. Por isso
+// surfaceamos o erro VISIVEL com instrucoes claras (o operador concede
+// em Configuracoes > Apps > Casa da Baba > Permissoes > Dispositivos
+// proximos / Nearby devices).
 function loadPrinterDevices() {
   const list = document.getElementById('printerPickerList');
   const hint = document.getElementById('printerPickerHint');
@@ -4736,35 +4745,92 @@ function loadPrinterDevices() {
   const bs = window.bluetoothSerial;
   if (!bs || !bs.list) {
     list.innerHTML = '';
-    hint.textContent = 'Bluetooth não disponível. Use o APK Android (não funciona no navegador).';
+    hint.innerHTML = '⚠️ <b>Plugin Bluetooth não carregou</b><br>'
+                   + '<span style="font-size:12px">Você precisa abrir pelo APK Android (não funciona no navegador). '
+                   + 'Se já está no APK, force fechar e reabrir.</span>';
     return;
   }
 
-  bs.list((devices) => {
+  const showError = (where, err) => {
+    const detail = err && (err.message || err.toString && err.toString()) || JSON.stringify(err) || '(sem detalhe)';
     list.innerHTML = '';
-    if (!devices || devices.length === 0) {
-      hint.textContent = 'Nenhum dispositivo pareado. Pareie a impressora pelas Configurações do Android primeiro, depois volte aqui.';
-      return;
+    hint.innerHTML = '⚠️ <b>Bluetooth bloqueado</b><br>'
+                   + '<span style="font-size:11px;opacity:.8">[' + where + '] ' + escapeHtml(String(detail)) + '</span><br><br>'
+                   + '<b>Como resolver:</b><br>'
+                   + '<span style="font-size:12px">'
+                   + '1. Configurações Android → Apps → <b>Casa da Baba</b><br>'
+                   + '2. Permissões → ative <b>"Dispositivos próximos"</b> (ou "Nearby devices")<br>'
+                   + '3. Verifique também que Bluetooth está <b>ligado</b><br>'
+                   + '4. Volte aqui e toque "Buscar de novo"'
+                   + '</span>';
+  };
+
+  const doList = () => {
+    try {
+      bs.list((devices) => {
+        list.innerHTML = '';
+        if (!devices || devices.length === 0) {
+          hint.innerHTML = '⚠️ <b>Nenhum dispositivo pareado</b><br>'
+                         + '<span style="font-size:12px">Pareie a impressora térmica pelas <b>Configurações do Android → Bluetooth</b>, '
+                         + 'depois volte aqui e toque "Buscar de novo".</span>';
+          return;
+        }
+        hint.textContent = devices.length + ' dispositivo(s) pareado(s). Toque na impressora.';
+        const saved = getSavedPrinter();
+        devices.forEach((d) => {
+          const addr = d.address || d.id;
+          const name = d.name || addr;
+          const isSaved = saved && saved.address === addr;
+          const row = document.createElement('button');
+          row.className = 'np-btn ' + (isSaved ? 'np-primary' : 'np-secondary');
+          row.style.textAlign = 'left';
+          row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
+                        + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
+          row.onclick = () => selectPrinter({ address: addr, name });
+          list.appendChild(row);
+        });
+      }, (err) => showError('list', err));
+    } catch (ex) {
+      showError('list-throw', ex);
     }
-    hint.textContent = devices.length + ' dispositivo(s) pareado(s). Toque na impressora.';
-    const saved = getSavedPrinter();
-    devices.forEach((d) => {
-      const addr = d.address || d.id;
-      const name = d.name || addr;
-      const isSaved = saved && saved.address === addr;
-      const row = document.createElement('button');
-      row.className = 'np-btn ' + (isSaved ? 'np-primary' : 'np-secondary');
-      row.style.textAlign = 'left';
-      row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
-                    + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
-      row.onclick = () => selectPrinter({ address: addr, name });
-      list.appendChild(row);
-    });
-  }, (err) => {
-    list.innerHTML = '';
-    hint.textContent = 'Erro Bluetooth: ' + (err && err.message ? err.message : err)
-                     + '. Verifique se o Bluetooth está ligado e se o app tem permissão.';
-  });
+  };
+
+  // Verifica se Bluetooth esta ligado antes de listar — isEnabled tambem
+  // exige BLUETOOTH_CONNECT no Android 12+, entao se falhar aqui, ja
+  // surfaceamos a instrucao de permissao sem precisar passar pra list.
+  if (typeof bs.isEnabled === 'function') {
+    try {
+      bs.isEnabled(() => doList(), (err) => {
+        // isEnabled error pode ser "Bluetooth desligado" OU permission negada.
+        // Tentamos list mesmo assim — se for permission, o erro do list ajuda
+        // a diagnosticar; se for BT off, o list tambem vai falhar com msg clara.
+        doList();
+      });
+    } catch (ex) {
+      doList();
+    }
+  } else {
+    doList();
+  }
+}
+
+// Diagnostico visivel — alerta com estado do runtime pra debug em campo.
+// Acessivel via "Diagnóstico" em Ajustes > Impressora.
+function printerDiagnostics() {
+  const lines = [];
+  const ver = (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
+  lines.push('Bundle: ' + ver);
+  lines.push('Plataforma: ' + (window.Capacitor ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor') : 'web'));
+  const bs = window.bluetoothSerial;
+  lines.push('Plugin BT: ' + (bs ? 'CARREGADO' : 'NÃO CARREGADO'));
+  if (bs) {
+    lines.push('  bs.list: ' + (typeof bs.list));
+    lines.push('  bs.isEnabled: ' + (typeof bs.isEnabled));
+    lines.push('  bs.connect: ' + (typeof bs.connect));
+  }
+  const p = getSavedPrinter();
+  lines.push('Salva: ' + (p ? (p.name + ' / ' + p.address) : '(nenhuma)'));
+  alert(lines.join('\n'));
 }
 
 function selectPrinter(printer) {
