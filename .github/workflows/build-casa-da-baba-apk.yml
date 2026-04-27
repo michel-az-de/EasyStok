@@ -52,7 +52,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
+          # SDK 35 e necessario por causa de androidx.work:work-runtime:2.10
+          # puxado pelo @capgo/capacitor-updater. SDK 34 mantido como target.
+          packages: 'platforms;android-34 platforms;android-35 build-tools;34.0.0 platform-tools'
 
       - name: Install Capacitor deps
         working-directory: casa-da-baba-mobile/apk
