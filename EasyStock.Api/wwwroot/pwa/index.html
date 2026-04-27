@@ -1480,13 +1480,15 @@ body {
 .ajustes-section .hint { font-size: 11px; color: var(--ink-mute); margin: 0 0 8px; }
 .ajustes-section .field { margin-bottom: 10px; }
 .ajustes-section label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
-.ajustes-section input {
+.ajustes-section input,
+.ajustes-section select {
   width: 100%; padding: 10px 12px;
   background: var(--bg-elev-2); border: 1px solid var(--line);
   border-radius: 8px; color: var(--ink); font-size: 14px;
   font-family: inherit;
 }
-.ajustes-section input:focus { outline: none; border-color: var(--accent); }
+.ajustes-section input:focus,
+.ajustes-section select:focus { outline: none; border-color: var(--accent); }
 .ajustes-section .printer-status {
   padding: 10px 12px; border-radius: 8px;
   background: var(--bg-elev-2); font-size: 12px;
@@ -1645,6 +1647,127 @@ body {
   .print-area .pa-item .pi-qty { font-weight: 800; }
   @page { size: 58mm auto; margin: 0; }
 }
+
+/* ========== Modal de revisão da produção: validade e peso por linha ========== */
+.prod-detail-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.pd-row {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.pd-name {
+  font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.pd-name .pd-qty {
+  background: var(--gold-soft); color: var(--gold);
+  padding: 2px 8px; border-radius: 100px;
+  font-size: 11px; font-weight: 800;
+}
+.pd-fields { display: flex; flex-direction: column; gap: 8px; }
+.pd-weight {
+  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; font-family: inherit;
+}
+.pd-weight:focus { outline: none; border-color: var(--accent); }
+.pd-validity-pills {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.pd-validity-pills button {
+  flex: 0 0 auto; padding: 6px 10px;
+  background: transparent; color: var(--ink-dim);
+  border: 1px solid var(--line); border-radius: 100px;
+  font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.pd-validity-pills button.active {
+  background: var(--accent); color: white; border-color: var(--accent);
+}
+.pd-validity-pills .pd-validity-custom {
+  flex: 1 1 80px; min-width: 70px;
+  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 100px;
+  padding: 6px 10px; font-size: 12px; font-family: inherit;
+}
+.pd-validity-pills .pd-validity-custom:focus { outline: none; border-color: var(--accent); }
+.pd-row.invalid { border-color: #ef6b6b; animation: shakeX 0.3s; }
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+/* ========== Tela de preview de etiquetas (nova feature) ========== */
+.etq-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  display: none; flex-direction: column;
+  z-index: 11000;
+}
+.etq-overlay.show { display: flex; }
+.etq-sheet {
+  flex: 1;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+.etq-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 16px 16px 8px; gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.etq-head h3 { margin: 0; font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); }
+.etq-head .etq-sub { font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
+.etq-body {
+  flex: 1; overflow-y: auto;
+  padding: 16px; background: #2a2520;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.etq-card {
+  width: 360px; max-width: 100%;
+  background: #fff; color: #000;
+  font-family: 'Courier New', 'Roboto Mono', monospace;
+  font-size: 12px; line-height: 1.4;
+  padding: 14px 12px;
+  border: 1px dashed #888;
+  border-radius: 4px;
+}
+.etq-card .et-title {
+  text-align: center; font-size: 14px; font-weight: 800;
+  margin-bottom: 4px; letter-spacing: 0.05em;
+}
+.etq-card .et-prod {
+  text-align: center; font-size: 13px; font-weight: 700;
+  margin: 6px 0; padding: 4px 0;
+  border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;
+}
+.etq-card .et-bars {
+  display: flex; height: 36px; margin: 8px 0 4px;
+  align-items: stretch; justify-content: center;
+  background: #fff;
+}
+.etq-card .et-bars .bar { background: #000; height: 100%; }
+.etq-card .et-bars .gap { background: transparent; height: 100%; }
+.etq-card .et-code {
+  text-align: center; font-size: 11px; font-weight: 800;
+  letter-spacing: 0.1em; margin-bottom: 8px;
+}
+.etq-card .et-row { display: flex; justify-content: space-between; padding: 1px 0; }
+.etq-card .et-row .lbl { font-weight: 700; }
+.etq-actions {
+  display: flex; gap: 8px; padding: 12px 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.etq-actions .etq-btn {
+  flex: 1; padding: 14px 8px;
+  border: 0; border-radius: 12px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.etq-actions .etq-print  { background: var(--accent); color: white; }
+.etq-actions .etq-save   { background: rgba(96,165,250,0.18); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+.etq-actions .etq-share  { background: rgba(37,211,102,0.18); color: #25D366; border: 1px solid rgba(37,211,102,0.3); }
+.etq-actions .etq-btn:active { transform: scale(0.97); }
 
 /* ========== Login / boas-vindas ========== */
 .welcome {
@@ -2212,6 +2335,9 @@ body {
         <div class="barcode-text" id="barcodeText">TALH-000000-000</div>
       </div>
 
+      <label class="modal-label">Validade e peso de cada produto</label>
+      <div class="prod-detail-list" id="prodDetailList"></div>
+
       <label class="modal-label">Foto (opcional)</label>
       <div id="photoPickerWrap">
         <label class="photo-picker" for="prodPhoto">
@@ -2287,15 +2413,35 @@ body {
       </div>
 
       <div class="ajustes-section">
-        <h4>💳 PIX</h4>
-        <p class="hint">Aparece na cobrança que você compartilha pelo WhatsApp e na etiqueta impressa.</p>
+        <h4>🏢 Empresa</h4>
+        <p class="hint">Nome que aparece no topo das etiquetas e da cobrança.</p>
         <div class="field">
-          <label>Chave PIX</label>
-          <input type="text" id="ajustePixKey" autocomplete="off" placeholder="11975739992" />
+          <label>Nome da empresa</label>
+          <input type="text" id="ajusteEmpresa" maxlength="48" autocomplete="off" placeholder="Casa da Baba" />
+        </div>
+      </div>
+
+      <div class="ajustes-section">
+        <h4>💳 PIX</h4>
+        <p class="hint">Tipo determina a formatação da chave (CPF: 123.456.789-00, telefone: (11) 99999-9999, etc.).</p>
+        <div class="field">
+          <label>Tipo de chave</label>
+          <select id="ajustePixType">
+            <option value="telefone">Telefone</option>
+            <option value="email">E-mail</option>
+            <option value="cpf">CPF</option>
+            <option value="cnpj">CNPJ</option>
+            <option value="aleatoria">Chave aleatória</option>
+          </select>
         </div>
         <div class="field">
-          <label>Nome do titular</label>
-          <input type="text" id="ajustePixHolder" autocomplete="off" placeholder="Casa da Baba" />
+          <label>Chave PIX</label>
+          <input type="text" id="ajustePixKey" autocomplete="off" placeholder="(11) 99999-9999" />
+          <div class="hint" id="ajustePixHint" style="margin-top:4px;font-size:11px;color:var(--ink-mute)"></div>
+        </div>
+        <div class="field">
+          <label>Nome do titular da chave</label>
+          <input type="text" id="ajustePixHolder" autocomplete="off" placeholder="Felipe Michel" />
         </div>
       </div>
 
@@ -2345,6 +2491,25 @@ body {
 
   <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
   <div class="print-area" id="printArea"></div>
+
+  <!-- Tela cheia de preview de etiquetas: produção (N etiquetas) ou pedido (1) -->
+  <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true">
+    <div class="etq-sheet">
+      <div class="etq-head">
+        <div>
+          <h3 id="etqTitle">Etiquetas geradas</h3>
+          <div class="etq-sub" id="etqSubtitle">—</div>
+        </div>
+        <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
+      </div>
+      <div class="etq-body" id="etqBody"></div>
+      <div class="etq-actions">
+        <button class="etq-btn etq-print"  onclick="etqAction('print')">🖨️ Imprimir</button>
+        <button class="etq-btn etq-save"   onclick="etqAction('save')">💾 Salvar</button>
+        <button class="etq-btn etq-share"  onclick="etqAction('share')">📤 Compartilhar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal de Cobrança (mensagem WhatsApp + PIX) -->
   <div class="cobranca-overlay" id="cobrancaModal" role="dialog" aria-modal="true" aria-labelledby="cobrancaTitle">
@@ -2987,11 +3152,85 @@ function openProductionConfirm() {
     </div>
   `).join('');
 
+  // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
+  populateProdDetailList(items);
+
   const now = new Date();
   document.getElementById('batchDate').textContent =
-    `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())}`;
+    `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())} · ${getLoteDoDia(now)}`;
 
   document.getElementById('productionConfirmModal').classList.add('show');
+}
+
+const VALIDITY_OPTIONS = [3, 5, 7, 10, 15];
+
+function populateProdDetailList(items) {
+  const host = document.getElementById('prodDetailList');
+  if (!host) return;
+  host.innerHTML = items.map(p => {
+    const defWeight   = p.defaultWeightG ?? '';
+    const defValidity = p.defaultValidityDays;
+    const pills = VALIDITY_OPTIONS.map(d =>
+      `<button type="button" data-d="${d}" class="${defValidity === d ? 'active' : ''}">${d}d</button>`
+    ).join('');
+    const customVal = (defValidity && !VALIDITY_OPTIONS.includes(defValidity)) ? defValidity : '';
+    return `
+      <div class="pd-row" data-pid="${escapeHtml(p.id)}">
+        <div class="pd-name">
+          <span>${p.emoji || '📦'} ${escapeHtml(p.name)}</span>
+          <span class="pd-qty">×${p.count}</span>
+        </div>
+        <div class="pd-fields">
+          <input type="number" class="pd-weight" placeholder="peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
+          <div class="pd-validity-pills">
+            ${pills}
+            <input type="number" class="pd-validity-custom" placeholder="custom" min="1" max="365" value="${customVal}" />
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Pills: ao clicar, marca ativa e limpa custom. Custom: ao digitar, desmarca pills.
+  host.querySelectorAll('.pd-validity-pills').forEach(group => {
+    const pills  = group.querySelectorAll('button[data-d]');
+    const custom = group.querySelector('.pd-validity-custom');
+    pills.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pills.forEach(b => b.classList.toggle('active', b === btn));
+        if (custom) custom.value = '';
+      });
+    });
+    if (custom) {
+      custom.addEventListener('input', () => {
+        if (custom.value) pills.forEach(b => b.classList.remove('active'));
+      });
+    }
+  });
+}
+
+/**
+ * Lê valores de validade/peso da seção do modal. Marca .invalid em rows
+ * sem validade. Retorna { valid, perProduct: Map<productId, {weightG, validityDays}> }.
+ */
+function readProdDetailValues() {
+  const rows = Array.from(document.querySelectorAll('#prodDetailList .pd-row'));
+  const perProduct = new Map();
+  let valid = true;
+  rows.forEach(row => {
+    row.classList.remove('invalid');
+    const pid = row.dataset.pid;
+    const weightRaw = row.querySelector('.pd-weight')?.value || '';
+    const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
+    const activePill = row.querySelector('.pd-validity-pills button.active');
+    let validityDays = null;
+    if (customRaw && !isNaN(parseInt(customRaw))) validityDays = parseInt(customRaw);
+    else if (activePill) validityDays = parseInt(activePill.dataset.d);
+    if (!validityDays || validityDays < 1) { valid = false; row.classList.add('invalid'); }
+    const weightG = weightRaw && !isNaN(parseInt(weightRaw)) ? parseInt(weightRaw) : null;
+    perProduct.set(pid, { weightG, validityDays });
+  });
+  return { valid, perProduct };
 }
 
 function closeProductionConfirm() {
@@ -3437,40 +3676,117 @@ function hideActionToast() {
 
 // ================================================================
 // COBRANÇA — gera mensagem de WhatsApp + PIX pra o cliente pagar
-// Config: chave PIX e nome do titular ficam em localStorage,
-// com defaults abaixo. Dá pra trocar via window.cdbSetPix().
+// Config: tipo, chave, nome do titular, nome da empresa em localStorage.
+// Tipos suportados: telefone, email, cpf, cnpj, aleatoria.
+// Trocar via console: cdbSetPix(key, holder, type) ou pela tela Ajustes.
 // ================================================================
 const DEFAULT_PIX_KEY = '1197573992';
-const DEFAULT_PIX_HOLDER = 'Casa da Baba';
+const DEFAULT_PIX_HOLDER = 'Felipe Michel';
+const DEFAULT_PIX_TYPE = 'telefone';
+const DEFAULT_EMPRESA_NAME = 'Casa da Baba';
+const PIX_TYPES = {
+  telefone:  { label: 'Telefone',         placeholder: '(11) 99999-9999',     short: 'Cel' },
+  email:     { label: 'E-mail',           placeholder: 'seu@email.com',        short: 'E-mail' },
+  cpf:       { label: 'CPF',              placeholder: '123.456.789-00',       short: 'CPF' },
+  cnpj:      { label: 'CNPJ',             placeholder: '12.345.678/0001-90',   short: 'CNPJ' },
+  aleatoria: { label: 'Chave aleatória',  placeholder: 'cole a chave UUID',    short: 'Aleatória' }
+};
 
-function getPixKey() {
-  try { return localStorage.getItem('cdb-pix-key') || DEFAULT_PIX_KEY; }
-  catch (e) { return DEFAULT_PIX_KEY; }
-}
-function getPixHolder() {
-  try { return localStorage.getItem('cdb-pix-holder') || DEFAULT_PIX_HOLDER; }
-  catch (e) { return DEFAULT_PIX_HOLDER; }
-}
-// Helper pra trocar por console se precisar: cdbSetPix('11999998888', 'Fulano')
-window.cdbSetPix = function (key, holder) {
-  if (key) localStorage.setItem('cdb-pix-key', String(key));
-  if (holder) localStorage.setItem('cdb-pix-holder', String(holder));
-  console.log('[PIX] atualizado:', getPixKey(), '·', getPixHolder());
+function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')      || DEFAULT_PIX_KEY;      } catch (e) { return DEFAULT_PIX_KEY; } }
+function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
+function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
+function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+
+// Helper de console: cdbSetPix(key, holder, type, empresa).
+window.cdbSetPix = function (key, holder, type, empresa) {
+  if (key)     localStorage.setItem('cdb-pix-key',      String(key));
+  if (holder)  localStorage.setItem('cdb-pix-holder',   String(holder));
+  if (type)    localStorage.setItem('cdb-pix-type',     String(type));
+  if (empresa) localStorage.setItem('cdb-empresa-name', String(empresa));
+  console.log('[PIX]', getPixType(), '·', getPixKey(), '·', getPixHolder(), '·', getEmpresaName());
 };
 
 /**
- * Formata uma chave PIX celular (11 dígitos) como "(11) 97573-9992".
- * Se não bater, devolve como veio.
+ * Migração suave da versão antiga (só key + holder, sem type).
+ * Detecta tipo pelo formato; quando estoura, marca como 'aleatoria'.
+ * Roda 1× no boot — idempotente (skip se cdb-pix-type já existe).
  */
-function formatPixCelular(raw) {
-  const digits = String(raw || '').replace(/\D/g, '');
-  if (digits.length === 11) {
-    return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+function migratePixIfNeeded() {
+  try {
+    if (localStorage.getItem('cdb-pix-type')) return;
+    const raw = (localStorage.getItem('cdb-pix-key') || '').trim();
+    if (!raw) return; // nada a migrar — vai usar defaults
+    const digits = raw.replace(/\D/g, '');
+    let type = 'aleatoria';
+    if (raw.includes('@'))                       type = 'email';
+    else if (digits.length === 14)               type = 'cnpj';
+    else if (digits.length === 11 && digits === raw) type = 'cpf'; // 11 puros sem máscara → CPF
+    else if (digits.length === 10 || digits.length === 11) type = 'telefone';
+    localStorage.setItem('cdb-pix-type', type);
+  } catch (e) {}
+}
+migratePixIfNeeded();
+
+/**
+ * Formata chave PIX conforme o tipo. Se inválido pra aquele tipo, retorna como veio.
+ */
+function formatPixByType(raw, type) {
+  const v = String(raw || '').trim();
+  type = type || getPixType();
+  if (type === 'telefone') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return v;
   }
-  if (digits.length === 10) {
-    return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+  if (type === 'cpf') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+    return v;
   }
-  return raw;
+  if (type === 'cnpj') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+    return v;
+  }
+  // email e aleatoria: sem formatação
+  return v;
+}
+
+/**
+ * Validação básica por tipo. Não checa dígito verificador de CPF/CNPJ —
+ * só formato. Suficiente pra impedir digitar nome no campo errado.
+ */
+function validatePixKey(raw, type) {
+  const v = String(raw || '').trim();
+  if (!v) return false;
+  type = type || getPixType();
+  const d = v.replace(/\D/g, '');
+  if (type === 'telefone')  return d.length === 10 || d.length === 11;
+  if (type === 'cpf')       return d.length === 11;
+  if (type === 'cnpj')      return d.length === 14;
+  if (type === 'email')     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  if (type === 'aleatoria') return v.length >= 8; // UUID ou similar
+  return true;
+}
+
+// Compat: chamadas antigas a formatPixCelular passam por formatPixByType.
+function formatPixCelular(raw) { return formatPixByType(raw, 'telefone'); }
+
+// Identificador do dia pra agrupar produções: LOT-YYMMDD.
+function getLoteDoDia(dt = new Date()) {
+  const y = String(dt.getFullYear()).slice(-2);
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const d = String(dt.getDate()).padStart(2,'0');
+  return `LOT-${y}${m}${d}`;
+}
+
+// SKU pra etiqueta (prefixo do código de barras). Lê do produto se cadastrado;
+// senão deriva do id (slug uppercase, max 8 caracteres).
+function getProductSku(product) {
+  if (product?.sku) return product.sku;
+  const raw = String(product?.id || product?.name || 'XXX');
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'XXX';
 }
 
 /**
@@ -3485,18 +3801,21 @@ function buildCobrancaMessage(order) {
     .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}`)
     .join('\n');
   const obsBloco = order.notes ? `\n📝 Obs: ${order.notes}\n` : '';
-  const pixDisplay = formatPixCelular(getPixKey());
+  const pixType    = getPixType();
+  const pixLabel   = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const pixDisplay = formatPixByType(getPixKey(), pixType);
   const pixHolder  = getPixHolder();
+  const empresa    = getEmpresaName();
 
   return (
-    `🍝 *Casa da Baba*\n\n` +
+    `🍝 *${empresa}*\n\n` +
     `Oi *${nome}*${ref}! Seu pedido está anotado:\n\n` +
     `${itensLinhas}\n\n` +
     `💰 *Total: ${money(total)}*` +
     `${obsBloco}` +
     `\n💳 *Pagamento via PIX*\n` +
-    `Chave (celular): *${pixDisplay}*\n` +
-    `Nome: ${pixHolder}\n\n` +
+    `${pixLabel}: *${pixDisplay}*\n` +
+    `Titular: ${pixHolder}\n\n` +
     `Por favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n` +
     `_Pedido ${order.id}_`
   );
@@ -3533,8 +3852,11 @@ function openCobranca(orderId) {
 
   const msg = buildCobrancaMessage(o);
   document.getElementById('cobrancaPreview').textContent = msg;
-  document.getElementById('cobrancaPixValue').textContent  = formatPixCelular(getPixKey());
+  document.getElementById('cobrancaPixValue').textContent  = formatPixByType(getPixKey(), getPixType());
   document.getElementById('cobrancaPixHolder').textContent = getPixHolder();
+  // Atualiza o label "PIX — celular" pro tipo certo (CPF/CNPJ/email/aleatória).
+  const labelEl = document.querySelector('#cobrancaModal .pix-label');
+  if (labelEl) labelEl.textContent = '💳 PIX — ' + ((PIX_TYPES[getPixType()]?.short) || 'Chave');
   document.getElementById('cobrancaModal').classList.add('show');
 }
 function closeCobranca() {
@@ -3572,9 +3894,12 @@ function copyCobranca() {
 }
 
 function copyPixKey() {
-  // Copia a chave em formato "puro" (só dígitos) pra cliente colar no banco.
-  const raw = String(getPixKey()).replace(/\D/g, '');
-  copyToClipboard(raw, 'Chave PIX copiada: ' + formatPixCelular(raw));
+  // Copia a chave no formato esperado pelo banco: telefone/cpf/cnpj só dígitos,
+  // email/aleatória como veio. App de banco aceita os dois formatos pra telefone.
+  const type = getPixType();
+  const raw  = String(getPixKey());
+  const toCopy = (type === 'email' || type === 'aleatoria') ? raw : raw.replace(/\D/g, '');
+  copyToClipboard(toCopy, 'Chave PIX copiada: ' + formatPixByType(raw, type));
 }
 
 function copyToClipboard(text, successMsg) {
@@ -3610,20 +3935,54 @@ function toggleModal(id, show) {
 // ================================================================
 // AJUSTES — operador, PIX, impressora térmica
 // ================================================================
+let ajustesListenersBound = false;
 function openAjustes() {
-  document.getElementById('ajusteOperator').value = operatorName || '';
-  document.getElementById('ajustePixKey').value   = getPixKey();
+  document.getElementById('ajusteOperator').value  = operatorName || '';
+  document.getElementById('ajusteEmpresa').value   = getEmpresaName();
+  document.getElementById('ajustePixType').value   = getPixType();
+  document.getElementById('ajustePixKey').value    = getPixKey();
   document.getElementById('ajustePixHolder').value = getPixHolder();
+  if (!ajustesListenersBound) {
+    document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
+    document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
+    ajustesListenersBound = true;
+  }
+  updatePixHint();
   renderPrinterStatus();
   toggleModal('ajustesModal', true);
 }
 function closeAjustes() { toggleModal('ajustesModal', false); }
+
+// Reage à troca do tipo de chave: ajusta placeholder e mostra preview formatado.
+function updatePixHint() {
+  const sel  = document.getElementById('ajustePixType');
+  const inp  = document.getElementById('ajustePixKey');
+  const hint = document.getElementById('ajustePixHint');
+  if (!sel || !inp || !hint) return;
+  const type = sel.value;
+  const cfg  = PIX_TYPES[type] || {};
+  inp.placeholder = cfg.placeholder || '';
+  const v = inp.value.trim();
+  if (!v) { hint.textContent = ''; return; }
+  const ok = validatePixKey(v, type);
+  hint.textContent = ok
+    ? '✓ ' + formatPixByType(v, type)
+    : 'Formato inválido pra ' + (cfg.label || type);
+  hint.style.color = ok ? '#4ade80' : '#ef6b6b';
+}
+
 function saveAjustes() {
-  const op     = (document.getElementById('ajusteOperator').value || '').trim().slice(0,32);
-  const key    = (document.getElementById('ajustePixKey').value || '').trim();
-  const holder = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
+  const op      = (document.getElementById('ajusteOperator').value  || '').trim().slice(0,32);
+  const empresa = (document.getElementById('ajusteEmpresa').value   || '').trim().slice(0,48);
+  const type    = document.getElementById('ajustePixType').value;
+  const key     = (document.getElementById('ajustePixKey').value    || '').trim();
+  const holder  = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
+  if (key && !validatePixKey(key, type)) {
+    showToast('Chave PIX inválida pra esse tipo');
+    return;
+  }
   if (op) saveOperatorName(op);
-  if (key || holder) cdbSetPix(key, holder);
+  cdbSetPix(key || null, holder || null, type, empresa || null);
   closeAjustes();
   showToast('Ajustes salvos');
 }
@@ -3869,7 +4228,10 @@ function escPosTextLines(title, lines) {
 }
 
 function escPosOrderLabel(o) {
-  const b = escPosBuilder().init().center().big().line('CASA DA BABA').normal().push(0x0A).left();
+  const empresa = (getEmpresaName() || 'CASA DA BABA').toUpperCase();
+  const pixType = getPixType();
+  const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const b = escPosBuilder().init().center().big().line(empresa).normal().push(0x0A).left();
   b.line(divider());
   b.line('Pedido: ' + (o.id || '').slice(-8));
   b.line('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente'));
@@ -3881,8 +4243,8 @@ function escPosOrderLabel(o) {
   b.big().line(padLine('TOTAL', money(o.total))).normal();
   if (o.notes) b.line('Obs: ' + o.notes);
   b.line(divider());
-  b.line('PIX: ' + getPixKey());
-  b.line(getPixHolder());
+  b.line('PIX (' + pixLabel + '): ' + formatPixByType(getPixKey(), pixType));
+  b.line('Titular: ' + getPixHolder());
   if (o.confirmedBy) b.line('Conferido por: ' + o.confirmedBy);
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
@@ -3938,18 +4300,286 @@ function printAreaHtml(html) {
   }, 80);
 }
 
+// ================================================================
+// ETIQUETAS — produção (N por batch) e pedido (1 por order).
+// Tela única de preview com 3 ações: imprimir BT, salvar PNG, compartilhar.
+// ================================================================
+
+function fmtDateBR(ms)   { return new Date(ms).toLocaleDateString('pt-BR'); }
+function fmtPesoG(g)     { return g >= 1000 ? (g/1000).toFixed(2).replace('.',',') + 'kg' : g + 'g'; }
+
+/**
+ * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
+ * dados que cada etiqueta precisa pra ser renderizada/impressa.
+ */
+function etiquetasFromBatch(batch) {
+  const out = [];
+  const lote = batch.lote || getLoteDoDia(new Date(batch.createdAt));
+  const empresa = getEmpresaName();
+  let serial = 1;
+  (batch.items || []).forEach(it => {
+    const product = products.find(p => p.id === it.productId);
+    const sku = getProductSku(product || { id: it.productId, name: it.name });
+    for (let i = 0; i < it.qty; i++) {
+      const idxStr = String(serial).padStart(3, '0');
+      out.push({
+        empresa,
+        productName: it.name,
+        emoji: it.emoji || '',
+        unit: it.unit || '',
+        sku,
+        lote,
+        idx: serial,
+        idxStr,
+        codigoBarras: `${sku}-${lote}-${idxStr}`,
+        weightG: it.weightG ?? null,
+        productionDate: batch.createdAt,
+        expiresAt: it.expiresAt ?? null,
+        validityDays: it.validityDays ?? null
+      });
+      serial++;
+    }
+  });
+  return out;
+}
+
+function etiquetaProducaoHtml(et) {
+  const bars = buildBarcodePattern(et.codigoBarras);
+  const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
+  const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
+  return `
+    <div class="et-title">${escapeHtml(et.empresa)}</div>
+    <div class="et-prod">${et.emoji} ${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
+    <div class="et-bars">${bars}</div>
+    <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+    ${peso}
+    <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
+    <div class="et-row"><span class="lbl">Validade</span><span>${escapeHtml(venc)}</span></div>
+    <div class="et-row"><span class="lbl">Lote</span><span>${escapeHtml(et.lote)}</span></div>
+  `;
+}
+
+function escPosLabelProducao(et) {
+  const b = escPosBuilder().init().center().big().line(et.empresa).normal();
+  b.line(divider());
+  b.center().line(et.productName + (et.unit ? ' (' + et.unit + ')' : ''));
+  b.line(et.codigoBarras);
+  b.line(divider()).left();
+  if (et.weightG) b.line(padLine('Peso',     fmtPesoG(et.weightG)));
+  b.line(padLine('Producao', fmtDateBR(et.productionDate)));
+  b.line(padLine('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
+  b.line(padLine('Lote',     et.lote));
+  return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
+}
+
+/**
+ * Renderiza etiquetas em um canvas vertical e retorna Promise<Blob> PNG.
+ * Largura fixa 384px (= 58mm a 200dpi). Cada etiqueta ocupa ~280px + 20px gap.
+ * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
+ */
+function etiquetasToPng(etiquetas, kind) {
+  const W = 384;
+  const ROW_H = kind === 'order' ? 380 : 280;
+  const GAP = 20;
+  const H = etiquetas.length * (ROW_H + GAP) + GAP;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'top';
+
+  etiquetas.forEach((et, i) => {
+    const yTop = GAP + i * (ROW_H + GAP);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    if (kind === 'order') {
+      drawOrderEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
+    } else {
+      drawProducaoEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
+    }
+  });
+
+  return new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/png'));
+}
+
+function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H) {
+  const cx = W / 2;
+  let y = y0 + 8;
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText(et.empresa.toUpperCase(), cx, y); y += 24;
+  // separador
+  ctx.fillRect(20, y, W - 40, 1); y += 6;
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText((et.emoji + ' ' + et.productName).slice(0, 28), cx, y); y += 22;
+  // barras
+  drawBarcodeOnCanvas(ctx, et.codigoBarras, 24, y, W - 48, 36); y += 40;
+  ctx.font = 'bold 11px monospace';
+  ctx.fillText(et.codigoBarras, cx, y); y += 18;
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'left';
+  const lx = 24, rx = W - 24;
+  if (et.weightG) {
+    ctx.fillText('Peso', lx, y); ctx.textAlign = 'right'; ctx.fillText(fmtPesoG(et.weightG), rx, y); ctx.textAlign = 'left'; y += 16;
+  }
+  ctx.fillText('Produção', lx, y);  ctx.textAlign = 'right'; ctx.fillText(fmtDateBR(et.productionDate), rx, y); ctx.textAlign = 'left'; y += 16;
+  ctx.fillText('Validade', lx, y);  ctx.textAlign = 'right'; ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', rx, y); ctx.textAlign = 'left'; y += 16;
+  ctx.fillText('Lote',     lx, y);  ctx.textAlign = 'right'; ctx.fillText(et.lote, rx, y); ctx.textAlign = 'left';
+}
+
+function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
+  // et aqui é { kind: 'order', order: o } — formato simples pra etiqueta de pedido.
+  const o = et.order;
+  const cx = W / 2;
+  let y = y0 + 8;
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText((getEmpresaName() || 'Casa da Baba').toUpperCase(), cx, y); y += 24;
+  ctx.font = '12px monospace';
+  ctx.fillText('Pedido ' + (o.id || '').slice(-8), cx, y); y += 18;
+  ctx.fillRect(20, y, W - 40, 1); y += 8;
+  ctx.textAlign = 'left';
+  ctx.font = '12px monospace';
+  ctx.fillText(('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente')).slice(0, 32), 24, y); y += 16;
+  if (o.clientSnapshot?.ref) { ctx.fillText(String(o.clientSnapshot.ref).slice(0, 32), 24, y); y += 16; }
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), 24, y); y += 16;
+  ctx.fillRect(20, y, W - 40, 1); y += 8;
+  (o.items || []).forEach(it => {
+    ctx.fillText((it.qty + '× ' + it.name).slice(0, 24), 24, y);
+    ctx.textAlign = 'right'; ctx.fillText(money(it.qty * it.unitPrice), W - 24, y); ctx.textAlign = 'left';
+    y += 14;
+  });
+  ctx.fillRect(20, y, W - 40, 1); y += 8;
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText('TOTAL', 24, y);
+  ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 24, y); ctx.textAlign = 'left';
+  y += 18;
+  ctx.font = '11px monospace';
+  ctx.fillText('PIX (' + ((PIX_TYPES[getPixType()]?.short) || 'Chave') + '): ' + formatPixByType(getPixKey(), getPixType()), 24, y); y += 14;
+  ctx.fillText('Titular: ' + getPixHolder(), 24, y);
+}
+
+function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  let cur = x;
+  ctx.fillStyle = '#000';
+  for (let i = 0; i < 42 && cur < x + w; i++) {
+    const barW = (Math.abs(hash >> (i % 28)) % 3) + 1;
+    const gapW = (Math.abs(hash >> ((i + 7) % 28)) % 2) + 1;
+    ctx.fillRect(cur, y, barW, h);
+    cur += barW + gapW;
+  }
+}
+
+// Estado do preview de etiquetas
+let currentEtiquetas = [];
+let currentEtiquetasKind = 'producao'; // 'producao' | 'order'
+
+function showEtiquetasPreview(etiquetas, kind, subtitle) {
+  if (!etiquetas || !etiquetas.length) return;
+  currentEtiquetas = etiquetas;
+  currentEtiquetasKind = kind || 'producao';
+  document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
+  document.getElementById('etqSubtitle').textContent = subtitle || '';
+
+  const body = document.getElementById('etqBody');
+  if (kind === 'order') {
+    // 1 etiqueta de pedido — mesmo container, mas usa orderLabelHtml.
+    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
+  } else {
+    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
+  }
+  document.getElementById('etiquetasPreview').classList.add('show');
+}
+
+function closeEtiquetasPreview() {
+  document.getElementById('etiquetasPreview').classList.remove('show');
+  // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
+  if (currentEtiquetasKind === 'producao') go('home');
+  currentEtiquetas = [];
+}
+
+async function etqAction(action) {
+  if (!currentEtiquetas.length) return;
+  if (action === 'print') {
+    if (currentEtiquetasKind === 'order') {
+      // 1 só etiqueta de pedido
+      const et = currentEtiquetas[0];
+      printViaBluetooth(escPosOrderLabel(et.order), () => printAreaHtml(orderLabelHtml(et.order)));
+    } else {
+      // produção: imprime sequencialmente. ESC/POS suporta concatenar.
+      const totalBytes = currentEtiquetas.reduce((acc, et) => {
+        const b = escPosLabelProducao(et);
+        return Uint8Array.from([...acc, ...b]);
+      }, new Uint8Array());
+      printViaBluetooth(totalBytes, () => {
+        // Fallback sem BT: monta HTML com todas etiquetas e usa window.print
+        const html = currentEtiquetas.map(et => `<div>${etiquetaProducaoHtml(et)}</div><div style="page-break-after:always"></div>`).join('');
+        printAreaHtml(html);
+      });
+    }
+    return;
+  }
+  if (action === 'save') {
+    showToast('Gerando imagem…');
+    const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
+    if (!blob) { showToast('Falha ao gerar imagem'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `etiquetas-${currentEtiquetasKind}-${Date.now()}.png`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('PNG salvo');
+    return;
+  }
+  if (action === 'share') {
+    showToast('Preparando…');
+    const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
+    if (!blob) { showToast('Falha ao gerar imagem'); return; }
+    const file = new File([blob], `etiquetas-${Date.now()}.png`, { type: 'image/png' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Etiquetas' });
+      } else {
+        // Fallback: download (compartilhar manual)
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = file.name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('Sem suporte a compartilhar — baixei a imagem');
+      }
+    } catch (e) {
+      if (e?.name !== 'AbortError') showToast('Erro ao compartilhar');
+    }
+    return;
+  }
+}
+
+// Refactor: bot 🖨️ no kanban abre tela de preview com 1 etiqueta de pedido,
+// em vez de tentar window.print direto (que falhava em alguns Android).
 function printEtiqueta(orderId) {
   const o = getOrderById(orderId);
   if (!o) { showToast('Pedido não encontrado'); return; }
-  printViaBluetooth(escPosOrderLabel(o), () => printAreaHtml(orderLabelHtml(o)));
+  showEtiquetasPreview([{ order: o }], 'order', `Pedido ${(o.id||'').slice(-8)}`);
 }
 
 function orderLabelHtml(o) {
   const items = (o.items || []).map(it =>
     `<div class="pa-item"><span class="pi-qty">${it.qty}×</span> ${escapeHtml(it.name)}<span>${money(it.qty*it.unitPrice)}</span></div>`
   ).join('');
+  const empresa  = (getEmpresaName() || 'Casa da Baba').toUpperCase();
+  const pixType  = getPixType();
+  const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const pixVal   = formatPixByType(getPixKey(), pixType);
   return `
-    <div class="pa-title">CASA DA BABA</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
     <div class="pa-center">Pedido ${escapeHtml((o.id||'').slice(-8))}</div>
     <div class="pa-sep">--------------------------------</div>
     <div>Cliente: ${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
@@ -3961,8 +4591,8 @@ function orderLabelHtml(o) {
     <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
     ${o.notes ? `<div>Obs: ${escapeHtml(o.notes)}</div>` : ''}
     <div class="pa-sep">--------------------------------</div>
-    <div>PIX: ${escapeHtml(getPixKey())}</div>
-    <div>${escapeHtml(getPixHolder())}</div>
+    <div>PIX (${escapeHtml(pixLabel)}): ${escapeHtml(pixVal)}</div>
+    <div>Titular: ${escapeHtml(getPixHolder())}</div>
     ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}`;
 }
 
@@ -3983,15 +4613,30 @@ function decProduct(id) {
 }
 
 function confirmProduction() {
-  const items = products.filter(p => p.count > 0).map(p => ({
-    productId: p.id,
-    name: p.name,
-    emoji: p.emoji,
-    unit: p.unit,
-    qty: p.count,
-    photo: p.photo || null
-  }));
-  if (items.length === 0) return;
+  const itemsRaw = products.filter(p => p.count > 0);
+  if (itemsRaw.length === 0) return;
+
+  // Validação: todo produto precisa de validade. Peso é opcional.
+  const detail = readProdDetailValues();
+  if (!detail.valid) {
+    showToast('Defina a validade de cada produto');
+    return;
+  }
+
+  const nowMs = Date.now();
+  const lote  = getLoteDoDia(new Date(nowMs));
+
+  const items = itemsRaw.map(p => {
+    const d = detail.perProduct.get(p.id) || {};
+    const expiresAt = d.validityDays ? nowMs + d.validityDays * 24*60*60*1000 : null;
+    return {
+      productId: p.id, name: p.name, emoji: p.emoji, unit: p.unit, qty: p.count,
+      photo: p.photo || null,
+      weightG: d.weightG ?? null,
+      validityDays: d.validityDays ?? null,
+      expiresAt: expiresAt
+    };
+  });
 
   // Incrementa o estoque dos produtos produzidos
   items.forEach(it => {
@@ -4001,11 +4646,12 @@ function confirmProduction() {
 
   const code = document.getElementById('barcodeText').textContent;
   const batch = {
-    id: 'b-' + Date.now(),
+    id: 'b-' + nowMs,
     code,
     items,
     batchPhoto: currentPhotoDataUrl,
-    createdAt: Date.now(),
+    createdAt: nowMs,
+    lote,
     lastOperatorName: operatorName || null
   };
   batches.push(batch);
@@ -4015,8 +4661,16 @@ function confirmProduction() {
   closeProductionConfirm();
   pendingSync += items.length;
   updateSync();
-  showToast(`Lote ${code} registrado`);
-  go('home');
+
+  // Em vez de só toast e go('home'), abre tela de preview com N etiquetas.
+  // Operador clica Imprimir/Salvar/Compartilhar e fecha quando quiser.
+  const etiquetas = etiquetasFromBatch(batch);
+  if (etiquetas.length > 0) {
+    showEtiquetasPreview(etiquetas, 'producao', `Lote ${lote} · ${etiquetas.length} etiqueta${etiquetas.length>1?'s':''}`);
+  } else {
+    showToast(`Lote ${code} registrado`);
+    go('home');
+  }
 }
 
 // =========================

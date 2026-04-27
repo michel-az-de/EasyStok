@@ -56,4 +56,16 @@ public class Product
     /// <summary>Nome do operador (informado no PWA) que fez a última alteração. Auditoria.</summary>
     [Column("last_operator_name"), MaxLength(64)]
     public string? LastOperatorName { get; set; }
+
+    /// <summary>SKU pra etiqueta de produção (prefixo do código de barras). Ex: "TALH".</summary>
+    [Column("sku"), MaxLength(32)]
+    public string? Sku { get; set; }
+
+    /// <summary>Peso default em gramas — pré-preenche tela de revisão de produção.</summary>
+    [Column("default_weight_g")]
+    public int? DefaultWeightG { get; set; }
+
+    /// <summary>Validade default em dias — pré-preenche tela de revisão de produção.</summary>
+    [Column("default_validity_days")]
+    public int? DefaultValidityDays { get; set; }
 }

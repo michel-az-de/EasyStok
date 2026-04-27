@@ -131,4 +131,17 @@ ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS confirmed_by     VARCHAR(64);
 ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS confirmed_at     TIMESTAMP;
 ALTER TABLE mobile_orders ADD COLUMN IF NOT EXISTS fact_at          TIMESTAMP;
 
+-- ===== Etiquetas de produção: SKU + peso/validade default + lote do dia =====
+-- mobile_products.sku: prefixo do código de barras (slug do id em uppercase, max 8). Gerado no app.
+-- mobile_products.default_weight_g / default_validity_days: pré-preenchimento na tela de revisão.
+-- mobile_batches.lote: identificador do dia (LOT-YYMMDD). Todas as produções do mesmo dia compartilham.
+-- mobile_batch_items.weight_g / validity_days / expires_at: detalhes por linha produzida.
+ALTER TABLE mobile_products    ADD COLUMN IF NOT EXISTS sku                   VARCHAR(32);
+ALTER TABLE mobile_products    ADD COLUMN IF NOT EXISTS default_weight_g      INTEGER;
+ALTER TABLE mobile_products    ADD COLUMN IF NOT EXISTS default_validity_days INTEGER;
+ALTER TABLE mobile_batches     ADD COLUMN IF NOT EXISTS lote                  VARCHAR(32);
+ALTER TABLE mobile_batch_items ADD COLUMN IF NOT EXISTS weight_g              INTEGER;
+ALTER TABLE mobile_batch_items ADD COLUMN IF NOT EXISTS validity_days         INTEGER;
+ALTER TABLE mobile_batch_items ADD COLUMN IF NOT EXISTS expires_at            TIMESTAMP;
+
 COMMIT;

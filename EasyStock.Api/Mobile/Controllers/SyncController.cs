@@ -135,6 +135,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 Id = dto.Id, Name = dto.Name, Emoji = dto.Emoji, Category = dto.Category,
                 Unit = dto.Unit, Price = dto.Price, Stock = dto.Stock,
                 IsCustom = dto.Custom ?? false,
+                Sku = dto.Sku,
+                DefaultWeightG = dto.DefaultWeightG,
+                DefaultValidityDays = dto.DefaultValidityDays,
                 LastDeviceId = deviceId,
                 LastOperatorName = operatorName
             });
@@ -152,6 +155,10 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
+            // Etiquetas: só persiste se DTO mandou (preserva valor se APK antigo omitir).
+            if (dto.Sku is not null)                 existing.Sku = dto.Sku;
+            if (dto.DefaultWeightG.HasValue)         existing.DefaultWeightG = dto.DefaultWeightG;
+            if (dto.DefaultValidityDays.HasValue)    existing.DefaultValidityDays = dto.DefaultValidityDays;
         }
     }
 
@@ -295,6 +302,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         {
             Id = dto.Id, Code = dto.Code, BatchPhoto = dto.BatchPhoto,
             CreatedAt = createdAt,
+            Lote = dto.Lote,
             LastDeviceId = deviceId,
             LastOperatorName = operatorName
         };
@@ -303,7 +311,12 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             batch.Items.Add(new BatchItem
             {
                 BatchId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, Photo = i.Photo
+                Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, Photo = i.Photo,
+                WeightG = i.WeightG,
+                ValidityDays = i.ValidityDays,
+                ExpiresAt = i.ExpiresAt.HasValue
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(i.ExpiresAt.Value).UtcDateTime
+                    : (DateTime?)null
             });
             // Incrementa estoque
             var p = await _db.Set<Product>().FindAsync(i.ProductId);
@@ -333,7 +346,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     // ──────────────────────────────────────────────────────────────────────
 
     private static ProductDto ToDto(Product p) =>
-        new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom);
+        new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays);
 
     private static ClientDto ToDto(Client c) =>
         new(c.Id, c.Name, c.Apt, c.Address, c.Phone,
@@ -349,9 +363,15 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
 
     private static BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
-            b.Items.Select(i => new BatchItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.Photo)).ToList(),
+            b.Items.Select(i => new BatchItemDto(
+                i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.Photo,
+                i.WeightG, i.ValidityDays,
+                i.ExpiresAt.HasValue
+                    ? new DateTimeOffset(i.ExpiresAt.Value).ToUnixTimeMilliseconds()
+                    : (long?)null)).ToList(),
             b.BatchPhoto,
-            new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds());
+            new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds(),
+            b.Lote);
 
     private static CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,

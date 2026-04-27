@@ -11,7 +11,11 @@ public record ProductDto(
     string? Unit,
     decimal? Price,
     int Stock,
-    bool? Custom
+    bool? Custom,
+    // Etiquetas de produção (opcionais — APKs antigos não enviam).
+    string? Sku = null,
+    int? DefaultWeightG = null,
+    int? DefaultValidityDays = null
 );
 
 public record ClientDto(
@@ -58,7 +62,11 @@ public record BatchItemDto(
     string? Emoji,
     string? Unit,
     int Qty,
-    string? Photo
+    string? Photo,
+    // Etiquetas (opcionais — APKs antigos não enviam).
+    int? WeightG = null,
+    int? ValidityDays = null,
+    long? ExpiresAt = null
 );
 
 public record BatchDto(
@@ -66,7 +74,9 @@ public record BatchDto(
     string Code,
     List<BatchItemDto> Items,
     string? BatchPhoto,
-    long CreatedAt
+    long CreatedAt,
+    // Lote do dia (LOT-YYMMDD). Opcional — APKs antigos omitem.
+    string? Lote = null
 );
 
 public record CashEntryDto(

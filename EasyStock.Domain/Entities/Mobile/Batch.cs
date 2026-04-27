@@ -32,6 +32,10 @@ public class Batch
     [Column("last_operator_name"), MaxLength(64)]
     public string? LastOperatorName { get; set; }
 
+    /// <summary>Identificador do dia (LOT-YYMMDD). Todas produções do mesmo dia compartilham.</summary>
+    [Column("lote"), MaxLength(32)]
+    public string? Lote { get; set; }
+
     public List<BatchItem> Items { get; set; } = new();
 }
 
@@ -60,6 +64,18 @@ public class BatchItem
 
     /// <summary>Foto do item individual (opcional).</summary>
     public string? Photo { get; set; }
+
+    /// <summary>Peso por unidade em gramas. Vai pra todas as etiquetas dessa linha.</summary>
+    [Column("weight_g")]
+    public int? WeightG { get; set; }
+
+    /// <summary>Validade em dias a partir da data de produção (CreatedAt do Batch).</summary>
+    [Column("validity_days")]
+    public int? ValidityDays { get; set; }
+
+    /// <summary>Calculado no app como CreatedAt + ValidityDays. Persistido pra evitar recálculo.</summary>
+    [Column("expires_at")]
+    public DateTime? ExpiresAt { get; set; }
 
     [ForeignKey(nameof(BatchId))]
     public Batch? Batch { get; set; }
