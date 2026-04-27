@@ -1,0 +1,10 @@
+{
+  "name": "casa-da-baba-swa-api",
+  "version": "1.0.0",
+  "description": "Azure Functions hospedadas no SWA — endpoint de update pro LiveUpdater (POST -> JSON com version/url/checksum).",
+  "private": true,
+  "main": "**/index.js",
+  "engines": {
+    "node": ">=18"
+  }
+}
