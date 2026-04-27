@@ -1262,7 +1262,7 @@ body {
 
 /* Toast */
 .toast {
-  position: absolute;
+  position: fixed;
   bottom: 100px;
   left: 22px;
   right: 22px;
@@ -1276,7 +1276,9 @@ body {
   gap: 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   animation: slideUp 0.25s ease;
-  z-index: 40;
+  /* Acima de TODOS os modais (modal upd e=12000). Toasts sempre devem
+     ficar visiveis mesmo com Ajustes/Etiquetas/etc. abertos. */
+  z-index: 13000;
 }
 .toast.show { display: flex; }
 .toast .msg { font-size: 13px; flex: 1; }
@@ -5767,38 +5769,40 @@ window.cdbApp = {
 })();
 
 // Forca checagem manual de update (botao Ajustes > Verificar atualizacoes).
-// Util se o autoUpdate nao tiver disparado por algum motivo.
+// Usa alert() ao inves de showToast porque o modal Ajustes tem z-index alto
+// e o toast ficava enterrado embaixo (invisivel). alert() e nativo do
+// Android WebView e sempre aparece em cima de TUDO.
 function forceCheckUpdate() {
   try {
     var Plugin = window.Capacitor
               && window.Capacitor.Plugins
               && window.Capacitor.Plugins.CapacitorUpdater;
     if (!Plugin) {
-      showToast('Disponivel apenas no APK Android');
+      alert('Plugin LiveUpdater nao disponivel.\n\nIsso so funciona dentro do APK Android, nao no browser.');
       return;
     }
-    showToast('Verificando atualizacoes...');
+    alert('Verificando atualizacoes no servidor...');
     // getLatest consulta updates.json e baixa se houver versao nova.
     // Em seguida, set() ativa o bundle baixado pra proxima reabertura.
     Plugin.getLatest().then(function (info) {
       console.log('[LiveUpdater] getLatest:', info);
       if (info && info.url) {
-        showToast('Baixando atualizacao...');
+        alert('Versao ' + info.version + ' encontrada.\n\nBaixando...');
         return Plugin.download({ url: info.url, version: info.version }).then(function (bundle) {
           console.log('[LiveUpdater] download OK:', bundle);
           return Plugin.set({ id: bundle.id }).then(function () {
-            showToast('Atualizacao instalada — reabra o app');
+            alert('Atualizacao baixada!\n\nFeche o app (deslize pra cima na lista de recentes) e abra de novo.');
           });
         });
       } else {
-        showToast('Voce ja esta na ultima versao');
+        alert('Voce ja esta na ultima versao.\n\nNada a baixar.');
       }
     }).catch(function (e) {
       console.warn('[LiveUpdater] forceCheckUpdate falhou:', e);
-      showToast('Erro ao verificar: ' + (e && e.message ? e.message : 'desconhecido'));
+      alert('Erro ao verificar atualizacao:\n\n' + (e && e.message ? e.message : JSON.stringify(e)));
     });
   } catch (e) {
-    showToast('Erro: ' + e.message);
+    alert('Erro inesperado:\n\n' + e.message);
   }
 }
 
