@@ -5654,6 +5654,19 @@ window.cdbApp = {
 <script src="qrcode.min.js"></script>
 <script src="sync.js"></script>
 <script>
+// LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
+// Sem isso, o plugin faz rollback automatico apos appReadyTimeout (15s).
+// Roda logo no boot — antes de qualquer await/inicializacao pesada.
+(function notifyLiveUpdaterAppReady() {
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) {
+      window.Capacitor.Plugins.CapacitorUpdater.notifyAppReady()
+        .then(() => console.log('[LiveUpdater] notifyAppReady OK'))
+        .catch(e => console.warn('[LiveUpdater] notifyAppReady falhou:', e));
+    }
+  } catch (e) { /* nao-Capacitor (browser) — ignora */ }
+})();
+
 // Auto-update silencioso: ao detectar novo SW assumindo controle, recarrega
 // a pagina sem pedir nada pro usuario. Combinado com network-first no sw.js,
 // cada git push -> deploy SWA -> proxima abertura do app ja tem versao nova.

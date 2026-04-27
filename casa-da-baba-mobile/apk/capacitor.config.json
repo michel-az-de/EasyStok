@@ -10,5 +10,14 @@
   "server": {
     "androidScheme": "http",
     "cleartext": true
+  },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": true,
+      "updateUrl": "https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/updates.json",
+      "directUpdate": "atInstall",
+      "responseTimeout": 10,
+      "appReadyTimeout": 15000
+    }
   }
 }

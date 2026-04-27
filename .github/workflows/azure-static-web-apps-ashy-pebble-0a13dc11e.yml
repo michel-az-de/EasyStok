@@ -41,6 +41,36 @@ jobs:
         run: |
           sed -i "s|cdb-v2|cdb-${GITHUB_SHA:0:7}|g" EasyStock.Api/wwwroot/pwa/sw.js
 
+      # LiveUpdater: gera bundle-{version}.zip + updates.json dentro do
+      # diretorio servido pelo SWA. APK Capacitor le updates.json, baixa
+      # o ZIP, descompacta e troca o webDir mantendo origem http://localhost.
+      # Versao usa run_number como patch pra ficar semver crescente.
+      - name: Generate LiveUpdater bundle + updates.json
+        run: |
+          cd EasyStock.Api/wwwroot/pwa
+          VERSION="1.0.${{ github.run_number }}"
+          ZIPNAME="bundle-${VERSION}.zip"
+
+          # ZIP de TUDO no diretorio (index.html ja na raiz — formato exigido pelo plugin)
+          # Exclui o proprio zip do passo anterior caso re-execute, e .git stuff.
+          zip -rq "/tmp/${ZIPNAME}" . -x "bundle-*.zip" "updates.json" "*.git*"
+          mv "/tmp/${ZIPNAME}" "./${ZIPNAME}"
+
+          CHECKSUM=$(sha256sum "${ZIPNAME}" | awk '{print $1}')
+          BUNDLE_URL="https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/${ZIPNAME}"
+
+          cat > updates.json <<EOF
+          {
+            "version": "${VERSION}",
+            "url": "${BUNDLE_URL}",
+            "checksum": "${CHECKSUM}"
+          }
+          EOF
+
+          echo "[LiveUpdater] versao=${VERSION} checksum=${CHECKSUM}"
+          echo "[LiveUpdater] url=${BUNDLE_URL}"
+          ls -la bundle-*.zip updates.json
+
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
