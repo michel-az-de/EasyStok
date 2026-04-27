@@ -41,6 +41,13 @@ jobs:
         run: |
           sed -i "s|cdb-v2|cdb-${GITHUB_SHA:0:7}|g" EasyStock.Api/wwwroot/pwa/sw.js
 
+      # Carimbo visivel no header (substitui placeholder __APP_VERSION__).
+      # Permite ver visualmente quando o LiveUpdater entregou bundle novo.
+      - name: Stamp version in index.html
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          sed -i "s|__APP_VERSION__|${VERSION}|g" EasyStock.Api/wwwroot/pwa/index.html
+
       # LiveUpdater: gera bundle-{version}.zip + updates.json dentro do
       # diretorio servido pelo SWA. APK Capacitor le updates.json, baixa
       # o ZIP, descompacta e troca o webDir mantendo origem http://localhost.

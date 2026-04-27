@@ -52,6 +52,21 @@ function injectConfigBeforeSyncJs(htmlPath) {
   }
 }
 
+function stampVersionInHtml(htmlPath) {
+  // Bundle embutido no APK: marca como "init". Quando o LiveUpdater entregar
+  // um bundle novo do SWA, o sed do workflow substitui pra "1.0.X" — assim
+  // da pra distinguir visualmente bundle empacotado vs bundle baixado.
+  let html = fs.readFileSync(htmlPath, 'utf8');
+  if (html.includes('__APP_VERSION__')) {
+    const stamp = process.env.BUILD_VERSION_CODE
+      ? `apk-${process.env.BUILD_VERSION_CODE}`
+      : 'apk-local';
+    html = html.replace(/__APP_VERSION__/g, stamp);
+    fs.writeFileSync(htmlPath, html, 'utf8');
+    console.log('[copy-web] carimbou versao no index.html:', stamp);
+  }
+}
+
 function main() {
   if (!fs.existsSync(SRC)) {
     console.error('[copy-web] Fonte do PWA não encontrada:', SRC);
@@ -72,6 +87,7 @@ function main() {
   console.log('[copy-web] Gerou', configPath, `(apiBaseUrl=${apiBaseUrl || '""'})`);
 
   injectConfigBeforeSyncJs(path.join(DST, 'index.html'));
+  stampVersionInHtml(path.join(DST, 'index.html'));
 
   // Service worker não faz sentido dentro do APK (Capacitor usa WebView local,
   // sem HTTPS). Removemos o arquivo e a registração acontece apenas via browser.
