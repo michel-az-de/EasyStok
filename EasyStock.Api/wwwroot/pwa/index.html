@@ -4783,6 +4783,41 @@ function saveAjustes() {
   showToast('Ajustes salvos');
 }
 
+// ================================================================
+// PERMISSAO BLUETOOTH RUNTIME — Android 12+ exige BLUETOOTH_CONNECT
+// runtime pra qualquer chamada BT (list/connect/isEnabled). O plugin
+// cordova-plugin-bluetooth-serial 0.4.7 nao requisita; sem permissao,
+// chamadas nativas lancam SecurityException nao tratada -> APP CRASHA.
+// Usamos cordova-plugin-android-permissions pra pedir do JS antes de
+// qualquer chamada bs.*, e tambem no boot pra prompt na 1a abertura.
+// ================================================================
+function ensureBluetoothPermission(cb) {
+  // Sem Cordova (browser) ou plugin ausente: assume ok e deixa fluxo seguir
+  const perms = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+  if (!perms || !perms.BLUETOOTH_CONNECT) { cb(true); return; }
+  // Pede BLUETOOTH_CONNECT (mandatorio Android 12+) e SCAN (alguns OEMs
+  // exigem pra getBondedDevices). requestPermissions aceita array e
+  // mostra um unico dialog combinado pro usuario.
+  const list = [perms.BLUETOOTH_CONNECT];
+  if (perms.BLUETOOTH_SCAN) list.push(perms.BLUETOOTH_SCAN);
+  try {
+    perms.checkPermission(perms.BLUETOOTH_CONNECT, (res) => {
+      if (res && res.hasPermission) { cb(true); return; }
+      perms.requestPermissions(list,
+        (r) => cb(!!(r && r.hasPermission)),
+        () => cb(false)
+      );
+    }, () => {
+      try {
+        perms.requestPermissions(list,
+          (r) => cb(!!(r && r.hasPermission)),
+          () => cb(false)
+        );
+      } catch (e) { cb(false); }
+    });
+  } catch (e) { cb(false); }
+}
+
 function getSavedPrinter() { return load('cdb-printer', null); }
 function setSavedPrinter(p) {
   if (p) save('cdb-printer', p);
@@ -4901,23 +4936,15 @@ function loadPrinterDevices() {
     }
   };
 
-  // Verifica se Bluetooth esta ligado antes de listar — isEnabled tambem
-  // exige BLUETOOTH_CONNECT no Android 12+, entao se falhar aqui, ja
-  // surfaceamos a instrucao de permissao sem precisar passar pra list.
-  if (typeof bs.isEnabled === 'function') {
-    try {
-      bs.isEnabled(() => doList(), (err) => {
-        // isEnabled error pode ser "Bluetooth desligado" OU permission negada.
-        // Tentamos list mesmo assim — se for permission, o erro do list ajuda
-        // a diagnosticar; se for BT off, o list tambem vai falhar com msg clara.
-        doList();
-      });
-    } catch (ex) {
-      doList();
+  // Pede permissao BLUETOOTH_CONNECT ANTES de qualquer bs.* — sem isso,
+  // Android 12+ lanca SecurityException nativo nao tratado (crash do app).
+  ensureBluetoothPermission((granted) => {
+    if (!granted) {
+      showError('permission', 'BLUETOOTH_CONNECT negada ou indisponivel');
+      return;
     }
-  } else {
     doList();
-  }
+  });
 }
 
 // Diagnostico visivel — alerta com estado do runtime pra debug em campo.
@@ -5233,23 +5260,51 @@ function printViaBluetooth(bytes, onFallback) {
     return;
   }
   if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
-  isPrinting = true;
-  printWatchdog = setTimeout(() => {
-    showToast('Impressora não respondeu — liberando');
-    releasePrinting();
-  }, 15000);
-  const send = () => {
-    bs.write(bytes,
-      () => { showToast('Enviado pra impressora'); releasePrinting(); },
-      (err) => { showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
-    );
-  };
-  bs.isConnected(send, () => {
-    bs.connect(printer.address, send, (err) => {
-      showToast('Não conectou: ' + (err && err.message || err));
+
+  // Gate de permissao BLUETOOTH_CONNECT — sem isso, bs.connect/write
+  // lancam SecurityException nativo no Android 12+ e crasham o app.
+  ensureBluetoothPermission((granted) => {
+    if (!granted) {
+      showToast('Permissão Bluetooth negada — Configurações > Apps > Casa da Baba');
+      if (typeof onFallback === 'function') onFallback();
+      return;
+    }
+    isPrinting = true;
+    printWatchdog = setTimeout(() => {
+      showToast('Impressora não respondeu — liberando');
+      releasePrinting();
+    }, 15000);
+    const send = () => {
+      try {
+        bs.write(bytes,
+          () => { showToast('Enviado pra impressora'); releasePrinting(); },
+          (err) => { showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
+        );
+      } catch (ex) {
+        showToast('Erro nativo: ' + (ex.message || ex));
+        releasePrinting();
+        if (typeof onFallback === 'function') onFallback();
+      }
+    };
+    try {
+      bs.isConnected(send, () => {
+        try {
+          bs.connect(printer.address, send, (err) => {
+            showToast('Não conectou: ' + (err && err.message || err));
+            releasePrinting();
+            if (typeof onFallback === 'function') onFallback();
+          });
+        } catch (ex) {
+          showToast('Erro conectar: ' + (ex.message || ex));
+          releasePrinting();
+          if (typeof onFallback === 'function') onFallback();
+        }
+      });
+    } catch (ex) {
+      showToast('Erro Bluetooth: ' + (ex.message || ex));
       releasePrinting();
       if (typeof onFallback === 'function') onFallback();
-    });
+    }
   });
 }
 
@@ -6759,6 +6814,24 @@ if ('serviceWorker' in navigator) {
     }).catch(err => console.warn('SW falhou:', err));
   });
 }
+
+// Pede permissao Bluetooth na 1a abertura do app — sem isso, qualquer
+// chamada bs.* no Android 12+ crasha. Roda apos deviceready (cordova) ou
+// logo que window.cordova existe (Capacitor injeta antes do load).
+document.addEventListener('deviceready', () => {
+  if (typeof ensureBluetoothPermission === 'function') {
+    ensureBluetoothPermission(() => {/* prompt mostrado, segue */});
+  }
+}, false);
+// Fallback: Capacitor nao dispara deviceready em todas as versoes.
+// Tenta de novo 2s apos load — se ja tiver permissao, no-op silencioso.
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (typeof ensureBluetoothPermission === 'function') {
+      try { ensureBluetoothPermission(() => {}); } catch (e) {}
+    }
+  }, 2000);
+});
 </script>
 
 </body>
