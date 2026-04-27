@@ -1510,6 +1510,29 @@ body {
 }
 .btn-ajustes-printer { background: var(--gold-soft); color: var(--gold); }
 
+/* Lista de produtos no Catalogo (Ajustes -> Catalogo de produtos) */
+.catalog-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.catalog-list .cat-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg-elev-1, rgba(255,255,255,0.04));
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.catalog-list .cat-emoji { font-size: 22px; }
+.catalog-list .cat-info  { flex: 1; min-width: 0; }
+.catalog-list .cat-name  { font-weight: 700; font-size: 14px; color: var(--ink); }
+.catalog-list .cat-meta  { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
+.catalog-list .cat-actions { display: flex; gap: 4px; }
+.catalog-list .cat-btn {
+  background: transparent; border: 1px solid var(--line); border-radius: 8px;
+  width: 32px; height: 32px; padding: 0; font-size: 14px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.catalog-list .cat-btn:active { opacity: 0.7; }
+.catalog-list .cat-btn.danger { color: #e87a7a; border-color: rgba(232,122,122,0.3); }
+.catalog-list .cat-empty {
+  text-align: center; color: var(--ink-mute); font-size: 12px; padding: 12px;
+}
+
 /* ========== Modal de Conferência ========== */
 .confer-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.75);
@@ -2333,26 +2356,25 @@ body {
       </div>
     </div>
 
-    <!-- MOVIMENTAÇÃO -->
-    <div class="screen" data-screen="movimentos">
-      <div class="section-label">Movimentação do estoque</div>
-      <button class="export-btn" onclick="exportSnapshot()">
+    <!-- HISTÓRICO (substitui Movimentos — engloba auditoria completa) -->
+    <div class="screen" data-screen="historico">
+      <div class="section-label">Histórico de ações</div>
+      <button class="export-btn" onclick="exportAuditLog()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Exportar pra EasyStock
+        Exportar histórico
         <span class="hint">JSON</span>
       </button>
-      <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background:rgba(96,165,250,0.12);color:#60a5fa;border-color:rgba(96,165,250,0.3)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Importar de arquivo
-        <span class="hint">backup</span>
-      </button>
-      <input type="file" id="importFile" class="hidden-file" accept="application/json,.json" onchange="importSnapshot(event)" />
-      <div class="mov-filter" id="movFilter">
-        <button data-f="all" class="active" onclick="setMovFilter('all')">Tudo</button>
-        <button data-f="entry" onclick="setMovFilter('entry')">Entradas</button>
-        <button data-f="exit" onclick="setMovFilter('exit')">Saídas</button>
+      <div class="mov-filter" id="histFilter">
+        <button data-f="all"      class="active" onclick="setHistFilter('all')">Tudo</button>
+        <button data-f="product"  onclick="setHistFilter('product')">Produtos</button>
+        <button data-f="batch"    onclick="setHistFilter('batch')">Produção</button>
+        <button data-f="order"    onclick="setHistFilter('order')">Pedidos</button>
+        <button data-f="cash"     onclick="setHistFilter('cash')">Caixa</button>
+        <button data-f="settings" onclick="setHistFilter('settings')">Ajustes</button>
+        <button data-f="backup"   onclick="setHistFilter('backup')">Backup</button>
       </div>
-      <div id="movList"></div>
+      <div id="histList"></div>
+      <button id="histLoadMore" class="export-btn" style="display:none" onclick="histLoadMore()">Carregar mais</button>
     </div>
 
   </div>
@@ -2571,6 +2593,13 @@ body {
       </div>
 
       <div class="ajustes-section">
+        <h4>📦 Catálogo de produtos</h4>
+        <p class="hint">Cadastrar, editar ou arquivar produtos do grid de Produção. Arquivar não apaga: produtos antigos em pedidos/lotes ficam intactos.</p>
+        <div id="catalogList" class="catalog-list"></div>
+        <button class="btn-ajustes-printer" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
+      </div>
+
+      <div class="ajustes-section">
         <h4>💾 Backup &amp; Restauração</h4>
         <p class="hint">Exporte um arquivo JSON com TUDO (produtos, clientes, pedidos, lotes, caixa). Guarde em algum lugar seguro. Em caso de problema ou reinstalação, use Restaurar pra trazer tudo de volta.</p>
         <div style="display:flex;gap:6px;flex-direction:column">
@@ -2622,6 +2651,18 @@ body {
 
   <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
   <div class="print-area" id="printArea"></div>
+
+  <!-- Modal "Backup automatico" — aparece a cada 50 acoes ou 7 dias.
+       Operador pode salvar agora (chama exportBackup) ou pular dessa vez. -->
+  <div class="np-overlay" id="autoBackupModal" role="dialog" aria-modal="true">
+    <div class="np-sheet">
+      <div class="np-icon">💾</div>
+      <h3 class="np-title">Hora do backup</h3>
+      <p class="np-text">Já fazem alguns dias ou várias mudanças desde o último backup. Salvar agora protege seus dados em caso de problema com o celular.</p>
+      <button class="np-btn np-primary"   onclick="autoBackupAction('save')">Salvar agora</button>
+      <button class="np-btn np-tertiary"  onclick="autoBackupAction('skip')">Pular dessa vez</button>
+    </div>
+  </div>
 
   <!-- Modal "Sem impressora" — aparece quando o operador toca em Imprimir
        sem ter pareado uma impressora termica. Substitui o confirm() do
@@ -2711,9 +2752,9 @@ body {
       <span class="nav-icon" aria-hidden="true">📋</span>
       <span class="label">Pedidos</span>
     </button>
-    <button class="nav-btn" data-nav="movimentos" onclick="go('movimentos')">
-      <span class="nav-icon" aria-hidden="true">📦</span>
-      <span class="label">Movimento</span>
+    <button class="nav-btn" data-nav="historico" onclick="go('historico')">
+      <span class="nav-icon" aria-hidden="true">📜</span>
+      <span class="label">Histórico</span>
     </button>
     <button class="nav-btn" data-nav="compras" onclick="go('compras')">
       <span class="nav-icon" aria-hidden="true">🛒</span>
@@ -2909,6 +2950,106 @@ function persistAll() {
   if (typeof window.cdbOnPersist === 'function') {
     try { window.cdbOnPersist({ products, clients, orders, cashEntries, batches }); } catch (e) { console.warn(e); }
   }
+  // Conta acoes pra disparar backup automatico (a cada 50 ou 7 dias)
+  try { incrementActionCounter(); } catch (e) {}
+}
+
+// =========================
+// LOGS DE AUDITORIA (HISTORICO)
+// =========================
+// Cada acao relevante chama logAction(...). Salvo em localStorage com
+// rotacao automatica em ~1000 entradas (evita encher os 5MB do storage).
+// Operador (cdb-operator-name) e deviceId capturados aqui.
+const AUDIT_LOG_KEY = 'cdb-audit-log';
+const AUDIT_LOG_MAX = 1000;
+
+function loadAuditLog() {
+  try { return JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || '[]') || []; }
+  catch (e) { return []; }
+}
+
+function logAction(opts) {
+  try {
+    const entry = {
+      id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      ts: Date.now(),
+      operator: operatorName || 'desconhecido',
+      deviceId: localStorage.getItem('cdb-device-id') || '',
+      action: opts.action,
+      entityType: opts.entityType || '',
+      entityId: opts.entityId || '',
+      summary: opts.summary || '',
+      diff: opts.diff || null
+    };
+    const log = loadAuditLog();
+    log.unshift(entry); // mais recentes primeiro
+    if (log.length > AUDIT_LOG_MAX) log.length = AUDIT_LOG_MAX;
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(log));
+  } catch (e) {
+    console.warn('[logAction] falhou:', e);
+  }
+}
+
+// Helpers pra calcular diff leve entre dois objetos (so campos que mudaram)
+function diffObjects(before, after, fields) {
+  const out = {};
+  fields.forEach(f => {
+    if (before[f] !== after[f]) {
+      out[f] = { from: before[f], to: after[f] };
+    }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+// =========================
+// BACKUP AUTOMATICO
+// =========================
+// A cada 50 acoes (persistAll) OU 7 dias desde o ultimo prompt, mostra modal
+// pedindo pro operador exportar backup. Nao interrompe trabalho ativo (so
+// exibe DEPOIS da acao terminar). Operador pode pular — counter zera mesmo
+// assim pra nao ficar repetindo no mesmo dia.
+const AUTO_BACKUP_ACTION_THRESHOLD = 50;
+const AUTO_BACKUP_DAYS_THRESHOLD   = 7;
+
+function incrementActionCounter() {
+  let count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
+  count++;
+  try { localStorage.setItem('cdb-action-count', String(count)); } catch (e) {}
+  // Defer pra nao bloquear o fluxo da acao em andamento (ex: criar pedido)
+  setTimeout(maybeTriggerAutoBackup, 800);
+}
+
+function maybeTriggerAutoBackup() {
+  // Nao dispara se ja tem outro modal aberto — evita pilha de modais
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','etiquetasPreview','ajustesModal'];
+  for (const id of overlays) {
+    const el = document.getElementById(id);
+    if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
+  }
+
+  const count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
+  const last  = parseInt(localStorage.getItem('cdb-last-backup-prompt') || '0', 10) || 0;
+  const daysSince = last ? (Date.now() - last) / (1000 * 60 * 60 * 24) : Infinity;
+
+  const triggerByCount = count >= AUTO_BACKUP_ACTION_THRESHOLD;
+  const triggerByTime  = daysSince >= AUTO_BACKUP_DAYS_THRESHOLD && count > 0;
+
+  if (triggerByCount || triggerByTime) {
+    document.getElementById('autoBackupModal').classList.add('show');
+  }
+}
+
+function autoBackupAction(choice) {
+  document.getElementById('autoBackupModal').classList.remove('show');
+  // Em ambos os casos, zera counter e atualiza timestamp pra nao re-disparar
+  try {
+    localStorage.setItem('cdb-action-count', '0');
+    localStorage.setItem('cdb-last-backup-prompt', String(Date.now()));
+  } catch (e) {}
+  if (choice === 'save') {
+    // exportBackup() ja existe — abre share sheet com o JSON
+    setTimeout(exportBackup, 200);
+  }
 }
 
 // =========================
@@ -2946,6 +3087,13 @@ function exportBackup() {
     const json = JSON.stringify(payload, null, 2);
     const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
     const filename = `casa-da-baba-backup-${stamp}.json`;
+    // Audit log: backup exportado (registra antes do share — se cancelar
+    // ainda assim conta como tentativa)
+    logAction({
+      action: 'backup.export',
+      entityType: 'backup',
+      summary: 'Backup exportado · ' + filename
+    });
 
     // Web Share API com File: melhor caminho no Android (deixa o usuário
     // escolher onde salvar — Drive, e-mail, Files, WhatsApp).
@@ -3039,11 +3187,34 @@ function applyBackupPayload(payload) {
 
   // Restaura chaves soltas, exceto cdb-device-id (manter o ID atual evita
   // conflito de "mesmo device" no servidor após restore em outro aparelho)
+  // E exceto cdb-audit-log: nao sobrescreve o log existente — ANEXA o log do
+  // backup pra preservar continuidade (e re-rotaciona pra max 1000 entradas).
   const ls = payload.localStorage || {};
   Object.keys(ls).forEach(k => {
     if (k === 'cdb-device-id') return;
+    if (k === 'cdb-audit-log') return; // tratado abaixo
     try { localStorage.setItem(k, ls[k]); } catch (e) {}
   });
+  // Merge audit log: log atual + log do backup, ordena por ts desc, dedup, rotaciona
+  try {
+    const current = loadAuditLog();
+    let imported = [];
+    try { imported = JSON.parse(ls['cdb-audit-log'] || '[]') || []; } catch (e) {}
+    const seenIds = new Set(current.map(e => e.id));
+    imported.forEach(e => { if (!seenIds.has(e.id)) current.push(e); });
+    current.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    if (current.length > AUDIT_LOG_MAX) current.length = AUDIT_LOG_MAX;
+    localStorage.setItem('cdb-audit-log', JSON.stringify(current));
+  } catch (e) { console.warn('[restore] merge audit log falhou:', e); }
+
+  // Audit log: backup restaurado (depois do merge pra essa entrada aparecer)
+  logAction({
+    action: 'backup.restore',
+    entityType: 'backup',
+    summary: 'Backup restaurado · ' + (payload.exportedAt || 'sem data')
+            + ' · ' + ((s.products?.length||0) + (s.orders?.length||0) + (s.batches?.length||0)) + ' registro(s)'
+  });
+
   persistAll();
 }
 
@@ -3056,7 +3227,7 @@ function go(screen) {
   document.getElementById('content').scrollTop = 0;
   if (screen === 'home')       renderHome();
   if (screen === 'pedidos')    renderOrdersFeed();
-  if (screen === 'movimentos') renderMovimentos();
+  if (screen === 'historico')  renderHistorico();
 }
 
 // =========================
@@ -3321,7 +3492,8 @@ function renderProductGrid() {
   let anyCounted = false;
 
   CATEGORIES.forEach(cat => {
-    const items = products.filter(p => p.category === cat.key);
+    // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
+    const items = products.filter(p => p.category === cat.key && !p.archived);
     const isExtra = cat.key === 'extra';
     if (items.length === 0 && !isExtra) return;
 
@@ -3566,14 +3738,24 @@ function removeBatchPhoto() {
 // ================================================================
 // MOVIMENTAÇÃO (timeline de entradas + saídas)
 // ================================================================
-let movFilter = 'all'; // 'all' | 'entry' | 'exit'
+// Filtro do Histórico — substituiu o antigo movFilter (entry/exit) por
+// filtros mais amplos: produto, batch, order, cash, settings, backup.
+let histFilter = 'all';
+let histPageSize = 100;
+let histShown = histPageSize;
 
-function setMovFilter(f) {
-  movFilter = f;
-  document.querySelectorAll('#movFilter button').forEach(b => {
+function setHistFilter(f) {
+  histFilter = f;
+  histShown = histPageSize;
+  document.querySelectorAll('#histFilter button').forEach(b => {
     b.classList.toggle('active', b.dataset.f === f);
   });
-  renderMovimentos();
+  renderHistorico();
+}
+
+function histLoadMore() {
+  histShown += histPageSize;
+  renderHistorico();
 }
 
 /**
@@ -3614,38 +3796,148 @@ function buildMovimentos() {
   return events.sort((a, b) => b.at - a.at);
 }
 
-function renderMovimentos() {
-  const list = document.getElementById('movList');
+// Mapa de label/icone por tipo de acao do audit log
+const HIST_ACTION_META = {
+  'product.create':       { icon: '➕', label: 'Cadastro de produto', type: 'product' },
+  'product.update':       { icon: '✏️', label: 'Edição de produto',  type: 'product' },
+  'product.archive':      { icon: '🗑️', label: 'Produto arquivado',  type: 'product' },
+  'product.restore':      { icon: '↺',  label: 'Produto restaurado', type: 'product' },
+  'batch.create':         { icon: '🍳', label: 'Produção registrada', type: 'batch' },
+  'order.create':         { icon: '📋', label: 'Pedido criado',       type: 'order' },
+  'order.status_change':  { icon: '🔄', label: 'Status do pedido',    type: 'order' },
+  'order.delete':         { icon: '❌', label: 'Pedido excluído',     type: 'order' },
+  'cash.manual_entry':    { icon: '💰', label: 'Lançamento de caixa', type: 'cash' },
+  'settings.update':      { icon: '⚙️', label: 'Ajustes alterados',  type: 'settings' },
+  'backup.export':        { icon: '⬇️', label: 'Backup exportado',    type: 'backup' },
+  'backup.restore':       { icon: '⬆️', label: 'Backup restaurado',   type: 'backup' }
+};
+
+// Normaliza eventos legacy (lotes/pedidos antigos sem entrada de log)
+// pra aparecerem no Histórico mesmo sem audit log gerado.
+function buildHistoryEvents() {
+  const log = loadAuditLog();
+  const events = log.map(entry => {
+    const meta = HIST_ACTION_META[entry.action] || { icon: '•', label: entry.action, type: 'other' };
+    return {
+      id: entry.id,
+      ts: entry.ts,
+      operator: entry.operator,
+      icon: meta.icon,
+      label: meta.label,
+      type: meta.type,
+      summary: entry.summary,
+      diff: entry.diff,
+      action: entry.action,
+      entityId: entry.entityId
+    };
+  });
+
+  // Backfill: lotes/pedidos sem audit log (criados antes do feature) ainda
+  // aparecem como entrada generica usando timestamp + operador da entidade.
+  const seenIds = new Set(log.map(e => e.entityId).filter(Boolean));
+  batches.forEach(b => {
+    if (seenIds.has(b.id)) return;
+    events.push({
+      id: 'legacy-b-' + b.id,
+      ts: b.createdAt,
+      operator: b.lastOperatorName || '—',
+      icon: '🍳',
+      label: 'Produção registrada',
+      type: 'batch',
+      summary: 'Lote ' + (b.code || b.id) + ' (' + (b.items?.length || 0) + ' produto(s))',
+      action: 'batch.create',
+      entityId: b.id
+    });
+  });
+  orders.forEach(o => {
+    if (seenIds.has(o.id)) return;
+    events.push({
+      id: 'legacy-o-' + o.id,
+      ts: o.createdAt,
+      operator: o.lastOperatorName || '—',
+      icon: '📋',
+      label: 'Pedido criado',
+      type: 'order',
+      summary: 'Pedido para ' + (o.clientSnapshot?.name || 'cliente') + ' · R$ ' + Number(o.total || 0).toFixed(2).replace('.', ','),
+      action: 'order.create',
+      entityId: o.id
+    });
+  });
+
+  return events.sort((a, b) => b.ts - a.ts);
+}
+
+function renderHistorico() {
+  const list = document.getElementById('histList');
   if (!list) return;
-  const all = buildMovimentos();
-  const filtered = movFilter === 'all' ? all : all.filter(e => e.type === movFilter);
+  const all = buildHistoryEvents();
+  const filtered = histFilter === 'all' ? all : all.filter(e => e.type === histFilter);
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty"><span class="big">📦</span>Nenhuma movimentação ainda.<br><span style="font-size:12px;color:var(--ink-mute)">Registre um lote em Produção ou marque um pedido como pronto.</span></div>`;
+    list.innerHTML = `<div class="empty"><span class="big">📜</span>Nada por aqui ainda.<br><span style="font-size:12px;color:var(--ink-mute)">Cada produção, pedido, edição de cadastro etc. aparece aqui automaticamente.</span></div>`;
+    document.getElementById('histLoadMore').style.display = 'none';
     return;
   }
 
-  list.innerHTML = filtered.map(e => {
-    const dt = new Date(e.at);
+  const visible = filtered.slice(0, histShown);
+  list.innerHTML = visible.map(e => {
+    const dt = new Date(e.ts);
     const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
       String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
-    const typeLabel = e.type === 'entry' ? '↑ Entrada no estoque' : '↓ Saída do estoque';
-    const sign = e.type === 'entry' ? '+' : '−';
-    const itemsLine = (e.items || []).map(i =>
-      `<span class="qty">${sign}${i.qty}</span> ${escapeHtml(i.emoji || '')} ${escapeHtml(i.name)}${i.unit ? ' (' + escapeHtml(i.unit) + ')' : ''}`
-    ).join(' · ');
-    const opLine = e.opName ? `<span class="op">por ${escapeHtml(e.opName)}</span> · ` : '';
     return `
       <div class="mov-item ${e.type}">
         <div class="mov-head">
-          <span class="mov-type ${e.type}">${typeLabel}</span>
+          <span class="mov-type">${e.icon} ${escapeHtml(e.label)}</span>
           <span>${dateStr}</span>
         </div>
-        <div class="mov-items">${itemsLine}</div>
-        <div class="mov-ref">${opLine}${escapeHtml(e.label)} · ${escapeHtml(e.ref)}</div>
+        <div class="mov-items">${escapeHtml(e.summary || '')}</div>
+        <div class="mov-ref"><span class="op">por ${escapeHtml(e.operator || '—')}</span></div>
       </div>
     `;
   }).join('');
+
+  // Mostra "Carregar mais" se ainda tem itens depois do shown atual
+  document.getElementById('histLoadMore').style.display =
+    filtered.length > histShown ? 'block' : 'none';
+}
+
+// Exporta o audit log inteiro como JSON via Share sheet (reusa plugin
+// @capacitor/share que ja foi adicionado pras etiquetas).
+async function exportAuditLog() {
+  try {
+    const log = loadAuditLog();
+    if (!log.length) { showToast('Sem histórico pra exportar'); return; }
+    const json = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      operator: operatorName,
+      count: log.length,
+      entries: log
+    }, null, 2);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const filename = `historico-${stamp}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+
+    const FS    = window.Capacitor?.Plugins?.Filesystem;
+    const Share = window.Capacitor?.Plugins?.Share;
+    if (FS && Share) {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'CACHE', recursive: true
+      });
+      await Share.share({ title: 'Histórico Casa da Baba', files: [written.uri], dialogTitle: 'Compartilhar histórico' });
+      return;
+    }
+    // Fallback browser: download direto
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Histórico baixado');
+  } catch (e) {
+    console.error('exportAuditLog', e);
+    showToast('Erro ao exportar: ' + (e?.message || e));
+  }
 }
 
 // ================================================================
@@ -3788,7 +4080,7 @@ function importSnapshot(event) {
       renderHome();
       renderKanban();
       renderRecents();
-      renderMovimentos();
+      renderHistorico();
       showToast(`Importou ${result.applied} registros (${result.skipped} pulados).`);
     } catch (err) {
       console.error(err);
@@ -4250,9 +4542,67 @@ function openAjustes() {
   }
   updatePixHint();
   renderPrinterStatus();
+  renderCatalogList();
   toggleModal('ajustesModal', true);
 }
 function closeAjustes() { toggleModal('ajustesModal', false); }
+
+// Renderiza lista de produtos cadastrados (Ajustes > Catalogo de produtos)
+// Mostra TODOS — inclusive arquivados (com badge), pra operador poder
+// reverter um arquivamento se errou.
+function renderCatalogList() {
+  const box = document.getElementById('catalogList');
+  if (!box) return;
+  if (!products.length) {
+    box.innerHTML = '<div class="cat-empty">Nenhum produto cadastrado</div>';
+    return;
+  }
+  // Ordem: ativos primeiro, depois arquivados
+  const sorted = [...products].sort((a, b) => {
+    if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  box.innerHTML = sorted.map(p => {
+    const meta = [
+      p.category || 'sem categoria',
+      p.unit || '',
+      p.price != null ? 'R$ ' + Number(p.price).toFixed(2).replace('.', ',') : ''
+    ].filter(Boolean).join(' · ');
+    const archivedTag = p.archived ? ' <span style="color:#e87a7a">(arquivado)</span>' : '';
+    const archiveBtn = p.archived
+      ? `<button class="cat-btn" title="Restaurar" onclick="restoreProduct('${p.id}')">↺</button>`
+      : `<button class="cat-btn danger" title="Arquivar" onclick="archiveProduct('${p.id}')">🗑️</button>`;
+    return `
+      <div class="cat-row">
+        <div class="cat-emoji">${p.emoji || '📦'}</div>
+        <div class="cat-info">
+          <div class="cat-name">${escapeHtml(p.name)}${archivedTag}</div>
+          <div class="cat-meta">${escapeHtml(meta)}</div>
+        </div>
+        <div class="cat-actions">
+          <button class="cat-btn" title="Editar" onclick="closeAjustes(); openProductModalForEdit('${p.id}')">✏️</button>
+          ${archiveBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function restoreProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  p.archived = false;
+  persistAll();
+  renderProductGrid();
+  renderCatalogList();
+  logAction({
+    action: 'product.restore',
+    entityType: 'product',
+    entityId: productId,
+    summary: 'Restaurou produto ' + p.name
+  });
+  showToast(p.name + ' restaurado');
+}
 
 // Reage à troca do tipo de chave: ajusta placeholder e mostra preview formatado.
 function updatePixHint() {
@@ -4282,8 +4632,32 @@ function saveAjustes() {
     showToast('Chave PIX inválida pra esse tipo');
     return;
   }
+  // Calcula diff antes de salvar pra registrar no log o que mudou
+  const before = {
+    operator: operatorName,
+    empresa: getEmpresaName(),
+    pixType: getPixType(),
+    pixKey: getPixKey(),
+    pixHolder: getPixHolder()
+  };
   if (op) saveOperatorName(op);
   cdbSetPix(key || null, holder || null, type, empresa || null);
+  const after = {
+    operator: operatorName,
+    empresa: getEmpresaName(),
+    pixType: getPixType(),
+    pixKey: getPixKey(),
+    pixHolder: getPixHolder()
+  };
+  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder']);
+  if (diff) {
+    logAction({
+      action: 'settings.update',
+      entityType: 'settings',
+      summary: 'Ajustes alterados (' + Object.keys(diff).join(', ') + ')',
+      diff
+    });
+  }
   closeAjustes();
   showToast('Ajustes salvos');
 }
@@ -5245,6 +5619,15 @@ function confirmProduction() {
   pendingSync += items.length;
   updateSync();
 
+  // Audit log: produção registrada
+  const itemsSummary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+  logAction({
+    action: 'batch.create',
+    entityType: 'batch',
+    entityId: batch.id,
+    summary: `Lote ${lote} · ${itemsSummary}`
+  });
+
   // Fluxo: confirmar -> registrar -> informar cadastrado (banner + toast)
   // -> oferecer imprimir/salvar/compartilhar etiquetas.
   // O registro JÁ aconteceu acima (batches.push + persistAll); o preview
@@ -5588,6 +5971,14 @@ function saveOrder() {
   persistAll();
   renderRecents();
 
+  // Audit log: pedido criado
+  logAction({
+    action: 'order.create',
+    entityType: 'order',
+    entityId: order.id,
+    summary: `Pedido para ${snapshot.name} · ${order.items.length} item(ns) · R$ ${total.toFixed(2).replace('.', ',')}` + (retroAtMs ? ' (retroativo)' : '')
+  });
+
   if (isRetro) resetRetroToggle();
 
   currentOrderItems = [];
@@ -5652,6 +6043,10 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
 function closeProductModal() {
   document.getElementById('newProductModal').classList.remove('show');
   productModalCallback = null;
+  editingProductId = null;
+  // Restaura titulo (caso tenha sido alterado pra "Editar")
+  const titleEl = document.querySelector('#newProductModal .modal-title');
+  if (titleEl) titleEl.innerHTML = 'Novo <span class="accent">produto</span>';
 }
 function saveNewProduct() {
   const name = document.getElementById('newProdName').value.trim();
@@ -5660,6 +6055,35 @@ function saveNewProduct() {
   const priceStr = document.getElementById('newProdPrice').value.trim();
   const priceParsed = priceStr ? parseMoneyInput(priceStr) : NaN;
   const price = isNaN(priceParsed) ? null : priceParsed;
+
+  // Modo edit: editingProductId setado por openProductModalForEdit
+  if (editingProductId) {
+    const idx = products.findIndex(p => p.id === editingProductId);
+    if (idx === -1) { closeProductModal(); return; }
+    const before = { ...products[idx] };
+    products[idx] = {
+      ...products[idx],
+      name, emoji: selectedEmoji, category: selectedCat,
+      unit: unit || '', price
+    };
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price']);
+    persistAll();
+    renderProductGrid();
+    if (typeof renderCatalogList === 'function') renderCatalogList();
+    logAction({
+      action: 'product.update',
+      entityType: 'product',
+      entityId: editingProductId,
+      summary: 'Editou produto ' + name,
+      diff
+    });
+    closeProductModal();
+    showToast(`${name} atualizado`);
+    haptic();
+    return;
+  }
+
+  // Modo create
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
@@ -5668,6 +6092,13 @@ function saveNewProduct() {
   products.push(product);
   persistAll();
   renderProductGrid();
+
+  logAction({
+    action: 'product.create',
+    entityType: 'product',
+    entityId: product.id,
+    summary: 'Cadastrou produto ' + name
+  });
 
   if (productModalCallback) {
     // Adiciona direto no pedido em construção
@@ -5680,6 +6111,54 @@ function saveNewProduct() {
   closeProductModal();
   showToast(`${name} criado`);
   haptic();
+}
+
+// Abre o modal em modo EDIT (reaproveita newProductModal). Pre-preenche campos
+// e setta editingProductId pra saveNewProduct() saber se cria ou atualiza.
+let editingProductId = null;
+function openProductModalForEdit(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  editingProductId = productId;
+  document.getElementById('newProdName').value = p.name || '';
+  document.getElementById('newProdUnit').value = p.unit || '';
+  document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
+  selectedCat = p.category || 'massa';
+  selectedEmoji = p.emoji || '🍝';
+  document.querySelectorAll('#catPills .cat-pill').forEach(x => {
+    x.classList.toggle('active', x.dataset.cat === selectedCat);
+  });
+  document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => {
+    x.classList.toggle('active', x.textContent === selectedEmoji);
+  });
+  // Muda titulo do modal
+  const titleEl = document.querySelector('#newProductModal .modal-title');
+  if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
+  document.getElementById('newProductModal').classList.add('show');
+}
+
+// Soft-delete: marca produto como archived (mantem em pedidos antigos)
+function archiveProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  if (!confirm('Arquivar "' + p.name + '"?\n\nProduto sai do grid de produção mas pedidos e lotes antigos com esse produto continuam OK.')) return;
+  p.archived = true;
+  persistAll();
+  renderProductGrid();
+  if (typeof renderCatalogList === 'function') renderCatalogList();
+  logAction({
+    action: 'product.archive',
+    entityType: 'product',
+    entityId: productId,
+    summary: 'Arquivou produto ' + p.name
+  });
+  showToast(p.name + ' arquivado');
+}
+
+// Helper pra formatar preco no input (R$ nao tem cifrao no input)
+function formatMoneyInput(val) {
+  if (val == null) return '';
+  return Number(val).toFixed(2).replace('.', ',');
 }
 
 document.querySelectorAll('#catPills .cat-pill').forEach(pill => {
@@ -5744,17 +6223,27 @@ function saveCashEntry() {
     return;
   }
 
-  cashEntries.push({
+  const entry = {
     id: 'cash-' + Date.now(),
     type: cashType,
     amount,
     description: desc,
     createdAt: Date.now(),
     lastOperatorName: operatorName || null
-  });
+  };
+  cashEntries.push(entry);
   persistAll();
   pendingSync++;
   updateSync();
+
+  // Audit log: lancamento manual no caixa
+  logAction({
+    action: 'cash.manual_entry',
+    entityType: 'cash',
+    entityId: entry.id,
+    summary: (cashType === 'expense' ? 'Saída' : 'Entrada') + ' R$ ' + amount.toFixed(2).replace('.', ',') + ' · ' + desc
+  });
+
   closeCashModal();
   renderHome();
   showToast((cashType === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(amount) + ' registrada');
