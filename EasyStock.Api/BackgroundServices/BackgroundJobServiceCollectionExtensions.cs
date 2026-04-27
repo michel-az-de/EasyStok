@@ -14,18 +14,25 @@ public static class BackgroundJobServiceCollectionExtensions
 
         services.TryAddSingleton<IPedidoFornecedorRecebimentoProcessor, NoOpPedidoFornecedorRecebimentoProcessor>();
 
-        services.AddHostedService<AnalisadorEstoqueBackgroundService>();
-        services.AddHostedService<CacheWarmupService>();
-
-        // Health snapshot service (singleton para ser injetado no DiagnosticoController)
-        services.AddSingleton<HealthSnapshotService>();
-        services.AddHostedService(sp => sp.GetRequiredService<HealthSnapshotService>());
-
-        // Backup automático de logs no file storage (a cada 30 min)
-        services.AddHostedService<LogStorageBackgroundService>();
-
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()
             ?? new BackgroundJobOptions();
+
+        if (options.EnableAnalisadorEstoque)
+            services.AddHostedService<AnalisadorEstoqueBackgroundService>();
+
+        if (options.EnableCacheWarmup)
+            services.AddHostedService<CacheWarmupService>();
+
+        // Health snapshot service (singleton para ser injetado no DiagnosticoController).
+        // O singleton sempre é registrado para o DiagnosticoController poder consumir o último snapshot,
+        // mas o HostedService (loop em background) só roda se a flag estiver habilitada.
+        services.AddSingleton<HealthSnapshotService>();
+        if (options.EnableHealthSnapshot)
+            services.AddHostedService(sp => sp.GetRequiredService<HealthSnapshotService>());
+
+        // Backup automático de logs no file storage (a cada 30 min)
+        if (options.EnableLogStorage)
+            services.AddHostedService<LogStorageBackgroundService>();
 
         if (options.EnableAlertasEstoqueJob)
             services.AddHostedService<AlertasEstoqueJob>();
