@@ -2329,12 +2329,6 @@ body {
       <label class="modal-label">Itens</label>
       <div class="prod-summary" id="prodSummary"></div>
 
-      <label class="modal-label">Código do lote</label>
-      <div class="barcode">
-        <div class="barcode-bars" id="barcodeBars"></div>
-        <div class="barcode-text" id="barcodeText">TALH-000000-000</div>
-      </div>
-
       <label class="modal-label">Validade e peso de cada produto</label>
       <div class="prod-detail-list" id="prodDetailList"></div>
 
@@ -3112,6 +3106,8 @@ function onPhotoPicked(e) {
 // =========================
 // PRODUÇÃO - confirmação/lote
 // =========================
+let currentBatchCode = '';
+
 function buildBatchCode(items) {
   const first = items[0];
   const key = (first.name.toUpperCase().replace(/[^A-Z]/g,'').substring(0,4) || 'LOTE');
@@ -3140,9 +3136,9 @@ function openProductionConfirm() {
   currentPhotoDataUrl = null;
   renderBatchPhotoPreview();
 
-  const code = buildBatchCode(items);
-  document.getElementById('barcodeText').textContent = code;
-  document.getElementById('barcodeBars').innerHTML = buildBarcodePattern(code);
+  // Código do batch fica em variável — não aparece mais na tela de revisão.
+  // É usado só internamente pra identificar o batch no banco.
+  currentBatchCode = buildBatchCode(items);
 
   const summary = document.getElementById('prodSummary');
   summary.innerHTML = items.map(i => `
@@ -3169,7 +3165,9 @@ function populateProdDetailList(items) {
   if (!host) return;
   host.innerHTML = items.map(p => {
     const defWeight   = p.defaultWeightG ?? '';
-    const defValidity = p.defaultValidityDays;
+    // Pré-seleciona 5d se o produto não tem default — evita o operador travar
+    // em "Finalizar" achando que precisa preencher manualmente.
+    const defValidity = p.defaultValidityDays ?? 5;
     const pills = VALIDITY_OPTIONS.map(d =>
       `<button type="button" data-d="${d}" class="${defValidity === d ? 'active' : ''}">${d}d</button>`
     ).join('');
@@ -4227,13 +4225,38 @@ function escPosTextLines(title, lines) {
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
+/**
+ * Comandos GS ( k pra QR code em ESC/POS (suportado pela Hipertech WTP05).
+ * Sequência: setModelo → setSize → setErrorCorrection → store → print.
+ */
+function escPosQrCommands(data) {
+  const enc = PRINT_ENCODER.encode(data || '');
+  const len = enc.length + 3; // +3 do header (cn, fn, m)
+  const pL = len & 0xFF;
+  const pH = (len >> 8) & 0xFF;
+  const out = [];
+  // Modelo 2 (mais comum)
+  out.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+  // Tamanho do módulo (6 = ~24mm)
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06);
+  // Error correction L (48)
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30);
+  // Store data
+  out.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
+  enc.forEach(byte => out.push(byte));
+  // Print
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
+  return out;
+}
+
 function escPosOrderLabel(o) {
   const empresa = (getEmpresaName() || 'CASA DA BABA').toUpperCase();
   const pixType = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const orderRef = (o.id || '').slice(-8);
   const b = escPosBuilder().init().center().big().line(empresa).normal().push(0x0A).left();
   b.line(divider());
-  b.line('Pedido: ' + (o.id || '').slice(-8));
+  b.line('Pedido: ' + orderRef);
   b.line('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente'));
   if (o.clientSnapshot?.ref) b.line(o.clientSnapshot.ref);
   b.line(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'));
@@ -4242,6 +4265,12 @@ function escPosOrderLabel(o) {
   b.line(divider());
   b.big().line(padLine('TOTAL', money(o.total))).normal();
   if (o.notes) b.line('Obs: ' + o.notes);
+  b.line(divider());
+  // QR code centralizado (GS ( k — padrão ESC/POS, WTP05 suporta).
+  b.center().push(...escPosQrCommands(`pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`));
+  b.push(0x0A);
+  b.line(orderRef);
+  b.left();
   b.line(divider());
   b.line('PIX (' + pixLabel + '): ' + formatPixByType(getPixKey(), pixType));
   b.line('Titular: ' + getPixHolder());
@@ -4307,6 +4336,56 @@ function printAreaHtml(html) {
 
 function fmtDateBR(ms)   { return new Date(ms).toLocaleDateString('pt-BR'); }
 function fmtPesoG(g)     { return g >= 1000 ? (g/1000).toFixed(2).replace('.',',') + 'kg' : g + 'g'; }
+
+/**
+ * Gera SVG de QR code via lib qrcode-generator (Kazuhiko Arase, MIT).
+ * Tipo 0 = auto, error correction L. Pra textos curtos (orderId, codigoBarras).
+ * Retorna string SVG inline com width/height fixos pra controlar layout.
+ */
+function generateQrSvg(data, size = 96) {
+  if (typeof qrcode !== 'function') return ''; // lib não carregada — silencioso
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(String(data || ''));
+    qr.make();
+    const cells = qr.getModuleCount();
+    const cellSize = Math.max(1, Math.floor(size / cells));
+    const realSize = cellSize * cells;
+    let rects = '';
+    for (let r = 0; r < cells; r++) {
+      for (let c = 0; c < cells; c++) {
+        if (qr.isDark(r, c)) {
+          rects += `<rect x="${c*cellSize}" y="${r*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+        }
+      }
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${realSize}" height="${realSize}" viewBox="0 0 ${realSize} ${realSize}" style="background:#fff">${rects}</svg>`;
+  } catch (e) { console.warn('QR falhou:', e); return ''; }
+}
+
+/**
+ * Desenha QR code direto num canvas (pra geração de PNG).
+ */
+function drawQrOnCanvas(ctx, data, x, y, size) {
+  if (typeof qrcode !== 'function') return;
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(String(data || ''));
+    qr.make();
+    const cells = qr.getModuleCount();
+    const cellSize = Math.max(1, Math.floor(size / cells));
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, cellSize * cells, cellSize * cells);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < cells; r++) {
+      for (let c = 0; c < cells; c++) {
+        if (qr.isDark(r, c)) {
+          ctx.fillRect(x + c*cellSize, y + r*cellSize, cellSize, cellSize);
+        }
+      }
+    }
+  } catch (e) { console.warn('QR canvas falhou:', e); }
+}
 
 /**
  * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
@@ -4379,7 +4458,8 @@ function escPosLabelProducao(et) {
  */
 function etiquetasToPng(etiquetas, kind) {
   const W = 384;
-  const ROW_H = kind === 'order' ? 380 : 280;
+  // order tem QR + barcode → mais alto. produção é compacta.
+  const ROW_H = kind === 'order' ? 540 : 280;
   const GAP = 20;
   const H = etiquetas.length * (ROW_H + GAP) + GAP;
   const canvas = document.createElement('canvas');
@@ -4431,7 +4511,7 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H) {
 }
 
 function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
-  // et aqui é { kind: 'order', order: o } — formato simples pra etiqueta de pedido.
+  // et = { order: o }
   const o = et.order;
   const cx = W / 2;
   let y = y0 + 8;
@@ -4440,7 +4520,8 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = 'bold 18px monospace';
   ctx.fillText((getEmpresaName() || 'Casa da Baba').toUpperCase(), cx, y); y += 24;
   ctx.font = '12px monospace';
-  ctx.fillText('Pedido ' + (o.id || '').slice(-8), cx, y); y += 18;
+  const orderRef = (o.id || '').slice(-8);
+  ctx.fillText('Pedido ' + orderRef, cx, y); y += 18;
   ctx.fillRect(20, y, W - 40, 1); y += 8;
   ctx.textAlign = 'left';
   ctx.font = '12px monospace';
@@ -4457,7 +4538,17 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = 'bold 14px monospace';
   ctx.fillText('TOTAL', 24, y);
   ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 24, y); ctx.textAlign = 'left';
-  y += 18;
+  y += 20;
+  // Barcode visual + texto
+  drawBarcodeOnCanvas(ctx, o.id || orderRef, 24, y, W - 48, 30); y += 34;
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(orderRef, cx, y); y += 18;
+  // QR code centralizado
+  const qrSize = 120;
+  drawQrOnCanvas(ctx, `pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`, cx - qrSize/2, y, qrSize);
+  y += qrSize + 8;
+  ctx.textAlign = 'left';
   ctx.font = '11px monospace';
   ctx.fillText('PIX (' + ((PIX_TYPES[getPixType()]?.short) || 'Chave') + '): ' + formatPixByType(getPixKey(), getPixType()), 24, y); y += 14;
   ctx.fillText('Titular: ' + getPixHolder(), 24, y);
@@ -4504,61 +4595,92 @@ function closeEtiquetasPreview() {
   currentEtiquetas = [];
 }
 
-async function etqAction(action) {
-  if (!currentEtiquetas.length) return;
-  if (action === 'print') {
-    if (currentEtiquetasKind === 'order') {
-      // 1 só etiqueta de pedido
-      const et = currentEtiquetas[0];
-      printViaBluetooth(escPosOrderLabel(et.order), () => printAreaHtml(orderLabelHtml(et.order)));
-    } else {
-      // produção: imprime sequencialmente. ESC/POS suporta concatenar.
-      const totalBytes = currentEtiquetas.reduce((acc, et) => {
-        const b = escPosLabelProducao(et);
-        return Uint8Array.from([...acc, ...b]);
-      }, new Uint8Array());
-      printViaBluetooth(totalBytes, () => {
-        // Fallback sem BT: monta HTML com todas etiquetas e usa window.print
-        const html = currentEtiquetas.map(et => `<div>${etiquetaProducaoHtml(et)}</div><div style="page-break-after:always"></div>`).join('');
-        printAreaHtml(html);
-      });
+/**
+ * Salva o blob como arquivo no dispositivo. WebView Android NÃO suporta
+ * <a download> direto, então a estratégia é: tentar Web Share API (que
+ * abre o seletor "Salvar em" do Android — Drive, Galeria, Arquivos).
+ * Fallback final: abrir a imagem em nova janela (operador faz "salvar imagem").
+ */
+async function saveBlobAsFile(blob, filename) {
+  if (!blob) { showToast('Sem imagem pra salvar'); return; }
+  const file = new File([blob], filename, { type: blob.type || 'image/png' });
+  // 1. Web Share API: nativa do Android, abre o sheet de compartilhar
+  //    onde "Salvar em" é uma das opções (Drive, Galeria, etc.).
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      showToast('Compartilhado');
+      return;
     }
-    return;
+  } catch (e) {
+    if (e?.name === 'AbortError') return; // usuário cancelou — silencioso
+    console.warn('share falhou:', e);
   }
-  if (action === 'save') {
-    showToast('Gerando imagem…');
-    const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
-    if (!blob) { showToast('Falha ao gerar imagem'); return; }
+  // 2. <a download> — funciona em browser desktop e alguns WebViews
+  try {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `etiquetas-${currentEtiquetasKind}-${Date.now()}.png`;
+    a.href = url; a.download = filename; a.target = '_blank';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
     showToast('PNG salvo');
     return;
-  }
-  if (action === 'share') {
-    showToast('Preparando…');
-    const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
-    if (!blob) { showToast('Falha ao gerar imagem'); return; }
-    const file = new File([blob], `etiquetas-${Date.now()}.png`, { type: 'image/png' });
-    try {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Etiquetas' });
+  } catch (e) { console.warn('download falhou:', e); }
+  // 3. Fallback final: abrir em nova janela — operador faz "Salvar imagem"
+  try {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const w = window.open();
+      if (w) {
+        w.document.write(`<title>${filename}</title><img src="${reader.result}" style="max-width:100%;display:block">`);
+        showToast('Pressione e segure a imagem pra salvar');
       } else {
-        // Fallback: download (compartilhar manual)
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = file.name;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        showToast('Sem suporte a compartilhar — baixei a imagem');
+        showToast('Permita popups pra salvar');
       }
-    } catch (e) {
-      if (e?.name !== 'AbortError') showToast('Erro ao compartilhar');
+    };
+    reader.readAsDataURL(blob);
+  } catch (e) {
+    showToast('Não foi possível salvar');
+  }
+}
+
+async function etqAction(action) {
+  if (!currentEtiquetas.length) { showToast('Sem etiquetas'); return; }
+  try {
+    if (action === 'print') {
+      const bs = window.bluetoothSerial;
+      const printer = getSavedPrinter();
+      const noBt = !bs || !printer || !printer.address;
+      if (noBt) {
+        // Sem BT: pergunta se quer salvar/compartilhar como imagem.
+        if (confirm('Sem impressora térmica configurada.\n\nQuer compartilhar como imagem (PNG)?\n(Configure a impressora em ⚙️ Ajustes pra imprimir direto.)')) {
+          return etqAction('share');
+        }
+        return;
+      }
+      if (currentEtiquetasKind === 'order') {
+        const et = currentEtiquetas[0];
+        printViaBluetooth(escPosOrderLabel(et.order), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+      } else {
+        const totalBytes = currentEtiquetas.reduce((acc, et) => {
+          const b = escPosLabelProducao(et);
+          return Uint8Array.from([...acc, ...b]);
+        }, new Uint8Array());
+        printViaBluetooth(totalBytes, () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+      }
+      return;
     }
-    return;
+    if (action === 'save' || action === 'share') {
+      showToast(action === 'share' ? 'Preparando…' : 'Gerando imagem…');
+      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
+      if (!blob) { showToast('Falha ao gerar imagem'); return; }
+      const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
+      await saveBlobAsFile(blob, filename);
+      return;
+    }
+  } catch (e) {
+    console.error('etqAction', action, e);
+    showToast('Erro: ' + (e?.message || e));
   }
 }
 
@@ -4578,9 +4700,14 @@ function orderLabelHtml(o) {
   const pixType  = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
   const pixVal   = formatPixByType(getPixKey(), pixType);
+  const orderRef = (o.id || '').slice(-8);
+  // Conteúdo do QR: ID do pedido + total — operador escaneia com qualquer leitor.
+  const qrPayload = `pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`;
+  const qr = generateQrSvg(qrPayload, 110);
+  const bars = buildBarcodePattern(o.id || 'order');
   return `
     <div class="pa-title">${escapeHtml(empresa)}</div>
-    <div class="pa-center">Pedido ${escapeHtml((o.id||'').slice(-8))}</div>
+    <div class="pa-center">Pedido ${escapeHtml(orderRef)}</div>
     <div class="pa-sep">--------------------------------</div>
     <div>Cliente: ${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
     ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
@@ -4590,6 +4717,10 @@ function orderLabelHtml(o) {
     <div class="pa-sep">--------------------------------</div>
     <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
     ${o.notes ? `<div>Obs: ${escapeHtml(o.notes)}</div>` : ''}
+    <div class="pa-sep">--------------------------------</div>
+    <div class="et-bars" style="display:flex;height:34px;justify-content:center;margin:6px 0">${bars}</div>
+    <div class="pa-center" style="font-weight:800;letter-spacing:0.05em">${escapeHtml(orderRef)}</div>
+    ${qr ? `<div class="pa-center" style="margin:8px 0">${qr}</div>` : ''}
     <div class="pa-sep">--------------------------------</div>
     <div>PIX (${escapeHtml(pixLabel)}): ${escapeHtml(pixVal)}</div>
     <div>Titular: ${escapeHtml(getPixHolder())}</div>
@@ -4644,7 +4775,7 @@ function confirmProduction() {
     if (p) p.stock = (p.stock || 0) + it.qty;
   });
 
-  const code = document.getElementById('barcodeText').textContent;
+  const code = currentBatchCode || buildBatchCode(itemsRaw);
   const batch = {
     id: 'b-' + nowMs,
     code,
@@ -5285,6 +5416,7 @@ window.cdbApp = {
 };
 </script>
 
+<script src="qrcode.min.js"></script>
 <script src="sync.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
