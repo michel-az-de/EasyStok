@@ -4,11 +4,11 @@
   "webDir": "web",
   "bundledWebRuntime": false,
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "backgroundColor": "#1a1410"
   },
   "server": {
-    "androidScheme": "https",
-    "cleartext": false
+    "androidScheme": "http",
+    "cleartext": true
   }
 }
