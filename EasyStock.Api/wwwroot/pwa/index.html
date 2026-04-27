@@ -1699,6 +1699,47 @@ body {
 }
 
 /* ========== Tela de preview de etiquetas (nova feature) ========== */
+/* Modal "App atualizado" — aparece quando o LiveUpdater entrega bundle novo */
+.upd-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center;
+  z-index: 12000; padding: 24px; backdrop-filter: blur(4px);
+}
+.upd-overlay.show { display: flex; }
+.upd-sheet {
+  background: var(--bg-card, #2a2520); color: var(--ink, #f4eee5);
+  border: 1px solid var(--line, #3d362e); border-radius: 16px;
+  padding: 28px 24px; max-width: 360px; width: 100%;
+  text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  animation: upd-pop 0.25s ease-out;
+}
+@keyframes upd-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.upd-icon { font-size: 48px; margin-bottom: 8px; }
+.upd-title {
+  font-family: 'Fraunces', serif; font-size: 22px; margin: 0 0 4px;
+  color: var(--ink, #f4eee5);
+}
+.upd-version {
+  font-family: monospace; font-size: 13px; color: var(--gold, #d4af37);
+  margin-bottom: 16px;
+}
+.upd-notes {
+  font-size: 14px; line-height: 1.5; color: var(--ink-mute, #b0a799);
+  background: rgba(0,0,0,0.25); border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 20px;
+  text-align: left; max-height: 200px; overflow-y: auto;
+  word-break: break-word;
+}
+.upd-btn {
+  width: 100%; padding: 14px; border: 0; border-radius: 10px;
+  background: var(--gold, #d4af37); color: #000;
+  font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.upd-btn:active { opacity: 0.8; }
+
 .etq-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.85);
   display: none; flex-direction: column;
@@ -2070,6 +2111,16 @@ body {
          deploy (placeholder "__APP_VERSION__" -> "v1.0.X"). Util pra confirmar
          visualmente que o LiveUpdater entregou um bundle novo. -->
     <span id="appVersion" style="margin-left:8px;font-size:10px;opacity:.6;font-family:monospace">v__APP_VERSION__</span>
+    <script>
+      // Info do bundle atual: workflow SWA substitui __APP_VERSION__ por
+      // "1.0.X" (run_number) e __APP_RELEASE_NOTES__ pela primeira linha do
+      // commit message (escapado em JSON). Usado pra detectar update novo
+      // e mostrar modal de "atualizado".
+      window.__BUNDLE_INFO__ = {
+        version: "__APP_VERSION__",
+        releaseNotes: "__APP_RELEASE_NOTES__"
+      };
+    </script>
     <div class="icons">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h20v-8H2v8zm2-6h16v4H4v-4z"/></svg>
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33A1.33 1.33 0 007 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
@@ -2526,6 +2577,18 @@ body {
 
   <!-- Área invisível usada apenas para window.print() — preenchida sob demanda -->
   <div class="print-area" id="printArea"></div>
+
+  <!-- Modal "App atualizado" — aparece quando LiveUpdater entrega bundle
+       com versao diferente da ultima vista pelo operador. -->
+  <div class="upd-overlay" id="updateModal" role="dialog" aria-modal="true">
+    <div class="upd-sheet">
+      <div class="upd-icon">🎉</div>
+      <h3 class="upd-title">App atualizado!</h3>
+      <div class="upd-version" id="updateModalVersion">—</div>
+      <div class="upd-notes" id="updateModalNotes">—</div>
+      <button class="upd-btn" onclick="closeUpdateModal()">Continuar</button>
+    </div>
+  </div>
 
   <!-- Tela cheia de preview de etiquetas: produção (N etiquetas) ou pedido (1) -->
   <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true">
@@ -5669,6 +5732,38 @@ window.cdbApp = {
         .catch(e => console.warn('[LiveUpdater] notifyAppReady falhou:', e));
     }
   } catch (e) { /* nao-Capacitor (browser) — ignora */ }
+})();
+
+// Modal "App atualizado": compara version do bundle atual com a ultima
+// vista pelo operador. Se mudou, mostra modal com release notes do commit.
+function closeUpdateModal() {
+  document.getElementById('updateModal').classList.remove('show');
+}
+(function checkAppUpdate() {
+  try {
+    var info = window.__BUNDLE_INFO__;
+    if (!info || !info.version) return;
+    // Placeholder nao substituido (build local, fora do CI) -> nao mostra
+    if (String(info.version).indexOf('__') === 0) return;
+    var KEY = 'cdb-last-version';
+    var last = null;
+    try { last = localStorage.getItem(KEY); } catch (e) {}
+    if (last === info.version) return; // mesma versao: nada a fazer
+    // Persiste a nova versao ANTES de mostrar (evita loop se modal crashar)
+    try { localStorage.setItem(KEY, info.version); } catch (e) {}
+    // Primeira instalacao (last == null): nao incomoda o operador com modal
+    if (last === null) return;
+    // Atualizou de verdade: mostra modal
+    document.getElementById('updateModalVersion').textContent = 'v' + info.version;
+    var notes = (info.releaseNotes && !String(info.releaseNotes).startsWith('__'))
+      ? info.releaseNotes
+      : 'Melhorias e correcoes';
+    document.getElementById('updateModalNotes').textContent = notes;
+    // Espera o DOM principal carregar pra mostrar (visual mais natural)
+    setTimeout(function () {
+      document.getElementById('updateModal').classList.add('show');
+    }, 600);
+  } catch (e) { console.warn('[update modal]', e); }
 })();
 
 // Auto-update silencioso: ao detectar novo SW assumindo controle, recarrega

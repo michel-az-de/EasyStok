@@ -41,12 +41,36 @@ jobs:
         run: |
           sed -i "s|cdb-v2|cdb-${GITHUB_SHA:0:7}|g" EasyStock.Api/wwwroot/pwa/sw.js
 
-      # Carimbo visivel no header (substitui placeholder __APP_VERSION__).
-      # Permite ver visualmente quando o LiveUpdater entregou bundle novo.
-      - name: Stamp version in index.html
+      # Carimba versao + release notes (primeira linha do commit) no
+      # index.html. JS do app le window.__BUNDLE_INFO__ ao boot e mostra
+      # modal "App atualizado!" quando deteta versao diferente da anterior.
+      - name: Stamp version + release notes in index.html
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          VERSION="1.0.${{ github.run_number }}"
-          sed -i "s|__APP_VERSION__|${VERSION}|g" EasyStock.Api/wwwroot/pwa/index.html
+          python3 - <<'PY'
+          import os, json
+          version = "1.0." + os.environ["RUN_NUMBER"]
+          msg = os.environ.get("COMMIT_MSG", "").strip()
+          # Primeira linha = subject; usa ela como release notes resumida
+          notes = msg.split("\n")[0].strip() or "Atualizacao"
+          # Limita pra nao explodir o modal
+          if len(notes) > 200:
+              notes = notes[:197] + "..."
+          notes_json = json.dumps(notes)
+          path = "EasyStock.Api/wwwroot/pwa/index.html"
+          with open(path, "r", encoding="utf-8") as f:
+              html = f.read()
+          html = html.replace("__APP_VERSION__", version)
+          # Substitui o "__APP_RELEASE_NOTES__" entre aspas pelo JSON com
+          # aspas — preserva sintaxe JS valida mesmo com chars especiais.
+          html = html.replace('"__APP_RELEASE_NOTES__"', notes_json)
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(html)
+          print(f"[stamp] version={version}")
+          print(f"[stamp] notes={notes}")
+          PY
 
       # LiveUpdater: gera bundle-{version}.zip + updates.json dentro do
       # diretorio servido pelo SWA. APK Capacitor le updates.json, baixa

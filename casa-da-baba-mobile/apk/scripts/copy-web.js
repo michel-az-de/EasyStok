@@ -53,18 +53,25 @@ function injectConfigBeforeSyncJs(htmlPath) {
 }
 
 function stampVersionInHtml(htmlPath) {
-  // Bundle embutido no APK: marca como "init". Quando o LiveUpdater entregar
+  // Bundle embutido no APK: marca como "apk-X". Quando o LiveUpdater entregar
   // um bundle novo do SWA, o sed do workflow substitui pra "1.0.X" — assim
   // da pra distinguir visualmente bundle empacotado vs bundle baixado.
+  // Tambem substitui o placeholder de release notes pra manter JS valido.
   let html = fs.readFileSync(htmlPath, 'utf8');
+  let changed = false;
   if (html.includes('__APP_VERSION__')) {
     const stamp = process.env.BUILD_VERSION_CODE
       ? `apk-${process.env.BUILD_VERSION_CODE}`
       : 'apk-local';
     html = html.replace(/__APP_VERSION__/g, stamp);
-    fs.writeFileSync(htmlPath, html, 'utf8');
     console.log('[copy-web] carimbou versao no index.html:', stamp);
+    changed = true;
   }
+  if (html.includes('"__APP_RELEASE_NOTES__"')) {
+    html = html.replace(/"__APP_RELEASE_NOTES__"/g, JSON.stringify('Bundle empacotado no APK'));
+    changed = true;
+  }
+  if (changed) fs.writeFileSync(htmlPath, html, 'utf8');
 }
 
 function main() {
