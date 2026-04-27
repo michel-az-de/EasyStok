@@ -5743,18 +5743,24 @@ function closeUpdateModal() {
   try {
     var info = window.__BUNDLE_INFO__;
     if (!info || !info.version) return;
-    // Placeholder nao substituido (build local, fora do CI) -> nao mostra
-    if (String(info.version).indexOf('__') === 0) return;
+    var ver = String(info.version);
+    // Placeholder nao substituido (build local) -> nao mostra
+    if (ver.indexOf('__') === 0) return;
+    // Versoes "apk-*" sao do bundle empacotado original (primeira instalacao
+    // sem LiveUpdater ainda). Nao incomoda com modal — modal so pra updates
+    // de verdade vindos do servidor (versoes "1.0.X").
+    if (ver.indexOf('apk-') === 0) return;
+
     var KEY = 'cdb-last-version';
     var last = null;
     try { last = localStorage.getItem(KEY); } catch (e) {}
-    if (last === info.version) return; // mesma versao: nada a fazer
+    if (last === ver) return; // mesma versao: nada a fazer
+
     // Persiste a nova versao ANTES de mostrar (evita loop se modal crashar)
-    try { localStorage.setItem(KEY, info.version); } catch (e) {}
-    // Primeira instalacao (last == null): nao incomoda o operador com modal
-    if (last === null) return;
-    // Atualizou de verdade: mostra modal
-    document.getElementById('updateModalVersion').textContent = 'v' + info.version;
+    try { localStorage.setItem(KEY, ver); } catch (e) {}
+
+    // Atualizou (ou primeiro update via LiveUpdater): mostra modal
+    document.getElementById('updateModalVersion').textContent = 'v' + ver;
     var notes = (info.releaseNotes && !String(info.releaseNotes).startsWith('__'))
       ? info.releaseNotes
       : 'Melhorias e correcoes';
