@@ -52,7 +52,8 @@ jobs:
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "./EasyStock.Api/wwwroot/pwa" # App source code path
           api_location: "" # Api source code path - optional
-          output_location: "." # Built app content directory - optional
+          output_location: "" # vazio: app_location já é a pasta final estática (sem build step)
+          skip_app_build: true
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
