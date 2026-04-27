@@ -16,6 +16,7 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.0",
     "@capgo/capacitor-updater": "lts-v6",
     "cordova-plugin-bluetooth-serial": "^0.4.7"
   }

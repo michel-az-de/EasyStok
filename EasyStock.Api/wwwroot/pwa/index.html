@@ -4836,13 +4836,26 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
 function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  let cur = x;
-  ctx.fillStyle = '#000';
-  for (let i = 0; i < 42 && cur < x + w; i++) {
+
+  // Pre-calcula larguras pra saber largura total do barcode (42 barras+gaps).
+  // Sem isso o barcode fica colado a esquerda, deixando espaco vazio a direita.
+  const widths = [];
+  let totalW = 0;
+  for (let i = 0; i < 42; i++) {
     const barW = (Math.abs(hash >> (i % 28)) % 3) + 1;
     const gapW = (Math.abs(hash >> ((i + 7) % 28)) % 2) + 1;
-    ctx.fillRect(cur, y, barW, h);
-    cur += barW + gapW;
+    widths.push([barW, gapW]);
+    totalW += barW + gapW;
+  }
+
+  // Escala se total exceder espaco disponivel; senao centraliza no slot.
+  const scale = totalW > w ? w / totalW : 1;
+  const renderedW = totalW * scale;
+  let cur = x + Math.max(0, (w - renderedW) / 2);
+  ctx.fillStyle = '#000';
+  for (const [barW, gapW] of widths) {
+    ctx.fillRect(cur, y, barW * scale, h);
+    cur += (barW + gapW) * scale;
   }
 }
 
@@ -4906,23 +4919,68 @@ function showImageForSaving(dataUrl, filename) {
 }
 
 /**
- * "Compartilhar": Web Share API com arquivo. Abre o sheet nativo do Android
- * (WhatsApp, Drive, Gmail, "Salvar em arquivos"…). Único caminho realmente
- * universal pro fluxo de compartilhamento em PWA empacotada como APK.
+ * Salva a imagem direto no Android via Capacitor Filesystem plugin (Documents).
+ * No browser, faz <a download> nativo (vai pra pasta Downloads do navegador).
+ * Sem fallback de press-and-hold — o save tem que SALVAR.
  */
-async function shareBlobAsFile(blob, filename) {
-  if (!blob) { showToast('Sem imagem pra compartilhar'); return false; }
+async function saveImageToDevice(blob, filename) {
+  // 1) Caminho preferencial no APK: plugin Filesystem
+  try {
+    const Plugin = window.Capacitor
+                && window.Capacitor.Plugins
+                && window.Capacitor.Plugins.Filesystem;
+    if (Plugin) {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      const result = await Plugin.writeFile({
+        path: filename,
+        data: base64,
+        directory: 'DOCUMENTS',
+        recursive: true
+      });
+      alert('Imagem salva em Documentos:\n\n' + filename
+            + (result && result.uri ? '\n\n' + result.uri : ''));
+      return true;
+    }
+  } catch (e) {
+    console.warn('[save] Filesystem plugin falhou:', e);
+    alert('Erro ao salvar via Filesystem:\n\n' + (e && e.message ? e.message : e)
+          + '\n\nTentando download do navegador...');
+  }
+  // 2) Fallback browser: <a download>
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Salvo em Downloads (' + filename + ')');
+    return true;
+  } catch (e) {
+    alert('Erro ao salvar:\n\n' + (e && e.message ? e.message : e));
+    return false;
+  }
+}
+
+/**
+ * Compartilha a imagem via sheet nativa do Android (Web Share API).
+ * Abre WhatsApp, Drive, Gmail, "Salvar em arquivos", etc.
+ * Sem fallback de press-and-hold — se nao suporta, fala isso pro usuario.
+ */
+async function shareImageNative(blob, filename) {
+  if (!blob) { alert('Sem imagem pra compartilhar'); return false; }
   const file = new File([blob], filename, { type: blob.type || 'image/png' });
   if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
-    showToast('Compartilhamento não suportado neste device');
+    alert('Compartilhamento de arquivo nao suportado neste dispositivo.\n\n'
+          + 'Use o botao Salvar e depois compartilhe pelo gerenciador de arquivos.');
     return false;
   }
   try {
     await navigator.share({ files: [file], title: filename });
+    showToast('Compartilhado');
     return true;
   } catch (e) {
-    if (e?.name === 'AbortError') return false; // usuário cancelou
-    showToast('Erro compartilhar: ' + (e?.message || e));
+    if (e && e.name === 'AbortError') return false; // usuario cancelou — sem alert
+    alert('Erro ao compartilhar:\n\n' + (e && e.message ? e.message : e));
     return false;
   }
 }
@@ -4966,8 +5024,7 @@ async function etqAction(action) {
       const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
       if (!blob) { showToast('Falha ao gerar imagem'); return; }
       const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      const dataUrl = await blobToDataUrl(blob);
-      showImageForSaving(dataUrl, filename);
+      await saveImageToDevice(blob, filename);
       return;
     }
     if (action === 'share') {
@@ -4975,12 +5032,7 @@ async function etqAction(action) {
       const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
       if (!blob) { showToast('Falha ao gerar imagem'); return; }
       const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      const ok = await shareBlobAsFile(blob, filename);
-      if (!ok) {
-        // Fallback: mostra a imagem pra operador segurar e salvar.
-        const dataUrl = await blobToDataUrl(blob);
-        showImageForSaving(dataUrl, filename);
-      }
+      await shareImageNative(blob, filename);
       return;
     }
   } catch (e) {
