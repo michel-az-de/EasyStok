@@ -2478,6 +2478,16 @@ body {
         </div>
       </div>
 
+      <div class="ajustes-section">
+        <h4>💾 Backup &amp; Restauração</h4>
+        <p class="hint">Exporte um arquivo JSON com TUDO (produtos, clientes, pedidos, lotes, caixa). Guarde em algum lugar seguro. Em caso de problema ou reinstalação, use Restaurar pra trazer tudo de volta.</p>
+        <div style="display:flex;gap:6px;flex-direction:column">
+          <button class="btn-ajustes-printer" onclick="exportBackup()">⬇️ Exportar backup (JSON)</button>
+          <button class="btn-ajustes-printer" onclick="document.getElementById('backupFileInput').click()">⬆️ Restaurar de arquivo</button>
+          <input type="file" id="backupFileInput" accept="application/json,.json" style="display:none" onchange="importBackup(event)" />
+        </div>
+      </div>
+
       <button class="btn-ajustes-save" onclick="saveAjustes()">Salvar</button>
     </div>
   </div>
@@ -2773,6 +2783,142 @@ function persistAll() {
   if (typeof window.cdbOnPersist === 'function') {
     try { window.cdbOnPersist({ products, clients, orders, cashEntries, batches }); } catch (e) { console.warn(e); }
   }
+}
+
+// =========================
+// BACKUP / RESTAURAÇÃO
+// =========================
+// Coleta TUDO que o app usa (state + chaves soltas em localStorage) num único
+// JSON. Versionado pra futuras migrações de schema.
+function buildBackupPayload() {
+  const lsKeys = [
+    'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-batches',
+    'cdb-operator-name','cdb-empresa-name',
+    'cdb-pix-key','cdb-pix-holder','cdb-pix-type',
+    'cdb-printer','cdb-theme','cdb-onboarding-done',
+    'cdb-device-id','cdb-last-sync','cdb-sync-queue'
+  ];
+  const ls = {};
+  lsKeys.forEach(k => {
+    try { const v = localStorage.getItem(k); if (v !== null) ls[k] = v; } catch (e) {}
+  });
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    appId: 'casa-da-baba',
+    state: {
+      products: products.map(({count, photo, ...rest}) => rest),
+      clients, orders, cashEntries, batches
+    },
+    localStorage: ls
+  };
+}
+
+function exportBackup() {
+  try {
+    const payload = buildBackupPayload();
+    const json = JSON.stringify(payload, null, 2);
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    const filename = `casa-da-baba-backup-${stamp}.json`;
+
+    // Web Share API com File: melhor caminho no Android (deixa o usuário
+    // escolher onde salvar — Drive, e-mail, Files, WhatsApp).
+    const blob = new Blob([json], { type: 'application/json' });
+    if (navigator.canShare && typeof File !== 'undefined') {
+      try {
+        const file = new File([blob], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: filename })
+            .then(() => showToast('Backup exportado'))
+            .catch(() => fallbackBackupDownload(blob, filename, json));
+          return;
+        }
+      } catch (e) {}
+    }
+    fallbackBackupDownload(blob, filename, json);
+  } catch (e) {
+    console.error('Backup falhou:', e);
+    showToast('Erro ao gerar backup');
+  }
+}
+
+function fallbackBackupDownload(blob, filename, json) {
+  // Sem Web Share API: tenta <a download>; se ainda assim falhar (alguns
+  // WebViews ignoram), abre tela cheia com JSON pra copy/paste manual.
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Backup baixado');
+  } catch (e) {
+    showBackupTextForCopy(json, filename);
+  }
+}
+
+function showBackupTextForCopy(json, filename) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;padding:12px';
+  overlay.innerHTML = `
+    <div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;text-align:center">
+      Selecione todo o texto e copie para um lugar seguro<br/>(Drive, e-mail, anotações)
+    </div>
+    <div style="color:#aaa;font-size:11px;margin-bottom:8px;text-align:center">${escapeHtml(filename)}</div>
+    <textarea readonly style="flex:1;width:100%;font-family:monospace;font-size:10px;background:#111;color:#0f0;border:1px solid #333;padding:8px;border-radius:4px"></textarea>
+    <button id="closeBackupTxt" style="margin-top:10px;padding:12px;background:#d4af37;color:#000;border:0;border-radius:8px;font-weight:700">Fechar</button>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('textarea').value = json;
+  overlay.querySelector('#closeBackupTxt').onclick = () => overlay.remove();
+}
+
+function importBackup(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ''; // permite re-importar o mesmo arquivo
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const payload = JSON.parse(String(e.target.result || ''));
+      if (!payload || payload.appId !== 'casa-da-baba' || !payload.state) {
+        showToast('Arquivo inválido (não é backup do Casa da Baba)');
+        return;
+      }
+      const itemCount = (payload.state.products?.length || 0)
+                      + (payload.state.clients?.length || 0)
+                      + (payload.state.orders?.length || 0)
+                      + (payload.state.batches?.length || 0)
+                      + (payload.state.cashEntries?.length || 0);
+      if (!confirm(`Restaurar ${itemCount} registros?\n\nIsso vai SUBSTITUIR os dados atuais do app por completo. Use só se tem certeza (recuperação de backup).`)) return;
+      applyBackupPayload(payload);
+      showToast('Backup restaurado · recarregando...');
+      setTimeout(() => location.reload(), 800);
+    } catch (e) {
+      console.error('Import falhou:', e);
+      showToast('Arquivo corrompido ou inválido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function applyBackupPayload(payload) {
+  const s = payload.state || {};
+  // Sobrescreve estado em memória
+  if (Array.isArray(s.products))     products      = s.products.map(p => ({...p, count: 0}));
+  if (Array.isArray(s.clients))      clients       = s.clients;
+  if (Array.isArray(s.orders))       orders        = s.orders;
+  if (Array.isArray(s.cashEntries))  cashEntries   = s.cashEntries;
+  if (Array.isArray(s.batches))      batches       = s.batches;
+
+  // Restaura chaves soltas, exceto cdb-device-id (manter o ID atual evita
+  // conflito de "mesmo device" no servidor após restore em outro aparelho)
+  const ls = payload.localStorage || {};
+  Object.keys(ls).forEach(k => {
+    if (k === 'cdb-device-id') return;
+    try { localStorage.setItem(k, ls[k]); } catch (e) {}
+  });
+  persistAll();
 }
 
 // =========================
