@@ -1806,6 +1806,66 @@ body {
 .cf-prob  { background: var(--accent); color: #fff; }
 .cf-cancel { background: transparent; color: var(--ink-mute); border: 1px solid var(--line) !important; }
 
+/* Tela de Conferência */
+.confer-search {
+  display: flex; gap: 8px; margin-bottom: 8px;
+}
+.confer-search input {
+  flex: 1; background: var(--bg-elev); color: var(--ink);
+  border: 1.5px solid var(--gold); border-radius: 12px;
+  padding: 14px 16px; font-size: 17px; letter-spacing: 0.06em;
+  text-transform: uppercase; outline: none;
+  font-family: inherit;
+}
+.confer-search-btn {
+  background: var(--gold); color: #1c1408; border: 0;
+  padding: 0 18px; border-radius: 12px;
+  font-weight: 800; font-size: 14px; cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.confer-hint { font-size: 13px; color: var(--ink-mute); min-height: 18px; margin-bottom: 10px; }
+.confer-future-note {
+  background: var(--gold-soft); color: var(--ink-dim);
+  border: 1px dashed var(--gold); border-radius: 12px;
+  padding: 10px 14px; font-size: 12px; line-height: 1.5;
+  margin: 8px 0 16px;
+}
+.confer-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-elev); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 8px;
+  border-left: 3px solid var(--gold);
+}
+.confer-row.done { border-left-color: var(--basil); opacity: 0.85; }
+.confer-row.problem { border-left-color: var(--accent); }
+.confer-row .cr-main { flex: 1; min-width: 0; }
+.confer-row .cr-code { font-size: 11px; color: var(--ink-mute); font-family: monospace; letter-spacing: 0.06em; margin-bottom: 2px; }
+.confer-row .cr-name { font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.confer-row .cr-meta { font-size: 12px; color: var(--ink-dim); }
+.confer-row .cr-action {
+  background: var(--basil); color: #06281e; border: 0;
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 800; cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.confer-row .cr-action:active { opacity: 0.8; }
+.confer-empty { text-align: center; color: var(--ink-mute); font-size: 13px; padding: 20px; font-style: italic; }
+
+/* Botões de atalho na home */
+.home-actions {
+  display: flex; gap: 8px; margin: 14px 0;
+}
+.home-action-btn {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--bg-elev); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: inherit;
+}
+.home-action-btn:active { opacity: 0.8; }
+.home-action-btn .ico { font-size: 20px; }
+
 /* Selo de status nos cards do kanban */
 .k-confer-badge {
   display: inline-block; padding: 3px 8px; border-radius: 100px;
@@ -2624,6 +2684,15 @@ body {
         </div>
       </div>
 
+      <div class="home-actions">
+        <button class="home-action-btn" onclick="go('conferencia')">
+          <span class="ico">🔍</span> Conferir pedido
+        </button>
+        <button class="home-action-btn" onclick="go('compras')">
+          <span class="ico">🛒</span> Lista de compras
+        </button>
+      </div>
+
       <div class="section-label">
         <span>Pedidos em aberto</span>
         <span class="count" id="openCount">0</span>
@@ -2722,6 +2791,27 @@ body {
     </div>
 
     <!-- COMPRAR -->
+    <!-- CONFERENCIA — busca por codigo curto + lista de pedidos pendentes -->
+    <div class="screen" data-screen="conferencia">
+      <div class="section-label">Conferir pedido</div>
+      <div class="confer-search">
+        <input id="conferScreenInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
+               placeholder="Digite o código (ex: 24467287)"
+               oninput="onConferScreenInput()" onkeydown="if(event.key==='Enter') doConferScreenSearch()">
+        <button class="confer-search-btn" onclick="doConferScreenSearch()">Abrir</button>
+      </div>
+      <div id="conferScreenHint" class="confer-hint"></div>
+      <div class="confer-future-note">
+        📷 <b>Scanner por câmera</b> chega em breve — por enquanto digite o código curto que aparece embaixo do QR na etiqueta.
+      </div>
+
+      <div class="section-label">Pedidos pendentes</div>
+      <div id="conferPendingList"></div>
+
+      <div class="section-label">Conferidos hoje</div>
+      <div id="conferDoneList"></div>
+    </div>
+
     <div class="screen" data-screen="compras">
       <div class="section-label">Faltou o quê?</div>
       <div class="input-box">
@@ -3243,9 +3333,9 @@ body {
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
       <span class="label">Histórico</span>
     </button>
-    <button class="nav-btn" data-nav="compras" onclick="go('compras')">
-      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg></span>
-      <span class="label">Comprar</span>
+    <button class="nav-btn" data-nav="conferencia" onclick="go('conferencia')">
+      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="17" y1="14" x2="17" y2="17"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="17" y2="17"/><line x1="20" y1="17" x2="20" y2="17"/><line x1="17" y1="20" x2="21" y2="20"/></svg></span>
+      <span class="label">Conferir</span>
     </button>
   </div>
 
@@ -3721,9 +3811,10 @@ function go(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.nav === screen));
   document.getElementById('content').scrollTop = 0;
-  if (screen === 'home')       renderHome();
-  if (screen === 'pedidos')    renderOrdersFeed();
-  if (screen === 'historico')  renderHistoricoScreen();
+  if (screen === 'home')         renderHome();
+  if (screen === 'pedidos')      renderOrdersFeed();
+  if (screen === 'historico')    renderHistoricoScreen();
+  if (screen === 'conferencia')  renderConferenciaScreen();
 }
 
 // =========================
@@ -5714,18 +5805,28 @@ function applyConfirmation(orderId, type, payload) {
     summary: `Pedido ${(o.id||'').slice(-8)} · ${conferStatusLabel(status)} · ${change}`
   });
   persistAll();
-  // Re-render kanban e historico se abertos
+  // Re-render kanban, historico e tela de conferencia se abertos
   if (typeof renderKanban === 'function') renderKanban();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
 }
 
 function confirmConfer() {
   const id = pendingConferOrderId;
   if (!id) return;
   closeConfer();
+  const o = getOrderById(id);
   applyConfirmation(id, 'ok', null);
-  showToast('✓ Conferido por ' + (operatorName || 'operador'));
-  // Mantém o pedido no kanban — operador decide quando avançar pra entregue.
+  // Se o pedido ja estava em "pronto", confere = finaliza e avanca pra
+  // entregue (fluxo natural: kanban -> Proximo -> conferencia -> entregue).
+  // Em outros status, so registra a conferencia e mantem o pedido no fluxo.
+  if (o && o.status === STATUS.PRONTO) {
+    applyAdvanceTransition(id, STATUS.ENTREGUE);
+    showToast('✓ Conferido e entregue por ' + (operatorName || 'operador'));
+  } else {
+    showToast('✓ Conferido por ' + (operatorName || 'operador'));
+  }
 }
 
 // ===== AJUSTAR =====
@@ -5836,6 +5937,79 @@ function doConferBusca() {
   const o = findOrderByShortCode(code);
   if (!o) { showToast('Pedido não encontrado'); return; }
   closeConferBusca();
+  openConfer(o.id);
+}
+
+// ===== TELA DE CONFERENCIA (data-screen=conferencia) =====
+// Substitui o item "Comprar" no menu inferior. Mostra:
+//   - Input grande pra digitar codigo curto
+//   - Lista de pedidos PENDENTES (nao conferidos)
+//   - Lista de pedidos CONFERIDOS HOJE
+function renderConferenciaScreen() {
+  const pendingHost = document.getElementById('conferPendingList');
+  const doneHost = document.getElementById('conferDoneList');
+  if (!pendingHost || !doneHost) return;
+  // Pendentes: pedidos abertos sem confirmation OU com status='pendente'
+  const today0 = new Date(); today0.setHours(0,0,0,0);
+  const todayMs = today0.getTime();
+  const allOrders = orders || [];
+  const pending = allOrders.filter(o =>
+    o.status !== STATUS.CANCELADO &&
+    getConferStatus(o) === CONFER_STATUS.PENDENTE
+  ).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const done = allOrders.filter(o =>
+    o.confirmation && o.confirmation.at >= todayMs
+  ).sort((a, b) => (b.confirmation.at || 0) - (a.confirmation.at || 0));
+
+  pendingHost.innerHTML = pending.length
+    ? pending.map(o => conferRowHtml(o)).join('')
+    : '<div class="confer-empty">Nenhum pedido pendente. ✓</div>';
+
+  doneHost.innerHTML = done.length
+    ? done.map(o => conferRowHtml(o)).join('')
+    : '<div class="confer-empty">Nada conferido hoje ainda.</div>';
+}
+function conferRowHtml(o) {
+  const code = (o.id || '').slice(-8);
+  const cliente = o.clientSnapshot?.name || 'Sem cliente';
+  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  const status = getConferStatus(o);
+  const qty = (o.items || []).reduce((acc, i) => acc + (Number(i.qty)||0), 0);
+  const cls = status === CONFER_STATUS.CONFERIDO ? 'done'
+            : status === CONFER_STATUS.DIVERGENCIA ? 'problem' : '';
+  const meta = status === CONFER_STATUS.PENDENTE
+    ? `${qty} item${qty===1?'':'s'} · ${money(o.total)}`
+    : `${conferStatusLabel(status)} · ${o.confirmation?.by || '—'}`;
+  return `<div class="confer-row ${cls}">
+    <div class="cr-main">
+      <div class="cr-code">${escapeHtml(code)}</div>
+      <div class="cr-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
+      <div class="cr-meta">${escapeHtml(meta)}</div>
+    </div>
+    <button class="cr-action" onclick="openConfer('${o.id}')">${status === CONFER_STATUS.PENDENTE ? '✓ Conferir' : 'Ver'}</button>
+  </div>`;
+}
+function onConferScreenInput() {
+  const code = document.getElementById('conferScreenInput').value;
+  const hint = document.getElementById('conferScreenHint');
+  if (!code) { hint.textContent = ''; return; }
+  const o = findOrderByShortCode(code);
+  if (o) {
+    const cliente = o.clientSnapshot?.name || 'Sem cliente';
+    const status = getConferStatus(o);
+    hint.innerHTML = `<span style="color:var(--basil)">✓ ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
+  } else if (code.length >= 4) {
+    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido com esse código</span>';
+  } else {
+    hint.textContent = 'Continue digitando…';
+  }
+}
+function doConferScreenSearch() {
+  const code = document.getElementById('conferScreenInput').value;
+  const o = findOrderByShortCode(code);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  document.getElementById('conferScreenInput').value = '';
+  document.getElementById('conferScreenHint').textContent = '';
   openConfer(o.id);
 }
 
