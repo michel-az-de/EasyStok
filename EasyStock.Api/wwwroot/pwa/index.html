@@ -3447,7 +3447,14 @@ body {
         <div class="copy">O nome da empresa, a cobranca e a impressao termica saem daqui. Ajustes bem organizados ajudam o app a parecer produto, nao improviso.</div>
       </div>
 
-      <div class="ajustes-section">
+      <!-- Tabs de Ajustes (chunking 7±2: 9 secoes em 3 grupos) -->
+      <div class="screen-tabs ajustes-tabs">
+        <button class="screen-tab active" data-group="loja"  onclick="setAjustesTab('loja')">🏪 Loja</button>
+        <button class="screen-tab"        data-group="eq"    onclick="setAjustesTab('eq')">🛠 Equip.</button>
+        <button class="screen-tab"        data-group="manut" onclick="setAjustesTab('manut')">⚙ Manut.</button>
+      </div>
+
+      <div class="ajustes-section" data-group="loja">
         <h4>Operador</h4>
         <p class="hint">Nome usado nos pedidos, historico e rastreabilidade da operacao.</p>
         <div class="field">
@@ -3456,7 +3463,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="loja">
         <h4>Aparência</h4>
         <p class="hint">Tema visual do app. Aplicado imediatamente.</p>
         <div class="ajustes-actions-stack">
@@ -3466,7 +3473,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="loja">
         <h4>Empresa</h4>
         <p class="hint">Nome exibido no topo do app, nas etiquetas e nas mensagens de cobranca.</p>
         <div class="field">
@@ -3475,7 +3482,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="loja">
         <h4>PIX</h4>
         <p class="hint">Defina a chave que aparece no recibo e na mensagem pronta para o cliente.</p>
         <div class="field">
@@ -3499,7 +3506,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="eq">
         <h4>Impressora termica</h4>
         <p class="hint">Hipertech WTP05 ou outra ESC/POS Bluetooth 58mm. Pareie pelo Android antes.</p>
         <div class="printer-status none" id="printerStatus">
@@ -3512,14 +3519,14 @@ body {
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnostico</button>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="eq">
         <h4>Catalogo de produtos</h4>
         <p class="hint">Cadastre, edite ou arquive produtos sem afetar pedidos e lotes antigos.</p>
         <div id="catalogList" class="catalog-list"></div>
         <button class="btn-ajustes-printer primary-soft" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="manut">
         <h4>Backup e restauracao</h4>
         <p class="hint">Exporte um JSON completo da operacao para guardar com seguranca e restaurar quando precisar.</p>
         <div class="ajustes-actions-stack">
@@ -3529,7 +3536,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="manut">
         <h4>🛠️ Operacional</h4>
         <p class="hint">Limpeza e manutenção. Use com cuidado — algumas ações são irreversíveis.</p>
         <div class="ajustes-actions-stack">
@@ -3539,7 +3546,7 @@ body {
         </div>
       </div>
 
-      <div class="ajustes-section">
+      <div class="ajustes-section" data-group="manut">
         <h4>Atualizacao do app</h4>
         <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificacao manual.</p>
         <div class="ajustes-actions-stack">
@@ -3979,6 +3986,17 @@ function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   applyTheme(current === 'light' ? 'dark' : 'light');
 }
+// Tabs do modal Ajustes (Loja / Equipamento / Manutenção)
+// Toggleia visibilidade dos .ajustes-section por data-group.
+function setAjustesTab(group) {
+  document.querySelectorAll('.ajustes-tabs .screen-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.group === group));
+  document.querySelectorAll('.ajustes-section[data-group]').forEach(s =>
+    s.style.display = s.dataset.group === group ? '' : 'none');
+  // Scrolla pro topo dentro do modal pra dar contexto
+  try { document.querySelector('.ajustes-sheet').scrollTop = 0; } catch (e) {}
+}
+
 // Atualiza label do botao de tema dentro do modal Ajustes pra refletir
 // estado atual (texto descreve PARA ONDE vai mudar, nao o estado atual).
 function refreshAjustesThemeLabel() {
@@ -6291,6 +6309,7 @@ function openAjustes() {
   renderPrinterStatus();
   renderCatalogList();
   refreshAjustesThemeLabel();
+  setAjustesTab('loja'); // default ao abrir
   toggleModal('ajustesModal', true);
 }
 function closeAjustes() { toggleModal('ajustesModal', false); }
