@@ -931,6 +931,13 @@ body {
   line-height: 1;
   font-family: inherit;
 }
+.cp-edit {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--ink-mute); border-radius: 8px;
+  padding: 6px 8px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cp-edit:active { transform: scale(0.92); color: var(--ink); }
 
 /* Order items list */
 .order-items { margin-top: 4px; }
@@ -1308,6 +1315,19 @@ body {
   font-weight: 500;
 }
 .price-row .input-box { flex: 1; margin-top: 0; }
+/* Hint live de validacao do CPF/CNPJ no modal de cliente */
+.doc-hint {
+  font-size: 12px; font-weight: 700;
+  margin: -8px 0 12px; min-height: 16px;
+  letter-spacing: 0.02em;
+  color: var(--ink-mute);
+}
+.doc-hint.valid { color: var(--basil); }
+.doc-hint.invalid { color: var(--accent); }
+.doc-hint.partial { color: var(--ink-mute); }
+[data-theme="light"] .doc-hint.valid { color: var(--basil); }
+[data-theme="light"] .doc-hint.invalid { color: var(--accent); }
+
 .modal-ctas {
   display: flex;
   gap: 10px;
@@ -3373,22 +3393,25 @@ body {
   <div class="modal-overlay" id="newClientModal">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title">Novo <span class="accent">cliente</span></div>
-      <div class="modal-sub">só o essencial agora, resto depois</div>
+      <div class="modal-title" id="newClientModalTitle">Novo <span class="accent">cliente</span></div>
+      <div class="modal-sub">Nome é obrigatório. Resto é opcional.</div>
+
       <label class="modal-label">Nome</label>
-      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda"></div>
-      <label class="modal-label">Onde entrega</label>
-      <div class="loc-tabs" id="locTabs">
-        <button class="loc-tab active" data-loc="apt">Aqui no prédio</button>
-        <button class="loc-tab" data-loc="ext">Fora</button>
-      </div>
-      <div id="locApt"><div class="input-box"><input id="newClientApt" placeholder="ex: 506, 81B, cobertura"></div></div>
-      <div id="locExt" style="display:none"><div class="input-box"><input id="newClientAddr" placeholder="ex: Rua Tal 123, casa azul"></div></div>
+      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda Silva"></div>
+
+      <label class="modal-label">Endereço (opcional)</label>
+      <div class="input-box"><input id="newClientAddr" placeholder="ex: Apto 506, Rua Tal 123, ou referência"></div>
+
       <label class="modal-label">WhatsApp (opcional)</label>
       <div class="input-box"><input id="newClientPhone" type="tel" placeholder="(11) 9xxxx xxxx"></div>
+
+      <label class="modal-label">CPF ou CNPJ (opcional)</label>
+      <div class="input-box"><input id="newClientDoc" type="text" inputmode="numeric" placeholder="ex: 123.456.789-00 ou 12.345.678/0001-90" oninput="onClientDocInput(event)" maxlength="18"></div>
+      <div id="newClientDocHint" class="doc-hint"></div>
+
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeClientModal()">Cancelar</button>
-        <button class="cta-btn primary" onclick="saveNewClient()">Criar e usar</button>
+        <button class="cta-btn primary" id="saveClientBtn" onclick="saveNewClient()">Criar e usar</button>
       </div>
     </div>
   </div>
@@ -3928,6 +3951,20 @@ defaultProducts.forEach(dp => {
 products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
 
 let clients = load('cdb-clients', defaultClients);
+// Migration silenciosa do legado "apt" -> "address". Clientes que tinham
+// apenas apartamento (do toggle "Aqui no predio" antigo) ganham endereco
+// formatado "Apto X". O campo apt fica preservado pra retrocompat com
+// snapshots de pedidos antigos. Roda 1x na carga.
+(function migrateClientsApt() {
+  let migrated = 0;
+  (clients || []).forEach(c => {
+    if (c.apt && !c.address) { c.address = 'Apto ' + c.apt; migrated++; }
+  });
+  if (migrated > 0) {
+    try { save('cdb-clients', clients); } catch (e) {}
+    try { console.log('[migration] ' + migrated + ' cliente(s) com apt -> address'); } catch (e) {}
+  }
+})();
 let orders = load('cdb-orders', null) || seedOrders();
 let cashEntries = load('cdb-cash', null) || seedCash();
 let cashClosings = load('cdb-cash-closings', null) || [];
@@ -8724,10 +8761,91 @@ function confirmProduction() {
 // =========================
 // CLIENTES
 // =========================
+
+// ===== Validacao de CPF/CNPJ (algoritmo oficial Receita Federal) =====
+function isValidCPF(cpf) {
+  const s = String(cpf||'').replace(/\D/g, '');
+  if (s.length !== 11 || /^(\d)\1+$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(s[i], 10) * (10 - i);
+  let dv1 = 11 - (sum % 11); if (dv1 >= 10) dv1 = 0;
+  if (dv1 !== parseInt(s[9], 10)) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(s[i], 10) * (11 - i);
+  let dv2 = 11 - (sum % 11); if (dv2 >= 10) dv2 = 0;
+  return dv2 === parseInt(s[10], 10);
+}
+function isValidCNPJ(cnpj) {
+  const s = String(cnpj||'').replace(/\D/g, '');
+  if (s.length !== 14 || /^(\d)\1+$/.test(s)) return false;
+  const w1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(s[i], 10) * w1[i];
+  let dv1 = sum % 11; dv1 = dv1 < 2 ? 0 : 11 - dv1;
+  if (dv1 !== parseInt(s[12], 10)) return false;
+  const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+  sum = 0;
+  for (let i = 0; i < 13; i++) sum += parseInt(s[i], 10) * w2[i];
+  let dv2 = sum % 11; dv2 = dv2 < 2 ? 0 : 11 - dv2;
+  return dv2 === parseInt(s[13], 10);
+}
+function formatCPF(s) {
+  const d = String(s||'').replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return d.slice(0,3) + '.' + d.slice(3);
+  if (d.length <= 9) return d.slice(0,3) + '.' + d.slice(3,6) + '.' + d.slice(6);
+  return d.slice(0,3) + '.' + d.slice(3,6) + '.' + d.slice(6,9) + '-' + d.slice(9);
+}
+function formatCNPJ(s) {
+  const d = String(s||'').replace(/\D/g, '').slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return d.slice(0,2) + '.' + d.slice(2);
+  if (d.length <= 8) return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5);
+  if (d.length <= 12) return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5,8) + '/' + d.slice(8);
+  return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5,8) + '/' + d.slice(8,12) + '-' + d.slice(12);
+}
+// Classifica raw input — detecta CPF (≤11 dígitos) ou CNPJ (>11), valida.
+function classifyDocument(raw) {
+  const digits = String(raw||'').replace(/\D/g, '');
+  if (digits.length === 0)  return { type: null,  valid: true,  formatted: '', digits };
+  if (digits.length === 11) return { type: 'cpf', valid: isValidCPF(digits),  formatted: formatCPF(digits),  digits };
+  if (digits.length === 14) return { type: 'cnpj', valid: isValidCNPJ(digits), formatted: formatCNPJ(digits), digits };
+  // Parcial — provisoriamente formata como o tipo provavel
+  if (digits.length < 11)   return { type: 'cpf', valid: false, formatted: formatCPF(digits), digits, partial: true };
+  return { type: 'cnpj', valid: false, formatted: formatCNPJ(digits), digits, partial: true };
+}
+// Listener do input de CPF/CNPJ — auto-format + hint live
+function onClientDocInput(ev) {
+  const inp = ev.target;
+  const cls = classifyDocument(inp.value);
+  inp.value = cls.formatted;
+  const hint = document.getElementById('newClientDocHint');
+  if (!hint) return;
+  if (cls.digits.length === 0) {
+    hint.textContent = '';
+    hint.className = 'doc-hint';
+    return;
+  }
+  if (cls.partial) {
+    hint.textContent = 'Continue digitando…';
+    hint.className = 'doc-hint partial';
+    return;
+  }
+  if (cls.valid) {
+    hint.textContent = '✓ ' + (cls.type === 'cpf' ? 'CPF' : 'CNPJ') + ' válido';
+    hint.className = 'doc-hint valid';
+  } else {
+    hint.textContent = '⚠ ' + (cls.type === 'cpf' ? 'CPF' : 'CNPJ') + ' inválido';
+    hint.className = 'doc-hint invalid';
+  }
+}
+
 function clientReference(c) {
-  if (c.apt) return 'apto ' + c.apt;
+  if (!c) return 'sem referência';
   if (c.address) return c.address;
-  if (c.phone) return c.phone;
+  if (c.apt)     return 'apto ' + c.apt;        // legado pra clientes pré-migration
+  if (c.phone)   return c.phone;
+  if (c.document) return c.document;
   return 'sem referência';
 }
 
@@ -8738,7 +8856,9 @@ function renderRecents() {
   recents.forEach(c => {
     const btn = document.createElement('button');
     btn.className = 'chip';
-    btn.innerHTML = escapeHtml(c.name) + (c.apt ? `<span class="apt">${escapeHtml(c.apt)}</span>` : '');
+    // Mostra address (novo padrao) ou apt (legado pre-migration) como hint
+    const hint = c.address || (c.apt ? 'Apto ' + c.apt : '');
+    btn.innerHTML = escapeHtml(c.name) + (hint ? `<span class="apt">${escapeHtml(hint.length > 16 ? hint.slice(0, 14) + '…' : hint)}</span>` : '');
     btn.onclick = () => selectClient(c);
     box.appendChild(btn);
   });
@@ -8782,6 +8902,9 @@ function renderSelectedClient() {
           <div class="cp-name">${escapeHtml(c.name)}</div>
           <div class="cp-ref">${escapeHtml(clientReference(c))}${c.orderCount ? ' · ' + c.orderCount + ' ' + (c.orderCount === 1 ? 'pedido' : 'pedidos') : ''}</div>
         </div>
+        <button class="cp-edit" onclick="openClientModal({editId: '${c.id}'})" title="Editar cliente" aria-label="Editar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
+        </button>
         <button class="cp-clear" onclick="clearClient()">&times;</button>
       </div>
     `;
@@ -8798,11 +8921,15 @@ function clearClient() {
 function searchClient() {
   const raw = document.getElementById('clientSearch').value;
   const q = raw.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, '');
   const box = document.getElementById('clientSuggestions');
   if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
   const matches = clients.filter(c =>
     c.name.toLowerCase().includes(q) ||
-    (c.apt && c.apt.toLowerCase().includes(q))
+    (c.address && c.address.toLowerCase().includes(q)) ||
+    (c.apt && c.apt.toLowerCase().includes(q)) ||
+    (qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits)) ||
+    (qDigits && c.phone && c.phone.replace(/\D/g, '').includes(qDigits))
   ).slice(0, 5);
   box.innerHTML = '';
   matches.forEach(c => {
@@ -8823,29 +8950,110 @@ function searchClient() {
   box.classList.add('show');
 }
 
-// Modal novo cliente
-function openClientModal(prefill = '') {
-  document.getElementById('newClientName').value = prefill;
-  document.getElementById('newClientApt').value = '';
-  document.getElementById('newClientAddr').value = '';
-  document.getElementById('newClientPhone').value = '';
-  document.querySelectorAll('#locTabs .loc-tab').forEach(t => t.classList.toggle('active', t.dataset.loc === 'apt'));
-  document.getElementById('locApt').style.display = 'block';
-  document.getElementById('locExt').style.display = 'none';
+// Modal de cliente — modo cadastro OU edicao (passa editId pra editar).
+let editingClientId = null;
+function openClientModal(prefillOrEditId) {
+  const isEdit = prefillOrEditId && typeof prefillOrEditId === 'object' && prefillOrEditId.editId;
+  const editId = isEdit ? prefillOrEditId.editId : null;
+  const prefill = (typeof prefillOrEditId === 'string') ? prefillOrEditId : '';
+  editingClientId = editId;
+  // Titulo dinamico
+  const title = document.getElementById('newClientModalTitle');
+  if (title) title.innerHTML = editId
+    ? 'Editar <span class="accent">cliente</span>'
+    : 'Novo <span class="accent">cliente</span>';
+  const saveBtn = document.getElementById('saveClientBtn');
+  if (saveBtn) saveBtn.textContent = editId ? 'Salvar alterações' : 'Criar e usar';
+
+  if (editId) {
+    const c = clients.find(x => x.id === editId);
+    if (c) {
+      document.getElementById('newClientName').value  = c.name || '';
+      document.getElementById('newClientAddr').value  = c.address || (c.apt ? 'Apto ' + c.apt : '');
+      document.getElementById('newClientPhone').value = c.phone || '';
+      document.getElementById('newClientDoc').value   = c.document || '';
+    }
+  } else {
+    document.getElementById('newClientName').value  = prefill;
+    document.getElementById('newClientAddr').value  = '';
+    document.getElementById('newClientPhone').value = '';
+    document.getElementById('newClientDoc').value   = '';
+  }
+  // Reseta hint
+  const hint = document.getElementById('newClientDocHint');
+  if (hint) {
+    if (editingClientId && document.getElementById('newClientDoc').value) {
+      // Reavalia o hint pro doc preenchido
+      onClientDocInput({ target: document.getElementById('newClientDoc') });
+    } else {
+      hint.textContent = '';
+      hint.className = 'doc-hint';
+    }
+  }
   document.getElementById('newClientModal').classList.add('show');
-  setTimeout(() => document.getElementById(prefill ? 'newClientApt' : 'newClientName').focus(), 300);
+  setTimeout(() => document.getElementById((editId || prefill) ? 'newClientAddr' : 'newClientName').focus(), 300);
 }
 function closeClientModal() {
+  editingClientId = null;
   document.getElementById('newClientModal').classList.remove('show');
 }
 function saveNewClient() {
   const name = document.getElementById('newClientName').value.trim();
-  if (!name) { document.getElementById('newClientName').focus(); return; }
-  const loc = document.querySelector('#locTabs .loc-tab.active').dataset.loc;
-  const apt = loc === 'apt' ? (document.getElementById('newClientApt').value.trim() || null) : null;
-  const address = loc === 'ext' ? (document.getElementById('newClientAddr').value.trim() || null) : null;
-  const phone = document.getElementById('newClientPhone').value.trim() || null;
-  const c = { id: 'c-' + Date.now(), name, apt, address, phone, lastOrder: Date.now(), orderCount: 0 };
+  if (!name) {
+    showToast('Nome é obrigatório');
+    document.getElementById('newClientName').focus();
+    return;
+  }
+  const address = document.getElementById('newClientAddr').value.trim() || null;
+  const phone   = document.getElementById('newClientPhone').value.trim() || null;
+  // CPF/CNPJ: opcional. Se preenchido, DEVE ser valido.
+  const docRaw = document.getElementById('newClientDoc').value.trim();
+  let document_ = null, documentType = null;
+  if (docRaw) {
+    const cls = classifyDocument(docRaw);
+    if (!cls.valid || !cls.type) {
+      showToast(cls.type === 'cnpj' ? 'CNPJ inválido' : 'CPF inválido');
+      document.getElementById('newClientDoc').focus();
+      return;
+    }
+    document_ = cls.formatted;
+    documentType = cls.type;
+  }
+
+  if (editingClientId) {
+    // Modo edicao — atualiza in-place
+    const c = clients.find(x => x.id === editingClientId);
+    if (!c) { closeClientModal(); return; }
+    c.name = name;
+    c.address = address;
+    c.phone = phone;
+    c.document = document_;
+    c.documentType = documentType;
+    persistAll();
+    renderRecents();
+    // Re-renderiza pill se cliente editado e o atualmente selecionado
+    if (selectedClient && typeof selectedClient === 'object' && selectedClient.id === editingClientId) {
+      selectedClient = c;
+      renderSelectedClient();
+    }
+    closeClientModal();
+    showToast(name + ' atualizado');
+    logAction({
+      action: 'settings.update', entityType: 'client', entityId: c.id,
+      summary: 'Cliente editado · ' + name
+    });
+    return;
+  }
+
+  // Modo cadastro
+  const c = {
+    id: 'c-' + Date.now(),
+    name, address, phone,
+    document: document_, documentType,
+    apt: null,
+    lastOrder: Date.now(),
+    orderCount: 0
+  };
   clients.push(c);
   persistAll();
   renderRecents();
@@ -8853,14 +9061,6 @@ function saveNewClient() {
   selectClient(c);
   showToast(name + ' cadastrado');
 }
-
-document.querySelectorAll('#locTabs .loc-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('#locTabs .loc-tab').forEach(t => t.classList.toggle('active', t === tab));
-    document.getElementById('locApt').style.display = tab.dataset.loc === 'apt' ? 'block' : 'none';
-    document.getElementById('locExt').style.display = tab.dataset.loc === 'ext' ? 'block' : 'none';
-  });
-});
 
 // =========================
 // ITENS DO PEDIDO
