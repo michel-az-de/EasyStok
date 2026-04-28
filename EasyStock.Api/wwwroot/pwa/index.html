@@ -4784,15 +4784,121 @@ function saveAjustes() {
 }
 
 // ================================================================
-// PERMISSAO BLUETOOTH RUNTIME — Android 12+ exige BLUETOOTH_CONNECT
-// runtime pra qualquer chamada BT (list/connect/isEnabled). O plugin
-// cordova-plugin-bluetooth-serial 0.4.7 nao requisita; sem permissao,
-// chamadas nativas lancam SecurityException nao tratada -> APP CRASHA.
-// Usamos cordova-plugin-android-permissions pra pedir do JS antes de
-// qualquer chamada bs.*, e tambem no boot pra prompt na 1a abertura.
+// THERMAL PRINTER NATIVE SHIM
+// Substitui cordova-plugin-bluetooth-serial 0.4.7 (abandonware, crashes
+// JNI em Android 12+) por plugin Capacitor proprio escrito em Java
+// (com.casadababa.app.printer.ThermalPrinterPlugin). Mantem API
+// window.bluetoothSerial.* identica pra preservar todo codigo existente.
+// O plugin nativo:
+//  - Pede BLUETOOTH_CONNECT/SCAN runtime corretamente (Android 12+).
+//  - Filtra dispositivos sem SPP (fones BLE-only somem da lista).
+//  - Roda I/O em thread separada (nada bloqueia main thread).
+//  - Converte excecoes Java em Promise rejection -> JS recebe erro,
+//    nao crash nativo.
+// ================================================================
+(function installThermalPrinterShim() {
+  function install() {
+    try {
+      const Cap = window.Capacitor;
+      if (!Cap || !Cap.Plugins) return false;
+      const TP = Cap.Plugins.ThermalPrinter;
+      if (!TP) return false;
+      if (window.bluetoothSerial && window.bluetoothSerial.__cdbNative) return true;
+
+      function bytesToBase64(data) {
+        if (typeof data === 'string') data = new TextEncoder().encode(data);
+        const u = data instanceof Uint8Array ? data : Uint8Array.from(data);
+        let bin = '';
+        const CHUNK = 0x8000;
+        for (let i = 0; i < u.length; i += CHUNK) {
+          bin += String.fromCharCode.apply(null, u.subarray(i, i + CHUNK));
+        }
+        return btoa(bin);
+      }
+      function errStr(e) {
+        if (!e) return '(sem detalhe)';
+        if (typeof e === 'string') return e;
+        return e.message || e.errorMessage || JSON.stringify(e);
+      }
+
+      window.bluetoothSerial = {
+        __cdbNative: true,
+        list: function (success, fail) {
+          TP.requestPermissions()
+            .then(function () { return TP.listPaired(); })
+            .then(function (res) { success && success(res && res.devices ? res.devices : []); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        },
+        isEnabled: function (success, fail) {
+          TP.isEnabled()
+            .then(function (res) { if (res && res.enabled) success && success(); else fail && fail('disabled'); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        },
+        isConnected: function (success, fail) {
+          TP.isConnected()
+            .then(function (res) { if (res && res.connected) success && success(); else fail && fail('not connected'); })
+            .catch(function () { fail && fail('not connected'); });
+        },
+        connect: function (address, success, fail) {
+          TP.requestPermissions()
+            .then(function () { return TP.connect({ address: address }); })
+            .then(function () { success && success(); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        },
+        connectInsecure: function (address, success, fail) {
+          // Mesmo connect — o impl ja faz fallback insecure se o seguro falhar.
+          this.connect(address, success, fail);
+        },
+        disconnect: function (success, fail) {
+          TP.disconnect()
+            .then(function () { success && success(); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        },
+        write: function (data, success, fail) {
+          try {
+            const b64 = bytesToBase64(data);
+            TP.write({ base64: b64 })
+              .then(function () { success && success(); })
+              .catch(function (err) { fail && fail(errStr(err)); });
+          } catch (ex) {
+            fail && fail((ex && ex.message) || String(ex));
+          }
+        }
+      };
+      return true;
+    } catch (e) {
+      try { console.error('ThermalPrinter shim install failed:', e); } catch (_) {}
+      return false;
+    }
+  }
+  // Instala em varios momentos — Capacitor.Plugins fica disponivel cedo,
+  // mas em alguns paths (LiveUpdater/cold start) chega depois.
+  if (!install()) {
+    document.addEventListener('deviceready', install, false);
+    document.addEventListener('DOMContentLoaded', install, false);
+    setTimeout(install, 500);
+    setTimeout(install, 2000);
+  }
+})();
+
+// ================================================================
+// PERMISSAO BLUETOOTH RUNTIME — Android 12+ exige BLUETOOTH_CONNECT.
+// Com o plugin nativo ThermalPrinter, a propria chamada *.connect/.list
+// ja pede a permissao. Mantemos esse helper como facade pra nao quebrar
+// chamadas existentes; quando rodando com o plugin nativo, delega pra
+// TP.requestPermissions(). Caso contrario (browser dev), faz fallback
+// pro cordova-plugin-android-permissions.
 // ================================================================
 function ensureBluetoothPermission(cb) {
-  // Sem Cordova (browser) ou plugin ausente: assume ok e deixa fluxo seguir
+  // Plugin nativo presente: delega
+  try {
+    const TP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+    if (TP && TP.requestPermissions) {
+      TP.requestPermissions().then(function () { cb(true); }).catch(function () { cb(false); });
+      return;
+    }
+  } catch (e) {}
+  // Fallback legado (sem Cordova/plugin: assume ok)
   const perms = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
   if (!perms || !perms.BLUETOOTH_CONNECT) { cb(true); return; }
   // Pede BLUETOOTH_CONNECT (mandatorio Android 12+) e SCAN (alguns OEMs
@@ -4955,7 +5061,9 @@ function printerDiagnostics() {
   lines.push('Bundle: ' + ver);
   lines.push('Plataforma: ' + (window.Capacitor ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor') : 'web'));
   const bs = window.bluetoothSerial;
-  lines.push('Plugin BT: ' + (bs ? 'CARREGADO' : 'NÃO CARREGADO'));
+  const TP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+  lines.push('Plugin nativo (ThermalPrinter): ' + (TP ? 'CARREGADO' : 'NÃO CARREGADO'));
+  lines.push('Shim window.bluetoothSerial: ' + (bs ? (bs.__cdbNative ? 'NATIVO ✓' : 'LEGADO') : 'AUSENTE'));
   if (bs) {
     lines.push('  bs.list: ' + (typeof bs.list));
     lines.push('  bs.isEnabled: ' + (typeof bs.isEnabled));
@@ -4963,22 +5071,54 @@ function printerDiagnostics() {
   }
   const p = getSavedPrinter();
   lines.push('Salva: ' + (p ? (p.name + ' / ' + p.address) : '(nenhuma)'));
+  // Trail dos ultimos passos Bluetooth — sobrevive a crash, mostra onde morreu
+  try {
+    const trail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]');
+    if (trail.length) {
+      lines.push('');
+      lines.push('--- Trail BT (ultimos ' + trail.length + ') ---');
+      const baseT = trail[0].t;
+      trail.forEach(e => {
+        const dt = ((e.t - baseT) / 1000).toFixed(1);
+        lines.push('+' + dt + 's ' + e.s);
+      });
+    }
+  } catch (e) {}
   alert(lines.join('\n'));
 }
 
+// Step logger persistente — sobrevive a native crash (JNI), permite ver
+// onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
+function btStep(label) {
+  try {
+    const trail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]');
+    trail.push({ t: Date.now(), s: label });
+    if (trail.length > 30) trail.splice(0, trail.length - 30);
+    localStorage.setItem('cdb-bt-trail', JSON.stringify(trail));
+  } catch (e) {}
+}
+
 function selectPrinter(printer) {
-  setSavedPrinter(printer);
-  showToast('Impressora: ' + printer.name);
-  logAction({
-    action: 'settings.update',
-    entityType: 'settings',
-    summary: 'Impressora selecionada · ' + printer.name
-  });
-  // Dispara impressao se o picker foi aberto pelo fluxo de Imprimir
-  const cb = printerPickerOnSelect;
-  closePrinterPicker();
-  if (typeof cb === 'function') {
-    setTimeout(() => cb(), 300);
+  btStep('select:start ' + (printer && printer.address));
+  try {
+    setSavedPrinter(printer);
+    btStep('select:saved');
+    showToast('Impressora salva: ' + printer.name + ' — toque Imprimir novamente');
+    logAction({
+      action: 'settings.update',
+      entityType: 'settings',
+      summary: 'Impressora selecionada · ' + printer.name
+    });
+    btStep('select:logged');
+    // Sempre limpa o callback — exige toque manual em Imprimir depois.
+    // Auto-print apos select estava crashando o app (BLE devices na lista
+    // de pareados quebram bs.connect SPP).
+    printerPickerOnSelect = null;
+    closePrinterPicker();
+    btStep('select:closed');
+  } catch (e) {
+    btStep('select:ERR ' + (e && e.message || e));
+    showToast('Erro ao salvar: ' + (e.message || e));
   }
 }
 function testPrint() {
@@ -5253,17 +5393,19 @@ function releasePrinting() {
   if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
 }
 function printViaBluetooth(bytes, onFallback) {
+  btStep('print:start');
   const bs = window.bluetoothSerial;
   const printer = getSavedPrinter();
   if (!bs || !printer || !printer.address) {
+    btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
     if (typeof onFallback === 'function') onFallback();
     return;
   }
   if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
 
-  // Gate de permissao BLUETOOTH_CONNECT — sem isso, bs.connect/write
-  // lancam SecurityException nativo no Android 12+ e crasham o app.
+  btStep('print:perm-check');
   ensureBluetoothPermission((granted) => {
+    btStep('print:perm-result granted=' + granted);
     if (!granted) {
       showToast('Permissão Bluetooth negada — Configurações > Apps > Casa da Baba');
       if (typeof onFallback === 'function') onFallback();
@@ -5275,32 +5417,45 @@ function printViaBluetooth(bytes, onFallback) {
       releasePrinting();
     }, 15000);
     const send = () => {
+      btStep('print:send-write');
       try {
         bs.write(bytes,
-          () => { showToast('Enviado pra impressora'); releasePrinting(); },
-          (err) => { showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
+          () => { btStep('print:write-ok'); showToast('Enviado pra impressora'); releasePrinting(); },
+          (err) => { btStep('print:write-err ' + (err && err.message || err)); showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
         );
       } catch (ex) {
+        btStep('print:write-throw ' + (ex.message || ex));
         showToast('Erro nativo: ' + (ex.message || ex));
         releasePrinting();
         if (typeof onFallback === 'function') onFallback();
       }
     };
+    btStep('print:isConnected-call addr=' + printer.address);
     try {
-      bs.isConnected(send, () => {
-        try {
-          bs.connect(printer.address, send, (err) => {
-            showToast('Não conectou: ' + (err && err.message || err));
+      bs.isConnected(
+        () => { btStep('print:already-connected'); send(); },
+        () => {
+          btStep('print:connect-call');
+          try {
+            bs.connect(printer.address,
+              () => { btStep('print:connected'); send(); },
+              (err) => {
+                btStep('print:connect-err ' + (err && err.message || err));
+                showToast('Não conectou: ' + (err && err.message || err));
+                releasePrinting();
+                if (typeof onFallback === 'function') onFallback();
+              }
+            );
+          } catch (ex) {
+            btStep('print:connect-throw ' + (ex.message || ex));
+            showToast('Erro conectar: ' + (ex.message || ex));
             releasePrinting();
             if (typeof onFallback === 'function') onFallback();
-          });
-        } catch (ex) {
-          showToast('Erro conectar: ' + (ex.message || ex));
-          releasePrinting();
-          if (typeof onFallback === 'function') onFallback();
+          }
         }
-      });
+      );
     } catch (ex) {
+      btStep('print:isConnected-throw ' + (ex.message || ex));
       showToast('Erro Bluetooth: ' + (ex.message || ex));
       releasePrinting();
       if (typeof onFallback === 'function') onFallback();
