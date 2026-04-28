@@ -1610,6 +1610,41 @@ body {
   background: rgba(231, 104, 69, 0.08);
 }
 
+/* FAB (Floating Action Button) — acao primaria por tela */
+.fab {
+  position: fixed;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  right: 18px;
+  z-index: 50;
+  display: none; /* show conditional via JS .show */
+  align-items: center; gap: 10px;
+  background: var(--gold); color: #1c1408;
+  border: 0; border-radius: 100px;
+  padding: 14px 22px;
+  font-family: inherit; font-weight: 800;
+  font-size: 14px; letter-spacing: 0.04em;
+  box-shadow: 0 14px 36px rgba(240, 184, 74, 0.32),
+              0 4px 14px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.15s;
+  animation: fab-in 0.25s ease-out;
+}
+.fab.show { display: inline-flex; }
+.fab:active { transform: scale(0.96); }
+.fab .fab-icon { font-size: 20px; line-height: 1; font-weight: 400; }
+.fab .fab-label { white-space: nowrap; }
+@keyframes fab-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+[data-theme="light"] .fab {
+  color: #fff;
+  box-shadow: 0 14px 36px rgba(183, 129, 34, 0.30),
+              0 4px 14px rgba(0, 0, 0, 0.10);
+}
+/* Some quando modal aberto pra nao competir com sheet */
+body.modal-open .fab { opacity: 0; pointer-events: none; }
+
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 
@@ -4263,6 +4298,14 @@ select:focus-visible {
     </button>
   </div>
 
+  <!-- FAB (Floating Action Button) — acao principal por tela. Visibilidade
+       e label gerenciados por updateFab(screen) chamado em go(). Some
+       quando algum modal esta aberto (body.modal-open via toggleModal). -->
+  <button class="fab" id="fab" onclick="onFabClick()" aria-label="Ação rápida">
+    <span class="fab-icon" id="fabIcon">+</span>
+    <span class="fab-label" id="fabLabel">Novo</span>
+  </button>
+
 </div>
 
 <script>
@@ -4784,6 +4827,35 @@ function applyBackupPayload(payload) {
 // =========================
 // NAVEGAÇÃO
 // =========================
+// FAB — acao principal por tela. Mapeia screen -> { icon, label, fn }.
+// Telas sem entrada (producao, finalizados, historico) escondem o FAB.
+const FAB_CONFIG = {
+  home:        { icon: '+',  label: 'Pedido',     fn: function () { go('pedidos'); setTimeout(function () { try { goPedidosTab('novo'); } catch (e) {} }, 50); } },
+  caixa:       { icon: '+',  label: 'Lançamento', fn: function () { try { openCashModal(); } catch (e) {} } },
+  compras:     { icon: '+',  label: 'Item',       fn: function () { try { document.getElementById('shopInput').focus(); } catch (e) {} } },
+  conferencia: { icon: '📷', label: 'Escanear',   fn: function () { try { openScanner('tela'); } catch (e) {} } }
+  // pedidos: tratado dinamicamente abaixo (so mostra FAB na aba Andamento)
+};
+let _currentFabAction = null;
+function updateFab(screen) {
+  const fab = document.getElementById('fab');
+  if (!fab) return;
+  let cfg = FAB_CONFIG[screen] || null;
+  // Caso especial: na tela Pedidos, FAB so aparece na aba Andamento
+  // (na aba Novo o operador ja esta no formulario).
+  if (screen === 'pedidos') {
+    const novoActive = document.querySelector('[data-screen="pedidos"] .pedidos-tab-section[data-tab="novo"]');
+    const isNovoVisible = novoActive && novoActive.style.display !== 'none';
+    cfg = isNovoVisible ? null : { icon: '+', label: 'Pedido', fn: function () { try { goPedidosTab('novo'); } catch (e) {} } };
+  }
+  if (!cfg) { fab.classList.remove('show'); _currentFabAction = null; return; }
+  document.getElementById('fabIcon').textContent = cfg.icon;
+  document.getElementById('fabLabel').textContent = cfg.label;
+  _currentFabAction = cfg.fn;
+  fab.classList.add('show');
+}
+function onFabClick() { if (typeof _currentFabAction === 'function') _currentFabAction(); }
+
 function go(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.nav === screen));
@@ -4800,6 +4872,7 @@ function go(screen) {
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
   if (screen === 'caixa')        renderCashDetails();
+  if (typeof updateFab === 'function') updateFab(screen);
 }
 
 // Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
@@ -4808,6 +4881,8 @@ function goPedidosTab(tab) {
     b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
     s.style.display = s.dataset.tab === tab ? '' : 'none');
+  // Atualiza FAB pra refletir aba ativa (esconde em "novo")
+  if (typeof updateFab === 'function') updateFab('pedidos');
 }
 // Atualiza badge "Andamento ●N" sempre que kanban re-renderizar
 function updatePedidosTabBadge() {
@@ -6725,7 +6800,29 @@ function fallbackCopy(text, successMsg) {
 function getOrderById(id) { return orders.find(x => x.id === id); }
 function toggleModal(id, show) {
   document.getElementById(id)?.classList.toggle('show', !!show);
+  // Atualiza body class pra esconder FAB quando algum modal aberto
+  if (typeof refreshBodyModalClass === 'function') refreshBodyModalClass();
 }
+// Verifica se ha algum overlay aberto e atualiza body.modal-open.
+// Usado pelo FAB pra sumir quando modal/scanner ativo.
+function refreshBodyModalClass() {
+  const anyOpen = document.querySelector(
+    '.modal-overlay.show, .np-overlay.show, .confer-overlay.show, .ajustes-overlay.show, .upd-overlay.show, .etq-overlay.show, .historico-overlay.show, .scan-overlay.show'
+  );
+  document.body.classList.toggle('modal-open', !!anyOpen);
+}
+// Observa mutações de classe nos overlays (alguns abrem direto via classList,
+// não passando por toggleModal). MutationObserver eh mais simples que
+// reescrever 30 callsites.
+(function watchOverlayClasses() {
+  if (typeof MutationObserver !== 'function') return;
+  const obs = new MutationObserver(function () { refreshBodyModalClass(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll(
+      '.modal-overlay, .np-overlay, .confer-overlay, .ajustes-overlay, .upd-overlay, .etq-overlay, .historico-overlay, .scan-overlay'
+    ).forEach(function (el) { obs.observe(el, { attributes: true, attributeFilter: ['class'] }); });
+  });
+})();
 
 // ================================================================
 // AJUSTES — operador, PIX, impressora térmica
