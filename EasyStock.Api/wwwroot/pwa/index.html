@@ -1936,6 +1936,69 @@ body {
 .confer-row .cr-action:active { opacity: 0.8; }
 .confer-empty { text-align: center; color: var(--ink-mute); font-size: 13px; padding: 20px; font-style: italic; }
 
+/* Tabs Pedidos/Produção na tela Conferir */
+.confer-tabs {
+  display: flex; gap: 6px; margin: 16px 0 8px;
+  background: var(--bg-elev); border-radius: 12px; padding: 4px;
+}
+.confer-tab {
+  flex: 1; background: transparent; color: var(--ink-mute);
+  border: 0; border-radius: 10px; padding: 10px;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.confer-tab.active { background: var(--gold); color: #1c1408; }
+.confer-tab:active { transform: scale(0.98); }
+[data-theme="light"] .confer-tab.active { background: var(--gold); color: #fff; }
+
+/* Cards de lote na aba Produção */
+.batch-card {
+  background: var(--bg-elev); border-radius: 12px;
+  margin-bottom: 10px; overflow: hidden;
+  border-left: 3px solid var(--gold);
+}
+.batch-card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; cursor: pointer;
+  user-select: none;
+}
+.batch-card-head:active { background: var(--bg-elev-2); }
+.batch-card-head .bc-info { flex: 1; min-width: 0; }
+.batch-card-head .bc-lote { font-size: 12px; color: var(--ink-mute); font-family: monospace; letter-spacing: 0.04em; }
+.batch-card-head .bc-summary { font-size: 14px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+.batch-card-head .bc-progress { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+.batch-card-head .bc-toggle { color: var(--ink-mute); font-size: 18px; flex-shrink: 0; transition: transform 0.2s; }
+.batch-card.open .bc-toggle { transform: rotate(90deg); }
+.batch-units {
+  display: none; padding: 4px 14px 12px;
+  border-top: 1px solid var(--line);
+  max-height: 320px; overflow-y: auto;
+}
+.batch-card.open .batch-units { display: block; }
+.batch-unit-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; font-size: 13px;
+  border-bottom: 1px dashed var(--border);
+}
+.batch-unit-row:last-child { border-bottom: 0; }
+.batch-unit-row .u-idx {
+  font-family: monospace; color: var(--gold); font-weight: 800;
+  min-width: 38px; font-size: 14px;
+}
+.batch-unit-row .u-status {
+  font-size: 11px; padding: 2px 8px; border-radius: 100px;
+  font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.batch-unit-row .u-status.pendente   { background: var(--gold-soft); color: var(--gold); }
+.batch-unit-row .u-status.conferido  { background: var(--basil-soft); color: var(--basil); }
+.batch-unit-row .u-status.divergencia { background: var(--accent-soft); color: var(--accent); }
+.batch-unit-row .u-action {
+  margin-left: auto; background: var(--gold); color: #1c1408;
+  border: 0; border-radius: 6px; padding: 5px 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+[data-theme="light"] .u-action { background: var(--gold); color: #fff; }
+
 /* Botões de atalho na home */
 .home-actions {
   display: flex; gap: 8px; margin: 14px 0;
@@ -2926,28 +2989,39 @@ body {
     </div>
 
     <!-- COMPRAR -->
-    <!-- CONFERENCIA — scanner de cmera + busca por cdigo curto + lista. -->
+    <!-- CONFERENCIA — scanner híbrido (pedido + produção) -->
     <div class="screen" data-screen="conferencia">
       <button class="confer-scan-cta" onclick="openScanner('tela')">
         <span class="ico">📷</span>
-        <span class="lbl">Escanear QR ou código</span>
+        <span class="lbl">Escanear QR ou código de barras</span>
       </button>
 
-      <div class="confer-divider"><span>ou digite</span></div>
+      <div class="confer-divider"><span>ou digite o código</span></div>
 
       <div class="confer-search">
-        <input id="conferScreenInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
-               placeholder="Código (8 caracteres)"
+        <input id="conferScreenInput" type="text" inputmode="text" autocomplete="off" maxlength="40"
+               placeholder="Pedido (8 chars) ou Lote (SKU-LOT-XXX)"
                oninput="onConferScreenInput()" onkeydown="if(event.key==='Enter') doConferScreenSearch()">
         <button class="confer-search-btn" onclick="doConferScreenSearch()">Abrir</button>
       </div>
       <div id="conferScreenHint" class="confer-hint"></div>
 
-      <div class="section-label">Pedidos pendentes</div>
-      <div id="conferPendingList"></div>
+      <div class="confer-tabs">
+        <button class="confer-tab active" data-tab="pedidos" onclick="setConferTab('pedidos')">📋 Pedidos</button>
+        <button class="confer-tab" data-tab="producao" onclick="setConferTab('producao')">🍳 Produção</button>
+      </div>
 
-      <div class="section-label">Conferidos hoje</div>
-      <div id="conferDoneList"></div>
+      <div id="conferTabPedidos">
+        <div class="section-label">Pedidos pendentes</div>
+        <div id="conferPendingList"></div>
+        <div class="section-label">Conferidos hoje</div>
+        <div id="conferDoneList"></div>
+      </div>
+
+      <div id="conferTabProducao" style="display:none">
+        <div class="section-label">Lotes recentes (toque pra expandir)</div>
+        <div id="conferBatchesList"></div>
+      </div>
     </div>
 
     <div class="screen" data-screen="compras">
@@ -3306,6 +3380,43 @@ body {
       <textarea id="problemaNotes" placeholder="Detalhe (opcional)" rows="2" style="width:100%;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;resize:vertical;margin-bottom:12px"></textarea>
       <button class="np-btn np-primary" onclick="saveProblema()">Reportar</button>
       <button class="np-btn np-tertiary" onclick="closeProblema()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal de Conferência DE PRODUÇÃO (unidade individual de um lote).
+       Layout enxuto: identificação, dados da etiqueta, foto opcional,
+       3 ações grandes (OK / Reportar / Cancelar). -->
+  <div class="confer-overlay" id="conferProdModal" role="dialog" aria-modal="true">
+    <div class="confer-sheet">
+      <div class="cf-block">
+        <div class="cf-badge" id="conferProdStatusBadge">Aguardando conferência</div>
+        <h3 class="cf-title" id="conferProdTitle">Produto</h3>
+        <div class="cf-meta" id="conferProdMeta">lote · unidade</div>
+      </div>
+      <div class="cf-block cf-block-items">
+        <div class="cf-label">Dados da etiqueta</div>
+        <div class="confer-items" id="conferProdDados"></div>
+        <div id="conferProdWarn" class="cf-notes" style="display:none;background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent);font-weight:700"></div>
+        <div id="conferProdPhoto" style="margin-top:10px;text-align:center;display:none"></div>
+      </div>
+      <div class="cf-actions">
+        <button class="cf-btn cf-ok" onclick="confirmProdConfer()">✓ Conferido</button>
+        <button class="cf-btn cf-prob" onclick="openProdProblema()">⚠️ Reportar problema</button>
+        <button class="cf-btn cf-cancel" onclick="closeConferProd()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Reportar problema NA PRODUÇÃO -->
+  <div class="np-overlay" id="prodProblemaModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:420px">
+      <div class="np-icon">⚠️</div>
+      <h3 class="np-title">Problema na unidade</h3>
+      <p class="np-text">Selecione a categoria e adicione detalhe se quiser.</p>
+      <div id="prodProblemaCategorias" style="text-align:left;margin:8px 0 14px;display:flex;flex-direction:column;gap:6px"></div>
+      <textarea id="prodProblemaNotes" placeholder="Detalhe (opcional)" rows="2" style="width:100%;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;resize:vertical;margin-bottom:12px"></textarea>
+      <button class="np-btn np-primary" onclick="saveProdProblema()">Reportar</button>
+      <button class="np-btn np-tertiary" onclick="closeProdProblema()">Cancelar</button>
     </div>
   </div>
 
@@ -3765,7 +3876,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','conferProdModal','prodProblemaModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -4543,6 +4654,9 @@ const HIST_ACTION_META = {
   'order.confirm_ok':     { icon: '✅', label: 'Conferido',           type: 'order' },
   'order.confirm_adjust': { icon: '✏️', label: 'Conferido com ajuste', type: 'order' },
   'order.confirm_problem':{ icon: '⚠️', label: 'Divergência reportada', type: 'order' },
+  'batch.unit_confirm_ok':     { icon: '✅', label: 'Unidade conferida',  type: 'batch' },
+  'batch.unit_confirm_problem':{ icon: '⚠️', label: 'Unidade c/ problema', type: 'batch' },
+  'batch.unit_confirm_adjust': { icon: '✏️', label: 'Unidade ajustada',  type: 'batch' },
   'cash.manual_entry':    { icon: '💰', label: 'Lançamento de caixa', type: 'cash' },
   'settings.update':      { icon: '⚙️', label: 'Ajustes alterados',  type: 'settings' },
   'backup.export':        { icon: '⬇️', label: 'Backup exportado',    type: 'backup' },
@@ -6079,23 +6193,193 @@ function onConferBuscaInput() {
   const code = document.getElementById('conferBuscaInput').value;
   const hint = document.getElementById('conferBuscaHint');
   if (!code) { hint.textContent = ''; return; }
-  const o = findOrderByShortCode(code);
-  if (o) {
+  const found = findAnyByCode(code);
+  if (found && found.kind === 'production') {
+    const u = found.unit;
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Lote · ${escapeHtml(u.et.productName)} · Un ${u.idxStr}</span>`;
+  } else if (found && found.kind === 'order') {
+    const o = found.order;
     const cliente = o.clientSnapshot?.name || 'Sem cliente';
     const status = getConferStatus(o);
-    hint.innerHTML = `<span style="color:var(--basil)">✓ ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Pedido · ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
   } else if (code.length >= 4) {
-    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido com esse código</span>';
+    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido ou lote com esse código</span>';
   } else {
     hint.textContent = 'Continue digitando…';
   }
 }
 function doConferBusca() {
   const code = document.getElementById('conferBuscaInput').value;
-  const o = findOrderByShortCode(code);
-  if (!o) { showToast('Pedido não encontrado'); return; }
+  const found = findAnyByCode(code);
+  if (!found) { showToast('Não encontrado'); return; }
   closeConferBusca();
-  openConfer(o.id);
+  if (found.kind === 'production') openConferProducao(found.unit.batch.id, found.unit.idxStr);
+  else openConfer(found.order.id);
+}
+
+// ===== CONFERENCIA DE PRODUCAO (etiquetas de lote) =====
+// Cada batch.unitConfirmations[idxStr] guarda o status de uma unidade
+// individual produzida. Estrutura igual a order.confirmation:
+//   { status, type, by, at, notes, problem }
+const PROD_PROBLEMA_OPCOES = [
+  { key: 'avariado',         label: 'Produto avariado' },
+  { key: 'etiqueta-errada',  label: 'Etiqueta errada' },
+  { key: 'peso-incorreto',   label: 'Peso incorreto' },
+  { key: 'validade',         label: 'Problema de validade' },
+  { key: 'outro',            label: 'Outro' }
+];
+
+function getUnitConfirmation(batch, idxStr) {
+  if (!batch || !batch.unitConfirmations) return null;
+  return batch.unitConfirmations[idxStr] || null;
+}
+function getUnitStatus(batch, idxStr) {
+  const c = getUnitConfirmation(batch, idxStr);
+  return c ? c.status : CONFER_STATUS.PENDENTE;
+}
+
+// Busca unidade especifica de qualquer batch pelo codigo de barras impresso.
+// Format: SKU-LOT-NNN-IDX (ex CUSTOM17-LOT-260427-001).
+function findUnitByCode(code) {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return null;
+  const allBatches = batches || [];
+  for (const batch of allBatches) {
+    const ets = etiquetasFromBatch(batch);
+    for (const et of ets) {
+      if (String(et.codigoBarras || '').toUpperCase() === c) {
+        return { batch, et, idxStr: et.idxStr };
+      }
+    }
+  }
+  return null;
+}
+
+let pendingProdBatchId = null;
+let pendingProdIdxStr = null;
+let pendingProdEt = null;
+
+function openConferProducao(batchId, idxStr) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  const ets = etiquetasFromBatch(batch);
+  const et = ets.find(e => e.idxStr === idxStr);
+  if (!et) { showToast('Unidade não encontrada no lote'); return; }
+  pendingProdBatchId = batchId;
+  pendingProdIdxStr = idxStr;
+  pendingProdEt = et;
+
+  // Bloco 1: identificacao
+  const status = getUnitStatus(batch, idxStr);
+  const badge = document.getElementById('conferProdStatusBadge');
+  badge.textContent = conferStatusLabel(status);
+  badge.className = 'cf-badge ' + status;
+  document.getElementById('conferProdTitle').textContent = et.productName + (et.unit ? ' (' + et.unit + ')' : '');
+  document.getElementById('conferProdMeta').textContent =
+    'Lote ' + et.lote + ' · Unidade ' + et.idxStr + ' · ' + (batch.lastOperatorName || '—');
+
+  // Bloco 2: dados da etiqueta
+  const dadosHtml = [];
+  if (et.weightG) dadosHtml.push(`<div class="ci-row"><span class="ci-name">Peso</span><span>${escapeHtml(fmtPesoG(et.weightG))}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Produção</span><span>${escapeHtml(fmtDateBR(et.productionDate))}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Validade</span><span>${et.expiresAt ? escapeHtml(fmtDateBR(et.expiresAt)) : '—'}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Código</span><span style="font-family:monospace;font-size:13px">${escapeHtml(et.codigoBarras)}</span></div>`);
+  document.getElementById('conferProdDados').innerHTML = dadosHtml.join('');
+
+  // Foto se houver
+  const photoWrap = document.getElementById('conferProdPhoto');
+  if (et.photo) {
+    photoWrap.style.display = 'block';
+    photoWrap.innerHTML = '<img src="' + et.photo + '" alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
+  } else {
+    photoWrap.style.display = 'none';
+  }
+
+  // Validade expirada? alerta
+  const warn = document.getElementById('conferProdWarn');
+  if (et.expiresAt && et.expiresAt < Date.now()) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ Validade vencida em ' + fmtDateBR(et.expiresAt);
+  } else {
+    warn.style.display = 'none';
+  }
+
+  toggleModal('conferProdModal', true);
+}
+function closeConferProd() {
+  pendingProdBatchId = null;
+  pendingProdIdxStr = null;
+  pendingProdEt = null;
+  toggleModal('conferProdModal', false);
+}
+
+function applyProductionConfirmation(batchId, idxStr, type, payload) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) return;
+  if (!batch.unitConfirmations) batch.unitConfirmations = {};
+  const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
+  batch.unitConfirmations[idxStr] = {
+    status, type,
+    by: operatorName || null,
+    at: Date.now(),
+    notes: payload && payload.notes || null,
+    problem: payload && payload.problem || null
+  };
+  // Audit log
+  const action = type === 'ok' ? 'batch.unit_confirm_ok'
+                : type === 'problem' ? 'batch.unit_confirm_problem'
+                : 'batch.unit_confirm_adjust';
+  const probLabel = type === 'problem'
+    ? (PROD_PROBLEMA_OPCOES.find(p => p.key === (payload && payload.problem))?.label || 'Problema')
+    : '';
+  logAction({
+    action, entityType: 'batch', entityId: batchId,
+    summary: `Lote ${batch.lote || batch.code} · Un ${idxStr} · ${conferStatusLabel(status)}${probLabel ? ' (' + probLabel + ')' : ''}`
+  });
+  persistAll();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+}
+
+function confirmProdConfer() {
+  const bid = pendingProdBatchId, ix = pendingProdIdxStr;
+  if (!bid || !ix) return;
+  closeConferProd();
+  applyProductionConfirmation(bid, ix, 'ok', null);
+  showToast('✓ Unidade ' + ix + ' conferida');
+}
+function openProdProblema() {
+  const host = document.getElementById('prodProblemaCategorias');
+  host.innerHTML = PROD_PROBLEMA_OPCOES.map((opt, i) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elev);border-radius:10px;cursor:pointer;font-size:14px">
+       <input type="radio" name="prodProb" value="${opt.key}"${i===0?' checked':''} style="accent-color:var(--accent)">
+       <span>${opt.label}</span>
+     </label>`
+  ).join('');
+  document.getElementById('prodProblemaNotes').value = '';
+  toggleModal('prodProblemaModal', true);
+}
+function closeProdProblema() { toggleModal('prodProblemaModal', false); }
+function saveProdProblema() {
+  const bid = pendingProdBatchId, ix = pendingProdIdxStr;
+  if (!bid || !ix) { closeProdProblema(); return; }
+  const sel = document.querySelector('#prodProblemaCategorias input[name="prodProb"]:checked');
+  const problem = sel ? sel.value : 'outro';
+  const notes = (document.getElementById('prodProblemaNotes').value || '').trim() || null;
+  closeProdProblema();
+  closeConferProd();
+  applyProductionConfirmation(bid, ix, 'problem', { problem, notes });
+  showToast('⚠️ Problema reportado na unidade ' + ix);
+}
+
+// Busca unificada — primeiro tenta produção, depois pedido.
+// Usado pelo scanner pra rotear automaticamente.
+function findAnyByCode(code) {
+  const unit = findUnitByCode(code);
+  if (unit) return { kind: 'production', unit };
+  const order = findOrderByShortCode(code);
+  if (order) return { kind: 'order', order };
+  return null;
 }
 
 // ===== SCANNER DE CAMERA (BarcodeDetector API nativa) =====
@@ -6212,86 +6496,148 @@ function closeScanner() {
 function handleScannedCode(rawValue) {
   if (!rawValue) return;
   const statusEl = document.getElementById('scannerStatus');
-  // Tenta encontrar pedido por orderRef (8 chars finais) — extrai do payload
-  // se for URL/uri, ou usa raw direto.
   let code = String(rawValue || '').trim();
   // Se for um URI tipo cdb-confirm:XXX, pega o final
   const m = code.match(/[a-z0-9-]+$/i);
   const candidate = m ? m[0] : code;
-  const o = findOrderByShortCode(candidate) || findOrderByShortCode(code);
-  if (o) {
+  // Busca unificada: tenta unidade de produção primeiro (codigo SKU-LOT-IDX),
+  // depois pedido (orderRef 8 chars).
+  const found = findAnyByCode(candidate) || findAnyByCode(code);
+  if (found && found.kind === 'production') {
+    const u = found.unit;
+    statusEl.className = 'scan-status found';
+    statusEl.textContent = '✓ ' + u.et.productName + ' · Un ' + u.idxStr;
+    try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
+    setTimeout(() => {
+      closeScanner();
+      _clearConferInputs();
+      openConferProducao(u.batch.id, u.idxStr);
+    }, 350);
+    return;
+  }
+  if (found && found.kind === 'order') {
+    const o = found.order;
     statusEl.className = 'scan-status found';
     statusEl.textContent = '✓ ' + (o.clientSnapshot?.name || 'Pedido encontrado');
     try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
     setTimeout(() => {
       closeScanner();
-      // Limpa input do origem que disparou (busca ou tela)
-      if (scannerOrigin === 'busca') {
-        try { document.getElementById('conferBuscaInput').value = ''; } catch (e) {}
-        closeConferBusca();
-      } else {
-        try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
-      }
+      _clearConferInputs();
       openConfer(o.id);
     }, 350);
-  } else {
-    // Não achou — não fecha; continua tentando. Só atualiza status.
-    statusEl.className = 'scan-status error';
-    statusEl.textContent = 'Código "' + candidate + '" não bate com nenhum pedido — tente outro';
-    // Volta a procurar após 1.5s
-    setTimeout(() => {
-      if (scannerActive) {
-        statusEl.className = 'scan-status';
-        statusEl.textContent = 'Procurando código…';
-        if (!scannerRaf) {
-          // Restart loop
-          const video = document.getElementById('scannerVideo');
-          if (video && video.srcObject) {
-            const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
-            const loop = async () => {
-              if (!scannerActive) return;
-              try {
-                const codes = await detector.detect(video);
-                if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue); return; }
-              } catch (e) {}
-              scannerRaf = requestAnimationFrame(loop);
-            };
-            loop();
-          }
-        }
+    return;
+  }
+  // Não achou — não fecha; continua tentando.
+  statusEl.className = 'scan-status error';
+  statusEl.textContent = 'Código "' + candidate + '" não bate com nenhum pedido ou lote';
+  setTimeout(() => {
+    if (!scannerActive) return;
+    statusEl.className = 'scan-status';
+    statusEl.textContent = 'Procurando código…';
+    if (!scannerRaf) {
+      const video = document.getElementById('scannerVideo');
+      if (video && video.srcObject) {
+        const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
+        const loop = async () => {
+          if (!scannerActive) return;
+          try {
+            const codes = await detector.detect(video);
+            if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue); return; }
+          } catch (e) {}
+          scannerRaf = requestAnimationFrame(loop);
+        };
+        loop();
       }
-    }, 1500);
+    }
+  }, 1500);
+}
+function _clearConferInputs() {
+  if (scannerOrigin === 'busca') {
+    try { document.getElementById('conferBuscaInput').value = ''; } catch (e) {}
+    closeConferBusca();
+  } else {
+    try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
   }
 }
 
 // ===== TELA DE CONFERENCIA (data-screen=conferencia) =====
-// Substitui o item "Comprar" no menu inferior. Mostra:
-//   - Input grande pra digitar codigo curto
-//   - Lista de pedidos PENDENTES (nao conferidos)
-//   - Lista de pedidos CONFERIDOS HOJE
+// Tabs: Pedidos / Produção. Cada tab tem listas separadas.
+let conferTab = 'pedidos';
+function setConferTab(tab) {
+  conferTab = tab;
+  document.querySelectorAll('.confer-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('conferTabPedidos').style.display = tab === 'pedidos' ? '' : 'none';
+  document.getElementById('conferTabProducao').style.display = tab === 'producao' ? '' : 'none';
+  renderConferenciaScreen();
+}
+
 function renderConferenciaScreen() {
+  // ABA PEDIDOS
   const pendingHost = document.getElementById('conferPendingList');
   const doneHost = document.getElementById('conferDoneList');
-  if (!pendingHost || !doneHost) return;
-  // Pendentes: pedidos abertos sem confirmation OU com status='pendente'
-  const today0 = new Date(); today0.setHours(0,0,0,0);
-  const todayMs = today0.getTime();
-  const allOrders = orders || [];
-  const pending = allOrders.filter(o =>
-    o.status !== STATUS.CANCELADO &&
-    getConferStatus(o) === CONFER_STATUS.PENDENTE
-  ).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  const done = allOrders.filter(o =>
-    o.confirmation && o.confirmation.at >= todayMs
-  ).sort((a, b) => (b.confirmation.at || 0) - (a.confirmation.at || 0));
+  if (pendingHost && doneHost) {
+    const today0 = new Date(); today0.setHours(0,0,0,0);
+    const todayMs = today0.getTime();
+    const allOrders = orders || [];
+    const pending = allOrders.filter(o =>
+      o.status !== STATUS.CANCELADO &&
+      getConferStatus(o) === CONFER_STATUS.PENDENTE
+    ).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const done = allOrders.filter(o =>
+      o.confirmation && o.confirmation.at >= todayMs
+    ).sort((a, b) => (b.confirmation.at || 0) - (a.confirmation.at || 0));
 
-  pendingHost.innerHTML = pending.length
-    ? pending.map(o => conferRowHtml(o)).join('')
-    : '<div class="confer-empty">Nenhum pedido pendente. ✓</div>';
+    pendingHost.innerHTML = pending.length
+      ? pending.map(o => conferRowHtml(o)).join('')
+      : '<div class="confer-empty">Nenhum pedido pendente. ✓</div>';
+    doneHost.innerHTML = done.length
+      ? done.map(o => conferRowHtml(o)).join('')
+      : '<div class="confer-empty">Nada conferido hoje ainda.</div>';
+  }
+  // ABA PRODUCAO
+  const batchHost = document.getElementById('conferBatchesList');
+  if (batchHost) {
+    const allBatches = (batches || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (!allBatches.length) {
+      batchHost.innerHTML = '<div class="confer-empty">Nenhum lote registrado ainda.</div>';
+    } else {
+      batchHost.innerHTML = allBatches.slice(0, 10).map(b => batchCardHtml(b)).join('');
+    }
+  }
+}
 
-  doneHost.innerHTML = done.length
-    ? done.map(o => conferRowHtml(o)).join('')
-    : '<div class="confer-empty">Nada conferido hoje ainda.</div>';
+function batchCardHtml(batch) {
+  const ets = etiquetasFromBatch(batch);
+  const total = ets.length;
+  const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
+  const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
+  const items = (batch.items || []).map(i => `${i.qty}× ${i.name}`).join(' · ');
+  const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
+    new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
+  const progress = `${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
+    (divergencias ? ` · ${divergencias} divergência${divergencias === 1 ? '' : 's'}` : '');
+  const unitsHtml = ets.map(et => {
+    const st = getUnitStatus(batch, et.idxStr);
+    const statusBadge = `<span class="u-status ${st}">${conferStatusLabel(st)}</span>`;
+    const actionLabel = st === CONFER_STATUS.PENDENTE ? '✓ Conferir' : 'Ver';
+    return `<div class="batch-unit-row">
+      <span class="u-idx">${escapeHtml(et.idxStr)}</span>
+      <span style="flex:1;font-size:13px">${escapeHtml(et.codigoBarras)}</span>
+      ${statusBadge}
+      <button class="u-action" onclick="event.stopPropagation();openConferProducao('${batch.id}','${et.idxStr}')">${actionLabel}</button>
+    </div>`;
+  }).join('');
+  return `<div class="batch-card" id="bc-${batch.id}">
+    <div class="batch-card-head" onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')">
+      <div class="bc-info">
+        <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)}</div>
+        <div class="bc-summary">${escapeHtml(items)}</div>
+        <div class="bc-progress">${escapeHtml(progress)}</div>
+      </div>
+      <span class="bc-toggle">›</span>
+    </div>
+    <div class="batch-units">${unitsHtml}</div>
+  </div>`;
 }
 function conferRowHtml(o) {
   const code = (o.id || '').slice(-8);
@@ -6317,24 +6663,29 @@ function onConferScreenInput() {
   const code = document.getElementById('conferScreenInput').value;
   const hint = document.getElementById('conferScreenHint');
   if (!code) { hint.textContent = ''; return; }
-  const o = findOrderByShortCode(code);
-  if (o) {
+  const found = findAnyByCode(code);
+  if (found && found.kind === 'production') {
+    const u = found.unit;
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Lote · ${escapeHtml(u.et.productName)} · Un ${u.idxStr}</span>`;
+  } else if (found && found.kind === 'order') {
+    const o = found.order;
     const cliente = o.clientSnapshot?.name || 'Sem cliente';
     const status = getConferStatus(o);
-    hint.innerHTML = `<span style="color:var(--basil)">✓ ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Pedido · ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
   } else if (code.length >= 4) {
-    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido com esse código</span>';
+    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido ou lote com esse código</span>';
   } else {
     hint.textContent = 'Continue digitando…';
   }
 }
 function doConferScreenSearch() {
   const code = document.getElementById('conferScreenInput').value;
-  const o = findOrderByShortCode(code);
-  if (!o) { showToast('Pedido não encontrado'); return; }
+  const found = findAnyByCode(code);
+  if (!found) { showToast('Não encontrado'); return; }
   document.getElementById('conferScreenInput').value = '';
   document.getElementById('conferScreenHint').textContent = '';
-  openConfer(o.id);
+  if (found.kind === 'production') openConferProducao(found.unit.batch.id, found.unit.idxStr);
+  else openConfer(found.order.id);
 }
 
 // 'entregue' exige passar por conferência antes; todos os outros vêm direto.
