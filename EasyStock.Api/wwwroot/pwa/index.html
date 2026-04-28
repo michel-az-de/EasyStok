@@ -3,34 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Casa da Baba Mobile</title>
+<title>Easy Stock Mobile</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1a1410">
+<meta name="theme-color" content="#111827">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Casa da Baba">
+<meta name="apple-mobile-web-app-title" content="Easy Stock Mobile">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 :root {
-  --bg: #141210;
-  --bg-elev: #1e1a16;
-  --bg-elev-2: #272118;
-  --ink: #f4ede2;
-  --ink-dim: #a89684;
-  --ink-mute: #6b5a4a;
-  --accent: #d04f32;
-  --accent-soft: rgba(208, 79, 50, 0.16);
-  --basil: #7a9a4f;
-  --basil-soft: rgba(122, 154, 79, 0.16);
-  --gold: #d6a133;
-  --gold-soft: rgba(214, 161, 51, 0.15);
-  --cream: #e8d5b0;
-  --border: rgba(244, 237, 226, 0.10);
-  --border-strong: rgba(244, 237, 226, 0.18);
-  --shadow: 0 16px 48px rgba(0,0,0,0.55);
+  --bg: #111827;
+  --bg-elev: #172033;
+  --bg-elev-2: #202b42;
+  --bg-card: #151f31;
+  --ink: #f7f2e8;
+  --ink-dim: #c8c1b4;
+  --ink-mute: #8793a7;
+  --accent: #e76845;
+  --accent-soft: rgba(231, 104, 69, 0.16);
+  --basil: #4fbf9f;
+  --basil-soft: rgba(79, 191, 159, 0.15);
+  --gold: #f0b84a;
+  --gold-soft: rgba(240, 184, 74, 0.14);
+  --cream: #f1dcc0;
+  --border: rgba(247, 242, 232, 0.10);
+  --border-strong: rgba(247, 242, 232, 0.18);
+  --shadow: 0 20px 56px rgba(4, 8, 18, 0.56);
+  --glow: 0 0 0 1px rgba(247, 242, 232, 0.04), 0 18px 48px rgba(3, 7, 18, 0.32);
   /* Aliases usados nos componentes novos */
   --surface: var(--bg-elev);
   --line:    var(--border-strong);
@@ -46,22 +48,24 @@
 
 /* ========== Tema claro ========== */
 [data-theme="light"] {
-  --bg: #f7f4ef;
+  --bg: #f5f7fb;
   --bg-elev: #ffffff;
-  --bg-elev-2: #ede9e0;
-  --ink: #1f1a14;
-  --ink-dim: #5a4a3a;
-  --ink-mute: #9c8b79;
-  --accent: #c44a2f;
-  --accent-soft: rgba(196, 74, 47, 0.12);
-  --basil: #5f7c3c;
-  --basil-soft: rgba(95, 124, 60, 0.12);
-  --gold: #b88a20;
-  --gold-soft: rgba(184, 138, 32, 0.14);
-  --cream: #c9a76a;
-  --border: rgba(31, 26, 20, 0.10);
-  --border-strong: rgba(31, 26, 20, 0.20);
-  --shadow: 0 8px 32px rgba(0,0,0,0.10);
+  --bg-elev-2: #edf1f7;
+  --bg-card: #ffffff;
+  --ink: #172033;
+  --ink-dim: #526071;
+  --ink-mute: #8693a4;
+  --accent: #cf5738;
+  --accent-soft: rgba(207, 87, 56, 0.11);
+  --basil: #168f7a;
+  --basil-soft: rgba(22, 143, 122, 0.11);
+  --gold: #b78122;
+  --gold-soft: rgba(183, 129, 34, 0.13);
+  --cream: #bd8f5c;
+  --border: rgba(23, 32, 51, 0.09);
+  --border-strong: rgba(23, 32, 51, 0.18);
+  --shadow: 0 12px 34px rgba(21, 31, 49, 0.10);
+  --glow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 12px 34px rgba(21, 31, 49, 0.08);
   --surface: var(--bg-elev);
   --line:    var(--border-strong);
   --page-bg: #ebe6dc;
@@ -94,7 +98,10 @@ body {
   height: 100vh;
   height: 100dvh;           /* viewport dinâmico em mobile — exclui URL bar */
   max-height: 932px;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 220px),
+    radial-gradient(circle at 80% -20%, rgba(79, 191, 159, 0.16), transparent 34%),
+    var(--bg);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -110,23 +117,9 @@ body {
   }
 }
 
-/* Status bar */
-.status-bar {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.status-bar .icons { display: flex; gap: 6px; }
-.status-bar .icons svg { width: 16px; height: 16px; }
-
 /* Header */
 .header {
-  padding: 8px 22px 14px;
+  padding: 20px 22px 14px;
   flex-shrink: 0;
 }
 .header .greeting {
@@ -141,16 +134,38 @@ body {
 }
 .header .title {
   font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 32px;
-  line-height: 1;
-  margin-top: 2px;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-size: 31px;
+  line-height: 0.95;
+  margin-top: 6px;
+  letter-spacing: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
 }
 .header .title .accent {
   color: var(--accent);
   font-style: italic;
   font-weight: 400;
+}
+.header .title .brand-name {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 700;
+}
+.header .title .suffix {
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transform: translateY(-2px);
 }
 
 /* Sync chip */
@@ -234,12 +249,15 @@ body {
 .mini-stats {
   display: flex;
   gap: 0;
-  padding: 14px 0;
-  background: var(--bg-elev);
+  padding: 16px 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 70px),
+    var(--bg-card, var(--bg-elev));
   border: 1px solid var(--border);
-  border-radius: 16px;
-  margin-bottom: 4px;
+  border-radius: 18px;
+  margin-bottom: 6px;
   overflow: hidden;
+  box-shadow: var(--glow);
 }
 .mini-stat {
   flex: 1;
@@ -256,35 +274,38 @@ body {
 }
 .mini-stat .v {
   font-family: 'Fraunces', serif;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .mini-stat .v.accent { color: var(--accent); }
 .mini-stat .v.basil { color: var(--basil); }
 .mini-stat .l {
   font-size: 10px;
   color: var(--ink-mute);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 600;
-  margin-top: 5px;
+  font-weight: 700;
+  margin-top: 7px;
 }
 
 /* Open order cards (home) */
 .open-order {
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 90px),
+    var(--bg-card, var(--bg-elev));
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 14px 16px;
+  border-radius: 18px;
+  padding: 16px;
   margin-bottom: 10px;
   position: relative;
-  transition: box-shadow var(--transition), border-color var(--transition);
+  transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
+  box-shadow: var(--glow);
 }
 .open-order:has(.oo-advance:hover) {
   border-color: var(--border-strong);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.18);
 }
 .oo-head {
   display: flex;
@@ -293,8 +314,8 @@ body {
   gap: 10px;
 }
 .oo-who {
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 800;
+  font-size: 16px;
   letter-spacing: -0.01em;
 }
 .oo-who .ref {
@@ -311,23 +332,26 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .oo-items {
-  margin-top: 8px;
+  margin-top: 9px;
   font-size: 13px;
   color: var(--ink-dim);
   line-height: 1.45;
 }
 .oo-notes {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
-  color: var(--ink-mute);
-  font-style: italic;
-  font-family: 'Fraunces', serif;
+  color: var(--ink-dim);
+  background: rgba(255,255,255,0.03);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 9px 10px;
+  line-height: 1.4;
 }
 .oo-foot {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .status-pill {
   display: inline-flex;
@@ -350,24 +374,25 @@ body {
 .oo-total {
   margin-left: auto;
   font-family: 'Fraunces', serif;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--gold);
 }
 .oo-advance {
   margin-top: 10px;
   width: 100%;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #f08a56);
   color: #fff;
-  border: none;
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
-  padding: 12px;
+  padding: 13px;
   font-family: inherit;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 14px;
   cursor: pointer;
   letter-spacing: 0.02em;
-  transition: opacity var(--transition), transform var(--transition);
+  transition: opacity var(--transition), transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 10px 24px rgba(231, 104, 69, 0.24);
 }
 .oo-advance:active { opacity: 0.85; transform: scale(0.98); }
 .oo-advance.soft {
@@ -396,34 +421,39 @@ body {
 /* Empty state */
 .empty {
   text-align: center;
-  padding: 26px 20px;
+  padding: 28px 20px;
   color: var(--ink-mute);
   font-family: 'Fraunces', serif;
   font-style: italic;
   font-size: 14px;
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
+    var(--bg-elev);
   border: 1px dashed var(--border-strong);
   border-radius: 18px;
 }
 .empty .big {
-  font-size: 32px;
+  font-size: 34px;
   display: block;
   margin-bottom: 8px;
-  opacity: 0.5;
+  opacity: 0.65;
 }
 
 /* Cash card (home) */
 .cash-card {
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 90px),
+    var(--bg-card, var(--bg-elev));
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
   padding: 16px;
+  box-shadow: var(--glow);
 }
 .cash-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 4px 0;
+  padding: 6px 0;
 }
 .cash-row .l {
   font-size: 13px;
@@ -431,16 +461,16 @@ body {
 }
 .cash-row .v {
   font-family: 'Fraunces', serif;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .cash-row.in .v { color: var(--basil); }
 .cash-row.out .v { color: var(--accent); }
 .cash-row.balance {
   border-top: 1px solid var(--border);
-  margin-top: 8px;
-  padding-top: 12px;
+  margin-top: 10px;
+  padding-top: 14px;
 }
 .cash-row.balance .l {
   font-size: 12px;
@@ -450,22 +480,22 @@ body {
   color: var(--ink-mute);
 }
 .cash-row.balance .v {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ink);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--cream);
 }
 .cash-btn {
   width: 100%;
-  margin-top: 14px;
-  background: transparent;
+  margin-top: 16px;
+  background: rgba(255,255,255,0.03);
   border: 1px dashed var(--border-strong);
   color: var(--ink-dim);
   border-radius: 12px;
-  padding: 12px;
+  padding: 13px;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .cash-btn:active { background: var(--bg-elev-2); }
@@ -1085,7 +1115,9 @@ body {
 }
 .modal-overlay.show { display: flex; animation: fadeIn 0.2s ease; }
 .modal-sheet {
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 110px),
+    var(--bg-elev);
   width: 100%;
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
@@ -1094,6 +1126,7 @@ body {
   overflow-y: auto;
   animation: slideUpSheet 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
   border-top: 1px solid var(--border-strong);
+  box-shadow: 0 -18px 44px rgba(0,0,0,0.32);
 }
 .modal-sheet::-webkit-scrollbar { display: none; }
 /* Handle bar visual no topo de cada modal */
@@ -1328,22 +1361,24 @@ body {
   bottom: 100px;
   left: 22px;
   right: 22px;
-  background: var(--bg-elev-2);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent),
+    var(--bg-elev-2);
   border: 1px solid var(--border-strong);
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 16px;
   display: none;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.35);
   animation: slideUp 0.25s ease;
   /* Acima de TODOS os modais (modal upd e=12000). Toasts sempre devem
      ficar visiveis mesmo com Ajustes/Etiquetas/etc. abertos. */
   z-index: 13000;
 }
 .toast.show { display: flex; }
-.toast .msg { font-size: 13px; flex: 1; }
+.toast .msg { font-size: 13px; flex: 1; line-height: 1.4; }
 .toast .undo {
   background: transparent;
   border: none;
@@ -1367,15 +1402,17 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  min-height: 64px;
-  background: var(--bg-elev);                    /* sólido em vez de blur */
+  min-height: 70px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent),
+    var(--bg-elev);
   border-top: 1px solid var(--border-strong);
   display: flex;
   justify-content: space-around;
   align-items: flex-start;
-  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 10px));
+  padding: 9px 8px calc(9px + env(safe-area-inset-bottom, 10px));
   z-index: 30;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.15);      /* leve elevação */
+  box-shadow: 0 -12px 34px rgba(0,0,0,0.22);
 }
 .nav-btn {
   background: transparent;
@@ -1390,7 +1427,9 @@ body {
   gap: 2px;
   cursor: pointer;
   font-family: inherit;
-  padding: 4px 0;
+  padding: 6px 0 5px;
+  border-radius: 12px;
+  transition: color var(--transition), background var(--transition);
 }
 .nav-icon {
   width: 24px;
@@ -1420,7 +1459,10 @@ body {
   white-space: nowrap;
 }
 .nav-btn { color: var(--ink-mute); }
-.nav-btn.active { color: var(--accent); }
+.nav-btn.active {
+  color: var(--accent);
+  background: rgba(231, 104, 69, 0.08);
+}
 
 /* Hidden file input */
 .hidden-file { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
@@ -1501,12 +1543,13 @@ body {
 
 /* Botão "Cobrar" inline nos cards (kanban + home) */
 .btn-cobrar {
-  padding: 8px 10px;
-  background: rgba(37, 211, 102, 0.12);
+  min-height: 38px;
+  padding: 8px 12px;
+  background: rgba(37, 211, 102, 0.10);
   color: #25D366;
   border: 1px solid rgba(37, 211, 102, 0.3);
-  border-radius: 8px;
-  font-size: 11px; font-weight: 700; cursor: pointer;
+  border-radius: 10px;
+  font-size: 11px; font-weight: 800; cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -1514,12 +1557,13 @@ body {
 
 /* Botão "Imprimir" inline */
 .btn-imprimir {
-  padding: 8px 10px;
-  background: rgba(96, 165, 250, 0.12);
+  min-height: 38px;
+  padding: 8px 12px;
+  background: rgba(96, 165, 250, 0.10);
   color: #60a5fa;
   border: 1px solid rgba(96, 165, 250, 0.3);
-  border-radius: 8px;
-  font-size: 11px; font-weight: 700; cursor: pointer;
+  border-radius: 10px;
+  font-size: 11px; font-weight: 800; cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -1527,12 +1571,13 @@ body {
 
 /* Botão "Histórico" inline (fica discreto) */
 .btn-historico {
-  padding: 8px 10px;
-  background: transparent;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
   color: var(--ink-dim);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 11px; font-weight: 600; cursor: pointer;
+  border-radius: 10px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -1546,65 +1591,124 @@ body {
 }
 .ajustes-overlay.show { display: flex; }
 .ajustes-sheet {
-  background: var(--bg-elev); color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 120px),
+    var(--bg-elev); color: var(--ink);
   width: 100%; max-width: 430px;
-  border-radius: 20px 20px 0 0;
-  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px 24px 0 0;
+  padding: 18px 18px calc(22px + env(safe-area-inset-bottom, 0px));
   max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 -8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 -18px 44px rgba(0,0,0,0.32);
   animation: slideUp 0.3s ease;
 }
-.ajustes-section { margin-bottom: 20px; }
-.ajustes-section h4 {
-  font-family: 'Fraunces', serif; font-size: 16px;
-  margin: 0 0 4px; color: var(--gold);
+.ajustes-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px; margin-bottom: 14px;
 }
-.ajustes-section .hint { font-size: 11px; color: var(--ink-mute); margin: 0 0 8px; }
-.ajustes-section .field { margin-bottom: 10px; }
-.ajustes-section label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.ajustes-head h3 {
+  font-family: 'Fraunces', serif; font-size: 22px; margin: 0 0 2px;
+}
+.ajustes-head .sub {
+  font-size: 12px; color: var(--ink-mute); line-height: 1.45;
+}
+.ajustes-hero {
+  padding: 14px 16px; border-radius: 16px; margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(231,104,69,0.14), rgba(79,191,159,0.08));
+  border: 1px solid var(--border);
+}
+.ajustes-hero .eyebrow {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-mute); margin-bottom: 6px;
+}
+.ajustes-hero .headline {
+  font-family: 'Fraunces', serif; font-size: 22px; line-height: 1.05;
+  margin: 0 0 4px;
+}
+.ajustes-hero .copy {
+  font-size: 12px; color: var(--ink-dim); line-height: 1.45;
+}
+.ajustes-section {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  box-shadow: var(--glow);
+}
+.ajustes-section h4 {
+  font-family: 'Fraunces', serif; font-size: 17px;
+  margin: 0 0 4px; color: var(--ink);
+}
+.ajustes-section .hint { font-size: 11px; color: var(--ink-mute); margin: 0 0 10px; line-height: 1.45; }
+.ajustes-section .field { margin-bottom: 12px; }
+.ajustes-section .field:last-child { margin-bottom: 0; }
+.ajustes-section label { display: block; font-size: 10px; color: var(--ink-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 800; }
 .ajustes-section input,
 .ajustes-section select {
-  width: 100%; padding: 10px 12px;
+  width: 100%; padding: 12px 13px;
   background: var(--bg-elev-2); border: 1px solid var(--line);
-  border-radius: 8px; color: var(--ink); font-size: 14px;
+  border-radius: 12px; color: var(--ink); font-size: 14px;
   font-family: inherit;
 }
 .ajustes-section input:focus,
-.ajustes-section select:focus { outline: none; border-color: var(--accent); }
+.ajustes-section select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(231,104,69,0.12); }
 .ajustes-section .printer-status {
-  padding: 10px 12px; border-radius: 8px;
+  padding: 12px 13px; border-radius: 12px;
   background: var(--bg-elev-2); font-size: 12px;
   display: flex; justify-content: space-between; align-items: center;
 }
 .ajustes-section .printer-status.ok { color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
 .ajustes-section .printer-status.none { color: var(--ink-mute); border: 1px dashed var(--line); }
+.ajustes-actions-row {
+  display: flex; gap: 8px; margin-top: 10px;
+}
+.ajustes-actions-stack {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
+}
 .ajustes-section button {
-  padding: 10px 14px;
-  border: 0; border-radius: 8px;
-  font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 11px 14px;
+  border: 1px solid transparent; border-radius: 12px;
+  font-family: inherit; font-size: 13px; font-weight: 700;
   cursor: pointer;
 }
+.ajustes-section button:active { transform: scale(0.98); }
 .btn-ajustes-save {
-  background: var(--accent); color: white;
-  width: 100%; padding: 14px !important;
+  background: linear-gradient(135deg, var(--accent), #f08a56); color: white;
+  width: 100%; padding: 15px !important; margin-top: 4px;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 12px 26px rgba(231,104,69,0.24);
 }
-.btn-ajustes-printer { background: var(--gold-soft); color: var(--gold); }
+.btn-ajustes-printer {
+  background: rgba(255,255,255,0.03); color: var(--ink);
+  border-color: var(--border);
+}
+.btn-ajustes-printer.primary-soft {
+  background: rgba(240,184,74,0.14); color: var(--gold);
+  border-color: rgba(240,184,74,0.22);
+}
+.btn-ajustes-printer.success-soft {
+  background: rgba(79,191,159,0.12); color: var(--basil);
+  border-color: rgba(79,191,159,0.22);
+}
+.btn-ajustes-printer.subtle {
+  background: transparent; color: var(--ink-mute);
+}
 
 /* Lista de produtos no Catalogo (Ajustes -> Catalogo de produtos) */
-.catalog-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.catalog-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .catalog-list .cat-row {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; background: var(--bg-elev-1, rgba(255,255,255,0.04));
-  border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 12px; background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line); border-radius: 14px;
 }
 .catalog-list .cat-emoji { font-size: 22px; }
 .catalog-list .cat-info  { flex: 1; min-width: 0; }
-.catalog-list .cat-name  { font-weight: 700; font-size: 14px; color: var(--ink); }
-.catalog-list .cat-meta  { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
-.catalog-list .cat-actions { display: flex; gap: 4px; }
+.catalog-list .cat-name  { font-weight: 800; font-size: 14px; color: var(--ink); }
+.catalog-list .cat-meta  { font-size: 11px; color: var(--ink-mute); margin-top: 3px; line-height: 1.4; }
+.catalog-list .cat-actions { display: flex; gap: 6px; }
 .catalog-list .cat-btn {
-  background: transparent; border: 1px solid var(--line); border-radius: 8px;
-  width: 32px; height: 32px; padding: 0; font-size: 14px; cursor: pointer;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 10px;
+  width: 34px; height: 34px; padding: 0; font-size: 14px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .catalog-list .cat-btn:active { opacity: 0.7; }
@@ -1680,20 +1784,28 @@ body {
 }
 .historico-overlay.show { display: flex; }
 .historico-sheet {
-  background: var(--bg-elev); width: 100%; max-width: 430px;
-  border-radius: 20px 20px 0 0;
-  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
-  max-height: 75vh; overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 120px),
+    var(--bg-elev);
+  width: 100%; max-width: 430px;
+  border-radius: 24px 24px 0 0;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  max-height: 78vh; overflow-y: auto;
+  box-shadow: 0 -18px 44px rgba(0,0,0,0.32);
 }
 .historico-event {
-  display: flex; gap: 10px; padding: 10px 0;
+  display: flex; gap: 12px; padding: 12px 0;
   border-bottom: 1px dashed var(--line);
 }
 .historico-event:last-child { border-bottom: 0; }
-.he-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+.he-icon {
+  font-size: 18px; flex-shrink: 0; width: 30px; height: 30px; text-align: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+}
 .he-body { flex: 1; }
-.he-action { font-size: 13px; font-weight: 600; color: var(--ink); }
-.he-meta { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
+.he-action { font-size: 13px; font-weight: 700; color: var(--ink); }
+.he-meta { font-size: 11px; color: var(--ink-mute); margin-top: 3px; line-height: 1.4; }
 .he-meta .op { color: var(--gold); }
 .he-change { font-size: 12px; color: var(--ink-dim); margin-top: 4px; font-style: italic; }
 
@@ -1737,19 +1849,60 @@ body {
   .print-area {
     display: block !important;
     position: fixed !important; left: 0; top: 0;
-    width: 58mm; padding: 4mm 2mm;
+    width: 58mm; padding: 3mm 2.5mm 4mm;
     color: #000 !important; background: #fff !important;
-    font-family: 'Courier New', 'Roboto Mono', monospace !important;
-    font-size: 11pt; line-height: 1.3;
+    font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace !important;
+    font-size: 10.5pt; line-height: 1.28;
   }
-  .print-area .pa-title { text-align: center; font-size: 13pt; font-weight: 800; margin-bottom: 6px; }
-  .print-area .pa-sep { text-align: center; margin: 4px 0; letter-spacing: 1px; }
-  .print-area .pa-row { display: flex; justify-content: space-between; }
-  .print-area .pa-bold { font-weight: 800; }
-  .print-area .pa-large { font-size: 14pt; font-weight: 800; }
+  .print-area .pa-kicker {
+    text-align: center; font-size: 8pt; font-weight: 800; letter-spacing: 1.6px;
+    text-transform: uppercase; margin-bottom: 3px;
+  }
+  .print-area .pa-title {
+    text-align: center; font-size: 14pt; font-weight: 900; margin-bottom: 3px;
+    line-height: 1.1;
+  }
   .print-area .pa-center { text-align: center; }
-  .print-area .pa-item { display: flex; justify-content: space-between; padding: 2px 0; }
-  .print-area .pa-item .pi-qty { font-weight: 800; }
+  .print-area .pa-meta {
+    text-align: center; font-size: 8.5pt; opacity: 0.9; margin-bottom: 6px;
+  }
+  .print-area .pa-sep {
+    border-top: 1px dashed #000; height: 0; margin: 6px 0;
+  }
+  .print-area .pa-grid {
+    border: 1px solid #000; border-radius: 2mm; padding: 2mm; margin: 6px 0;
+  }
+  .print-area .pa-block { margin: 5px 0; }
+  .print-area .pa-label {
+    font-size: 8pt; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;
+    opacity: 0.85; margin-bottom: 1px;
+  }
+  .print-area .pa-row { display: flex; justify-content: space-between; gap: 8px; }
+  .print-area .pa-bold { font-weight: 800; }
+  .print-area .pa-large { font-size: 14pt; font-weight: 900; }
+  .print-area .pa-item {
+    display: flex; justify-content: space-between; gap: 6px; padding: 2px 0;
+    align-items: flex-start;
+  }
+  .print-area .pa-item .pi-main {
+    flex: 1; min-width: 0; padding-right: 6px;
+  }
+  .print-area .pa-item .pi-name {
+    display: block; font-weight: 800; word-break: break-word;
+  }
+  .print-area .pa-item .pi-unit {
+    display: block; font-size: 8pt; opacity: 0.85; margin-top: 1px;
+  }
+  .print-area .pa-item .pi-qty {
+    font-weight: 900; min-width: 28px;
+  }
+  .print-area .pa-item .pi-price {
+    white-space: nowrap; font-weight: 800;
+  }
+  .print-area .pa-note {
+    border: 1px dashed #000; border-radius: 2mm; padding: 2mm; margin-top: 6px;
+  }
+  .print-area .pa-note .pa-label { margin-bottom: 2px; }
   @page { size: 58mm auto; margin: 0; }
 }
 
@@ -1911,57 +2064,84 @@ body {
 }
 .etq-body {
   flex: 1; overflow-y: auto;
-  padding: 16px; background: #2a2520;
+  padding: 20px 16px 28px;
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.04), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 24%),
+    #202a3f;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
-/* Card desenhado pra impressora 50mm — fontes grandes em negrito, alta legibilidade térmica. */
 .etq-card {
   width: 320px; max-width: 100%;
   background: #fff; color: #000;
-  font-family: 'Courier New', 'Roboto Mono', monospace;
-  font-size: 16px; line-height: 1.35; font-weight: 700;
-  padding: 14px 10px;
-  border: 1px dashed #888;
-  border-radius: 4px;
+  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+  font-size: 15px; line-height: 1.35; font-weight: 700;
+  padding: 16px 14px 14px;
+  border: 1px solid #d7d7d7;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.18);
 }
 .etq-card .et-title {
-  text-align: center; font-size: 20px; font-weight: 900;
-  margin-bottom: 6px; letter-spacing: 0.05em;
+  text-align: center; font-size: 19px; font-weight: 900;
+  margin-bottom: 2px; line-height: 1.1;
+}
+.etq-card .et-kicker,
+.etq-card .pa-kicker {
+  text-align: center; font-size: 11px; font-weight: 900;
+  letter-spacing: 0.18em; text-transform: uppercase; color: #555;
+  margin-bottom: 8px;
 }
 .etq-card .et-prod {
   text-align: center; font-size: 18px; font-weight: 900;
-  margin: 8px 0; padding: 6px 0;
-  border-top: 2px solid #000; border-bottom: 2px solid #000;
+  margin: 10px 0 8px; padding: 8px 0;
+  border-top: 1px solid #000; border-bottom: 1px solid #000;
 }
 .etq-card .et-bars {
-  display: flex; height: 44px; margin: 10px auto 4px;
+  display: flex; height: 50px; margin: 10px auto 4px;
   align-items: stretch; justify-content: center;
   background: #fff;
 }
 .etq-card .et-bars .bar { background: #000; height: 100%; }
 .etq-card .et-bars .gap { background: transparent; height: 100%; }
 .etq-card .et-code {
-  text-align: center; font-size: 14px; font-weight: 900;
-  letter-spacing: 0.08em; margin-bottom: 10px;
+  text-align: center; font-size: 13px; font-weight: 900;
+  letter-spacing: 0.12em; margin-bottom: 12px;
 }
 .etq-card .et-qr {
   display: flex; justify-content: center; align-items: center;
-  margin: 10px 0;
+  margin: 8px 0 10px;
 }
 .etq-card .et-qr svg { display: block; }
+.etq-card .et-grid,
+.etq-card .pa-grid {
+  border: 1px solid #000; border-radius: 10px; padding: 10px 12px;
+}
 .etq-card .et-row {
   display: flex; justify-content: space-between;
-  padding: 3px 0; font-size: 16px; font-weight: 700;
+  gap: 10px; padding: 4px 0; font-size: 14px; font-weight: 700;
 }
 .etq-card .et-row .lbl { font-weight: 900; }
-.etq-card .pa-title  { text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 0.05em; margin-bottom: 4px; }
+.etq-card .pa-title  { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 2px; line-height: 1.1; }
 .etq-card .pa-center { text-align: center; font-weight: 800; }
-.etq-card .pa-sep    { text-align: center; font-weight: 900; letter-spacing: 0.05em; }
-.etq-card .pa-item   { display: flex; justify-content: space-between; gap: 6px; padding: 2px 0; }
+.etq-card .pa-meta   { text-align: center; font-size: 11px; color: #555; margin-bottom: 8px; }
+.etq-card .pa-sep    { border-top: 1px dashed #000; height: 0; margin: 8px 0; }
+.etq-card .pa-block  { margin: 6px 0; }
+.etq-card .pa-label  {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 900; color: #555; margin-bottom: 3px;
+}
+.etq-card .pa-item   { display: flex; justify-content: space-between; gap: 6px; padding: 3px 0; align-items: flex-start; }
+.etq-card .pa-item .pi-main { flex: 1; min-width: 0; }
+.etq-card .pa-item .pi-name { display: block; font-weight: 900; word-break: break-word; }
+.etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #666; margin-top: 1px; }
 .etq-card .pa-item .pi-qty { font-weight: 900; min-width: 28px; }
-.etq-card .pa-row    { display: flex; justify-content: space-between; padding: 2px 0; }
+.etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 900; }
+.etq-card .pa-row    { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
 .etq-card .pa-bold   { font-weight: 900; }
-.etq-card .pa-large  { font-size: 20px; }
+.etq-card .pa-large  { font-size: 22px; }
+.etq-card .pa-note {
+  border: 1px dashed #000; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+}
 .etq-actions {
   display: flex; gap: 8px; padding: 12px 16px;
   background: var(--bg);
@@ -2075,31 +2255,36 @@ body {
 .product-tile .qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ========== Movimentação (timeline) ========== */
-.mov-filter { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+.mov-filter { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 6px; }
 .mov-filter button {
-  padding: 6px 12px; border-radius: 14px;
-  background: var(--surface); border: 1px solid var(--line);
-  color: var(--ink-mute); font-size: 12px; font-weight: 600;
+  padding: 9px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--line);
+  color: var(--ink-mute); font-size: 11px; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase;
   cursor: pointer; white-space: nowrap; font-family: inherit;
 }
 .mov-filter button.active { background: var(--accent); color: white; border-color: var(--accent); }
 .mov-item {
-  background: var(--surface); border: 1px solid var(--line);
-  border-left: 3px solid var(--line);
-  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 88px),
+    var(--bg-card, var(--surface));
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 16px; padding: 14px; margin-bottom: 10px;
+  box-shadow: var(--glow);
 }
 .mov-item.entry { border-left-color: #4ade80; }
 .mov-item.exit  { border-left-color: #ef6b6b; }
 .mov-item.adjust { border-left-color: #60a5fa; }
-.mov-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-mute); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-.mov-type { font-weight: 700; }
+.mov-head { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; color: var(--ink-mute); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.12em; }
+.mov-type { font-weight: 800; }
 .mov-type.entry { color: #4ade80; }
 .mov-type.exit  { color: #ef6b6b; }
 .mov-type.adjust { color: #60a5fa; }
-.mov-items { font-size: 14px; color: var(--ink); margin-bottom: 4px; }
+.mov-items { font-size: 14px; color: var(--ink); margin-bottom: 6px; line-height: 1.45; }
 .mov-items .qty { font-weight: 700; color: var(--gold); }
-.mov-ref { font-size: 12px; color: var(--ink-mute); }
-.mov-ref .op { color: var(--gold); }
+.mov-ref { font-size: 12px; color: var(--ink-mute); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.mov-ref .op { color: var(--gold); font-weight: 700; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -2120,55 +2305,118 @@ body {
 /* ========== Kanban (esteira) ========== */
 .kanban-col {
   margin-bottom: 16px;
-  background: var(--surface);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 84px),
+    var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 18px;
   overflow: hidden;
+  box-shadow: var(--glow);
 }
 .kanban-col-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 14px; background: var(--bg-elev-2);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 12px 14px; background: rgba(255,255,255,0.02);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--ink-dim);
 }
 .kanban-col-header .count {
-  background: var(--bg-elev); color: var(--ink);
-  padding: 2px 8px; border-radius: 10px; font-size: 11px;
+  background: rgba(255,255,255,0.05); color: var(--ink);
+  padding: 3px 9px; border-radius: 999px; font-size: 11px;
+  border: 1px solid var(--border);
 }
 .kanban-col.col-aguardando .kanban-col-header { color: #cf8a3a; border-bottom: 2px solid rgba(207,138,58,0.4); }
 .kanban-col.col-preparando .kanban-col-header { color: #60a5fa; border-bottom: 2px solid rgba(96,165,250,0.4); }
 .kanban-col.col-pronto     .kanban-col-header { color: #4ade80; border-bottom: 2px solid rgba(74,222,128,0.4); }
-.kanban-col-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 20px; }
-.kanban-col-empty { padding: 12px; text-align: center; color: var(--ink-mute); font-size: 12px; font-style: italic; }
+.kanban-col-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 20px; }
+.kanban-col-empty {
+  padding: 16px; text-align: center; color: var(--ink-mute); font-size: 12px;
+  font-style: italic; border: 1px dashed var(--border); border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+}
 
 .k-card {
   position: relative;
-  background: var(--bg-elev); border: 1px solid var(--line);
-  border-radius: 10px; padding: 10px 12px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 90px),
+    var(--bg-card, var(--bg-elev));
+  border: 1px solid var(--line);
+  border-radius: 16px; padding: 14px;
+  box-shadow: var(--glow);
 }
-.k-card .k-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-.k-card .k-who { font-weight: 700; font-size: 14px; color: var(--ink); }
-.k-card .k-who .apt { font-weight: 400; font-size: 12px; color: var(--ink-mute); margin-left: 4px; }
-.k-card .k-time { font-size: 11px; color: var(--ink-mute); white-space: nowrap; }
-.k-card .k-items { font-size: 12px; color: var(--ink-dim); margin-bottom: 6px; }
-.k-card .k-foot {
+.k-card .k-topline {
   display: flex; justify-content: space-between; align-items: center;
-  margin-top: 8px; gap: 8px;
+  gap: 10px; margin-bottom: 10px;
 }
-.k-card .k-total { font-weight: 700; font-size: 14px; color: var(--gold); }
+.k-card .k-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+.k-card.status-aguardando .k-status { color: #cf8a3a; background: rgba(207,138,58,0.10); }
+.k-card.status-preparando .k-status { color: #60a5fa; background: rgba(96,165,250,0.10); }
+.k-card.status-pronto .k-status { color: #4ade80; background: rgba(74,222,128,0.10); }
+.k-card .k-time { font-size: 11px; color: var(--ink-mute); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.k-card .k-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  margin-bottom: 6px;
+}
+.k-card .k-who {
+  font-weight: 800; font-size: 15px; color: var(--ink);
+  line-height: 1.2; letter-spacing: -0.01em;
+}
+.k-card .k-who .apt {
+  display: inline-block; margin-left: 6px; font-weight: 600; font-size: 11px;
+  color: var(--ink-mute);
+}
+.k-card .k-total {
+  font-family: 'Fraunces', serif; font-weight: 700; font-size: 20px;
+  color: var(--gold); white-space: nowrap; letter-spacing: 0;
+}
+.k-card .k-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.k-card .k-chip {
+  display: inline-flex; align-items: center; padding: 4px 8px;
+  border-radius: 999px; background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border); color: var(--ink-dim);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.k-card .k-items {
+  font-size: 13px; color: var(--ink-dim); margin-bottom: 8px;
+  line-height: 1.45;
+}
+.k-card .k-note {
+  margin-bottom: 10px; padding: 9px 10px;
+  border-radius: 12px; background: rgba(255,255,255,0.03);
+  border: 1px dashed var(--border);
+  font-size: 12px; color: var(--ink-dim); line-height: 1.4;
+}
+.k-card .k-progress { margin-bottom: 10px; }
+.k-card .k-foot {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 10px;
+}
+.k-card .k-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
 .k-card .k-advance {
   flex: 1;
-  padding: 8px 12px; background: var(--accent); color: white;
-  border: 0; border-radius: 8px;
-  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  min-height: 42px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--accent), #f08a56); color: white;
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+  font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+  box-shadow: 0 10px 22px rgba(231, 104, 69, 0.24);
 }
 .k-card .k-advance:active { transform: scale(0.97); }
 .k-card .k-cancel {
-  width: 28px; height: 28px; border: 0; background: transparent;
-  color: var(--ink-mute); font-size: 18px; cursor: pointer; border-radius: 6px;
+  width: 38px; height: 38px; border: 1px solid rgba(239,107,107,0.18); background: rgba(239,107,107,0.08);
+  color: #ef8f8f; font-size: 18px; cursor: pointer; border-radius: 10px;
   font-family: inherit;
 }
-.k-card .k-cancel:hover { color: #ef6b6b; background: rgba(239,107,107,0.1); }
+.k-card .k-cancel:hover { color: #ef6b6b; background: rgba(239,107,107,0.14); }
 .k-card.blink {
   animation: blinkHighlight 1.5s ease-in-out 0s 2;
 }
@@ -2200,10 +2448,12 @@ body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  background: var(--bg-elev-2); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent),
+    var(--bg-elev-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 18px;
   padding: 14px 16px; max-width: 360px; width: calc(100% - 32px);
-  box-shadow: var(--shadow); z-index: 9000;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.36); z-index: 9000;
   transition:
     opacity 0.25s ease,
     transform 0.25s ease,
@@ -2219,13 +2469,13 @@ body {
     transform 0.25s ease,
     visibility 0s linear 0s;
 }
-.action-toast .at-msg { font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+.action-toast .at-msg { font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
 .action-toast .at-msg .hi { color: var(--gold); font-weight: 700; }
 .action-toast .at-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .action-toast .at-actions button {
-  flex: 1; min-width: 90px; padding: 8px 10px;
-  font-family: inherit; font-size: 12px; font-weight: 700;
-  border-radius: 8px; cursor: pointer;
+  flex: 1; min-width: 90px; padding: 10px 12px;
+  font-family: inherit; font-size: 12px; font-weight: 800;
+  border-radius: 12px; cursor: pointer;
 }
 .action-toast .at-primary { background: var(--accent); color: white; border: 0; }
 .action-toast .at-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
@@ -2237,8 +2487,8 @@ body {
 <!-- Boas-vindas / login com nome do operador -->
 <div class="welcome hidden" id="welcomeScreen">
   <div class="emoji">👋</div>
-  <h1>Bem-vindo à Casa da Baba</h1>
-  <p>Para começar, me conta seu nome. Ele vai aparecer nos lotes e pedidos que você registrar — é como você "assina" o que fez.</p>
+  <h1>Bem-vindo ao Easy Stock Mobile</h1>
+  <p>Para comecar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operacao rastreavel.</p>
   <input type="text" id="welcomeName" placeholder="Seu nome" maxlength="32" autocomplete="off" />
   <button id="welcomeContinue" disabled>Começar</button>
   <div class="hint">Você pode trocar depois tocando no seu nome no topo.</div>
@@ -2260,35 +2510,6 @@ body {
 
 <div class="phone">
 
-  <!-- Status bar -->
-  <div class="status-bar">
-    <span id="clock">09:24</span>
-    <!-- Carimbo de versao do bundle: substituido pelo workflow do SWA a cada
-         deploy (placeholder "__APP_VERSION__" -> "v1.0.X"). Util pra confirmar
-         visualmente que o LiveUpdater entregou um bundle novo. -->
-    <span id="appVersion" style="margin-left:8px;font-size:10px;opacity:.6;font-family:monospace"></span>
-    <script>
-      // Info do bundle atual: workflow SWA substitui __APP_VERSION__ por
-      // "1.0.X" (run_number) e __APP_RELEASE_NOTES__ pela primeira linha do
-      // commit message (escapado em JSON). Usado pra detectar update novo
-      // e mostrar modal de "atualizado".
-      window.__BUNDLE_INFO__ = {
-        version: "__APP_VERSION__",
-        releaseNotes: "__APP_RELEASE_NOTES__"
-      };
-      // Exibe versão só se o CI substituiu o placeholder; oculta o literal feio
-      (function(){
-        var raw = "__APP_VERSION__";
-        var el  = document.getElementById('appVersion');
-        if (el) el.textContent = (raw && !raw.startsWith('__')) ? 'v' + raw : '';
-      })();
-    </script>
-    <div class="icons">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h20v-8H2v8zm2-6h16v4H4v-4z"/></svg>
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33A1.33 1.33 0 007 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
-    </div>
-  </div>
-
   <!-- Header -->
   <div class="header">
     <div class="greeting">
@@ -2305,7 +2526,7 @@ body {
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
     </div>
-    <div class="title">Casa da <span class="accent">Baba</span></div>
+    <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
     <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
       <span class="dot"></span>
       <span id="syncText">Tudo sincronizado</span>
@@ -2636,14 +2857,23 @@ body {
   <!-- Tela de Ajustes (PIX, telefone, impressora) -->
   <div class="ajustes-overlay" id="ajustesModal" role="dialog" aria-modal="true">
     <div class="ajustes-sheet">
-      <div class="cobranca-head">
-        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Ajustes</h3>
+      <div class="ajustes-head">
+        <div>
+          <h3>Ajustes</h3>
+          <div class="sub">Identidade, cobranca, impressao e manutencao do app.</div>
+        </div>
         <button class="cobranca-close" onclick="closeAjustes()" aria-label="Fechar">×</button>
       </div>
 
+      <div class="ajustes-hero">
+        <div class="eyebrow">White label</div>
+        <div class="headline">Deixe a operacao com a cara da loja</div>
+        <div class="copy">O nome da empresa, a cobranca e a impressao termica saem daqui. Ajustes bem organizados ajudam o app a parecer produto, nao improviso.</div>
+      </div>
+
       <div class="ajustes-section">
-        <h4>👤 Operador</h4>
-        <p class="hint">Nome que aparece nos pedidos e cobranças.</p>
+        <h4>Operador</h4>
+        <p class="hint">Nome usado nos pedidos, historico e rastreabilidade da operacao.</p>
         <div class="field">
           <label>Seu nome</label>
           <input type="text" id="ajusteOperator" maxlength="32" autocomplete="off" />
@@ -2651,17 +2881,17 @@ body {
       </div>
 
       <div class="ajustes-section">
-        <h4>🏢 Empresa</h4>
-        <p class="hint">Nome que aparece no topo das etiquetas e da cobrança.</p>
+        <h4>Empresa</h4>
+        <p class="hint">Nome exibido no topo do app, nas etiquetas e nas mensagens de cobranca.</p>
         <div class="field">
           <label>Nome da empresa</label>
-          <input type="text" id="ajusteEmpresa" maxlength="48" autocomplete="off" placeholder="Casa da Baba" />
+          <input type="text" id="ajusteEmpresa" maxlength="48" autocomplete="off" placeholder="Nome da empresa" />
         </div>
       </div>
 
       <div class="ajustes-section">
-        <h4>💳 PIX</h4>
-        <p class="hint">Tipo determina a formatação da chave (CPF: 123.456.789-00, telefone: (11) 99999-9999, etc.).</p>
+        <h4>PIX</h4>
+        <p class="hint">Defina a chave que aparece no recibo e na mensagem pronta para o cliente.</p>
         <div class="field">
           <label>Tipo de chave</label>
           <select id="ajustePixType">
@@ -2679,45 +2909,45 @@ body {
         </div>
         <div class="field">
           <label>Nome do titular da chave</label>
-          <input type="text" id="ajustePixHolder" autocomplete="off" placeholder="Felipe Michel" />
+          <input type="text" id="ajustePixHolder" autocomplete="off" placeholder="Titular da chave" />
         </div>
       </div>
 
       <div class="ajustes-section">
-        <h4>🖨️ Impressora térmica</h4>
+        <h4>Impressora termica</h4>
         <p class="hint">Hipertech WTP05 ou outra ESC/POS Bluetooth 58mm. Pareie pelo Android antes.</p>
         <div class="printer-status none" id="printerStatus">
           <span id="printerStatusLabel">Nenhuma impressora selecionada</span>
         </div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="btn-ajustes-printer" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
-          <button class="btn-ajustes-printer" onclick="testPrint()" style="flex:1">Testar impressão</button>
+        <div class="ajustes-actions-row">
+          <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
+          <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressao</button>
         </div>
-        <button class="btn-ajustes-printer" onclick="printerDiagnostics()" style="margin-top:6px;width:100%;font-size:12px;opacity:.8">🔍 Diagnóstico (debug)</button>
+        <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnostico</button>
       </div>
 
       <div class="ajustes-section">
-        <h4>📦 Catálogo de produtos</h4>
-        <p class="hint">Cadastrar, editar ou arquivar produtos do grid de Produção. Arquivar não apaga: produtos antigos em pedidos/lotes ficam intactos.</p>
+        <h4>Catalogo de produtos</h4>
+        <p class="hint">Cadastre, edite ou arquive produtos sem afetar pedidos e lotes antigos.</p>
         <div id="catalogList" class="catalog-list"></div>
-        <button class="btn-ajustes-printer" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
+        <button class="btn-ajustes-printer primary-soft" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
       </div>
 
       <div class="ajustes-section">
-        <h4>💾 Backup &amp; Restauração</h4>
-        <p class="hint">Exporte um arquivo JSON com TUDO (produtos, clientes, pedidos, lotes, caixa). Guarde em algum lugar seguro. Em caso de problema ou reinstalação, use Restaurar pra trazer tudo de volta.</p>
-        <div style="display:flex;gap:6px;flex-direction:column">
-          <button class="btn-ajustes-printer" onclick="exportBackup()">⬇️ Exportar backup (JSON)</button>
-          <button class="btn-ajustes-printer" onclick="document.getElementById('backupFileInput').click()">⬆️ Restaurar de arquivo</button>
+        <h4>Backup e restauracao</h4>
+        <p class="hint">Exporte um JSON completo da operacao para guardar com seguranca e restaurar quando precisar.</p>
+        <div class="ajustes-actions-stack">
+          <button class="btn-ajustes-printer" onclick="exportBackup()">Exportar backup (JSON)</button>
+          <button class="btn-ajustes-printer" onclick="document.getElementById('backupFileInput').click()">Restaurar de arquivo</button>
           <input type="file" id="backupFileInput" accept="application/json,.json" style="display:none" onchange="importBackup(event)" />
         </div>
       </div>
 
       <div class="ajustes-section">
-        <h4>🔄 Atualização do app</h4>
-        <p class="hint">O app atualiza sozinho ao reabrir, sem reinstalar APK. Se demorar, force aqui.</p>
-        <div style="display:flex;gap:6px;flex-direction:column">
-          <button class="btn-ajustes-printer" onclick="forceCheckUpdate()">🔄 Verificar atualizações agora</button>
+        <h4>Atualizacao do app</h4>
+        <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificacao manual.</p>
+        <div class="ajustes-actions-stack">
+          <button class="btn-ajustes-printer" onclick="forceCheckUpdate()">Verificar atualizacoes agora</button>
         </div>
       </div>
 
@@ -2790,9 +3020,9 @@ body {
       <div class="np-icon">🖨️</div>
       <h3 class="np-title">Impressora não configurada</h3>
       <p class="np-text">Você ainda não pareou uma impressora térmica. O que prefere fazer?</p>
-      <button class="np-btn np-primary"   onclick="closeNoPrinterModal(); closeEtiquetasPreview(); openAjustes()">Configurar agora</button>
-      <button class="np-btn np-secondary" onclick="closeNoPrinterModal(); etqAction('share')">Compartilhar como imagem</button>
-      <button class="np-btn np-tertiary"  onclick="closeNoPrinterModal()">Cancelar</button>
+      <button class="np-btn np-primary"   onclick="npModalAction('configure')">Configurar agora</button>
+      <button class="np-btn np-secondary" onclick="npModalAction('share')">Compartilhar como imagem</button>
+      <button class="np-btn np-tertiary"  onclick="npModalAction('cancel')">Cancelar</button>
     </div>
   </div>
 
@@ -2843,7 +3073,7 @@ body {
         <div>
           <div class="pix-label">💳 PIX — celular</div>
           <div class="pix-value" id="cobrancaPixValue">—</div>
-          <div class="pix-holder" id="cobrancaPixHolder">Casa da Baba</div>
+          <div class="pix-holder" id="cobrancaPixHolder">Empresa</div>
         </div>
         <button class="pix-copy" onclick="copyPixKey()">Copiar</button>
       </div>
@@ -2887,7 +3117,7 @@ body {
 // STATE
 // =========================
 
-// Catálogo oficial (não é dado fictício — é o menu da Casa da Baba).
+// Catalogo operacional padrao do app.
 // Stock inicia em 0. Usuário produz lotes pra popular o estoque.
 const defaultProducts = [
   { id: 'talharim',  name: 'Talharim Fresco',            emoji: '🍝', category: 'massa', unit: '300g',  price: 12, stock: 0 },
@@ -2963,6 +3193,12 @@ function renderOperatorBadge() {
     const h = new Date().getHours();
     greet.textContent = h < 12 ? 'Bom dia,' : h < 18 ? 'Boa tarde,' : 'Boa noite,';
   }
+}
+
+function renderBrandName() {
+  const el = document.getElementById('brandName');
+  if (!el) return;
+  el.textContent = (getEmpresaName() || 'Minha empresa').trim() || 'Minha empresa';
 }
 
 function showWelcome() {
@@ -3277,7 +3513,7 @@ function importBackup(event) {
     try {
       const payload = JSON.parse(String(e.target.result || ''));
       if (!payload || payload.appId !== 'casa-da-baba' || !payload.state) {
-        showToast('Arquivo inválido (não é backup do Casa da Baba)');
+        showToast('Arquivo invalido (nao e backup do Easy Stock Mobile)');
         return;
       }
       const itemCount = (payload.state.products?.length || 0)
@@ -3350,17 +3586,6 @@ function go(screen) {
   if (screen === 'pedidos')    renderOrdersFeed();
   if (screen === 'historico')  renderHistoricoScreen();
 }
-
-// =========================
-// CLOCK
-// =========================
-function tickClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent =
-    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-}
-tickClock();
-setInterval(tickClock, 30000);
 
 // =========================
 // SYNC
@@ -4045,7 +4270,7 @@ async function exportAuditLog() {
       const written = await FS.writeFile({
         path: filename, data: base64, directory: 'CACHE', recursive: true
       });
-      await Share.share({ title: 'Histórico Casa da Baba', files: [written.uri], dialogTitle: 'Compartilhar histórico' });
+      await Share.share({ title: 'Historico Easy Stock Mobile', files: [written.uri], dialogTitle: 'Compartilhar histórico' });
       return;
     }
     // Fallback browser: download direto
@@ -4315,21 +4540,35 @@ function renderKanban() {
 function renderKanbanCard(o, col) {
   const isHighlight = highlightOrderId === o.id;
   const itemsLine = (o.items || []).map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+  const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
+  const itemCount = (o.items || []).reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   return `
-    <div class="k-card ${isHighlight ? 'blink' : ''}">
-      <div class="k-head">
-        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
+    <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
+      <div class="k-topline">
+        <span class="k-status">${col.label}</span>
         <div class="k-time">${timeOf(o.createdAt)}</div>
       </div>
-      <div class="k-items">${itemsLine}${o.notes ? ' · <em>' + escapeHtml(o.notes) + '</em>' : ''}</div>
-      ${renderProgressDots(o.status, { small: true, showLabel: false })}
-      <div class="k-foot">
-        <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">💳 Cobrar</button>
-        <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">🖨️</button>
-        <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">🕐</button>
-        <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next} →</button>
+      <div class="k-head">
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
         <span class="k-total">${money(o.total)}</span>
-        <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
+      </div>
+      <div class="k-meta">
+        <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
+        <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
+      </div>
+      <div class="k-items">${itemsLine}</div>
+      ${notes}
+      <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
+      <div class="k-foot">
+        <div class="k-actions">
+          <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
+          <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
+          <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
+        </div>
+        <div class="k-actions">
+          <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next}</button>
+          <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
+        </div>
       </div>
     </div>
   `;
@@ -4394,10 +4633,10 @@ function hideActionToast() {
 // Tipos suportados: telefone, email, cpf, cnpj, aleatoria.
 // Trocar via console: cdbSetPix(key, holder, type) ou pela tela Ajustes.
 // ================================================================
-const DEFAULT_PIX_KEY = '1197573992';
-const DEFAULT_PIX_HOLDER = 'Felipe Michel';
+const DEFAULT_PIX_KEY = '';
+const DEFAULT_PIX_HOLDER = '';
 const DEFAULT_PIX_TYPE = 'telefone';
-const DEFAULT_EMPRESA_NAME = 'Casa da Baba';
+const DEFAULT_EMPRESA_NAME = 'Minha empresa';
 const PIX_TYPES = {
   telefone:  { label: 'Telefone',         placeholder: '(11) 99999-9999',     short: 'Cel' },
   email:     { label: 'E-mail',           placeholder: 'seu@email.com',        short: 'E-mail' },
@@ -4548,7 +4787,7 @@ function buildEtiqueta(order) {
   const horario = timeOf(order.createdAt);
   const obs = order.notes ? `\nObs: ${order.notes}` : '';
   return (
-    `== CASA DA BABA ==\n` +
+    `== EASY STOCK MOBILE ==\n` +
     `Cliente: ${nome}${ref ? ' · ' + ref : ''}\n` +
     `${itensLinhas}\n` +
     `Total: ${money(Number(order.total) || 0)}\n` +
@@ -4588,7 +4827,7 @@ async function shareCobranca() {
   const msg = buildCobrancaMessage(o);
   try {
     if (navigator.share) {
-      await navigator.share({ title: 'Casa da Baba — Pedido', text: msg });
+      await navigator.share({ title: 'Easy Stock Mobile - Pedido', text: msg });
       return;
     }
     // Fallback: wa.me/?text=... abre o WhatsApp direto
@@ -4763,6 +5002,7 @@ function saveAjustes() {
   };
   if (op) saveOperatorName(op);
   cdbSetPix(key || null, holder || null, type, empresa || null);
+  renderBrandName();
   const after = {
     operator: operatorName,
     empresa: getEmpresaName(),
@@ -4980,7 +5220,7 @@ function closePrinterPicker() {
 // NAO requisita essa permissao automaticamente — entao bs.list() lanca
 // SecurityException se o usuario nao concedeu manualmente. Por isso
 // surfaceamos o erro VISIVEL com instrucoes claras (o operador concede
-// em Configuracoes > Apps > Casa da Baba > Permissoes > Dispositivos
+// em Configuracoes > Apps > Easy Stock Mobile > Permissoes > Dispositivos
 // proximos / Nearby devices).
 function loadPrinterDevices() {
   const list = document.getElementById('printerPickerList');
@@ -5003,7 +5243,7 @@ function loadPrinterDevices() {
                    + '<span style="font-size:11px;opacity:.8">[' + where + '] ' + escapeHtml(String(detail)) + '</span><br><br>'
                    + '<b>Como resolver:</b><br>'
                    + '<span style="font-size:12px">'
-                   + '1. Configurações Android → Apps → <b>Casa da Baba</b><br>'
+                   + '1. Configuracoes Android -> Apps -> <b>Easy Stock Mobile</b><br>'
                    + '2. Permissões → ative <b>"Dispositivos próximos"</b> (ou "Nearby devices")<br>'
                    + '3. Verifique também que Bluetooth está <b>ligado</b><br>'
                    + '4. Volte aqui e toque "Buscar de novo"'
@@ -5121,13 +5361,13 @@ function selectPrinter(printer) {
 }
 function testPrint() {
   const bytes = escPosTextLines('TESTE', [
-    'Casa da Baba',
+    'Easy Stock Mobile',
     'Hipertech WTP05',
     'Impressao OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)
   ]);
   printViaBluetooth(bytes, () => {
     showToast('Bluetooth indisponível — usando impressão do sistema');
-    printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">Casa da Baba<br>Hipertech WTP05<br>Sistema fallback</div>');
+    printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">Easy Stock Mobile<br>Hipertech WTP05<br>Sistema fallback</div>');
   });
 }
 
@@ -5272,12 +5512,22 @@ function applyAdvanceTransition(id, nextStatus) {
 }
 
 // ================================================================
-// IMPRESSÃO TÉRMICA — Hipertech WTP05 (rolo 40mm de largura util de
-// impressao, ESC/POS via plugin Capacitor nativo ThermalPrinter).
-// PRINT_COLS = 24 chars cabe confortavel em fonte A 12px @ 40mm.
-// Se a impressora for outro modelo (58mm), pode subir pra 32.
+// IMPRESSÃO TÉRMICA — Hipertech WTP05 (58mm, 32 colunas em fonte A,
+// ESC/POS via plugin Capacitor nativo ThermalPrinter).
+//
+// Diretrizes de layout primoroso:
+//   - PRINT_COLS = 32 (largura natural da WTP05). Texto cabe sem cortar.
+//   - bold() em vez de big() pros titulos (TOTAL, empresa) — big() dobra
+//     altura e fica esticado/feio na fonte da WTP05.
+//   - asciiNorm() em todo texto pra eliminar acentos (impressora termica
+//     basica imprime caixinhas no lugar de char com diacritico).
+//   - padLine(left, right) alinha label esquerda com valor direita,
+//     truncando ou quebrando se exceder PRINT_COLS.
+//   - divider() linha de hifens da largura completa pra separar secoes.
+//   - Sem QR no recibo de pedido (limpeza visual). Etiqueta de producao
+//     usa CODE128 nativo (escPosBarcode128) pra leitura por scanner.
 // ================================================================
-const PRINT_COLS = 24;
+const PRINT_COLS = 32;
 const PRINT_ENCODER = new TextEncoder();
 
 // Acentos fora porque a WTP05 com CP default imprime caixinhas.
@@ -5292,11 +5542,11 @@ function padLine(left, right) {
   return left + ' '.repeat(space) + right;
 }
 function divider() { return '-'.repeat(PRINT_COLS); }
-// Versão pra modo "big" (caracteres dobrados) — fonte dobra largura, entao
-// se PRINT_COLS=24 (40mm), em big cabem ~14 chars (numero generoso pra
-// caber "TOTAL R$ 120,00" sem quebrar). Em PRINT_COLS=32 (58mm), 16.
+// Versão pra modo "big" (caracteres dobrados) — metade das colunas.
+// Mantida pra compatibilidade; o layout principal agora usa bold() em vez
+// de big() porque big() fica esticado e feio na WTP05.
 function padLineBig(left, right) {
-  const COLS = Math.max(12, Math.floor(PRINT_COLS * 0.6));
+  const COLS = Math.floor(PRINT_COLS / 2);
   left  = asciiNorm(left);
   right = asciiNorm(right);
   if (left.length + right.length >= COLS) {
@@ -5313,74 +5563,88 @@ function escPosBuilder() {
     push: (...b) => { b.forEach(x => out.push(x)); return api; },
     text: (s) => { PRINT_ENCODER.encode(asciiNorm(s)).forEach(b => out.push(b)); return api; },
     line: (s) => api.text(s || '').push(LF),
-    init:   () => api.push(ESC, 0x40),
-    center: () => api.push(ESC, 0x61, 0x01),
-    left:   () => api.push(ESC, 0x61, 0x00),
-    big:    () => api.push(ESC, 0x21, 0x10),
-    normal: () => api.push(ESC, 0x21, 0x00),
-    bytes:  () => new Uint8Array(out)
+    init:    () => api.push(ESC, 0x40),
+    center:  () => api.push(ESC, 0x61, 0x01),
+    left:    () => api.push(ESC, 0x61, 0x00),
+    big:     () => api.push(ESC, 0x21, 0x10),
+    normal:  () => api.push(ESC, 0x21, 0x00),
+    // Negrito (ESC E n). Mais elegante que big — mantem altura/largura
+    // padrao mas escurece os tracos. Usado pra titulo da empresa e TOTAL.
+    bold:    () => api.push(ESC, 0x45, 0x01),
+    boldOff: () => api.push(ESC, 0x45, 0x00),
+    bytes:   () => new Uint8Array(out)
   };
   return api;
 }
 
 function escPosTextLines(title, lines) {
-  const b = escPosBuilder().init().center().big();
-  if (title) b.line(title);
-  b.normal().push(0x0A);
+  const b = escPosBuilder().init().center();
+  if (title) b.bold().line(title).boldOff();
+  b.push(0x0A);
   (lines || []).forEach(l => b.line(l));
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
 /**
- * Comandos GS ( k pra QR code em ESC/POS (suportado pela Hipertech WTP05).
- * Sequência: setModelo → setSize → setErrorCorrection → store → print.
+ * Comandos GS k pra barcode CODE128 em ESC/POS (formato 2: GS k m n d1..dn).
+ * Subset B (caracteres ASCII printable, suficiente pra letras+digitos+hifens).
+ * HRI (texto legivel) abaixo do barcode, height ~7.5mm, width modular 2.
  */
-function escPosQrCommands(data) {
-  const enc = PRINT_ENCODER.encode(data || '');
-  const len = enc.length + 3; // +3 do header (cn, fn, m)
-  const pL = len & 0xFF;
-  const pH = (len >> 8) & 0xFF;
+function escPosBarcode128(data) {
   const out = [];
-  // Modelo 2 (mais comum)
-  out.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
-  // Tamanho do módulo (6 = ~24mm)
-  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06);
-  // Error correction L (48)
-  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30);
-  // Store data
-  out.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
+  // HRI: caracteres legiveis ABAIXO do barcode (GS H 2)
+  out.push(0x1D, 0x48, 0x02);
+  // Fonte HRI: A (default, GS f 0)
+  out.push(0x1D, 0x66, 0x00);
+  // Altura barcode em dots (GS h n) — 80 = ~10mm
+  out.push(0x1D, 0x68, 0x50);
+  // Largura modular (GS w n) — 2 fica compacto e legivel
+  out.push(0x1D, 0x77, 0x02);
+  // Prefixo {B forca subset B (ASCII printable)
+  const payload = '{B' + (data || '');
+  const enc = PRINT_ENCODER.encode(payload);
+  // GS k m n d1..dn — m=73 (CODE128 formato 2), n=length
+  out.push(0x1D, 0x6B, 0x49, enc.length);
   enc.forEach(byte => out.push(byte));
-  // Print
-  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
   return out;
 }
 
 function escPosOrderLabel(o) {
-  const empresa = (getEmpresaName() || 'CASA DA BABA').toUpperCase();
+  const empresa = (getEmpresaName() || 'EASY STOCK MOBILE').toUpperCase();
   const pixType = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
   const orderRef = (o.id || '').slice(-8);
-  const b = escPosBuilder().init().center().big().line(empresa).normal().push(0x0A).left();
-  b.line(divider());
-  b.line('Pedido: ' + orderRef);
-  b.line('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente'));
-  if (o.clientSnapshot?.ref) b.line(o.clientSnapshot.ref);
-  b.line(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'));
-  b.line(divider());
-  (o.items || []).forEach(it => b.line(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice))));
-  b.line(divider());
-  b.big().line(padLine('TOTAL', money(o.total))).normal();
-  if (o.notes) b.line('Obs: ' + o.notes);
-  b.line(divider());
-  // QR code centralizado (GS ( k — padrão ESC/POS, WTP05 suporta).
-  b.center().push(...escPosQrCommands(`pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`));
-  b.push(0x0A);
-  b.line(orderRef);
+  const cliente = (o.clientSnapshot?.name || 'Sem cliente');
+  const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
+  const b = escPosBuilder().init();
+  // Cabecalho: nome da empresa em negrito centralizado, depois pedido.
+  b.center().bold().line(empresa).boldOff();
+  b.line('Pedido ' + orderRef);
   b.left();
   b.line(divider());
+  // Dados do cliente — truncados se passarem da largura
+  b.line(asciiNorm('Cliente: ' + cliente).slice(0, PRINT_COLS));
+  if (o.clientSnapshot?.ref) b.line(asciiNorm(o.clientSnapshot.ref).slice(0, PRINT_COLS));
+  b.line(data);
+  b.line(divider());
+  // Itens (qty x nome | preco) com truncamento via padLine
+  (o.items || []).forEach(it => {
+    b.line(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice)));
+  });
+  b.line(divider());
+  // TOTAL em negrito (sem big — elegante, cabe na linha)
+  b.bold().line(padLine('TOTAL', money(o.total))).boldOff();
+  // Observacao em ate 2 linhas (32+32 chars max — evita poluir a impressao)
+  if (o.notes) {
+    const obs = asciiNorm(o.notes);
+    b.line('Obs: ' + obs.slice(0, PRINT_COLS - 5));
+    if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
+  }
+  b.line(divider());
+  // PIX e titular (cada um em sua linha pra leitura clara)
   b.line('PIX (' + pixLabel + '): ' + formatPixByType(getPixKey(), pixType));
-  b.line('Titular: ' + getPixHolder());
-  if (o.confirmedBy) b.line('Conferido por: ' + o.confirmedBy);
+  b.line('Titular: ' + asciiNorm(getPixHolder()).slice(0, PRINT_COLS - 9));
+  if (o.confirmedBy) b.line('Conferido: ' + asciiNorm(o.confirmedBy).slice(0, PRINT_COLS - 11));
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
@@ -5408,7 +5672,7 @@ function printViaBluetooth(bytes, onFallback) {
   ensureBluetoothPermission((granted) => {
     btStep('print:perm-result granted=' + granted);
     if (!granted) {
-      showToast('Permissão Bluetooth negada — Configurações > Apps > Casa da Baba');
+      showToast('Permissao Bluetooth negada - Configuracoes > Apps > Easy Stock Mobile');
       if (typeof onFallback === 'function') onFallback();
       return;
     }
@@ -5513,30 +5777,6 @@ function generateQrSvg(data, size = 96) {
 }
 
 /**
- * Desenha QR code direto num canvas (pra geração de PNG).
- */
-function drawQrOnCanvas(ctx, data, x, y, size) {
-  if (typeof qrcode !== 'function') return;
-  try {
-    const qr = qrcode(0, 'L');
-    qr.addData(String(data || ''));
-    qr.make();
-    const cells = qr.getModuleCount();
-    const cellSize = Math.max(1, Math.floor(size / cells));
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x, y, cellSize * cells, cellSize * cells);
-    ctx.fillStyle = '#000';
-    for (let r = 0; r < cells; r++) {
-      for (let c = 0; c < cells; c++) {
-        if (qr.isDark(r, c)) {
-          ctx.fillRect(x + c*cellSize, y + r*cellSize, cellSize, cellSize);
-        }
-      }
-    }
-  } catch (e) { console.warn('QR canvas falhou:', e); }
-}
-
-/**
  * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
  * dados que cada etiqueta precisa pra ser renderizada/impressa.
  */
@@ -5575,35 +5815,45 @@ function etiquetaProducaoHtml(et) {
   const bars = buildBarcodePattern(et.codigoBarras);
   const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
+  const pixSafe = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
   return `
+    <div class="et-kicker">Etiqueta de lote</div>
     <div class="et-title">${escapeHtml(et.empresa)}</div>
-    <div class="et-prod">${et.emoji} ${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
+    <div class="et-prod">${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
     <div class="et-bars">${bars}</div>
     <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
-    ${peso}
-    <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
-    <div class="et-row"><span class="lbl">Validade</span><span>${escapeHtml(venc)}</span></div>
-    <div class="et-row"><span class="lbl">Lote</span><span>${escapeHtml(et.lote)}</span></div>
+    <div class="et-grid">
+      ${peso}
+      <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
+      <div class="et-row"><span class="lbl">Validade</span><span>${escapeHtml(venc)}</span></div>
+      <div class="et-row"><span class="lbl">Lote</span><span>${escapeHtml(et.lote)}</span></div>
+    </div>
   `;
 }
 
 function escPosLabelProducao(et) {
-  // Tudo em big mode (modo dobrado) — fica legível na térmica de 50mm
-  // mesmo com fonte default; reduz colunas mas ganha em legibilidade.
-  const b = escPosBuilder().init().center().big().line(et.empresa);
-  b.line('-'.repeat(16));
-  b.line(et.productName + (et.unit ? ' (' + et.unit + ')' : ''));
-  b.line('-'.repeat(16));
-  b.normal();
-  b.center().line(et.codigoBarras);
+  // Layout de etiqueta de pote (cola na embalagem):
+  //   - Empresa em negrito centralizado (fonte normal, sem big — evita esticado).
+  //   - Nome do produto em negrito, truncado se passar das 32 colunas.
+  //   - Barcode CODE128 com HRI (texto sob as barras automatico).
+  //   - Bloco final: Peso/Producao/Validade/Lote em padLine 32 cols, alinhamento
+  //     direito limpo. Sem big() pra nao ficar esticado / quebrar em 2 linhas.
+  const empresa = (et.empresa || 'Minha empresa');
+  const prod = et.productName + (et.unit ? ' (' + et.unit + ')' : '');
+  const b = escPosBuilder().init();
+  b.center().bold().line(empresa).boldOff();
+  b.line(divider());
+  b.bold().line(asciiNorm(prod).slice(0, PRINT_COLS)).boldOff();
+  b.line(divider());
+  // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
+  b.push(...escPosBarcode128(et.codigoBarras));
   b.push(0x0A);
-  b.center().push(...escPosQrCommands(et.codigoBarras));
-  b.push(0x0A);
-  b.left().big();
-  if (et.weightG) b.line(padLineBig('Peso',  fmtPesoG(et.weightG)));
-  b.line(padLineBig('Producao', fmtDateBR(et.productionDate)));
-  b.line(padLineBig('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
-  b.line(padLineBig('Lote',     et.lote));
+  // Dados do lote alinhados em 2 colunas
+  b.left();
+  if (et.weightG) b.line(padLine('Peso',     fmtPesoG(et.weightG)));
+  b.line(padLine('Producao', fmtDateBR(et.productionDate)));
+  b.line(padLine('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
+  b.line(padLine('Lote',     et.lote));
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
@@ -5615,9 +5865,9 @@ function escPosLabelProducao(et) {
 function etiquetasToPng(etiquetas, kind) {
   // 384px ≈ 50mm @ ~195dpi — bate com a impressora térmica de 50mm.
   const W = 384;
-  // order tem QR (160px) + barcode (44px) + textos grandes → ~720px.
-  // produção: textos grandes + barcode (48px) → ~360px.
-  const ROW_H = kind === 'order' ? 760 : 380;
+  // order: blocos com cliente, itens, total, observacao e PIX.
+  // producao: branding, barcode e grade de lote/validade.
+  const ROW_H = kind === 'order' ? 620 : 430;
   const GAP = 20;
   const H = etiquetas.length * (ROW_H + GAP) + GAP;
   const canvas = document.createElement('canvas');
@@ -5648,74 +5898,101 @@ function etiquetasToPng(etiquetas, kind) {
 
 function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H) {
   const cx = W / 2;
-  let y = y0 + 12;
+  let y = y0 + 14;
   ctx.fillStyle = '#000';
   ctx.textAlign = 'center';
-  ctx.font = 'bold 26px monospace';
-  ctx.fillText(et.empresa.toUpperCase(), cx, y); y += 32;
-  // separador
-  ctx.fillRect(20, y, W - 40, 2); y += 10;
-  ctx.font = 'bold 22px monospace';
-  ctx.fillText((et.emoji + ' ' + et.productName).slice(0, 22), cx, y); y += 30;
-  ctx.fillRect(20, y, W - 40, 2); y += 8;
-  // barras
-  drawBarcodeOnCanvas(ctx, et.codigoBarras, 24, y, W - 48, 48); y += 54;
-  ctx.font = 'bold 16px monospace';
-  ctx.fillText(et.codigoBarras, cx, y); y += 24;
-  ctx.font = 'bold 18px monospace';
+  ctx.font = '900 12px monospace';
+  ctx.fillText('ETIQUETA DE LOTE', cx, y); y += 18;
+  ctx.font = '900 28px monospace';
+  ctx.fillText(et.empresa.toUpperCase().slice(0, 22), cx, y); y += 34;
+  ctx.font = '900 22px monospace';
+  ctx.fillText(et.productName.slice(0, 24), cx, y); y += 26;
+  if (et.unit) { ctx.font = '700 14px monospace'; ctx.fillText(et.unit, cx, y); y += 18; }
+  ctx.fillRect(26, y, W - 52, 2); y += 10;
+  drawBarcodeOnCanvas(ctx, et.codigoBarras, 28, y, W - 56, 50); y += 58;
+  ctx.font = '900 16px monospace';
+  ctx.fillText(et.codigoBarras, cx, y); y += 28;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y - 2, W - 40, 118);
+  ctx.font = '900 17px monospace';
   ctx.textAlign = 'left';
-  const lx = 24, rx = W - 24;
+  const lx = 34, rx = W - 34;
   if (et.weightG) {
-    ctx.fillText('Peso', lx, y); ctx.textAlign = 'right'; ctx.fillText(fmtPesoG(et.weightG), rx, y); ctx.textAlign = 'left'; y += 24;
+    ctx.fillText('Peso', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtPesoG(et.weightG), rx, y + 10); ctx.textAlign = 'left'; y += 26;
   }
-  ctx.fillText('Producao', lx, y); ctx.textAlign = 'right'; ctx.fillText(fmtDateBR(et.productionDate), rx, y); ctx.textAlign = 'left'; y += 24;
-  ctx.fillText('Validade', lx, y); ctx.textAlign = 'right'; ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '-', rx, y); ctx.textAlign = 'left'; y += 24;
-  ctx.fillText('Lote',     lx, y); ctx.textAlign = 'right'; ctx.fillText(et.lote, rx, y); ctx.textAlign = 'left';
+  ctx.fillText('Producao', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtDateBR(et.productionDate), rx, y + 10); ctx.textAlign = 'left'; y += 26;
+  ctx.fillText('Validade', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '-', rx, y + 10); ctx.textAlign = 'left'; y += 26;
+  ctx.fillText('Lote',     lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.lote, rx, y + 10); ctx.textAlign = 'left';
 }
 
 function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   // et = { order: o }
   const o = et.order;
+  const pixText = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
   const cx = W / 2;
-  let y = y0 + 12;
+  let y = y0 + 14;
   ctx.fillStyle = '#000';
   ctx.textAlign = 'center';
-  ctx.font = 'bold 26px monospace';
-  ctx.fillText((getEmpresaName() || 'Casa da Baba').toUpperCase(), cx, y); y += 32;
-  ctx.font = 'bold 18px monospace';
+  ctx.font = '900 12px monospace';
+  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 18;
+  ctx.font = '900 28px monospace';
+  ctx.fillText((getEmpresaName() || 'Easy Stock Mobile').toUpperCase().slice(0, 22), cx, y); y += 34;
+  ctx.font = '900 18px monospace';
   const orderRef = (o.id || '').slice(-8);
-  ctx.fillText('Pedido ' + orderRef, cx, y); y += 24;
-  ctx.fillRect(20, y, W - 40, 2); y += 10;
+  ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
+  ctx.font = '700 12px monospace';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
+  ctx.fillRect(24, y, W - 48, 2); y += 12;
   ctx.textAlign = 'left';
-  ctx.font = 'bold 17px monospace';
-  ctx.fillText(('Cliente: ' + (o.clientSnapshot?.name || 'Sem cliente')).slice(0, 26), 24, y); y += 22;
-  if (o.clientSnapshot?.ref) { ctx.fillText(String(o.clientSnapshot.ref).slice(0, 26), 24, y); y += 22; }
-  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), 24, y); y += 22;
-  ctx.fillRect(20, y, W - 40, 2); y += 8;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y, W - 40, 54);
+  ctx.font = '900 11px monospace';
+  ctx.fillText('CLIENTE', 30, y + 8);
+  ctx.font = '900 18px monospace';
+  ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 24), 30, y + 24);
+  if (o.clientSnapshot?.ref) {
+    ctx.textAlign = 'right';
+    ctx.font = '700 12px monospace';
+    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 18), W - 30, y + 10);
+    ctx.textAlign = 'left';
+  }
+  y += 70;
+  ctx.fillRect(24, y, W - 48, 2); y += 10;
   (o.items || []).forEach(it => {
-    ctx.fillText((it.qty + 'x ' + it.name).slice(0, 20), 24, y);
-    ctx.textAlign = 'right'; ctx.fillText(money(it.qty * it.unitPrice), W - 24, y); ctx.textAlign = 'left';
-    y += 22;
+    ctx.font = '900 15px monospace';
+    ctx.fillText((it.qty + 'x ' + it.name).slice(0, 24), 24, y);
+    if (it.unit) {
+      ctx.font = '700 11px monospace';
+      ctx.fillText(String(it.unit).slice(0, 20), 44, y + 16);
+    }
+    ctx.textAlign = 'right';
+    ctx.font = '900 15px monospace';
+    ctx.fillText(money(it.qty * it.unitPrice), W - 24, y);
+    ctx.textAlign = 'left';
+    y += it.unit ? 34 : 24;
   });
-  ctx.fillRect(20, y, W - 40, 2); y += 8;
-  ctx.font = 'bold 22px monospace';
+  ctx.fillRect(24, y, W - 48, 2); y += 12;
+  ctx.font = '900 24px monospace';
   ctx.fillText('TOTAL', 24, y);
   ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 24, y); ctx.textAlign = 'left';
-  y += 30;
-  // Barcode visual + texto
-  drawBarcodeOnCanvas(ctx, o.id || orderRef, 24, y, W - 48, 44); y += 50;
-  ctx.font = 'bold 18px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(orderRef, cx, y); y += 26;
-  // QR code centralizado
-  const qrSize = 160;
-  drawQrOnCanvas(ctx, `pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`, cx - qrSize/2, y, qrSize);
-  y += qrSize + 12;
-  ctx.textAlign = 'left';
-  ctx.font = 'bold 16px monospace';
-  ctx.fillText('PIX (' + ((PIX_TYPES[getPixType()]?.short) || 'Chave') + '):', 24, y); y += 20;
-  ctx.fillText(formatPixByType(getPixKey(), getPixType()), 24, y); y += 22;
-  ctx.fillText('Titular: ' + getPixHolder(), 24, y);
+  y += 34;
+  if (o.notes) {
+    ctx.strokeRect(20, y, W - 40, 52);
+    ctx.font = '900 11px monospace';
+    ctx.fillText('OBSERVACAO', 30, y + 8);
+    ctx.font = '700 13px monospace';
+    ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
+    y += 64;
+  }
+  ctx.strokeRect(20, y, W - 40, 68);
+  ctx.font = '900 11px monospace';
+  ctx.fillText('PAGAMENTO PIX', 30, y + 8);
+  ctx.font = '900 14px monospace';
+  ctx.fillText(pixText.slice(0, 28), 30, y + 24);
+  ctx.font = '700 12px monospace';
+  ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
 }
 
 function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
@@ -6006,37 +6283,43 @@ function printEtiqueta(orderId) {
 
 function orderLabelHtml(o) {
   const items = (o.items || []).map(it =>
-    `<div class="pa-item"><span class="pi-qty">${it.qty}×</span> ${escapeHtml(it.name)}<span>${money(it.qty*it.unitPrice)}</span></div>`
+    `<div class="pa-item">
+      <span class="pi-qty">${it.qty}×</span>
+      <span class="pi-main">
+        <span class="pi-name">${escapeHtml(it.name)}</span>
+        ${it.unit ? `<span class="pi-unit">${escapeHtml(it.unit)}</span>` : ''}
+      </span>
+      <span class="pi-price">${money(it.qty*it.unitPrice)}</span>
+    </div>`
   ).join('');
-  const empresa  = (getEmpresaName() || 'Casa da Baba').toUpperCase();
+  const empresa  = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
   const pixType  = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
-  const pixVal   = formatPixByType(getPixKey(), pixType);
+  const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
-  // Conteúdo do QR: ID do pedido + total — operador escaneia com qualquer leitor.
-  const qrPayload = `pedido:${o.id}|total:${(Number(o.total)||0).toFixed(2)}`;
-  const qr = generateQrSvg(qrPayload, 140);
-  const bars = buildBarcodePattern(o.id || 'order');
   return `
+    <div class="pa-kicker">Recibo de pedido</div>
     <div class="pa-title">${escapeHtml(empresa)}</div>
-    <div class="pa-center">Pedido ${escapeHtml(orderRef)}</div>
-    <div class="pa-sep">--------------------------------</div>
-    <div>Cliente: ${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
-    ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
-    <div>${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
-    <div class="pa-sep">--------------------------------</div>
-    ${items}
-    <div class="pa-sep">--------------------------------</div>
+    <div class="pa-center pa-bold">Pedido ${escapeHtml(orderRef)}</div>
+    <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
+    <div class="pa-grid">
+      <div class="pa-label">Cliente</div>
+      <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
+      ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
+    </div>
+    <div class="pa-block">
+      <div class="pa-label">Itens</div>
+      ${items}
+    </div>
+    <div class="pa-sep"></div>
     <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
-    ${o.notes ? `<div>Obs: ${escapeHtml(o.notes)}</div>` : ''}
-    <div class="pa-sep">--------------------------------</div>
-    <div class="et-bars">${bars}</div>
-    <div class="et-code">${escapeHtml(orderRef)}</div>
-    ${qr ? `<div class="et-qr">${qr}</div>` : ''}
-    <div class="pa-sep">--------------------------------</div>
-    <div>PIX (${escapeHtml(pixLabel)}): ${escapeHtml(pixVal)}</div>
-    <div>Titular: ${escapeHtml(getPixHolder())}</div>
-    ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}`;
+    ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
+    <div class="pa-grid">
+      <div class="pa-label">Pagamento PIX</div>
+      <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
+      <div>Titular: ${escapeHtml(getPixHolder())}</div>
+      ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
+    </div>`;
 }
 
 // Botões +/- explícitos nos tiles de produção
@@ -6811,6 +7094,7 @@ renderHome();
 renderOrdersFeed();
 updateSync();
 renderOperatorBadge();
+renderBrandName();
 window.CDB_OPERATOR = operatorName;
 
 // Welcome flow: se ainda não informou o nome, bloqueia o app até preencher.
@@ -6932,6 +7216,35 @@ function forceCheckUpdate() {
 // tem impressora termica pareada. Substitui o confirm() cinza do Android.
 function openNoPrinterModal()  { document.getElementById('noPrinterModal').classList.add('show'); }
 function closeNoPrinterModal() { document.getElementById('noPrinterModal').classList.remove('show'); }
+
+// Centraliza handlers dos botoes do noPrinterModal com try/catch + log
+// no btStep trail (visivel via Ajustes > Diagnostico). Se algum botao
+// nao responde, conseguimos ver o erro mesmo apos reiniciar o app.
+function npModalAction(kind) {
+  btStep('np-modal:' + kind + ':start');
+  try {
+    closeNoPrinterModal();
+    btStep('np-modal:' + kind + ':closed');
+    if (kind === 'configure') {
+      try { closeEtiquetasPreview(); } catch (e1) { btStep('np-modal:configure:closeEtq-err ' + (e1 && e1.message || e1)); }
+      try { openAjustes(); btStep('np-modal:configure:ajustes-ok'); }
+      catch (e2) {
+        btStep('np-modal:configure:ajustes-err ' + (e2 && e2.message || e2));
+        showToast('Erro ao abrir Ajustes: ' + (e2 && e2.message || e2));
+      }
+    } else if (kind === 'share') {
+      try { etqAction('share'); btStep('np-modal:share:ok'); }
+      catch (e3) {
+        btStep('np-modal:share:err ' + (e3 && e3.message || e3));
+        showToast('Erro ao compartilhar: ' + (e3 && e3.message || e3));
+      }
+    }
+    // 'cancel' so fecha — ja feito acima
+  } catch (e) {
+    btStep('np-modal:' + kind + ':OUTER-ERR ' + (e && e.message || e));
+    showToast('Erro: ' + (e && e.message || e));
+  }
+}
 
 // Modal "App atualizado": compara version do bundle atual com a ultima
 // vista pelo operador. Se mudou, mostra modal com release notes do commit.

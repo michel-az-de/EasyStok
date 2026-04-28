@@ -13,9 +13,9 @@
   },
   "plugins": {
     "CapacitorUpdater": {
-      "autoUpdate": true,
+      "autoUpdate": false,
       "updateUrl": "https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/api/updates",
-      "directUpdate": "always",
+      "directUpdate": "never",
       "responseTimeout": 20,
       "appReadyTimeout": 30000,
       "autoDeleteFailed": true,

@@ -1,13 +1,13 @@
 {
-  "name": "Casa da Baba",
-  "short_name": "Casa da Baba",
-  "description": "Ferramenta operacional do dia a dia: produção, pedidos, caixa",
+  "name": "Easy Stock Mobile",
+  "short_name": "Easy Stock",
+  "description": "PWA operacional white label para producao, pedidos, estoque e caixa",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a1410",
-  "theme_color": "#1a1410",
+  "background_color": "#111827",
+  "theme_color": "#111827",
   "lang": "pt-BR",
   "icons": [
     {
