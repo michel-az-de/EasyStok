@@ -4253,6 +4253,10 @@ function renderCash() {
 function advanceOrder(id) {
   const o = getOrderById(id);
   if (!o) return;
+  // Bloqueia pedido cancelado de ser avancado (cancelado nao esta em
+  // ORDER_FLOW entao cairia no return abaixo, mas explicitamos pra
+  // o operador receber feedback claro caso UI mostre botao por engano).
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido cancelado nao pode avancar'); return; }
   const idx = ORDER_FLOW.indexOf(o.status);
   if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
   const nextStatus = ORDER_FLOW[idx + 1];
@@ -4262,10 +4266,18 @@ function advanceOrder(id) {
 }
 
 function cancelOrder(id) {
-  if (!confirm('Cancelar esse pedido?')) return;
   const o = getOrderById(id);
   if (!o) return;
+  // Idempotencia: pedido ja cancelado nao re-executa devolucao de estoque.
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido ja esta cancelado'); return; }
+  // Confirmacao mais forte se ja foi entregue (afeta caixa do dia).
   const prev = o.status;
+  const wasDelivered = prev === STATUS.ENTREGUE;
+  const promptMsg = wasDelivered
+    ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
+    : 'Cancelar esse pedido?';
+  if (!confirm(promptMsg)) return;
+
   // Devolve ao estoque se o desconto já havia sido feito.
   if (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE) {
     o.items.forEach(it => {
@@ -4276,13 +4288,20 @@ function cancelOrder(id) {
   o.status = STATUS.CANCELADO;
   o.updatedAt = Date.now();
   o.lastOperatorName = operatorName || null;
-  addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado');
+  addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado' + (wasDelivered ? ' (estornado do caixa)' : ''));
+  // Audit log explicito pra entregues (afeta financeiro)
+  logAction({
+    action: 'order.delete', entityType: 'order', entityId: id,
+    summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
+  });
   persistAll();
   pendingSync++;
   updateSync();
   renderHome();
   renderOrdersFeed();
-  showToast('Pedido cancelado');
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showToast(wasDelivered ? `Pedido entregue cancelado · ${money(o.total)} estornado` : 'Pedido cancelado');
 }
 
 // =========================
@@ -4311,10 +4330,13 @@ function attachTileHandlers(tile, p) {
     qtyTimer = setTimeout(() => {
       tile.dataset.held = '1';
       const v = prompt(`${p.name}: quantidade exata?`, p.count);
-      if (v !== null && !isNaN(parseInt(v))) {
-        p.count = Math.max(0, parseInt(v));
-        renderProductGrid();
-      }
+      if (v === null) return;
+      // parseInt aceita "-10abc" -> -10. Validacao explicita: numero finito
+      // e nao-negativo. Limite max 9999 pra evitar overflow acidental.
+      const n = parseInt(v, 10);
+      if (!isFinite(n) || n < 0) { showToast('Quantidade inválida'); return; }
+      p.count = Math.min(9999, Math.max(0, n));
+      renderProductGrid();
     }, 500);
     menuTimer = setTimeout(() => {
       // Menu sobrescreve o prompt: cancela qtyTimer e marca held pra
@@ -6733,6 +6755,28 @@ function doConferScreenSearch() {
 function applyAdvanceTransition(id, nextStatus) {
   const o = getOrderById(id);
   if (!o) return;
+  // Se vai descontar estoque (transicao pra PRONTO), verifica ANTES se
+  // teria estoque negativo — e pede confirmacao explicita ao operador.
+  // (Felipe quer permitir negativo porque na pratica vai produzir, mas o
+  // alerta passivo era ignoravel demais e gerava saldos errados.)
+  if (nextStatus === STATUS.PRONTO) {
+    const wouldGoNegative = [];
+    o.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) {
+        const newStock = (p.stock || 0) - it.qty;
+        if (newStock < 0) wouldGoNegative.push(`${p.name}: ${p.stock || 0} - ${it.qty} = ${newStock}`);
+      }
+    });
+    if (wouldGoNegative.length > 0) {
+      const proceed = confirm(
+        '⚠️ ESTOQUE INSUFICIENTE\n\n' +
+        wouldGoNegative.join('\n') +
+        '\n\nMarcar como PRONTO mesmo assim? (estoque ficara negativo)'
+      );
+      if (!proceed) { showToast('Avanco cancelado'); return; }
+    }
+  }
   let negatives = [];
   if (nextStatus === STATUS.PRONTO) {
     o.items.forEach(it => {
@@ -6999,6 +7043,9 @@ function printViaBluetooth(bytes, onFallback) {
     printWatchdog = setTimeout(() => {
       showToast('Impressora não respondeu — liberando');
       releasePrinting();
+      // Tenta fechar socket pra evitar leak — se o write travou, o socket
+      // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
+      try { bs.disconnect(function () {}, function () {}); } catch (_) {}
     }, 15000);
     const send = () => {
       btStep('print:send-write');
@@ -7634,10 +7681,18 @@ async function etqAction(action) {
         const et = currentEtiquetas[0];
         printViaBluetooth(escPosOrderLabel(et.order), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
       } else {
-        const totalBytes = currentEtiquetas.reduce((acc, et) => {
+        // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
+        // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
+        // etiqueta, travando o app pra batches de 100+ unidades).
+        let totalLen = 0;
+        const parts = currentEtiquetas.map(et => {
           const b = escPosLabelProducao(et);
-          return Uint8Array.from([...acc, ...b]);
-        }, new Uint8Array());
+          totalLen += b.length;
+          return b;
+        });
+        const totalBytes = new Uint8Array(totalLen);
+        let off = 0;
+        for (const b of parts) { totalBytes.set(b, off); off += b.length; }
         printViaBluetooth(totalBytes, () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
       }
       return;
@@ -7734,7 +7789,11 @@ function decProduct(id) {
   haptic();
 }
 
+let _isSavingProduction = false;
 function confirmProduction() {
+  // Guard contra duplo-clique: bloqueia execucao concorrente que poderia
+  // gerar 2 batches duplicados + dobrar estoque.
+  if (_isSavingProduction) return;
   const itemsRaw = products.filter(p => p.count > 0);
   if (itemsRaw.length === 0) return;
 
@@ -7744,6 +7803,13 @@ function confirmProduction() {
     showToast('Defina a validade de cada produto');
     return;
   }
+  // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
+  for (const p of itemsRaw) {
+    const q = parseInt(p.count, 10);
+    if (!isFinite(q) || q <= 0) { showToast('Quantidade inválida em ' + p.name); return; }
+    p.count = q;
+  }
+  _isSavingProduction = true;
 
   const nowMs = Date.now();
   const lote  = getLoteDoDia(new Date(nowMs));
@@ -7760,12 +7826,6 @@ function confirmProduction() {
     };
   });
 
-  // Incrementa o estoque dos produtos produzidos
-  items.forEach(it => {
-    const p = products.find(x => x.id === it.productId);
-    if (p) p.stock = (p.stock || 0) + it.qty;
-  });
-
   const code = currentBatchCode || buildBatchCode(itemsRaw);
   const batch = {
     id: 'b-' + nowMs,
@@ -7776,8 +7836,16 @@ function confirmProduction() {
     lote,
     lastOperatorName: operatorName || null
   };
+  // Persiste o batch ANTES de mexer no estoque pra cobrir crash entre
+  // os dois passos: se persist falhar, estoque nem incrementa.
   batches.push(batch);
+  // Incrementa o estoque DEPOIS — mesma persistAll cobre os dois.
+  items.forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = (p.stock || 0) + it.qty;
+  });
   persistAll();
+  _isSavingProduction = false;
 
   clearProduction();
   closeProductionConfirm();
@@ -7998,6 +8066,13 @@ function renderItemPickerList(q) {
 }
 
 function addItemToOrder(product) {
+  // Guarda contra preco invalido — pedido com unitPrice=0 entra no caixa
+  // como R$ 0 e zera relatorios de venda.
+  const price = Number(product.price);
+  if (!isFinite(price) || price <= 0) {
+    showToast(`"${product.name}" sem preço cadastrado — defina em Ajustes > Catálogo`);
+    return;
+  }
   const existing = currentOrderItems.find(i => i.productId === product.id);
   if (existing) {
     existing.qty++;
@@ -8008,7 +8083,7 @@ function addItemToOrder(product) {
       emoji: product.emoji,
       unit: product.unit,
       qty: 1,
-      unitPrice: product.price || 0
+      unitPrice: price
     });
   }
   closeItemPicker();
@@ -8056,8 +8131,11 @@ function renderOrderItems() {
 function changeItemQty(idx, delta) {
   const it = currentOrderItems[idx];
   if (!it) return;
-  it.qty += delta;
-  if (it.qty <= 0) currentOrderItems.splice(idx, 1);
+  // Calcula nova qty sem aplicar — evita estado momentaneo negativo que
+  // poderia gerar render intermediario com qty < 0.
+  const next = (it.qty || 0) + delta;
+  if (next <= 0) currentOrderItems.splice(idx, 1);
+  else it.qty = next;
   renderOrderItems();
   updateSaveOrderBtn();
   haptic();
@@ -8100,8 +8178,16 @@ function saveOrder() {
   let retroAtMs = null;
   if (isRetro) {
     const dtRaw = (document.getElementById('retroDatetime')?.value || '').trim();
-    const t = dtRaw ? new Date(dtRaw).getTime() : NaN;
-    if (!isNaN(t) && t <= Date.now()) retroAtMs = t;
+    if (!dtRaw) { showToast('Data retroativa em branco'); return; }
+    const t = new Date(dtRaw).getTime();
+    if (!isFinite(t) || isNaN(t)) { showToast('Data retroativa inválida'); return; }
+    if (t > Date.now()) { showToast('Data retroativa não pode ser no futuro'); return; }
+    // Aviso se data for muito antiga (> 90 dias) — passa, mas sinaliza
+    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > ninetyDays) {
+      if (!confirm('Data retroativa é mais de 90 dias atrás.\n\nConfirmar?')) return;
+    }
+    retroAtMs = t;
   }
 
   const nowMs = Date.now();
