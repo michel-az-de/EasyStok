@@ -2096,6 +2096,13 @@ body {
   margin: 10px 0 8px; padding: 8px 0;
   border-top: 1px solid #000; border-bottom: 1px solid #000;
 }
+.etq-card .et-photo-wrap {
+  display: flex; justify-content: center; margin: 8px 0 4px;
+}
+.etq-card .et-photo {
+  max-width: 90%; max-height: 140px; object-fit: contain;
+  border: 1px solid #000; border-radius: 4px; background: #fff;
+}
 .etq-card .et-bars {
   display: flex; height: 50px; margin: 10px auto 4px;
   align-items: stretch; justify-content: center;
@@ -2285,6 +2292,13 @@ body {
 .mov-items .qty { font-weight: 700; color: var(--gold); }
 .mov-ref { font-size: 12px; color: var(--ink-mute); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .mov-ref .op { color: var(--gold); font-weight: 700; }
+.mov-actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.hist-action {
+  background: var(--gold); color: #000; border: 0;
+  padding: 9px 14px; border-radius: 8px;
+  font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer;
+}
+.hist-action:active { opacity: 0.8; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -3012,6 +3026,20 @@ body {
     </div>
   </div>
 
+  <!-- Modal "Acoes do produto" — aparece com long-press num tile de
+       produto na tela de Producao. Permite editar ou arquivar (soft
+       delete) o produto sem precisar ir ate Ajustes > Catalogo. -->
+  <div class="np-overlay" id="productActionsModal" role="dialog" aria-modal="true">
+    <div class="np-sheet">
+      <div class="np-icon" id="productActionsEmoji">📦</div>
+      <h3 class="np-title" id="productActionsTitle">Produto</h3>
+      <p class="np-text" id="productActionsSubtitle">O que deseja fazer?</p>
+      <button class="np-btn np-primary"   id="productActionsEdit">✏️ Editar produto</button>
+      <button class="np-btn np-secondary" id="productActionsArchive">🗑️ Arquivar</button>
+      <button class="np-btn np-tertiary"  onclick="closeProductActionsMenu()">Cancelar</button>
+    </div>
+  </div>
+
   <!-- Modal "Sem impressora" — aparece quando o operador toca em Imprimir
        sem ter pareado uma impressora termica. Substitui o confirm() do
        Android (cinza, fora do tema). Estilo igual ao modal de update. -->
@@ -3378,7 +3406,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -3796,7 +3824,10 @@ const CATEGORIES = [
 ];
 
 function attachTileHandlers(tile, p) {
-  // Clique no tile principal = +1 (mas não conta se clicou no botão camera)
+  // Tap curto: +1. Press 500ms: prompt de qty exata. Press 1500ms: abre
+  // menu de ações (Editar / Arquivar). O menu cancela o prompt setando
+  // dataset.held — quando o pointerup dispara depois, o click handler
+  // checa esse flag e não incrementa.
   tile.addEventListener('click', (e) => {
     if (e.target.closest('.camera-btn')) return;
     if (tile.dataset.held === '1') { tile.dataset.held = '0'; return; }
@@ -3804,8 +3835,9 @@ function attachTileHandlers(tile, p) {
     renderProductGrid();
     haptic();
   });
+  let qtyTimer = null, menuTimer = null;
   tile.addEventListener('pointerdown', () => {
-    holdTimer = setTimeout(() => {
+    qtyTimer = setTimeout(() => {
       tile.dataset.held = '1';
       const v = prompt(`${p.name}: quantidade exata?`, p.count);
       if (v !== null && !isNaN(parseInt(v))) {
@@ -3813,23 +3845,19 @@ function attachTileHandlers(tile, p) {
         renderProductGrid();
       }
     }, 500);
+    menuTimer = setTimeout(() => {
+      // Menu sobrescreve o prompt: cancela qtyTimer e marca held pra
+      // bloquear o +1 do click subsequente.
+      clearTimeout(qtyTimer);
+      tile.dataset.held = '1';
+      try { haptic(); } catch (e) {}
+      openProductActionsMenu(p.id);
+    }, 1500);
   });
-  tile.addEventListener('pointerup', () => clearTimeout(holdTimer));
-  tile.addEventListener('pointerleave', () => clearTimeout(holdTimer));
-  if (p.custom) {
-    let rt;
-    tile.addEventListener('pointerdown', () => {
-      rt = setTimeout(() => {
-        if (confirm(`Remover "${p.name}" do app?`)) {
-          products = products.filter(x => x.id !== p.id);
-          persistAll();
-          renderProductGrid();
-        }
-      }, 1400);
-    });
-    tile.addEventListener('pointerup', () => clearTimeout(rt));
-    tile.addEventListener('pointerleave', () => clearTimeout(rt));
-  }
+  const cancelTimers = () => { clearTimeout(qtyTimer); clearTimeout(menuTimer); };
+  tile.addEventListener('pointerup', cancelTimers);
+  tile.addEventListener('pointerleave', cancelTimers);
+  tile.addEventListener('pointercancel', cancelTimers);
 }
 
 function renderProductGrid() {
@@ -4230,6 +4258,11 @@ function renderHistoricoScreen() {
     const dt = new Date(e.ts);
     const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
       String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+    // Acoes contextuais por tipo de evento. Batch -> Reimprimir etiquetas.
+    let actions = '';
+    if (e.type === 'batch' && e.entityId && batches.some(b => b.id === e.entityId)) {
+      actions = `<div class="mov-actions"><button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')">🖨️ Reimprimir etiquetas</button></div>`;
+    }
     return `
       <div class="mov-item ${e.type}">
         <div class="mov-head">
@@ -4238,6 +4271,7 @@ function renderHistoricoScreen() {
         </div>
         <div class="mov-items">${escapeHtml(e.summary || '')}</div>
         <div class="mov-ref"><span class="op">por ${escapeHtml(e.operator || '—')}</span></div>
+        ${actions}
       </div>
     `;
   }).join('');
@@ -4245,6 +4279,22 @@ function renderHistoricoScreen() {
   // Mostra "Carregar mais" se ainda tem itens depois do shown atual
   document.getElementById('histLoadMore').style.display =
     filtered.length > histShown ? 'block' : 'none';
+}
+
+// Reimprime etiquetas de um lote ja registrado. Usado no Historico pra
+// recuperar etiquetas perdidas / imprimir copia adicional.
+function reprintFromBatchId(batchId) {
+  const batch = batches.find(b => b.id === batchId);
+  if (!batch) { showToast('Lote nao encontrado neste aparelho'); return; }
+  const etiquetas = etiquetasFromBatch(batch);
+  if (!etiquetas.length) { showToast('Lote sem itens pra etiquetar'); return; }
+  const lote = batch.lote || batch.code || batch.id;
+  showEtiquetasPreview(
+    etiquetas,
+    'producao',
+    `Lote ${lote} · ${etiquetas.length} etiqueta${etiquetas.length > 1 ? 's' : ''}`,
+    null
+  );
 }
 
 // Exporta o audit log inteiro como JSON via Share sheet (reusa plugin
@@ -5554,6 +5604,30 @@ function padLineBig(left, right) {
   }
   return left + ' '.repeat(Math.max(1, COLS - left.length - right.length)) + right;
 }
+// Quebra texto em N linhas preservando palavras inteiras. Se uma palavra
+// individual exceder cols, ela é cortada (último recurso). Usado pra nomes
+// de produto longos no recibo de produção e no canvas de preview.
+function wordWrap(text, cols) {
+  const words = asciiNorm(text).split(/\s+/).filter(Boolean);
+  const out = [];
+  let line = '';
+  for (const w of words) {
+    if (!line) {
+      line = w.length > cols ? w.slice(0, cols) : w;
+      if (w.length > cols) { out.push(line); line = ''; }
+      continue;
+    }
+    if ((line + ' ' + w).length <= cols) {
+      line += ' ' + w;
+    } else {
+      out.push(line);
+      line = w.length > cols ? w.slice(0, cols) : w;
+      if (w.length > cols) { out.push(line); line = ''; }
+    }
+  }
+  if (line) out.push(line);
+  return out.length ? out : [''];
+}
 
 // Builder de bytes ESC/POS com operações básicas (init, align, bold, text, LF).
 function escPosBuilder() {
@@ -5588,20 +5662,33 @@ function escPosTextLines(title, lines) {
 /**
  * Comandos GS k pra barcode CODE128 em ESC/POS (formato 2: GS k m n d1..dn).
  * Subset B (caracteres ASCII printable, suficiente pra letras+digitos+hifens).
- * HRI (texto legivel) abaixo do barcode, height ~7.5mm, width modular 2.
+ * HRI (texto legivel) abaixo do barcode.
+ *
+ * IMPORTANTE: largura modular 1 (GS w 1) — em width 2 a WTP05 estoura os
+ * 384 dots uteis com codigos de ~20+ chars e imprime literal "wide error!"
+ * em cima do barcode. Width 1 reduz pela metade, cabe folgado.
+ *
+ * Tamanho maximo do payload: 32 chars (apos prefixo {B). Acima disso,
+ * trunca + warn. Em width 1, 32 chars * 11 modulos = 352 dots — cabe.
  */
+const ESCPOS_BARCODE_MAX = 32;
 function escPosBarcode128(data) {
   const out = [];
   // HRI: caracteres legiveis ABAIXO do barcode (GS H 2)
   out.push(0x1D, 0x48, 0x02);
   // Fonte HRI: A (default, GS f 0)
   out.push(0x1D, 0x66, 0x00);
-  // Altura barcode em dots (GS h n) — 80 = ~10mm
-  out.push(0x1D, 0x68, 0x50);
-  // Largura modular (GS w n) — 2 fica compacto e legivel
-  out.push(0x1D, 0x77, 0x02);
+  // Altura barcode em dots (GS h n) — 70 = ~9mm, fica discreto sem cortar HRI
+  out.push(0x1D, 0x68, 0x46);
+  // Largura modular (GS w 1) — 1 dot por modulo, evita estouro de largura
+  out.push(0x1D, 0x77, 0x01);
+  let raw = String(data || '');
+  if (raw.length > ESCPOS_BARCODE_MAX) {
+    try { console.warn('escPosBarcode128: truncando payload', raw.length, '->', ESCPOS_BARCODE_MAX); } catch (e) {}
+    raw = raw.slice(0, ESCPOS_BARCODE_MAX);
+  }
   // Prefixo {B forca subset B (ASCII printable)
-  const payload = '{B' + (data || '');
+  const payload = '{B' + raw;
   const enc = PRINT_ENCODER.encode(payload);
   // GS k m n d1..dn — m=73 (CODE128 formato 2), n=length
   out.push(0x1D, 0x6B, 0x49, enc.length);
@@ -5803,7 +5890,11 @@ function etiquetasFromBatch(batch) {
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,
-        validityDays: it.validityDays ?? null
+        validityDays: it.validityDays ?? null,
+        // Foto opcional do produto (data URL). Aparece no preview HTML e
+        // no PNG salvo, mas NAO é enviada pra impressora térmica (ESC/POS
+        // imprimiria com qualidade ruim em monocromatico).
+        photo: it.photo || null
       });
       serial++;
     }
@@ -5816,10 +5907,13 @@ function etiquetaProducaoHtml(et) {
   const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
   const pixSafe = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
+  // Foto opcional do produto entre nome e barcode
+  const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
   return `
     <div class="et-kicker">Etiqueta de lote</div>
     <div class="et-title">${escapeHtml(et.empresa)}</div>
     <div class="et-prod">${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
+    ${photo}
     <div class="et-bars">${bars}</div>
     <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
     <div class="et-grid">
@@ -5843,7 +5937,10 @@ function escPosLabelProducao(et) {
   const b = escPosBuilder().init();
   b.center().bold().line(empresa).boldOff();
   b.line(divider());
-  b.bold().line(asciiNorm(prod).slice(0, PRINT_COLS)).boldOff();
+  // Nome do produto centralizado em negrito, quebrando em palavras se exceder.
+  b.bold();
+  wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
+  b.boldOff();
   b.line(divider());
   // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
   b.push(...escPosBarcode128(et.codigoBarras));
@@ -5867,7 +5964,9 @@ function etiquetasToPng(etiquetas, kind) {
   const W = 384;
   // order: blocos com cliente, itens, total, observacao e PIX.
   // producao: branding, barcode e grade de lote/validade.
-  const ROW_H = kind === 'order' ? 620 : 430;
+  // ROW_H: produção sem foto = 430; com foto = 590 (espaço pra miniatura).
+  const hasAnyPhoto = kind !== 'order' && etiquetas.some(et => et && et.photo);
+  const ROW_H = kind === 'order' ? 620 : (hasAnyPhoto ? 590 : 430);
   const GAP = 20;
   const H = etiquetas.length * (ROW_H + GAP) + GAP;
   const canvas = document.createElement('canvas');
@@ -5877,26 +5976,39 @@ function etiquetasToPng(etiquetas, kind) {
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
 
-  etiquetas.forEach((et, i) => {
-    const yTop = GAP + i * (ROW_H + GAP);
-    if (kind === 'order') {
-      drawOrderEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
-    } else {
-      drawProducaoEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
-    }
+  // Pre-carrega TODAS as fotos antes de desenhar — Image.onload é async,
+  // se não esperarmos o canvas sai sem fotos. Pre-load idempotente.
+  const photoPromises = etiquetas.map(et => {
+    if (!et || !et.photo) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = et.photo;
+    });
   });
 
-  return new Promise((resolve, reject) => {
-    try {
-      canvas.toBlob(b => {
-        if (b) resolve(b);
-        else reject(new Error('toBlob retornou null'));
-      }, 'image/png');
-    } catch (e) { reject(e); }
+  return Promise.all(photoPromises).then(images => {
+    etiquetas.forEach((et, i) => {
+      const yTop = GAP + i * (ROW_H + GAP);
+      if (kind === 'order') {
+        drawOrderEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
+      } else {
+        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, ROW_H, images[i]);
+      }
+    });
+    return new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob(b => {
+          if (b) resolve(b);
+          else reject(new Error('toBlob retornou null'));
+        }, 'image/png');
+      } catch (e) { reject(e); }
+    });
   });
 }
 
-function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H) {
+function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
   const cx = W / 2;
   let y = y0 + 14;
   ctx.fillStyle = '#000';
@@ -5906,9 +6018,23 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = '900 28px monospace';
   ctx.fillText(et.empresa.toUpperCase().slice(0, 22), cx, y); y += 34;
   ctx.font = '900 22px monospace';
-  ctx.fillText(et.productName.slice(0, 24), cx, y); y += 26;
+  // Nome do produto com word-wrap (preserva palavras inteiras)
+  wordWrap(et.productName, 24).forEach(l => { ctx.fillText(l, cx, y); y += 26; });
   if (et.unit) { ctx.font = '700 14px monospace'; ctx.fillText(et.unit, cx, y); y += 18; }
   ctx.fillRect(26, y, W - 52, 2); y += 10;
+  // Foto opcional (preserva aspect ratio, max 140px de altura)
+  if (photoImg && photoImg.width && photoImg.height) {
+    const maxW = W - 60;
+    const maxH = 140;
+    const ratio = Math.min(maxW / photoImg.width, maxH / photoImg.height);
+    const dw = Math.floor(photoImg.width * ratio);
+    const dh = Math.floor(photoImg.height * ratio);
+    const dx = Math.floor((W - dw) / 2);
+    ctx.drawImage(photoImg, dx, y, dw, dh);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.strokeRect(dx, y, dw, dh);
+    y += dh + 10;
+  }
   drawBarcodeOnCanvas(ctx, et.codigoBarras, 28, y, W - 56, 50); y += 58;
   ctx.font = '900 16px monospace';
   ctx.fillText(et.codigoBarras, cx, y); y += 28;
@@ -6904,6 +7030,52 @@ function openProductModalForEdit(productId) {
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
   document.getElementById('newProductModal').classList.add('show');
+}
+
+// Long-press num tile de produto (tela de Producao) abre esse menu pra
+// editar ou arquivar/restaurar sem precisar ir até Ajustes > Catalogo.
+function openProductActionsMenu(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  document.getElementById('productActionsEmoji').textContent = p.emoji || '📦';
+  document.getElementById('productActionsTitle').textContent = p.name;
+  document.getElementById('productActionsSubtitle').textContent =
+    p.archived ? 'Produto arquivado. O que deseja fazer?' : 'O que deseja fazer?';
+
+  const editBtn = document.getElementById('productActionsEdit');
+  editBtn.onclick = function () {
+    closeProductActionsMenu();
+    try { openProductModalForEdit(productId); }
+    catch (e) { showToast('Erro: ' + (e && e.message || e)); }
+  };
+
+  const archBtn = document.getElementById('productActionsArchive');
+  if (p.archived) {
+    archBtn.textContent = '↩️ Restaurar';
+    archBtn.onclick = function () {
+      closeProductActionsMenu();
+      p.archived = false;
+      persistAll();
+      renderProductGrid();
+      if (typeof renderCatalogList === 'function') renderCatalogList();
+      logAction({
+        action: 'product.update', entityType: 'product', entityId: productId,
+        summary: 'Restaurou produto ' + p.name, diff: { archived: { before: true, after: false } }
+      });
+      showToast(p.name + ' restaurado');
+    };
+  } else {
+    archBtn.textContent = '🗑️ Arquivar';
+    archBtn.onclick = function () {
+      closeProductActionsMenu();
+      archiveProduct(productId);
+    };
+  }
+
+  document.getElementById('productActionsModal').classList.add('show');
+}
+function closeProductActionsMenu() {
+  document.getElementById('productActionsModal').classList.remove('show');
 }
 
 // Soft-delete: marca produto como archived (mantem em pedidos antigos)
