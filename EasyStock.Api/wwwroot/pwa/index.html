@@ -2033,6 +2033,25 @@ body {
 .confer-tab:active { transform: scale(0.98); }
 [data-theme="light"] .confer-tab.active { background: var(--gold); color: #fff; }
 
+/* Header de screen com botao back (usado em Caixa, e futuras screens) */
+.screen-header {
+  display: flex; align-items: center; gap: 12px;
+  margin: -4px 0 12px; padding: 4px 0;
+}
+.screen-back {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  width: 36px; height: 36px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink); padding: 0;
+}
+.screen-back:active { transform: scale(0.95); }
+.screen-title {
+  font-family: 'Fraunces', serif; font-weight: 700;
+  font-size: 22px; margin: 0; color: var(--ink);
+  flex: 1; min-width: 0;
+}
+[data-theme="light"] .screen-back { background: #fff; }
+
 /* Tabs de tela (Pedidos: Novo/Andamento; Ajustes: Loja/Equip/Manut) */
 .screen-tabs {
   display: flex; gap: 6px; margin: 6px 0 14px;
@@ -3174,6 +3193,34 @@ body {
     <!-- COMPRAR -->
     <!-- FINALIZADOS — pedidos entregues e cancelados, com a\u00e7\u00f5es de
          cancelar (entregue) e excluir registro (cancelado). -->
+    <!-- CAIXA — screen dedicada (Onda 2.3, antes era modal cashDetailsModal).
+         Acessada via tap no card colapsado da home. cashCloseModal e
+         cashEntryModal continuam como modais por cima desta screen. -->
+    <div class="screen" data-screen="caixa">
+      <div class="screen-header">
+        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="screen-title">Caixa de hoje</h2>
+      </div>
+
+      <div id="cashDetailsClosedBanner" style="display:none;background:var(--gold-soft);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;margin-bottom:10px">
+        🔒 Caixa do dia já foi fechado. Reabra primeiro pra editar.
+      </div>
+      <div id="cashDetailsSummary" style="background:var(--bg-elev);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;font-size:14px"></div>
+
+      <div id="cashDetailsActions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="openCashModal()">+ Lançamento manual</button>
+        <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
+        <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
+      </div>
+
+      <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
+      <div id="cashDetailsList" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
+      <div class="cf-label">Pedidos entregues hoje</div>
+      <div id="cashDetailsOrders" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
+    </div>
+
     <div class="screen" data-screen="finalizados">
       <div class="section-label">Pedidos finalizados</div>
       <div class="mov-filter" id="finFilter">
@@ -3611,32 +3658,10 @@ body {
     </div>
   </div>
 
-  <!-- Modal Detalhes do Caixa do Dia -->
-  <div class="np-overlay" id="cashDetailsModal" role="dialog" aria-modal="true">
-    <div class="np-sheet" style="max-width:480px;text-align:left">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <h3 class="np-title" style="text-align:left">Caixa de hoje</h3>
-        <button onclick="closeCashDetails()" style="background:transparent;border:0;color:var(--ink-mute);font-size:24px;cursor:pointer;padding:0 4px">×</button>
-      </div>
-      <div id="cashDetailsClosedBanner" style="display:none;background:var(--gold-soft);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;margin-bottom:10px">
-        🔒 Caixa do dia já foi fechado. Reabra primeiro pra editar.
-      </div>
-      <div id="cashDetailsSummary" style="background:var(--bg-elev);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;font-size:14px"></div>
-
-      <!-- Acoes principais (migradas do card da home) -->
-      <div id="cashDetailsActions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-        <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="closeCashDetails(); openCashModal()">+ Lançamento manual</button>
-        <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="closeCashDetails(); openCashCloseModal()">🔒 Fechar caixa do dia</button>
-        <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="closeCashDetails(); reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
-      </div>
-
-      <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
-      <div id="cashDetailsList" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
-      <div class="cf-label">Pedidos entregues hoje</div>
-      <div id="cashDetailsOrders" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
-      <button class="np-btn np-tertiary" onclick="closeCashDetails()">Fechar</button>
-    </div>
-  </div>
+  <!-- (Onda 2.3) cashDetailsModal foi convertido em screen
+       data-screen="caixa" — sem modal aninhado. Conteudo migrado pra
+       baixo de #content. cashCloseModal e cashEntryModal continuam como
+       modais (abrem por cima da screen Caixa). -->
 
   <!-- Modal Fechar Caixa do Dia -->
   <div class="np-overlay" id="cashCloseModal" role="dialog" aria-modal="true">
@@ -4168,7 +4193,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashDetailsModal','cashCloseModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashCloseModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -4384,6 +4409,7 @@ function go(screen) {
   if (screen === 'historico')    renderHistoricoScreen();
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
+  if (screen === 'caixa')        renderCashDetails();
 }
 
 // Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
@@ -5439,13 +5465,10 @@ function reopenCashDay() {
 }
 
 // ===== DETALHES DO CAIXA DO DIA =====
-function openCashDetails() {
-  document.getElementById('cashDetailsModal').classList.add('show');
-  renderCashDetails();
-}
-function closeCashDetails() {
-  document.getElementById('cashDetailsModal').classList.remove('show');
-}
+// (Onda 2.3) Caixa virou screen dedicada — alias mantidos pra nao quebrar
+// referencias antigas (botao do card da home, callbacks de outros lugares).
+function openCashDetails() { go('caixa'); }
+function closeCashDetails() { /* no-op: navegacao pela back button */ }
 function renderCashDetails() {
   const sum = calcCashSummaryToday();
   document.getElementById('cashDetailsSummary').innerHTML = `
