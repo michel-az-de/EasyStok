@@ -1775,6 +1775,54 @@ body {
 .btn-confer-ok { background: var(--accent); color: white; }
 .btn-confer-ok:active, .btn-confer-cancel:active { transform: scale(0.97); }
 
+/* Confer modal redesenhado — 3 blocos */
+.confer-sheet { max-width: 420px; }
+.cf-block { margin-bottom: 14px; }
+.cf-block:last-child { margin-bottom: 0; }
+.cf-badge {
+  display: inline-block; padding: 6px 12px; border-radius: 100px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.cf-badge.pendente   { background: var(--gold-soft); color: var(--gold); }
+.cf-badge.conferido  { background: var(--basil-soft); color: var(--basil); }
+.cf-badge.divergencia { background: var(--accent-soft); color: var(--accent); }
+.cf-title { font-family: 'Fraunces', serif; font-size: 22px; margin: 0 0 4px; color: var(--gold); }
+.cf-meta { font-size: 13px; color: var(--ink-dim); }
+.cf-label { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 6px; }
+.cf-notes {
+  background: var(--accent-soft); border-left: 3px solid var(--accent);
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px;
+}
+.cf-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.cf-btn {
+  width: 100%; padding: 14px; border: 0; border-radius: 10px;
+  font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.cf-btn:active { transform: scale(0.98); }
+.cf-ok    { background: var(--basil); color: #06281e; }
+.cf-adj   { background: var(--gold); color: #1c1408; }
+.cf-prob  { background: var(--accent); color: #fff; }
+.cf-cancel { background: transparent; color: var(--ink-mute); border: 1px solid var(--line) !important; }
+
+/* Selo de status nos cards do kanban */
+.k-confer-badge {
+  display: inline-block; padding: 3px 8px; border-radius: 100px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-left: 6px;
+}
+.k-confer-badge.pendente   { background: var(--gold-soft); color: var(--gold); }
+.k-confer-badge.conferido  { background: var(--basil-soft); color: var(--basil); }
+.k-confer-badge.divergencia { background: var(--accent-soft); color: var(--accent); }
+.k-confer-btn {
+  background: var(--basil); color: #06281e; border: 0;
+  padding: 6px 10px; border-radius: 8px;
+  font-size: 12px; font-weight: 800; cursor: pointer;
+  margin-left: 6px;
+}
+.k-confer-btn:active { opacity: 0.8; }
+
 /* ========== Modal Histórico ========== */
 .historico-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.7);
@@ -2149,6 +2197,14 @@ body {
 .etq-card .pa-note {
   border: 1px dashed #000; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
 }
+.etq-card .pa-confer {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 1.5px solid #000; border-radius: 12px; padding: 12px;
+  margin: 10px 0;
+}
+.etq-card .pa-confer-qr svg { display: block; max-width: 130px; height: auto; }
+.etq-card .pa-confer-code { font-size: 16px; letter-spacing: 0.05em; }
+.etq-card .pa-confer-hint { font-size: 11px; color: #555; }
 .etq-actions {
   display: flex; gap: 8px; padding: 12px 16px;
   background: var(--bg);
@@ -2660,6 +2716,9 @@ body {
 
       <div class="today-divider" id="kanbanDivider">esteira de produção</div>
       <div id="kanban"></div>
+      <div style="display:flex;justify-content:center;margin:14px 0 4px">
+        <button class="cf-btn cf-adj" style="max-width:280px" onclick="openConferBusca()">🔍 Conferir por código</button>
+      </div>
     </div>
 
     <!-- COMPRAR -->
@@ -2969,20 +3028,72 @@ body {
     </div>
   </div>
 
-  <!-- Modal de Conferência (antes de marcar entregue) -->
+  <!-- Modal de Conferência — 3 blocos: identificação, conteúdo, decisão.
+       Decisão: Confere tudo / Ajustar / Reportar problema (3 botões grandes). -->
   <div class="confer-overlay" id="conferModal" role="dialog" aria-modal="true">
     <div class="confer-sheet">
-      <h3>Confere o pedido?</h3>
-      <div class="who" id="conferWho">cliente</div>
-      <div class="confer-items" id="conferItems"></div>
-      <div class="confer-total">
-        <span>Total</span>
-        <span class="ct-value" id="conferTotal">R$ 0,00</span>
+      <!-- Bloco 1: identificação -->
+      <div class="cf-block">
+        <div class="cf-badge" id="conferStatusBadge">Aguardando conferência</div>
+        <h3 class="cf-title" id="conferTitle">Pedido #</h3>
+        <div class="cf-meta" id="conferMeta">cliente · horário</div>
       </div>
-      <div class="confer-actions">
-        <button class="btn-confer-cancel" onclick="closeConfer()">Cancelar</button>
-        <button class="btn-confer-ok" onclick="confirmConfer()">Confere e finalizar</button>
+      <!-- Bloco 2: conteúdo -->
+      <div class="cf-block cf-block-items">
+        <div class="cf-label">Itens</div>
+        <div class="confer-items" id="conferItems"></div>
+        <div class="confer-total"><span>Total</span><span class="ct-value" id="conferTotal">R$ 0,00</span></div>
+        <div class="cf-notes" id="conferNotes" style="display:none"></div>
       </div>
+      <!-- Bloco 3: decisão -->
+      <div class="cf-actions">
+        <button class="cf-btn cf-ok" onclick="confirmConfer()">✓ Confere tudo</button>
+        <button class="cf-btn cf-adj" onclick="openAjustar()">✏️ Ajustar</button>
+        <button class="cf-btn cf-prob" onclick="openProblema()">⚠️ Reportar problema</button>
+        <button class="cf-btn cf-cancel" onclick="closeConfer()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Ajustar — operador corrige quantidades e adiciona obs curta. -->
+  <div class="np-overlay" id="ajustarModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:420px">
+      <div class="np-icon">✏️</div>
+      <h3 class="np-title">Ajustar pedido</h3>
+      <p class="np-text">Corrija quantidades ou adicione observação.</p>
+      <div id="ajustarItems" style="text-align:left;margin:8px 0 14px;display:flex;flex-direction:column;gap:8px"></div>
+      <textarea id="ajustarNotes" placeholder="Observação curta (opcional)" rows="2" style="width:100%;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;resize:vertical;margin-bottom:12px"></textarea>
+      <button class="np-btn np-primary" onclick="saveAjustar()">Salvar ajuste</button>
+      <button class="np-btn np-tertiary" onclick="closeAjustar()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal Reportar problema — categoria + obs opcional curta. -->
+  <div class="np-overlay" id="problemaModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:420px">
+      <div class="np-icon">⚠️</div>
+      <h3 class="np-title">Reportar problema</h3>
+      <p class="np-text">Selecione a categoria e adicione detalhe se quiser.</p>
+      <div id="problemaCategorias" style="text-align:left;margin:8px 0 14px;display:flex;flex-direction:column;gap:6px"></div>
+      <textarea id="problemaNotes" placeholder="Detalhe (opcional)" rows="2" style="width:100%;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;resize:vertical;margin-bottom:12px"></textarea>
+      <button class="np-btn np-primary" onclick="saveProblema()">Reportar</button>
+      <button class="np-btn np-tertiary" onclick="closeProblema()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal Buscar por código curto — campo grande, foco automatico, busca match em pedidos. -->
+  <div class="np-overlay" id="conferBuscaModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:380px">
+      <div class="np-icon">🔍</div>
+      <h3 class="np-title">Conferir pedido</h3>
+      <p class="np-text">Digite o código curto da etiqueta (8 caracteres).</p>
+      <input id="conferBuscaInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
+             placeholder="ex: 24467287"
+             style="width:100%;background:var(--bg-elev);color:var(--ink);border:1.5px solid var(--gold);border-radius:10px;padding:14px;font-size:18px;letter-spacing:0.08em;text-align:center;text-transform:uppercase;margin-bottom:14px"
+             oninput="onConferBuscaInput()" onkeydown="if(event.key==='Enter') doConferBusca()">
+      <div id="conferBuscaHint" style="font-size:13px;color:var(--ink-mute);margin-bottom:12px;min-height:18px"></div>
+      <button class="np-btn np-primary" onclick="doConferBusca()">Abrir conferência</button>
+      <button class="np-btn np-tertiary" onclick="closeConferBusca()">Cancelar</button>
     </div>
   </div>
 
@@ -3406,7 +3517,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -4180,6 +4291,9 @@ const HIST_ACTION_META = {
   'order.create':         { icon: '📋', label: 'Pedido criado',       type: 'order' },
   'order.status_change':  { icon: '🔄', label: 'Status do pedido',    type: 'order' },
   'order.delete':         { icon: '❌', label: 'Pedido excluído',     type: 'order' },
+  'order.confirm_ok':     { icon: '✅', label: 'Conferido',           type: 'order' },
+  'order.confirm_adjust': { icon: '✏️', label: 'Conferido com ajuste', type: 'order' },
+  'order.confirm_problem':{ icon: '⚠️', label: 'Divergência reportada', type: 'order' },
   'cash.manual_entry':    { icon: '💰', label: 'Lançamento de caixa', type: 'cash' },
   'settings.update':      { icon: '⚙️', label: 'Ajustes alterados',  type: 'settings' },
   'backup.export':        { icon: '⬇️', label: 'Backup exportado',    type: 'backup' },
@@ -4592,10 +4706,14 @@ function renderKanbanCard(o, col) {
   const itemsLine = (o.items || []).map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
   const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
   const itemCount = (o.items || []).reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
+  // Selo de status de conferência ao lado do status do kanban
+  const cs = getConferStatus(o);
+  const conferBadge = `<span class="k-confer-badge ${cs}">${conferStatusLabel(cs)}</span>`;
+  const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? '✓ Conferir' : '✓ Reconferir';
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        <span class="k-status">${col.label}</span>
+        <span class="k-status">${col.label}</span>${conferBadge}
         <div class="k-time">${timeOf(o.createdAt)}</div>
       </div>
       <div class="k-head">
@@ -4611,6 +4729,7 @@ function renderKanbanCard(o, col) {
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
         <div class="k-actions">
+          <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
           <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
           <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
@@ -5501,33 +5620,223 @@ function resetRetroToggle() { setRetroActive(false); }
 // ================================================================
 // CONFERÊNCIA — antes de marcar entregue, abre modal de revisão
 // ================================================================
+// CONFERÊNCIA — modal de 3 blocos (identificação / itens / decisão)
+// 3 ações: Confere tudo / Ajustar / Reportar problema.
+// Estado guardado em order.confirmation = { status, by, at, type, notes, adjustments, problem }
+//   status: 'pendente' | 'conferido' | 'divergencia'
+//   type: 'ok' | 'adjust' | 'problem'  (ação que mudou o estado)
+const CONFER_STATUS = { PENDENTE: 'pendente', CONFERIDO: 'conferido', DIVERGENCIA: 'divergencia' };
+const PROBLEMA_OPCOES = [
+  { key: 'item-ausente',     label: 'Item ausente' },
+  { key: 'etiqueta-errada',  label: 'Etiqueta errada' },
+  { key: 'volume-trocado',   label: 'Volume trocado' },
+  { key: 'avariado',         label: 'Produto avariado' },
+  { key: 'outro',            label: 'Outro' }
+];
+
+function getConferStatus(o) {
+  if (!o) return CONFER_STATUS.PENDENTE;
+  if (o.confirmation && o.confirmation.status) return o.confirmation.status;
+  // Compat legado: se tem confirmedBy/At, ja foi conferido
+  if (o.confirmedBy || o.confirmedAt) return CONFER_STATUS.CONFERIDO;
+  return CONFER_STATUS.PENDENTE;
+}
+function conferStatusLabel(s) {
+  if (s === CONFER_STATUS.CONFERIDO)   return '✓ Conferido';
+  if (s === CONFER_STATUS.DIVERGENCIA) return '⚠ Divergência';
+  return 'Aguardando conferência';
+}
+
 let pendingConferOrderId = null;
 function openConfer(orderId) {
   const o = getOrderById(orderId);
-  if (!o) return;
+  if (!o) { showToast('Pedido não encontrado'); return; }
   pendingConferOrderId = orderId;
-  document.getElementById('conferWho').textContent =
-    (o.clientSnapshot?.name || 'Sem cliente') + (o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '');
+  const orderRef = (o.id || '').slice(-8);
+  const cliente = o.clientSnapshot?.name || 'Sem cliente';
+  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
+  // Bloco 1: identificação
+  const status = getConferStatus(o);
+  const badge = document.getElementById('conferStatusBadge');
+  badge.textContent = conferStatusLabel(status);
+  badge.className = 'cf-badge ' + status;
+  document.getElementById('conferTitle').textContent = 'Pedido #' + orderRef;
+  document.getElementById('conferMeta').textContent = cliente + ref + ' · ' + data;
+  // Bloco 2: itens + obs
   document.getElementById('conferTotal').textContent = money(o.total);
   document.getElementById('conferItems').innerHTML = (o.items || []).map(it =>
-    `<div class="ci-row"><span>${it.qty}× ${escapeHtml(it.name)}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
+    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
   ).join('');
+  const notesEl = document.getElementById('conferNotes');
+  if (o.notes) {
+    notesEl.style.display = 'block';
+    notesEl.innerHTML = '<b>Obs:</b> ' + escapeHtml(o.notes);
+  } else {
+    notesEl.style.display = 'none';
+  }
   toggleModal('conferModal', true);
 }
 function closeConfer() {
   pendingConferOrderId = null;
   toggleModal('conferModal', false);
 }
+
+// Aplica resultado da conferência: atualiza order.confirmation, registra
+// audit log e history do pedido. NÃO avança status automaticamente —
+// operador mantém controle do kanban (assim divergência fica visível
+// até ele decidir entregar mesmo assim ou cancelar).
+function applyConfirmation(orderId, type, payload) {
+  const o = getOrderById(orderId);
+  if (!o) return;
+  const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
+  const conf = {
+    status, type,
+    by: operatorName || null,
+    at: Date.now(),
+    notes: payload && payload.notes || null,
+    adjustments: payload && payload.adjustments || null,
+    problem: payload && payload.problem || null
+  };
+  o.confirmation = conf;
+  // Compat legado
+  o.confirmedBy = conf.by;
+  o.confirmedAt = conf.at;
+  // History do pedido
+  let change = 'Confere tudo';
+  if (type === 'adjust') change = 'Ajustou: ' + (conf.notes || (conf.adjustments || []).map(a => a.name + '→' + a.correctedQty).join(', '));
+  if (type === 'problem') change = 'Problema: ' + (PROBLEMA_OPCOES.find(p => p.key === conf.problem)?.label || conf.problem) + (conf.notes ? ' · ' + conf.notes : '');
+  addHistoryEvent(o, STATUS.CONFERIDO, change);
+  // Audit log global
+  const action = type === 'ok' ? 'order.confirm_ok' : (type === 'adjust' ? 'order.confirm_adjust' : 'order.confirm_problem');
+  logAction({
+    action, entityType: 'order', entityId: orderId,
+    summary: `Pedido ${(o.id||'').slice(-8)} · ${conferStatusLabel(status)} · ${change}`
+  });
+  persistAll();
+  // Re-render kanban e historico se abertos
+  if (typeof renderKanban === 'function') renderKanban();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+}
+
 function confirmConfer() {
   const id = pendingConferOrderId;
+  if (!id) return;
   closeConfer();
+  applyConfirmation(id, 'ok', null);
+  showToast('✓ Conferido por ' + (operatorName || 'operador'));
+  // Mantém o pedido no kanban — operador decide quando avançar pra entregue.
+}
+
+// ===== AJUSTAR =====
+function openAjustar() {
+  const id = pendingConferOrderId;
   if (!id) return;
   const o = getOrderById(id);
   if (!o) return;
-  o.confirmedBy = operatorName || null;
-  o.confirmedAt = Date.now();
-  addHistoryEvent(o, STATUS.CONFERIDO, 'finalizou e conferiu');
-  applyAdvanceTransition(id, STATUS.ENTREGUE);
+  const host = document.getElementById('ajustarItems');
+  host.innerHTML = (o.items || []).map((it, idx) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elev);border-radius:8px">
+       <div style="flex:1;font-size:14px">${escapeHtml(it.name)}</div>
+       <input type="number" min="0" step="1" value="${it.qty}" data-idx="${idx}" data-original="${it.qty}"
+              class="ajustar-qty"
+              style="width:64px;text-align:center;background:var(--bg-card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font-size:15px;font-weight:700">
+     </div>`
+  ).join('');
+  document.getElementById('ajustarNotes').value = '';
+  toggleModal('ajustarModal', true);
+}
+function closeAjustar() { toggleModal('ajustarModal', false); }
+function saveAjustar() {
+  const id = pendingConferOrderId;
+  if (!id) { closeAjustar(); return; }
+  const o = getOrderById(id);
+  if (!o) { closeAjustar(); return; }
+  const adjustments = [];
+  document.querySelectorAll('#ajustarItems .ajustar-qty').forEach(inp => {
+    const idx = parseInt(inp.dataset.idx, 10);
+    const original = parseInt(inp.dataset.original, 10);
+    const corrected = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+    if (corrected !== original) {
+      const it = o.items[idx];
+      adjustments.push({ name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
+    }
+  });
+  const notes = (document.getElementById('ajustarNotes').value || '').trim() || null;
+  if (!adjustments.length && !notes) {
+    showToast('Nenhum ajuste informado');
+    return;
+  }
+  closeAjustar();
+  closeConfer();
+  applyConfirmation(id, 'adjust', { adjustments, notes });
+  showToast('✏️ Ajuste registrado');
+}
+
+// ===== REPORTAR PROBLEMA =====
+function openProblema() {
+  const id = pendingConferOrderId;
+  if (!id) return;
+  const host = document.getElementById('problemaCategorias');
+  host.innerHTML = PROBLEMA_OPCOES.map((opt, i) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elev);border-radius:10px;cursor:pointer;font-size:14px">
+       <input type="radio" name="probCat" value="${opt.key}"${i===0?' checked':''} style="accent-color:var(--accent)">
+       <span>${opt.label}</span>
+     </label>`
+  ).join('');
+  document.getElementById('problemaNotes').value = '';
+  toggleModal('problemaModal', true);
+}
+function closeProblema() { toggleModal('problemaModal', false); }
+function saveProblema() {
+  const id = pendingConferOrderId;
+  if (!id) { closeProblema(); return; }
+  const sel = document.querySelector('#problemaCategorias input[name="probCat"]:checked');
+  const problem = sel ? sel.value : 'outro';
+  const notes = (document.getElementById('problemaNotes').value || '').trim() || null;
+  closeProblema();
+  closeConfer();
+  applyConfirmation(id, 'problem', { problem, notes });
+  showToast('⚠️ Problema reportado');
+}
+
+// ===== BUSCA POR CÓDIGO CURTO =====
+function openConferBusca() {
+  document.getElementById('conferBuscaInput').value = '';
+  document.getElementById('conferBuscaHint').textContent = '';
+  toggleModal('conferBuscaModal', true);
+  setTimeout(() => { try { document.getElementById('conferBuscaInput').focus(); } catch (e) {} }, 100);
+}
+function closeConferBusca() { toggleModal('conferBuscaModal', false); }
+function findOrderByShortCode(code) {
+  const c = String(code || '').trim().toLowerCase();
+  if (!c) return null;
+  // Tenta match nos ultimos 8 chars (orderRef impresso)
+  return orders.find(o => (o.id || '').toLowerCase().slice(-8) === c)
+      || orders.find(o => (o.id || '').toLowerCase() === c)
+      || null;
+}
+function onConferBuscaInput() {
+  const code = document.getElementById('conferBuscaInput').value;
+  const hint = document.getElementById('conferBuscaHint');
+  if (!code) { hint.textContent = ''; return; }
+  const o = findOrderByShortCode(code);
+  if (o) {
+    const cliente = o.clientSnapshot?.name || 'Sem cliente';
+    const status = getConferStatus(o);
+    hint.innerHTML = `<span style="color:var(--basil)">✓ ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
+  } else if (code.length >= 4) {
+    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido com esse código</span>';
+  } else {
+    hint.textContent = 'Continue digitando…';
+  }
+}
+function doConferBusca() {
+  const code = document.getElementById('conferBuscaInput').value;
+  const o = findOrderByShortCode(code);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  closeConferBusca();
+  openConfer(o.id);
 }
 
 // 'entregue' exige passar por conferência antes; todos os outros vêm direto.
@@ -5660,6 +5969,31 @@ function escPosTextLines(title, lines) {
 }
 
 /**
+ * Comandos GS ( k pra QR code em ESC/POS (suportado pela Hipertech WTP05).
+ * Sequencia: setModelo -> setSize -> setErrorCorrection -> store -> print.
+ * Usado pra confer\u00eancia: QR pequeno (\u224820mm) com c\u00f3digo curto (orderRef).
+ */
+function escPosQrCommands(data, moduleSize) {
+  const enc = PRINT_ENCODER.encode(data || '');
+  const len = enc.length + 3; // +3 do header (cn, fn, m)
+  const pL = len & 0xFF;
+  const pH = (len >> 8) & 0xFF;
+  const out = [];
+  // Modelo 2 (mais comum)
+  out.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+  // Tamanho do m\u00f3dulo (5 = ~20mm)
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize || 0x05);
+  // Error correction L (48)
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30);
+  // Store data
+  out.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
+  enc.forEach(byte => out.push(byte));
+  // Print
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
+  return out;
+}
+
+/**
  * Comandos GS k pra barcode CODE128 em ESC/POS (formato 2: GS k m n d1..dn).
  * Subset B (caracteres ASCII printable, suficiente pra letras+digitos+hifens).
  * HRI (texto legivel) abaixo do barcode.
@@ -5727,6 +6061,14 @@ function escPosOrderLabel(o) {
     b.line('Obs: ' + obs.slice(0, PRINT_COLS - 5));
     if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
   }
+  b.line(divider());
+  // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo
+  b.center();
+  b.push(...escPosQrCommands(orderRef, 0x05));
+  b.push(0x0A);
+  b.bold().line('Codigo: ' + orderRef).boldOff();
+  b.line('Confira no app pelo codigo ou QR');
+  b.left();
   b.line(divider());
   // PIX e titular (cada um em sua linha pra leitura clara)
   b.line('PIX (' + pixLabel + '): ' + formatPixByType(getPixKey(), pixType));
@@ -6112,6 +6454,16 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
     y += 64;
   }
+  // QR de conferencia + codigo curto
+  const qrSize = 130;
+  drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
+  y += qrSize + 8;
+  ctx.textAlign = 'center';
+  ctx.font = '900 16px monospace';
+  ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+  ctx.font = '700 11px monospace';
+  ctx.fillText('Confira no app pelo codigo ou QR', cx, y); y += 18;
+  ctx.textAlign = 'left';
   ctx.strokeRect(20, y, W - 40, 68);
   ctx.font = '900 11px monospace';
   ctx.fillText('PAGAMENTO PIX', 30, y + 8);
@@ -6119,6 +6471,29 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.fillText(pixText.slice(0, 28), 30, y + 24);
   ctx.font = '700 12px monospace';
   ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
+}
+
+/**
+ * Desenha QR code direto num canvas (pra geracao de PNG da etiqueta).
+ * Usa lib qrcode-generator (Kazuhiko Arase) ja carregada no head.
+ */
+function drawQrOnCanvas(ctx, data, x, y, size) {
+  if (typeof qrcode !== 'function') return;
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(String(data || ''));
+    qr.make();
+    const cells = qr.getModuleCount();
+    const cellSize = Math.max(1, Math.floor(size / cells));
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, cellSize * cells, cellSize * cells);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < cells; r++) {
+      for (let c = 0; c < cells; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect(x + c * cellSize, y + r * cellSize, cellSize, cellSize);
+      }
+    }
+  } catch (e) { console.warn('QR canvas falhou:', e); }
 }
 
 function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
@@ -6440,6 +6815,11 @@ function orderLabelHtml(o) {
     <div class="pa-sep"></div>
     <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
+    <div class="pa-confer">
+      <div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>
+      <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
+      <div class="pa-confer-hint">Confira no app pelo codigo ou QR</div>
+    </div>
     <div class="pa-grid">
       <div class="pa-label">Pagamento PIX</div>
       <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
