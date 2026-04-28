@@ -2790,7 +2790,7 @@ body {
       <div class="np-icon">🖨️</div>
       <h3 class="np-title">Impressora não configurada</h3>
       <p class="np-text">Você ainda não pareou uma impressora térmica. O que prefere fazer?</p>
-      <button class="np-btn np-primary"   onclick="closeNoPrinterModal(); openAjustes()">Configurar agora</button>
+      <button class="np-btn np-primary"   onclick="closeNoPrinterModal(); closeEtiquetasPreview(); openAjustes()">Configurar agora</button>
       <button class="np-btn np-secondary" onclick="closeNoPrinterModal(); etqAction('share')">Compartilhar como imagem</button>
       <button class="np-btn np-tertiary"  onclick="closeNoPrinterModal()">Cancelar</button>
     </div>
@@ -4796,90 +4796,88 @@ function saveAjustes() {
 //  - Converte excecoes Java em Promise rejection -> JS recebe erro,
 //    nao crash nativo.
 // ================================================================
-(function installThermalPrinterShim() {
-  function install() {
-    try {
-      const Cap = window.Capacitor;
-      if (!Cap || !Cap.Plugins) return false;
-      const TP = Cap.Plugins.ThermalPrinter;
-      if (!TP) return false;
-      if (window.bluetoothSerial && window.bluetoothSerial.__cdbNative) return true;
+window.cdbInstallThermalShim = function () {
+  try {
+    const Cap = window.Capacitor;
+    if (!Cap || !Cap.Plugins) return false;
+    const TP = Cap.Plugins.ThermalPrinter;
+    if (!TP) return false;
+    if (window.bluetoothSerial && window.bluetoothSerial.__cdbNative) return true;
 
-      function bytesToBase64(data) {
-        if (typeof data === 'string') data = new TextEncoder().encode(data);
-        const u = data instanceof Uint8Array ? data : Uint8Array.from(data);
-        let bin = '';
-        const CHUNK = 0x8000;
-        for (let i = 0; i < u.length; i += CHUNK) {
-          bin += String.fromCharCode.apply(null, u.subarray(i, i + CHUNK));
-        }
-        return btoa(bin);
+    function bytesToBase64(data) {
+      if (typeof data === 'string') data = new TextEncoder().encode(data);
+      const u = data instanceof Uint8Array ? data : Uint8Array.from(data);
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < u.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u.subarray(i, i + CHUNK));
       }
-      function errStr(e) {
-        if (!e) return '(sem detalhe)';
-        if (typeof e === 'string') return e;
-        return e.message || e.errorMessage || JSON.stringify(e);
-      }
-
-      window.bluetoothSerial = {
-        __cdbNative: true,
-        list: function (success, fail) {
-          TP.requestPermissions()
-            .then(function () { return TP.listPaired(); })
-            .then(function (res) { success && success(res && res.devices ? res.devices : []); })
-            .catch(function (err) { fail && fail(errStr(err)); });
-        },
-        isEnabled: function (success, fail) {
-          TP.isEnabled()
-            .then(function (res) { if (res && res.enabled) success && success(); else fail && fail('disabled'); })
-            .catch(function (err) { fail && fail(errStr(err)); });
-        },
-        isConnected: function (success, fail) {
-          TP.isConnected()
-            .then(function (res) { if (res && res.connected) success && success(); else fail && fail('not connected'); })
-            .catch(function () { fail && fail('not connected'); });
-        },
-        connect: function (address, success, fail) {
-          TP.requestPermissions()
-            .then(function () { return TP.connect({ address: address }); })
-            .then(function () { success && success(); })
-            .catch(function (err) { fail && fail(errStr(err)); });
-        },
-        connectInsecure: function (address, success, fail) {
-          // Mesmo connect — o impl ja faz fallback insecure se o seguro falhar.
-          this.connect(address, success, fail);
-        },
-        disconnect: function (success, fail) {
-          TP.disconnect()
-            .then(function () { success && success(); })
-            .catch(function (err) { fail && fail(errStr(err)); });
-        },
-        write: function (data, success, fail) {
-          try {
-            const b64 = bytesToBase64(data);
-            TP.write({ base64: b64 })
-              .then(function () { success && success(); })
-              .catch(function (err) { fail && fail(errStr(err)); });
-          } catch (ex) {
-            fail && fail((ex && ex.message) || String(ex));
-          }
-        }
-      };
-      return true;
-    } catch (e) {
-      try { console.error('ThermalPrinter shim install failed:', e); } catch (_) {}
-      return false;
+      return btoa(bin);
     }
+    function errStr(e) {
+      if (!e) return '(sem detalhe)';
+      if (typeof e === 'string') return e;
+      return e.message || e.errorMessage || JSON.stringify(e);
+    }
+
+    window.bluetoothSerial = {
+      __cdbNative: true,
+      list: function (success, fail) {
+        TP.requestPermissions()
+          .then(function () { return TP.listPaired(); })
+          .then(function (res) { success && success(res && res.devices ? res.devices : []); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      isEnabled: function (success, fail) {
+        TP.isEnabled()
+          .then(function (res) { if (res && res.enabled) success && success(); else fail && fail('disabled'); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      isConnected: function (success, fail) {
+        TP.isConnected()
+          .then(function (res) { if (res && res.connected) success && success(); else fail && fail('not connected'); })
+          .catch(function () { fail && fail('not connected'); });
+      },
+      connect: function (address, success, fail) {
+        TP.requestPermissions()
+          .then(function () { return TP.connect({ address: address }); })
+          .then(function () { success && success(); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      connectInsecure: function (address, success, fail) {
+        // Mesmo connect — o impl ja faz fallback insecure se o seguro falhar.
+        this.connect(address, success, fail);
+      },
+      disconnect: function (success, fail) {
+        TP.disconnect()
+          .then(function () { success && success(); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      write: function (data, success, fail) {
+        try {
+          const b64 = bytesToBase64(data);
+          TP.write({ base64: b64 })
+            .then(function () { success && success(); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        } catch (ex) {
+          fail && fail((ex && ex.message) || String(ex));
+        }
+      }
+    };
+    return true;
+  } catch (e) {
+    try { console.error('ThermalPrinter shim install failed:', e); } catch (_) {}
+    return false;
   }
-  // Instala em varios momentos — Capacitor.Plugins fica disponivel cedo,
-  // mas em alguns paths (LiveUpdater/cold start) chega depois.
-  if (!install()) {
-    document.addEventListener('deviceready', install, false);
-    document.addEventListener('DOMContentLoaded', install, false);
-    setTimeout(install, 500);
-    setTimeout(install, 2000);
-  }
-})();
+};
+// Instala em varios momentos — Capacitor.Plugins fica disponivel cedo,
+// mas em alguns paths (LiveUpdater/cold start) chega depois.
+if (!window.cdbInstallThermalShim()) {
+  document.addEventListener('deviceready', window.cdbInstallThermalShim, false);
+  document.addEventListener('DOMContentLoaded', window.cdbInstallThermalShim, false);
+  setTimeout(window.cdbInstallThermalShim, 500);
+  setTimeout(window.cdbInstallThermalShim, 2000);
+}
 
 // ================================================================
 // PERMISSAO BLUETOOTH RUNTIME — Android 12+ exige BLUETOOTH_CONNECT.
@@ -5274,11 +5272,12 @@ function applyAdvanceTransition(id, nextStatus) {
 }
 
 // ================================================================
-// IMPRESSÃO TÉRMICA — Hipertech WTP05 (58mm, 32 cols, ESC/POS)
-// Estratégia: tenta Bluetooth (cordova-plugin-bluetooth-serial); se
-// indisponível, cai pra window.print() formatado a 58mm via @media print.
+// IMPRESSÃO TÉRMICA — Hipertech WTP05 (rolo 40mm de largura util de
+// impressao, ESC/POS via plugin Capacitor nativo ThermalPrinter).
+// PRINT_COLS = 24 chars cabe confortavel em fonte A 12px @ 40mm.
+// Se a impressora for outro modelo (58mm), pode subir pra 32.
 // ================================================================
-const PRINT_COLS = 32;
+const PRINT_COLS = 24;
 const PRINT_ENCODER = new TextEncoder();
 
 // Acentos fora porque a WTP05 com CP default imprime caixinhas.
@@ -5293,9 +5292,11 @@ function padLine(left, right) {
   return left + ' '.repeat(space) + right;
 }
 function divider() { return '-'.repeat(PRINT_COLS); }
-// Versão pra modo "big" (caracteres dobrados) — metade das colunas.
+// Versão pra modo "big" (caracteres dobrados) — fonte dobra largura, entao
+// se PRINT_COLS=24 (40mm), em big cabem ~14 chars (numero generoso pra
+// caber "TOTAL R$ 120,00" sem quebrar). Em PRINT_COLS=32 (58mm), 16.
 function padLineBig(left, right) {
-  const COLS = Math.floor(PRINT_COLS / 2);
+  const COLS = Math.max(12, Math.floor(PRINT_COLS * 0.6));
   left  = asciiNorm(left);
   right = asciiNorm(right);
   if (left.length + right.length >= COLS) {
@@ -5928,15 +5929,36 @@ async function etqAction(action) {
   if (!currentEtiquetas.length) { showToast('Sem etiquetas'); return; }
   try {
     if (action === 'print') {
-      const bs = window.bluetoothSerial;
+      // Tenta (re)instalar o shim do plugin nativo on-demand. Cobre o caso
+      // de Capacitor.Plugins.ThermalPrinter ter ficado disponivel DEPOIS do
+      // boot inicial (LiveUpdater bundle, race em deviceready, etc).
+      try { if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim(); } catch (_) {}
+
+      let bs = window.bluetoothSerial;
       const printer = getSavedPrinter();
-      // Sem plugin Bluetooth: rodando no browser, nao tem como imprimir
-      if (!bs) { openNoPrinterModal(); return; }
+      const hasCapacitor = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web');
+      const hasNativePlugin = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter);
+
+      // No APK (Capacitor) o shim DEVE estar pronto. Se nao esta, plugin
+      // nativo nao foi registrado — situacao de erro real, instrui usuario.
+      if (hasCapacitor && !hasNativePlugin) {
+        showToast('Plugin Bluetooth nao registrou — feche e reabra o app');
+        return;
+      }
+      // Sem plugin Bluetooth no browser puro: oferece configurar/share
+      if (!bs && !hasCapacitor) { openNoPrinterModal(); return; }
+      // Capacitor presente, plugin nativo presente, mas shim ainda undefined
+      // (timing): re-tenta instalar e segue com a referencia recem-criada.
+      if (!bs && hasNativePlugin) {
+        if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim();
+        bs = window.bluetoothSerial;
+      }
+      if (!bs) { showToast('Bluetooth indisponivel — tente de novo em 2s'); return; }
       // Tem plugin mas operador nao selecionou impressora ainda: abre picker
-      // direto e SALVA a escolha no localStorage. Apos selecionar, dispara
-      // a impressao automaticamente (printerPickerOnSelect callback).
+      // direto e SALVA a escolha no localStorage. Apos selecionar, ele toca
+      // Imprimir de novo (selectPrinter nao auto-dispara mais).
       if (!printer || !printer.address) {
-        printerPickerOnSelect = () => etqAction('print');
+        printerPickerOnSelect = null;
         openPrinterPicker();
         return;
       }
