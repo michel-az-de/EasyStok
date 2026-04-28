@@ -3380,6 +3380,27 @@ select:focus-visible {
 .action-toast .at-primary { background: var(--accent); color: white; border: 0; }
 .action-toast .at-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 .action-toast .at-primary:active, .action-toast .at-secondary:active { transform: scale(0.97); }
+
+/* Botao "Desfazer" no undo toast (alinhamento gold = ação reversivel) */
+.action-toast .at-undo {
+  background: var(--gold); color: #1c1408; border: 0;
+  font-weight: 800; letter-spacing: 0.02em;
+}
+[data-theme="light"] .action-toast .at-undo { color: #fff; }
+.action-toast .at-undo:active { transform: scale(0.97); opacity: 0.9; }
+/* Barra regressiva visual — diminui de 100% pra 0 em delayMs */
+.action-toast .at-progress {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; background: var(--gold);
+  transform-origin: left; transform: scaleX(1);
+  border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+  pointer-events: none;
+}
+@keyframes at-countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.action-toast { position: fixed; } /* garantir relative-positioning ancestor pra .at-progress */
 </style>
 </head>
 <body>
@@ -5154,35 +5175,78 @@ function cancelOrder(id) {
       return;
     }
   }
-  const promptMsg = wasDelivered
-    ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
-    : 'Cancelar esse pedido?';
-  if (!confirm(promptMsg)) return;
-
-  // Devolve ao estoque se o desconto já havia sido feito.
-  if (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE) {
+  // Estoque ja' decrementado em PRONTO/ENTREGUE → cancelar tem consequencia
+  // financeira (caixa) ou de estoque ja' "saido". Mantem confirm() forte.
+  // Em AGUARDANDO/PREPARANDO o estoque ainda nao foi tocado → undo toast.
+  const stockAlreadyTaken = (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE);
+  if (stockAlreadyTaken) {
+    const promptMsg = wasDelivered
+      ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
+      : 'Cancelar pedido pronto? Estoque sera devolvido.';
+    if (!confirm(promptMsg)) return;
     o.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
       if (p) p.stock = (p.stock || 0) + it.qty;
     });
+    o.status = STATUS.CANCELADO;
+    o.updatedAt = Date.now();
+    o.lastOperatorName = operatorName || null;
+    addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado' + (wasDelivered ? ' (estornado do caixa)' : ''));
+    logAction({
+      action: 'order.delete', entityType: 'order', entityId: id,
+      summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
+    });
+    persistAll();
+    pendingSync++;
+    updateSync();
+    renderHome();
+    renderOrdersFeed();
+    if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+    if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+    showToast(wasDelivered ? `Pedido entregue cancelado · ${money(o.total)} estornado` : 'Pedido cancelado');
+    return;
   }
+
+  // Caso reversivel (estoque intacto): executa direto + undo toast 5s.
   o.status = STATUS.CANCELADO;
   o.updatedAt = Date.now();
   o.lastOperatorName = operatorName || null;
-  addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado' + (wasDelivered ? ' (estornado do caixa)' : ''));
-  // Audit log explicito pra entregues (afeta financeiro)
-  logAction({
-    action: 'order.delete', entityType: 'order', entityId: id,
-    summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
-  });
+  addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado');
   persistAll();
-  pendingSync++;
-  updateSync();
   renderHome();
   renderOrdersFeed();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
   if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
-  showToast(wasDelivered ? `Pedido entregue cancelado · ${money(o.total)} estornado` : 'Pedido cancelado');
+  showUndoToast(
+    '<span class="hi">Pedido</span> cancelado · ' + money(o.total),
+    function () {
+      // Reverte status, remove ultimo history event de cancelamento.
+      const cur = getOrderById(id);
+      if (!cur) return;
+      cur.status = prev;
+      cur.updatedAt = Date.now();
+      if (Array.isArray(cur.history) && cur.history.length) {
+        const last = cur.history[cur.history.length - 1];
+        if (last && last.status === STATUS.CANCELADO) cur.history.pop();
+      }
+      persistAll();
+      renderHome();
+      renderOrdersFeed();
+      if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+      if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+      showToast('Cancelamento desfeito');
+    },
+    {
+      onCommit: function () {
+        pendingSync++;
+        updateSync();
+        logAction({
+          action: 'order.delete', entityType: 'order', entityId: id,
+          summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}`
+        });
+      }
+    }
+  );
 }
 
 // =========================
@@ -6092,8 +6156,8 @@ function deleteBatch(batchId) {
   if (!batch) { showToast('Lote não encontrado'); return; }
   if (batch.deleted) { showToast('Lote já está excluído'); return; }
   const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
-  if (!confirm(`Excluir lote ${batch.lote || batch.code}?\n\n${total} unidade(s) sairao do estoque.\n\nEtiquetas impressas viram inválidas. Voce pode recuperar pelo Historico.`)) return;
-  // Reverte estoque
+  // Soft-delete + undo toast (5s pra reverter sem confirm bloqueante).
+  // Reverte estoque imediatamente; restoreBatch via undo restaura.
   (batch.items || []).forEach(it => {
     const p = products.find(x => x.id === it.productId);
     if (p) p.stock = Math.max(0, (p.stock || 0) - (Number(it.qty) || 0));
@@ -6102,14 +6166,40 @@ function deleteBatch(batchId) {
   batch.deletedAt = Date.now();
   batch.deletedBy = operatorName || null;
   persistAll();
-  logAction({
-    action: 'batch.delete', entityType: 'batch', entityId: batchId,
-    summary: `Lote ${batch.lote || batch.code} excluído · ${total} unidades estornadas`
-  });
   if (typeof renderHome === 'function') renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
   if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
-  showToast(`Lote ${batch.lote || batch.code} excluído`);
+  const lote = batch.lote || batch.code;
+  showUndoToast(
+    `<span class="hi">Lote ${escapeHtml(lote)}</span> excluído · ${total} unid. estornadas`,
+    function () { _silentRestoreBatch(batchId); },
+    {
+      onCommit: function () {
+        // Audit log so dispara apos confirmacao (operador nao desfez)
+        logAction({
+          action: 'batch.delete', entityType: 'batch', entityId: batchId,
+          summary: `Lote ${lote} excluído · ${total} unidades estornadas`
+        });
+      }
+    }
+  );
+}
+// Restore silencioso pra ser chamado pelo undo (sem confirm modal).
+function _silentRestoreBatch(batchId) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch || !batch.deleted) return;
+  (batch.items || []).forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
+  });
+  batch.deleted = false;
+  batch.deletedAt = null;
+  batch.deletedBy = null;
+  persistAll();
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showToast(`Lote ${batch.lote || batch.code} restaurado`);
 }
 function restoreBatch(batchId) {
   const batch = (batches || []).find(b => b.id === batchId);
@@ -10075,22 +10165,41 @@ function closeProductActionsMenu() {
   document.getElementById('productActionsModal').classList.remove('show');
 }
 
-// Soft-delete: marca produto como archived (mantem em pedidos antigos)
+// Soft-delete: marca produto como archived (mantem em pedidos antigos).
+// Executa direto + showUndoToast (5s pra desfazer). Audit log so' apos commit.
 function archiveProduct(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
-  if (!confirm('Arquivar "' + p.name + '"?\n\nProduto sai do grid de produção mas pedidos e lotes antigos com esse produto continuam OK.')) return;
+  if (p.archived) { showToast('Produto ja arquivado'); return; }
   p.archived = true;
   persistAll();
   renderProductGrid();
   if (typeof renderCatalogList === 'function') renderCatalogList();
-  logAction({
-    action: 'product.archive',
-    entityType: 'product',
-    entityId: productId,
-    summary: 'Arquivou produto ' + p.name
-  });
-  showToast(p.name + ' arquivado');
+  const name = p.name;
+  showUndoToast(
+    '<span class="hi">' + escapeHtml(name) + '</span> arquivado',
+    function () { _silentRestoreProduct(productId); },
+    {
+      onCommit: function () {
+        logAction({
+          action: 'product.archive',
+          entityType: 'product',
+          entityId: productId,
+          summary: 'Arquivou produto ' + name
+        });
+      }
+    }
+  );
+}
+// Reverte archive sem confirm/log/toast — usado pelo undo.
+function _silentRestoreProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  p.archived = false;
+  persistAll();
+  renderProductGrid();
+  if (typeof renderCatalogList === 'function') renderCatalogList();
+  showToast((p.name || 'Produto') + ' restaurado');
 }
 
 // Helper pra formatar preco no input (R$ nao tem cifrao no input)
@@ -10256,18 +10365,37 @@ function deleteCashEntry(id) {
     showToast(`Caixa de ${fmtDateKey(entryDay)} fechado. Reabra primeiro.`);
     return;
   }
-  if (!confirm(`Excluir lançamento "${e.description}" de ${money(e.amount)}?`)) return;
+  // Soft-delete via undo toast: guarda copia da entry, remove agora, reinsere se desfazer.
+  const savedEntry = Object.assign({}, e);
   cashEntries = cashEntries.filter(x => x.id !== id);
   persistAll();
-  pendingSync++;
-  updateSync();
-  logAction({
-    action: 'cash.entry_delete', entityType: 'cash', entityId: id,
-    summary: `Excluído ${e.type === 'expense' ? 'saída' : 'entrada'} de ${money(e.amount)} · ${e.description}`
-  });
   renderHome();
   if (typeof renderCashDetails === 'function') renderCashDetails();
-  showToast('Lançamento excluído');
+  const label = (e.type === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(e.amount);
+  showUndoToast(
+    '<span class="hi">' + escapeHtml(label) + '</span> excluída',
+    function () {
+      // Reinsere na lista (renderCashDetails ordena por createdAt desc)
+      if (!cashEntries.find(x => x.id === savedEntry.id)) {
+        cashEntries.push(savedEntry);
+        persistAll();
+        renderHome();
+        if (typeof renderCashDetails === 'function') renderCashDetails();
+      }
+      showToast('Lançamento restaurado');
+    },
+    {
+      onCommit: function () {
+        // Sync e audit log so' depois do delay (commit definitivo)
+        pendingSync++;
+        updateSync();
+        logAction({
+          action: 'cash.entry_delete', entityType: 'cash', entityId: id,
+          summary: 'Excluído ' + (e.type === 'expense' ? 'saída' : 'entrada') + ' de ' + money(e.amount) + ' · ' + e.description
+        });
+      }
+    }
+  );
 }
 
 document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(pill => {
@@ -10319,6 +10447,60 @@ function showToast(msg) {
 function undoLast() {
   document.getElementById('toast').classList.remove('show');
   showToast('Ação desfeita');
+}
+
+// ===== Toast com botao Desfazer (substitui confirm() em acoes reversiveis) =====
+// Padrao mobile-native: a acao executa imediatamente; operador tem N segundos
+// pra clicar "Desfazer". Se nao desfaz, executa o commit definitivo (callback
+// onCommit) — usado pra disparar audit log so quando a acao "vinga".
+let _undoToastTimer = null;
+let _undoToastFired = false;
+function showUndoToast(msg, undoFn, opts) {
+  opts = opts || {};
+  const delayMs = opts.delayMs || 5000;
+  const onCommit = opts.onCommit; // chamado se NAO foi desfeito (audit log etc)
+  const el = document.getElementById('actionToast');
+  if (!el) return;
+  // Se ha um undo toast pendente de outra acao, commit imediato dele
+  if (_undoToastTimer) {
+    clearTimeout(_undoToastTimer);
+    if (!_undoToastFired && typeof window._pendingCommit === 'function') {
+      try { window._pendingCommit(); } catch (e) {}
+    }
+  }
+  _undoToastFired = false;
+  window._pendingCommit = onCommit || null;
+  document.getElementById('actionToastMsg').innerHTML = msg;
+  document.getElementById('actionToastActions').innerHTML =
+    '<button class="at-undo" onclick="window._handleUndoClick()">Desfazer</button>';
+  // Barra regressiva — re-cria pra reiniciar animacao
+  let bar = el.querySelector('.at-progress');
+  if (bar) bar.remove();
+  bar = document.createElement('div');
+  bar.className = 'at-progress';
+  bar.style.animation = 'at-countdown ' + delayMs + 'ms linear forwards';
+  el.appendChild(bar);
+  el.classList.add('show');
+  // Handler do botao Desfazer (window scope pra onclick inline funcionar)
+  window._handleUndoClick = function () {
+    if (_undoToastFired) return;
+    _undoToastFired = true;
+    if (_undoToastTimer) { clearTimeout(_undoToastTimer); _undoToastTimer = null; }
+    el.classList.remove('show');
+    window._pendingCommit = null;
+    try { undoFn(); } catch (e) { try { console.warn('undo falhou', e); } catch (_) {} showToast('Erro ao desfazer'); }
+  };
+  // Auto-hide + commit definitivo apos delay
+  _undoToastTimer = setTimeout(function () {
+    _undoToastTimer = null;
+    if (!_undoToastFired) {
+      _undoToastFired = true;
+      el.classList.remove('show');
+      const commit = window._pendingCommit;
+      window._pendingCommit = null;
+      if (typeof commit === 'function') { try { commit(); } catch (e) { try { console.warn('commit falhou', e); } catch (_) {} } }
+    }
+  }, delayMs);
 }
 
 // =========================
