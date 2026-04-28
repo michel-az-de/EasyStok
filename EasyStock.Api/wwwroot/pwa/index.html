@@ -1806,7 +1806,92 @@ body {
 .cf-prob  { background: var(--accent); color: #fff; }
 .cf-cancel { background: transparent; color: var(--ink-mute); border: 1px solid var(--line) !important; }
 
+/* Scanner de cmera fullscreen — sobre tudo */
+.scan-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 13500;
+  background: #000;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+.scan-overlay.show { display: flex; }
+.scan-overlay video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; background: #000;
+}
+.scan-frame {
+  position: relative;
+  width: min(72vw, 320px); aspect-ratio: 1;
+  z-index: 2;
+  pointer-events: none;
+}
+.scan-corners {
+  position: absolute; width: 36px; height: 36px;
+  border: 4px solid var(--gold);
+}
+.scan-corners.c1 { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 12px; }
+.scan-corners.c2 { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 12px; }
+.scan-corners.c3 { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 12px; }
+.scan-corners.c4 { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 12px; }
+.scan-laser {
+  position: absolute; left: 8%; right: 8%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  box-shadow: 0 0 12px var(--gold);
+  top: 50%;
+  animation: scanLaser 2s ease-in-out infinite;
+}
+@keyframes scanLaser {
+  0%, 100% { top: 12%; opacity: 0.4; }
+  50%      { top: 88%; opacity: 1; }
+}
+.scan-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px;
+  display: flex; align-items: center; gap: 12px; z-index: 3;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
+}
+.scan-close {
+  background: rgba(255,255,255,0.15); color: #fff; border: 0;
+  width: 44px; height: 44px; border-radius: 50%;
+  font-size: 28px; line-height: 1; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-close:active { transform: scale(0.92); }
+.scan-title { color: #fff; font-size: 16px; font-weight: 700; }
+.scan-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  background: linear-gradient(0deg, rgba(0,0,0,0.7), transparent);
+  text-align: center;
+}
+.scan-status {
+  color: #fff; font-size: 14px; font-weight: 600;
+  background: rgba(0,0,0,0.5); border-radius: 100px;
+  padding: 10px 18px; display: inline-block;
+}
+.scan-status.found { background: var(--basil); color: #06281e; }
+.scan-status.error { background: var(--accent); color: #fff; }
+
 /* Tela de Conferência */
+.confer-scan-cta {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  background: linear-gradient(135deg, var(--gold), #e8a02f);
+  color: #1c1408; border: 0; border-radius: 16px;
+  padding: 22px 16px; margin-bottom: 14px;
+  font-family: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
+  letter-spacing: 0.02em; box-shadow: 0 10px 28px rgba(240,184,74,0.25);
+}
+.confer-scan-cta:active { transform: scale(0.98); }
+.confer-scan-cta .ico { font-size: 26px; line-height: 1; }
+.confer-divider {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--ink-mute); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  margin: 6px 0 10px;
+}
+.confer-divider::before, .confer-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--line);
+}
 .confer-search {
   display: flex; gap: 8px; margin-bottom: 8px;
 }
@@ -2094,11 +2179,61 @@ body {
   margin-bottom: 8px;
 }
 .np-btn:active { opacity: 0.8; }
-.np-primary   { background: var(--gold, #d4af37); color: #000; }
-.np-secondary { background: rgba(255,255,255,0.08); color: var(--ink, #f4eee5);
+.np-primary   { background: var(--gold, #d4af37); color: #1c1408; }
+.np-secondary { background: var(--bg-elev-2); color: var(--ink, #f4eee5);
                 border: 1px solid var(--line, #3d362e); }
 .np-tertiary  { background: transparent; color: var(--ink-mute, #b0a799);
                 margin-bottom: 0; }
+[data-theme="light"] .np-primary { color: #fff; background: var(--gold); }
+[data-theme="light"] .np-secondary { background: var(--bg-elev-2); border: 1px solid var(--border-strong); }
+
+/* Overrides do tema claro pra componentes novos (conferencia/scanner/etc) */
+[data-theme="light"] .cf-ok    { background: var(--basil); color: #fff; }
+[data-theme="light"] .cf-adj   { background: var(--gold); color: #fff; }
+[data-theme="light"] .cf-prob  { background: var(--accent); color: #fff; }
+[data-theme="light"] .cf-cancel { background: transparent; color: var(--ink-mute); border: 1px solid var(--border-strong) !important; }
+[data-theme="light"] .cf-badge.pendente   { background: rgba(183, 129, 34, 0.16); color: var(--gold); }
+[data-theme="light"] .cf-badge.conferido  { background: rgba(22, 143, 122, 0.16); color: var(--basil); }
+[data-theme="light"] .cf-badge.divergencia { background: rgba(207, 87, 56, 0.16); color: var(--accent); }
+[data-theme="light"] .k-confer-badge.pendente   { background: rgba(183, 129, 34, 0.16); color: var(--gold); }
+[data-theme="light"] .k-confer-badge.conferido  { background: rgba(22, 143, 122, 0.16); color: var(--basil); }
+[data-theme="light"] .k-confer-badge.divergencia { background: rgba(207, 87, 56, 0.16); color: var(--accent); }
+[data-theme="light"] .k-confer-btn { background: var(--basil); color: #fff; }
+[data-theme="light"] .hist-action { background: var(--gold); color: #fff; }
+[data-theme="light"] .home-action-btn {
+  background: #fff; border: 1px solid var(--border-strong);
+  box-shadow: 0 2px 8px rgba(21, 31, 49, 0.04);
+}
+[data-theme="light"] .confer-scan-cta {
+  background: linear-gradient(135deg, var(--gold), #cf922a);
+  color: #fff; box-shadow: 0 8px 22px rgba(183, 129, 34, 0.3);
+}
+[data-theme="light"] .confer-search input {
+  background: #fff; border: 1.5px solid var(--gold); color: var(--ink);
+}
+[data-theme="light"] .confer-search-btn { background: var(--gold); color: #fff; }
+[data-theme="light"] .confer-future-note {
+  background: rgba(183, 129, 34, 0.10); color: var(--ink-dim);
+  border: 1px dashed var(--gold);
+}
+[data-theme="light"] .confer-row { background: #fff; box-shadow: 0 2px 6px rgba(21,31,49,0.04); }
+[data-theme="light"] .confer-row .cr-action { background: var(--basil); color: #fff; }
+[data-theme="light"] .confer-empty { color: var(--ink-mute); }
+[data-theme="light"] .et-photo { border: 1px solid #d0d0d0; }
+[data-theme="light"] .pa-confer { border: 1.5px solid #1a1a1a; }
+[data-theme="light"] .pa-confer-hint { color: #777; }
+[data-theme="light"] #conferBuscaInput,
+[data-theme="light"] #conferScreenInput {
+  background: #fff !important; border: 1.5px solid var(--gold) !important; color: var(--ink) !important;
+}
+[data-theme="light"] .ajustar-qty {
+  background: #fff !important; border: 1px solid var(--border-strong) !important;
+}
+[data-theme="light"] #ajustarNotes,
+[data-theme="light"] #problemaNotes {
+  background: #fff !important; border: 1px solid var(--border-strong) !important;
+  color: var(--ink) !important;
+}
 
 /* Modal "App atualizado" — aparece quando o LiveUpdater entrega bundle novo */
 .upd-overlay {
@@ -2791,19 +2926,22 @@ body {
     </div>
 
     <!-- COMPRAR -->
-    <!-- CONFERENCIA — busca por codigo curto + lista de pedidos pendentes -->
+    <!-- CONFERENCIA — scanner de cmera + busca por cdigo curto + lista. -->
     <div class="screen" data-screen="conferencia">
-      <div class="section-label">Conferir pedido</div>
+      <button class="confer-scan-cta" onclick="openScanner('tela')">
+        <span class="ico">📷</span>
+        <span class="lbl">Escanear QR ou código</span>
+      </button>
+
+      <div class="confer-divider"><span>ou digite</span></div>
+
       <div class="confer-search">
         <input id="conferScreenInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
-               placeholder="Digite o código (ex: 24467287)"
+               placeholder="Código (8 caracteres)"
                oninput="onConferScreenInput()" onkeydown="if(event.key==='Enter') doConferScreenSearch()">
         <button class="confer-search-btn" onclick="doConferScreenSearch()">Abrir</button>
       </div>
       <div id="conferScreenHint" class="confer-hint"></div>
-      <div class="confer-future-note">
-        📷 <b>Scanner por câmera</b> chega em breve — por enquanto digite o código curto que aparece embaixo do QR na etiqueta.
-      </div>
 
       <div class="section-label">Pedidos pendentes</div>
       <div id="conferPendingList"></div>
@@ -3176,14 +3314,34 @@ body {
     <div class="np-sheet" style="max-width:380px">
       <div class="np-icon">🔍</div>
       <h3 class="np-title">Conferir pedido</h3>
-      <p class="np-text">Digite o código curto da etiqueta (8 caracteres).</p>
+      <p class="np-text">Escaneie o QR/barcode ou digite o código.</p>
+      <button class="np-btn np-primary" onclick="openScanner('busca')" style="margin-bottom:10px">📷 Escanear câmera</button>
       <input id="conferBuscaInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
-             placeholder="ex: 24467287"
+             placeholder="ou digite ex: 24467287"
              style="width:100%;background:var(--bg-elev);color:var(--ink);border:1.5px solid var(--gold);border-radius:10px;padding:14px;font-size:18px;letter-spacing:0.08em;text-align:center;text-transform:uppercase;margin-bottom:14px"
              oninput="onConferBuscaInput()" onkeydown="if(event.key==='Enter') doConferBusca()">
       <div id="conferBuscaHint" style="font-size:13px;color:var(--ink-mute);margin-bottom:12px;min-height:18px"></div>
-      <button class="np-btn np-primary" onclick="doConferBusca()">Abrir conferência</button>
+      <button class="np-btn np-secondary" onclick="doConferBusca()">Abrir pelo código digitado</button>
       <button class="np-btn np-tertiary" onclick="closeConferBusca()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Scanner de câmera fullscreen — usa BarcodeDetector API nativa do
+       Chromium WebView (suporte: Android 10+ Chrome 83+). Sem plugin
+       Capacitor. Decodifica QR + CODE128 + EAN13 + CODE39. -->
+  <div id="scannerOverlay" class="scan-overlay" role="dialog" aria-modal="true">
+    <video id="scannerVideo" playsinline autoplay muted></video>
+    <div class="scan-frame">
+      <div class="scan-corners c1"></div><div class="scan-corners c2"></div>
+      <div class="scan-corners c3"></div><div class="scan-corners c4"></div>
+      <div class="scan-laser"></div>
+    </div>
+    <div class="scan-top">
+      <button class="scan-close" onclick="closeScanner()" aria-label="Fechar scanner">×</button>
+      <div class="scan-title">Aponte pra etiqueta</div>
+    </div>
+    <div class="scan-bottom">
+      <div class="scan-status" id="scannerStatus">Procurando código…</div>
     </div>
   </div>
 
@@ -5938,6 +6096,172 @@ function doConferBusca() {
   if (!o) { showToast('Pedido não encontrado'); return; }
   closeConferBusca();
   openConfer(o.id);
+}
+
+// ===== SCANNER DE CAMERA (BarcodeDetector API nativa) =====
+// Lê QR Code + CODE128 + EAN13 + CODE39 direto da câmera, sem plugin
+// Capacitor. Usa getUserMedia + BarcodeDetector (Chromium 83+).
+// Pra abrir: openScanner('busca' | 'tela').
+let scannerStream = null;
+let scannerRaf = null;
+let scannerActive = false;
+let scannerOrigin = null;
+
+function ensureCameraPermission() {
+  return new Promise(resolve => {
+    try {
+      const perms = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+      if (!perms || !perms.CAMERA) { resolve(true); return; }
+      perms.checkPermission(perms.CAMERA, function (res) {
+        if (res && res.hasPermission) { resolve(true); return; }
+        perms.requestPermission(perms.CAMERA,
+          function (r) { resolve(!!(r && r.hasPermission)); },
+          function () { resolve(false); }
+        );
+      }, function () {
+        try {
+          perms.requestPermission(perms.CAMERA,
+            function (r) { resolve(!!(r && r.hasPermission)); },
+            function () { resolve(false); }
+          );
+        } catch (e) { resolve(false); }
+      });
+    } catch (e) { resolve(false); }
+  });
+}
+
+async function openScanner(origin) {
+  if (scannerActive) return;
+  scannerOrigin = origin || 'tela';
+  const overlay = document.getElementById('scannerOverlay');
+  const video = document.getElementById('scannerVideo');
+  const statusEl = document.getElementById('scannerStatus');
+  overlay.classList.add('show');
+  statusEl.className = 'scan-status';
+  statusEl.textContent = 'Pedindo permissão de câmera…';
+  scannerActive = true;
+
+  // Verifica suporte
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Câmera não disponível neste dispositivo';
+    return;
+  }
+  if (!('BarcodeDetector' in window)) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Scanner não suportado — atualize Android System WebView';
+    return;
+  }
+
+  // Pede permissao runtime CAMERA via cordova-plugin-android-permissions
+  // (Android 12+ exige). Sem isso, getUserMedia falha silencioso.
+  const granted = await ensureCameraPermission();
+  if (!granted) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Permissão negada — Configurações > Apps > Easy Stock > Permissões > Câmera';
+    return;
+  }
+  statusEl.textContent = 'Iniciando câmera…';
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = scannerStream;
+    await video.play();
+    statusEl.textContent = 'Procurando código…';
+    const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
+    const detectLoop = async () => {
+      if (!scannerActive) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes && codes.length > 0) {
+          const value = codes[0].rawValue;
+          handleScannedCode(value);
+          return;
+        }
+      } catch (e) { /* ignora frames com erro */ }
+      scannerRaf = requestAnimationFrame(detectLoop);
+    };
+    detectLoop();
+  } catch (err) {
+    statusEl.className = 'scan-status error';
+    const msg = (err && err.message) || String(err);
+    if (/permission|denied/i.test(msg)) {
+      statusEl.textContent = 'Permissão negada — Configurações > Apps > Easy Stock > Câmera';
+    } else {
+      statusEl.textContent = 'Erro câmera: ' + msg;
+    }
+  }
+}
+
+function closeScanner() {
+  scannerActive = false;
+  if (scannerRaf) cancelAnimationFrame(scannerRaf);
+  scannerRaf = null;
+  const video = document.getElementById('scannerVideo');
+  if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
+  if (scannerStream) {
+    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    scannerStream = null;
+  }
+  document.getElementById('scannerOverlay').classList.remove('show');
+}
+
+function handleScannedCode(rawValue) {
+  if (!rawValue) return;
+  const statusEl = document.getElementById('scannerStatus');
+  // Tenta encontrar pedido por orderRef (8 chars finais) — extrai do payload
+  // se for URL/uri, ou usa raw direto.
+  let code = String(rawValue || '').trim();
+  // Se for um URI tipo cdb-confirm:XXX, pega o final
+  const m = code.match(/[a-z0-9-]+$/i);
+  const candidate = m ? m[0] : code;
+  const o = findOrderByShortCode(candidate) || findOrderByShortCode(code);
+  if (o) {
+    statusEl.className = 'scan-status found';
+    statusEl.textContent = '✓ ' + (o.clientSnapshot?.name || 'Pedido encontrado');
+    try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
+    setTimeout(() => {
+      closeScanner();
+      // Limpa input do origem que disparou (busca ou tela)
+      if (scannerOrigin === 'busca') {
+        try { document.getElementById('conferBuscaInput').value = ''; } catch (e) {}
+        closeConferBusca();
+      } else {
+        try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
+      }
+      openConfer(o.id);
+    }, 350);
+  } else {
+    // Não achou — não fecha; continua tentando. Só atualiza status.
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Código "' + candidate + '" não bate com nenhum pedido — tente outro';
+    // Volta a procurar após 1.5s
+    setTimeout(() => {
+      if (scannerActive) {
+        statusEl.className = 'scan-status';
+        statusEl.textContent = 'Procurando código…';
+        if (!scannerRaf) {
+          // Restart loop
+          const video = document.getElementById('scannerVideo');
+          if (video && video.srcObject) {
+            const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
+            const loop = async () => {
+              if (!scannerActive) return;
+              try {
+                const codes = await detector.detect(video);
+                if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue); return; }
+              } catch (e) {}
+              scannerRaf = requestAnimationFrame(loop);
+            };
+            loop();
+          }
+        }
+      }
+    }, 1500);
+  }
 }
 
 // ===== TELA DE CONFERENCIA (data-screen=conferencia) =====
