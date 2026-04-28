@@ -119,9 +119,17 @@ body {
 
 /* Header */
 .header {
-  padding: 20px 22px 14px;
+  padding: 16px 22px 12px;
   flex-shrink: 0;
 }
+.header .header-row1 {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.header .header-row1 .sync-chip {
+  margin-top: 0; padding: 4px 10px; font-size: 10px; flex-shrink: 0;
+}
+.header .header-row1 .sync-chip svg { display: none; }
 .header .greeting {
   display: flex;
   align-items: center;
@@ -135,14 +143,14 @@ body {
 .header .title {
   font-family: 'Fraunces', serif;
   font-weight: 700;
-  font-size: 31px;
+  font-size: 22px;
   line-height: 0.95;
-  margin-top: 6px;
   letter-spacing: 0;
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 6px;
   flex-wrap: wrap;
+  flex: 1; min-width: 0;
 }
 .header .title .accent {
   color: var(--accent);
@@ -244,6 +252,72 @@ body {
   letter-spacing: 0.02em;
   font-weight: 800;
 }
+/* Section label com links inline (Finalizados, Compras) */
+.section-label-with-links { gap: 8px; }
+.section-label-with-links .sl-links {
+  display: inline-flex; gap: 12px;
+  text-transform: none; letter-spacing: 0.02em;
+}
+.section-label-with-links .sl-links a {
+  color: var(--gold); font-size: 11px; font-weight: 700;
+  text-decoration: none; cursor: pointer;
+}
+.section-label-with-links .sl-links a:active { opacity: 0.7; }
+[data-theme="light"] .section-label-with-links .sl-links a { color: var(--gold); }
+
+/* Mini-stats wrap (details collapsed) */
+.mini-stats-wrap {
+  background: var(--bg-card, var(--bg-elev));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: all var(--transition);
+}
+.mini-stats-wrap > summary {
+  cursor: pointer; padding: 12px 16px; list-style: none;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; color: var(--ink-dim);
+}
+.mini-stats-wrap > summary::-webkit-details-marker { display: none; }
+.mini-stats-wrap > summary::after {
+  content: '▾'; font-size: 11px; color: var(--ink-mute);
+  transition: transform var(--transition);
+}
+.mini-stats-wrap[open] > summary::after { transform: rotate(180deg); }
+.mini-stats-wrap > summary .ms-summary-text b { color: var(--accent); font-weight: 800; }
+.mini-stats-wrap > summary .ms-summary-hint { color: var(--ink-mute); font-size: 11px; }
+.mini-stats-wrap[open] .mini-stats { border-top: 1px solid var(--border); border-radius: 0; margin-bottom: 0; border: 0; }
+
+/* Cash card colapsado (so saldo + botao Detalhes) */
+.cash-card-collapsed {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--bg-card, var(--bg-elev));
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 18px;
+  cursor: pointer; font-family: inherit;
+  text-align: left; color: var(--ink);
+}
+.cash-card-collapsed:active { transform: scale(0.99); }
+.cash-card-collapsed .ccc-info { flex: 1; min-width: 0; }
+.cash-card-collapsed .ccc-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-mute); margin-bottom: 2px;
+}
+.cash-card-collapsed .ccc-balance {
+  font-size: 24px; font-weight: 800; color: var(--gold);
+  font-family: 'Fraunces', serif;
+}
+.cash-card-collapsed .ccc-status {
+  font-size: 11px; margin-top: 2px; font-weight: 600;
+}
+.cash-card-collapsed .ccc-status.open { color: var(--ink-mute); }
+.cash-card-collapsed .ccc-status.closed { color: var(--gold); }
+.cash-card-collapsed .ccc-cta {
+  font-size: 13px; color: var(--gold); font-weight: 700; flex-shrink: 0;
+}
+[data-theme="light"] .cash-card-collapsed { background: #fff; box-shadow: 0 2px 6px rgba(21,31,49,0.04); }
 
 /* Mini stats (home) */
 .mini-stats {
@@ -2908,8 +2982,16 @@ body {
 
 <div class="phone">
 
-  <!-- Header -->
+  <!-- Header (cirurgia rapida: 5 -> 3 elementos. Theme toggle migrou pro
+       Ajustes, sync chip ficou inline e compacto). -->
   <div class="header">
+    <div class="header-row1">
+      <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
+      <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
+        <span class="dot"></span>
+        <span id="syncText">Tudo sincronizado</span>
+      </button>
+    </div>
     <div class="greeting">
       <span id="greetingText">Olá</span>
       <button class="op-badge" id="opBadge" onclick="changeOperator()" title="Trocar operador">
@@ -2917,19 +2999,10 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
       </button>
       <span style="flex:1"></span>
-      <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="Alternar tema">
-        <svg id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-      </button>
-      <button class="icon-btn" id="ajustesBtn" onclick="openAjustes()" title="Ajustes" style="margin-left:6px">
+      <button class="icon-btn" id="ajustesBtn" onclick="openAjustes()" title="Ajustes">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
     </div>
-    <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
-    <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
-      <span class="dot"></span>
-      <span id="syncText">Tudo sincronizado</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-    </button>
   </div>
 
   <!-- Content -->
@@ -2942,68 +3015,62 @@ body {
            movimentacao e sem fechamento. -->
       <div id="openCashDaysBanner" class="open-days-banner" style="display:none"></div>
 
-      <div class="mini-stats">
-        <div class="mini-stat">
-          <div class="v accent" id="msOpen">0</div>
-          <div class="l">em aberto</div>
+      <!-- Mini-stats colapsadas atras de <details> nativo HTML.
+           Default fechado, expandido persiste em localStorage. -->
+      <details class="mini-stats-wrap" id="miniStatsDetails">
+        <summary>
+          <span class="ms-summary-text"><b id="msOpenSummary">0</b> em aberto · <span class="ms-summary-hint">toque pra ver mais</span></span>
+        </summary>
+        <div class="mini-stats">
+          <div class="mini-stat">
+            <div class="v accent" id="msOpen">0</div>
+            <div class="l">em aberto</div>
+          </div>
+          <div class="mini-stat">
+            <div class="v" id="msProduced">0</div>
+            <div class="l">produzido</div>
+          </div>
+          <div class="mini-stat">
+            <div class="v basil" id="msRevenue">R$ 0</div>
+            <div class="l">vendido</div>
+          </div>
         </div>
-        <div class="mini-stat">
-          <div class="v" id="msProduced">0</div>
-          <div class="l">produzido</div>
-        </div>
-        <div class="mini-stat">
-          <div class="v basil" id="msRevenue">R$ 0</div>
-          <div class="l">vendido</div>
-        </div>
-      </div>
+      </details>
 
-      <div class="home-actions">
-        <button class="home-action-btn" onclick="go('conferencia')">
-          <span class="ico">🔍</span> Conferir pedido
-        </button>
-        <button class="home-action-btn" onclick="go('finalizados')">
-          <span class="ico">✅</span> Finalizados
-        </button>
-        <button class="home-action-btn" onclick="go('compras')">
-          <span class="ico">🛒</span> Lista de compras
-        </button>
-      </div>
-
-      <div class="section-label">
-        <span>Pedidos em aberto</span>
-        <span class="count" id="openCount">0</span>
+      <div class="section-label section-label-with-links">
+        <span>Pedidos em aberto <span class="count" id="openCount">0</span></span>
+        <span class="sl-links">
+          <a href="javascript:void(0)" onclick="go('finalizados')">Finalizados →</a>
+          <a href="javascript:void(0)" onclick="go('compras')">Compras →</a>
+        </span>
       </div>
       <div id="openOrdersList"></div>
 
+      <!-- Cash card colapsado: so saldo + botao Detalhes. As 4 linhas
+           detalhadas e os botoes Lançamento/Fechar/Reabrir migraram pro
+           cashDetailsModal. -->
       <div class="section-label">Caixa de hoje</div>
-      <div class="cash-card">
-        <div class="cash-row in">
-          <div class="l">Vendas de pedidos</div>
-          <div class="v" id="cashSold">R$ 0,00</div>
+      <button class="cash-card-collapsed" onclick="openCashDetails()">
+        <div class="ccc-info">
+          <div class="ccc-label">Saldo</div>
+          <div class="ccc-balance" id="cashHomeBalance">R$ 0,00</div>
+          <div class="ccc-status" id="cashHomeStatus"></div>
         </div>
-        <div class="cash-row in" id="cashReceivableRow" style="display:none">
-          <div class="l">A receber (prontos)</div>
-          <div class="v" id="cashReceivable">R$ 0,00</div>
-        </div>
-        <div class="cash-row in">
-          <div class="l">Entradas extras</div>
-          <div class="v" id="cashExtraIn">R$ 0,00</div>
-        </div>
-        <div class="cash-row out">
-          <div class="l">Saídas</div>
-          <div class="v" id="cashOut">R$ 0,00</div>
-        </div>
-        <div class="cash-row balance">
-          <div class="l">Saldo</div>
-          <div class="v" id="cashBalance">R$ 0,00</div>
-        </div>
-        <div id="cashClosedBadge" style="display:none;background:var(--gold-soft);color:var(--gold);padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.04em;margin-top:6px;text-align:center"></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="cash-btn" style="flex:1" onclick="openCashModal()">+ lançamento</button>
-          <button class="cash-btn" style="flex:1" onclick="openCashDetails()">ver detalhes</button>
-        </div>
-        <button id="cashCloseBtn" class="cash-btn" style="margin-top:6px;background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold);font-weight:800" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
-        <button id="cashReopenBtn" class="cash-btn" style="margin-top:6px;background:transparent;color:var(--ink-mute);border:1px solid var(--line);display:none" onclick="reopenCashDay()">🔓 Reabrir caixa</button>
+        <div class="ccc-cta">Detalhes →</div>
+      </button>
+
+      <!-- Mantem IDs originais ocultos pro renderCash continuar atualizando.
+           Os valores aparecem dentro do cashDetailsModal quando aberto. -->
+      <div style="display:none">
+        <span id="cashSold">R$ 0,00</span>
+        <span id="cashReceivable">R$ 0,00</span>
+        <span id="cashExtraIn">R$ 0,00</span>
+        <span id="cashOut">R$ 0,00</span>
+        <span id="cashBalance">R$ 0,00</span>
+        <span id="cashClosedBadge"></span>
+        <button id="cashCloseBtn"></button>
+        <button id="cashReopenBtn"></button>
+        <span id="cashReceivableRow"></span>
       </div>
     </div>
 
@@ -3358,6 +3425,16 @@ body {
       </div>
 
       <div class="ajustes-section">
+        <h4>Aparência</h4>
+        <p class="hint">Tema visual do app. Aplicado imediatamente.</p>
+        <div class="ajustes-actions-stack">
+          <button class="btn-ajustes-printer" id="themeToggleAjustes" onclick="toggleTheme(); refreshAjustesThemeLabel()">
+            <span id="themeToggleLabel">Mudar pra modo claro</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="ajustes-section">
         <h4>Empresa</h4>
         <p class="hint">Nome exibido no topo do app, nas etiquetas e nas mensagens de cobranca.</p>
         <div class="field">
@@ -3506,6 +3583,14 @@ body {
         🔒 Caixa do dia já foi fechado. Reabra primeiro pra editar.
       </div>
       <div id="cashDetailsSummary" style="background:var(--bg-elev);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;font-size:14px"></div>
+
+      <!-- Acoes principais (migradas do card da home) -->
+      <div id="cashDetailsActions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="closeCashDetails(); openCashModal()">+ Lançamento manual</button>
+        <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="closeCashDetails(); openCashCloseModal()">🔒 Fechar caixa do dia</button>
+        <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="closeCashDetails(); reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
+      </div>
+
       <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
       <div id="cashDetailsList" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
       <div class="cf-label">Pedidos entregues hoje</div>
@@ -3879,9 +3964,34 @@ function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   applyTheme(current === 'light' ? 'dark' : 'light');
 }
+// Atualiza label do botao de tema dentro do modal Ajustes pra refletir
+// estado atual (texto descreve PARA ONDE vai mudar, nao o estado atual).
+function refreshAjustesThemeLabel() {
+  const label = document.getElementById('themeToggleLabel');
+  if (!label) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  label.textContent = isLight ? '🌙 Mudar pra modo escuro' : '☀️ Mudar pra modo claro';
+}
 // Aplica tema salvo antes de renderizar (evita flash) — getItem direto
 // para não passar por JSON.parse do load().
 applyTheme((() => { try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; } })());
+
+// Mini-stats <details>: persiste estado collapsed/expanded em localStorage.
+// Default: collapsed (mostra so summary "N em aberto").
+function setupMiniStatsDetails() {
+  const det = document.getElementById('miniStatsDetails');
+  if (!det) return;
+  try {
+    const collapsed = localStorage.getItem('cdb-stats-collapsed');
+    if (collapsed === '0') det.open = true;  // unica vez que abrimos é se user abriu antes
+  } catch (e) {}
+  det.addEventListener('toggle', function () {
+    try { localStorage.setItem('cdb-stats-collapsed', det.open ? '0' : '1'); } catch (e) {}
+  });
+}
+document.addEventListener('DOMContentLoaded', setupMiniStatsDetails);
+// Tambem inicia se DOMContentLoaded ja disparou
+if (document.readyState !== 'loading') setupMiniStatsDetails();
 
 // ================================================================
 // TUTORIAL / ONBOARDING (4 steps, mostrado só na primeira abertura)
@@ -4343,7 +4453,10 @@ function renderOpenCashDaysBanner() {
 }
 
 function renderMiniStats() {
-  document.getElementById('msOpen').textContent = openOrders().length;
+  const openCount = openOrders().length;
+  document.getElementById('msOpen').textContent = openCount;
+  const summaryEl = document.getElementById('msOpenSummary');
+  if (summaryEl) summaryEl.textContent = openCount;
 
   // total produzido hoje (soma dos counts nos batches de hoje)
   const todayBatches = batches.filter(b => isToday(b.createdAt));
@@ -4435,22 +4548,31 @@ function renderCash() {
     receivableRow.style.display = 'none';
   }
 
-  // Estado de fechamento: badge + botoes de fechar/reabrir.
+  // Estado de fechamento: badge + botoes de fechar/reabrir (modal).
   const closing = getActiveCashClosing();
-  const badge = document.getElementById('cashClosedBadge');
-  const closeBtn = document.getElementById('cashCloseBtn');
-  const reopenBtn = document.getElementById('cashReopenBtn');
-  if (badge && closeBtn && reopenBtn) {
+  const homeBalance = document.getElementById('cashHomeBalance');
+  if (homeBalance) homeBalance.textContent = money(balance);
+  const homeStatus = document.getElementById('cashHomeStatus');
+  if (homeStatus) {
     if (closing) {
       const t = new Date(closing.closedAt).toLocaleTimeString('pt-BR').slice(0,5);
-      badge.style.display = 'block';
-      badge.textContent = `🔒 Caixa fechado às ${t} por ${closing.closedBy || '—'}`;
-      closeBtn.style.display = 'none';
-      reopenBtn.style.display = 'block';
+      homeStatus.textContent = `🔒 Fechado ${t} por ${closing.closedBy || '—'}`;
+      homeStatus.className = 'ccc-status closed';
     } else {
-      badge.style.display = 'none';
-      closeBtn.style.display = 'block';
-      reopenBtn.style.display = 'none';
+      homeStatus.textContent = 'Aberto';
+      homeStatus.className = 'ccc-status open';
+    }
+  }
+  // Botoes do modal de detalhes (alterna entre Fechar/Reabrir)
+  const closeDayBtn = document.getElementById('cashDetailsCloseDayBtn');
+  const reopenDayBtn = document.getElementById('cashDetailsReopenBtn');
+  if (closeDayBtn && reopenDayBtn) {
+    if (closing) {
+      closeDayBtn.style.display = 'none';
+      reopenDayBtn.style.display = 'block';
+    } else {
+      closeDayBtn.style.display = 'block';
+      reopenDayBtn.style.display = 'none';
     }
   }
 }
@@ -6128,6 +6250,7 @@ function openAjustes() {
   updatePixHint();
   renderPrinterStatus();
   renderCatalogList();
+  refreshAjustesThemeLabel();
   toggleModal('ajustesModal', true);
 }
 function closeAjustes() { toggleModal('ajustesModal', false); }
