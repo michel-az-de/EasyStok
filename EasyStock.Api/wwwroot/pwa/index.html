@@ -2033,6 +2033,35 @@ body {
 [data-theme="light"] .fin-card { background: #fff; box-shadow: 0 2px 6px rgba(21,31,49,0.04); }
 [data-theme="light"] .fin-action.danger { background: rgba(207, 87, 56, 0.12); }
 
+/* Banner de "caixa em aberto" — dias passados sem fechamento */
+.open-days-banner {
+  background: var(--gold-soft); color: var(--gold);
+  border: 1px solid var(--gold); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 12px;
+  font-size: 13px;
+}
+.open-days-banner .od-title { font-weight: 800; margin-bottom: 6px; }
+.open-days-banner .od-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.open-days-banner .od-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;
+}
+.open-days-banner .od-row .od-info { flex: 1; min-width: 0; font-size: 12px; }
+.open-days-banner .od-row .od-info .od-date { font-weight: 800; }
+.open-days-banner .od-row .od-info .od-meta { color: var(--ink-dim); font-size: 11px; }
+.open-days-banner .od-btn {
+  background: var(--gold); color: #1c1408; border: 0;
+  padding: 6px 12px; border-radius: 8px;
+  font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.open-days-banner .od-btn:active { opacity: 0.8; }
+[data-theme="light"] .open-days-banner {
+  background: rgba(183,129,34,0.08); color: var(--gold);
+  border-color: var(--gold);
+}
+[data-theme="light"] .open-days-banner .od-row { background: #fff; }
+[data-theme="light"] .open-days-banner .od-btn { color: #fff; }
+
 /* Botões de atalho na home */
 .home-actions {
   display: flex; gap: 8px; margin: 14px 0;
@@ -2908,6 +2937,11 @@ body {
 
     <!-- HOME -->
     <div class="screen active" data-screen="home">
+      <!-- Banner de dias com caixa em aberto (renderizado dinamicamente
+           por renderHome). Aparece se houver dias anteriores com
+           movimentacao e sem fechamento. -->
+      <div id="openCashDaysBanner" class="open-days-banner" style="display:none"></div>
+
       <div class="mini-stats">
         <div class="mini-stat">
           <div class="v accent" id="msOpen">0</div>
@@ -4271,6 +4305,41 @@ function renderHome() {
   renderMiniStats();
   renderOpenOrders();
   renderCash();
+  renderOpenCashDaysBanner();
+}
+
+// Banner de dias com caixa em aberto (anteriores a hoje, com movimentacao
+// e sem fechamento). Felipe pode fechar de la sem precisar voltar no tempo.
+function renderOpenCashDaysBanner() {
+  const banner = document.getElementById('openCashDaysBanner');
+  if (!banner) return;
+  const days = getOpenPriorDays();
+  if (!days.length) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+  // Mostra os 5 mais recentes pra evitar lista gigante
+  const showing = days.slice(0, 5);
+  const rows = showing.map(k => {
+    const sum = calcCashSummary(k);
+    const movs = sum.ordersCount + sum.entriesCount;
+    return `<div class="od-row">
+      <div class="od-info">
+        <div class="od-date">${escapeHtml(fmtDateKey(k))}</div>
+        <div class="od-meta">${movs} movimento(s) · saldo ${money(sum.balance)}</div>
+      </div>
+      <button class="od-btn" onclick="openCashCloseModal('${k}')">Fechar</button>
+    </div>`;
+  }).join('');
+  const moreHint = days.length > 5 ? `<div style="font-size:11px;color:var(--ink-mute);margin-top:6px">+ ${days.length - 5} dia(s) anteriores também em aberto</div>` : '';
+  banner.innerHTML = `
+    <div class="od-title">⚠️ Caixa de dia(s) anterior(es) ainda em aberto</div>
+    <div style="font-size:12px;opacity:.85">Sem fechamento, esses dias ficam sem snapshot. Recomendado fechar.</div>
+    <div class="od-list">${rows}</div>
+    ${moreHint}
+  `;
+  banner.style.display = 'block';
 }
 
 function renderMiniStats() {
@@ -4409,10 +4478,13 @@ function cancelOrder(id) {
   // Confirmacao mais forte se ja foi entregue (afeta caixa do dia).
   const prev = o.status;
   const wasDelivered = prev === STATUS.ENTREGUE;
-  // Trava se cancela pedido entregue HOJE com caixa ja fechado
-  if (wasDelivered && o.updatedAt && isToday(o.updatedAt) && isCashClosedToday()) {
-    showToast('Caixa do dia já está fechado. Reabra primeiro pra cancelar este pedido.');
-    return;
+  // Trava se cancela pedido entregue de um dia com caixa ja fechado
+  if (wasDelivered && o.updatedAt) {
+    const orderDay = dateKeyOf(o.updatedAt);
+    if (isCashClosedFor(orderDay)) {
+      showToast(`Caixa de ${fmtDateKey(orderDay)} fechado. Reabra primeiro pra cancelar este pedido.`);
+      return;
+    }
   }
   const promptMsg = wasDelivered
     ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
@@ -5050,28 +5122,73 @@ function getActiveCashClosing(dateKey) {
   const k = dateKey || dateKeyOf();
   return (cashClosings || []).find(c => c.dateKey === k && !c.reopenedAt) || null;
 }
-function isCashClosedToday() { return !!getActiveCashClosing(); }
+function isCashClosedFor(dateKey) { return !!getActiveCashClosing(dateKey); }
+function isCashClosedToday() { return isCashClosedFor(dateKeyOf()); }
 
-function calcCashSummaryToday() {
-  const allOrders = orders || [];
-  const allEntries = cashEntries || [];
-  const todayOrders = allOrders.filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && isToday(o.updatedAt));
-  const todayEntries = allEntries.filter(e => isToday(e.createdAt));
-  const sold = todayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
-  const inX = todayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const out = todayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+// Calcula sumario de caixa pra um dateKey especifico (default = hoje).
+// Usado pra: card home (hoje), modal fechamento (dia especifico), modal
+// detalhes (dia especifico), banner de dias em aberto.
+function calcCashSummary(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const sold = dayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const inX = dayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const out = dayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   return {
     sold, in: inX, out, balance: sold + inX - out,
-    ordersCount: todayOrders.length,
-    entriesCount: todayEntries.length
+    ordersCount: dayOrders.length,
+    entriesCount: dayEntries.length
   };
 }
+function calcCashSummaryToday() { return calcCashSummary(dateKeyOf()); }
 
-function openCashCloseModal() {
-  if (isCashClosedToday()) { showToast('Caixa do dia já está fechado'); return; }
-  const sum = calcCashSummaryToday();
+// Retorna lista de dateKeys com movimentacao anterior a hoje E sem
+// fechamento ativo. Usado pra banner "caixa de DD/MM ainda aberto".
+function getOpenPriorDays() {
+  const today = dateKeyOf();
+  const seen = new Set();
+  // Coleta dateKeys com movimentacao
+  (orders || []).forEach(o => {
+    if (o.status === STATUS.ENTREGUE && o.updatedAt) {
+      const k = dateKeyOf(o.updatedAt);
+      if (k !== today) seen.add(k);
+    }
+  });
+  (cashEntries || []).forEach(e => {
+    const k = dateKeyOf(e.createdAt);
+    if (k !== today) seen.add(k);
+  });
+  // Filtra os que NAO tem closing ativo
+  const open = [];
+  seen.forEach(k => {
+    if (!isCashClosedFor(k)) open.push(k);
+  });
+  // Ordena descendente (mais recentes primeiro)
+  return open.sort((a, b) => b.localeCompare(a));
+}
+function fmtDateKey(k) {
+  // YYYY-MM-DD -> DD/MM
+  const parts = k.split('-');
+  if (parts.length !== 3) return k;
+  return parts[2] + '/' + parts[1];
+}
+
+// dateKey opcional — se omitido, fecha caixa de HOJE.
+// Permite fechar dias anteriores em aberto via banner.
+let pendingCloseDateKey = null;
+function openCashCloseModal(dateKey) {
+  const k = dateKey || dateKeyOf();
+  if (isCashClosedFor(k)) { showToast(`Caixa de ${fmtDateKey(k)} já está fechado`); return; }
+  const sum = calcCashSummary(k);
   if (sum.ordersCount === 0 && sum.entriesCount === 0) {
-    if (!confirm('Nenhuma movimentação hoje. Fechar mesmo assim?')) return;
+    if (!confirm(`Nenhuma movimentação em ${fmtDateKey(k)}. Fechar mesmo assim?`)) return;
+  }
+  pendingCloseDateKey = k;
+  // Atualiza titulo
+  const titleEl = document.querySelector('#cashCloseModal .np-title');
+  if (titleEl) {
+    titleEl.textContent = k === dateKeyOf() ? 'Fechar caixa do dia' : `Fechar caixa de ${fmtDateKey(k)}`;
   }
   document.getElementById('cashCloseSummary').innerHTML = `
     <div style="display:flex;justify-content:space-between"><span>Vendas</span><span style="font-weight:800">${money(sum.sold)}</span></div>
@@ -5098,14 +5215,15 @@ function openCashCloseModal() {
 function closeCashCloseModal() { document.getElementById('cashCloseModal').classList.remove('show'); }
 
 function confirmCloseCashDay() {
-  const sum = calcCashSummaryToday();
+  const k = pendingCloseDateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
   const conferredRaw = (document.getElementById('cashCloseConferred').value || '').trim();
   const conf = conferredRaw ? parseMoneyInput(conferredRaw) : null;
   const notes = (document.getElementById('cashCloseNotes').value || '').trim() || null;
   if (conferredRaw && isNaN(conf)) { showToast('Saldo conferido inválido'); return; }
   const closing = {
     id: 'close-' + Date.now(),
-    dateKey: dateKeyOf(),
+    dateKey: k,
     closedAt: Date.now(),
     closedBy: operatorName || null,
     summary: { ...sum, conferredBalance: isNaN(conf) ? null : conf },
@@ -5119,9 +5237,10 @@ function confirmCloseCashDay() {
     summary: `Caixa fechado · ${closing.dateKey} · saldo ${money(sum.balance)}` + (notes ? ' · ' + notes : '')
   });
   closeCashCloseModal();
+  pendingCloseDateKey = null;
   renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
-  showToast('🔒 Caixa do dia fechado');
+  showToast(`🔒 Caixa de ${fmtDateKey(k)} fechado`);
 }
 
 function reopenCashDay() {
@@ -9082,9 +9201,19 @@ function parseMoneyInput(raw) {
 }
 
 function saveCashEntry() {
-  // Bloqueia edicao/criacao se caixa fechado
-  if (isCashClosedToday()) {
-    showToast('Caixa do dia já está fechado. Reabra primeiro.');
+  // Bloqueia edicao se a entry sendo editada e de um dia ja fechado.
+  // Pra criacao nova, sempre é hoje — checa hoje.
+  if (editingCashEntryId) {
+    const existing = (cashEntries || []).find(x => x.id === editingCashEntryId);
+    if (existing) {
+      const day = dateKeyOf(existing.createdAt);
+      if (isCashClosedFor(day)) {
+        showToast(`Caixa de ${fmtDateKey(day)} fechado. Reabra primeiro.`);
+        return;
+      }
+    }
+  } else if (isCashClosedToday()) {
+    showToast('Caixa de hoje já está fechado. Reabra primeiro.');
     return;
   }
   const desc = document.getElementById('cashDesc').value.trim();
@@ -9149,12 +9278,14 @@ function saveCashEntry() {
 }
 
 function deleteCashEntry(id) {
-  if (isCashClosedToday()) {
-    showToast('Caixa do dia já está fechado. Reabra primeiro.');
-    return;
-  }
   const e = (cashEntries || []).find(x => x.id === id);
   if (!e) return;
+  // Trava se o caixa do DIA da entry ja esta fechado
+  const entryDay = dateKeyOf(e.createdAt);
+  if (isCashClosedFor(entryDay)) {
+    showToast(`Caixa de ${fmtDateKey(entryDay)} fechado. Reabra primeiro.`);
+    return;
+  }
   if (!confirm(`Excluir lançamento "${e.description}" de ${money(e.amount)}?`)) return;
   cashEntries = cashEntries.filter(x => x.id !== id);
   persistAll();
