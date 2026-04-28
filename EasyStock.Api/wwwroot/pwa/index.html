@@ -602,7 +602,9 @@ body {
   background: var(--border);
 }
 .product-tile {
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.028), transparent 78px),
+    var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px 14px;
@@ -617,16 +619,22 @@ body {
   flex-direction: column;
   justify-content: space-between;
 }
+.product-tile:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.13);
+}
 .product-tile:active { transform: scale(0.97); box-shadow: none; }
 .product-tile.counted {
-  background: linear-gradient(145deg, rgba(122, 154, 79, 0.18), rgba(122, 154, 79, 0.06));
-  border-color: rgba(122, 154, 79, 0.5);
-  box-shadow: 0 2px 12px rgba(122,154,79,0.12);
+  background:
+    linear-gradient(145deg, rgba(122, 154, 79, 0.24), rgba(122, 154, 79, 0.07)),
+    var(--bg-elev);
+  border-color: rgba(122, 154, 79, 0.62);
+  box-shadow: 0 10px 24px rgba(122,154,79,0.14);
 }
-.product-tile .emoji { font-size: 22px; line-height: 1; }
+.product-tile .emoji { font-size: 24px; line-height: 1; }
 .product-tile .pname {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 800;
+  font-size: 13.5px;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -740,6 +748,50 @@ body {
   font-family: 'Fraunces', serif;
   font-style: italic;
 }
+.prod-screen-summary {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 11px 12px;
+  background:
+    linear-gradient(135deg, rgba(240,184,74,0.14), transparent 54%),
+    var(--bg-elev);
+  border: 1px solid rgba(240,184,74,0.28);
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.14);
+}
+.prod-screen-summary .ps-kicker {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.prod-screen-summary strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 850;
+}
+.prod-screen-summary button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.035);
+  color: var(--ink-dim);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.prod-screen-summary button:active { transform: scale(0.96); }
 
 /* CTA */
 .cta-row {
@@ -1977,15 +2029,36 @@ body {
 /* Tela de Conferência */
 .confer-scan-cta {
   width: 100%;
-  display: flex; align-items: center; justify-content: center; gap: 14px;
-  background: linear-gradient(135deg, var(--gold), #e8a02f);
-  color: #1c1408; border: 0; border-radius: 16px;
-  padding: 22px 16px; margin-bottom: 14px;
-  font-family: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
-  letter-spacing: 0.02em; box-shadow: 0 10px 28px rgba(240,184,74,0.25);
+  display: flex; align-items: center; justify-content: flex-start; gap: 13px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.22), transparent 48%),
+    linear-gradient(135deg, var(--gold), #e8a02f);
+  color: #1c1408; border: 1px solid rgba(255,255,255,0.18); border-radius: 16px;
+  padding: 17px 16px; margin-bottom: 14px;
+  font-family: inherit; font-size: 16px; font-weight: 850; cursor: pointer;
+  letter-spacing: 0.01em; box-shadow: 0 12px 30px rgba(240,184,74,0.22);
+  text-align: left;
 }
 .confer-scan-cta:active { transform: scale(0.98); }
-.confer-scan-cta .ico { font-size: 26px; line-height: 1; }
+.confer-scan-cta .ico {
+  width: 42px; height: 42px; flex: 0 0 42px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(28,20,8,0.12); border-radius: 14px;
+  font-size: 0; line-height: 1;
+}
+.confer-scan-cta .ico::before {
+  content: '';
+  width: 21px; height: 21px; display: block;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M4 7a3 3 0 0 1 3-3h2.2l1.2-1.8A2 2 0 0 1 12.1 1h3.8a2 2 0 0 1 1.7 1l1.2 2H20a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm8 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-2.2a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M4 7a3 3 0 0 1 3-3h2.2l1.2-1.8A2 2 0 0 1 12.1 1h3.8a2 2 0 0 1 1.7 1l1.2 2H20a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm8 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-2.2a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.confer-scan-cta .lbl { display: block; line-height: 1.25; }
+.confer-scan-cta .sub {
+  display: block; margin-top: 3px;
+  color: rgba(28,20,8,0.68); font-size: 12px; font-weight: 750;
+  letter-spacing: 0;
+}
 .confer-divider {
   display: flex; align-items: center; gap: 12px;
   color: var(--ink-mute); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
@@ -1995,20 +2068,23 @@ body {
   content: ''; flex: 1; height: 1px; background: var(--line);
 }
 .confer-search {
-  display: flex; gap: 8px; margin-bottom: 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 82px; gap: 8px; margin-bottom: 8px;
 }
 .confer-search input {
-  flex: 1; background: var(--bg-elev); color: var(--ink);
-  border: 1.5px solid var(--gold); border-radius: 12px;
-  padding: 14px 16px; font-size: 17px; letter-spacing: 0.06em;
+  min-width: 0; background: var(--bg-elev); color: var(--ink);
+  border: 1px solid rgba(240,184,74,0.58); border-radius: 12px;
+  padding: 13px 14px; font-size: 14px; letter-spacing: 0.02em;
   text-transform: uppercase; outline: none;
   font-family: inherit;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
 }
+.confer-search input::placeholder { color: var(--ink-mute); letter-spacing: 0; text-transform: none; }
+.confer-search input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
 .confer-search-btn {
   background: var(--gold); color: #1c1408; border: 0;
-  padding: 0 18px; border-radius: 12px;
+  padding: 0 12px; border-radius: 12px;
   font-weight: 800; font-size: 14px; cursor: pointer;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 .confer-hint { font-size: 13px; color: var(--ink-mute); min-height: 18px; margin-bottom: 10px; }
 .confer-future-note {
@@ -2019,9 +2095,11 @@ body {
 }
 .confer-row {
   display: flex; align-items: center; gap: 10px;
-  background: var(--bg-elev); border-radius: 12px;
-  padding: 12px 14px; margin-bottom: 8px;
-  border-left: 3px solid var(--gold);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 74px),
+    var(--bg-elev);
+  border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 14px;
+  padding: 12px 13px; margin-bottom: 9px;
 }
 .confer-row.done { border-left-color: var(--basil); opacity: 0.85; }
 .confer-row.problem { border-left-color: var(--accent); }
@@ -2031,8 +2109,8 @@ body {
 .confer-row .cr-meta { font-size: 12px; color: var(--ink-dim); }
 .confer-row .cr-action {
   background: var(--basil); color: #06281e; border: 0;
-  padding: 8px 12px; border-radius: 8px;
-  font-size: 13px; font-weight: 800; cursor: pointer;
+  min-width: 72px; padding: 8px 11px; border-radius: 9px;
+  font-size: 12px; font-weight: 850; cursor: pointer;
   letter-spacing: 0.02em;
 }
 .confer-row .cr-action:active { opacity: 0.8; }
@@ -2040,8 +2118,9 @@ body {
 
 /* Tabs Pedidos/Produção na tela Conferir */
 .confer-tabs {
-  display: flex; gap: 6px; margin: 16px 0 8px;
-  background: var(--bg-elev); border-radius: 12px; padding: 4px;
+  display: flex; gap: 6px; margin: 16px 0 10px;
+  background: rgba(255,255,255,0.035); border: 1px solid var(--line);
+  border-radius: 14px; padding: 4px;
 }
 .confer-tab {
   flex: 1; background: transparent; color: var(--ink-mute);
@@ -2049,7 +2128,7 @@ body {
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
   letter-spacing: 0.02em;
 }
-.confer-tab.active { background: var(--gold); color: #1c1408; }
+.confer-tab.active { background: var(--gold); color: #1c1408; box-shadow: 0 8px 18px rgba(240,184,74,0.16); }
 .confer-tab:active { transform: scale(0.98); }
 [data-theme="light"] .confer-tab.active { background: var(--gold); color: #fff; }
 
@@ -2097,7 +2176,10 @@ body {
 
 /* Cards de lote na aba Produção */
 .batch-card {
-  background: var(--bg-elev); border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 78px),
+    var(--bg-elev);
+  border: 1px solid var(--line); border-radius: 14px;
   margin-bottom: 10px; overflow: hidden;
   border-left: 3px solid var(--gold);
 }
@@ -2138,16 +2220,19 @@ body {
 .batch-unit-row .u-status.divergencia { background: var(--accent-soft); color: var(--accent); }
 .batch-unit-row .u-action {
   margin-left: auto; background: var(--gold); color: #1c1408;
-  border: 0; border-radius: 6px; padding: 5px 10px;
-  font-size: 12px; font-weight: 700; cursor: pointer;
+  border: 0; border-radius: 8px; padding: 6px 10px;
+  font-size: 12px; font-weight: 800; cursor: pointer;
 }
 [data-theme="light"] .u-action { background: var(--gold); color: #fff; }
 
 /* Tela Finalizados */
 .fin-card {
-  background: var(--bg-elev); border-radius: 12px;
-  padding: 12px 14px; margin-bottom: 10px;
-  border-left: 3px solid var(--basil);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 86px),
+    var(--bg-elev);
+  border: 1px solid var(--line); border-left: 3px solid var(--basil);
+  border-radius: 15px;
+  padding: 13px 14px; margin-bottom: 10px;
 }
 .fin-card.cancelado { border-left-color: var(--accent); }
 .fin-row { display: flex; align-items: center; gap: 10px; }
@@ -2158,11 +2243,12 @@ body {
 .fin-badge { font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 800; letter-spacing: 0.04em; flex-shrink: 0; }
 .fin-badge.entregue  { background: var(--basil-soft); color: var(--basil); }
 .fin-badge.cancelado { background: var(--accent-soft); color: var(--accent); }
-.fin-actions { display: flex; gap: 6px; margin-top: 10px; }
+.fin-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
 .fin-action {
-  flex: 1; background: var(--bg-elev-2); color: var(--ink);
+  min-width: 0; background: var(--bg-elev-2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 8px;
-  padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  padding: 9px 10px; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+  white-space: nowrap;
 }
 .fin-action:active { opacity: 0.8; }
 .fin-action.danger { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
@@ -2205,19 +2291,24 @@ body {
 .home-action-btn {
   flex: 1;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: var(--bg-elev); color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 80%),
+    var(--bg-elev);
+  color: var(--ink);
   border: 1px solid var(--line); border-radius: 12px;
   padding: 14px 12px; font-size: 14px; font-weight: 700; cursor: pointer;
   font-family: inherit;
+  box-shadow: var(--shadow-sm, 0 8px 18px rgba(0,0,0,0.12));
 }
 .home-action-btn:active { opacity: 0.8; }
 .home-action-btn .ico { font-size: 20px; }
 
 /* Selo de status nos cards do kanban */
 .k-confer-badge {
-  display: inline-block; padding: 3px 8px; border-radius: 100px;
-  font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-  margin-left: 6px;
+  display: inline-flex; align-items: center; max-width: 142px;
+  padding: 3px 8px; border-radius: 100px;
+  font-size: 9px; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase;
+  margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .k-confer-badge.pendente   { background: var(--gold-soft); color: var(--gold); }
 .k-confer-badge.conferido  { background: var(--basil-soft); color: var(--basil); }
@@ -2358,52 +2449,73 @@ body {
     border: 1px dashed #000; border-radius: 2mm; padding: 2mm; margin-top: 6px;
   }
   .print-area .pa-note .pa-label { margin-bottom: 2px; }
+  .print-area .pa-confer,
+  .print-area .et-scan {
+    border: 1.5px solid #000; border-radius: 2.5mm; padding: 2.5mm;
+    margin: 2.5mm 0; text-align: center;
+    break-inside: avoid;
+  }
+  .print-area .pa-confer-qr,
+  .print-area .et-qr { display: flex; justify-content: center; margin-bottom: 1.5mm; }
+  .print-area .pa-confer-qr svg,
+  .print-area .et-qr svg { display: block; width: 31mm; height: 31mm; }
+  .print-area .pa-confer-code,
+  .print-area .et-code {
+    font-size: 10pt; font-weight: 900; letter-spacing: 0.06em;
+    overflow-wrap: anywhere; line-height: 1.2;
+  }
+  .print-area .pa-confer-hint,
+  .print-area .et-hint { font-size: 7.5pt; opacity: 0.82; margin-top: 1mm; }
   @page { size: 58mm auto; margin: 0; }
 }
 
 /* ========== Modal de revisão da produção: validade e peso por linha ========== */
 .prod-detail-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .pd-row {
-  background: var(--bg-elev);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.028), transparent 82px),
+    var(--bg-elev);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
 }
 .pd-name {
-  font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;
+  font-size: 14px; font-weight: 800; color: var(--ink); margin-bottom: 10px;
   display: flex; align-items: center; justify-content: space-between; gap: 6px;
 }
 .pd-name .pd-qty {
   background: var(--gold-soft); color: var(--gold);
-  padding: 2px 8px; border-radius: 100px;
+  padding: 3px 9px; border-radius: 100px;
   font-size: 11px; font-weight: 800;
 }
 .pd-fields { display: flex; flex-direction: column; gap: 8px; }
 .pd-weight {
   background: var(--bg); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 8px;
-  padding: 8px 10px; font-size: 13px; font-family: inherit;
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 11px; font-size: 13px; font-family: inherit;
 }
-.pd-weight:focus { outline: none; border-color: var(--accent); }
+.pd-weight:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
 .pd-validity-pills {
   display: flex; gap: 6px; flex-wrap: wrap;
 }
 .pd-validity-pills button {
-  flex: 0 0 auto; padding: 6px 10px;
+  flex: 0 0 auto; padding: 8px 11px;
   background: transparent; color: var(--ink-dim);
   border: 1px solid var(--line); border-radius: 100px;
-  font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
+  font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer;
 }
 .pd-validity-pills button.active {
-  background: var(--accent); color: white; border-color: var(--accent);
+  background: var(--gold); color: #1c1408; border-color: var(--gold);
+  box-shadow: 0 8px 18px rgba(240,184,74,0.18);
 }
 .pd-validity-pills .pd-validity-custom {
   flex: 1 1 80px; min-width: 70px;
   background: var(--bg); color: var(--ink);
   border: 1px solid var(--line); border-radius: 100px;
-  padding: 6px 10px; font-size: 12px; font-family: inherit;
+  padding: 8px 11px; font-size: 12px; font-family: inherit;
 }
-.pd-validity-pills .pd-validity-custom:focus { outline: none; border-color: var(--accent); }
+.pd-validity-pills .pd-validity-custom:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
 .pd-row.invalid { border-color: #ef6b6b; animation: shakeX 0.3s; }
 @keyframes shakeX {
   0%, 100% { transform: translateX(0); }
@@ -2538,9 +2650,13 @@ body {
 .upd-btn:active { opacity: 0.8; }
 
 .etq-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(240,184,74,0.16), transparent 34%),
+    rgba(7,10,16,0.92);
   display: none; flex-direction: column;
   z-index: 11000;
+  backdrop-filter: blur(8px);
 }
 .etq-overlay.show { display: flex; }
 .etq-sheet {
@@ -2551,15 +2667,26 @@ body {
 }
 .etq-head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 16px 16px 8px; gap: 12px;
+  padding: 18px 16px 12px; gap: 12px;
   border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 100%),
+    var(--bg-elev);
 }
 .etq-head h3 { margin: 0; font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); }
 .etq-head .etq-sub { font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
+.etq-mode-chip {
+  display: inline-flex; align-items: center;
+  margin-top: 8px; padding: 5px 9px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(255,255,255,0.04); color: var(--gold);
+  font-size: 11px; font-weight: 850; letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .etq-success-banner {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; background: #1f3a1f; color: #b8e0b8;
-  border-bottom: 1px solid #2a5a2a; font-weight: 700; font-size: 13px;
+  padding: 10px 16px; background: rgba(22,143,122,0.18); color: var(--basil);
+  border-bottom: 1px solid rgba(22,143,122,0.28); font-weight: 800; font-size: 13px;
 }
 .etq-success-icon {
   display: inline-flex; align-items: center; justify-content: center;
@@ -2568,11 +2695,12 @@ body {
 }
 .etq-body {
   flex: 1; overflow-y: auto;
-  padding: 20px 16px 28px;
+  padding: 22px 16px 30px;
   background:
-    radial-gradient(circle at top, rgba(255,255,255,0.04), transparent 26%),
-    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 24%),
-    #202a3f;
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 26%),
+    #111827;
+  background-size: 18px 18px, auto, auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .etq-card {
@@ -2580,25 +2708,36 @@ body {
   background: #fff; color: #000;
   font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
   font-size: 15px; line-height: 1.35; font-weight: 700;
-  padding: 16px 14px 14px;
-  border: 1px solid #d7d7d7;
-  border-radius: 12px;
-  box-shadow: 0 14px 34px rgba(0,0,0,0.18);
+  padding: 17px 15px 15px;
+  border: 1px solid #ececec;
+  border-radius: 6px;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+  position: relative;
 }
+.etq-card::before,
+.etq-card::after {
+  content: ''; position: absolute; left: 12px; right: 12px; height: 1px;
+  background: repeating-linear-gradient(90deg, #d8d8d8 0 5px, transparent 5px 10px);
+}
+.etq-card::before { top: 7px; }
+.etq-card::after { bottom: 7px; }
+.etq-card .et-title,
+.etq-card .pa-title { overflow-wrap: anywhere; }
 .etq-card .et-title {
-  text-align: center; font-size: 19px; font-weight: 900;
-  margin-bottom: 2px; line-height: 1.1;
+  text-align: center; font-size: 20px; font-weight: 950;
+  margin-bottom: 2px; line-height: 1.08;
 }
 .etq-card .et-kicker,
 .etq-card .pa-kicker {
   text-align: center; font-size: 11px; font-weight: 900;
-  letter-spacing: 0.18em; text-transform: uppercase; color: #555;
+  letter-spacing: 0.16em; text-transform: uppercase; color: #555;
   margin-bottom: 8px;
 }
 .etq-card .et-prod {
-  text-align: center; font-size: 18px; font-weight: 900;
-  margin: 10px 0 8px; padding: 8px 0;
-  border-top: 1px solid #000; border-bottom: 1px solid #000;
+  text-align: center; font-size: 18px; font-weight: 950;
+  margin: 10px 0 9px; padding: 9px 8px;
+  border: 2px solid #000; border-radius: 8px;
+  line-height: 1.2; overflow-wrap: anywhere;
 }
 .etq-card .et-photo-wrap {
   display: flex; justify-content: center; margin: 8px 0 4px;
@@ -2607,32 +2746,44 @@ body {
   max-width: 90%; max-height: 140px; object-fit: contain;
   border: 1px solid #000; border-radius: 4px; background: #fff;
 }
+.etq-card .et-scan {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  border: 2px solid #000; border-radius: 10px;
+  padding: 12px 10px; margin: 10px 0 12px;
+  background: #fafafa;
+}
 .etq-card .et-bars {
-  display: flex; height: 50px; margin: 10px auto 4px;
+  display: flex; height: 58px; margin: 4px auto 2px;
   align-items: stretch; justify-content: center;
   background: #fff;
+  max-width: 100%; overflow: hidden;
 }
+.etq-card .et-bars svg { display: block; max-width: 100%; height: 58px; }
 .etq-card .et-bars .bar { background: #000; height: 100%; }
 .etq-card .et-bars .gap { background: transparent; height: 100%; }
 .etq-card .et-code {
-  text-align: center; font-size: 13px; font-weight: 900;
-  letter-spacing: 0.12em; margin-bottom: 12px;
+  text-align: center; font-size: 14px; font-weight: 900;
+  letter-spacing: 0.04em; line-height: 1.25; overflow-wrap: anywhere;
 }
 .etq-card .et-qr {
   display: flex; justify-content: center; align-items: center;
-  margin: 8px 0 10px;
+  margin: 0 0 3px;
 }
-.etq-card .et-qr svg { display: block; }
+.etq-card .et-qr svg { display: block; width: 128px; height: 128px; }
+.etq-card .et-hint { font-size: 11px; color: #555; font-weight: 800; }
 .etq-card .et-grid,
 .etq-card .pa-grid {
-  border: 1px solid #000; border-radius: 10px; padding: 10px 12px;
+  border: 1.5px solid #000; border-radius: 9px; padding: 10px 12px;
+  background: #fff;
 }
 .etq-card .et-row {
   display: flex; justify-content: space-between;
-  gap: 10px; padding: 4px 0; font-size: 14px; font-weight: 700;
+  gap: 10px; padding: 5px 0; font-size: 14px; font-weight: 800;
+  border-bottom: 1px dotted #c9c9c9;
 }
+.etq-card .et-row:last-child { border-bottom: 0; }
 .etq-card .et-row .lbl { font-weight: 900; }
-.etq-card .pa-title  { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 2px; line-height: 1.1; }
+.etq-card .pa-title  { text-align: center; font-size: 21px; font-weight: 950; margin-bottom: 2px; line-height: 1.08; }
 .etq-card .pa-center { text-align: center; font-weight: 800; }
 .etq-card .pa-meta   { text-align: center; font-size: 11px; color: #555; margin-bottom: 8px; }
 .etq-card .pa-sep    { border-top: 1px dashed #000; height: 0; margin: 8px 0; }
@@ -2649,7 +2800,10 @@ body {
 .etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 900; }
 .etq-card .pa-row    { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
 .etq-card .pa-bold   { font-weight: 900; }
-.etq-card .pa-large  { font-size: 22px; }
+.etq-card .pa-large  {
+  font-size: 22px; border: 2px solid #000; border-radius: 9px;
+  padding: 8px 10px; margin-top: 8px; background: #f7f7f7;
+}
 .etq-card .pa-note {
   border: 1px dashed #000; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
 }
@@ -2662,19 +2816,30 @@ body {
 .etq-card .pa-confer-code { font-size: 16px; letter-spacing: 0.05em; }
 .etq-card .pa-confer-hint { font-size: 11px; color: #555; }
 .etq-actions {
-  display: flex; gap: 8px; padding: 12px 16px;
-  background: var(--bg);
+  display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent),
+    var(--bg-elev);
   border-top: 1px solid var(--line);
 }
 .etq-actions .etq-btn {
-  flex: 1; padding: 14px 8px;
+  min-width: 0; padding: 13px 8px;
   border: 0; border-radius: 12px; cursor: pointer;
-  font-family: inherit; font-size: 13px; font-weight: 700;
+  font-family: inherit; font-size: 12px; font-weight: 850;
+  letter-spacing: 0.01em;
 }
-.etq-actions .etq-print  { background: var(--accent); color: white; }
+.etq-actions .etq-print  { background: var(--gold); color: #1c1408; box-shadow: 0 10px 22px rgba(240,184,74,0.18); }
 .etq-actions .etq-save   { background: rgba(96,165,250,0.18); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
 .etq-actions .etq-share  { background: rgba(37,211,102,0.18); color: #25D366; border: 1px solid rgba(37,211,102,0.3); }
 .etq-actions .etq-btn:active { transform: scale(0.97); }
+@media (min-width: 720px) {
+  .etq-overlay { align-items: center; justify-content: center; padding: 28px; }
+  .etq-sheet {
+    width: min(520px, 100%); max-height: 92vh; flex: 0 1 92vh;
+    border: 1px solid var(--line); border-radius: 22px;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.42);
+  }
+}
 
 /* ========== Login / boas-vindas ========== */
 .welcome {
@@ -2758,12 +2923,13 @@ body {
 /* ========== Botões +/- nos tiles de produção ========== */
 .product-tile .qty-controls {
   display: flex; gap: 4px; align-items: center;
-  background: rgba(0,0,0,0.25); border-radius: 10px; padding: 3px;
-  margin-top: 8px; width: fit-content;
+  background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px; padding: 3px;
+  margin-top: 10px; width: fit-content;
 }
 [data-theme="light"] .product-tile .qty-controls { background: rgba(31,26,20,0.06); }
 .product-tile .qty-btn {
-  width: 30px; height: 30px; border: 0; background: transparent;
+  width: 32px; height: 32px; border: 0; background: transparent;
   font-size: 18px; font-weight: 800; cursor: pointer; border-radius: 8px;
   line-height: 1; display: flex; align-items: center; justify-content: center;
   font-family: inherit;
@@ -2774,15 +2940,22 @@ body {
 .product-tile .qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ========== Movimentação (timeline) ========== */
-.mov-filter { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 6px; }
+.mov-filter {
+  display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding: 2px 0 7px;
+  scrollbar-width: none;
+}
+.mov-filter::-webkit-scrollbar { display: none; }
 .mov-filter button {
   padding: 9px 12px; border-radius: 999px;
-  background: rgba(255,255,255,0.03); border: 1px solid var(--line);
+  background: rgba(255,255,255,0.035); border: 1px solid var(--line);
   color: var(--ink-mute); font-size: 11px; font-weight: 800;
   letter-spacing: 0.06em; text-transform: uppercase;
   cursor: pointer; white-space: nowrap; font-family: inherit;
 }
-.mov-filter button.active { background: var(--accent); color: white; border-color: var(--accent); }
+.mov-filter button.active {
+  background: var(--accent); color: white; border-color: var(--accent);
+  box-shadow: 0 8px 20px rgba(255,106,75,0.18);
+}
 .mov-item {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.03), transparent 88px),
@@ -2807,7 +2980,7 @@ body {
 .mov-actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .hist-action {
   background: var(--gold); color: #000; border: 0;
-  padding: 9px 14px; border-radius: 8px;
+  padding: 9px 14px; border-radius: 9px;
   font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer;
 }
 .hist-action:active { opacity: 0.8; }
@@ -2824,12 +2997,15 @@ body {
 /* ========== Botão Export ========== */
 .export-btn {
   display: flex; align-items: center; gap: 8px;
-  width: 100%; padding: 12px 14px;
-  background: var(--gold-soft); color: var(--gold);
+  width: 100%; padding: 13px 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 100%),
+    var(--gold-soft);
+  color: var(--gold);
   border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: 12px; font-size: 13px; font-weight: 700;
   font-family: inherit; cursor: pointer;
-  margin-bottom: 12px;
+  margin-bottom: 12px; box-shadow: var(--shadow-sm, 0 8px 18px rgba(0,0,0,0.12));
 }
 .export-btn:active { transform: scale(0.98); }
 .export-btn svg { width: 16px; height: 16px; }
@@ -2956,6 +3132,162 @@ body {
 @keyframes blinkHighlight {
   0%, 100% { border-color: var(--line); box-shadow: none; }
   50% { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+}
+
+/* ========== Premium polish layer ========== */
+button, input, textarea, select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.section-label {
+  align-items: center;
+  min-height: 18px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  margin-left: 10px;
+  background: linear-gradient(90deg, var(--line), transparent);
+  opacity: 0.75;
+}
+.section-label-with-links::after { display: none; }
+.section-label .count {
+  box-shadow: 0 7px 16px rgba(231,104,69,0.18);
+}
+.screen-tabs,
+.confer-tabs {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 8px 20px rgba(0,0,0,0.10);
+}
+.screen-tab.active,
+.confer-tab.active {
+  font-weight: 850;
+}
+.input-box,
+.search-box {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 8px 18px rgba(0,0,0,0.08);
+}
+.input-box:focus-within,
+.search-box:focus-within {
+  border-color: rgba(240,184,74,0.72);
+  box-shadow: 0 0 0 3px var(--gold-soft), 0 8px 18px rgba(0,0,0,0.10);
+}
+.empty,
+.confer-empty,
+.kanban-col-empty {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 100%),
+    rgba(255,255,255,0.025);
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  font-style: normal;
+}
+.btn-cobrar,
+.btn-imprimir,
+.btn-historico,
+.k-confer-btn,
+.fin-action,
+.hist-action {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.btn-cobrar:hover,
+.btn-imprimir:hover,
+.btn-historico:hover,
+.k-confer-btn:hover,
+.fin-action:hover,
+.hist-action:hover {
+  transform: translateY(-1px);
+}
+.btn-cobrar,
+.btn-imprimir,
+.btn-historico,
+.k-confer-btn {
+  border-radius: 10px;
+}
+.open-order,
+.k-card,
+.fin-card,
+.batch-card,
+.mov-item,
+.cash-card-collapsed {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.open-order:hover,
+.k-card:hover,
+.fin-card:hover,
+.batch-card:hover,
+.mov-item:hover,
+.cash-card-collapsed:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+.k-card {
+  overflow: hidden;
+}
+.k-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--line);
+}
+.k-card.status-aguardando::before { background: #cf8a3a; }
+.k-card.status-preparando::before { background: #60a5fa; }
+.k-card.status-pronto::before { background: #4ade80; }
+.k-card .k-topline {
+  align-items: flex-start;
+}
+.k-card .k-status,
+.k-confer-badge,
+.fin-badge,
+.batch-unit-row .u-status {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.045);
+}
+.k-card .k-actions:first-child {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.k-card .k-actions:first-child > button {
+  margin-left: 0;
+  min-width: 0;
+  justify-content: center;
+}
+.cta-btn.primary,
+.oo-advance,
+.k-card .k-advance {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.16), transparent 42%),
+    linear-gradient(135deg, var(--accent), #f08a56);
+}
+.cta-btn.primary:disabled {
+  box-shadow: none;
+}
+.shop-sug,
+.chip,
+.k-chip,
+.mov-filter button {
+  backdrop-filter: blur(8px);
+}
+[data-theme="light"] .empty,
+[data-theme="light"] .confer-empty,
+[data-theme="light"] .kanban-col-empty {
+  background: #fff;
+  border-color: var(--border-strong);
+}
+[data-theme="light"] .screen-tabs,
+[data-theme="light"] .confer-tabs,
+[data-theme="light"] .input-box,
+[data-theme="light"] .search-box {
+  box-shadow: 0 8px 18px rgba(21,31,49,0.05);
 }
 
 /* ========== Progress dots ========== */
@@ -3138,6 +3470,13 @@ body {
     <!-- PRODUÇÃO -->
     <div class="screen" data-screen="producao">
       <div class="section-label">Toque para somar, segure para ajustar</div>
+      <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
+        <div>
+          <span class="ps-kicker">Selecionado</span>
+          <strong id="prodScreenSummaryMain">0 unidades</strong>
+        </div>
+        <button type="button" onclick="clearProduction()">Limpar</button>
+      </div>
       <div class="product-grid" id="productGrid"></div>
 
       <div class="cta-row">
@@ -3260,23 +3599,23 @@ body {
     <!-- CONFERENCIA — scanner híbrido (pedido + produção) -->
     <div class="screen" data-screen="conferencia">
       <button class="confer-scan-cta" onclick="openScanner('tela')">
-        <span class="ico">📷</span>
-        <span class="lbl">Escanear QR ou código de barras</span>
+        <span class="ico" aria-hidden="true">📷</span>
+        <span class="lbl">Escanear QR ou código de barras<span class="sub">Pedido, lote ou unidade de produção</span></span>
       </button>
 
       <div class="confer-divider"><span>ou digite o código</span></div>
 
       <div class="confer-search">
         <input id="conferScreenInput" type="text" inputmode="text" autocomplete="off" maxlength="40"
-               placeholder="Pedido (8 chars) ou Lote (SKU-LOT-XXX)"
+               placeholder="Codigo do pedido ou lote"
                oninput="onConferScreenInput()" onkeydown="if(event.key==='Enter') doConferScreenSearch()">
         <button class="confer-search-btn" onclick="doConferScreenSearch()">Abrir</button>
       </div>
       <div id="conferScreenHint" class="confer-hint"></div>
 
       <div class="confer-tabs">
-        <button class="confer-tab active" data-tab="pedidos" onclick="setConferTab('pedidos')">📋 Pedidos</button>
-        <button class="confer-tab" data-tab="producao" onclick="setConferTab('producao')">🍳 Produção</button>
+        <button class="confer-tab active" data-tab="pedidos" onclick="setConferTab('pedidos')">Pedidos</button>
+        <button class="confer-tab" data-tab="producao" onclick="setConferTab('producao')">Produção</button>
       </div>
 
       <div id="conferTabPedidos">
@@ -3590,6 +3929,19 @@ body {
       </div>
 
       <div class="ajustes-section" data-group="eq">
+        <h4>Leitura das etiquetas</h4>
+        <p class="hint">Escolha o que sai nas etiquetas de produção. Use barras para leitores dedicados; QR costuma ser melhor com câmera.</p>
+        <div class="field">
+          <label>Codigo impresso na produção</label>
+          <select id="ajusteProdScanMode">
+            <option value="both">QR + codigo de barras</option>
+            <option value="barcode">Somente codigo de barras</option>
+            <option value="qr">Somente QR Code</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ajustes-section" data-group="eq">
         <h4>Catalogo de produtos</h4>
         <p class="hint">Cadastre, edite ou arquive produtos sem afetar pedidos e lotes antigos.</p>
         <div id="catalogList" class="catalog-list"></div>
@@ -3845,6 +4197,7 @@ body {
         <div>
           <h3 id="etqTitle">Etiquetas geradas</h3>
           <div class="etq-sub" id="etqSubtitle">—</div>
+          <div class="etq-mode-chip" id="etqModeChip">QR + barras</div>
         </div>
         <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
       </div>
@@ -3854,9 +4207,9 @@ body {
       </div>
       <div class="etq-body" id="etqBody"></div>
       <div class="etq-actions">
-        <button class="etq-btn etq-print"  onclick="etqAction('print')">🖨️ Imprimir</button>
-        <button class="etq-btn etq-save"   onclick="etqAction('save')">💾 Salvar</button>
-        <button class="etq-btn etq-share"  onclick="etqAction('share')">📤 Compartilhar</button>
+        <button class="etq-btn etq-print"  onclick="etqAction('print')">Imprimir</button>
+        <button class="etq-btn etq-save"   onclick="etqAction('save')">Salvar PNG</button>
+        <button class="etq-btn etq-share"  onclick="etqAction('share')">Enviar</button>
       </div>
     </div>
   </div>
@@ -4810,6 +5163,8 @@ function renderProductGrid() {
   const grid = document.getElementById('productGrid');
   grid.innerHTML = '';
   let anyCounted = false;
+  let totalUnits = 0;
+  let totalSkus = 0;
 
   CATEGORIES.forEach(cat => {
     // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
@@ -4823,7 +5178,12 @@ function renderProductGrid() {
     grid.appendChild(header);
 
     items.forEach(p => {
-      if (p.count > 0) anyCounted = true;
+      const qty = Number(p.count) || 0;
+      if (qty > 0) {
+        anyCounted = true;
+        totalSkus++;
+        totalUnits += qty;
+      }
       const tile = document.createElement('div');
       tile.className = 'product-tile' + (p.count > 0 ? ' counted' : '') + (p.custom ? ' custom' : '');
       const hasPhoto = p.photo ? ' has-photo' : '';
@@ -4862,7 +5222,17 @@ function renderProductGrid() {
     }
   });
 
-  document.getElementById('saveProdBtn').disabled = !anyCounted;
+  const summary = document.getElementById('prodScreenSummary');
+  const summaryMain = document.getElementById('prodScreenSummaryMain');
+  if (summary && summaryMain) {
+    summary.style.display = anyCounted ? 'flex' : 'none';
+    summaryMain.textContent = `${totalUnits} unidade${totalUnits === 1 ? '' : 's'} · ${totalSkus} produto${totalSkus === 1 ? '' : 's'}`;
+  }
+  const saveBtn = document.getElementById('saveProdBtn');
+  saveBtn.disabled = !anyCounted;
+  saveBtn.textContent = anyCounted
+    ? `Registrar ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
+    : 'Registrar produção';
 }
 
 function clearProduction() {
@@ -5596,8 +5966,8 @@ function renderFinalizadosScreen() {
     const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
     const orderRef = (o.id || '').slice(-8);
     const statusBadge = o.status === STATUS.ENTREGUE
-      ? '<span class="fin-badge entregue">✓ Entregue</span>'
-      : '<span class="fin-badge cancelado">⊗ Cancelado</span>';
+      ? '<span class="fin-badge entregue">Entregue</span>'
+      : '<span class="fin-badge cancelado">Cancelado</span>';
     const acoes = o.status === STATUS.ENTREGUE
       ? `<button class="fin-action danger" onclick="cancelOrder('${o.id}')">Cancelar</button>`
       : `<button class="fin-action danger" onclick="purgeOrderRecord('${o.id}')">Excluir do registro</button>`;
@@ -6004,8 +6374,9 @@ function renderKanbanCard(o, col) {
   const itemCount = (o.items || []).reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
-  const conferBadge = `<span class="k-confer-badge ${cs}">${conferStatusLabel(cs)}</span>`;
-  const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? '✓ Conferir' : '✓ Reconferir';
+  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
+  const conferBadge = `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
+  const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
@@ -6114,6 +6485,12 @@ function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')    
 function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
 function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+function getProdScanMode() {
+  try {
+    const mode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
+    return ['both', 'barcode', 'qr'].includes(mode) ? mode : 'both';
+  } catch (e) { return 'both'; }
+}
 
 // Helper de console: cdbSetPix(key, holder, type, empresa).
 window.cdbSetPix = function (key, holder, type, empresa) {
@@ -6360,6 +6737,8 @@ function openAjustes() {
   document.getElementById('ajustePixType').value   = getPixType();
   document.getElementById('ajustePixKey').value    = getPixKey();
   document.getElementById('ajustePixHolder').value = getPixHolder();
+  const scanSel = document.getElementById('ajusteProdScanMode');
+  if (scanSel) scanSel.value = getProdScanMode();
   if (!ajustesListenersBound) {
     document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
     document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
@@ -6455,6 +6834,7 @@ function saveAjustes() {
   const type    = document.getElementById('ajustePixType').value;
   const key     = (document.getElementById('ajustePixKey').value    || '').trim();
   const holder  = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
+  const prodScanMode = (document.getElementById('ajusteProdScanMode')?.value || 'both');
   if (key && !validatePixKey(key, type)) {
     showToast('Chave PIX inválida pra esse tipo');
     return;
@@ -6465,19 +6845,22 @@ function saveAjustes() {
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder()
+    pixHolder: getPixHolder(),
+    prodScanMode: getProdScanMode()
   };
   if (op) saveOperatorName(op);
   cdbSetPix(key || null, holder || null, type, empresa || null);
+  try { localStorage.setItem('cdb-prod-scan-mode', ['both','barcode','qr'].includes(prodScanMode) ? prodScanMode : 'both'); } catch (e) {}
   renderBrandName();
   const after = {
     operator: operatorName,
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder()
+    pixHolder: getPixHolder(),
+    prodScanMode: getProdScanMode()
   };
-  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder']);
+  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder','prodScanMode']);
   if (diff) {
     logAction({
       action: 'settings.update',
@@ -7561,7 +7944,7 @@ function batchCardHtml(batch) {
   const unitsHtml = ets.map(et => {
     const st = getUnitStatus(batch, et.idxStr);
     const statusBadge = `<span class="u-status ${st}">${conferStatusLabel(st)}</span>`;
-    const actionLabel = st === CONFER_STATUS.PENDENTE ? '✓ Conferir' : 'Ver';
+    const actionLabel = st === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver';
     return `<div class="batch-unit-row">
       <span class="u-idx">${escapeHtml(et.idxStr)}</span>
       <span style="flex:1;font-size:13px">${escapeHtml(et.codigoBarras)}</span>
@@ -7598,7 +7981,7 @@ function conferRowHtml(o) {
       <div class="cr-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
       <div class="cr-meta">${escapeHtml(meta)}</div>
     </div>
-    <button class="cr-action" onclick="openConfer('${o.id}')">${status === CONFER_STATUS.PENDENTE ? '✓ Conferir' : 'Ver'}</button>
+    <button class="cr-action" onclick="openConfer('${o.id}')">${status === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver'}</button>
   </div>`;
 }
 function onConferScreenInput() {
@@ -7825,8 +8208,8 @@ function escPosBarcode128(data) {
   out.push(0x1D, 0x48, 0x02);
   // Fonte HRI: A (default, GS f 0)
   out.push(0x1D, 0x66, 0x00);
-  // Altura barcode em dots (GS h n) — 70 = ~9mm, fica discreto sem cortar HRI
-  out.push(0x1D, 0x68, 0x46);
+  // Altura barcode em dots (GS h n) — 90 melhora leitura sem estourar a etiqueta
+  out.push(0x1D, 0x68, 0x5A);
   // Largura modular (GS w 1) — 1 dot por modulo, evita estouro de largura
   out.push(0x1D, 0x77, 0x01);
   let raw = String(data || '');
@@ -8007,18 +8390,64 @@ function generateQrSvg(data, size = 96) {
     qr.addData(String(data || ''));
     qr.make();
     const cells = qr.getModuleCount();
-    const cellSize = Math.max(1, Math.floor(size / cells));
-    const realSize = cellSize * cells;
+    const quiet = 4;
+    const cellSize = Math.max(1, Math.floor(size / (cells + quiet * 2)));
+    const realSize = cellSize * (cells + quiet * 2);
     let rects = '';
     for (let r = 0; r < cells; r++) {
       for (let c = 0; c < cells; c++) {
         if (qr.isDark(r, c)) {
-          rects += `<rect x="${c*cellSize}" y="${r*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+          rects += `<rect x="${(c + quiet)*cellSize}" y="${(r + quiet)*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
         }
       }
     }
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${realSize}" height="${realSize}" viewBox="0 0 ${realSize} ${realSize}" style="background:#fff">${rects}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${realSize}" height="${realSize}" viewBox="0 0 ${realSize} ${realSize}" style="background:#fff"><rect width="100%" height="100%" fill="#fff"/>${rects}</svg>`;
   } catch (e) { console.warn('QR falhou:', e); return ''; }
+}
+
+const CODE128_PATTERNS = [
+  '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+  '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+  '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+  '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+  '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+  '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+  '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+  '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+  '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+  '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+  '114131','311141','411131','211412','211214','211232','2331112'
+];
+
+function code128Values(data) {
+  const raw = asciiNorm(String(data || '')).replace(/[^\x20-\x7E]/g, '').slice(0, ESCPOS_BARCODE_MAX);
+  const values = [104]; // Start B
+  for (let i = 0; i < raw.length; i++) values.push(raw.charCodeAt(i) - 32);
+  let checksum = values[0];
+  for (let i = 1; i < values.length; i++) checksum += values[i] * i;
+  values.push(checksum % 103, 106);
+  return values;
+}
+
+function code128Modules(data) {
+  return code128Values(data).map(v => CODE128_PATTERNS[v] || '').join('');
+}
+
+function generateCode128Svg(data, width = 260, height = 58) {
+  const modules = code128Modules(data);
+  if (!modules) return '';
+  const total = modules.split('').reduce((s, n) => s + Number(n || 0), 0);
+  const quiet = 10;
+  const scale = Math.max(1, Math.floor((width - quiet * 2) / total));
+  const realW = total * scale + quiet * 2;
+  let x = quiet;
+  let rects = '';
+  for (let i = 0; i < modules.length; i++) {
+    const w = Number(modules[i]) * scale;
+    if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`;
+    x += w;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${realW}" height="${height}" viewBox="0 0 ${realW} ${height}" style="background:#fff"><rect width="100%" height="100%" fill="#fff"/>${rects}</svg>`;
 }
 
 /**
@@ -8061,10 +8490,11 @@ function etiquetasFromBatch(batch) {
 }
 
 function etiquetaProducaoHtml(et) {
-  const bars = buildBarcodePattern(et.codigoBarras);
   const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
-  const pixSafe = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
+  const scanMode = getProdScanMode();
+  const showQr = scanMode !== 'barcode';
+  const showBarcode = scanMode !== 'qr';
   // Foto opcional do produto entre nome e barcode
   const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
   return `
@@ -8072,8 +8502,12 @@ function etiquetaProducaoHtml(et) {
     <div class="et-title">${escapeHtml(et.empresa)}</div>
     <div class="et-prod">${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
     ${photo}
-    <div class="et-bars">${bars}</div>
-    <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+    <div class="et-scan">
+      ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, 132)}</div>` : ''}
+      ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, 268, 58)}</div>` : ''}
+      <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+      <div class="et-hint">Escaneie no app para conferir</div>
+    </div>
     <div class="et-grid">
       ${peso}
       <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
@@ -8100,9 +8534,23 @@ function escPosLabelProducao(et) {
   wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
   b.boldOff();
   b.line(divider());
-  // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
-  b.push(...escPosBarcode128(et.codigoBarras));
-  b.push(0x0A);
+  const scanMode = getProdScanMode();
+  const showQr = scanMode !== 'barcode';
+  const showBarcode = scanMode !== 'qr';
+  if (showQr) {
+    // QR: mais robusto no scanner do app e mais legivel em termica.
+    b.push(...escPosQrCommands(et.codigoBarras, 0x04));
+    b.push(0x0A);
+  }
+  b.bold().line(et.codigoBarras).boldOff();
+  b.line('Escaneie no app para conferir');
+  if (showBarcode) {
+    b.line(divider());
+    // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
+    // Mantido por compatibilidade com leitores de codigo de barras.
+    b.push(...escPosBarcode128(et.codigoBarras));
+    b.push(0x0A);
+  }
   // Dados do lote alinhados em 2 colunas
   b.left();
   if (et.weightG) b.line(padLine('Peso',     fmtPesoG(et.weightG)));
@@ -8122,9 +8570,9 @@ function etiquetasToPng(etiquetas, kind) {
   const W = 384;
   // order: blocos com cliente, itens, total, observacao e PIX.
   // producao: branding, barcode e grade de lote/validade.
-  // ROW_H: produção sem foto = 430; com foto = 590 (espaço pra miniatura).
+  // ROW_H: producao sem foto = 510; com foto = 670 (QR + barras + miniatura).
   const hasAnyPhoto = kind !== 'order' && etiquetas.some(et => et && et.photo);
-  const ROW_H = kind === 'order' ? 620 : (hasAnyPhoto ? 590 : 430);
+  const ROW_H = kind === 'order' ? 620 : (hasAnyPhoto ? 670 : 510);
   const GAP = 20;
   const H = etiquetas.length * (ROW_H + GAP) + GAP;
   const canvas = document.createElement('canvas');
@@ -8193,9 +8641,26 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
     ctx.strokeRect(dx, y, dw, dh);
     y += dh + 10;
   }
-  drawBarcodeOnCanvas(ctx, et.codigoBarras, 28, y, W - 56, 50); y += 58;
-  ctx.font = '900 16px monospace';
-  ctx.fillText(et.codigoBarras, cx, y); y += 28;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  const scanMode = getProdScanMode();
+  const showQr = scanMode !== 'barcode';
+  const showBarcode = scanMode !== 'qr';
+  const qrSize = scanMode === 'both' ? 104 : 124;
+  const boxH = (showQr ? qrSize + 14 : 0) + (showBarcode ? 64 : 0) + 56;
+  ctx.strokeRect(20, y - 2, W - 40, boxH);
+  if (showQr) {
+    drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y + 10, qrSize);
+    y += qrSize + 18;
+  }
+  if (showBarcode) {
+    drawCode128OnCanvas(ctx, et.codigoBarras, 36, y, W - 72, 58);
+    y += 70;
+  }
+  ctx.font = '900 15px monospace';
+  wordWrap(et.codigoBarras, 28).forEach(l => { ctx.fillText(l, cx, y); y += 18; });
+  ctx.font = '700 11px monospace';
+  ctx.fillText('Escaneie no app para conferir', cx, y); y += 24;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.strokeRect(20, y - 2, W - 40, 118);
@@ -8258,10 +8723,13 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     y += it.unit ? 34 : 24;
   });
   ctx.fillRect(24, y, W - 48, 2); y += 12;
-  ctx.font = '900 24px monospace';
-  ctx.fillText('TOTAL', 24, y);
-  ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 24, y); ctx.textAlign = 'left';
-  y += 34;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y - 2, W - 40, 44);
+  ctx.font = '900 22px monospace';
+  ctx.fillText('TOTAL', 34, y + 27);
+  ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 34, y + 27); ctx.textAlign = 'left';
+  y += 56;
   if (o.notes) {
     ctx.strokeRect(20, y, W - 40, 52);
     ctx.font = '900 11px monospace';
@@ -8272,6 +8740,9 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   }
   // QR de conferencia + codigo curto
   const qrSize = 130;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y - 4, W - 40, qrSize + 58);
   drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
   y += qrSize + 8;
   ctx.textAlign = 'center';
@@ -8300,13 +8771,15 @@ function drawQrOnCanvas(ctx, data, x, y, size) {
     qr.addData(String(data || ''));
     qr.make();
     const cells = qr.getModuleCount();
-    const cellSize = Math.max(1, Math.floor(size / cells));
+    const quiet = 4;
+    const cellSize = Math.max(1, Math.floor(size / (cells + quiet * 2)));
+    const realSize = cellSize * (cells + quiet * 2);
     ctx.fillStyle = '#fff';
-    ctx.fillRect(x, y, cellSize * cells, cellSize * cells);
+    ctx.fillRect(x, y, realSize, realSize);
     ctx.fillStyle = '#000';
     for (let r = 0; r < cells; r++) {
       for (let c = 0; c < cells; c++) {
-        if (qr.isDark(r, c)) ctx.fillRect(x + c * cellSize, y + r * cellSize, cellSize, cellSize);
+        if (qr.isDark(r, c)) ctx.fillRect(x + (c + quiet) * cellSize, y + (r + quiet) * cellSize, cellSize, cellSize);
       }
     }
   } catch (e) { console.warn('QR canvas falhou:', e); }
@@ -8338,9 +8811,32 @@ function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
   }
 }
 
+function drawCode128OnCanvas(ctx, data, x, y, w, h) {
+  const modules = code128Modules(data);
+  if (!modules) return;
+  const total = modules.split('').reduce((s, n) => s + Number(n || 0), 0);
+  const scale = Math.max(1, Math.floor(w / total));
+  const renderedW = total * scale;
+  let cur = x + Math.max(0, (w - renderedW) / 2);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#000';
+  for (let i = 0; i < modules.length; i++) {
+    const bw = Number(modules[i]) * scale;
+    if (i % 2 === 0) ctx.fillRect(cur, y, bw, h);
+    cur += bw;
+  }
+}
+
 // Estado do preview de etiquetas
 let currentEtiquetas = [];
 let currentEtiquetasKind = 'producao'; // 'producao' | 'order'
+
+function prodScanModeLabel(mode) {
+  return mode === 'barcode' ? 'Codigo de barras'
+       : mode === 'qr' ? 'QR Code'
+       : 'QR + barras';
+}
 
 function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   if (!etiquetas || !etiquetas.length) return;
@@ -8348,6 +8844,10 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   currentEtiquetasKind = kind || 'producao';
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
+  const modeChip = document.getElementById('etqModeChip');
+  if (modeChip) {
+    modeChip.textContent = kind === 'order' ? 'Recibo + QR' : prodScanModeLabel(getProdScanMode());
+  }
 
   // Banner verde de confirmação. Garante que o operador veja "cadastrado"
   // antes do passo de imprimir, mesmo que feche o modal sem imprimir.
