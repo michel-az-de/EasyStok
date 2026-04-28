@@ -2033,6 +2033,29 @@ body {
 .confer-tab:active { transform: scale(0.98); }
 [data-theme="light"] .confer-tab.active { background: var(--gold); color: #fff; }
 
+/* Tabs de tela (Pedidos: Novo/Andamento; Ajustes: Loja/Equip/Manut) */
+.screen-tabs {
+  display: flex; gap: 6px; margin: 6px 0 14px;
+  background: var(--bg-elev); border-radius: 12px; padding: 4px;
+  position: sticky; top: 0; z-index: 5;
+}
+.screen-tab {
+  flex: 1; background: transparent; color: var(--ink-mute);
+  border: 0; border-radius: 10px; padding: 10px;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.screen-tab.active { background: var(--gold); color: #1c1408; }
+.screen-tab:active { transform: scale(0.98); }
+[data-theme="light"] .screen-tab.active { background: var(--gold); color: #fff; }
+.screen-tab-badge {
+  background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 800; padding: 2px 7px;
+  border-radius: 100px; letter-spacing: 0.02em; min-width: 18px;
+}
+.screen-tab.active .screen-tab-badge { background: rgba(0,0,0,0.18); color: inherit; }
+
 /* Cards de lote na aba Produção */
 .batch-card {
   background: var(--bg-elev); border-radius: 12px;
@@ -2422,7 +2445,6 @@ body {
 [data-theme="light"] .et-photo { border: 1px solid #d0d0d0; }
 [data-theme="light"] .pa-confer { border: 1.5px solid #1a1a1a; }
 [data-theme="light"] .pa-confer-hint { color: #777; }
-[data-theme="light"] #conferBuscaInput,
 [data-theme="light"] #conferScreenInput {
   background: #fff !important; border: 1.5px solid var(--gold) !important; color: var(--ink) !important;
 }
@@ -3088,55 +3110,65 @@ body {
     <!-- PEDIDOS -->
     <div class="screen" data-screen="pedidos">
 
-      <div class="section-label">Cliente</div>
-      <div id="clientPicker">
-        <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="clientSearch" placeholder="Quem pediu?" oninput="searchClient()" autocomplete="off">
+      <!-- Tabs Novo/Andamento (resolve scroll de >2000px da tela antiga) -->
+      <div class="screen-tabs">
+        <button class="screen-tab" data-tab="novo" onclick="goPedidosTab('novo')">+ Novo</button>
+        <button class="screen-tab active" data-tab="andamento" onclick="goPedidosTab('andamento')">
+          Andamento <span class="screen-tab-badge" id="pedidosTabBadge">0</span>
+        </button>
+      </div>
+
+      <!-- Aba "Novo" — formulario de criacao de pedido -->
+      <section class="pedidos-tab-section" data-tab="novo" style="display:none">
+        <div class="section-label">Cliente</div>
+        <div id="clientPicker">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="clientSearch" placeholder="Quem pediu?" oninput="searchClient()" autocomplete="off">
+          </div>
+          <div id="clientSuggestions" class="suggestions"></div>
+          <div class="recents-label">recentes</div>
+          <div class="chips-row" id="recentsChips"></div>
         </div>
-        <div id="clientSuggestions" class="suggestions"></div>
-        <div class="recents-label">recentes</div>
-        <div class="chips-row" id="recentsChips"></div>
-      </div>
-      <div id="clientSelected" style="display:none"></div>
+        <div id="clientSelected" style="display:none"></div>
 
-      <div class="section-label">
-        <span>Itens do pedido</span>
-        <span id="itemsCount" style="font-size:10px;color:var(--ink-mute);font-weight:600;"></span>
-      </div>
-      <div class="order-items" id="orderItemsList"></div>
-      <button class="add-item-btn" onclick="openItemPicker()">
-        <div class="plus">+</div>
-        Adicionar item do cardápio
-      </button>
-      <div class="total-line" id="totalLine" style="display:none">
-        <div class="l">Total</div>
-        <div class="v" id="orderTotal">R$ 0</div>
-      </div>
+        <div class="section-label">
+          <span>Itens do pedido</span>
+          <span id="itemsCount" style="font-size:10px;color:var(--ink-mute);font-weight:600;"></span>
+        </div>
+        <div class="order-items" id="orderItemsList"></div>
+        <button class="add-item-btn" onclick="openItemPicker()">
+          <div class="plus">+</div>
+          Adicionar item do cardápio
+        </button>
+        <div class="total-line" id="totalLine" style="display:none">
+          <div class="l">Total</div>
+          <div class="v" id="orderTotal">R$ 0</div>
+        </div>
 
-      <div class="section-label">Observação (opcional)</div>
-      <div class="input-box">
-        <textarea id="orderNotes" rows="2" placeholder="ex: pra gratinar, retira 19h, sem cebola"></textarea>
-      </div>
+        <div class="section-label">Observação (opcional)</div>
+        <div class="input-box">
+          <textarea id="orderNotes" rows="2" placeholder="ex: pra gratinar, retira 19h, sem cebola"></textarea>
+        </div>
 
-      <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
-        🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
-      </button>
-      <div class="retroactive-fields" id="retroFields">
-        <label>Quando aconteceu?</label>
-        <input type="datetime-local" id="retroDatetime" />
-        <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
-      </div>
+        <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
+          🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
+        </button>
+        <div class="retroactive-fields" id="retroFields">
+          <label>Quando aconteceu?</label>
+          <input type="datetime-local" id="retroDatetime" />
+          <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
+        </div>
 
-      <div class="cta-row">
-        <button class="cta-btn primary" id="saveOrderBtn" onclick="saveOrder()" disabled>Salvar pedido</button>
-      </div>
+        <div class="cta-row">
+          <button class="cta-btn primary" id="saveOrderBtn" onclick="saveOrder()" disabled>Salvar pedido</button>
+        </div>
+      </section>
 
-      <div class="today-divider" id="kanbanDivider">esteira de produção</div>
-      <div id="kanban"></div>
-      <div style="display:flex;justify-content:center;margin:14px 0 4px">
-        <button class="cf-btn cf-adj" style="max-width:280px" onclick="openConferBusca()">🔍 Conferir por código</button>
-      </div>
+      <!-- Aba "Andamento" — kanban da esteira -->
+      <section class="pedidos-tab-section" data-tab="andamento">
+        <div id="kanban"></div>
+      </section>
     </div>
 
     <!-- COMPRAR -->
@@ -3652,23 +3684,6 @@ body {
     </div>
   </div>
 
-  <!-- Modal Buscar por código curto — campo grande, foco automatico, busca match em pedidos. -->
-  <div class="np-overlay" id="conferBuscaModal" role="dialog" aria-modal="true">
-    <div class="np-sheet" style="max-width:380px">
-      <div class="np-icon">🔍</div>
-      <h3 class="np-title">Conferir pedido</h3>
-      <p class="np-text">Escaneie o QR/barcode ou digite o código.</p>
-      <button class="np-btn np-primary" onclick="openScanner('busca')" style="margin-bottom:10px">📷 Escanear câmera</button>
-      <input id="conferBuscaInput" type="text" inputmode="text" autocomplete="off" maxlength="32"
-             placeholder="ou digite ex: 24467287"
-             style="width:100%;background:var(--bg-elev);color:var(--ink);border:1.5px solid var(--gold);border-radius:10px;padding:14px;font-size:18px;letter-spacing:0.08em;text-align:center;text-transform:uppercase;margin-bottom:14px"
-             oninput="onConferBuscaInput()" onkeydown="if(event.key==='Enter') doConferBusca()">
-      <div id="conferBuscaHint" style="font-size:13px;color:var(--ink-mute);margin-bottom:12px;min-height:18px"></div>
-      <button class="np-btn np-secondary" onclick="doConferBusca()">Abrir pelo código digitado</button>
-      <button class="np-btn np-tertiary" onclick="closeConferBusca()">Cancelar</button>
-    </div>
-  </div>
-
   <!-- Scanner de câmera fullscreen — usa BarcodeDetector API nativa do
        Chromium WebView (suporte: Android 10+ Chrome 83+). Sem plugin
        Capacitor. Decodifica QR + CODE128 + EAN13 + CODE39. -->
@@ -4135,7 +4150,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','conferProdModal','prodProblemaModal','cashDetailsModal','cashCloseModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashDetailsModal','cashCloseModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -4341,10 +4356,32 @@ function go(screen) {
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.nav === screen));
   document.getElementById('content').scrollTop = 0;
   if (screen === 'home')         renderHome();
-  if (screen === 'pedidos')      renderOrdersFeed();
+  if (screen === 'pedidos') {
+    renderOrdersFeed();
+    // Default inteligente: se tem pedido em construcao, abre "Novo";
+    // senao "Andamento" (operador chega vendo o que ta rolando).
+    const hasDraft = (currentOrderItems && currentOrderItems.length > 0);
+    goPedidosTab(hasDraft ? 'novo' : 'andamento');
+  }
   if (screen === 'historico')    renderHistoricoScreen();
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
+}
+
+// Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
+function goPedidosTab(tab) {
+  document.querySelectorAll('#content [data-screen="pedidos"] .screen-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
+    s.style.display = s.dataset.tab === tab ? '' : 'none');
+}
+// Atualiza badge "Andamento ●N" sempre que kanban re-renderizar
+function updatePedidosTabBadge() {
+  const el = document.getElementById('pedidosTabBadge');
+  if (!el) return;
+  const n = openOrders().length;
+  el.textContent = String(n);
+  el.style.display = n > 0 ? '' : 'none';
 }
 
 // =========================
@@ -5848,6 +5885,9 @@ function renderKanban() {
   const root = document.getElementById('kanban');
   if (!root) return;
 
+  // Atualiza badge da aba "Andamento" com contador de pedidos abertos
+  if (typeof updatePedidosTabBadge === 'function') updatePedidosTabBadge();
+
   const openItems = orders.filter(o =>
     o.status === 'aguardando' || o.status === 'preparando' || o.status === 'pronto'
   );
@@ -6989,14 +7029,10 @@ function saveProblema() {
   showToast('⚠️ Problema reportado');
 }
 
-// ===== BUSCA POR CÓDIGO CURTO =====
-function openConferBusca() {
-  document.getElementById('conferBuscaInput').value = '';
-  document.getElementById('conferBuscaHint').textContent = '';
-  toggleModal('conferBuscaModal', true);
-  setTimeout(() => { try { document.getElementById('conferBuscaInput').focus(); } catch (e) {} }, 100);
-}
-function closeConferBusca() { toggleModal('conferBuscaModal', false); }
+// ===== BUSCA POR CÓDIGO CURTO (helper compartilhado) =====
+// O modal de busca foi removido (Onda 2.1) — entrada unica via tela
+// Conferencia (data-screen=conferencia). findOrderByShortCode continua
+// porque e usada por handleScannedCode (scanner) e pela tela Conferencia.
 function findOrderByShortCode(code) {
   const c = String(code || '').trim().toLowerCase();
   if (!c) return null;
@@ -7004,33 +7040,6 @@ function findOrderByShortCode(code) {
   return orders.find(o => (o.id || '').toLowerCase().slice(-8) === c)
       || orders.find(o => (o.id || '').toLowerCase() === c)
       || null;
-}
-function onConferBuscaInput() {
-  const code = document.getElementById('conferBuscaInput').value;
-  const hint = document.getElementById('conferBuscaHint');
-  if (!code) { hint.textContent = ''; return; }
-  const found = findAnyByCode(code);
-  if (found && found.kind === 'production') {
-    const u = found.unit;
-    hint.innerHTML = `<span style="color:var(--basil)">✓ Lote · ${escapeHtml(u.et.productName)} · Un ${u.idxStr}</span>`;
-  } else if (found && found.kind === 'order') {
-    const o = found.order;
-    const cliente = o.clientSnapshot?.name || 'Sem cliente';
-    const status = getConferStatus(o);
-    hint.innerHTML = `<span style="color:var(--basil)">✓ Pedido · ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
-  } else if (code.length >= 4) {
-    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido ou lote com esse código</span>';
-  } else {
-    hint.textContent = 'Continue digitando…';
-  }
-}
-function doConferBusca() {
-  const code = document.getElementById('conferBuscaInput').value;
-  const found = findAnyByCode(code);
-  if (!found) { showToast('Não encontrado'); return; }
-  closeConferBusca();
-  if (found.kind === 'production') openConferProducao(found.unit.batch.id, found.unit.idxStr);
-  else openConfer(found.order.id);
 }
 
 // ===== CONFERENCIA DE PRODUCAO (etiquetas de lote) =====
@@ -7409,12 +7418,9 @@ function handleScannedCode(rawValue, format) {
   }, 1500);
 }
 function _clearConferInputs() {
-  if (scannerOrigin === 'busca') {
-    try { document.getElementById('conferBuscaInput').value = ''; } catch (e) {}
-    closeConferBusca();
-  } else {
-    try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
-  }
+  // O modal de busca foi removido na Onda 2.1; agora unico ponto e a tela
+  // de conferencia. Limpa o input dela apos scan bem-sucedido.
+  try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
 }
 
 // ===== TELA DE CONFERENCIA (data-screen=conferencia) =====
@@ -9036,6 +9042,8 @@ function saveOrder() {
   highlightOrderId = order.id;
   renderKanban();
   setTimeout(() => { highlightOrderId = null; renderKanban(); }, 3200);
+  // Apos salvar, vai automatico pra aba Andamento (kanban com o card novo)
+  if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
 
   pendingSync++;
   updateSync();
