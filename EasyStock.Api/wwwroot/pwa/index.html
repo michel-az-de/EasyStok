@@ -6414,6 +6414,34 @@ function ensureCameraPermission() {
   });
 }
 
+// Formatos que queremos detectar.
+//   qr_code  -> recibo de pedido (orderRef 8 chars)
+//   code_128 -> etiqueta de producao (SKU-LOT-IDX, gerado pelo escPosBarcode128)
+//   ean_13/code_39/ean_8/upc_a -> bonus pra outros barcodes que possam aparecer
+const SCAN_FORMATS_WANTED = ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'];
+let scanFormatsAvailable = null; // setado uma vez via getSupportedFormats()
+
+async function getActiveScanFormats() {
+  if (scanFormatsAvailable) return scanFormatsAvailable;
+  try {
+    if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+      const supported = await window.BarcodeDetector.getSupportedFormats();
+      scanFormatsAvailable = SCAN_FORMATS_WANTED.filter(f => supported.includes(f));
+    } else {
+      scanFormatsAvailable = SCAN_FORMATS_WANTED.slice();
+    }
+  } catch (e) {
+    scanFormatsAvailable = ['qr_code']; // fallback minimo
+  }
+  if (!scanFormatsAvailable.length) scanFormatsAvailable = ['qr_code'];
+  return scanFormatsAvailable;
+}
+
+function fmtScanFormatsLabel(list) {
+  const human = { qr_code: 'QR', code_128: 'CODE128', ean_13: 'EAN13', code_39: 'CODE39', ean_8: 'EAN8', upc_a: 'UPC' };
+  return list.map(f => human[f] || f).join(' + ');
+}
+
 async function openScanner(origin) {
   if (scannerActive) return;
   scannerOrigin = origin || 'tela';
@@ -6454,15 +6482,26 @@ async function openScanner(origin) {
     });
     video.srcObject = scannerStream;
     await video.play();
-    statusEl.textContent = 'Procurando código…';
-    const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
+    const active = await getActiveScanFormats();
+    if (!active.includes('code_128')) {
+      // Avisa que device nao decoda CODE128 (etiqueta de producao nao funciona)
+      statusEl.className = 'scan-status error';
+      statusEl.textContent = '⚠ Este device só lê: ' + fmtScanFormatsLabel(active) + '. Atualize "Android System WebView" pra ler barcode da produção.';
+      // Continua mesmo assim — QR de pedido ainda funciona
+      setTimeout(() => {
+        if (scannerActive) { statusEl.className = 'scan-status'; statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active); }
+      }, 3500);
+    } else {
+      statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
+    }
+    const detector = new window.BarcodeDetector({ formats: active });
     const detectLoop = async () => {
       if (!scannerActive) return;
       try {
         const codes = await detector.detect(video);
         if (codes && codes.length > 0) {
-          const value = codes[0].rawValue;
-          handleScannedCode(value);
+          const c = codes[0];
+          handleScannedCode(c.rawValue, c.format);
           return;
         }
       } catch (e) { /* ignora frames com erro */ }
@@ -6493,20 +6532,21 @@ function closeScanner() {
   document.getElementById('scannerOverlay').classList.remove('show');
 }
 
-function handleScannedCode(rawValue) {
+function handleScannedCode(rawValue, format) {
   if (!rawValue) return;
   const statusEl = document.getElementById('scannerStatus');
   let code = String(rawValue || '').trim();
   // Se for um URI tipo cdb-confirm:XXX, pega o final
   const m = code.match(/[a-z0-9-]+$/i);
   const candidate = m ? m[0] : code;
+  const fmtLabel = format === 'qr_code' ? 'QR' : (format === 'code_128' ? 'CODE128' : (format || ''));
   // Busca unificada: tenta unidade de produção primeiro (codigo SKU-LOT-IDX),
   // depois pedido (orderRef 8 chars).
   const found = findAnyByCode(candidate) || findAnyByCode(code);
   if (found && found.kind === 'production') {
     const u = found.unit;
     statusEl.className = 'scan-status found';
-    statusEl.textContent = '✓ ' + u.et.productName + ' · Un ' + u.idxStr;
+    statusEl.textContent = '✓ ' + (fmtLabel ? '['+fmtLabel+'] ' : '') + u.et.productName + ' · Un ' + u.idxStr;
     try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
     setTimeout(() => {
       closeScanner();
@@ -6518,7 +6558,7 @@ function handleScannedCode(rawValue) {
   if (found && found.kind === 'order') {
     const o = found.order;
     statusEl.className = 'scan-status found';
-    statusEl.textContent = '✓ ' + (o.clientSnapshot?.name || 'Pedido encontrado');
+    statusEl.textContent = '✓ ' + (fmtLabel ? '['+fmtLabel+'] ' : '') + (o.clientSnapshot?.name || 'Pedido encontrado');
     try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
     setTimeout(() => {
       closeScanner();
@@ -6529,20 +6569,21 @@ function handleScannedCode(rawValue) {
   }
   // Não achou — não fecha; continua tentando.
   statusEl.className = 'scan-status error';
-  statusEl.textContent = 'Código "' + candidate + '" não bate com nenhum pedido ou lote';
-  setTimeout(() => {
+  statusEl.textContent = (fmtLabel ? '['+fmtLabel+'] ' : '') + 'Código "' + candidate + '" não bate com pedido ou lote deste aparelho';
+  setTimeout(async () => {
     if (!scannerActive) return;
     statusEl.className = 'scan-status';
-    statusEl.textContent = 'Procurando código…';
+    const active = await getActiveScanFormats();
+    statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
     if (!scannerRaf) {
       const video = document.getElementById('scannerVideo');
       if (video && video.srcObject) {
-        const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'] });
+        const detector = new window.BarcodeDetector({ formats: active });
         const loop = async () => {
           if (!scannerActive) return;
           try {
             const codes = await detector.detect(video);
-            if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue); return; }
+            if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue, codes[0].format); return; }
           } catch (e) {}
           scannerRaf = requestAnimationFrame(loop);
         };
