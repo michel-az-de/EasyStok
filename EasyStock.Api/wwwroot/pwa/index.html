@@ -1693,6 +1693,14 @@ body {
 .btn-ajustes-printer.subtle {
   background: transparent; color: var(--ink-mute);
 }
+.btn-ajustes-printer.danger {
+  background: rgba(232,122,122,0.10); color: #e87a7a;
+  border-color: rgba(232,122,122,0.22);
+}
+[data-theme="light"] .btn-ajustes-printer.danger {
+  background: rgba(207,87,56,0.12); color: var(--accent);
+  border-color: rgba(207,87,56,0.30);
+}
 
 /* Lista de produtos no Catalogo (Ajustes -> Catalogo de produtos) */
 .catalog-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
@@ -1998,6 +2006,32 @@ body {
   font-size: 12px; font-weight: 700; cursor: pointer;
 }
 [data-theme="light"] .u-action { background: var(--gold); color: #fff; }
+
+/* Tela Finalizados */
+.fin-card {
+  background: var(--bg-elev); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px;
+  border-left: 3px solid var(--basil);
+}
+.fin-card.cancelado { border-left-color: var(--accent); }
+.fin-row { display: flex; align-items: center; gap: 10px; }
+.fin-info { flex: 1; min-width: 0; }
+.fin-code { font-size: 11px; color: var(--ink-mute); font-family: monospace; letter-spacing: 0.06em; margin-bottom: 2px; }
+.fin-name { font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.fin-meta { font-size: 12px; color: var(--ink-dim); }
+.fin-badge { font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 800; letter-spacing: 0.04em; flex-shrink: 0; }
+.fin-badge.entregue  { background: var(--basil-soft); color: var(--basil); }
+.fin-badge.cancelado { background: var(--accent-soft); color: var(--accent); }
+.fin-actions { display: flex; gap: 6px; margin-top: 10px; }
+.fin-action {
+  flex: 1; background: var(--bg-elev-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.fin-action:active { opacity: 0.8; }
+.fin-action.danger { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+[data-theme="light"] .fin-card { background: #fff; box-shadow: 0 2px 6px rgba(21,31,49,0.04); }
+[data-theme="light"] .fin-action.danger { background: rgba(207, 87, 56, 0.12); }
 
 /* Botões de atalho na home */
 .home-actions {
@@ -2613,6 +2647,13 @@ body {
   font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer;
 }
 .hist-action:active { opacity: 0.8; }
+.hist-action.danger {
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--accent);
+}
+[data-theme="light"] .hist-action.danger {
+  background: rgba(207, 87, 56, 0.12); color: var(--accent); border-color: var(--accent);
+}
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -2886,6 +2927,9 @@ body {
         <button class="home-action-btn" onclick="go('conferencia')">
           <span class="ico">🔍</span> Conferir pedido
         </button>
+        <button class="home-action-btn" onclick="go('finalizados')">
+          <span class="ico">✅</span> Finalizados
+        </button>
         <button class="home-action-btn" onclick="go('compras')">
           <span class="ico">🛒</span> Lista de compras
         </button>
@@ -2919,7 +2963,13 @@ body {
           <div class="l">Saldo</div>
           <div class="v" id="cashBalance">R$ 0,00</div>
         </div>
-        <button class="cash-btn" onclick="openCashModal()">+ lançamento manual</button>
+        <div id="cashClosedBadge" style="display:none;background:var(--gold-soft);color:var(--gold);padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.04em;margin-top:6px;text-align:center"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="cash-btn" style="flex:1" onclick="openCashModal()">+ lançamento</button>
+          <button class="cash-btn" style="flex:1" onclick="openCashDetails()">ver detalhes</button>
+        </div>
+        <button id="cashCloseBtn" class="cash-btn" style="margin-top:6px;background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold);font-weight:800" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
+        <button id="cashReopenBtn" class="cash-btn" style="margin-top:6px;background:transparent;color:var(--ink-mute);border:1px solid var(--line);display:none" onclick="reopenCashDay()">🔓 Reabrir caixa</button>
       </div>
     </div>
 
@@ -2989,6 +3039,24 @@ body {
     </div>
 
     <!-- COMPRAR -->
+    <!-- FINALIZADOS — pedidos entregues e cancelados, com a\u00e7\u00f5es de
+         cancelar (entregue) e excluir registro (cancelado). -->
+    <div class="screen" data-screen="finalizados">
+      <div class="section-label">Pedidos finalizados</div>
+      <div class="mov-filter" id="finFilter">
+        <button data-f="hoje" class="active" onclick="setFinFilter('hoje')">Hoje</button>
+        <button data-f="7d"   onclick="setFinFilter('7d')">7 dias</button>
+        <button data-f="30d"  onclick="setFinFilter('30d')">30 dias</button>
+        <button data-f="all"  onclick="setFinFilter('all')">Tudo</button>
+      </div>
+      <div class="mov-filter" id="finStatus">
+        <button data-s="todos"     class="active" onclick="setFinStatus('todos')">Todos</button>
+        <button data-s="entregue"  onclick="setFinStatus('entregue')">Entregues</button>
+        <button data-s="cancelado" onclick="setFinStatus('cancelado')">Cancelados</button>
+      </div>
+      <div id="finList"></div>
+    </div>
+
     <!-- CONFERENCIA — scanner híbrido (pedido + produção) -->
     <div class="screen" data-screen="conferencia">
       <button class="confer-scan-cta" onclick="openScanner('tela')">
@@ -3319,6 +3387,16 @@ body {
       </div>
 
       <div class="ajustes-section">
+        <h4>🛠️ Operacional</h4>
+        <p class="hint">Limpeza e manutenção. Use com cuidado — algumas ações são irreversíveis.</p>
+        <div class="ajustes-actions-stack">
+          <button class="btn-ajustes-printer subtle" onclick="purgeOldData()">Limpar pedidos antigos (&gt;30 dias)</button>
+          <button class="btn-ajustes-printer danger" onclick="clearTestData()">🧪 Limpar dados de teste de hoje</button>
+          <button class="btn-ajustes-printer danger" onclick="factoryReset()">⚠️ Reset total (apaga tudo)</button>
+        </div>
+      </div>
+
+      <div class="ajustes-section">
         <h4>Atualizacao do app</h4>
         <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificacao manual.</p>
         <div class="ajustes-actions-stack">
@@ -3380,6 +3458,41 @@ body {
       <textarea id="problemaNotes" placeholder="Detalhe (opcional)" rows="2" style="width:100%;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;resize:vertical;margin-bottom:12px"></textarea>
       <button class="np-btn np-primary" onclick="saveProblema()">Reportar</button>
       <button class="np-btn np-tertiary" onclick="closeProblema()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal Detalhes do Caixa do Dia -->
+  <div class="np-overlay" id="cashDetailsModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:480px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 class="np-title" style="text-align:left">Caixa de hoje</h3>
+        <button onclick="closeCashDetails()" style="background:transparent;border:0;color:var(--ink-mute);font-size:24px;cursor:pointer;padding:0 4px">×</button>
+      </div>
+      <div id="cashDetailsClosedBanner" style="display:none;background:var(--gold-soft);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;margin-bottom:10px">
+        🔒 Caixa do dia já foi fechado. Reabra primeiro pra editar.
+      </div>
+      <div id="cashDetailsSummary" style="background:var(--bg-elev);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;font-size:14px"></div>
+      <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
+      <div id="cashDetailsList" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
+      <div class="cf-label">Pedidos entregues hoje</div>
+      <div id="cashDetailsOrders" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 16px"></div>
+      <button class="np-btn np-tertiary" onclick="closeCashDetails()">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Modal Fechar Caixa do Dia -->
+  <div class="np-overlay" id="cashCloseModal" role="dialog" aria-modal="true">
+    <div class="np-sheet" style="max-width:420px;text-align:left">
+      <div class="np-icon" style="text-align:center">🔒</div>
+      <h3 class="np-title">Fechar caixa do dia</h3>
+      <p class="np-text">Confira o resumo abaixo. Após fechar, lançamentos do dia ficam travados (você pode reabrir se precisar corrigir).</p>
+      <div id="cashCloseSummary" style="background:var(--bg-elev);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px;font-size:14px"></div>
+      <label style="display:block;font-size:11px;letter-spacing:0.10em;text-transform:uppercase;font-weight:800;color:var(--ink-mute);margin-bottom:6px">Saldo conferido (opcional)</label>
+      <input id="cashCloseConferred" type="text" inputmode="decimal" placeholder="ex: 245,00" style="width:100%;background:var(--bg-elev-2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;margin-bottom:8px">
+      <div id="cashCloseDiff" style="font-size:12px;margin-bottom:10px;min-height:14px"></div>
+      <textarea id="cashCloseNotes" placeholder="Observações (opcional)" rows="2" style="width:100%;background:var(--bg-elev-2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;margin-bottom:12px;resize:vertical"></textarea>
+      <button class="np-btn np-primary" onclick="confirmCloseCashDay()">Confirmar fechamento</button>
+      <button class="np-btn np-tertiary" onclick="closeCashCloseModal()">Cancelar</button>
     </div>
   </div>
 
@@ -3651,6 +3764,7 @@ products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}
 let clients = load('cdb-clients', defaultClients);
 let orders = load('cdb-orders', null) || seedOrders();
 let cashEntries = load('cdb-cash', null) || seedCash();
+let cashClosings = load('cdb-cash-closings', null) || [];
 let batches = load('cdb-batches', null) || seedBatches();
 
 let selectedClient = null;
@@ -3800,6 +3914,7 @@ function persistAll() {
   save('cdb-clients', clients);
   save('cdb-orders', orders);
   save('cdb-cash', cashEntries);
+  save('cdb-cash-closings', cashClosings);
   save('cdb-batches', batches);
   // Hook de sync: sync.js sobrescreve esse callback
   if (typeof window.cdbOnPersist === 'function') {
@@ -3876,7 +3991,7 @@ function incrementActionCounter() {
 
 function maybeTriggerAutoBackup() {
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
-  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','conferProdModal','prodProblemaModal','etiquetasPreview','ajustesModal'];
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferBuscaModal','conferProdModal','prodProblemaModal','cashDetailsModal','cashCloseModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
     const el = document.getElementById(id);
     if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
@@ -3914,7 +4029,7 @@ function autoBackupAction(choice) {
 // JSON. Versionado pra futuras migrações de schema.
 function buildBackupPayload() {
   const lsKeys = [
-    'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-batches',
+    'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-cash-closings','cdb-batches',
     'cdb-operator-name','cdb-empresa-name',
     'cdb-pix-key','cdb-pix-holder','cdb-pix-type',
     'cdb-printer','cdb-theme','cdb-onboarding-done',
@@ -3925,12 +4040,12 @@ function buildBackupPayload() {
     try { const v = localStorage.getItem(k); if (v !== null) ls[k] = v; } catch (e) {}
   });
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     appId: 'casa-da-baba',
     state: {
       products: products.map(({count, photo, ...rest}) => rest),
-      clients, orders, cashEntries, batches
+      clients, orders, cashEntries, cashClosings, batches
     },
     localStorage: ls
   };
@@ -4038,6 +4153,7 @@ function applyBackupPayload(payload) {
   if (Array.isArray(s.clients))      clients       = s.clients;
   if (Array.isArray(s.orders))       orders        = s.orders;
   if (Array.isArray(s.cashEntries))  cashEntries   = s.cashEntries;
+  if (Array.isArray(s.cashClosings)) cashClosings  = s.cashClosings;
   if (Array.isArray(s.batches))      batches       = s.batches;
 
   // Restaura chaves soltas, exceto cdb-device-id (manter o ID atual evita
@@ -4084,6 +4200,7 @@ function go(screen) {
   if (screen === 'pedidos')      renderOrdersFeed();
   if (screen === 'historico')    renderHistoricoScreen();
   if (screen === 'conferencia')  renderConferenciaScreen();
+  if (screen === 'finalizados')  renderFinalizadosScreen();
 }
 
 // =========================
@@ -4248,6 +4365,25 @@ function renderCash() {
   } else {
     receivableRow.style.display = 'none';
   }
+
+  // Estado de fechamento: badge + botoes de fechar/reabrir.
+  const closing = getActiveCashClosing();
+  const badge = document.getElementById('cashClosedBadge');
+  const closeBtn = document.getElementById('cashCloseBtn');
+  const reopenBtn = document.getElementById('cashReopenBtn');
+  if (badge && closeBtn && reopenBtn) {
+    if (closing) {
+      const t = new Date(closing.closedAt).toLocaleTimeString('pt-BR').slice(0,5);
+      badge.style.display = 'block';
+      badge.textContent = `🔒 Caixa fechado às ${t} por ${closing.closedBy || '—'}`;
+      closeBtn.style.display = 'none';
+      reopenBtn.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+      closeBtn.style.display = 'block';
+      reopenBtn.style.display = 'none';
+    }
+  }
 }
 
 function advanceOrder(id) {
@@ -4273,6 +4409,11 @@ function cancelOrder(id) {
   // Confirmacao mais forte se ja foi entregue (afeta caixa do dia).
   const prev = o.status;
   const wasDelivered = prev === STATUS.ENTREGUE;
+  // Trava se cancela pedido entregue HOJE com caixa ja fechado
+  if (wasDelivered && o.updatedAt && isToday(o.updatedAt) && isCashClosedToday()) {
+    showToast('Caixa do dia já está fechado. Reabra primeiro pra cancelar este pedido.');
+    return;
+  }
   const promptMsg = wasDelivered
     ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
     : 'Cancelar esse pedido?';
@@ -4679,6 +4820,16 @@ const HIST_ACTION_META = {
   'batch.unit_confirm_ok':     { icon: '✅', label: 'Unidade conferida',  type: 'batch' },
   'batch.unit_confirm_problem':{ icon: '⚠️', label: 'Unidade c/ problema', type: 'batch' },
   'batch.unit_confirm_adjust': { icon: '✏️', label: 'Unidade ajustada',  type: 'batch' },
+  'batch.delete':              { icon: '🗑️', label: 'Lote excluído',     type: 'batch' },
+  'batch.restore':             { icon: '↩️', label: 'Lote recuperado',   type: 'batch' },
+  'order.purge':               { icon: '⌫', label: 'Registro removido', type: 'order' },
+  'cash.entry_delete':         { icon: '🗑️', label: 'Lançamento excluído', type: 'cash' },
+  'cash.entry_edit':           { icon: '✏️', label: 'Lançamento editado', type: 'cash' },
+  'cash.day_close':            { icon: '🔒', label: 'Caixa fechado',     type: 'cash' },
+  'cash.day_reopen':           { icon: '🔓', label: 'Caixa reaberto',    type: 'cash' },
+  'op.purge_old':              { icon: '🧹', label: 'Dados antigos limpos', type: 'settings' },
+  'op.clear_tests':            { icon: '🧪', label: 'Dados de teste limpos', type: 'settings' },
+  'op.factory_reset':          { icon: '💣', label: 'Reset total', type: 'settings' },
   'cash.manual_entry':    { icon: '💰', label: 'Lançamento de caixa', type: 'cash' },
   'settings.update':      { icon: '⚙️', label: 'Ajustes alterados',  type: 'settings' },
   'backup.export':        { icon: '⬇️', label: 'Backup exportado',    type: 'backup' },
@@ -4757,10 +4908,20 @@ function renderHistoricoScreen() {
     const dt = new Date(e.ts);
     const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
       String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
-    // Acoes contextuais por tipo de evento. Batch -> Reimprimir etiquetas.
+    // Acoes contextuais por tipo de evento. Batch -> Reimprimir + Excluir/Recuperar.
     let actions = '';
-    if (e.type === 'batch' && e.entityId && batches.some(b => b.id === e.entityId)) {
-      actions = `<div class="mov-actions"><button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')">🖨️ Reimprimir etiquetas</button></div>`;
+    if (e.type === 'batch' && e.entityId) {
+      const batch = batches.find(b => b.id === e.entityId);
+      if (batch) {
+        const btns = [];
+        if (!batch.deleted) {
+          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')">🖨️ Reimprimir</button>`);
+          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')">🗑️ Excluir lote</button>`);
+        } else {
+          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')">↩️ Recuperar lote</button>`);
+        }
+        actions = `<div class="mov-actions">${btns.join('')}</div>`;
+      }
     }
     return `
       <div class="mov-item ${e.type}">
@@ -4782,6 +4943,397 @@ function renderHistoricoScreen() {
 
 // Reimprime etiquetas de um lote ja registrado. Usado no Historico pra
 // recuperar etiquetas perdidas / imprimir copia adicional.
+// ===== OPERACIONAL (Ajustes > seção danger zone) =====
+// purgeOldData: remove orders/batches/cashEntries criados ha mais de 30 dias.
+// clearTestData: remove orders/batches/cashEntries criados HOJE (testes ops).
+// factoryReset: oferece backup automatico, depois apaga TUDO + reload.
+
+function purgeOldData() {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const oldOrders  = (orders || []).filter(o => (o.createdAt || 0) < cutoff);
+  const oldBatches = (batches || []).filter(b => (b.createdAt || 0) < cutoff);
+  const oldEntries = (cashEntries || []).filter(e => (e.createdAt || 0) < cutoff);
+  const total = oldOrders.length + oldBatches.length + oldEntries.length;
+  if (!total) { showToast('Nada com mais de 30 dias pra limpar'); return; }
+  if (!confirm(`Limpar ${oldOrders.length} pedido(s), ${oldBatches.length} lote(s), ${oldEntries.length} lançamento(s) com mais de 30 dias?\n\nIrreversível (faça backup antes se precisar).`)) return;
+  orders      = orders.filter(o => (o.createdAt || 0) >= cutoff);
+  batches     = batches.filter(b => (b.createdAt || 0) >= cutoff);
+  cashEntries = cashEntries.filter(e => (e.createdAt || 0) >= cutoff);
+  persistAll();
+  logAction({
+    action: 'op.purge_old', entityType: 'settings',
+    summary: `Removido ${oldOrders.length} pedidos, ${oldBatches.length} lotes, ${oldEntries.length} lançamentos > 30 dias`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  showToast(`${total} registro(s) antigo(s) removidos`);
+}
+
+function clearTestData() {
+  const todayOrders  = (orders || []).filter(o => isToday(o.createdAt));
+  const todayBatches = (batches || []).filter(b => isToday(b.createdAt));
+  const todayEntries = (cashEntries || []).filter(e => isToday(e.createdAt));
+  const total = todayOrders.length + todayBatches.length + todayEntries.length;
+  if (!total) { showToast('Nenhum dado de hoje pra limpar'); return; }
+  if (!confirm(`🧪 Limpar dados de TESTE criados HOJE?\n\n- ${todayOrders.length} pedido(s)\n- ${todayBatches.length} lote(s)\n- ${todayEntries.length} lançamento(s)\n\nÚtil pra demo após testes. Irreversível.`)) return;
+  if (!confirm('Tem certeza? Última chance — não há como desfazer.')) return;
+  // Reverte estoque dos batches removidos (efeito colateral igual a deleteBatch)
+  todayBatches.forEach(b => {
+    (b.items || []).forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) p.stock = Math.max(0, (p.stock || 0) - (Number(it.qty) || 0));
+    });
+  });
+  // Reverte estoque dos pedidos pronto/entregue de hoje
+  todayOrders.forEach(o => {
+    if (o.status === STATUS.PRONTO || o.status === STATUS.ENTREGUE) {
+      (o.items || []).forEach(it => {
+        const p = products.find(x => x.id === it.productId);
+        if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
+      });
+    }
+  });
+  orders      = orders.filter(o => !isToday(o.createdAt));
+  batches     = batches.filter(b => !isToday(b.createdAt));
+  cashEntries = cashEntries.filter(e => !isToday(e.createdAt));
+  persistAll();
+  logAction({
+    action: 'op.clear_tests', entityType: 'settings',
+    summary: `Limpou ${todayOrders.length} pedidos, ${todayBatches.length} lotes, ${todayEntries.length} lançamentos de hoje (estoque revertido)`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
+  showToast(`${total} registro(s) de hoje limpos`);
+}
+
+async function factoryReset() {
+  // Passo 1: oferece backup (recomendado)
+  const wantBackup = confirm('💣 RESET TOTAL\n\nIsso vai apagar TUDO:\n- Produtos\n- Pedidos\n- Lotes\n- Clientes\n- Caixa\n- Histórico\n- Configurações\n\nFazer backup antes? (RECOMENDADO)');
+  if (wantBackup) {
+    try { await exportBackup(); } catch (e) {}
+  }
+  // Passo 2: confirmação 1
+  if (!confirm('Apagar TUDO mesmo? Esta ação não pode ser desfeita.')) return;
+  // Passo 3: confirmação 2
+  if (!confirm('Tem certeza? Última chance!')) return;
+  // Audit log antes de apagar (depois ele some)
+  logAction({
+    action: 'op.factory_reset', entityType: 'settings',
+    summary: 'Reset total realizado pelo operador'
+  });
+  // Limpa tudo
+  products = [];
+  clients  = [];
+  orders   = [];
+  batches  = [];
+  cashEntries = [];
+  cashClosings = [];
+  // localStorage: mantém device-id (pra sync) e tema, limpa o resto
+  const keep = ['cdb-device-id', 'cdb-theme'];
+  const allKeys = Object.keys(localStorage).filter(k => k.startsWith('cdb-'));
+  allKeys.forEach(k => { if (!keep.includes(k)) try { localStorage.removeItem(k); } catch (e) {} });
+  showToast('App resetado · recarregando...');
+  setTimeout(() => location.reload(), 1200);
+}
+
+// ===== FECHAMENTO DE CAIXA DO DIA =====
+// cashClosings[]: { id, dateKey, closedAt, closedBy, summary, notes, reopenedAt?, reopenedBy? }
+// dateKey: 'YYYY-MM-DD' do fuso local. Snapshot do dia preservado.
+// reopenedAt setado != null indica que esta closing foi reaberta (nao bloqueia).
+function dateKeyOf(ms) {
+  const d = new Date(ms || Date.now());
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function getActiveCashClosing(dateKey) {
+  const k = dateKey || dateKeyOf();
+  return (cashClosings || []).find(c => c.dateKey === k && !c.reopenedAt) || null;
+}
+function isCashClosedToday() { return !!getActiveCashClosing(); }
+
+function calcCashSummaryToday() {
+  const allOrders = orders || [];
+  const allEntries = cashEntries || [];
+  const todayOrders = allOrders.filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && isToday(o.updatedAt));
+  const todayEntries = allEntries.filter(e => isToday(e.createdAt));
+  const sold = todayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const inX = todayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const out = todayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  return {
+    sold, in: inX, out, balance: sold + inX - out,
+    ordersCount: todayOrders.length,
+    entriesCount: todayEntries.length
+  };
+}
+
+function openCashCloseModal() {
+  if (isCashClosedToday()) { showToast('Caixa do dia já está fechado'); return; }
+  const sum = calcCashSummaryToday();
+  if (sum.ordersCount === 0 && sum.entriesCount === 0) {
+    if (!confirm('Nenhuma movimentação hoje. Fechar mesmo assim?')) return;
+  }
+  document.getElementById('cashCloseSummary').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span>Vendas</span><span style="font-weight:800">${money(sum.sold)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span>${money(sum.in)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px"><span>Saldo</span><span style="font-weight:800;color:var(--gold)">${money(sum.balance)}</span></div>
+  `;
+  document.getElementById('cashCloseConferred').value = '';
+  document.getElementById('cashCloseDiff').textContent = '';
+  document.getElementById('cashCloseNotes').value = '';
+  document.getElementById('cashCloseModal').classList.add('show');
+  document.getElementById('cashCloseConferred').oninput = function () {
+    const conf = parseMoneyInput(this.value);
+    const diffEl = document.getElementById('cashCloseDiff');
+    if (isNaN(conf)) { diffEl.textContent = ''; return; }
+    const diff = conf - sum.balance;
+    if (Math.abs(diff) < 0.005) {
+      diffEl.innerHTML = '<span style="color:var(--basil)">✓ Bate com o calculado</span>';
+    } else {
+      diffEl.innerHTML = `<span style="color:var(--accent)">⚠ Diferença de ${money(Math.abs(diff))} ${diff > 0 ? 'a mais' : 'a menos'}</span>`;
+    }
+  };
+}
+function closeCashCloseModal() { document.getElementById('cashCloseModal').classList.remove('show'); }
+
+function confirmCloseCashDay() {
+  const sum = calcCashSummaryToday();
+  const conferredRaw = (document.getElementById('cashCloseConferred').value || '').trim();
+  const conf = conferredRaw ? parseMoneyInput(conferredRaw) : null;
+  const notes = (document.getElementById('cashCloseNotes').value || '').trim() || null;
+  if (conferredRaw && isNaN(conf)) { showToast('Saldo conferido inválido'); return; }
+  const closing = {
+    id: 'close-' + Date.now(),
+    dateKey: dateKeyOf(),
+    closedAt: Date.now(),
+    closedBy: operatorName || null,
+    summary: { ...sum, conferredBalance: isNaN(conf) ? null : conf },
+    notes
+  };
+  if (!cashClosings) cashClosings = [];
+  cashClosings.push(closing);
+  persistAll();
+  logAction({
+    action: 'cash.day_close', entityType: 'cash', entityId: closing.id,
+    summary: `Caixa fechado · ${closing.dateKey} · saldo ${money(sum.balance)}` + (notes ? ' · ' + notes : '')
+  });
+  closeCashCloseModal();
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  showToast('🔒 Caixa do dia fechado');
+}
+
+function reopenCashDay() {
+  const c = getActiveCashClosing();
+  if (!c) { showToast('Caixa não está fechado'); return; }
+  if (!confirm(`Reabrir caixa do dia ${c.dateKey}?\n\nIsso permitirá editar lançamentos novamente.`)) return;
+  if (!confirm('Tem certeza? Audit log vai registrar a reabertura.')) return;
+  c.reopenedAt = Date.now();
+  c.reopenedBy = operatorName || null;
+  persistAll();
+  logAction({
+    action: 'cash.day_reopen', entityType: 'cash', entityId: c.id,
+    summary: `Caixa do dia ${c.dateKey} reaberto`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+  showToast('🔓 Caixa reaberto');
+}
+
+// ===== DETALHES DO CAIXA DO DIA =====
+function openCashDetails() {
+  document.getElementById('cashDetailsModal').classList.add('show');
+  renderCashDetails();
+}
+function closeCashDetails() {
+  document.getElementById('cashDetailsModal').classList.remove('show');
+}
+function renderCashDetails() {
+  const sum = calcCashSummaryToday();
+  document.getElementById('cashDetailsSummary').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span>Vendas (${sum.ordersCount})</span><span style="font-weight:800">${money(sum.sold)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span style="color:var(--basil)">+${money(sum.in)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px;font-weight:800"><span>Saldo</span><span style="color:var(--gold)">${money(sum.balance)}</span></div>
+  `;
+  const closed = isCashClosedToday();
+  document.getElementById('cashDetailsClosedBanner').style.display = closed ? 'block' : 'none';
+
+  const todayEntries = (cashEntries || [])
+    .filter(e => isToday(e.createdAt))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const listHost = document.getElementById('cashDetailsList');
+  if (!todayEntries.length) {
+    listHost.innerHTML = '<div class="confer-empty">Nenhum lançamento manual hoje.</div>';
+  } else {
+    listHost.innerHTML = todayEntries.map(e => {
+      const sign = e.type === 'expense' ? '-' : '+';
+      const color = e.type === 'expense' ? 'var(--accent)' : 'var(--basil)';
+      const time = new Date(e.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
+      const acoes = closed ? ''
+        : `<button class="fin-action" onclick="openCashModal('${e.id}')">✏️</button>
+           <button class="fin-action danger" onclick="deleteCashEntry('${e.id}')">🗑️</button>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${escapeHtml(e.description)}</div>
+          <div style="font-size:11px;color:var(--ink-mute)">${time} · ${escapeHtml(e.lastOperatorName || '—')}</div>
+        </div>
+        <div style="font-weight:800;color:${color};white-space:nowrap">${sign}${money(e.amount)}</div>
+        ${acoes}
+      </div>`;
+    }).join('');
+  }
+
+  const todayOrders = (orders || [])
+    .filter(o => o.status === STATUS.ENTREGUE && isToday(o.updatedAt))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const ordHost = document.getElementById('cashDetailsOrders');
+  if (!todayOrders.length) {
+    ordHost.innerHTML = '<div class="confer-empty">Nenhum pedido entregue hoje.</div>';
+  } else {
+    ordHost.innerHTML = todayOrders.map(o => {
+      const time = new Date(o.updatedAt).toLocaleTimeString('pt-BR').slice(0,5);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
+          <div style="font-size:11px;color:var(--ink-mute)">${time} · #${(o.id||'').slice(-8)}</div>
+        </div>
+        <div style="font-weight:800;color:var(--basil);white-space:nowrap">+${money(o.total)}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ===== TELA FINALIZADOS (data-screen=finalizados) =====
+// Lista pedidos status entregue + cancelado, com filtros de periodo e status.
+// Permite cancelar um entregue (estorna estoque + caixa) ou apagar do
+// registro um cancelado (hard delete + audit).
+let finPeriod = 'hoje';
+let finStatusFilter = 'todos';
+function setFinFilter(p) { finPeriod = p; document.querySelectorAll('#finFilter button').forEach(b => b.classList.toggle('active', b.dataset.f === p)); renderFinalizadosScreen(); }
+function setFinStatus(s) { finStatusFilter = s; document.querySelectorAll('#finStatus button').forEach(b => b.classList.toggle('active', b.dataset.s === s)); renderFinalizadosScreen(); }
+function renderFinalizadosScreen() {
+  const host = document.getElementById('finList');
+  if (!host) return;
+  const now = Date.now();
+  const cutoffMs = finPeriod === 'hoje' ? (now - 24*60*60*1000)
+                  : finPeriod === '7d'  ? (now - 7*24*60*60*1000)
+                  : finPeriod === '30d' ? (now - 30*24*60*60*1000)
+                  : 0;
+  const list = (orders || []).filter(o => {
+    if (o.status !== STATUS.ENTREGUE && o.status !== STATUS.CANCELADO) return false;
+    if (finStatusFilter !== 'todos' && o.status !== finStatusFilter) return false;
+    const ts = o.updatedAt || o.createdAt || 0;
+    return ts >= cutoffMs;
+  }).sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
+  if (!list.length) {
+    host.innerHTML = '<div class="confer-empty">Nenhum pedido finalizado nesse período.</div>';
+    return;
+  }
+  host.innerHTML = list.map(o => {
+    const ts = new Date(o.updatedAt || o.createdAt);
+    const dateStr = ts.toLocaleDateString('pt-BR') + ' ' + String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0');
+    const cliente = o.clientSnapshot?.name || 'Sem cliente';
+    const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+    const orderRef = (o.id || '').slice(-8);
+    const statusBadge = o.status === STATUS.ENTREGUE
+      ? '<span class="fin-badge entregue">✓ Entregue</span>'
+      : '<span class="fin-badge cancelado">⊗ Cancelado</span>';
+    const acoes = o.status === STATUS.ENTREGUE
+      ? `<button class="fin-action danger" onclick="cancelOrder('${o.id}')">Cancelar</button>`
+      : `<button class="fin-action danger" onclick="purgeOrderRecord('${o.id}')">Excluir do registro</button>`;
+    return `<div class="fin-card ${o.status}">
+      <div class="fin-row">
+        <div class="fin-info">
+          <div class="fin-code">#${escapeHtml(orderRef)}</div>
+          <div class="fin-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
+          <div class="fin-meta">${escapeHtml(dateStr)} · ${money(o.total)}</div>
+        </div>
+        ${statusBadge}
+      </div>
+      <div class="fin-actions">
+        <button class="fin-action" onclick="openHistorico('${o.id}')">Ver detalhes</button>
+        ${acoes}
+      </div>
+    </div>`;
+  }).join('');
+}
+// Hard delete de pedido CANCELADO (apaga do array, audit registra).
+// Pra entregue, o operador deve cancelar primeiro.
+function purgeOrderRecord(id) {
+  const o = (orders || []).find(x => x.id === id);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  if (o.status !== STATUS.CANCELADO) {
+    showToast('Apenas pedidos cancelados podem ser excluidos do registro');
+    return;
+  }
+  if (!confirm(`Apagar PERMANENTEMENTE o registro do pedido #${(o.id||'').slice(-8)}?\n\nIsso NAO pode ser desfeito (apenas via backup).`)) return;
+  const ref = (o.id||'').slice(-8);
+  orders = orders.filter(x => x.id !== id);
+  persistAll();
+  logAction({
+    action: 'order.purge', entityType: 'order', entityId: id,
+    summary: `Registro do pedido #${ref} apagado · ${money(o.total)} · ${o.clientSnapshot?.name || 'sem cliente'}`
+  });
+  if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  showToast(`Pedido #${ref} apagado`);
+}
+
+// Soft delete de batch — marca como deletado, reverte estoque, audit log.
+// Recuperavel via restoreBatch. NAO bloqueia se estoque ja foi consumido em
+// vendas: usa Math.max(0, ...) pra evitar negativo (rastreado em audit log).
+function deleteBatch(batchId) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  if (batch.deleted) { showToast('Lote já está excluído'); return; }
+  const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
+  if (!confirm(`Excluir lote ${batch.lote || batch.code}?\n\n${total} unidade(s) sairao do estoque.\n\nEtiquetas impressas viram inválidas. Voce pode recuperar pelo Historico.`)) return;
+  // Reverte estoque
+  (batch.items || []).forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = Math.max(0, (p.stock || 0) - (Number(it.qty) || 0));
+  });
+  batch.deleted = true;
+  batch.deletedAt = Date.now();
+  batch.deletedBy = operatorName || null;
+  persistAll();
+  logAction({
+    action: 'batch.delete', entityType: 'batch', entityId: batchId,
+    summary: `Lote ${batch.lote || batch.code} excluído · ${total} unidades estornadas`
+  });
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showToast(`Lote ${batch.lote || batch.code} excluído`);
+}
+function restoreBatch(batchId) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  if (!batch.deleted) { showToast('Lote não está excluído'); return; }
+  const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
+  if (!confirm(`Recuperar lote ${batch.lote || batch.code}?\n\n${total} unidade(s) volta(m) ao estoque.`)) return;
+  (batch.items || []).forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
+  });
+  batch.deleted = false;
+  batch.deletedAt = null;
+  batch.deletedBy = null;
+  persistAll();
+  logAction({
+    action: 'batch.restore', entityType: 'batch', entityId: batchId,
+    summary: `Lote ${batch.lote || batch.code} recuperado · ${total} unidades estornadas`
+  });
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showToast(`Lote ${batch.lote || batch.code} recuperado`);
+}
+
 function reprintFromBatchId(batchId) {
   const batch = batches.find(b => b.id === batchId);
   if (!batch) { showToast('Lote nao encontrado neste aparelho'); return; }
@@ -6660,7 +7212,7 @@ function renderConferenciaScreen() {
   // ABA PRODUCAO
   const batchHost = document.getElementById('conferBatchesList');
   if (batchHost) {
-    const allBatches = (batches || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const allBatches = (batches || []).filter(b => !b.deleted).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (!allBatches.length) {
       batchHost.innerHTML = '<div class="confer-empty">Nenhum lote registrado ainda.</div>';
     } else {
@@ -8474,18 +9026,37 @@ document.querySelectorAll('#emojiGrid .emoji-pick').forEach(em => {
 // =========================
 // MODAL CAIXA
 // =========================
-function openCashModal() {
-  document.getElementById('cashDesc').value = '';
-  document.getElementById('cashAmount').value = '';
-  cashType = 'expense';
+// editingCashEntryId: se setado, openCashModal abre em modo edicao
+// (preenche valores + altera saveCashEntry pra atualizar em vez de criar).
+let editingCashEntryId = null;
+function openCashModal(editId) {
+  // Bloqueia se caixa fechado pra hoje (sem reopen ativo)
+  if (isCashClosedToday() && !editId /* permite ver detalhes */) {
+    showToast('Caixa do dia fechado. Reabra primeiro.');
+    return;
+  }
+  editingCashEntryId = editId || null;
+  let desc = '', amount = '', type = 'expense';
+  if (editId) {
+    const e = (cashEntries || []).find(x => x.id === editId);
+    if (e) {
+      desc = e.description || '';
+      amount = String(e.amount || '').replace('.', ',');
+      type = e.type || 'expense';
+    }
+  }
+  document.getElementById('cashDesc').value = desc;
+  document.getElementById('cashAmount').value = amount;
+  cashType = type;
   document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(p => {
     p.classList.remove('active', 'expense', 'income');
-    if (p.dataset.type === 'expense') p.classList.add('active','expense');
+    if (p.dataset.type === type) p.classList.add('active', type);
   });
   document.getElementById('cashEntryModal').classList.add('show');
   setTimeout(() => document.getElementById('cashDesc').focus(), 300);
 }
 function closeCashModal() {
+  editingCashEntryId = null;
   document.getElementById('cashEntryModal').classList.remove('show');
 }
 /**
@@ -8511,6 +9082,11 @@ function parseMoneyInput(raw) {
 }
 
 function saveCashEntry() {
+  // Bloqueia edicao/criacao se caixa fechado
+  if (isCashClosedToday()) {
+    showToast('Caixa do dia já está fechado. Reabra primeiro.');
+    return;
+  }
   const desc = document.getElementById('cashDesc').value.trim();
   const amount = parseMoneyInput(document.getElementById('cashAmount').value);
 
@@ -8520,10 +9096,35 @@ function saveCashEntry() {
     return;
   }
 
+  // Modo edicao
+  if (editingCashEntryId) {
+    const entry = (cashEntries || []).find(x => x.id === editingCashEntryId);
+    if (!entry) { showToast('Lançamento não encontrado'); closeCashModal(); return; }
+    const before = { type: entry.type, amount: entry.amount, description: entry.description };
+    entry.type = cashType;
+    entry.amount = Math.abs(Number(amount));
+    entry.description = desc;
+    entry.lastOperatorName = operatorName || null;
+    persistAll();
+    pendingSync++;
+    updateSync();
+    logAction({
+      action: 'cash.entry_edit', entityType: 'cash', entityId: entry.id,
+      summary: 'Lançamento editado · ' + (entry.type === 'expense' ? 'Saída ' : 'Entrada ') + money(entry.amount) + ' · ' + desc,
+      diff: { before, after: { type: entry.type, amount: entry.amount, description: entry.description } }
+    });
+    closeCashModal();
+    renderHome();
+    if (typeof renderCashDetails === 'function') renderCashDetails();
+    showToast('Lançamento atualizado');
+    return;
+  }
+
+  // Modo criacao
   const entry = {
     id: 'cash-' + Date.now(),
     type: cashType,
-    amount,
+    amount: Math.abs(Number(amount)),
     description: desc,
     createdAt: Date.now(),
     lastOperatorName: operatorName || null
@@ -8543,7 +9144,29 @@ function saveCashEntry() {
 
   closeCashModal();
   renderHome();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
   showToast((cashType === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(amount) + ' registrada');
+}
+
+function deleteCashEntry(id) {
+  if (isCashClosedToday()) {
+    showToast('Caixa do dia já está fechado. Reabra primeiro.');
+    return;
+  }
+  const e = (cashEntries || []).find(x => x.id === id);
+  if (!e) return;
+  if (!confirm(`Excluir lançamento "${e.description}" de ${money(e.amount)}?`)) return;
+  cashEntries = cashEntries.filter(x => x.id !== id);
+  persistAll();
+  pendingSync++;
+  updateSync();
+  logAction({
+    action: 'cash.entry_delete', entityType: 'cash', entityId: id,
+    summary: `Excluído ${e.type === 'expense' ? 'saída' : 'entrada'} de ${money(e.amount)} · ${e.description}`
+  });
+  renderHome();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+  showToast('Lançamento excluído');
 }
 
 document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(pill => {
