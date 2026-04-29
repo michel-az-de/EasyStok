@@ -2098,6 +2098,12 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border: 1px solid var(--border);
   box-shadow: var(--glow);
 }
+.ajustes-section-feature {
+  background:
+    linear-gradient(135deg, rgba(240,184,74,0.12), rgba(79,191,159,0.07)),
+    rgba(255,255,255,0.025);
+  border-color: rgba(240,184,74,0.26);
+}
 .ajustes-section h4 {
   font-family: 'Fraunces', serif; font-size: 17px;
   margin: 0 0 4px; color: var(--ink);
@@ -2115,6 +2121,72 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .ajustes-section input:focus,
 .ajustes-section select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(231,104,69,0.12); }
+.scan-mode-select { display: none; }
+.scan-mode-options {
+  display: grid;
+  gap: 8px;
+}
+.scan-mode-card {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px !important;
+  color: var(--ink);
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--line) !important;
+  border-radius: 14px !important;
+  text-align: left;
+}
+.scan-mode-card.active {
+  background:
+    linear-gradient(135deg, rgba(240,184,74,0.18), rgba(79,191,159,0.10)),
+    rgba(255,255,255,0.04);
+  border-color: rgba(240,184,74,0.52) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.14);
+}
+.scan-mode-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.18);
+  color: var(--gold);
+  font-weight: 900;
+  font-size: 16px;
+}
+.scan-mode-text strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.15;
+}
+.scan-mode-text span {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 3px;
+}
+.scan-mode-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 12px;
+  font-weight: 900;
+}
+.scan-mode-card.active .scan-mode-check {
+  color: #1c1408;
+  background: var(--gold);
+  border-color: var(--gold);
+}
 .ajustes-section .printer-status {
   padding: 12px 13px; border-radius: 12px;
   background: var(--bg-elev-2); font-size: 12px;
@@ -2164,6 +2236,20 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: rgba(207,87,56,0.12); color: var(--accent);
   border-color: rgba(207,87,56,0.30);
 }
+[data-theme="light"] .ajustes-section-feature {
+  background: linear-gradient(135deg, rgba(189,126,19,0.10), rgba(79,191,159,0.08)), #fff;
+  border-color: rgba(189,126,19,0.24);
+}
+[data-theme="light"] .scan-mode-card {
+  background: rgba(255,255,255,0.78);
+  border-color: #d9e0ea !important;
+}
+[data-theme="light"] .scan-mode-card.active {
+  background: linear-gradient(135deg, rgba(189,126,19,0.14), rgba(79,191,159,0.08)), #fff;
+  border-color: rgba(189,126,19,0.40) !important;
+  box-shadow: 0 10px 22px rgba(21,31,49,0.08);
+}
+[data-theme="light"] .scan-mode-icon { background: #fff7e4; }
 
 /* Lista de produtos no Catalogo (Ajustes -> Catalogo de produtos) */
 .catalog-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
@@ -2845,6 +2931,90 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   }
   .print-area .pa-confer-hint,
   .print-area .et-hint { font-size: 7.5pt; opacity: 0.82; margin-top: 1mm; }
+  .print-area .pa-receipt {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+    letter-spacing: 0;
+  }
+  .print-area .pa-receipt .pa-kicker {
+    display: inline-block;
+    width: 100%;
+    color: #444;
+    font-size: 7.4pt;
+    letter-spacing: 1.2px;
+    margin-bottom: 1.5mm;
+  }
+  .print-area .pa-receipt .pa-title {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+    font-size: 15pt;
+    font-weight: 900;
+    letter-spacing: -0.15px;
+    margin-bottom: 1mm;
+  }
+  .print-area .pa-receipt .pa-order-ref {
+    display: inline-flex;
+    justify-content: center;
+    border: 1px solid #000;
+    border-radius: 999px;
+    padding: 1mm 2.4mm;
+    font-size: 9.5pt;
+    margin: 1mm auto 1mm;
+  }
+  .print-area .pa-receipt .pa-meta { color: #555; font-size: 8pt; margin-bottom: 2.5mm; }
+  .print-area .pa-receipt .pa-grid {
+    border: 1px solid #111;
+    border-radius: 3mm;
+    padding: 2.5mm;
+    margin: 2.4mm 0;
+  }
+  .print-area .pa-receipt .pa-label {
+    color: #555;
+    font-size: 7.2pt;
+    letter-spacing: 1.1px;
+    margin-bottom: 1.3mm;
+  }
+  .print-area .pa-receipt .pa-sep {
+    border-top: 1px solid #111;
+    margin: 2.5mm 0;
+  }
+  .print-area .pa-receipt .pa-item {
+    padding: 1.4mm 0;
+    border-bottom: 1px solid #e1e1e1;
+  }
+  .print-area .pa-receipt .pa-item:last-child { border-bottom: 0; }
+  .print-area .pa-receipt .pa-item .pi-name { font-weight: 850; font-size: 9.4pt; }
+  .print-area .pa-receipt .pa-item .pi-unit { color: #555; font-size: 7.4pt; }
+  .print-area .pa-receipt .pa-item .pi-qty {
+    min-width: 7mm;
+    height: 7mm;
+    border: 1px solid #111;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+  }
+  .print-area .pa-receipt .pi-price { font-weight: 900; }
+  .print-area .pa-receipt .pa-total-box {
+    border: 2px solid #000;
+    border-radius: 3.2mm;
+    padding: 2.4mm;
+    margin: 2.5mm 0;
+  }
+  .print-area .pa-receipt .pa-large { font-size: 15pt; }
+  .print-area .pa-receipt .pa-note {
+    border: 1px solid #111;
+    background: #f6f6f6 !important;
+    border-radius: 3mm;
+    padding: 2.5mm;
+  }
+  .print-area .pa-receipt .pa-confer {
+    border: 1px solid #111;
+    border-radius: 4mm;
+    padding: 3mm 2.5mm;
+    margin: 3mm 0;
+  }
+  .print-area .pa-receipt .pa-confer-code { font-size: 9.5pt; letter-spacing: 0.03em; }
+  .print-area .pa-receipt .pa-confer-hint { color: #555; }
   @page { size: 58mm auto; margin: 0; }
 }
 
@@ -4454,6 +4624,45 @@ select:focus-visible {
         </div>
       </div>
 
+      <div class="ajustes-section ajustes-section-feature" data-group="loja">
+        <h4>Formato das etiquetas</h4>
+        <p class="hint">Escolha se as etiquetas de produção saem com QR Code, codigo de barras ou os dois.</p>
+        <div class="field">
+          <label>Codigo impresso na produção</label>
+          <select id="ajusteProdScanMode" class="scan-mode-select">
+            <option value="both">QR + codigo de barras</option>
+            <option value="barcode">Somente codigo de barras</option>
+            <option value="qr">Somente QR Code</option>
+          </select>
+          <div class="scan-mode-options" id="scanModeOptions">
+            <button type="button" class="scan-mode-card" data-mode="both" onclick="setScanModeChoice('both', true)">
+              <span class="scan-mode-icon">2</span>
+              <span class="scan-mode-text">
+                <strong>QR + barras</strong>
+                <span>Mais completo para câmera e leitor dedicado.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-mode="barcode" onclick="setScanModeChoice('barcode', true)">
+              <span class="scan-mode-icon">|||</span>
+              <span class="scan-mode-text">
+                <strong>Codigo de barras</strong>
+                <span>Melhor para operação com leitor fisico.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-mode="qr" onclick="setScanModeChoice('qr', true)">
+              <span class="scan-mode-icon">QR</span>
+              <span class="scan-mode-text">
+                <strong>QR Code</strong>
+                <span>Mais limpo para leitura pela câmera do app.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="ajustes-section" data-group="loja">
         <h4>PIX</h4>
         <p class="hint">Defina a chave que aparece no recibo e na mensagem pronta para o cliente.</p>
@@ -4489,19 +4698,6 @@ select:focus-visible {
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressao</button>
         </div>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnostico</button>
-      </div>
-
-      <div class="ajustes-section" data-group="eq">
-        <h4>Leitura das etiquetas</h4>
-        <p class="hint">Escolha o que sai nas etiquetas de produção. Use barras para leitores dedicados; QR costuma ser melhor com câmera.</p>
-        <div class="field">
-          <label>Codigo impresso na produção</label>
-          <select id="ajusteProdScanMode">
-            <option value="both">QR + codigo de barras</option>
-            <option value="barcode">Somente codigo de barras</option>
-            <option value="qr">Somente QR Code</option>
-          </select>
-        </div>
       </div>
 
       <div class="ajustes-section" data-group="eq">
@@ -7559,14 +7755,32 @@ function refreshBodyModalClass() {
 // AJUSTES — operador, PIX, impressora térmica
 // ================================================================
 let ajustesListenersBound = false;
+function setScanModeChoice(mode, persistNow = false) {
+  const normalized = ['both','barcode','qr'].includes(mode) ? mode : 'both';
+  const select = document.getElementById('ajusteProdScanMode');
+  if (select) select.value = normalized;
+  document.querySelectorAll('.scan-mode-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.mode === normalized);
+  });
+  if (persistNow) {
+    try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {}
+    const modeChip = document.getElementById('etqModeChip');
+    if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
+    const previewBody = document.getElementById('etqBody');
+    const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
+    if (previewOpen && previewBody && currentEtiquetasKind === 'producao' && currentEtiquetas.length) {
+      previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
+    }
+    showToast('Formato das etiquetas: ' + prodScanModeLabel(normalized));
+  }
+}
 function openAjustes() {
   document.getElementById('ajusteOperator').value  = operatorName || '';
   document.getElementById('ajusteEmpresa').value   = getEmpresaName();
   document.getElementById('ajustePixType').value   = getPixType();
   document.getElementById('ajustePixKey').value    = getPixKey();
   document.getElementById('ajustePixHolder').value = getPixHolder();
-  const scanSel = document.getElementById('ajusteProdScanMode');
-  if (scanSel) scanSel.value = getProdScanMode();
+  setScanModeChoice(getProdScanMode());
   if (!ajustesListenersBound) {
     document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
     document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
@@ -9909,41 +10123,52 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   let y = y0 + 14;
   ctx.fillStyle = '#000';
   ctx.textAlign = 'center';
-  ctx.font = '900 12px monospace';
+  ctx.font = '900 12px Arial, sans-serif';
+  ctx.fillStyle = '#4b5563';
   ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 18;
-  ctx.font = '900 28px monospace';
+  ctx.fillStyle = '#000';
+  ctx.font = '900 28px Arial, sans-serif';
   ctx.fillText((getEmpresaName() || 'Easy Stock Mobile').toUpperCase().slice(0, 22), cx, y); y += 34;
-  ctx.font = '900 18px monospace';
+  ctx.font = '900 17px Arial, sans-serif';
   const orderRef = (o.id || '').slice(-8);
   ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
-  ctx.font = '700 12px monospace';
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 12px Arial, sans-serif';
   ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
+  ctx.fillStyle = '#000';
   ctx.fillRect(24, y, W - 48, 2); y += 12;
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.strokeRect(20, y, W - 40, 54);
-  ctx.font = '900 11px monospace';
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 11px Arial, sans-serif';
   ctx.fillText('CLIENTE', 30, y + 8);
-  ctx.font = '900 18px monospace';
+  ctx.fillStyle = '#000';
+  ctx.font = '900 18px Arial, sans-serif';
   ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 24), 30, y + 24);
   if (o.clientSnapshot?.ref) {
     ctx.textAlign = 'right';
-    ctx.font = '700 12px monospace';
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 12px Arial, sans-serif';
     ctx.fillText(String(o.clientSnapshot.ref).slice(0, 18), W - 30, y + 10);
+    ctx.fillStyle = '#000';
     ctx.textAlign = 'left';
   }
   y += 70;
   ctx.fillRect(24, y, W - 48, 2); y += 10;
   (o.items || []).forEach(it => {
-    ctx.font = '900 15px monospace';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 15px Arial, sans-serif';
     ctx.fillText((it.qty + 'x ' + it.name).slice(0, 24), 24, y);
     if (it.unit) {
-      ctx.font = '700 11px monospace';
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '700 11px Arial, sans-serif';
       ctx.fillText(String(it.unit).slice(0, 20), 44, y + 16);
     }
     ctx.textAlign = 'right';
-    ctx.font = '900 15px monospace';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 15px Arial, sans-serif';
     ctx.fillText(money(it.qty * it.unitPrice), W - 24, y);
     ctx.textAlign = 'left';
     y += it.unit ? 34 : 24;
@@ -9952,15 +10177,17 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.strokeRect(20, y - 2, W - 40, 44);
-  ctx.font = '900 22px monospace';
+  ctx.font = '900 22px Arial, sans-serif';
   ctx.fillText('TOTAL', 34, y + 27);
   ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 34, y + 27); ctx.textAlign = 'left';
   y += 56;
   if (o.notes) {
     ctx.strokeRect(20, y, W - 40, 52);
-    ctx.font = '900 11px monospace';
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '900 11px Arial, sans-serif';
     ctx.fillText('OBSERVACAO', 30, y + 8);
-    ctx.font = '700 13px monospace';
+    ctx.fillStyle = '#000';
+    ctx.font = '700 13px Arial, sans-serif';
     ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
     y += 64;
   }
@@ -9972,18 +10199,24 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
   y += qrSize + 8;
   ctx.textAlign = 'center';
-  ctx.font = '900 16px monospace';
+  ctx.font = '900 16px Arial, sans-serif';
   ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
-  ctx.font = '700 11px monospace';
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 11px Arial, sans-serif';
   ctx.fillText('Confira no app pelo codigo ou QR', cx, y); y += 18;
   ctx.textAlign = 'left';
+  ctx.fillStyle = '#000';
   ctx.strokeRect(20, y, W - 40, 68);
-  ctx.font = '900 11px monospace';
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 11px Arial, sans-serif';
   ctx.fillText('PAGAMENTO PIX', 30, y + 8);
-  ctx.font = '900 14px monospace';
+  ctx.fillStyle = '#000';
+  ctx.font = '900 14px Arial, sans-serif';
   ctx.fillText(pixText.slice(0, 28), 30, y + 24);
-  ctx.font = '700 12px monospace';
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 12px Arial, sans-serif';
   ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
+  ctx.fillStyle = '#000';
 }
 
 /**
@@ -10349,9 +10582,10 @@ function orderLabelHtml(o) {
   const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
   return `
+    <div class="pa-receipt">
     <div class="pa-kicker">Recibo de pedido</div>
     <div class="pa-title">${escapeHtml(empresa)}</div>
-    <div class="pa-center pa-bold">Pedido ${escapeHtml(orderRef)}</div>
+    <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
     <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
@@ -10362,8 +10596,9 @@ function orderLabelHtml(o) {
       <div class="pa-label">Itens</div>
       ${items}
     </div>
-    <div class="pa-sep"></div>
-    <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
+    <div class="pa-total-box">
+      <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
+    </div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
     <div class="pa-confer">
       <div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>
@@ -10375,6 +10610,7 @@ function orderLabelHtml(o) {
       <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
       <div>Titular: ${escapeHtml(getPixHolder())}</div>
       ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
+    </div>
     </div>`;
 }
 
