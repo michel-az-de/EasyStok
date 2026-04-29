@@ -9879,6 +9879,25 @@ function code128Modules(data) {
   return code128Values(data).map(v => CODE128_PATTERNS[v] || '').join('');
 }
 
+function drawCode128OnCanvas(ctx, data, x, y, width, height) {
+  const modules = code128Modules(data);
+  if (!modules) return;
+  const total = modules.split('').reduce((s, n) => s + Number(n || 0), 0);
+  const quiet = 10;
+  const scale = Math.max(1, Math.floor((width - quiet * 2) / total));
+  const realW = total * scale + quiet * 2;
+  // fundo branco
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x, y, realW, height);
+  ctx.fillStyle = '#000';
+  let cx = x + quiet;
+  for (let i = 0; i < modules.length; i++) {
+    const w = Number(modules[i]) * scale;
+    if (i % 2 === 0) ctx.fillRect(cx, y, w, height);
+    cx += w;
+  }
+}
+
 function generateCode128Svg(data, width = 260, height = 58) {
   const modules = code128Modules(data);
   if (!modules) return '';
@@ -10197,17 +10216,23 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
     y += 64;
   }
-  // QR / codigo de conferencia (respeita modo configurado)
+  // QR / codigo de barras de conferencia (respeita modo configurado)
   const _csm = getProdScanMode();
   const _cshowQr = _csm !== 'barcode';
+  const _cshowBars = _csm !== 'qr';
   const qrSize = _cshowQr ? 130 : 0;
-  const boxH = (_cshowQr ? qrSize + 10 : 0) + 46;
+  const barsH = _cshowBars ? 56 : 0;
+  const boxH = (_cshowQr ? qrSize + 10 : 0) + (_cshowBars ? barsH + 10 : 0) + 46;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.strokeRect(20, y - 4, W - 40, boxH);
   if (_cshowQr) {
     drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
     y += qrSize + 8;
+  }
+  if (_cshowBars) {
+    drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
+    y += barsH + 8;
   }
   ctx.textAlign = 'center';
   ctx.fillStyle = '#000';
