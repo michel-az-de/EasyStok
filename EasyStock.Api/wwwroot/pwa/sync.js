@@ -258,9 +258,70 @@
     flushIntervalId = setInterval(flush, 30000);
   }, 500);
 
+  // ---- Version ping (Onda 0): verifica compat + capabilities do servidor ----
+  // Resposta vai pro localStorage pra Diagnóstico exibir e pra UI
+  // condicional (ex: avisar quando ApiKeyEnforced virar true).
+  // Falha silenciosa: se offline ou rede ruim, deixa cache antigo.
+  async function pingVersion() {
+    if (!navigator.onLine) return null;
+    try {
+      const url = API_BASE_URL + API_PREFIX + '/version';
+      const resp = await fetch(url, { headers: baseHeaders() });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      try {
+        localStorage.setItem('cdb-server-version', JSON.stringify({
+          fetchedAt: Date.now(),
+          ...data
+        }));
+      } catch (e) {}
+      return data;
+    } catch (e) {
+      console.warn('pingVersion falhou:', e.message);
+      return null;
+    }
+  }
+
+  // ---- Upload de error log (Onda 0): opt-in via Ajustes/Diagnóstico ----
+  // Manda o cdb-error-log pro endpoint /diagnostics/errors. Servidor loga
+  // via Serilog (sem migration). Não é automático — operador clica.
+  async function uploadErrorLog(errors, meta) {
+    if (!navigator.onLine) {
+      throw new Error('sem rede');
+    }
+    if (!Array.isArray(errors) || errors.length === 0) {
+      throw new Error('sem erros pra enviar');
+    }
+    const url = API_BASE_URL + API_PREFIX + '/diagnostics/errors';
+    const body = {
+      deviceId,
+      operatorName: (meta && meta.operatorName) || null,
+      bundleVersion: (meta && meta.bundleVersion) || null,
+      errors: errors.map(e => ({
+        timestamp: e.t || Date.now(),
+        context: e.ctx || null,
+        message: e.msg || null,
+        stack: e.stack || null,
+        screen: e.screen || null,
+        operator: e.operator || null
+      }))
+    };
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: baseHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error('servidor recusou: ' + resp.status);
+    return await resp.json().catch(() => ({}));
+  }
+
+  // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
+  setTimeout(pingVersion, 700);
+
   // Expõe utilitários pra debug
   window.cdbSync = {
     flush, pull, stop,
+    pingVersion, uploadErrorLog,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

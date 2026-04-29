@@ -27,9 +27,9 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Route("api/mobile/sync")]
 // [MobileApiKey] — DESABILITADO temporariamente para facilitar testes iniciais
 // do PWA/APK. Reativar quando a ferramenta estiver estável e a API for
-// exposta fora da rede local. Ver também MobileApiKeyAttribute.cs.
+// exposta fora da rede local (ver Onda 1 do roadmap de integração).
 [AllowAnonymous]
-[ApiExplorerSettings(IgnoreApi = true)]
+[ApiExplorerSettings(GroupName = "mobile-v1")]
 public class SyncController(EasyStockDbContext db) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;

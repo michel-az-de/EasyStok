@@ -9313,7 +9313,34 @@ function collectDiagnostics() {
     printer: { plugin: !!TP, shim: !!bs, native: !!(bs && bs.__cdbNative),
       saved: printer, trailLen: btTrail.length },
     camera: { detectorAvailable, scanMode, errors: camErrors },
-    errors: getErrorLog()
+    errors: getErrorLog(),
+    server: collectServerInfo()
+  };
+}
+
+// Onda 0: lê info do servidor que pingVersion() persistiu em
+// 'cdb-server-version'. Se ainda não pingou (boot recente / offline),
+// retorna unknown sem quebrar.
+function collectServerInfo() {
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('cdb-server-version') || 'null'); } catch (e) {}
+  if (!cached) {
+    return {
+      status: navigator.onLine ? 'unknown' : 'offline',
+      statusLabel: navigator.onLine ? 'aguardando primeira checagem' : 'offline',
+      fetchedAt: 0,
+      apiVersion: null,
+      mobileSchemaVersion: null,
+      apiKeyEnforced: null
+    };
+  }
+  return {
+    status: cached.Status === 'ok' ? 'ok' : (cached.Status || 'unknown'),
+    statusLabel: cached.Status === 'ok' ? 'online' : (cached.Status || 'desconhecido'),
+    fetchedAt: cached.fetchedAt || 0,
+    apiVersion: cached.ApiVersion || null,
+    mobileSchemaVersion: cached.MobileSchemaVersion ?? null,
+    apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null
   };
 }
 
@@ -9424,12 +9451,22 @@ function openDiagnostics() {
         + _diagRow('Erros recentes', d.camera.errors.length || 'nenhum',
             d.camera.errors.length ? 'warn' : '')
       , '', camErrorsHtml)
+    + section('Servidor', d.server.status === 'ok' ? 'ok' : (d.server.status === 'offline' ? 'warn' : 'err'), ''
+        + _diagRow('Status', d.server.statusLabel, d.server.status === 'ok' ? '' : (d.server.status === 'offline' ? 'warn' : 'err'))
+        + (d.server.apiVersion ? _diagRow('Versão API', escapeHtml(d.server.apiVersion)) : '')
+        + (d.server.mobileSchemaVersion != null ? _diagRow('Contrato Mobile', 'v' + d.server.mobileSchemaVersion) : '')
+        + (d.server.fetchedAt ? _diagRow('Última checagem', _fmtRelTime(d.server.fetchedAt)) : '')
+        + (d.server.apiKeyEnforced != null ? _diagRow('Auth obrigatória', d.server.apiKeyEnforced ? 'sim' : 'não', d.server.apiKeyEnforced ? '' : 'warn') : '')
+      , ''
+        + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
+      , '')
     + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
         + _diagRow('Total registrado', d.errors.length || 'nenhum',
             d.errors.length ? 'warn' : '')
         + (d.errors.length ? _diagRow('Mais recente', _fmtRelTime(d.errors[d.errors.length-1].t)) : '')
       , ''
-        + (d.errors.length ? '<button class="diag-action" onclick="exportErrorLog()">Exportar</button>' : '')
+        + (d.errors.length ? '<button class="diag-action" onclick="exportErrorLog()">Compartilhar</button>' : '')
+        + (d.errors.length ? '<button class="diag-action" onclick="uploadErrorLogToServer()">Enviar ao servidor</button>' : '')
         + (d.errors.length ? '<button class="diag-action danger" onclick="diagClearErrorLog()">Limpar</button>' : '')
       , (d.errors.length
           ? '<div class="diag-issues">' + d.errors.slice(-5).reverse().map(e =>
@@ -9449,6 +9486,21 @@ function diagClearErrorLog() {
   if (!confirm('Limpar log de erros?\n\nIrreversivel — exporte antes se precisar investigar.')) return;
   clearErrorLog();
   showToast('Log de erros limpo');
+  openDiagnostics();
+}
+
+// Onda 0: pinga /api/mobile/version e re-renderiza diagnostico com resposta
+async function diagPingServer() {
+  if (!window.cdbSync || typeof window.cdbSync.pingVersion !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  showToast('Verificando servidor…');
+  const r = await window.cdbSync.pingVersion();
+  if (r) {
+    showToast('Servidor: ' + (r.Status || 'ok') + ' · API ' + (r.ApiVersion || '?'));
+  } else {
+    showToast('Sem resposta do servidor');
+  }
   openDiagnostics();
 }
 function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
@@ -10119,6 +10171,30 @@ function exportErrorLog() {
     shareTextNative('Error log Easy Stock', lines.join('\n'));
   } else {
     alert(lines.join('\n').slice(0, 4000));
+  }
+}
+
+// Onda 0: envia error log pro servidor via /api/mobile/diagnostics/errors.
+// Opt-in (operador clica). Serve pra time de plantao investigar sem precisar
+// que o operador abra o WhatsApp + cole texto.
+async function uploadErrorLogToServer() {
+  const arr = getErrorLog();
+  if (!arr.length) { showToast('Sem erros pra enviar'); return; }
+  if (!navigator.onLine) { showToast('Sem rede — tente mais tarde'); return; }
+  if (!window.cdbSync || typeof window.cdbSync.uploadErrorLog !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  showToast('Enviando ' + arr.length + ' erro(s)…');
+  try {
+    const meta = {
+      operatorName: (typeof operatorName !== 'undefined' && operatorName) || null,
+      bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null
+    };
+    const r = await window.cdbSync.uploadErrorLog(arr, meta);
+    showToast('Enviado: ' + (r && r.received != null ? r.received : arr.length) + ' erro(s) recebidos');
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
+    try { logError(e, 'uploadErrorLogToServer'); } catch (_) {}
   }
 }
 
