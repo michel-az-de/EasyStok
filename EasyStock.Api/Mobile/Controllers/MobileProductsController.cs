@@ -1,0 +1,187 @@
+using System.Security.Claims;
+using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Infra.Postgre.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace EasyStock.Api.Mobile.Controllers;
+
+/// <summary>
+/// Onda 2 — Catálogo unificado mobile ↔ ERP.
+///
+/// Operadores web usam estes endpoints pra revisar produtos custom criados
+/// no app (<c>IsCustom=true</c>, <c>IsApproved=false</c>, <c>ErpProductId=null</c>),
+/// linkar a um <c>Produto</c> ERP existente OU rejeitar.
+///
+/// Stock unificado vem na parte 2 desta onda — exige reconciliação com
+/// <c>itens_estoque</c> por loja, é mais profundo. Por ora link manual.
+/// </summary>
+[ApiController]
+[Route("api/mobile/products")]
+public class MobileProductsController(
+    EasyStockDbContext db,
+    ILogger<MobileProductsController> log) : ControllerBase
+{
+    private readonly EasyStockDbContext _db = db;
+    private readonly ILogger<MobileProductsController> _log = log;
+
+    /// <summary>
+    /// Lista produtos da empresa filtrável por status. Usado pelo painel
+    /// /produtos-mobile pra mostrar "pendentes de aprovação".
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    public async Task<ActionResult<MobileProductSummary[]>> List(
+        [FromQuery] Guid empresaId,
+        [FromQuery] bool? pendingOnly,
+        [FromQuery] bool? customOnly,
+        CancellationToken ct)
+    {
+        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+
+        var q = _db.Set<Product>().AsNoTracking().Where(p => p.EmpresaId == empresaId);
+        if (pendingOnly == true) q = q.Where(p => p.IsCustom && !p.IsApproved && p.ErpProductId == null);
+        if (customOnly == true) q = q.Where(p => p.IsCustom);
+
+        var items = await q.OrderByDescending(p => p.CreatedAt).Take(200).ToListAsync(ct);
+
+        return Ok(items.Select(p => new MobileProductSummary(
+            Id: p.Id,
+            Name: p.Name,
+            Emoji: p.Emoji,
+            Category: p.Category,
+            Unit: p.Unit,
+            Price: p.Price,
+            Stock: p.Stock,
+            IsCustom: p.IsCustom,
+            IsApproved: p.IsApproved,
+            ErpProductId: p.ErpProductId,
+            EmpresaId: p.EmpresaId,
+            LojaId: p.LojaId,
+            CreatedAt: p.CreatedAt,
+            UpdatedAt: p.UpdatedAt,
+            ApprovedAt: p.ApprovedAt,
+            LastDeviceId: p.LastDeviceId,
+            LastOperatorName: p.LastOperatorName
+        )).ToArray());
+    }
+
+    /// <summary>
+    /// Aprova um produto custom sem linkar a ERP — só marca como revisado.
+    /// Útil quando o produto é mobile-only (ex: serviço pontual) e não
+    /// precisa entrar no catálogo principal.
+    /// </summary>
+    [HttpPost("{id}/approve")]
+    [Authorize]
+    public async Task<IActionResult> Approve(string id, CancellationToken ct)
+    {
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product == null) return NotFound();
+
+        product.IsApproved = true;
+        product.ApprovedAt = DateTime.UtcNow;
+        product.ApprovedByUserId = ResolveUserId();
+        product.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Mobile product aprovado (sem link ERP): {ProductId} by {UserId}",
+            id, product.ApprovedByUserId);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Linka um <c>mobile_product</c> a um <c>Produto</c> ERP existente.
+    /// Marca como aprovado. Próxima sync do mobile recebe atualizações
+    /// do produto ERP (nome, preço) e — quando reconciliação de stock
+    /// for ativada — também valor de estoque.
+    /// </summary>
+    [HttpPost("{id}/link")]
+    [Authorize]
+    public async Task<IActionResult> Link(string id, [FromBody] LinkRequest req, CancellationToken ct)
+    {
+        if (req == null || req.ErpProductId == Guid.Empty)
+            return BadRequest(new { error = "erpProductId obrigatório" });
+
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product == null) return NotFound();
+
+        // Verifica que o Produto ERP existe e pertence à mesma empresa.
+        // Sem tipar a entidade ERP aqui pra não criar dependência circular —
+        // queries via EF Set<T>() exigiriam o type. Usamos SQL parametrizado.
+        var produtoExists = await _db.Database
+            .SqlQueryRaw<int>(@"
+                SELECT 1 FROM produtos
+                WHERE ""Id"" = {0} AND ""EmpresaId"" = {1}
+                LIMIT 1", req.ErpProductId, product.EmpresaId ?? Guid.Empty)
+            .ToListAsync(ct);
+
+        if (produtoExists.Count == 0)
+        {
+            return BadRequest(new { error = "Produto ERP não encontrado nesta empresa" });
+        }
+
+        product.ErpProductId = req.ErpProductId;
+        product.IsApproved = true;
+        product.ApprovedAt = DateTime.UtcNow;
+        product.ApprovedByUserId = ResolveUserId();
+        product.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Mobile product {MobileId} linkado a Produto ERP {ErpId} by {UserId}",
+            id, req.ErpProductId, product.ApprovedByUserId);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Desfaz a aprovação/link. Útil em caso de erro de operador.
+    /// </summary>
+    [HttpPost("{id}/unlink")]
+    [Authorize]
+    public async Task<IActionResult> Unlink(string id, CancellationToken ct)
+    {
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product == null) return NotFound();
+
+        product.ErpProductId = null;
+        product.IsApproved = false;
+        product.ApprovedAt = null;
+        product.ApprovedByUserId = null;
+        product.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Mobile product {ProductId} unlink/un-approve", id);
+        return NoContent();
+    }
+
+    private Guid? ResolveUserId()
+    {
+        var sub = User.FindFirstValue("sub")
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(sub, out var g) ? g : null;
+    }
+}
+
+// ---------- DTOs ----------
+
+public record MobileProductSummary(
+    string Id,
+    string Name,
+    string? Emoji,
+    string Category,
+    string? Unit,
+    decimal? Price,
+    int Stock,
+    bool IsCustom,
+    bool IsApproved,
+    Guid? ErpProductId,
+    Guid? EmpresaId,
+    Guid? LojaId,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    DateTime? ApprovedAt,
+    string? LastDeviceId,
+    string? LastOperatorName
+);
+
+public record LinkRequest(Guid ErpProductId);

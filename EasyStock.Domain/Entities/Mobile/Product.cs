@@ -80,4 +80,21 @@ public class Product
     /// <summary>Loja onde o registro vive dentro da empresa.</summary>
     [Column("loja_id")]
     public Guid? LojaId { get; set; }
+
+    /// <summary>
+    /// Onda 2 — link opcional pra <c>Produto</c> do ERP. NULL = só vive
+    /// no mobile (custom criado no app, ainda não revisado). Quando o
+    /// operador aprova/linka pelo painel /produtos-mobile, este campo
+    /// é populado e o stock passa a reconciliar com itens_estoque ERP.
+    /// </summary>
+    [Column("erp_product_id")]
+    public Guid? ErpProductId { get; set; }
+
+    /// <summary>Quando o produto foi aprovado/linkado no painel web.</summary>
+    [Column("approved_at")]
+    public DateTime? ApprovedAt { get; set; }
+
+    /// <summary>Usuário do EasyStock que aprovou/linkou. Audit trail.</summary>
+    [Column("approved_by_user_id")]
+    public Guid? ApprovedByUserId { get; set; }
 }
