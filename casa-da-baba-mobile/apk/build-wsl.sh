@@ -15,6 +15,24 @@ rsync -a --delete \
   --exclude="android/capacitor-cordova-android-plugins/build" \
   "$SRC/" "$DST/"
 
+# CRITICO: copia web/ -> android/.../assets/public/. Sem esse passo o
+# Gradle empacota a versao antiga que ficou em assets/public — explicava
+# por que mudancas visuais "nao apareciam" no APK. Equivalente a
+# 'npx cap copy android' mas sem dependencia de npm/node no WSL.
+# IMPORTANTE: copia SO os arquivos do app (nao 'rsync --delete' que
+# apagaria capacitor.js, cordova.js, plugins/).
+echo "==> Sincronizando web/ -> assets/public/ (capacitor copy manual)..."
+ASSETS_PUB="$DST/android/app/src/main/assets/public"
+mkdir -p "$ASSETS_PUB"
+cp -f "$DST/web/index.html"     "$ASSETS_PUB/index.html"
+cp -f "$DST/web/sync.js"        "$ASSETS_PUB/sync.js"
+cp -f "$DST/web/manifest.json"  "$ASSETS_PUB/manifest.json"
+[ -f "$DST/web/sw.js" ]          && cp -f "$DST/web/sw.js"         "$ASSETS_PUB/sw.js"
+[ -f "$DST/web/qrcode.min.js" ]  && cp -f "$DST/web/qrcode.min.js" "$ASSETS_PUB/qrcode.min.js"
+[ -f "$DST/web/config.js" ]      && cp -f "$DST/web/config.js"     "$ASSETS_PUB/config.js"
+[ -d "$DST/web/icons" ]          && rsync -a "$DST/web/icons/" "$ASSETS_PUB/icons/"
+ls -la "$ASSETS_PUB/index.html"
+
 cd "$DST/android"
 chmod +x ./gradlew
 
