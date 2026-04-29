@@ -470,6 +470,174 @@ body {
 }
 [data-theme="light"] .home-insight.warn { background: #fff8f6; }
 
+/* Centro de atencao — F1: prioridades operacionais do dia.
+   Cards full-width com icone, titulo, motivo e CTA. Severidade:
+   .err (estoque critico forte) > .warn > .info. Empty state elegante. */
+.attention-center {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.attention-card {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 13px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.034), transparent 100%),
+    var(--bg-card, var(--bg-elev));
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  box-shadow: var(--shadow-sm, 0 8px 18px rgba(0,0,0,0.10));
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: inherit;
+}
+.attention-card:active { transform: scale(0.99); }
+.attention-card .ac-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(240,184,74,0.14); color: var(--gold);
+  font-size: 18px; font-weight: 900;
+}
+.attention-card .ac-title {
+  font-weight: 850; font-size: 13.5px; line-height: 1.2;
+  display: flex; align-items: center; gap: 8px;
+}
+.attention-card .ac-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px;
+  background: var(--gold-soft); color: var(--gold);
+  font-size: 11px; font-weight: 900;
+  border: 1px solid rgba(240,184,74,0.22);
+}
+.attention-card .ac-reason {
+  margin-top: 3px;
+  color: var(--ink-dim); font-size: 11.5px; line-height: 1.35;
+}
+.attention-card .ac-cta {
+  color: var(--gold); font-size: 11px; font-weight: 900;
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.attention-card.warn {
+  border-color: rgba(240,184,74,0.34);
+  background:
+    linear-gradient(180deg, rgba(240,184,74,0.08), transparent 100%),
+    var(--bg-card, var(--bg-elev));
+}
+.attention-card.warn .ac-icon { background: rgba(240,184,74,0.18); }
+.attention-card.err {
+  border-color: rgba(214,80,51,0.36);
+  background:
+    linear-gradient(180deg, rgba(214,80,51,0.10), transparent 100%),
+    var(--bg-card, var(--bg-elev));
+}
+.attention-card.err .ac-icon { background: rgba(214,80,51,0.18); color: var(--accent); }
+.attention-card.err .ac-count { color: var(--accent); background: rgba(214,80,51,0.14); border-color: rgba(214,80,51,0.28); }
+.attention-card.err .ac-cta { color: var(--accent); }
+.attention-empty {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(109,185,142,0.08), transparent 100%),
+    var(--bg-card, var(--bg-elev));
+  border: 1px solid rgba(109,185,142,0.24);
+  border-radius: 14px;
+  color: var(--ink-dim); font-size: 12.5px;
+}
+.attention-empty .ae-check {
+  width: 26px; height: 26px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(109,185,142,0.18); color: var(--basil, #6db98e);
+  font-weight: 900; flex: 0 0 26px;
+}
+.attention-empty strong { color: var(--ink); font-weight: 850; }
+[data-theme="light"] .attention-card { background: #fff; border-color: #dbe2ec; box-shadow: 0 10px 24px rgba(21,31,49,0.06); }
+[data-theme="light"] .attention-card.warn {
+  background: linear-gradient(180deg, #fff7e4, #fff 100%), #fff;
+  border-color: rgba(189,126,19,0.34);
+}
+[data-theme="light"] .attention-card.warn .ac-icon { background: #fff1cc; color: #b78122; }
+[data-theme="light"] .attention-card.warn .ac-count { color: #b78122; background: #fff1cc; border-color: rgba(189,126,19,0.30); }
+[data-theme="light"] .attention-card.warn .ac-cta { color: #b78122; }
+[data-theme="light"] .attention-card.err {
+  background: linear-gradient(180deg, #fff0ec, #fff 100%), #fff;
+  border-color: rgba(207,87,56,0.36);
+}
+[data-theme="light"] .attention-card.err .ac-icon { background: #ffe4dc; color: #b8472b; }
+[data-theme="light"] .attention-card.err .ac-count { color: #b8472b; background: #ffe4dc; border-color: rgba(207,87,56,0.30); }
+[data-theme="light"] .attention-card.err .ac-cta { color: #b8472b; }
+[data-theme="light"] .attention-empty { background: #f0f9f3; border-color: #b9dcca; }
+[data-theme="light"] .attention-empty .ae-check { background: #e9f5ee; color: #2f7a5d; }
+
+/* F3 — Busca global. Reusa .historico-overlay/.historico-sheet pra ter
+   bottom-sheet consistente. Override de altura (auto cresce) + input
+   sticky no topo. */
+.gs-sheet { padding-bottom: 20px; }
+.gs-input-wrap {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 0 12px; margin: 4px 0 8px;
+  background: linear-gradient(180deg, var(--bg-elev) 0 75%, transparent);
+}
+.gs-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-elev-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  font-size: 15px; font-family: inherit;
+  outline: none;
+}
+.gs-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(240,184,74,0.16); }
+.gs-results { display: flex; flex-direction: column; gap: 14px; }
+.gs-group-title {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.14em;
+  color: var(--ink-mute); text-transform: uppercase;
+  margin: 4px 0 6px;
+}
+.gs-result-item {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 11px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer; color: var(--ink);
+  font-family: inherit;
+  margin-bottom: 6px;
+}
+.gs-result-item:active { transform: scale(0.99); }
+.gs-result-item .gs-icon {
+  width: 32px; height: 32px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(240,184,74,0.14); color: var(--gold);
+  font-size: 15px; font-weight: 900;
+}
+.gs-result-item .gs-label {
+  font-weight: 800; font-size: 13.5px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gs-result-item .gs-meta {
+  display: block; margin-top: 2px;
+  color: var(--ink-mute); font-size: 11px;
+}
+.gs-result-item .gs-arrow { color: var(--ink-mute); font-size: 14px; }
+.gs-empty { padding: 18px 8px; text-align: center; color: var(--ink-mute); font-size: 12.5px; line-height: 1.5; }
+.gs-empty strong { color: var(--ink); display: block; margin-bottom: 4px; font-size: 13px; }
+[data-theme="light"] .gs-input-wrap { background: linear-gradient(180deg, #fff 0 75%, transparent); }
+[data-theme="light"] .gs-input { background: #f7f8fb; border-color: #d9e0ea; color: #172033; }
+[data-theme="light"] .gs-input:focus { border-color: #b78122; box-shadow: 0 0 0 3px rgba(189,129,34,0.18); }
+[data-theme="light"] .gs-result-item { background: #fff; border-color: #d9e0ea; box-shadow: 0 6px 14px rgba(21,31,49,0.04); }
+[data-theme="light"] .gs-result-item .gs-icon { background: #fff7e4; color: #b78122; }
+
 /* Mini stats (home) */
 .mini-stats {
   display: flex;
@@ -4148,6 +4316,12 @@ select:focus-visible {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
       </button>
       <span style="flex:1"></span>
+      <button class="icon-btn" id="globalSearchBtn" onclick="openGlobalSearch()" title="Buscar" aria-label="Busca global">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M21 21l-4.3-4.3"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="ajustesBtn" onclick="openAjustes()" title="Ajustes">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
@@ -4210,6 +4384,9 @@ select:focus-visible {
 
       <div class="section-label">Painel gerencial</div>
       <div class="home-insights" id="homeInsights"></div>
+
+      <div class="section-label">Centro de atenção</div>
+      <div class="attention-center" id="attentionCenter"></div>
 
       <div class="section-label section-label-with-links">
         <span>Lista de compras</span>
@@ -4960,6 +5137,25 @@ select:focus-visible {
         </div>
       </div>
       <div id="diagnosticsBody"></div>
+    </div>
+  </div>
+
+  <!-- F3 — Busca global instantanea. Modal full-screen com input + grupos
+       de resultados (pedidos, clientes, produtos, lotes, atalhos). Indexa
+       direto sobre arrays em memoria, normaliza acentos + caixa, debounce
+       150ms. Sem dependencia de DOM existente alem de <input>. -->
+  <div class="historico-overlay" id="globalSearchModal" role="dialog" aria-modal="true" aria-label="Busca global">
+    <div class="historico-sheet gs-sheet">
+      <div class="cobranca-head">
+        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Buscar</h3>
+        <button class="cobranca-close" onclick="closeGlobalSearch()" aria-label="Fechar">×</button>
+      </div>
+      <div class="gs-input-wrap">
+        <input class="gs-input" id="globalSearchInput" type="search" inputmode="search"
+               autocomplete="off" autocapitalize="none" spellcheck="false"
+               placeholder="Pedido, cliente, produto, lote..." />
+      </div>
+      <div id="globalSearchResults" class="gs-results"></div>
     </div>
   </div>
 
@@ -5763,6 +5959,69 @@ const NEXT_LABEL = {
 const STATE_LABEL = {
   aguardando:'Aguardando', preparando:'Preparando', pronto:'Pronto', entregue:'Entregue', cancelado:'Cancelado'
 };
+
+// F2 — Acoes contextuais por status. Retorna array com a(s) acao(oes)
+// primaria(s) recomendada(s) pra um pedido. Tipo de retorno:
+//   [{ key, label, icon, handler, primary: true|false }]
+// `primary: true` = acao destacada (gold cheio), false = secundaria.
+// Renderizadores usam as primeiras 1-2 acoes; o resto fica disponivel
+// pelos botoes/menus existentes (cobrar, imprimir, historico, cancelar).
+// Status desconhecido → retorna [] (callers caem no layout antigo).
+function getOrderPrimaryActions(o) {
+  if (!o || typeof o !== 'object') return [];
+  const id = o.id;
+  switch (o.status) {
+    case 'aguardando':
+      return [{ key: 'start', label: 'Iniciar preparo', icon: '▶', primary: true,
+        handler: 'applyAdvanceTransition', args: [id, 'preparando'] }];
+    case 'preparando':
+      return [{ key: 'ready', label: 'Marcar pronto', icon: '✓', primary: true,
+        handler: 'applyAdvanceTransition', args: [id, 'pronto'] }];
+    case 'pronto': {
+      // Se conferencia ainda nao foi feita, prioriza conferir antes de entregar.
+      // CONFER_STATUS.CONFERIDO = 'conferido'; getConferStatus retorna esse string
+      // se confirmation OK ou se o.confirmedBy/At (compat legado).
+      const conferido = (typeof getConferStatus === 'function')
+        ? getConferStatus(o) === (typeof CONFER_STATUS !== 'undefined' ? CONFER_STATUS.CONFERIDO : 'conferido')
+        : !!o.confirmedAt;
+      if (!conferido) {
+        return [
+          { key: 'confer', label: 'Conferir', icon: '✅', primary: true,
+            handler: 'openConfer', args: [id] },
+          { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+            handler: 'openCobranca', args: [id] }
+        ];
+      }
+      return [
+        { key: 'deliver', label: 'Marcar entregue', icon: '✓', primary: true,
+          handler: 'applyAdvanceTransition', args: [id, 'entregue'] },
+        { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+          handler: 'openCobranca', args: [id] }
+      ];
+    }
+    case 'entregue':
+      return [{ key: 'reprint', label: 'Reimprimir', icon: '🖨', primary: true,
+        handler: 'printEtiqueta', args: [id] }];
+    default:
+      return [];
+  }
+}
+
+// Wrapper que executa a acao via lookup global — handlers nao podem
+// ser fechados em template literal (nao serializaveis). Mantem ZERO
+// lógica nova: invoca funcoes existentes pelo nome.
+function runOrderAction(orderId, key) {
+  const o = (typeof getOrderById === 'function') ? getOrderById(orderId) : null;
+  if (!o) return;
+  const actions = getOrderPrimaryActions(o);
+  const a = actions.find(x => x.key === key);
+  if (!a) return;
+  const fn = window[a.handler];
+  if (typeof fn === 'function') {
+    try { fn.apply(null, a.args || []); }
+    catch (e) { try { logError(e, 'orderAction:' + key); } catch (_) {} }
+  }
+}
 // STATUS: chaves de status do pedido (ORDER_FLOW) + ações de histórico.
 // Usar esse objeto em comparações evita typo silencioso ('entrege' etc.).
 const STATUS = {
@@ -5781,7 +6040,392 @@ function renderHome() {
   renderCash();
   renderOpenCashDaysBanner();
   renderHomeInsights();
+  renderAttentionCenter();
   renderHomeShopping();
+}
+
+// ============================================================
+// F1 — CENTRO DE ATENCAO
+// Lista priorizada (max 5) do que o operador deve fazer agora.
+// Deriva de estado ja carregado, sem nova storage. Severidades:
+// err > warn > info. Estado vazio = "Operacao estavel".
+// ============================================================
+const ATTENTION_SEVERITY_ORDER = { err: 0, warn: 1, info: 2 };
+const ATTENTION_TRAVADO_MS = 30 * 60 * 1000; // 30min em preparando
+
+function buildAttentionItems() {
+  const items = [];
+  try {
+    // 1. Estoque critico
+    const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+    if (lowStock.length) {
+      items.push({
+        kind: 'stock',
+        severity: lowStock.length >= 3 ? 'err' : 'warn',
+        icon: '⚠',
+        title: 'Estoque crítico',
+        reason: lowStock.slice(0, 3).map(p => p.name).join(', ') + (lowStock.length > 3 ? '…' : ''),
+        count: lowStock.length,
+        cta: 'Produção',
+        action: function () { go('producao'); }
+      });
+    }
+
+    // 2. Conferencia pendente (pedidos prontos sem confirmacao)
+    const open = (typeof openOrders === 'function') ? openOrders() : [];
+    const pendingConfer = open.filter(o => {
+      if (o.status !== 'pronto') return false;
+      if (typeof getConferStatus === 'function') return getConferStatus(o) === 'pendente';
+      return !o.confirmedAt;
+    });
+    if (pendingConfer.length) {
+      items.push({
+        kind: 'confer',
+        severity: 'warn',
+        icon: '✅',
+        title: 'Conferência pendente',
+        reason: pendingConfer.length + ' pedido' + (pendingConfer.length === 1 ? '' : 's') + ' aguardando conferência',
+        count: pendingConfer.length,
+        cta: 'Conferir',
+        action: function () { go('conferencia'); }
+      });
+    }
+
+    // 3. Pedidos travados (preparando ha mais de 30min)
+    const now = Date.now();
+    const stuck = open.filter(o => o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS);
+    if (stuck.length) {
+      items.push({
+        kind: 'stuck',
+        severity: 'warn',
+        icon: '⏱',
+        title: 'Pedidos travados',
+        reason: stuck.length + ' em preparo há mais de 30 min',
+        count: stuck.length,
+        cta: 'Pedidos',
+        action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('andamento'); }
+      });
+    }
+
+    // 4. Compras pendentes
+    const shopping = (typeof getShoppingRows === 'function') ? getShoppingRows() : [];
+    const shopPending = shopping.filter(r => !r.done);
+    if (shopPending.length) {
+      items.push({
+        kind: 'shopping',
+        severity: 'info',
+        icon: '🛒',
+        title: 'Compras pendentes',
+        reason: shopPending.slice(0, 2).map(r => r.name).join(', ') + (shopPending.length > 2 ? '…' : ''),
+        count: shopPending.length,
+        cta: 'Compras',
+        action: function () { go('compras'); }
+      });
+    }
+  } catch (e) {
+    try { logError(e, 'buildAttentionItems'); } catch (_) {}
+  }
+  // Ordena por severidade e limita a 5. NB: usa ?? (nao ||) porque
+  // err === 0 e seria erroneamente substituido pelo fallback.
+  items.sort((a, b) => (ATTENTION_SEVERITY_ORDER[a.severity] ?? 9) - (ATTENTION_SEVERITY_ORDER[b.severity] ?? 9));
+  return items.slice(0, 5);
+}
+
+function renderAttentionCenter() {
+  const host = document.getElementById('attentionCenter');
+  if (!host) return;
+  let items = [];
+  try { items = buildAttentionItems(); }
+  catch (e) { try { logError(e, 'renderAttentionCenter'); } catch (_) {} }
+  if (!items.length) {
+    host.innerHTML = '<div class="attention-empty">'
+      + '<span class="ae-check">✓</span>'
+      + '<div><strong>Operação estável.</strong> Nenhuma pendência crítica agora.</div>'
+      + '</div>';
+    return;
+  }
+  // Atribui handlers via delegacao — evita inline function em onclick
+  const html = items.map((it, i) => `
+    <button class="attention-card ${it.severity}" data-attention-idx="${i}" type="button">
+      <span class="ac-icon" aria-hidden="true">${escapeHtml(it.icon)}</span>
+      <span>
+        <span class="ac-title">${escapeHtml(it.title)} <span class="ac-count">${it.count}</span></span>
+        <span class="ac-reason">${escapeHtml(it.reason)}</span>
+      </span>
+      <span class="ac-cta">${escapeHtml(it.cta)} →</span>
+    </button>`).join('');
+  host.innerHTML = html;
+  // Liga clicks ao action via delegacao (handlers nao serializaveis em HTML)
+  host._attentionItems = items;
+  host.onclick = function (ev) {
+    const card = ev.target.closest('.attention-card');
+    if (!card) return;
+    const idx = parseInt(card.dataset.attentionIdx, 10);
+    const item = host._attentionItems && host._attentionItems[idx];
+    if (item && typeof item.action === 'function') {
+      try { item.action(); } catch (e) { try { logError(e, 'attention.action'); } catch (_) {} }
+    }
+  };
+}
+
+// ============================================================
+// F3 — BUSCA GLOBAL INSTANTANEA
+// Indexa em tempo de query sobre arrays ja em memoria. Normaliza
+// acentos + caixa pra match tolerante. Debounce 150ms. Atalhos
+// rapidos sempre presentes pra estado vazio util.
+// ============================================================
+
+function _normalizeSearch(s) {
+  // toLowerCase + remove acentos via Unicode normalization
+  // NB: o range usa caracteres de combining marks U+0300-U+036F
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+const GS_SHORTCUTS = [
+  { key: 'novo-pedido', label: 'Novo pedido', icon: '➕', kind: 'shortcut',
+    keywords: 'novo pedido criar adicionar', action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('novo'); } },
+  { key: 'producao', label: 'Registrar produção', icon: '🏭', kind: 'shortcut',
+    keywords: 'producao lote registrar', action: function () { go('producao'); } },
+  { key: 'conferencia', label: 'Abrir conferência', icon: '✅', kind: 'shortcut',
+    keywords: 'conferencia conferir scanner qr', action: function () { go('conferencia'); } },
+  { key: 'compras', label: 'Ir pra compras', icon: '🛒', kind: 'shortcut',
+    keywords: 'compras lista comprar shopping', action: function () { go('compras'); } },
+  { key: 'caixa', label: 'Abrir caixa', icon: '💰', kind: 'shortcut',
+    keywords: 'caixa fechamento dia saldo', action: function () { go('caixa'); } },
+  { key: 'diagnostico', label: 'Diagnóstico', icon: '🔍', kind: 'shortcut',
+    keywords: 'diagnostico erros sync ajuda problema', action: function () { if (typeof openDiagnostics === 'function') openDiagnostics(); } }
+];
+
+function _gsMatchOrder(o, nq) {
+  if (!o) return false;
+  const ref = ((o.id || '').slice(-8));
+  const name = (o.clientSnapshot && o.clientSnapshot.name) || '';
+  if (_normalizeSearch(name).indexOf(nq) >= 0) return true;
+  if (_normalizeSearch(ref).indexOf(nq) >= 0) return true;
+  if (Array.isArray(o.items)) {
+    for (const it of o.items) {
+      if (_normalizeSearch(it.name || '').indexOf(nq) >= 0) return true;
+    }
+  }
+  return false;
+}
+function _gsMatchClient(c, nq) {
+  if (!c) return false;
+  return _normalizeSearch(c.name || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.phone || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.doc || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.ref || '').indexOf(nq) >= 0;
+}
+function _gsMatchProduct(p, nq) {
+  if (!p) return false;
+  return _normalizeSearch(p.name || '').indexOf(nq) >= 0
+      || _normalizeSearch(p.emoji || '').indexOf(nq) >= 0
+      || _normalizeSearch(p.categoria || '').indexOf(nq) >= 0;
+}
+function _gsMatchBatch(b, nq) {
+  if (!b) return false;
+  if (_normalizeSearch(b.lote || '').indexOf(nq) >= 0) return true;
+  if (_normalizeSearch(b.code || '').indexOf(nq) >= 0) return true;
+  if (Array.isArray(b.items)) {
+    for (const it of b.items) {
+      if (_normalizeSearch(it.name || '').indexOf(nq) >= 0) return true;
+    }
+  }
+  return false;
+}
+function _gsMatchShortcuts(nq) {
+  if (!nq) return GS_SHORTCUTS.slice();
+  return GS_SHORTCUTS.filter(s =>
+    _normalizeSearch(s.label).indexOf(nq) >= 0 ||
+    _normalizeSearch(s.keywords).indexOf(nq) >= 0
+  );
+}
+
+// Retorna o objeto agrupado de resultados — testavel sem DOM.
+function buildSearchGroups(q) {
+  const nq = _normalizeSearch(String(q || '').trim());
+  const empty = nq.length < 2;
+  const groups = {
+    pedidos: [],
+    clientes: [],
+    produtos: [],
+    lotes: [],
+    acoes: empty ? GS_SHORTCUTS.slice(0, 5) : _gsMatchShortcuts(nq).slice(0, 5)
+  };
+  if (empty) return groups;
+  try {
+    groups.pedidos  = (orders   || []).filter(o => _gsMatchOrder(o, nq)).slice(0, 5);
+    groups.clientes = (clients  || []).filter(c => _gsMatchClient(c, nq)).slice(0, 5);
+    groups.produtos = (products || []).filter(p => !p.archived && _gsMatchProduct(p, nq)).slice(0, 5);
+    groups.lotes    = (batches  || []).filter(b => !b.deleted && _gsMatchBatch(b, nq)).slice(0, 5);
+  } catch (e) {
+    try { logError(e, 'buildSearchGroups'); } catch (_) {}
+  }
+  return groups;
+}
+
+let _gsDebounceTimer = null;
+function openGlobalSearch() {
+  toggleModal('globalSearchModal', true);
+  const inp = document.getElementById('globalSearchInput');
+  if (inp) {
+    inp.value = '';
+    inp.oninput = function () {
+      if (_gsDebounceTimer) clearTimeout(_gsDebounceTimer);
+      const v = inp.value;
+      _gsDebounceTimer = setTimeout(() => { _gsDebounceTimer = null; runGlobalSearch(v); }, 150);
+    };
+    inp.onkeydown = function (ev) { if (ev.key === 'Escape') closeGlobalSearch(); };
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 80);
+  }
+  runGlobalSearch(''); // mostra atalhos
+}
+function closeGlobalSearch() {
+  if (_gsDebounceTimer) { clearTimeout(_gsDebounceTimer); _gsDebounceTimer = null; }
+  toggleModal('globalSearchModal', false);
+}
+
+function runGlobalSearch(q) {
+  const host = document.getElementById('globalSearchResults');
+  if (!host) return;
+  const groups = buildSearchGroups(q);
+  const nq = _normalizeSearch(String(q || '').trim());
+  const isShort = nq.length < 2;
+  const totalReal = groups.pedidos.length + groups.clientes.length + groups.produtos.length + groups.lotes.length;
+  // Empty state: sem busca = atalhos. Com busca mas 0 matches reais e sem
+  // shortcut match = mensagem amigavel.
+  if (!isShort && totalReal === 0 && groups.acoes.length === 0) {
+    host.innerHTML = '<div class="gs-empty"><strong>Nenhum resultado pra "' + escapeHtml(q) + '"</strong>Tente outro termo ou um nome parcial.</div>';
+    return;
+  }
+  let html = '';
+  if (isShort) {
+    html += '<div class="gs-empty"><strong>O que voce quer encontrar?</strong>Comece a digitar pra buscar pedidos, clientes, produtos ou lotes.</div>';
+  }
+  if (groups.acoes.length) {
+    html += '<div><div class="gs-group-title">Atalhos rápidos</div>';
+    html += groups.acoes.map((s, i) => _gsRenderShortcut(s, i)).join('');
+    html += '</div>';
+  }
+  if (groups.pedidos.length) {
+    html += '<div><div class="gs-group-title">Pedidos</div>';
+    html += groups.pedidos.map(o => _gsRenderOrder(o)).join('');
+    html += '</div>';
+  }
+  if (groups.clientes.length) {
+    html += '<div><div class="gs-group-title">Clientes</div>';
+    html += groups.clientes.map(c => _gsRenderClient(c)).join('');
+    html += '</div>';
+  }
+  if (groups.produtos.length) {
+    html += '<div><div class="gs-group-title">Produtos</div>';
+    html += groups.produtos.map(p => _gsRenderProduct(p)).join('');
+    html += '</div>';
+  }
+  if (groups.lotes.length) {
+    html += '<div><div class="gs-group-title">Lotes</div>';
+    html += groups.lotes.map(b => _gsRenderBatch(b)).join('');
+    html += '</div>';
+  }
+  host.innerHTML = html;
+  // Delegacao de clicks
+  host.onclick = function (ev) {
+    const item = ev.target.closest('.gs-result-item');
+    if (!item) return;
+    const type = item.dataset.gsType;
+    const id   = item.dataset.gsId;
+    globalSearchSelect(type, id);
+  };
+}
+
+function _gsRenderShortcut(s) {
+  return `<button class="gs-result-item" data-gs-type="shortcut" data-gs-id="${escapeHtml(s.key)}" type="button">
+    <span class="gs-icon">${escapeHtml(s.icon)}</span>
+    <span><span class="gs-label">${escapeHtml(s.label)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderOrder(o) {
+  const ref = (o.id || '').slice(-8);
+  const name = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
+  const meta = (STATE_LABEL[o.status] || o.status) + ' · ' + money(Number(o.total) || 0);
+  return `<button class="gs-result-item" data-gs-type="order" data-gs-id="${escapeHtml(o.id)}" type="button">
+    <span class="gs-icon">📋</span>
+    <span><span class="gs-label">${escapeHtml(name)} · #${escapeHtml(ref)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderClient(c) {
+  const meta = c.phone || c.doc || c.ref || '';
+  return `<button class="gs-result-item" data-gs-type="client" data-gs-id="${escapeHtml(c.id)}" type="button">
+    <span class="gs-icon">👤</span>
+    <span><span class="gs-label">${escapeHtml(c.name || '(sem nome)')}</span>${meta ? '<span class="gs-meta">' + escapeHtml(meta) + '</span>' : ''}</span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderProduct(p) {
+  const meta = 'Estoque: ' + (Number(p.stock) || 0) + (p.unit ? ' · ' + p.unit : '');
+  return `<button class="gs-result-item" data-gs-type="product" data-gs-id="${escapeHtml(p.id)}" type="button">
+    <span class="gs-icon">${escapeHtml(p.emoji || '📦')}</span>
+    <span><span class="gs-label">${escapeHtml(p.name)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderBatch(b) {
+  const lote = b.lote || b.code || (b.id || '').slice(-8);
+  const qty = (Array.isArray(b.items) ? b.items.reduce((s, i) => s + (Number(i.qty) || 0), 0) : 0);
+  const dt = b.createdAt ? new Date(b.createdAt).toLocaleDateString('pt-BR') : '';
+  return `<button class="gs-result-item" data-gs-type="batch" data-gs-id="${escapeHtml(b.id)}" type="button">
+    <span class="gs-icon">📦</span>
+    <span><span class="gs-label">Lote ${escapeHtml(lote)}</span><span class="gs-meta">${qty} unid.${dt ? ' · ' + dt : ''}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+
+function globalSearchSelect(type, id) {
+  closeGlobalSearch();
+  try {
+    if (type === 'shortcut') {
+      const s = GS_SHORTCUTS.find(x => x.key === id);
+      if (s && typeof s.action === 'function') s.action();
+      return;
+    }
+    if (type === 'order') {
+      const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
+      if (!o) { showToast('Pedido nao encontrado'); return; }
+      // Caminho seguro: vai pra tela de pedidos. Operador localiza pelo ref.
+      go('pedidos');
+      if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
+      return;
+    }
+    if (type === 'client') {
+      // Sem detalhe dedicado de cliente — vai pra novo pedido com cliente
+      // pre-selecionado se houver helper, senao apenas abre pedidos.
+      go('pedidos');
+      if (typeof goPedidosTab === 'function') goPedidosTab('novo');
+      return;
+    }
+    if (type === 'product') {
+      if (typeof openProductModalForEdit === 'function') {
+        openProductModalForEdit(id);
+      } else {
+        go('producao');
+      }
+      return;
+    }
+    if (type === 'batch') {
+      // Reprintar e o caso de uso mais comum em busca de lote
+      if (typeof reprintFromBatchId === 'function') {
+        reprintFromBatchId(id);
+      } else {
+        go('conferencia');
+      }
+      return;
+    }
+  } catch (e) {
+    try { logError(e, 'globalSearchSelect:' + type); } catch (_) {}
+    showToast('Erro ao abrir resultado');
+  }
 }
 
 function renderHomeInsights() {
@@ -5927,7 +6571,19 @@ function renderOpenOrders() {
     const card = document.createElement('div');
     card.className = 'open-order';
     const itemsLine = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
-    const nextLabel = NEXT_LABEL[o.status];
+    // F2: a primeira acao primaria de getOrderPrimaryActions vira o botao
+    // .oo-advance (gold, full-width). Substitui o NEXT_LABEL fixo por algo
+    // contextual: pedido pronto sem conferencia mostra "✅ Conferir" em vez
+    // de "Marcar entregue", evitando entregar sem checar.
+    const primaryActions = (typeof getOrderPrimaryActions === 'function')
+      ? getOrderPrimaryActions(o) : [];
+    const primaryAction = primaryActions.find(a => a.primary) || null;
+    const advanceLabel = primaryAction
+      ? `${primaryAction.icon} ${escapeHtml(primaryAction.label)}`
+      : (NEXT_LABEL[o.status] || ''); // fallback se status desconhecido
+    const advanceClick = primaryAction
+      ? `runOrderAction('${o.id}', '${primaryAction.key}')`
+      : `advanceOrder('${o.id}')`;
     card.innerHTML = `
       <button class="oo-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar">&times;</button>
       <div class="oo-head">
@@ -5946,7 +6602,7 @@ function renderOpenOrders() {
         <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
         <span class="oo-total">${money(o.total)}</span>
       </div>
-      ${nextLabel ? `<button class="oo-advance" onclick="advanceOrder('${o.id}')">${nextLabel}</button>` : ''}
+      ${advanceLabel ? `<button class="oo-advance" onclick="${advanceClick}">${advanceLabel}</button>` : ''}
     `;
     list.appendChild(card);
   });
