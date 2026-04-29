@@ -35,6 +35,18 @@ public static class MobileModelRegistrar
 
         mb.Entity<CashEntry>();
 
+        // Onda 1 — pareamento de devices.
+        // Indexes para lookup eficiente:
+        //   - api_key (lookup do middleware MobileApiKey, hot path)
+        //   - pairing_code (lookup do POST /devices/pair)
+        //   - empresa_id (listagem no painel /dispositivos)
+        mb.Entity<MobileDevice>(b =>
+        {
+            b.HasIndex(d => d.ApiKey).IsUnique().HasDatabaseName("ix_mobile_devices_api_key");
+            b.HasIndex(d => d.PairingCode).HasDatabaseName("ix_mobile_devices_pairing_code");
+            b.HasIndex(d => d.EmpresaId).HasDatabaseName("ix_mobile_devices_empresa_id");
+        });
+
         return mb;
     }
 }

@@ -68,4 +68,16 @@ public class Product
     /// <summary>Validade default em dias — pré-preenche tela de revisão de produção.</summary>
     [Column("default_validity_days")]
     public int? DefaultValidityDays { get; set; }
+
+    /// <summary>
+    /// Empresa proprietária do registro (multi-tenant Onda 1). Nullable
+    /// para compat com registros pré-Onda-1 (devices ainda não pareados).
+    /// SyncController preenche automaticamente a partir do device autenticado.
+    /// </summary>
+    [Column("empresa_id")]
+    public Guid? EmpresaId { get; set; }
+
+    /// <summary>Loja onde o registro vive dentro da empresa.</summary>
+    [Column("loja_id")]
+    public Guid? LojaId { get; set; }
 }

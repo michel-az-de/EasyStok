@@ -20,6 +20,10 @@
   const DEVICE_ID_KEY = 'cdb-device-id';
   const QUEUE_KEY = 'cdb-sync-queue';
   const LAST_FULL_SYNC_KEY = 'cdb-last-sync';
+  // Onda 1 — pareamento de devices.
+  // Apos pareamento, server retorna { apiKey, empresaId, lojaId, ... }.
+  // Persistimos tudo em cdb-pairing pra usar em todo request subsequente.
+  const PAIRING_KEY = 'cdb-pairing';
 
   // ---- Device ID (primeiro boot gera um UUID, persiste) ----
   function getDeviceId() {
@@ -32,8 +36,29 @@
   }
   const deviceId = getDeviceId();
 
+  // Helpers de pareamento
+  function loadPairing() {
+    try { return JSON.parse(localStorage.getItem(PAIRING_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function savePairing(p) {
+    try { localStorage.setItem(PAIRING_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+  function clearPairing() {
+    try { localStorage.removeItem(PAIRING_KEY); } catch (e) {}
+    // Reseta flag de invalido — sem pairing, comportamento volta ao
+    // legado (request anonimo). App segue offline-first.
+    _pairingInvalid = false;
+  }
+  function getApiKey() {
+    const p = loadPairing();
+    return (p && p.apiKey) || null;
+  }
+
   function baseHeaders(extra) {
-    return Object.assign({ 'X-Device-Id': deviceId }, extra || {});
+    const h = Object.assign({ 'X-Device-Id': deviceId }, extra || {});
+    const apiKey = getApiKey();
+    if (apiKey) h['X-Mobile-Api-Key'] = apiKey;
+    return h;
   }
 
   // ---- Fila persistente ----
@@ -101,9 +126,17 @@
   }
 
   // ---- Flush: tenta enviar tudo ao backend ----
+  // OFFLINE-FIRST: se servidor indisponivel, fila persiste no localStorage
+  // e proximo flush (30s ou quando rede voltar) tenta de novo. App continua
+  // funcional sem rede em qualquer cenario.
   let flushing = false;
+  // Marcador soft de pairing invalidado (revogado/expirado no server).
+  // Não deletamos o pairing local — Felipe pode re-parear sem perder fila.
+  // Quando true: stop tentando flush ate operador re-parear OU clearPairing.
+  let _pairingInvalid = false;
   async function flush() {
     if (flushing) return;
+    if (_pairingInvalid) return; // backoff até re-parear
     const queue = loadQueue();
     if (queue.length === 0) {
       if (window.cdbApp) window.cdbApp.markAllSynced();
@@ -119,12 +152,31 @@
       const operatorName = (window.cdbApp && window.cdbApp.getOperator)
         ? window.cdbApp.getOperator()
         : (localStorage.getItem('cdb-operator-name') || null);
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: baseHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ deviceId, operatorName, mutations: queue })
-      });
+      // AbortController com timeout 15s — server pendurado nao trava o app.
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+      let resp;
+      try {
+        resp = await fetch(url, {
+          method: 'POST',
+          headers: baseHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ deviceId, operatorName, mutations: queue }),
+          signal: ctrl.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
+      if (resp.status === 401) {
+        // Pairing revogado/expirado. Marca em memoria, para de tentar.
+        // Operador vai precisar re-parear pelo Diagnostico.
+        _pairingInvalid = true;
+        console.warn('Sync rejeitou auth — pairing invalido, re-parear pelo Diagnostico');
+        if (window.cdbApp && window.cdbApp.onPairingInvalid) {
+          try { window.cdbApp.onPairingInvalid(); } catch (e) {}
+        }
+        return;
+      }
       if (!resp.ok) {
         console.warn('Sync falhou, status', resp.status);
         return;
@@ -148,12 +200,22 @@
   }
 
   // ---- Pull: traz mudanças do servidor (outros devices) ----
+  // OFFLINE-FIRST: silencioso quando offline ou pairing invalido.
   async function pull() {
     if (!navigator.onLine) return;
+    if (_pairingInvalid) return;
     try {
       const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
       const url = API_BASE_URL + API_PREFIX + '/sync/pull?since=' + since + '&deviceId=' + encodeURIComponent(deviceId);
-      const resp = await fetch(url, { headers: baseHeaders() });
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+      let resp;
+      try {
+        resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (resp.status === 401) { _pairingInvalid = true; return; }
       if (!resp.ok) return;
       const data = await resp.json();
       if (data && data.mutations && Array.isArray(data.mutations)) {
@@ -266,7 +328,14 @@
     if (!navigator.onLine) return null;
     try {
       const url = API_BASE_URL + API_PREFIX + '/version';
-      const resp = await fetch(url, { headers: baseHeaders() });
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+      let resp;
+      try {
+        resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (!resp.ok) return null;
       const data = await resp.json();
       try {
@@ -277,9 +346,62 @@
       } catch (e) {}
       return data;
     } catch (e) {
-      console.warn('pingVersion falhou:', e.message);
+      // Sem rede / timeout / DNS / TLS — silencioso. PWA continua offline.
+      try { console.warn('pingVersion falhou:', e && e.message); } catch (_) {}
       return null;
     }
+  }
+
+  // ---- Pareamento (Onda 1) ----
+  // Troca codigo de 6 digitos por apiKey + contexto (empresa/loja).
+  // Ao pareamento bem-sucedido, persiste em cdb-pairing e proximas chamadas
+  // ja saem com X-Mobile-Api-Key automaticamente.
+  async function pairWithCode(code, label) {
+    if (!navigator.onLine) throw new Error('sem rede');
+    const url = API_BASE_URL + API_PREFIX + '/devices/pair';
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 12000);
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+        body: JSON.stringify({
+          pairingCode: String(code || '').trim(),
+          deviceId,
+          label: label || null
+        }),
+        signal: ctrl.signal
+      });
+    } catch (e) {
+      throw new Error('servidor inacessivel');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!resp.ok) {
+      let msg = 'codigo invalido';
+      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    savePairing({
+      apiKey: data.apiKey,
+      empresaId: data.empresaId,
+      lojaId: data.lojaId,
+      label: data.label,
+      defaultOperatorName: data.defaultOperatorName,
+      pairedAt: data.pairedAt,
+      deviceId: data.deviceId
+    });
+    // Pareou com sucesso — destrava flush/pull caso estavam bloqueados
+    // por pairing invalidado em sessao anterior.
+    _pairingInvalid = false;
+    // Re-pinga version pra atualizar info no diagnostico
+    try { await pingVersion(); } catch (_) {}
+    // Tenta drenar fila imediatamente — pode ter mutations acumuladas
+    // do periodo offline / sem pairing.
+    try { flush(); } catch (_) {}
+    return data;
   }
 
   // ---- Upload de error log (Onda 0): opt-in via Ajustes/Diagnóstico ----
@@ -318,10 +440,14 @@
   // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
   setTimeout(pingVersion, 700);
 
-  // Expõe utilitários pra debug
+  // Expõe utilitários pra debug + integração com Diagnóstico
   window.cdbSync = {
     flush, pull, stop,
     pingVersion, uploadErrorLog,
+    pairWithCode,
+    getPairing: loadPairing,
+    clearPairing,
+    isPairingInvalid: () => _pairingInvalid,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

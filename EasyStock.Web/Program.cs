@@ -73,6 +73,7 @@ builder.Services.AddScoped<CategoriasService>();
 builder.Services.AddScoped<LojasService>();
 builder.Services.AddScoped<BuscaUnificadaService>();
 builder.Services.AddScoped<InteligenciaLojasService>();
+builder.Services.AddScoped<MobileDevicesService>();
 
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>

@@ -34,4 +34,11 @@ public class CashEntry
 
     [Column("last_operator_name"), MaxLength(64)]
     public string? LastOperatorName { get; set; }
+
+    /// <summary>Multi-tenant (Onda 1). Resolvido via device autenticado.</summary>
+    [Column("empresa_id")]
+    public Guid? EmpresaId { get; set; }
+
+    [Column("loja_id")]
+    public Guid? LojaId { get; set; }
 }

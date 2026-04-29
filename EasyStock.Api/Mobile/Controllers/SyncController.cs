@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Mobile.Security;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -25,11 +26,11 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/mobile/sync")]
-// [MobileApiKey] — DESABILITADO temporariamente para facilitar testes iniciais
-// do PWA/APK. Reativar quando a ferramenta estiver estável e a API for
-// exposta fora da rede local (ver Onda 1 do roadmap de integração).
+// Onda 1: middleware MobileApiKey resolve device pelo header X-Mobile-Api-Key.
+// Quando Mobile:RequireApiKey=true, requests sem header viram 401.
+// Quando false (modo de transição), aceita anônimo e segue como pré-Onda-1.
+[MobileApiKey]
 [AllowAnonymous]
-[ApiExplorerSettings(GroupName = "mobile-v1")]
 public class SyncController(EasyStockDbContext db) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
@@ -39,6 +40,13 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     {
         if (req == null || req.Mutations == null) return BadRequest("Payload invalido.");
 
+        // Onda 1 — escopo multi-tenant. Se device pareado: tudo herda
+        // EmpresaId/LojaId dele. Se anônimo (legado): null nos campos novos
+        // (registros pré-Onda-1).
+        var device = HttpContext.GetMobileDevice();
+        var empresaId = device?.EmpresaId;
+        var lojaId = device?.LojaId;
+
         var accepted = new List<string>();
         var rejected = new List<SyncConflict>();
 
@@ -46,7 +54,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         {
             try
             {
-                await ApplyMutation(m, req.DeviceId, req.OperatorName);
+                await ApplyMutation(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
                 accepted.Add(m.Id);
             }
             catch (Exception ex)
@@ -64,39 +72,53 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     {
         var sinceDate = DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime;
 
+        // Onda 1 — escopo multi-tenant. Quando device pareado, restringe pull
+        // aos registros da mesma loja. Sem device (legado), comportamento
+        // anterior: retorna tudo (1 tenant implícito).
+        var device = HttpContext.GetMobileDevice();
+        var lojaId = device?.LojaId;
+        var empresaId = device?.EmpresaId;
+
         var mutations = new List<MutationDto>();
 
-        var products = await _db.Set<Product>()
-            .Where(p => p.UpdatedAt > sinceDate && p.LastDeviceId != deviceId)
-            .ToListAsync();
+        var productsQ = _db.Set<Product>().Where(p => p.UpdatedAt > sinceDate && p.LastDeviceId != deviceId);
+        if (lojaId.HasValue)
+            productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
+        var products = await productsQ.ToListAsync();
         foreach (var p in products)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), p.LastDeviceId ?? "server",
                 "product.upsert", Serialize(ToDto(p)), new DateTimeOffset(p.UpdatedAt).ToUnixTimeMilliseconds()));
 
-        var clients = await _db.Set<Client>()
-            .Where(c => c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId)
-            .ToListAsync();
+        var clientsQ = _db.Set<Client>().Where(c => c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId);
+        if (lojaId.HasValue)
+            clientsQ = clientsQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
+        var clients = await clientsQ.ToListAsync();
         foreach (var c in clients)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), c.LastDeviceId ?? "server",
                 "client.upsert", Serialize(ToDto(c)), new DateTimeOffset(c.UpdatedAt).ToUnixTimeMilliseconds()));
 
-        var orders = await _db.Set<Order>().Include(o => o.Items)
-            .Where(o => o.UpdatedAt > sinceDate && o.LastDeviceId != deviceId)
-            .ToListAsync();
+        var ordersQ = _db.Set<Order>().Include(o => o.Items)
+            .Where(o => o.UpdatedAt > sinceDate && o.LastDeviceId != deviceId);
+        if (lojaId.HasValue)
+            ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
+        var orders = await ordersQ.ToListAsync();
         foreach (var o in orders)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), o.LastDeviceId ?? "server",
                 "order.upsert", Serialize(ToDto(o)), new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds()));
 
-        var batches = await _db.Set<Batch>().Include(b => b.Items)
-            .Where(b => b.CreatedAt > sinceDate && b.LastDeviceId != deviceId)
-            .ToListAsync();
+        var batchesQ = _db.Set<Batch>().Include(b => b.Items)
+            .Where(b => b.CreatedAt > sinceDate && b.LastDeviceId != deviceId);
+        if (lojaId.HasValue)
+            batchesQ = batchesQ.Where(b => b.LojaId == lojaId || b.LojaId == null);
+        var batches = await batchesQ.ToListAsync();
         foreach (var b in batches)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), b.LastDeviceId ?? "server",
                 "batch.upsert", Serialize(ToDto(b)), new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds()));
 
-        var cash = await _db.Set<CashEntry>()
-            .Where(c => c.CreatedAt > sinceDate && c.LastDeviceId != deviceId)
-            .ToListAsync();
+        var cashQ = _db.Set<CashEntry>().Where(c => c.CreatedAt > sinceDate && c.LastDeviceId != deviceId);
+        if (lojaId.HasValue)
+            cashQ = cashQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
+        var cash = await cashQ.ToListAsync();
         foreach (var c in cash)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), c.LastDeviceId ?? "server",
                 "cashEntry.upsert", Serialize(ToDto(c)), new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds()));
@@ -108,23 +130,25 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     // Apply mutation por tipo
     // ──────────────────────────────────────────────────────────────────────
 
-    private async Task ApplyMutation(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyMutation(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var parts = m.Type.Split('.');
         if (parts.Length != 2) throw new ArgumentException($"Tipo invalido: {m.Type}");
 
         switch (parts[0])
         {
-            case "product":   await ApplyProduct(m, deviceId, operatorName);   break;
-            case "client":    await ApplyClient(m, deviceId, operatorName);    break;
-            case "order":     await ApplyOrder(m, deviceId, operatorName);     break;
-            case "batch":     await ApplyBatch(m, deviceId, operatorName);     break;
-            case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName); break;
+            case "product":   await ApplyProduct(m, deviceId, operatorName, empresaId, lojaId);   break;
+            case "client":    await ApplyClient(m, deviceId, operatorName, empresaId, lojaId);    break;
+            case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
+            case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
+            case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
 
-    private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<ProductDto>(JsonOpts)!;
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
@@ -139,7 +163,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 DefaultWeightG = dto.DefaultWeightG,
                 DefaultValidityDays = dto.DefaultValidityDays,
                 LastDeviceId = deviceId,
-                LastOperatorName = operatorName
+                LastOperatorName = operatorName,
+                EmpresaId = empresaId,
+                LojaId = lojaId
             });
         }
         else
@@ -155,6 +181,11 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
+            // Multi-tenant: só seta se ainda não tinha (registros pré-Onda-1)
+            // OU se o device é da mesma loja (idempotente). Não permite trocar
+            // dono — uma vez vinculado, permanece.
+            if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
+            if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
             // Etiquetas: só persiste se DTO mandou (preserva valor se APK antigo omitir).
             if (dto.Sku is not null)                 existing.Sku = dto.Sku;
             if (dto.DefaultWeightG.HasValue)         existing.DefaultWeightG = dto.DefaultWeightG;
@@ -162,7 +193,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         }
     }
 
-    private async Task ApplyClient(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyClient(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<ClientDto>(JsonOpts)!;
         var existing = await _db.Set<Client>().FindAsync(dto.Id);
@@ -174,7 +206,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 Id = dto.Id, Name = dto.Name, Apt = dto.Apt, Address = dto.Address,
                 Phone = dto.Phone, LastOrder = lastOrderDate, OrderCount = dto.OrderCount,
                 LastDeviceId = deviceId,
-                LastOperatorName = operatorName
+                LastOperatorName = operatorName,
+                EmpresaId = empresaId,
+                LojaId = lojaId
             });
         }
         else
@@ -188,10 +222,13 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
+            if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
+            if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
         }
     }
 
-    private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<OrderDto>(JsonOpts)!;
         var existing = await _db.Set<Order>().Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == dto.Id);
@@ -225,7 +262,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                 HistoryJson = historyJson,
                 ConfirmedBy = dto.ConfirmedBy,
                 ConfirmedAt = confirmedAt,
-                FactAt = factAt
+                FactAt = factAt,
+                EmpresaId = empresaId,
+                LojaId = lojaId
             };
             foreach (var i in dto.Items)
                 order.Items.Add(new OrderItem
@@ -248,6 +287,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             existing.UpdatedAt = updatedAt;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
+            if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
+            if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
             // Atualiza só se o cliente enviou — preserva valores legados se omitir.
             if (historyJson is not null) existing.HistoryJson = historyJson;
             if (dto.ConfirmedBy is not null) existing.ConfirmedBy = dto.ConfirmedBy;
@@ -291,7 +332,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         }
     }
 
-    private async Task ApplyBatch(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyBatch(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<BatchDto>(JsonOpts)!;
         var existing = await _db.Set<Batch>().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == dto.Id);
@@ -304,7 +346,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             CreatedAt = createdAt,
             Lote = dto.Lote,
             LastDeviceId = deviceId,
-            LastOperatorName = operatorName
+            LastOperatorName = operatorName,
+            EmpresaId = empresaId,
+            LojaId = lojaId
         };
         foreach (var i in dto.Items)
         {
@@ -325,7 +369,8 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
         _db.Add(batch);
     }
 
-    private async Task ApplyCashEntry(MutationDto m, string deviceId, string? operatorName)
+    private async Task ApplyCashEntry(MutationDto m, string deviceId, string? operatorName,
+        Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<CashEntryDto>(JsonOpts)!;
         var existing = await _db.Set<CashEntry>().FindAsync(dto.Id);
@@ -337,7 +382,9 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             Id = dto.Id, Type = dto.Type, Amount = dto.Amount,
             Description = dto.Description, CreatedAt = createdAt,
             LastDeviceId = deviceId,
-            LastOperatorName = operatorName
+            LastOperatorName = operatorName,
+            EmpresaId = empresaId,
+            LojaId = lojaId
         });
     }
 

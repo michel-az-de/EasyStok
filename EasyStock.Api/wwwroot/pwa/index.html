@@ -9318,12 +9318,17 @@ function collectDiagnostics() {
   };
 }
 
-// Onda 0: lê info do servidor que pingVersion() persistiu em
-// 'cdb-server-version'. Se ainda não pingou (boot recente / offline),
-// retorna unknown sem quebrar.
+// Onda 0/1: lê info do servidor (pingVersion) + pareamento (Onda 1).
 function collectServerInfo() {
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem('cdb-server-version') || 'null'); } catch (e) {}
+  let pairing = null;
+  try {
+    if (window.cdbSync && typeof window.cdbSync.getPairing === 'function') {
+      pairing = window.cdbSync.getPairing();
+    }
+  } catch (e) {}
+
   if (!cached) {
     return {
       status: navigator.onLine ? 'unknown' : 'offline',
@@ -9331,7 +9336,8 @@ function collectServerInfo() {
       fetchedAt: 0,
       apiVersion: null,
       mobileSchemaVersion: null,
-      apiKeyEnforced: null
+      apiKeyEnforced: null,
+      pairing
     };
   }
   return {
@@ -9340,8 +9346,38 @@ function collectServerInfo() {
     fetchedAt: cached.fetchedAt || 0,
     apiVersion: cached.ApiVersion || null,
     mobileSchemaVersion: cached.MobileSchemaVersion ?? null,
-    apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null
+    apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null,
+    pairing
   };
+}
+
+// Onda 1: dispara dialog pra digitar codigo de 6 digitos. Em dispositivos
+// sem prompt() decente (alguns WebView Android), ainda funciona — quem
+// quiser UI premium evolui pra modal HTML proprio.
+async function pairDevicePrompt() {
+  const code = (window.prompt('Digite o código de pareamento (6 dígitos):') || '').trim();
+  if (!code) return;
+  if (!window.cdbSync || typeof window.cdbSync.pairWithCode !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  showToast('Pareando…');
+  try {
+    const data = await window.cdbSync.pairWithCode(code, null);
+    showToast('Pareado com loja ' + (data.lojaId || '').slice(0, 8) + '… ✓');
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
+    try { logError(e, 'pairDevicePrompt'); } catch (_) {}
+  }
+}
+
+function unpairDevice() {
+  if (!confirm('Desparear este dispositivo?\n\nApós desparear o app não vai conseguir sincronizar até parear de novo.')) return;
+  if (window.cdbSync && typeof window.cdbSync.clearPairing === 'function') {
+    window.cdbSync.clearPairing();
+    showToast('Dispositivo despareado');
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  }
 }
 
 function _diagBadge(level) {
@@ -9451,15 +9487,43 @@ function openDiagnostics() {
         + _diagRow('Erros recentes', d.camera.errors.length || 'nenhum',
             d.camera.errors.length ? 'warn' : '')
       , '', camErrorsHtml)
-    + section('Servidor', d.server.status === 'ok' ? 'ok' : (d.server.status === 'offline' ? 'warn' : 'err'), ''
-        + _diagRow('Status', d.server.statusLabel, d.server.status === 'ok' ? '' : (d.server.status === 'offline' ? 'warn' : 'err'))
-        + (d.server.apiVersion ? _diagRow('Versão API', escapeHtml(d.server.apiVersion)) : '')
-        + (d.server.mobileSchemaVersion != null ? _diagRow('Contrato Mobile', 'v' + d.server.mobileSchemaVersion) : '')
-        + (d.server.fetchedAt ? _diagRow('Última checagem', _fmtRelTime(d.server.fetchedAt)) : '')
-        + (d.server.apiKeyEnforced != null ? _diagRow('Auth obrigatória', d.server.apiKeyEnforced ? 'sim' : 'não', d.server.apiKeyEnforced ? '' : 'warn') : '')
-      , ''
-        + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
-      , '')
+    + (function() {
+        // Status do servidor + pareamento (Onda 1).
+        // Severidade:
+        //   - err  = pairing invalidado (revogado/expirado no server) — operador precisa re-parear
+        //   - warn = sem rede OU sem pareamento mas auth obrigatória
+        //   - ok   = pareado e respondendo
+        const p = d.server.pairing;
+        const invalidated = !!(window.cdbSync && window.cdbSync.isPairingInvalid && window.cdbSync.isPairingInvalid());
+        let level = 'ok';
+        let label = d.server.statusLabel;
+        if (invalidated) { level = 'err'; label = 'pareamento revogado — parear de novo'; }
+        else if (d.server.status === 'offline') { level = 'warn'; }
+        else if (d.server.status !== 'ok') { level = 'warn'; }
+        else if (d.server.apiKeyEnforced && !p) { level = 'warn'; label = 'sem pareamento (server exige)'; }
+
+        return section('Servidor', level, ''
+          + _diagRow('Status', label, level === 'ok' ? '' : level)
+          + (d.server.apiVersion ? _diagRow('Versão API', escapeHtml(d.server.apiVersion)) : '')
+          + (d.server.mobileSchemaVersion != null ? _diagRow('Contrato Mobile', 'v' + d.server.mobileSchemaVersion) : '')
+          + (d.server.fetchedAt ? _diagRow('Última checagem', _fmtRelTime(d.server.fetchedAt)) : '')
+          + (d.server.apiKeyEnforced != null ? _diagRow('Auth obrigatória', d.server.apiKeyEnforced ? 'sim' : 'não') : '')
+          // Pareamento — Onda 1
+          + (p
+              ? (_diagRow('Pareamento', '✓ pareado')
+                + (p.label ? _diagRow('Apelido', escapeHtml(p.label)) : '')
+                + (p.empresaId ? _diagRow('Empresa', escapeHtml(String(p.empresaId).slice(0, 8) + '…')) : '')
+                + (p.lojaId ? _diagRow('Loja', escapeHtml(String(p.lojaId).slice(0, 8) + '…')) : '')
+                + (p.defaultOperatorName ? _diagRow('Operador padrão', escapeHtml(p.defaultOperatorName)) : '')
+                + (p.pairedAt ? _diagRow('Pareado em', _fmtRelTime(new Date(p.pairedAt).getTime())) : ''))
+              : _diagRow('Pareamento', 'não pareado (modo offline)', d.server.apiKeyEnforced ? 'warn' : ''))
+        , ''
+          + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
+          + (p
+              ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
+              : '<button class="diag-action" onclick="pairDevicePrompt()">Parear dispositivo</button>')
+        , '');
+      })()
     + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
         + _diagRow('Total registrado', d.errors.length || 'nenhum',
             d.errors.length ? 'warn' : '')

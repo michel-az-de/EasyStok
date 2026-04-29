@@ -21,10 +21,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 [ApiController]
 [Route("api/mobile/version")]
 [AllowAnonymous]
-[ApiExplorerSettings(GroupName = "mobile-v1")]
-public class MobileVersionController(EasyStockDbContext db) : ControllerBase
+public class MobileVersionController(
+    EasyStockDbContext db,
+    IConfiguration configuration) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly IConfiguration _configuration = configuration;
 
     /// <summary>
     /// Retorna versão do contrato Mobile, hora do servidor e capabilities.
@@ -52,8 +54,9 @@ public class MobileVersionController(EasyStockDbContext db) : ControllerBase
         }
 
         // mobileSchemaVersion: incrementar quando contrato de mutations mudar.
-        // PWA usa pra decidir se precisa pedir ao operador pra atualizar APK.
-        const int mobileSchemaVersion = 1;
+        // v1 = baseline. v2 = Onda 1 (multi-tenant + auth). PWA pode usar pra
+        // decidir se UI mostra "atualize o APK" quando server avançar contrato.
+        const int mobileSchemaVersion = 2;
 
         // Tipos de mutation que o servidor sabe processar HOJE.
         // Quando expandirmos pra cashClosing/auditLog (Onda 3+), incluímos aqui.
@@ -66,12 +69,14 @@ public class MobileVersionController(EasyStockDbContext db) : ControllerBase
             "cashEntry.upsert",
         };
 
-        // Features que o cliente pode usar condicionalmente (UI + flows).
-        // Anonymous=true significa que /sync ainda aceita sem header.
-        // Quando Onda 1 entrar, vira false.
+        // Onda 1 entregue: pareamento de devices + ApiKey middleware.
+        // ApiKeyEnforced reflete a flag Mobile:RequireApiKey:
+        //   false (default) = transição. /sync aceita anônimo OU pareado.
+        //   true            = produção. /sync exige X-Mobile-Api-Key.
+        var requireApiKey = _configuration.GetValue<bool>("Mobile:RequireApiKey", false);
         var features = new MobileFeatures(
-            ApiKeyEnforced: false,
-            Pairing: false,
+            ApiKeyEnforced: requireApiKey,
+            Pairing: true,
             ErrorReporting: true,
             Diagnostics: true
         );

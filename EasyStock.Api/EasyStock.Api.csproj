@@ -52,8 +52,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Módulo Casa da Baba Mobile: schema SQL aplicado no startup por MobileSchemaInitializer. -->
-    <None Update="Mobile\Schema\001_CreateMobileSchema.sql">
+    <!-- Módulo Casa da Baba Mobile: schema SQL aplicado no startup por MobileSchemaInitializer.
+         Glob *.sql cobre 001_CreateMobileSchema, 002_AddMobileDevicesAndTenancy e ondas futuras. -->
+    <None Update="Mobile\Schema\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

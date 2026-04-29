@@ -36,6 +36,13 @@ public class Batch
     [Column("lote"), MaxLength(32)]
     public string? Lote { get; set; }
 
+    /// <summary>Multi-tenant (Onda 1). Resolvido via device autenticado.</summary>
+    [Column("empresa_id")]
+    public Guid? EmpresaId { get; set; }
+
+    [Column("loja_id")]
+    public Guid? LojaId { get; set; }
+
     public List<BatchItem> Items { get; set; } = new();
 }
 
