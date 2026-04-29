@@ -6053,61 +6053,171 @@ function renderHome() {
 const ATTENTION_SEVERITY_ORDER = { err: 0, warn: 1, info: 2 };
 const ATTENTION_TRAVADO_MS = 30 * 60 * 1000; // 30min em preparando
 
+// Helper: tempo decorrido em formato curto pt-BR (ex: "1h 25", "45 min")
+function _attentionFmtElapsed(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const min = Math.floor(ms / 60000);
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const r = min % 60;
+  return h + 'h' + (r ? ' ' + r : '');
+}
+
 function buildAttentionItems() {
   const items = [];
   try {
-    // 1. Estoque critico
+    const now = Date.now();
+
+    // 1. CAIXA DE DIA ANTERIOR EM ABERTO — severidade ERR (urgente: regulariza
+    // antes de fechar mais um dia em cima).
+    if (typeof getOpenPriorDays === 'function') {
+      const priorDays = getOpenPriorDays();
+      if (priorDays.length) {
+        const dayList = priorDays.slice(0, 2).map(k => typeof fmtDateKey === 'function' ? fmtDateKey(k) : k).join(', ');
+        items.push({
+          kind: 'cash-prior',
+          severity: 'err',
+          icon: '🔓',
+          title: 'Caixa de dia anterior aberto',
+          reason: priorDays.length === 1
+            ? 'Dia ' + dayList + ' ainda nao foi fechado'
+            : priorDays.length + ' dias em aberto: ' + dayList + (priorDays.length > 2 ? '…' : ''),
+          count: priorDays.length,
+          cta: 'Caixa',
+          action: function () { go('caixa'); }
+        });
+      }
+    }
+
+    // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
     const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
     if (lowStock.length) {
+      // Top 3 mais criticos (stock=0 primeiro)
+      const sortedLow = lowStock.slice().sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+      const namesDetailed = sortedLow.slice(0, 3).map(p => `${p.name} (${Number(p.stock) || 0})`).join(', ');
       items.push({
         kind: 'stock',
         severity: lowStock.length >= 3 ? 'err' : 'warn',
         icon: '⚠',
         title: 'Estoque crítico',
-        reason: lowStock.slice(0, 3).map(p => p.name).join(', ') + (lowStock.length > 3 ? '…' : ''),
+        reason: namesDetailed + (lowStock.length > 3 ? ` · +${lowStock.length - 3}` : ''),
         count: lowStock.length,
         cta: 'Produção',
         action: function () { go('producao'); }
       });
     }
 
-    // 2. Conferencia pendente (pedidos prontos sem confirmacao)
+    // 3. VALIDADE PROXIMA — lotes com items vencendo em <=7 dias e nao vencidos
+    const sevenDays = 7 * 24 * 3600 * 1000;
+    const expiringItems = [];
+    (batches || []).forEach(b => {
+      if (b.deleted) return;
+      (b.items || []).forEach(it => {
+        if (it.expiresAt && it.expiresAt > now && (it.expiresAt - now) < sevenDays) {
+          expiringItems.push({ name: it.name, expires: it.expiresAt, lote: b.lote || b.code });
+        }
+      });
+    });
+    if (expiringItems.length) {
+      expiringItems.sort((a, b) => a.expires - b.expires);
+      const top = expiringItems.slice(0, 2).map(e => {
+        const days = Math.max(0, Math.ceil((e.expires - now) / (24 * 3600 * 1000)));
+        return `${e.name} (${days}d)`;
+      }).join(', ');
+      items.push({
+        kind: 'expiring',
+        severity: 'warn',
+        icon: '🕒',
+        title: 'Validade próxima',
+        reason: top + (expiringItems.length > 2 ? ` · +${expiringItems.length - 2}` : ''),
+        count: expiringItems.length,
+        cta: 'Conferência',
+        action: function () { go('conferencia'); if (typeof setConferTab === 'function') setConferTab('producao'); }
+      });
+    }
+
+    // 4. CONFERENCIA PENDENTE — mostra clientes especificos
     const open = (typeof openOrders === 'function') ? openOrders() : [];
     const pendingConfer = open.filter(o => {
       if (o.status !== 'pronto') return false;
-      if (typeof getConferStatus === 'function') return getConferStatus(o) === 'pendente';
+      if (typeof getConferStatus === 'function') {
+        const cs = getConferStatus(o);
+        return cs !== (typeof CONFER_STATUS !== 'undefined' ? CONFER_STATUS.CONFERIDO : 'conferido');
+      }
       return !o.confirmedAt;
     });
     if (pendingConfer.length) {
+      const names = pendingConfer.slice(0, 2)
+        .map(o => (o.clientSnapshot && o.clientSnapshot.name) || 'sem cliente')
+        .join(', ');
       items.push({
         kind: 'confer',
         severity: 'warn',
         icon: '✅',
         title: 'Conferência pendente',
-        reason: pendingConfer.length + ' pedido' + (pendingConfer.length === 1 ? '' : 's') + ' aguardando conferência',
+        reason: names + (pendingConfer.length > 2 ? ` · +${pendingConfer.length - 2}` : ''),
         count: pendingConfer.length,
         cta: 'Conferir',
         action: function () { go('conferencia'); }
       });
     }
 
-    // 3. Pedidos travados (preparando ha mais de 30min)
-    const now = Date.now();
+    // 5. PEDIDOS TRAVADOS — em preparando ha >30min, mostra cliente + tempo do mais antigo
     const stuck = open.filter(o => o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS);
     if (stuck.length) {
+      stuck.sort((a, b) => (a.updatedAt || a.createdAt || 0) - (b.updatedAt || b.createdAt || 0));
+      const oldest = stuck[0];
+      const elapsed = now - (oldest.updatedAt || oldest.createdAt || now);
+      const oldestName = (oldest.clientSnapshot && oldest.clientSnapshot.name) || 'sem cliente';
       items.push({
         kind: 'stuck',
         severity: 'warn',
         icon: '⏱',
         title: 'Pedidos travados',
-        reason: stuck.length + ' em preparo há mais de 30 min',
+        reason: `${oldestName} há ${_attentionFmtElapsed(elapsed)}` + (stuck.length > 1 ? ` · +${stuck.length - 1}` : ''),
         count: stuck.length,
         cta: 'Pedidos',
         action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('andamento'); }
       });
     }
 
-    // 4. Compras pendentes
+    // 6. A RECEBER — pedidos prontos hoje (estoque ja descontado, falta entrar grana)
+    const todayMs = (function () { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+    const receivable = open.filter(o => o.status === 'pronto' && (o.createdAt || 0) >= todayMs);
+    if (receivable.length) {
+      const total = receivable.reduce((s, o) => s + (Number(o.total) || 0), 0);
+      const moneyFn = typeof money === 'function' ? money : (v => 'R$ ' + (v || 0).toFixed(2));
+      items.push({
+        kind: 'receivable',
+        severity: 'info',
+        icon: '💰',
+        title: 'A receber',
+        reason: receivable.length + ' pedido' + (receivable.length === 1 ? '' : 's') + ' pronto · ' + moneyFn(total),
+        count: receivable.length,
+        cta: 'Pedidos',
+        action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('andamento'); }
+      });
+    }
+
+    // 7. ERROS RECENTES — entradas no log das ultimas 24h
+    if (typeof getErrorLog === 'function') {
+      const day = 24 * 3600 * 1000;
+      const recentErrors = getErrorLog().filter(e => e && (now - (e.t || 0)) < day);
+      if (recentErrors.length) {
+        items.push({
+          kind: 'errors',
+          severity: recentErrors.length >= 5 ? 'err' : 'warn',
+          icon: '🐞',
+          title: 'Erros recentes',
+          reason: recentErrors.length + ' nas últimas 24h · veja o diagnóstico',
+          count: recentErrors.length,
+          cta: 'Diagnóstico',
+          action: function () { if (typeof openDiagnostics === 'function') openDiagnostics(); }
+        });
+      }
+    }
+
+    // 8. COMPRAS PENDENTES — mostra primeiros itens
     const shopping = (typeof getShoppingRows === 'function') ? getShoppingRows() : [];
     const shopPending = shopping.filter(r => !r.done);
     if (shopPending.length) {
@@ -6116,7 +6226,7 @@ function buildAttentionItems() {
         severity: 'info',
         icon: '🛒',
         title: 'Compras pendentes',
-        reason: shopPending.slice(0, 2).map(r => r.name).join(', ') + (shopPending.length > 2 ? '…' : ''),
+        reason: shopPending.slice(0, 2).map(r => r.name).join(', ') + (shopPending.length > 2 ? ` · +${shopPending.length - 2}` : ''),
         count: shopPending.length,
         cta: 'Compras',
         action: function () { go('compras'); }
@@ -6214,7 +6324,15 @@ function _gsMatchClient(c, nq) {
   return _normalizeSearch(c.name || '').indexOf(nq) >= 0
       || _normalizeSearch(c.phone || '').indexOf(nq) >= 0
       || _normalizeSearch(c.doc || '').indexOf(nq) >= 0
-      || _normalizeSearch(c.ref || '').indexOf(nq) >= 0;
+      || _normalizeSearch(c.ref || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.address || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.apt || '').indexOf(nq) >= 0;
+}
+function _gsMatchCashEntry(e, nq) {
+  if (!e) return false;
+  return _normalizeSearch(e.description || '').indexOf(nq) >= 0
+      || _normalizeSearch(e.note || '').indexOf(nq) >= 0
+      || _normalizeSearch(e.type || '').indexOf(nq) >= 0;
 }
 function _gsMatchProduct(p, nq) {
   if (!p) return false;
@@ -6241,23 +6359,60 @@ function _gsMatchShortcuts(nq) {
   );
 }
 
+// Score de relevancia: nome no inicio > nome em meio > metadata.
+// Estabiliza ordenacao em listas grandes — match prefix vence sempre.
+function _gsScore(s, nq) {
+  const n = _normalizeSearch(s || '');
+  if (!n || !nq) return 999;
+  const idx = n.indexOf(nq);
+  if (idx < 0) return 999;
+  if (idx === 0) return 0;     // prefix match — top
+  if (n[idx - 1] === ' ') return 1; // word boundary — segundo lugar
+  return 2 + idx;              // mid-word — pelo offset
+}
+
 // Retorna o objeto agrupado de resultados — testavel sem DOM.
+// Inclui pedidos abertos E finalizados (entregues/cancelados), separados
+// pra clareza, e lancamentos de caixa.
 function buildSearchGroups(q) {
   const nq = _normalizeSearch(String(q || '').trim());
   const empty = nq.length < 2;
   const groups = {
     pedidos: [],
+    finalizados: [],
     clientes: [],
     produtos: [],
     lotes: [],
+    lancamentos: [],
     acoes: empty ? GS_SHORTCUTS.slice(0, 5) : _gsMatchShortcuts(nq).slice(0, 5)
   };
   if (empty) return groups;
   try {
-    groups.pedidos  = (orders   || []).filter(o => _gsMatchOrder(o, nq)).slice(0, 5);
-    groups.clientes = (clients  || []).filter(c => _gsMatchClient(c, nq)).slice(0, 5);
-    groups.produtos = (products || []).filter(p => !p.archived && _gsMatchProduct(p, nq)).slice(0, 5);
-    groups.lotes    = (batches  || []).filter(b => !b.deleted && _gsMatchBatch(b, nq)).slice(0, 5);
+    const orderMatches = (orders || []).filter(o => _gsMatchOrder(o, nq));
+    // Separa abertos vs finalizados pra smart routing
+    const isFinal = (o) => o.status === 'entregue' || o.status === 'cancelado';
+    const open = orderMatches.filter(o => !isFinal(o));
+    const finals = orderMatches.filter(isFinal);
+    // Ordena por relevancia (cliente.name) e recencia
+    const byRelevance = (a, b) => {
+      const sa = _gsScore((a.clientSnapshot && a.clientSnapshot.name) || '', nq);
+      const sb = _gsScore((b.clientSnapshot && b.clientSnapshot.name) || '', nq);
+      if (sa !== sb) return sa - sb;
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    };
+    groups.pedidos     = open.sort(byRelevance).slice(0, 5);
+    groups.finalizados = finals.sort(byRelevance).slice(0, 5);
+
+    groups.clientes = (clients || []).filter(c => _gsMatchClient(c, nq))
+      .sort((a, b) => _gsScore(a.name, nq) - _gsScore(b.name, nq))
+      .slice(0, 5);
+    groups.produtos = (products || []).filter(p => !p.archived && _gsMatchProduct(p, nq))
+      .sort((a, b) => _gsScore(a.name, nq) - _gsScore(b.name, nq))
+      .slice(0, 5);
+    groups.lotes    = (batches || []).filter(b => !b.deleted && _gsMatchBatch(b, nq)).slice(0, 5);
+    groups.lancamentos = (cashEntries || []).filter(e => _gsMatchCashEntry(e, nq))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 5);
   } catch (e) {
     try { logError(e, 'buildSearchGroups'); } catch (_) {}
   }
@@ -6291,7 +6446,8 @@ function runGlobalSearch(q) {
   const groups = buildSearchGroups(q);
   const nq = _normalizeSearch(String(q || '').trim());
   const isShort = nq.length < 2;
-  const totalReal = groups.pedidos.length + groups.clientes.length + groups.produtos.length + groups.lotes.length;
+  const totalReal = groups.pedidos.length + groups.finalizados.length + groups.clientes.length
+                  + groups.produtos.length + groups.lotes.length + groups.lancamentos.length;
   // Empty state: sem busca = atalhos. Com busca mas 0 matches reais e sem
   // shortcut match = mensagem amigavel.
   if (!isShort && totalReal === 0 && groups.acoes.length === 0) {
@@ -6308,8 +6464,13 @@ function runGlobalSearch(q) {
     html += '</div>';
   }
   if (groups.pedidos.length) {
-    html += '<div><div class="gs-group-title">Pedidos</div>';
-    html += groups.pedidos.map(o => _gsRenderOrder(o)).join('');
+    html += '<div><div class="gs-group-title">Pedidos em aberto</div>';
+    html += groups.pedidos.map(o => _gsRenderOrder(o, 'open')).join('');
+    html += '</div>';
+  }
+  if (groups.finalizados.length) {
+    html += '<div><div class="gs-group-title">Pedidos finalizados</div>';
+    html += groups.finalizados.map(o => _gsRenderOrder(o, 'final')).join('');
     html += '</div>';
   }
   if (groups.clientes.length) {
@@ -6325,6 +6486,11 @@ function runGlobalSearch(q) {
   if (groups.lotes.length) {
     html += '<div><div class="gs-group-title">Lotes</div>';
     html += groups.lotes.map(b => _gsRenderBatch(b)).join('');
+    html += '</div>';
+  }
+  if (groups.lancamentos.length) {
+    html += '<div><div class="gs-group-title">Lançamentos do caixa</div>';
+    html += groups.lancamentos.map(e => _gsRenderCashEntry(e)).join('');
     html += '</div>';
   }
   host.innerHTML = html;
@@ -6345,13 +6511,29 @@ function _gsRenderShortcut(s) {
     <span class="gs-arrow">›</span>
   </button>`;
 }
-function _gsRenderOrder(o) {
+function _gsRenderOrder(o, kind) {
   const ref = (o.id || '').slice(-8);
   const name = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
-  const meta = (STATE_LABEL[o.status] || o.status) + ' · ' + money(Number(o.total) || 0);
-  return `<button class="gs-result-item" data-gs-type="order" data-gs-id="${escapeHtml(o.id)}" type="button">
-    <span class="gs-icon">📋</span>
+  const dt = o.updatedAt || o.createdAt;
+  const dateStr = dt ? new Date(dt).toLocaleDateString('pt-BR') : '';
+  const meta = (STATE_LABEL[o.status] || o.status) + ' · ' + money(Number(o.total) || 0) + (dateStr ? ' · ' + dateStr : '');
+  // kind 'open' → smart route pra cobranca; 'final' → historico
+  const dataKind = kind === 'final' ? 'order-final' : 'order-open';
+  const icon = kind === 'final' ? (o.status === 'cancelado' ? '✕' : '✓') : '📋';
+  return `<button class="gs-result-item" data-gs-type="${dataKind}" data-gs-id="${escapeHtml(o.id)}" type="button">
+    <span class="gs-icon">${icon}</span>
     <span><span class="gs-label">${escapeHtml(name)} · #${escapeHtml(ref)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderCashEntry(e) {
+  const dt = e.createdAt ? new Date(e.createdAt).toLocaleString('pt-BR') : '';
+  const sign = e.type === 'expense' ? '-' : '+';
+  const desc = e.description || (e.type === 'expense' ? 'Saída' : 'Entrada');
+  const meta = sign + money(Number(e.amount) || 0) + (dt ? ' · ' + dt : '');
+  return `<button class="gs-result-item" data-gs-type="cash" data-gs-id="${escapeHtml(e.id)}" type="button">
+    <span class="gs-icon">💸</span>
+    <span><span class="gs-label">${escapeHtml(desc)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
     <span class="gs-arrow">›</span>
   </button>`;
 }
@@ -6382,6 +6564,13 @@ function _gsRenderBatch(b) {
   </button>`;
 }
 
+// Smart routing: cada tipo abre a acao MAIS PROVAVEL pro caso de uso real.
+// - Pedido aberto → openCobranca (acao mais comum: ver/copiar PIX, mandar pro cliente)
+// - Pedido finalizado → openHistorico (timeline + reimpressao)
+// - Cliente → vai pra novo pedido e ja seleciona o cliente (selectClient)
+// - Produto → openProductModalForEdit (ver/editar/ajustar estoque)
+// - Lote → reprintFromBatchId (reimpressao de etiquetas)
+// - Lancamento caixa → go('caixa') (ver no contexto do dia)
 function globalSearchSelect(type, id) {
   closeGlobalSearch();
   try {
@@ -6390,19 +6579,41 @@ function globalSearchSelect(type, id) {
       if (s && typeof s.action === 'function') s.action();
       return;
     }
-    if (type === 'order') {
+    if (type === 'order-open' || type === 'order') {
       const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
       if (!o) { showToast('Pedido nao encontrado'); return; }
-      // Caminho seguro: vai pra tela de pedidos. Operador localiza pelo ref.
-      go('pedidos');
-      if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
+      // Pedido aberto: abre cobranca direto (ação mais comum)
+      if (typeof openCobranca === 'function') {
+        openCobranca(id);
+      } else {
+        go('pedidos');
+        if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
+      }
+      return;
+    }
+    if (type === 'order-final') {
+      const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
+      if (!o) { showToast('Pedido nao encontrado'); return; }
+      // Pedido finalizado: abre historico (timeline + opcao reimprimir)
+      if (typeof openHistorico === 'function') {
+        openHistorico(id);
+      } else if (typeof goFinalizados === 'function') {
+        goFinalizados();
+      } else {
+        go('finalizados');
+      }
       return;
     }
     if (type === 'client') {
-      // Sem detalhe dedicado de cliente — vai pra novo pedido com cliente
-      // pre-selecionado se houver helper, senao apenas abre pedidos.
+      const c = (clients || []).find(x => x.id === id);
+      if (!c) { showToast('Cliente nao encontrado'); return; }
+      // Vai pra novo pedido e pre-seleciona — fluxo mais util na operacao.
       go('pedidos');
       if (typeof goPedidosTab === 'function') goPedidosTab('novo');
+      if (typeof selectClient === 'function') {
+        // Pequeno timeout pra garantir que a tab Novo esta pronta no DOM
+        setTimeout(() => { try { selectClient(c); } catch (e) {} }, 50);
+      }
       return;
     }
     if (type === 'product') {
@@ -6414,12 +6625,16 @@ function globalSearchSelect(type, id) {
       return;
     }
     if (type === 'batch') {
-      // Reprintar e o caso de uso mais comum em busca de lote
       if (typeof reprintFromBatchId === 'function') {
         reprintFromBatchId(id);
       } else {
         go('conferencia');
       }
+      return;
+    }
+    if (type === 'cash') {
+      // Lancamento de caixa: abre tela de caixa (operador identifica pelo dia)
+      go('caixa');
       return;
     }
   } catch (e) {
