@@ -3015,6 +3015,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   }
   .print-area .pa-receipt .pa-confer-code { font-size: 9.5pt; letter-spacing: 0.03em; }
   .print-area .pa-receipt .pa-confer-hint { color: #555; }
+  .print-area .pa-receipt .pa-confer-bars svg { display: block; width: 100%; height: auto; max-height: 16mm; margin: 1.5mm auto; }
   @page { size: 58mm auto; margin: 0; }
 }
 
@@ -3362,6 +3363,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   margin: 10px 0;
 }
 .etq-card .pa-confer-qr svg { display: block; max-width: 130px; height: auto; }
+.etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 268px; height: auto; margin: 6px auto; }
 .etq-card .pa-confer-code { font-size: 16px; letter-spacing: 0.05em; }
 .etq-card .pa-confer-hint { font-size: 11px; color: #555; }
 .etq-actions {
@@ -7768,8 +7770,12 @@ function setScanModeChoice(mode, persistNow = false) {
     if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
     const previewBody = document.getElementById('etqBody');
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
-    if (previewOpen && previewBody && currentEtiquetasKind === 'producao' && currentEtiquetas.length) {
-      previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
+    if (previewOpen && previewBody && currentEtiquetas.length) {
+      if (currentEtiquetasKind === 'order') {
+        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
+      } else {
+        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
+      }
     }
     showToast('Formato das etiquetas: ' + prodScanModeLabel(normalized));
   }
@@ -10191,19 +10197,25 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
     y += 64;
   }
-  // QR de conferencia + codigo curto
-  const qrSize = 130;
+  // QR / codigo de conferencia (respeita modo configurado)
+  const _csm = getProdScanMode();
+  const _cshowQr = _csm !== 'barcode';
+  const qrSize = _cshowQr ? 130 : 0;
+  const boxH = (_cshowQr ? qrSize + 10 : 0) + 46;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
-  ctx.strokeRect(20, y - 4, W - 40, qrSize + 58);
-  drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
-  y += qrSize + 8;
+  ctx.strokeRect(20, y - 4, W - 40, boxH);
+  if (_cshowQr) {
+    drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
+    y += qrSize + 8;
+  }
   ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
   ctx.font = '900 16px Arial, sans-serif';
   ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
   ctx.fillStyle = '#4b5563';
   ctx.font = '700 11px Arial, sans-serif';
-  ctx.fillText('Confira no app pelo codigo ou QR', cx, y); y += 18;
+  ctx.fillText('Confira no app pelo codigo' + (_cshowQr ? ' ou QR' : ''), cx, y); y += 18;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#000';
   ctx.strokeRect(20, y, W - 40, 68);
@@ -10305,7 +10317,7 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   document.getElementById('etqSubtitle').textContent = subtitle || '';
   const modeChip = document.getElementById('etqModeChip');
   if (modeChip) {
-    modeChip.textContent = kind === 'order' ? 'Recibo + QR' : prodScanModeLabel(getProdScanMode());
+    modeChip.textContent = prodScanModeLabel(getProdScanMode());
   }
 
   // Banner verde de confirmação. Garante que o operador veja "cadastrado"
@@ -10581,6 +10593,9 @@ function orderLabelHtml(o) {
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
   const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
+  const _sm = getProdScanMode();
+  const _showQr = _sm !== 'barcode';
+  const _showBars = _sm !== 'qr';
   return `
     <div class="pa-receipt">
     <div class="pa-kicker">Recibo de pedido</div>
@@ -10601,9 +10616,10 @@ function orderLabelHtml(o) {
     </div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
     <div class="pa-confer">
-      <div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>
+      ${_showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>` : ''}
+      ${_showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, 268, 54)}</div>` : ''}
       <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
-      <div class="pa-confer-hint">Confira no app pelo codigo ou QR</div>
+      <div class="pa-confer-hint">Confira no app pelo codigo${_showQr ? ' ou QR' : ''}</div>
     </div>
     <div class="pa-grid">
       <div class="pa-label">Pagamento PIX</div>
