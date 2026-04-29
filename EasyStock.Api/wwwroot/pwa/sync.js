@@ -308,7 +308,7 @@
   // ---- Eventos de conectividade ----
   window.addEventListener('online', () => {
     console.log('Voltei online, sincronizando...');
-    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime);
+    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
   });
   window.addEventListener('offline', stopRealtime);
   window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
@@ -334,7 +334,7 @@
       }));
     }
     updatePendingCount();
-    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime);
+    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
     // Flush periódico a cada 30s. Guarda o id pra permitir cleanup
     // (ex: navegação SPA, hot-reload do Capacitor) e evitar timer ghost.
     // Combina flush + commands no mesmo tick — economia de battery.
@@ -348,6 +348,80 @@
   // Resposta vai pro localStorage pra Diagnóstico exibir e pra UI
   // condicional (ex: avisar quando ApiKeyEnforced virar true).
   // Falha silenciosa: se offline ou rede ruim, deixa cache antigo.
+  // ---- Backup automatico (Onda 8) ----
+  // Coleta todas as chaves cdb-* do localStorage e envia pro servidor.
+  // Auto-trigger 1x/dia (rastreado em cdb-last-backup-at). Manual via
+  // Diagnostico. Servidor mantem os 7 ultimos por device.
+  const LAST_BACKUP_KEY = 'cdb-last-backup-at';
+  const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
+
+  function _collectSnapshot() {
+    const snap = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('cdb-') === 0) {
+          // Pula sensiveis: api-key (do pairing) e bt-trail (debug verboso).
+          if (k === 'cdb-pairing' || k === 'cdb-bt-trail') continue;
+          snap[k] = localStorage.getItem(k);
+        }
+      }
+    } catch (e) {}
+    return snap;
+  }
+
+  async function uploadBackup(note) {
+    if (!navigator.onLine) throw new Error('sem rede');
+    if (!getApiKey()) throw new Error('nao pareado');
+    const snap = _collectSnapshot();
+    const json = JSON.stringify({
+      schema: 'cdb-backup-v1',
+      capturedAt: Date.now(),
+      deviceId,
+      data: snap
+    });
+    const url = API_BASE_URL + API_PREFIX + '/devices/me/backup';
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 30000);
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          snapshotJson: json,
+          bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
+          operatorName: (window.cdbApp && window.cdbApp.getOperator)
+            ? window.cdbApp.getOperator()
+            : null,
+          note: note || 'auto'
+        }),
+        signal: ctrl.signal
+      });
+    } finally { clearTimeout(timeoutId); }
+    if (resp.status === 401) { _pairingInvalid = true; throw new Error('pareamento invalidado'); }
+    if (!resp.ok) throw new Error('servidor recusou: ' + resp.status);
+    const data = await resp.json();
+    try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); } catch (e) {}
+    return data;
+  }
+
+  // Tenta backup automatico se passou >24h desde o ultimo. Falha silenciosa.
+  async function maybeAutoBackup() {
+    if (!navigator.onLine) return;
+    if (!getApiKey()) return;
+    if (_pairingInvalid) return;
+    let last = 0;
+    try { last = parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0; } catch (e) {}
+    if (Date.now() - last < BACKUP_INTERVAL_MS) return;
+    try {
+      await uploadBackup('auto');
+      console.log('[backup] auto OK');
+    } catch (e) {
+      try { console.warn('[backup] auto falhou:', e && e.message); } catch (_) {}
+    }
+  }
+
   // ---- Multi-loja (Onda 6) ----
   // App pareado pode trocar de loja sem re-parear. Empresa fixa (vem
   // do pareamento original); só lojaId muda. Após trocar, força flush
@@ -637,6 +711,8 @@
     startRealtime, stopRealtime,
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     listLojasDisponiveis, switchLoja,
+    uploadBackup, maybeAutoBackup,
+    lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

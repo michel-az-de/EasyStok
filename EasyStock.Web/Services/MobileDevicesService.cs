@@ -30,6 +30,21 @@ public class MobileDevicesService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> RevogarAsync(string deviceId) =>
         api.DeleteAsync($"mobile/devices/{deviceId}");
+
+    /// <summary>Onda 8 — lista backups disponíveis pro device.</summary>
+    public Task<ApiResult<List<DeviceBackupSummaryApi>>> ListarBackupsAsync(string deviceId) =>
+        api.GetAsync<List<DeviceBackupSummaryApi>>($"mobile/devices/{deviceId}/backups");
+}
+
+/// <summary>Onda 8 — resumo de um backup pra listagem.</summary>
+public class DeviceBackupSummaryApi
+{
+    public Guid Id { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int SizeBytes { get; set; }
+    public string? BundleVersion { get; set; }
+    public string? OperatorName { get; set; }
+    public string? Note { get; set; }
 }
 
 /// <summary>Resposta do GET /api/mobile/devices.</summary>

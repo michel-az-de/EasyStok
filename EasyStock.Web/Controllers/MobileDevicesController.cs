@@ -65,4 +65,16 @@ public class MobileDevicesController(
         }
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpGet("/dispositivos/{id}/backups")]
+    public async Task<IActionResult> Backups(string id)
+    {
+        ViewBag.Title = "Backups";
+        ViewBag.ActiveMenuItem = "Dispositivos";
+        ViewBag.DeviceId = id;
+
+        var result = await svc.ListarBackupsAsync(id);
+        if (HasError(result)) return View(new List<DeviceBackupSummaryApi>());
+        return View(result.Data ?? []);
+    }
 }

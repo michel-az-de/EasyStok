@@ -56,6 +56,15 @@ public static class MobileModelRegistrar
                 .HasDatabaseName("ix_mobile_device_commands_empresa");
         });
 
+        // Onda 8 — snapshots de localStorage pra backup/restore.
+        mb.Entity<DeviceBackup>(b =>
+        {
+            b.HasIndex(x => new { x.DeviceId, x.CreatedAt })
+                .HasDatabaseName("ix_mobile_device_backups_device");
+            b.HasIndex(x => new { x.EmpresaId, x.CreatedAt })
+                .HasDatabaseName("ix_mobile_device_backups_empresa");
+        });
+
         return mb;
     }
 }

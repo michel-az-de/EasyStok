@@ -1,0 +1,79 @@
+@using EasyStock.Web.Services
+@model List<DeviceBackupSummaryApi>
+@{
+    ViewBag.Title = "Backups";
+    Layout = "_Layout";
+    var deviceId = ViewBag.DeviceId as string ?? "";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Backups do dispositivo</h1>
+        <p class="text-xs text-slate-500 font-mono">@deviceId</p>
+    </div>
+    <a href="/dispositivos" class="text-sm text-slate-500 hover:text-slate-700">← Voltar pra dispositivos</a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="ws p-12 text-center">
+        <div class="text-6xl mb-4">💾</div>
+        <h2 class="text-lg font-semibold text-slate-900 mb-2">Nenhum backup ainda</h2>
+        <p class="text-sm text-slate-500">O app envia automaticamente uma cópia do localStorage 1 vez por dia. Operador também pode disparar manual em Ajustes → Diagnóstico → "Backup agora".</p>
+    </div>
+}
+else
+{
+    <div class="ws">
+        <div class="px-6 py-4 border-b border-slate-200">
+            <h2 class="text-base font-semibold text-slate-900">@Model.Count backup@(Model.Count == 1 ? "" : "s") disponíveis</h2>
+            <p class="text-xs text-slate-500 mt-1">Mantemos os 7 mais recentes. Mais antigos rotacionam ao novo upload.</p>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th class="px-4 py-3">Quando</th>
+                    <th class="px-4 py-3">Tamanho</th>
+                    <th class="px-4 py-3">Operador</th>
+                    <th class="px-4 py-3">Bundle</th>
+                    <th class="px-4 py-3">Tipo</th>
+                    <th class="px-4 py-3 text-right">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var b in Model)
+                {
+                    var kb = Math.Round((double)b.SizeBytes / 1024, 1);
+                    var notaBadge = b.Note == "auto"
+                        ? "bg-slate-100 text-slate-600"
+                        : "bg-indigo-100 text-indigo-700";
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-slate-900">@b.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="text-xs text-slate-500">@(((DateTime.UtcNow - b.CreatedAt).TotalHours < 1 ? "agora há pouco" : ((int)(DateTime.UtcNow - b.CreatedAt).TotalHours) + "h atrás"))</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700">@kb KB</td>
+                        <td class="px-4 py-3 text-sm text-slate-700">@(b.OperatorName ?? "—")</td>
+                        <td class="px-4 py-3 text-xs text-slate-500 font-mono">@(b.BundleVersion ?? "—")</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-block px-2 py-1 text-xs font-semibold rounded @notaBadge">@(b.Note ?? "auto")</span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="/api/mobile/devices/@deviceId/backups/@b.Id"
+                               target="_blank"
+                               class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                Baixar JSON →
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="text-xs text-slate-400 mt-4 px-2 leading-relaxed">
+        ℹ <strong>Como restaurar:</strong> baixe o JSON, abra o app no celular novo (já pareado),
+        cole o conteúdo em Ajustes → Manutenção → "Restaurar de backup". Compras, audit log local
+        e preferências voltam. Pedidos / lotes / produtos vêm do sync normal.
+    </div>
+}

@@ -73,6 +73,10 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+button, a, summary {
+  touch-action: manipulation;
+}
+
 html, body {
   height: 100%;
   font-family: 'Manrope', -apple-system, sans-serif;
@@ -219,6 +223,7 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 0 22px calc(140px + env(safe-area-inset-bottom, 0px));
   scrollbar-width: none;
 }
@@ -462,6 +467,47 @@ button:disabled {
   background: #fff;
   border-color: #dbe2ec;
   box-shadow: 0 10px 24px rgba(21,31,49,0.06);
+}
+.trust-badges {
+  display: flex;
+  gap: 7px;
+  margin: 9px 0 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.trust-badges::-webkit-scrollbar { display: none; }
+.trust-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+.trust-badge .tb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--basil);
+  box-shadow: 0 0 10px rgba(79,191,159,0.36);
+}
+.trust-badge.warn .tb-dot { background: var(--gold); box-shadow: 0 0 10px rgba(240,184,74,0.36); }
+.trust-badge.err .tb-dot { background: var(--accent); box-shadow: 0 0 10px rgba(231,104,69,0.36); }
+.trust-badge strong { color: var(--ink); font-weight: 900; }
+[data-theme="light"] .trust-badge {
+  background: #fff;
+  border-color: #dbe2ec;
+  box-shadow: 0 6px 14px rgba(21,31,49,0.045);
 }
 @media (max-width: 360px) {
   .content { padding-left: 16px; padding-right: 16px; }
@@ -2191,6 +2237,17 @@ button:disabled {
 }
 
 /* FAB (Floating Action Button) — acao primaria por tela */
+@media (max-width: 360px) {
+  .nav { padding-left: 4px; padding-right: 4px; }
+  .nav-btn { padding-left: 1px; padding-right: 1px; }
+  .nav-icon,
+  .nav-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .nav-btn .label { font-size: 8.5px; }
+}
+
 .fab {
   position: fixed;
   bottom: calc(78px + env(safe-area-inset-bottom, 0px));
@@ -4468,6 +4525,7 @@ select:focus-visible {
           <span class="hc-v">QR, lote ou pedido</span>
         </button>
       </div>
+      <div class="trust-badges" id="trustBadges" aria-label="Confianca operacional"></div>
 
       <div class="section-label section-label-with-links">
         <span>Pedidos em aberto <span class="count" id="openCount">0</span></span>
@@ -6021,6 +6079,7 @@ function updatePedidosTabBadge() {
 // =========================
 function syncNow() {
   pendingSync = 0;
+  try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {}
   updateSync();
   showToast('Sincronizado com EasyStock');
 }
@@ -6034,6 +6093,7 @@ function updateSync() {
     chip.classList.remove('pending');
     txt.textContent = 'Tudo sincronizado';
   }
+  if (typeof renderTrustBadges === 'function') renderTrustBadges();
 }
 
 // =========================
@@ -6147,10 +6207,61 @@ function renderHome() {
   renderMiniStats();
   renderOpenOrders();
   renderCash();
+  renderTrustBadges();
   renderOpenCashDaysBanner();
   renderHomeInsights();
   renderAttentionCenter();
   renderHomeShopping();
+}
+
+function trustRelativeTime(ts) {
+  if (!ts) return 'sem registro';
+  const diff = Math.max(0, Date.now() - Number(ts));
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + 'h';
+  const d = Math.floor(h / 24);
+  return d + 'd';
+}
+
+function renderTrustBadges() {
+  const el = document.getElementById('trustBadges');
+  if (!el) return;
+  const lastSync = Number(localStorage.getItem('cdb-last-sync')) || 0;
+  const closing = typeof getActiveCashClosing === 'function' ? getActiveCashClosing() : null;
+  const lastClose = closing ? closing.closedAt : (cashClosings || [])
+    .filter(c => c.closedAt)
+    .sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0))[0]?.closedAt;
+  const storageOk = (function () {
+    try {
+      const k = 'cdb-trust-check';
+      localStorage.setItem(k, '1');
+      localStorage.removeItem(k);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+  const syncPending = Number(pendingSync) || 0;
+  const badges = [
+    {
+      tone: syncPending ? 'warn' : '',
+      text: syncPending ? `${syncPending} pendente${syncPending === 1 ? '' : 's'}` : `Sync ${trustRelativeTime(lastSync)}`
+    },
+    {
+      tone: storageOk ? '' : 'err',
+      text: storageOk ? 'Dados salvos neste aparelho' : 'Armazenamento indisponivel'
+    },
+    {
+      tone: closing ? '' : 'warn',
+      text: closing ? `Caixa fechado ${trustRelativeTime(closing.closedAt)}` : (lastClose ? `Ultimo fechamento ${trustRelativeTime(lastClose)}` : 'Caixa sem fechamento')
+    }
+  ];
+  el.innerHTML = badges.map(b =>
+    `<span class="trust-badge ${b.tone}"><span class="tb-dot"></span><strong>${escapeHtml(b.text)}</strong></span>`
+  ).join('');
 }
 
 // ============================================================
@@ -9441,6 +9552,11 @@ function collectServerInfo() {
   // Onda 5: status do realtime (SSE)
   const realtime = !!(window.cdbSync && typeof window.cdbSync.realtimeConnected === 'function' && window.cdbSync.realtimeConnected());
 
+  // Onda 8: timestamp do ultimo backup
+  const lastBackupAt = (window.cdbSync && typeof window.cdbSync.lastBackupAt === 'function')
+    ? window.cdbSync.lastBackupAt()
+    : 0;
+
   if (!cached) {
     return {
       status: navigator.onLine ? 'unknown' : 'offline',
@@ -9450,7 +9566,8 @@ function collectServerInfo() {
       mobileSchemaVersion: null,
       apiKeyEnforced: null,
       pairing,
-      realtime
+      realtime,
+      lastBackupAt
     };
   }
   return {
@@ -9461,7 +9578,8 @@ function collectServerInfo() {
     mobileSchemaVersion: cached.MobileSchemaVersion ?? null,
     apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null,
     pairing,
-    realtime
+    realtime,
+    lastBackupAt
   };
 }
 
@@ -9552,6 +9670,23 @@ function showConflictModal(conflicts) {
   toggleModal('conflictModal', true);
 }
 function closeConflictModal() { toggleModal('conflictModal', false); }
+
+// Onda 8: dispara backup manual on-demand do localStorage pro servidor.
+async function diagBackupNow() {
+  if (!window.cdbSync || typeof window.cdbSync.uploadBackup !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  showToast('Enviando backup…');
+  try {
+    const r = await window.cdbSync.uploadBackup('manual');
+    const kb = Math.round((r && r.sizeBytes ? r.sizeBytes : 0) / 1024);
+    showToast('Backup OK — ' + kb + ' KB enviados');
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'diagBackupNow'); } catch (_) {}
+  }
+}
 
 // Onda 6: troca de loja sem re-parear. Empresa fixa.
 async function switchLojaPrompt() {
@@ -9743,10 +9878,19 @@ function openDiagnostics() {
               ? _diagRow('Tempo real', d.server.realtime ? '🟢 conectado' : 'desconectado',
                          d.server.realtime ? '' : 'warn')
               : '')
+          // Onda 8: ultimo backup
+          + (p
+              ? _diagRow('Último backup',
+                  d.server.lastBackupAt > 0 ? _fmtRelTime(d.server.lastBackupAt) : 'nunca',
+                  d.server.lastBackupAt > 0 ? '' : 'warn')
+              : '')
         , ''
           + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
           + (p
               ? '<button class="diag-action" onclick="switchLojaPrompt()">Trocar loja</button>'
+              : '')
+          + (p
+              ? '<button class="diag-action" onclick="diagBackupNow()">Backup agora</button>'
               : '')
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
@@ -13497,7 +13641,7 @@ window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
-  markAllSynced: () => { pendingSync = 0; updateSync(); },
+  markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
   getOperator: () => operatorName,
   showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
   // Onda 1: pairing revogado pelo servidor — operador precisa re-parear.
