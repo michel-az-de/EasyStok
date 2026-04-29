@@ -232,6 +232,14 @@
   window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
 
   // ---- Inicialização ----
+  let flushIntervalId = null;
+  function stop() {
+    if (flushIntervalId) { clearInterval(flushIntervalId); flushIntervalId = null; }
+  }
+  // Cleanup no unload — em Capacitor o pagehide dispara antes de descarregar
+  // a webview; no browser puro tambem cobre fechamento de aba.
+  window.addEventListener('pagehide', stop);
+
   setTimeout(() => {
     if (window.cdbApp) {
       const s = window.cdbApp.getState();
@@ -245,13 +253,14 @@
     }
     updatePendingCount();
     flush().then(pull);
-    // Flush periódico a cada 30s
-    setInterval(flush, 30000);
+    // Flush periódico a cada 30s. Guarda o id pra permitir cleanup
+    // (ex: navegação SPA, hot-reload do Capacitor) e evitar timer ghost.
+    flushIntervalId = setInterval(flush, 30000);
   }, 500);
 
   // Expõe utilitários pra debug
   window.cdbSync = {
-    flush, pull,
+    flush, pull, stop,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json?v=20260429a">
 <meta name="theme-color" content="#111827">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -7489,11 +7489,19 @@ function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')    
 function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
 function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+const SCAN_MODES = ['both', 'barcode', 'qr'];
 function getProdScanMode() {
   try {
     const mode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
-    return ['both', 'barcode', 'qr'].includes(mode) ? mode : 'both';
+    return SCAN_MODES.includes(mode) ? mode : 'both';
   } catch (e) { return 'both'; }
+}
+// Helper: dado um modo, retorna { showQr, showBars }. Centraliza a logica
+// usada em 3 paths de render (HTML do recibo, canvas do recibo, canvas/HTML
+// de producao) — antes ficava espalhada com flags _csm/_cshowQr/_cshowBars.
+function scanModeFlags(mode) {
+  const m = mode || getProdScanMode();
+  return { mode: m, showQr: m !== 'barcode', showBars: m !== 'qr' };
 }
 
 // Helper de console: cdbSetPix(key, holder, type, empresa).
@@ -9938,9 +9946,7 @@ function etiquetasFromBatch(batch) {
 function etiquetaProducaoHtml(et) {
   const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
-  const scanMode = getProdScanMode();
-  const showQr = scanMode !== 'barcode';
-  const showBarcode = scanMode !== 'qr';
+  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
   // Foto opcional do produto entre nome e barcode
   const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
   return `
@@ -9980,9 +9986,7 @@ function escPosLabelProducao(et) {
   wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
   b.boldOff();
   b.line(divider());
-  const scanMode = getProdScanMode();
-  const showQr = scanMode !== 'barcode';
-  const showBarcode = scanMode !== 'qr';
+  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
   if (showQr) {
     // QR: mais robusto no scanner do app e mais legivel em termica.
     b.push(...escPosQrCommands(et.codigoBarras, 0x04));
@@ -10089,9 +10093,7 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
   }
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
-  const scanMode = getProdScanMode();
-  const showQr = scanMode !== 'barcode';
-  const showBarcode = scanMode !== 'qr';
+  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
   const qrSize = scanMode === 'both' ? 104 : 124;
   const boxH = (showQr ? qrSize + 14 : 0) + (showBarcode ? 64 : 0) + 56;
   ctx.strokeRect(20, y - 2, W - 40, boxH);
@@ -10198,20 +10200,18 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     y += 64;
   }
   // QR / codigo de barras de conferencia (respeita modo configurado)
-  const _csm = getProdScanMode();
-  const _cshowQr = _csm !== 'barcode';
-  const _cshowBars = _csm !== 'qr';
-  const qrSize = _cshowQr ? 130 : 0;
-  const barsH = _cshowBars ? 56 : 0;
-  const boxH = (_cshowQr ? qrSize + 10 : 0) + (_cshowBars ? barsH + 10 : 0) + 46;
+  const { showQr, showBars } = scanModeFlags();
+  const qrSize = showQr ? 130 : 0;
+  const barsH = showBars ? 56 : 0;
+  const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.strokeRect(20, y - 4, W - 40, boxH);
-  if (_cshowQr) {
+  if (showQr) {
     drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
     y += qrSize + 8;
   }
-  if (_cshowBars) {
+  if (showBars) {
     drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
     y += barsH + 8;
   }
@@ -10221,7 +10221,7 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
   ctx.fillStyle = '#4b5563';
   ctx.font = '700 11px Arial, sans-serif';
-  ctx.fillText('Confira no app pelo codigo' + (_cshowQr ? ' ou QR' : ''), cx, y); y += 18;
+  ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#000';
   ctx.strokeRect(20, y, W - 40, 68);
@@ -10599,9 +10599,7 @@ function orderLabelHtml(o) {
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
   const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
-  const _sm = getProdScanMode();
-  const _showQr = _sm !== 'barcode';
-  const _showBars = _sm !== 'qr';
+  const { showQr, showBars } = scanModeFlags();
   return `
     <div class="pa-receipt">
     <div class="pa-kicker">Recibo de pedido</div>
@@ -10622,10 +10620,10 @@ function orderLabelHtml(o) {
     </div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
     <div class="pa-confer">
-      ${_showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>` : ''}
-      ${_showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, 268, 54)}</div>` : ''}
+      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>` : ''}
+      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, 268, 54)}</div>` : ''}
       <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
-      <div class="pa-confer-hint">Confira no app pelo codigo${_showQr ? ' ou QR' : ''}</div>
+      <div class="pa-confer-hint">Confira no app pelo codigo${showQr ? ' ou QR' : ''}</div>
     </div>
     <div class="pa-grid">
       <div class="pa-label">Pagamento PIX</div>
@@ -11879,8 +11877,8 @@ window.cdbApp = {
 };
 </script>
 
-<script src="qrcode.min.js"></script>
-<script src="sync.js"></script>
+<script src="qrcode.min.js?v=20260429a"></script>
+<script src="sync.js?v=20260429a"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
 // Sem isso, o plugin faz rollback automatico apos appReadyTimeout (30s).
@@ -12040,7 +12038,7 @@ if ('serviceWorker' in navigator) {
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(reg => {
+    navigator.serviceWorker.register('sw.js?v=20260429a').then(reg => {
       // Forca check de update toda vez que o app vira visivel
       // (usuario abre o app, ou volta do background) — Felipe pediu "so ao abrir".
       document.addEventListener('visibilitychange', () => {

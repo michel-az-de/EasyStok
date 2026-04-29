@@ -11,11 +11,12 @@
 // que o activate descarte caches antigos, forcando o conteudo cacheado a ser
 // re-baixado apos cada release.
 
-const CACHE_VERSION = 'cdb-v2';
+const CACHE_VERSION = 'cdb-v3-20260429a';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './qrcode.min.js',
   './sync.js',
   './icons/favicon.png',
   './icons/icon-192.png',
