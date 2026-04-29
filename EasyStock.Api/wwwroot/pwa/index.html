@@ -4356,7 +4356,7 @@ select:focus-visible {
         <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="openCashModal()">+ Lançamento manual</button>
         <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
         <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
-        <button class="np-btn np-tertiary" onclick="printCashClosing()">🖨 Imprimir fechamento</button>
+        <button class="np-btn np-tertiary" onclick="printCashClosing()">📤 Compartilhar fechamento</button>
       </div>
 
       <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
@@ -4420,7 +4420,7 @@ select:focus-visible {
       <div class="section-label section-label-with-links">
         <span>Faltou o quê?</span>
         <span class="sl-links">
-          <a href="#" onclick="event.preventDefault(); printShoppingList()">🖨 Imprimir lista</a>
+          <a href="#" onclick="event.preventDefault(); printShoppingList()">📤 Compartilhar lista</a>
         </span>
       </div>
       <div class="input-box">
@@ -10718,6 +10718,111 @@ function orderLabelHtml(o) {
 // Manrope, @media print). Visualmente alinhado ao recibo de pedido.
 // ================================================================
 
+// ----------------------------------------------------------------
+// shareTextNative: compartilha texto puro via Capacitor Share -> Web Share
+// API -> clipboard. Funciona em APK (manda pro WhatsApp/Drive/email),
+// browser desktop (Web Share quando disponivel) e fallback clipboard.
+// ----------------------------------------------------------------
+async function shareTextNative(title, text) {
+  const Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (Share) {
+    try {
+      await Share.share({ title: title || 'Compartilhar', text: text, dialogTitle: title });
+      return true;
+    } catch (e) {
+      const msg = (e && e.message ? String(e.message) : '').toLowerCase();
+      if (msg.indexOf('cancel') >= 0 || msg.indexOf('dismiss') >= 0) return false;
+      console.warn('[share text] plugin falhou:', e);
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share({ title: title, text: text }); return true; }
+    catch (e) { if (!e || e.name !== 'AbortError') console.warn('[share text] navigator.share falhou:', e); return false; }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copiado — cole onde quiser');
+    return true;
+  } catch (e) {
+    alert(text); // ultimo fallback
+    return true;
+  }
+}
+
+function cashClosingPlainText(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
+  const closing = getActiveCashClosing(k);
+  const empresa = getEmpresaName() || 'Easy Stock Mobile';
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const lines = [];
+  lines.push('=== FECHAMENTO DE CAIXA ===');
+  lines.push(empresa);
+  lines.push('Dia: ' + fmtDateKey(k));
+  if (closing) {
+    lines.push('Fechado em: ' + new Date(closing.closedAt).toLocaleString('pt-BR'));
+    if (closing.closedBy) lines.push('Operador: ' + closing.closedBy);
+  } else {
+    lines.push('(Caixa ainda aberto)');
+  }
+  lines.push('');
+  lines.push('--- Resumo ---');
+  lines.push(`Vendas (${sum.ordersCount}): ${money(sum.sold)}`);
+  lines.push(`Entradas extras: +${money(sum.in)}`);
+  lines.push(`Saidas: -${money(sum.out)}`);
+  lines.push(`SALDO: ${money(sum.balance)}`);
+  const conf = closing && closing.summary && closing.summary.conferredBalance;
+  if (typeof conf === 'number' && !isNaN(conf)) {
+    const diff = conf - sum.balance;
+    lines.push(`Conferido: ${money(conf)}`);
+    lines.push(`Diferenca: ${diff > 0 ? '+' : ''}${money(diff)}`);
+  }
+  if (dayOrders.length) {
+    lines.push('');
+    lines.push(`--- Pedidos entregues (${dayOrders.length}) ---`);
+    dayOrders.forEach(o => {
+      const ref = (o.id || '').slice(-6);
+      const nm = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
+      lines.push(`#${ref} ${nm}: ${money(o.total)}`);
+    });
+  }
+  if (dayEntries.length) {
+    lines.push('');
+    lines.push(`--- Lancamentos manuais (${dayEntries.length}) ---`);
+    dayEntries.forEach(e => {
+      const sign = e.type === 'expense' ? '-' : '+';
+      lines.push(`${sign} ${e.description || (e.type === 'expense' ? 'Saida' : 'Entrada')}: ${money(e.amount)}`);
+    });
+  }
+  if (closing && closing.notes) {
+    lines.push('');
+    lines.push('Obs: ' + closing.notes);
+  }
+  return lines.join('\n');
+}
+
+function shoppingListPlainText() {
+  const rows = getShoppingRows();
+  const empresa = getEmpresaName() || 'Easy Stock Mobile';
+  const pending = rows.filter(r => !r.done);
+  const done = rows.filter(r => r.done);
+  const lines = [];
+  lines.push('=== LISTA DE COMPRAS ===');
+  lines.push(empresa);
+  lines.push(new Date().toLocaleString('pt-BR'));
+  lines.push('');
+  lines.push(`--- A comprar (${pending.length}) ---`);
+  if (pending.length) pending.forEach(r => lines.push('[ ] ' + r.name));
+  else lines.push('(nenhum item pendente)');
+  if (done.length) {
+    lines.push('');
+    lines.push(`--- Ja comprados (${done.length}) ---`);
+    done.forEach(r => lines.push('[x] ' + r.name));
+  }
+  return lines.join('\n');
+}
+
 function cashClosingPrintHtml(dateKey) {
   const k = dateKey || dateKeyOf();
   const sum = calcCashSummary(k);
@@ -10774,9 +10879,13 @@ function cashClosingPrintHtml(dateKey) {
     </div>`;
 }
 
+// Em Capacitor Android, window.print() nao tem integracao nativa
+// confiavel. Usa Share plugin pra mandar o fechamento como texto pra
+// WhatsApp/Drive/email — operador escolhe destino. Fallback: clipboard.
 function printCashClosing(dateKey) {
   const k = dateKey || dateKeyOf();
-  printAreaHtml(cashClosingPrintHtml(k));
+  const text = cashClosingPlainText(k);
+  shareTextNative('Fechamento ' + fmtDateKey(k), text);
 }
 
 function shoppingListPrintHtml() {
@@ -10817,8 +10926,9 @@ function shoppingListPrintHtml() {
 }
 
 function printShoppingList() {
-  const html = shoppingListPrintHtml();
-  if (html) printAreaHtml(html);
+  const rows = getShoppingRows();
+  if (!rows.length) { showToast('Lista de compras vazia'); return; }
+  shareTextNative('Lista de compras', shoppingListPlainText());
 }
 
 // Botões +/- explícitos nos tiles de produção
