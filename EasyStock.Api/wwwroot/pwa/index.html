@@ -9410,6 +9410,9 @@ function collectServerInfo() {
     }
   } catch (e) {}
 
+  // Onda 5: status do realtime (SSE)
+  const realtime = !!(window.cdbSync && typeof window.cdbSync.realtimeConnected === 'function' && window.cdbSync.realtimeConnected());
+
   if (!cached) {
     return {
       status: navigator.onLine ? 'unknown' : 'offline',
@@ -9418,7 +9421,8 @@ function collectServerInfo() {
       apiVersion: null,
       mobileSchemaVersion: null,
       apiKeyEnforced: null,
-      pairing
+      pairing,
+      realtime
     };
   }
   return {
@@ -9428,7 +9432,8 @@ function collectServerInfo() {
     apiVersion: cached.ApiVersion || null,
     mobileSchemaVersion: cached.MobileSchemaVersion ?? null,
     apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null,
-    pairing
+    pairing,
+    realtime
   };
 }
 
@@ -9598,6 +9603,11 @@ function openDiagnostics() {
                 + (p.defaultOperatorName ? _diagRow('Operador padrão', escapeHtml(p.defaultOperatorName)) : '')
                 + (p.pairedAt ? _diagRow('Pareado em', _fmtRelTime(new Date(p.pairedAt).getTime())) : ''))
               : _diagRow('Pareamento', 'não pareado (modo offline)', d.server.apiKeyEnforced ? 'warn' : ''))
+          // Onda 5: status do realtime (SSE) — verde quando conectado.
+          + (p
+              ? _diagRow('Tempo real', d.server.realtime ? '🟢 conectado' : 'desconectado',
+                         d.server.realtime ? '' : 'warn')
+              : '')
         , ''
           + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
           + (p
@@ -13350,7 +13360,23 @@ window.cdbApp = {
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
   markAllSynced: () => { pendingSync = 0; updateSync(); },
-  getOperator: () => operatorName
+  getOperator: () => operatorName,
+  showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
+  // Onda 1: pairing revogado pelo servidor — operador precisa re-parear.
+  onPairingInvalid: function () {
+    try { showToast('Pareamento invalidado — abra Ajustes > Diagnostico pra re-parear'); } catch (e) {}
+    try { logError(new Error('pairing invalidated by server'), 'sync.pairing'); } catch (_) {}
+  },
+  // Onda 5: edits conflitaram com versão mais nova no servidor.
+  onSyncConflict: function (conflicts) {
+    try {
+      const n = (conflicts || []).length;
+      showToast(n + ' edicao' + (n === 1 ? '' : 'es') + ' conflitou — versao do servidor prevaleceu');
+    } catch (e) {}
+    (conflicts || []).forEach(c => {
+      try { logError(new Error(c.reason || 'conflict'), 'sync.conflict:' + (c.id || '?')); } catch (_) {}
+    });
+  }
 };
 </script>
 

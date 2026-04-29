@@ -36,11 +36,13 @@ namespace EasyStock.Api.Mobile.Controllers;
 public class SyncController(
     EasyStockDbContext db,
     MobileStockReconciler stockReconciler,
-    MobileSaleSyncService saleSync) : ControllerBase
+    MobileSaleSyncService saleSync,
+    MobileEventBroker eventBroker) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
     private readonly MobileSaleSyncService _saleSync = saleSync;
+    private readonly MobileEventBroker _eventBroker = eventBroker;
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -64,6 +66,12 @@ public class SyncController(
                 await ApplyMutation(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
                 accepted.Add(m.Id);
             }
+            catch (ConflictException cex)
+            {
+                // Onda 5 — conflict explícito. Reason começa com "conflict:" pra
+                // PWA detectar e mostrar UX especializada (toast + force-pull).
+                rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message));
+            }
             catch (Exception ex)
             {
                 rejected.Add(new SyncConflict(m.Id, ex.Message));
@@ -71,6 +79,14 @@ public class SyncController(
         }
 
         await _db.SaveChangesAsync();
+
+        // Onda 5: notifica outros devices da mesma loja em realtime.
+        // Fail-safe: se hub indisponível, devices pegam no polling 30s normal.
+        if (accepted.Count > 0)
+        {
+            await _eventBroker.NotifyMutationsAppliedAsync(empresaId, lojaId, req.DeviceId, accepted.Count);
+        }
+
         return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null));
     }
 
@@ -159,6 +175,23 @@ public class SyncController(
     {
         var dto = m.Payload.Deserialize<ProductDto>(JsonOpts)!;
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
+
+        // Onda 5: conflict detection. Se servidor tem versão mais nova
+        // (UpdatedAt > timestamp da mutation), rejeita pra evitar
+        // last-write-loser silencioso. Caller marca como rejected
+        // com reason="conflict" e PWA mostra UX apropriada.
+        if (existing != null && m.Ts > 0)
+        {
+            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            // Tolerância de 2s pra clock skew entre cliente e server.
+            if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
+            {
+                throw new ConflictException(
+                    $"Servidor já tem versão mais nova ({DateTimeOffset.FromUnixTimeMilliseconds(serverTsMs):HH:mm:ss}) " +
+                    $"editada por {existing.LastOperatorName ?? "outro device"}");
+            }
+        }
+
         if (existing == null)
         {
             _db.Add(new Product
@@ -484,3 +517,9 @@ public class SyncController(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 }
+
+/// <summary>
+/// Lançada quando uma mutation chega com timestamp anterior à versão
+/// do servidor — sinaliza last-write-loser que o cliente precisa tratar.
+/// </summary>
+public class ConflictException(string message) : Exception(message);

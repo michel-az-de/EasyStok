@@ -190,6 +190,25 @@
       } else {
         saveQueue([]);
       }
+
+      // Onda 5: trata conflicts. Server retorna rejected[] com reason
+      // começando com "conflict:" quando outro device sincronizou primeiro.
+      // PWA mostra toast + força pull pra refletir versão mais nova.
+      if (result.rejected && Array.isArray(result.rejected) && result.rejected.length > 0) {
+        const conflicts = result.rejected.filter(r => r.reason && r.reason.indexOf('conflict:') === 0);
+        if (conflicts.length > 0) {
+          // Remove os conflitados da fila (não vão ser aceitos mesmo)
+          const conflictIds = new Set(conflicts.map(c => c.id));
+          const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
+          saveQueue(remaining);
+          // Notifica o app pra exibir UX e logar
+          if (window.cdbApp && typeof window.cdbApp.onSyncConflict === 'function') {
+            try { window.cdbApp.onSyncConflict(conflicts); } catch (e) {}
+          }
+          // Force pull pra alinhar com servidor
+          setTimeout(pull, 200);
+        }
+      }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
       updatePendingCount();
     } catch (e) {
@@ -289,8 +308,9 @@
   // ---- Eventos de conectividade ----
   window.addEventListener('online', () => {
     console.log('Voltei online, sincronizando...');
-    flush().then(pull).then(fetchAndProcessCommands);
+    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime);
   });
+  window.addEventListener('offline', stopRealtime);
   window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
 
   // ---- Inicialização ----
@@ -314,7 +334,7 @@
       }));
     }
     updatePendingCount();
-    flush().then(pull).then(fetchAndProcessCommands);
+    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime);
     // Flush periódico a cada 30s. Guarda o id pra permitir cleanup
     // (ex: navegação SPA, hot-reload do Capacitor) e evitar timer ghost.
     // Combina flush + commands no mesmo tick — economia de battery.
@@ -328,6 +348,53 @@
   // Resposta vai pro localStorage pra Diagnóstico exibir e pra UI
   // condicional (ex: avisar quando ApiKeyEnforced virar true).
   // Falha silenciosa: se offline ou rede ruim, deixa cache antigo.
+  // ---- Realtime via SSE (Onda 5) ----
+  // Conecta no /api/mobile/operation/stream?apiKey=... e escuta eventos
+  // server-pushed. Quando outro device da mesma loja sincroniza, recebe
+  // evento mutations-applied e faz pull imediato (sem esperar 30s).
+  //
+  // FAIL-SAFE: se servidor offline / pairing inválido / browser sem
+  // EventSource, app continua funcionando com polling 30s normal.
+  // Reconnect automatico do EventSource em caso de drop.
+  let _sseSource = null;
+  function startRealtime() {
+    if (_sseSource) return; // já conectado
+    if (!navigator.onLine) return;
+    if (typeof EventSource === 'undefined') return; // browser sem suporte
+    const apiKey = getApiKey();
+    if (!apiKey) return; // só pareados
+    try {
+      const url = API_BASE_URL + API_PREFIX + '/operation/stream?apiKey=' + encodeURIComponent(apiKey);
+      _sseSource = new EventSource(url);
+      _sseSource.onmessage = function (ev) {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data && data.type === 'mutations-applied') {
+            // Outro device sincronizou — puxa atualizações.
+            console.log('[realtime] mutations-applied de', data.originDeviceId);
+            pull();
+          } else if (data && data.type === 'command-queued') {
+            console.log('[realtime] command-queued', data.commandType);
+            fetchAndProcessCommands();
+          }
+        } catch (e) {}
+      };
+      _sseSource.onerror = function () {
+        // EventSource reconecta sozinho. Só loga; polling 30s segue como fallback.
+        try { console.warn('[realtime] erro SSE — fallback pra polling'); } catch (_) {}
+      };
+    } catch (e) {
+      try { console.warn('[realtime] startRealtime falhou:', e && e.message); } catch (_) {}
+      _sseSource = null;
+    }
+  }
+  function stopRealtime() {
+    if (_sseSource) {
+      try { _sseSource.close(); } catch (e) {}
+      _sseSource = null;
+    }
+  }
+
   // ---- Comandos remotos (Onda 4) ----
   // Servidor pode enfileirar comandos pra este device (flush_now, pull_now,
   // reload, message). Processamos sempre que online + pareado, depois do
@@ -509,6 +576,8 @@
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,
     fetchCommands: fetchAndProcessCommands,
+    startRealtime, stopRealtime,
+    realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using EasyStock.Api.Mobile.Security;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -24,9 +25,11 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Route("api/mobile/operation")]
 public class OperationController(
     EasyStockDbContext db,
+    MobileEventBroker eventBroker,
     ILogger<OperationController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly MobileEventBroker _eventBroker = eventBroker;
     private readonly ILogger<OperationController> _log = log;
 
     /// <summary>
@@ -182,6 +185,89 @@ public class OperationController(
         return Ok(pending.Select(c => new DeviceCommandDto(
             c.Id, c.CommandType, c.PayloadJson, c.CreatedAt
         )).ToArray());
+    }
+
+    /// <summary>
+    /// Onda 5 — Server-Sent Events stream pro PWA receber notificações de
+    /// outros devices em tempo real. Auth: <c>?apiKey=mk_xxx</c> na query
+    /// (EventSource não suporta headers customizados).
+    ///
+    /// Eventos emitidos:
+    ///   - mutations-applied: outro device da mesma loja sincronizou →
+    ///     PWA dispara <c>pull()</c> imediato.
+    ///   - command-queued: gestor enfileirou comando pra este device →
+    ///     PWA dispara <c>fetchAndProcessCommands()</c>.
+    ///
+    /// Connection fica aberta até o client desconectar. Heartbeat de 25s
+    /// pra manter alive em proxies/load balancers que dropam idle &gt;30s.
+    /// Falha = client volta pra polling 30s normal.
+    /// </summary>
+    [HttpGet("stream")]
+    [AllowAnonymous]
+    public async Task Stream([FromQuery] string apiKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
+        var device = await _db.Set<MobileDevice>().AsNoTracking()
+            .FirstOrDefaultAsync(d => d.ApiKey == apiKey, ct);
+        if (device == null || device.Revoked)
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
+        Response.Headers["Content-Type"] = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache, no-transform";
+        Response.Headers["X-Accel-Buffering"] = "no"; // dica pra nginx não bufferizar
+        await Response.Body.FlushAsync(ct);
+
+        var connKey = device.Id + ":" + Guid.NewGuid().ToString("N");
+        using var subscription = _eventBroker.Subscribe(connKey, device.EmpresaId, device.LojaId, device.Id);
+
+        // Heartbeat task — comment lines `:` mantêm conexão viva
+        var heartbeatTask = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested && !subscription.Slot.Cancelled)
+            {
+                try
+                {
+                    await Task.Delay(25_000, ct);
+                    await Response.WriteAsync(": heartbeat\n\n", ct);
+                    await Response.Body.FlushAsync(ct);
+                }
+                catch { return; }
+            }
+        }, ct);
+
+        // Dispatch events conforme chegam na fila
+        try
+        {
+            // evento "ready" — confirmação inicial pro client tratar como "conectado"
+            await Response.WriteAsync($"event: ready\ndata: {{\"deviceId\":\"{device.Id}\"}}\n\n", ct);
+            await Response.Body.FlushAsync(ct);
+
+            while (!ct.IsCancellationRequested && !subscription.Slot.Cancelled)
+            {
+                await subscription.Slot.Signal.WaitAsync(ct);
+                while (subscription.Slot.Queue.TryDequeue(out var data))
+                {
+                    await Response.WriteAsync($"data: {data}\n\n", ct);
+                    await Response.Body.FlushAsync(ct);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // cliente desconectou — normal
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "SSE stream interrompido (device={DeviceId})", device.Id);
+        }
     }
 
     private Guid? ResolveUserId()
