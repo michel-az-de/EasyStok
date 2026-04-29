@@ -205,6 +205,49 @@ public class DevicePairingController(
         return Ok(summaries);
     }
 
+    /// <summary>
+    /// Onda 4 — Web autenticado: enfileira um comando remoto pro device.
+    /// Tipos suportados: <c>flush_now</c>, <c>pull_now</c>, <c>reload</c>, <c>message</c>.
+    /// Device executa na próxima chamada de /sync ou /sync/pull.
+    /// </summary>
+    [HttpPost("{id}/commands")]
+    [Authorize]
+    public async Task<ActionResult<object>> EnqueueCommand(
+        string id,
+        [FromBody] EnqueueCommandRequest req,
+        CancellationToken ct)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.CommandType))
+            return BadRequest(new { error = "commandType obrigatório" });
+
+        var device = await _db.Set<MobileDevice>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (device == null) return NotFound();
+        if (device.Revoked) return BadRequest(new { error = "device revogado" });
+
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "flush_now", "pull_now", "reload", "message" };
+        if (!allowed.Contains(req.CommandType))
+            return BadRequest(new { error = "commandType inválido. Use: " + string.Join(", ", allowed) });
+
+        var cmd = new DeviceCommand
+        {
+            Id = Guid.NewGuid(),
+            DeviceId = id,
+            EmpresaId = device.EmpresaId,
+            CommandType = req.CommandType.ToLowerInvariant(),
+            PayloadJson = req.PayloadJson,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = ResolveUserId(),
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
+        };
+        _db.Set<DeviceCommand>().Add(cmd);
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Comando enfileirado: {Cmd} pra device {DeviceId} by {User}",
+            cmd.CommandType, id, cmd.CreatedByUserId);
+        return Ok(new { id = cmd.Id, commandType = cmd.CommandType, expiresAt = cmd.ExpiresAt });
+    }
+
     /// <summary>Web autenticado — revoga device. App correspondente para de funcionar.</summary>
     [HttpDelete("{id}")]
     [Authorize]
@@ -287,3 +330,6 @@ public record DeviceSummary(
     DateTime? RevokedAt,
     bool PendingPair
 );
+
+/// <summary>Onda 4 — request pra enfileirar comando remoto.</summary>
+public record EnqueueCommandRequest(string CommandType, string? PayloadJson);

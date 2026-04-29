@@ -1,0 +1,204 @@
+@using EasyStock.Web.Services
+@model OperationDashboardApi?
+@{
+    ViewBag.Title = "Operação Mobile";
+    Layout = "_Layout";
+    var devices = ViewBag.Devices as List<MobileDeviceApi> ?? new List<MobileDeviceApi>();
+    var ativos = devices.Where(d => !d.Revoked).ToList();
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Operação Mobile</h1>
+        @if (Model != null)
+        {
+            <p class="text-xs text-slate-500">Atualizado @Model.Generated.ToString("HH:mm:ss") · @Model.DevicesAtivos / @Model.DevicesTotal dispositivos ativos</p>
+        }
+    </div>
+    <div class="flex items-center gap-3">
+        <button type="button" onclick="location.reload()" class="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg" title="Atualizar agora">
+            ↻ Atualizar
+        </button>
+        <a href="/dispositivos" class="text-sm text-slate-500 hover:text-slate-700">Dispositivos →</a>
+    </div>
+</div>
+
+@if (Model == null)
+{
+    <div class="ws p-12 text-center">
+        <div class="text-6xl mb-4">📡</div>
+        <h2 class="text-lg font-semibold text-slate-900 mb-2">Sem dados ainda</h2>
+        <p class="text-sm text-slate-500">Pareie pelo menos um dispositivo pra começar a coletar operação.</p>
+        <a href="/dispositivos" class="mt-4 inline-block px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Parear dispositivo</a>
+    </div>
+    return;
+}
+
+<!-- KPIs principais -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="ws p-4">
+        <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Vendas hoje</div>
+        <div class="text-2xl font-bold text-slate-900">R$ @Model.VendasHojeValor.ToString("0.00")</div>
+        <div class="text-xs text-slate-400 mt-1">@Model.VendasHojeCount pedido@(Model.VendasHojeCount == 1 ? "" : "s") entregue@(Model.VendasHojeCount == 1 ? "" : "s")</div>
+    </div>
+    <div class="ws p-4">
+        <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Saldo do caixa</div>
+        <div class="text-2xl font-bold text-slate-900">R$ @Model.CaixaSaldoHoje.ToString("0.00")</div>
+        <div class="text-xs text-slate-400 mt-1">+@Model.CaixaEntradasExtras.ToString("0.00") · -@Model.CaixaSaidas.ToString("0.00")</div>
+    </div>
+    <div class="ws p-4 @(Model.PedidosAbertos > 0 ? "" : "opacity-70")">
+        <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Pedidos abertos</div>
+        <div class="text-2xl font-bold text-slate-900">@Model.PedidosAbertos</div>
+        <div class="text-xs text-slate-400 mt-1">@Model.PedidosPreparando preparando · @Model.PedidosProntos prontos</div>
+    </div>
+    <div class="ws p-4">
+        <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Lotes hoje</div>
+        <div class="text-2xl font-bold text-slate-900">@Model.LotesHoje</div>
+        <div class="text-xs text-slate-400 mt-1">produção do dia</div>
+    </div>
+</div>
+
+<!-- Alertas operacionais -->
+@{
+    var alerts = new List<(string Label, int Count, string Icon, string Color, string Link)>();
+    if (Model.PedidosTravados > 0)
+        alerts.Add(("Pedidos travados (>30min)", Model.PedidosTravados, "⏱", "amber", "/dispositivos"));
+    if (Model.ConferenciaPendente > 0)
+        alerts.Add(("Conferência pendente", Model.ConferenciaPendente, "✅", "amber", "/dispositivos"));
+    if (Model.DivergenciasEstoque > 0)
+        alerts.Add(("Divergências de estoque", Model.DivergenciasEstoque, "⚠", "red", "/produtos-mobile/divergencias"));
+    if (Model.ProdutosPendenteAprovacao > 0)
+        alerts.Add(("Produtos custom pendentes", Model.ProdutosPendenteAprovacao, "📦", "indigo", "/produtos-mobile"));
+}
+
+@if (alerts.Any())
+{
+    <div class="ws mb-6">
+        <div class="px-6 py-4 border-b border-slate-200">
+            <h2 class="text-base font-semibold text-slate-900">Atenção</h2>
+        </div>
+        <div class="divide-y divide-slate-100">
+            @foreach (var a in alerts)
+            {
+                var bg = a.Color switch
+                {
+                    "amber" => "bg-amber-50",
+                    "red" => "bg-red-50",
+                    "indigo" => "bg-indigo-50",
+                    _ => "bg-slate-50"
+                };
+                var fg = a.Color switch
+                {
+                    "amber" => "text-amber-700",
+                    "red" => "text-red-700",
+                    "indigo" => "text-indigo-700",
+                    _ => "text-slate-700"
+                };
+                <a href="@a.Link" class="flex items-center justify-between px-6 py-3 hover:@bg transition-colors">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">@a.Icon</span>
+                        <div>
+                            <div class="font-medium text-slate-900">@a.Label</div>
+                            <div class="text-xs @fg">@a.Count item@(a.Count == 1 ? "" : "s") · clique pra revisar</div>
+                        </div>
+                    </div>
+                    <span class="text-slate-400">→</span>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<!-- Dispositivos ativos com botões de comando -->
+<div class="ws">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h2 class="text-base font-semibold text-slate-900">Dispositivos pareados</h2>
+        <a href="/dispositivos" class="text-xs text-slate-500 hover:text-slate-700">Gerenciar →</a>
+    </div>
+    @if (!ativos.Any())
+    {
+        <div class="p-8 text-center text-sm text-slate-500">
+            Nenhum dispositivo ativo. <a href="/dispositivos" class="text-indigo-600 underline">Parear um agora</a>.
+        </div>
+    }
+    else
+    {
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th class="px-4 py-3">Dispositivo</th>
+                    <th class="px-4 py-3">Última atividade</th>
+                    <th class="px-4 py-3 text-right">Comandos remotos</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var d in ativos.OrderByDescending(d => d.LastSeenAt ?? DateTime.MinValue))
+                {
+                    var ativoRecente = d.LastSeenAt.HasValue && (DateTime.UtcNow - d.LastSeenAt.Value).TotalMinutes < 30;
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-block w-2 h-2 rounded-full @(ativoRecente ? "bg-emerald-500" : "bg-slate-300")"></span>
+                                <div>
+                                    <div class="font-medium text-slate-900">@(d.Label ?? "(sem rótulo)")</div>
+                                    @if (!string.IsNullOrEmpty(d.DefaultOperatorName))
+                                    {
+                                        <div class="text-xs text-slate-500">Operador: @d.DefaultOperatorName</div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700">
+                            @if (d.LastSeenAt.HasValue)
+                            {
+                                var minutos = (DateTime.UtcNow - d.LastSeenAt.Value).TotalMinutes;
+                                if (minutos < 1) { <span class="text-emerald-600">agora mesmo</span> }
+                                else if (minutos < 60) { <span>@((int)minutos) min atrás</span> }
+                                else { <span class="text-slate-400">@d.LastSeenAt.Value.ToString("dd/MM HH:mm")</span> }
+                            }
+                            else
+                            {
+                                <span class="text-slate-400">nunca conectou</span>
+                            }
+                        </td>
+                        <td class="px-4 py-3 text-right space-x-2">
+                            <form method="post" action="/operacao/devices/@d.Id/comando" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="commandType" value="flush_now" />
+                                <button type="submit" class="text-xs text-slate-600 hover:text-indigo-700 font-medium" title="Força app a enviar mutations pendentes">
+                                    Forçar flush
+                                </button>
+                            </form>
+                            <span class="text-slate-200">·</span>
+                            <form method="post" action="/operacao/devices/@d.Id/comando" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="commandType" value="pull_now" />
+                                <button type="submit" class="text-xs text-slate-600 hover:text-indigo-700 font-medium" title="Força app a buscar atualizações do servidor">
+                                    Forçar pull
+                                </button>
+                            </form>
+                            <span class="text-slate-200">·</span>
+                            <form method="post" action="/operacao/devices/@d.Id/comando" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="commandType" value="reload" />
+                                <button type="submit" class="text-xs text-slate-600 hover:text-amber-700 font-medium" title="Reinicia o app no celular">
+                                    Recarregar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="text-xs text-slate-400 mt-4 px-2">
+    ℹ Comandos chegam no app na próxima sincronização (até 30s). Auto-expiram em 24h se device não buscar.
+</div>
+
+<script>
+    // Auto-refresh suave a cada 30s — sem polling agressivo. Útil em sala
+    // de gestão como dashboard "always on".
+    setTimeout(function() { location.reload(); }, 30000);
+</script>

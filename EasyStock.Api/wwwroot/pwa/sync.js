@@ -289,7 +289,7 @@
   // ---- Eventos de conectividade ----
   window.addEventListener('online', () => {
     console.log('Voltei online, sincronizando...');
-    flush().then(pull);
+    flush().then(pull).then(fetchAndProcessCommands);
   });
   window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
 
@@ -314,16 +314,76 @@
       }));
     }
     updatePendingCount();
-    flush().then(pull);
+    flush().then(pull).then(fetchAndProcessCommands);
     // Flush periódico a cada 30s. Guarda o id pra permitir cleanup
     // (ex: navegação SPA, hot-reload do Capacitor) e evitar timer ghost.
-    flushIntervalId = setInterval(flush, 30000);
+    // Combina flush + commands no mesmo tick — economia de battery.
+    flushIntervalId = setInterval(function () {
+      flush();
+      fetchAndProcessCommands();
+    }, 30000);
   }, 500);
 
   // ---- Version ping (Onda 0): verifica compat + capabilities do servidor ----
   // Resposta vai pro localStorage pra Diagnóstico exibir e pra UI
   // condicional (ex: avisar quando ApiKeyEnforced virar true).
   // Falha silenciosa: se offline ou rede ruim, deixa cache antigo.
+  // ---- Comandos remotos (Onda 4) ----
+  // Servidor pode enfileirar comandos pra este device (flush_now, pull_now,
+  // reload, message). Processamos sempre que online + pareado, depois do
+  // ciclo flush+pull. Falha silenciosa pra não interferir offline-first.
+  async function fetchAndProcessCommands() {
+    if (!navigator.onLine) return;
+    if (_pairingInvalid) return;
+    if (!getApiKey()) return; // só pareados recebem comandos
+    try {
+      const url = API_BASE_URL + API_PREFIX + '/operation/pending-commands';
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 10000);
+      let resp;
+      try {
+        resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (resp.status === 401) { _pairingInvalid = true; return; }
+      if (!resp.ok) return;
+      const cmds = await resp.json();
+      if (!Array.isArray(cmds) || cmds.length === 0) return;
+      cmds.forEach(executeRemoteCommand);
+    } catch (e) {
+      try { console.warn('fetchCommands falhou:', e && e.message); } catch (_) {}
+    }
+  }
+
+  function executeRemoteCommand(cmd) {
+    if (!cmd || !cmd.commandType) return;
+    const type = String(cmd.commandType).toLowerCase();
+    try {
+      if (type === 'flush_now') {
+        flush();
+      } else if (type === 'pull_now') {
+        pull();
+      } else if (type === 'reload') {
+        // Flush antes de reload pra não perder fila local
+        flush().finally(() => setTimeout(() => location.reload(), 800));
+      } else if (type === 'message') {
+        let text = '(mensagem do gestor)';
+        try {
+          const p = cmd.payloadJson ? JSON.parse(cmd.payloadJson) : null;
+          if (p && p.text) text = String(p.text).slice(0, 200);
+        } catch (_) {}
+        if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+          try { window.cdbApp.showToast(text); } catch (_) {}
+        } else if (typeof window.showToast === 'function') {
+          try { window.showToast(text); } catch (_) {}
+        }
+      }
+    } catch (e) {
+      console.warn('Comando remoto falhou:', type, e && e.message);
+    }
+  }
+
   async function pingVersion() {
     if (!navigator.onLine) return null;
     try {
@@ -448,6 +508,7 @@
     getPairing: loadPairing,
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,
+    fetchCommands: fetchAndProcessCommands,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,

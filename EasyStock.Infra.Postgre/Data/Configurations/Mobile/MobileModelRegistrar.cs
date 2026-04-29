@@ -47,6 +47,15 @@ public static class MobileModelRegistrar
             b.HasIndex(d => d.EmpresaId).HasDatabaseName("ix_mobile_devices_empresa_id");
         });
 
+        // Onda 4 — comandos remotos enfileirados.
+        mb.Entity<DeviceCommand>(b =>
+        {
+            b.HasIndex(c => new { c.DeviceId, c.DeliveredAt })
+                .HasDatabaseName("ix_mobile_device_commands_pending");
+            b.HasIndex(c => new { c.EmpresaId, c.CreatedAt })
+                .HasDatabaseName("ix_mobile_device_commands_empresa");
+        });
+
         return mb;
     }
 }
