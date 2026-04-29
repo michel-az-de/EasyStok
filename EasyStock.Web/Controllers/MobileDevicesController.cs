@@ -8,6 +8,7 @@ namespace EasyStock.Web.Controllers;
 /// </summary>
 public class MobileDevicesController(
     MobileDevicesService svc,
+    OperacaoMobileService opSvc,
     SessionService session) : BaseController(session)
 {
     [HttpGet("/dispositivos")]
@@ -16,9 +17,20 @@ public class MobileDevicesController(
         ViewBag.Title = "Dispositivos";
         ViewBag.ActiveMenuItem = "Dispositivos";
 
-        var result = await svc.ListarAsync();
-        if (HasError(result)) return View(new List<MobileDeviceApi>());
-        return View(result.Data ?? []);
+        // Onda 7: carrega saúde em paralelo pra mostrar coluna colorida.
+        var listTask = svc.ListarAsync();
+        var healthTask = opSvc.ObterSaudeDevicesAsync();
+        await Task.WhenAll(listTask, healthTask);
+
+        if (HasError(listTask.Result)) return View(new List<MobileDeviceApi>());
+
+        // Mapeia health por id pra view consultar O(1).
+        var healthById = healthTask.Result.Success && healthTask.Result.Data != null
+            ? healthTask.Result.Data.ToDictionary(h => h.Id)
+            : new Dictionary<string, DeviceHealthApi>();
+        ViewBag.HealthById = healthById;
+
+        return View(listTask.Result.Data ?? []);
     }
 
     [HttpPost("/dispositivos/parear")]

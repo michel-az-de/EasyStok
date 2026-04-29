@@ -147,6 +147,26 @@ public static class ApiServiceCollectionExtensions
                 limiter.QueueLimit = 20;
             });
 
+            // Onda 7 — Rate limit pra endpoints mobile anônimos.
+            // Cobre: GET /api/mobile/version, POST /api/mobile/devices/pair,
+            // POST /api/mobile/diagnostics/errors. Particionado por IP pra
+            // evitar abuso (tentativa de adivinhar pairing code, flood).
+            // Limites generosos pra não atrapalhar uso legítimo (PWA pinga
+            // version no boot a cada reload).
+            options.AddPolicy("mobile-anonymous", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 5
+                    });
+            });
+
             // Rate limit para endpoints sensíveis de autenticação (login, register,
             // forgot/reset password). Particionado por IP do cliente para dificultar
             // brute-force e spam de contas.

@@ -8,6 +8,9 @@
     var ativos = Model.Where(d => !d.Revoked && !d.PendingPair).ToList();
     var pendentes = Model.Where(d => d.PendingPair && !d.Revoked).ToList();
     var revogados = Model.Where(d => d.Revoked).ToList();
+    // Onda 7 — health agregada por id
+    var healthById = ViewBag.HealthById as Dictionary<string, DeviceHealthApi>
+                     ?? new Dictionary<string, DeviceHealthApi>();
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -54,6 +57,7 @@
                     <th class="px-4 py-3">Dispositivo</th>
                     <th class="px-4 py-3">Operador padrão</th>
                     <th class="px-4 py-3">Última atividade</th>
+                    <th class="px-4 py-3">Saúde</th>
                     <th class="px-4 py-3">Status</th>
                     <th class="px-4 py-3 text-right">Ações</th>
                 </tr>
@@ -80,6 +84,32 @@
                             {
                                 <span class="text-slate-400">nunca</span>
                             }
+                        </td>
+                        <td class="px-4 py-3">
+                            @{
+                                healthById.TryGetValue(d.Id, out var h);
+                                var healthBadgeClass = h?.Status switch
+                                {
+                                    "ok" => "bg-emerald-100 text-emerald-700",
+                                    "warn" => "bg-amber-100 text-amber-700",
+                                    "err" => "bg-red-100 text-red-700",
+                                    _ => "bg-slate-100 text-slate-700"
+                                };
+                                var healthDot = h?.Status switch
+                                {
+                                    "ok" => "🟢",
+                                    "warn" => "🟡",
+                                    "err" => "🔴",
+                                    _ => "⚪"
+                                };
+                                var healthTitle = h != null
+                                    ? $"{h.StatusLabel}{(h.PendingCommands > 0 ? $" · {h.PendingCommands} comando(s) pendente(s)" : "")}{(h.StuckCommands > 0 ? $" · {h.StuckCommands} preso(s) >1h" : "")}"
+                                    : "(sem dados)";
+                            }
+                            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded @healthBadgeClass" title="@healthTitle">
+                                <span>@healthDot</span>
+                                <span>@(h?.StatusLabel ?? "—")</span>
+                            </span>
                         </td>
                         <td class="px-4 py-3">
                             @if (d.Revoked)

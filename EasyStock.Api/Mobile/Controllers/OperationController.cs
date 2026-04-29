@@ -188,6 +188,97 @@ public class OperationController(
     }
 
     /// <summary>
+    /// Onda 7 — Status agregado de saúde de cada device pareado da empresa.
+    /// Painel /dispositivos usa pra mostrar coluna "Saúde" com badge colorido
+    /// e tooltip explicando.
+    ///
+    /// Sinais de saúde:
+    ///   - last_seen_at: nunca conectou / >24h / >2h / &lt;2h
+    ///   - command queue: comandos pendentes não-entregues há &gt;1h
+    ///   - revogado: status crítico
+    /// </summary>
+    [HttpGet("devices-health")]
+    [Authorize]
+    public async Task<ActionResult<DeviceHealthDto[]>> GetDevicesHealth(
+        [FromQuery] Guid empresaId,
+        CancellationToken ct)
+    {
+        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+
+        var devices = await _db.Set<MobileDevice>().AsNoTracking()
+            .Where(d => d.EmpresaId == empresaId)
+            .ToListAsync(ct);
+
+        if (devices.Count == 0) return Ok(Array.Empty<DeviceHealthDto>());
+
+        // Comandos pendentes (delivered_at = null) por device.
+        var deviceIds = devices.Select(d => d.Id).ToList();
+        var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+        var pendingCommandsByDevice = await _db.Set<DeviceCommand>().AsNoTracking()
+            .Where(c => deviceIds.Contains(c.DeviceId) && c.DeliveredAt == null
+                        && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow))
+            .GroupBy(c => c.DeviceId)
+            .Select(g => new { DeviceId = g.Key, Total = g.Count(), OldStuck = g.Count(c => c.CreatedAt < oneHourAgo) })
+            .ToListAsync(ct);
+
+        var now = DateTime.UtcNow;
+        var result = devices.Select(d =>
+        {
+            var cmds = pendingCommandsByDevice.FirstOrDefault(p => p.DeviceId == d.Id);
+            var cmdsPending = cmds?.Total ?? 0;
+            var cmdsStuck = cmds?.OldStuck ?? 0;
+
+            // Score de saúde:
+            //   "ok" — pareado, ativo nas ultimas 2h, sem comando preso
+            //   "warn" — inativo entre 2h-24h OU 1+ comando >1h preso
+            //   "err"  — >24h sem ver OU revogado OU pendente pareamento expirado
+            string status;
+            string label;
+            if (d.Revoked)
+            {
+                status = "err"; label = "revogado";
+            }
+            else if (d.PairingCode != null && d.PairingExpiresAt.HasValue && d.PairingExpiresAt < now)
+            {
+                status = "err"; label = "código expirado sem pareamento";
+            }
+            else if (d.PairingCode != null)
+            {
+                status = "warn"; label = "aguardando app conectar";
+            }
+            else if (!d.LastSeenAt.HasValue)
+            {
+                status = "warn"; label = "pareado mas nunca sincronizou";
+            }
+            else
+            {
+                var minutos = (now - d.LastSeenAt.Value).TotalMinutes;
+                if (minutos > 24 * 60) { status = "err"; label = "inativo há " + Math.Round(minutos / 60) + "h"; }
+                else if (minutos > 2 * 60 || cmdsStuck > 0) { status = "warn"; label = "atenção"; }
+                else { status = "ok"; label = "ativo"; }
+            }
+
+            return new DeviceHealthDto(
+                Id: d.Id,
+                Label: d.Label,
+                Status: status,
+                StatusLabel: label,
+                LastSeenAt: d.LastSeenAt,
+                LastSeenIp: d.LastSeenIp,
+                PendingCommands: cmdsPending,
+                StuckCommands: cmdsStuck,
+                Revoked: d.Revoked,
+                PendingPair: d.PairingCode != null
+            );
+        }).OrderBy(d =>
+            d.Status == "err" ? 0 : d.Status == "warn" ? 1 : 2
+        ).ThenByDescending(d => d.LastSeenAt ?? DateTime.MinValue)
+        .ToArray();
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Onda 5 — Server-Sent Events stream pro PWA receber notificações de
     /// outros devices em tempo real. Auth: <c>?apiKey=mk_xxx</c> na query
     /// (EventSource não suporta headers customizados).
@@ -304,3 +395,17 @@ public record OperationDashboard(
 
 /// <summary>Item retornado no pull de comandos (PWA processa).</summary>
 public record DeviceCommandDto(Guid Id, string CommandType, string? PayloadJson, DateTime CreatedAt);
+
+/// <summary>Onda 7 — saúde agregada de um device pra coluna no painel /dispositivos.</summary>
+public record DeviceHealthDto(
+    string Id,
+    string? Label,
+    string Status,        // "ok" | "warn" | "err"
+    string StatusLabel,   // texto curto explicando
+    DateTime? LastSeenAt,
+    string? LastSeenIp,
+    int PendingCommands,  // comandos não-entregues
+    int StuckCommands,    // comandos pendentes há >1h
+    bool Revoked,
+    bool PendingPair
+);

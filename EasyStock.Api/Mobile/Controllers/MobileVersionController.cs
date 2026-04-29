@@ -21,6 +21,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [ApiController]
 [Route("api/mobile/version")]
 [AllowAnonymous]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("mobile-anonymous")]
 public class MobileVersionController(
     EasyStockDbContext db,
     IConfiguration configuration) : ControllerBase

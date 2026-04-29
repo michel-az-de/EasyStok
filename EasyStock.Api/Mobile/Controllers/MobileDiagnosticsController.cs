@@ -13,6 +13,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [ApiController]
 [Route("api/mobile/diagnostics")]
 [AllowAnonymous]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("mobile-anonymous")]
 public class MobileDiagnosticsController(ILogger<MobileDiagnosticsController> log) : ControllerBase
 {
     private readonly ILogger<MobileDiagnosticsController> _log = log;

@@ -84,9 +84,13 @@ public class DevicePairingController(
     /// <summary>
     /// PWA anônimo — troca pairing code por api key.
     /// Single-use: ao consumir, limpa <c>pairing_code</c> e seta <c>paired_at</c>.
+    /// Rate-limited pra mitigar tentativas de adivinhar código (6 dígitos =
+    /// 1M combinações; com cap em 30 req/min/IP, brute-force levaria ~23 dias
+    /// e cada código vence em 10 min — inviável).
     /// </summary>
     [HttpPost("pair")]
     [AllowAnonymous]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("mobile-anonymous")]
     public async Task<ActionResult<PairResponse>> Pair(
         [FromBody] PairRequest req,
         CancellationToken ct)

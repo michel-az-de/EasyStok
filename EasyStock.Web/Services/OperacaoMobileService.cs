@@ -28,6 +28,23 @@ public class OperacaoMobileService(ApiClient api, SessionService session)
     public Task<ApiResult<object>> EnfileirarComandoAsync(string deviceId, string commandType, string? payloadJson = null) =>
         api.PostAsync<object>($"mobile/devices/{deviceId}/commands",
             new { commandType, payloadJson });
+
+    public Task<ApiResult<List<DeviceHealthApi>>> ObterSaudeDevicesAsync() =>
+        api.GetAsync<List<DeviceHealthApi>>($"mobile/operation/devices-health?empresaId={GetEmpresaId()}");
+}
+
+public class DeviceHealthApi
+{
+    public string Id { get; set; } = "";
+    public string? Label { get; set; }
+    public string Status { get; set; } = "";
+    public string StatusLabel { get; set; } = "";
+    public DateTime? LastSeenAt { get; set; }
+    public string? LastSeenIp { get; set; }
+    public int PendingCommands { get; set; }
+    public int StuckCommands { get; set; }
+    public bool Revoked { get; set; }
+    public bool PendingPair { get; set; }
 }
 
 /// <summary>KPIs do painel /operacao.</summary>
