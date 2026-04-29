@@ -2672,6 +2672,68 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .he-meta .op { color: var(--gold); }
 .he-change { font-size: 12px; color: var(--ink-dim); margin-top: 4px; font-style: italic; }
 
+/* ========== Modal Diagnóstico ========== */
+.diag-head-btn {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--ink); width: 32px; height: 32px; border-radius: 10px;
+  font-size: 14px; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.diag-head-btn:active { transform: scale(0.95); }
+.diag-section {
+  margin: 12px 0 0; padding: 12px 12px 10px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent 80px);
+}
+.diag-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.diag-section-title {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.diag-status {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.04em;
+  padding: 3px 8px; border-radius: 999px; text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.diag-status.ok    { background: rgba(79,191,159,0.14); color: #4fbf9f; border-color: rgba(79,191,159,0.28); }
+.diag-status.warn  { background: rgba(240,184,74,0.14); color: var(--gold); border-color: rgba(240,184,74,0.32); }
+.diag-status.err   { background: rgba(231,104,69,0.14); color: var(--accent); border-color: rgba(231,104,69,0.32); }
+[data-theme="light"] .diag-status.ok    { color: #168f7a; background: rgba(22,143,122,0.10); }
+[data-theme="light"] .diag-status.warn  { color: #b78122; background: rgba(183,129,34,0.10); }
+[data-theme="light"] .diag-status.err   { color: #cf5738; background: rgba(207,87,56,0.10); }
+.diag-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; line-height: 1.55; color: var(--ink-dim);
+  padding: 2px 0;
+}
+.diag-row .k { color: var(--ink-mute); flex: 0 0 auto; }
+.diag-row .v { color: var(--ink); text-align: right; word-break: break-word; }
+.diag-row .v.warn { color: var(--gold); font-weight: 700; }
+.diag-row .v.err  { color: var(--accent); font-weight: 700; }
+.diag-actions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.diag-action {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--ink); border-radius: 999px; padding: 6px 12px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  font-family: inherit; letter-spacing: 0.02em;
+}
+.diag-action:active { transform: scale(0.97); }
+.diag-action.danger { color: var(--accent); border-color: rgba(231,104,69,0.32); }
+.diag-issues {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(240,184,74,0.06); border: 1px dashed rgba(240,184,74,0.28);
+  font-size: 11px; line-height: 1.55; color: var(--ink-dim);
+}
+.diag-issues .issue { padding: 2px 0; }
+.diag-issues .issue.err { color: var(--accent); }
+.diag-issues .issue.warn { color: var(--gold); }
+.diag-empty { font-size: 12px; color: var(--ink-mute); font-style: italic; }
+
 /* ========== Pedido retroativo (link no form) ========== */
 .retroactive-toggle {
   display: inline-flex; align-items: center; gap: 6px;
@@ -4470,6 +4532,14 @@ select:focus-visible {
       </div>
 
       <div class="ajustes-section" data-group="manut">
+        <h4>🩺 Diagnóstico</h4>
+        <p class="hint">Estado completo do app: sync, storage, integridade, impressora, câmera. Útil quando algo parece travado — copie o relatório e mande pra suporte.</p>
+        <div class="ajustes-actions-stack">
+          <button class="btn-ajustes-printer" onclick="closeAjustes(); openDiagnostics()">Abrir diagnóstico</button>
+        </div>
+      </div>
+
+      <div class="ajustes-section" data-group="manut">
         <h4>Atualizacao do app</h4>
         <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificacao manual.</p>
         <div class="ajustes-actions-stack">
@@ -4619,6 +4689,24 @@ select:focus-visible {
         <button class="cobranca-close" onclick="closeHistorico()" aria-label="Fechar">×</button>
       </div>
       <div id="historicoEvents"></div>
+    </div>
+  </div>
+
+  <!-- Diagnostico operacional — substitui o alert() antigo do printerDiagnostics.
+       Modal scrollavel com seções: APP, SYNC, STORAGE, INTEGRIDADE, IMPRESSORA,
+       CAMERA, ATALHOS. Util em campo quando algo nao esta bem. Conteudo
+       renderizado via openDiagnostics() / collectDiagnostics(). -->
+  <div class="historico-overlay" id="diagnosticsModal" role="dialog" aria-modal="true">
+    <div class="historico-sheet">
+      <div class="cobranca-head">
+        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Diagnóstico</h3>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="diag-head-btn" onclick="openDiagnostics()" aria-label="Atualizar" title="Atualizar">↻</button>
+          <button class="diag-head-btn" onclick="copyDiagnosticsToClipboard()" aria-label="Copiar tudo" title="Copiar tudo">📋</button>
+          <button class="cobranca-close" onclick="closeDiagnostics()" aria-label="Fechar">×</button>
+        </div>
+      </div>
+      <div id="diagnosticsBody"></div>
     </div>
   </div>
 
@@ -7856,39 +7944,404 @@ function loadPrinterDevices() {
   });
 }
 
-// Diagnostico visivel — alerta com estado do runtime pra debug em campo.
-// Acessivel via "Diagnóstico" em Ajustes > Impressora.
-function printerDiagnostics() {
-  const lines = [];
+// =====================================================================
+// DIAGNOSTICO OPERACIONAL
+// =====================================================================
+// Substitui o alert() antigo por modal scrollavel com 6 secoes (App, Sync,
+// Storage, Integridade, Impressora, Camera) + atalhos de emergencia. Util
+// em campo: operador toca, ve por que sync trava / storage cheio / refs
+// orfas / camera silenciosa / impressora desconectada.
+// printerDiagnostics() vira alias que abre o modal (compat com botao em
+// Ajustes > Equipamento).
+
+const DIAG_KNOWN_KEYS = [
+  'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
+  'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-operator-name',
+  'cdb-empresa-name', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
+  'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-schema-version',
+  'cdb-pre-reset-backup'
+];
+
+function _fmtRelTime(ts) {
+  if (!ts) return 'nunca';
+  const dt = Date.now() - Number(ts);
+  if (dt < 0 || !isFinite(dt)) return 'nunca';
+  const s = Math.floor(dt / 1000);
+  if (s < 60) return 'há ' + s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return 'há ' + m + ' min';
+  const h = Math.floor(m / 60);
+  if (h < 24) return 'há ' + h + 'h';
+  const d = Math.floor(h / 24);
+  return 'há ' + d + ' dia' + (d > 1 ? 's' : '');
+}
+function _fmtBytes(n) {
+  if (!isFinite(n) || n < 0) return '?';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function estimateStorageUsage() {
+  let total = 0;
+  const breakdown = {};
+  DIAG_KNOWN_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    const len = v ? v.length : 0;
+    breakdown[k] = len;
+    total += len;
+  });
+  // Soma tambem qualquer outra chave cdb-* nao listada (futuro-proof)
+  let extra = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.indexOf('cdb-') === 0 && DIAG_KNOWN_KEYS.indexOf(k) === -1) {
+      extra += (localStorage.getItem(k) || '').length;
+    }
+  }
+  total += extra;
+  return { total, breakdown, extra };
+}
+
+// Detecta inconsistencias que confundem operador / dificultam debug.
+// Severidade: warn (cosmetico/historico) | err (bloqueante / corrupcao).
+function checkIntegrity() {
+  const issues = [];
+  const productIds = new Set((products || []).map(p => p.id));
+  // 1. Orders com produtos inexistentes
+  let orphanOrders = 0;
+  (orders || []).forEach(o => {
+    (o.items || []).forEach(it => {
+      if (it.productId && !productIds.has(it.productId)) {
+        orphanOrders++;
+      }
+    });
+  });
+  if (orphanOrders) issues.push({ severity: 'warn', type: 'orphan-order-items',
+    msg: orphanOrders + ' item(ns) de pedido referencia(m) produto inexistente' });
+
+  // 2. Batches com produtos inexistentes
+  let orphanBatches = 0;
+  (batches || []).forEach(b => {
+    (b.items || []).forEach(it => {
+      if (it.productId && !productIds.has(it.productId)) orphanBatches++;
+    });
+  });
+  if (orphanBatches) issues.push({ severity: 'warn', type: 'orphan-batch-items',
+    msg: orphanBatches + ' item(ns) de lote referencia(m) produto inexistente' });
+
+  // 3. Pedidos sem clientSnapshot
+  const noSnap = (orders || []).filter(o => !o.clientSnapshot || !o.clientSnapshot.name).length;
+  if (noSnap) issues.push({ severity: 'warn', type: 'no-snapshot',
+    msg: noSnap + ' pedido(s) sem snapshot de cliente' });
+
+  // 4. cashEntries com amount nao-numerico
+  const badCash = (cashEntries || []).filter(e => !isFinite(Number(e.amount))).length;
+  if (badCash) issues.push({ severity: 'err', type: 'bad-cash',
+    msg: badCash + ' lancamento(s) de caixa com valor invalido' });
+
+  // 5. Audit log proximo do limite
+  const log = loadAuditLog();
+  if (log.length >= AUDIT_LOG_MAX) {
+    issues.push({ severity: 'warn', type: 'audit-full',
+      msg: 'Audit log atingiu limite (' + AUDIT_LOG_MAX + ') — mais antigos serao descartados' });
+  }
+  return issues;
+}
+
+function collectDiagnostics() {
   const ver = (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
-  lines.push('Bundle: ' + ver);
-  lines.push('Plataforma: ' + (window.Capacitor ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor') : 'web'));
+  const platform = window.Capacitor
+    ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor')
+    : 'web';
+  const deviceId = localStorage.getItem('cdb-device-id') || '(sem id)';
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+
+  // Sync state via cdbSync
+  const cs = window.cdbSync || {};
+  const queueSize = (typeof cs.queueSize === 'function') ? cs.queueSize() : (pendingSync || 0);
+  const lastSync = Number(localStorage.getItem('cdb-last-sync')) || 0;
+  const apiBase = cs.apiBaseUrl || '(mesmo host)';
+  const online = navigator.onLine;
+
+  const storage = estimateStorageUsage();
+  const issues = checkIntegrity();
+
+  // Impressora
   const bs = window.bluetoothSerial;
   const TP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
-  lines.push('Plugin nativo (ThermalPrinter): ' + (TP ? 'CARREGADO' : 'NÃO CARREGADO'));
-  lines.push('Shim window.bluetoothSerial: ' + (bs ? (bs.__cdbNative ? 'NATIVO ✓' : 'LEGADO') : 'AUSENTE'));
-  if (bs) {
-    lines.push('  bs.list: ' + (typeof bs.list));
-    lines.push('  bs.isEnabled: ' + (typeof bs.isEnabled));
-    lines.push('  bs.connect: ' + (typeof bs.connect));
-  }
-  const p = getSavedPrinter();
-  lines.push('Salva: ' + (p ? (p.name + ' / ' + p.address) : '(nenhuma)'));
-  // Trail dos ultimos passos Bluetooth — sobrevive a crash, mostra onde morreu
+  const printer = (typeof getSavedPrinter === 'function') ? getSavedPrinter() : null;
+  let btTrail = [];
+  try { btTrail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]'); } catch (e) {}
+
+  // Camera
+  const camErrors = getCameraErrors();
+  const detectorAvailable = ('BarcodeDetector' in window);
+  const scanMode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
+
+  // Caixa hoje
+  let cashTodayCount = 0;
+  let cashTodayBalance = 0;
   try {
-    const trail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]');
-    if (trail.length) {
-      lines.push('');
-      lines.push('--- Trail BT (ultimos ' + trail.length + ') ---');
-      const baseT = trail[0].t;
-      trail.forEach(e => {
-        const dt = ((e.t - baseT) / 1000).toFixed(1);
-        lines.push('+' + dt + 's ' + e.s);
-      });
-    }
+    const today = (typeof dateKeyOf === 'function') ? dateKeyOf(Date.now()) : null;
+    (cashEntries || []).forEach(e => {
+      if (today && (typeof dateKeyOf === 'function') && dateKeyOf(e.createdAt) === today) {
+        cashTodayCount++;
+        const sig = e.type === 'expense' ? -1 : 1;
+        cashTodayBalance += sig * (Number(e.amount) || 0);
+      }
+    });
   } catch (e) {}
-  alert(lines.join('\n'));
+
+  return {
+    app: { ver, platform, theme, operator: operatorName || '(sem operador)', deviceId },
+    sync: { queueSize, lastSync, apiBase, online },
+    storage: {
+      total: storage.total,
+      products: (products || []).length,
+      orders: (orders || []).length,
+      batches: (batches || []).length,
+      clients: (clients || []).length,
+      cashEntries: (cashEntries || []).length,
+      auditLog: loadAuditLog().length,
+      auditMax: AUDIT_LOG_MAX
+    },
+    integrity: { issues, cashTodayCount, cashTodayBalance },
+    printer: { plugin: !!TP, shim: !!bs, native: !!(bs && bs.__cdbNative),
+      saved: printer, trailLen: btTrail.length },
+    camera: { detectorAvailable, scanMode, errors: camErrors }
+  };
 }
+
+function _diagBadge(level) {
+  if (level === 'err') return '<span class="diag-status err">erro</span>';
+  if (level === 'warn') return '<span class="diag-status warn">atenção</span>';
+  return '<span class="diag-status ok">ok</span>';
+}
+function _diagRow(k, v, klass) {
+  return '<div class="diag-row"><span class="k">' + k + '</span><span class="v ' + (klass || '') + '">' + v + '</span></div>';
+}
+
+function openDiagnostics() {
+  const d = collectDiagnostics();
+  const body = document.getElementById('diagnosticsBody');
+  if (!body) return;
+
+  // Determinar severidades por seção
+  const syncLevel = !d.sync.online ? 'warn' : (d.sync.queueSize > 0 ? 'warn' : 'ok');
+  const storLevel = (d.storage.auditLog >= d.storage.auditMax) ? 'warn' : 'ok';
+  const integrityErr = d.integrity.issues.some(i => i.severity === 'err');
+  const integrityWarn = d.integrity.issues.some(i => i.severity === 'warn');
+  const integrityLevel = integrityErr ? 'err' : (integrityWarn ? 'warn' : 'ok');
+  const printerLevel = d.printer.saved ? (d.printer.plugin ? 'ok' : 'warn') : 'warn';
+  const camLevel = !d.camera.detectorAvailable ? 'err'
+    : (d.camera.errors.length > 0 ? 'warn' : 'ok');
+
+  const escIssues = d.integrity.issues.length
+    ? '<div class="diag-issues">' + d.integrity.issues.map(i =>
+        '<div class="issue ' + i.severity + '">• ' + escapeHtml(i.msg) + '</div>'
+      ).join('') + '</div>'
+    : '';
+
+  const camErrorsHtml = d.camera.errors.length
+    ? '<div class="diag-issues">' + d.camera.errors.slice(-5).reverse().map(e =>
+        '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.msg) + '</div>'
+      ).join('') + '</div>'
+    : '';
+
+  const btTrailRows = d.printer.trailLen
+    ? _diagRow('Trail BT', d.printer.trailLen + ' eventos')
+    : '';
+
+  function section(title, level, rows, actions, extra) {
+    return ''
+      + '<div class="diag-section">'
+      + '<div class="diag-section-head">'
+      + '<div class="diag-section-title">' + title + '</div>'
+      + _diagBadge(level)
+      + '</div>'
+      + rows
+      + (actions ? '<div class="diag-actions">' + actions + '</div>' : '')
+      + (extra || '')
+      + '</div>';
+  }
+
+  body.innerHTML = ''
+    + section('App', 'ok', ''
+        + _diagRow('Bundle', escapeHtml(d.app.ver))
+        + _diagRow('Plataforma', escapeHtml(d.app.platform))
+        + _diagRow('Tema', escapeHtml(d.app.theme))
+        + _diagRow('Operador', escapeHtml(d.app.operator))
+        + _diagRow('Device', escapeHtml(String(d.app.deviceId).slice(-12)))
+      , '', '')
+    + section('Sync', syncLevel, ''
+        + _diagRow('Última sync', _fmtRelTime(d.sync.lastSync))
+        + _diagRow('Fila pendente', d.sync.queueSize, d.sync.queueSize > 0 ? 'warn' : '')
+        + _diagRow('Online', d.sync.online ? 'sim' : 'não', d.sync.online ? '' : 'warn')
+        + _diagRow('Endpoint', escapeHtml(d.sync.apiBase || '(mesmo host)'))
+      , ''
+        + '<button class="diag-action" onclick="diagForceFlush()">Forçar flush</button>'
+        + '<button class="diag-action" onclick="diagForcePull()">Forçar pull</button>'
+      , '')
+    + section('Storage', storLevel, ''
+        + _diagRow('Uso total', _fmtBytes(d.storage.total))
+        + _diagRow('Produtos', d.storage.products)
+        + _diagRow('Pedidos', d.storage.orders)
+        + _diagRow('Lotes', d.storage.batches)
+        + _diagRow('Clientes', d.storage.clients)
+        + _diagRow('Caixa', d.storage.cashEntries + ' lançamentos')
+        + _diagRow('Audit log', d.storage.auditLog + ' / ' + d.storage.auditMax,
+            d.storage.auditLog >= d.storage.auditMax ? 'warn' : '')
+      , ''
+        + '<button class="diag-action" onclick="diagCompactAuditLog()">Compactar audit</button>'
+        + '<button class="diag-action" onclick="closeDiagnostics(); exportBackup()">Exportar backup</button>'
+      , '')
+    + section('Integridade', integrityLevel, ''
+        + _diagRow('Caixa de hoje', d.integrity.cashTodayCount + ' lançamentos · ' + money(d.integrity.cashTodayBalance))
+        + _diagRow('Alertas', d.integrity.issues.length || 'nenhum',
+            d.integrity.issues.length ? (integrityErr ? 'err' : 'warn') : '')
+      , '', escIssues)
+    + section('Impressora', printerLevel, ''
+        + _diagRow('Plugin nativo', d.printer.plugin ? 'CARREGADO' : 'NÃO CARREGADO',
+            d.printer.plugin ? '' : 'warn')
+        + _diagRow('Shim BluetoothSerial', d.printer.shim
+            ? (d.printer.native ? 'NATIVO ✓' : 'LEGADO')
+            : 'AUSENTE', d.printer.shim ? '' : 'warn')
+        + _diagRow('Salva', d.printer.saved
+            ? escapeHtml(d.printer.saved.name + ' / ' + d.printer.saved.address)
+            : '(nenhuma)', d.printer.saved ? '' : 'warn')
+        + btTrailRows
+      , (d.printer.saved ? '<button class="diag-action" onclick="closeDiagnostics(); testPrint()">Testar impressão</button>' : '')
+      , '')
+    + section('Câmera', camLevel, ''
+        + _diagRow('BarcodeDetector', d.camera.detectorAvailable ? 'disponível' : 'AUSENTE',
+            d.camera.detectorAvailable ? '' : 'err')
+        + _diagRow('Modo scan', escapeHtml(d.camera.scanMode))
+        + _diagRow('Erros recentes', d.camera.errors.length || 'nenhum',
+            d.camera.errors.length ? 'warn' : '')
+      , '', camErrorsHtml)
+    + section('Atalhos de emergência', 'ok',
+        '<div style="font-size:11px;color:var(--ink-mute);line-height:1.5;margin-bottom:8px">Use só se algo estiver claramente travado.</div>'
+      , ''
+        + '<button class="diag-action danger" onclick="diagClearSyncQueue()">Limpar fila sync</button>'
+        + '<button class="diag-action" onclick="location.reload()">Recarregar app</button>'
+      , '');
+
+  toggleModal('diagnosticsModal', true);
+}
+function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
+
+// Acoes do diagnostico — todas chamam window.cdbSync (existente).
+function diagForceFlush() {
+  if (window.cdbSync && typeof window.cdbSync.flush === 'function') {
+    window.cdbSync.flush().then(() => { showToast('Sync forçado'); openDiagnostics(); });
+  } else { showToast('Sync indisponível'); }
+}
+function diagForcePull() {
+  if (window.cdbSync && typeof window.cdbSync.pull === 'function') {
+    window.cdbSync.pull().then(() => { showToast('Pull forçado'); openDiagnostics(); });
+  } else { showToast('Pull indisponível'); }
+}
+function diagClearSyncQueue() {
+  if (!confirm('Apagar fila de sincronização local?\n\nMutações pendentes nunca chegarão ao servidor. Use só se a fila estiver claramente corrompida.')) return;
+  if (window.cdbSync && typeof window.cdbSync.clearQueue === 'function') {
+    window.cdbSync.clearQueue();
+    showToast('Fila de sync limpa');
+    openDiagnostics();
+  }
+}
+function diagCompactAuditLog() {
+  if (!confirm('Compactar audit log?\n\nMantém os 200 mais recentes; arquiva o resto em cdb-audit-log-archive (recuperável via export).')) return;
+  compactAuditLog();
+  showToast('Audit log compactado');
+  openDiagnostics();
+}
+
+// Mantem so os ultimos 200 do audit log; move o restante pra archive.
+// Archive cresce indefinidamente mas tem cap em 5000.
+function compactAuditLog() {
+  try {
+    const log = loadAuditLog();
+    if (log.length <= 200) return;
+    const keep = log.slice(0, 200);
+    const overflow = log.slice(200);
+    let archive = [];
+    try { archive = JSON.parse(localStorage.getItem('cdb-audit-log-archive') || '[]') || []; }
+    catch (e) {}
+    archive = overflow.concat(archive);
+    if (archive.length > 5000) archive.length = 5000;
+    localStorage.setItem('cdb-audit-log-archive', JSON.stringify(archive));
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(keep));
+  } catch (e) { console.warn('compactAuditLog falhou', e); }
+}
+
+function copyDiagnosticsToClipboard() {
+  const d = collectDiagnostics();
+  const lines = [];
+  lines.push('=== EASY STOCK MOBILE — DIAGNOSTICO ===');
+  lines.push('Gerado em: ' + new Date().toISOString());
+  lines.push('');
+  lines.push('[APP]');
+  lines.push('Bundle: ' + d.app.ver);
+  lines.push('Plataforma: ' + d.app.platform + ' · Tema: ' + d.app.theme);
+  lines.push('Operador: ' + d.app.operator + ' · Device: ' + d.app.deviceId);
+  lines.push('');
+  lines.push('[SYNC]');
+  lines.push('Online: ' + (d.sync.online ? 'sim' : 'nao') + ' · Fila: ' + d.sync.queueSize);
+  lines.push('Ultima sync: ' + _fmtRelTime(d.sync.lastSync) + ' · Endpoint: ' + d.sync.apiBase);
+  lines.push('');
+  lines.push('[STORAGE] total ' + _fmtBytes(d.storage.total));
+  lines.push('Produtos: ' + d.storage.products + ' · Pedidos: ' + d.storage.orders + ' · Lotes: ' + d.storage.batches);
+  lines.push('Clientes: ' + d.storage.clients + ' · Caixa: ' + d.storage.cashEntries);
+  lines.push('Audit: ' + d.storage.auditLog + '/' + d.storage.auditMax);
+  lines.push('');
+  lines.push('[INTEGRIDADE]');
+  lines.push('Caixa hoje: ' + d.integrity.cashTodayCount + ' lanc · ' + money(d.integrity.cashTodayBalance));
+  if (d.integrity.issues.length) {
+    d.integrity.issues.forEach(i => lines.push('- [' + i.severity + '] ' + i.msg));
+  } else {
+    lines.push('- nenhum alerta');
+  }
+  lines.push('');
+  lines.push('[IMPRESSORA]');
+  lines.push('Plugin: ' + (d.printer.plugin ? 'CARREGADO' : 'AUSENTE') + ' · Shim: ' + (d.printer.shim ? (d.printer.native ? 'NATIVO' : 'LEGADO') : 'AUSENTE'));
+  lines.push('Salva: ' + (d.printer.saved ? (d.printer.saved.name + ' / ' + d.printer.saved.address) : 'nenhuma'));
+  lines.push('Trail BT: ' + d.printer.trailLen + ' eventos');
+  lines.push('');
+  lines.push('[CAMERA]');
+  lines.push('BarcodeDetector: ' + (d.camera.detectorAvailable ? 'disponivel' : 'AUSENTE'));
+  lines.push('Modo scan: ' + d.camera.scanMode + ' · Erros: ' + d.camera.errors.length);
+  if (d.camera.errors.length) {
+    d.camera.errors.slice(-5).forEach(e => lines.push('- ' + new Date(e.t).toISOString() + ' ' + e.msg));
+  }
+  const text = lines.join('\n');
+  // Tenta clipboard API primeiro; fallback execCommand pra WebView antigo.
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('Diagnóstico copiado'))
+      .catch(() => _copyFallback(text));
+  } else {
+    _copyFallback(text);
+  }
+}
+function _copyFallback(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Diagnóstico copiado');
+  } catch (e) { showToast('Falha ao copiar'); }
+}
+
+// Compat com botao existente em Ajustes > Equipamento.
+// Antes era alert(); agora abre o modal completo (operador encontra a
+// secao Impressora rolando, mas tambem ve o resto do estado do app).
+function printerDiagnostics() { openDiagnostics(); }
 
 // Step logger persistente — sobrevive a native crash (JNI), permite ver
 // onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
@@ -11321,6 +11774,33 @@ window.addEventListener('load', () => {
       try { ensureBluetoothPermission(() => {}); } catch (e) {}
     }
   }, 2000);
+});
+
+// Atalho de campo: tap longo (>=800ms) no chip de sync abre o Diagnostico.
+// Tap curto continua chamando syncNow() via onclick existente.
+document.addEventListener('DOMContentLoaded', function () {
+  const chip = document.getElementById('syncChip');
+  if (!chip) return;
+  let pressTimer = null;
+  let longPressed = false;
+  function start() {
+    longPressed = false;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(function () {
+      longPressed = true;
+      if (navigator.vibrate) try { navigator.vibrate(20); } catch (e) {}
+      openDiagnostics();
+    }, 800);
+  }
+  function cancel() { clearTimeout(pressTimer); pressTimer = null; }
+  chip.addEventListener('pointerdown', start);
+  chip.addEventListener('pointerup', cancel);
+  chip.addEventListener('pointerleave', cancel);
+  chip.addEventListener('pointercancel', cancel);
+  // Suprime o syncNow() onclick se foi long-press
+  chip.addEventListener('click', function (ev) {
+    if (longPressed) { ev.stopImmediatePropagation(); ev.preventDefault(); longPressed = false; }
+  }, true);
 });
 </script>
 
