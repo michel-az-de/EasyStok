@@ -79,6 +79,14 @@ public class Order
     [Column("loja_id")]
     public Guid? LojaId { get; set; }
 
+    /// <summary>
+    /// Onda 3 — link pra <c>Venda</c> ERP criada quando este pedido foi
+    /// entregue. NULL = ainda não entregou OU produtos não estavam linkados
+    /// ao ERP (não há como criar Venda). Garante idempotência no re-envio.
+    /// </summary>
+    [Column("erp_venda_id")]
+    public Guid? ErpVendaId { get; set; }
+
     public List<OrderItem> Items { get; set; } = new();
 }
 

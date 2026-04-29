@@ -145,6 +145,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 
 // ── Mobile module services (Onda 2 parte 2: stock reconciliation) ────────────
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
+// Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>();
 
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();

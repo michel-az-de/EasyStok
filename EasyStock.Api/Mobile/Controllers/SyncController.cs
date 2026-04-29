@@ -35,10 +35,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 [AllowAnonymous]
 public class SyncController(
     EasyStockDbContext db,
-    MobileStockReconciler stockReconciler) : ControllerBase
+    MobileStockReconciler stockReconciler,
+    MobileSaleSyncService saleSync) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
+    private readonly MobileSaleSyncService _saleSync = saleSync;
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -278,13 +280,20 @@ public class SyncController(
                     Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
                 });
             _db.Add(order);
+            // Onda 3 — pedido criado direto como "entregue" (retroativo) ja
+            // gera Venda no ERP. Caso contrario aguarda transicao de status.
+            if (order.Status == "entregue")
+            {
+                await _saleSync.CreateVendaForDeliveredOrderAsync(order, dto.Items);
+            }
         }
         else
         {
             // Status transicionou? Aplica regra de estoque.
-            if (existing.Status != dto.Status)
+            var oldStatus = existing.Status;
+            if (oldStatus != dto.Status)
             {
-                await ApplyStockRule(existing.Status, dto.Status, dto.Items, dto.Id);
+                await ApplyStockRule(oldStatus, dto.Status, dto.Items, dto.Id);
             }
             existing.Status = dto.Status;
             existing.Notes = dto.Notes;
@@ -307,6 +316,18 @@ public class SyncController(
                     OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
                     Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
                 });
+
+            // Onda 3 — vendas mobile -> ERP.
+            // Transicao -> entregue: cria Venda (idempotente via ErpVendaId).
+            if (oldStatus != "entregue" && dto.Status == "entregue")
+            {
+                await _saleSync.CreateVendaForDeliveredOrderAsync(existing, dto.Items);
+            }
+            // Transicao entregue -> cancelado: marca Venda como cancelada.
+            else if (oldStatus == "entregue" && dto.Status == "cancelado")
+            {
+                await _saleSync.CancelVendaForOrderAsync(existing);
+            }
         }
     }
 
