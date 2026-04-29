@@ -2898,8 +2898,12 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
     position: fixed !important; left: 0; top: 0;
     width: 58mm; padding: 3mm 2.5mm 4mm;
     color: #000 !important; background: #fff !important;
-    font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace !important;
-    font-size: 10.5pt; line-height: 1.28;
+    /* Manrope: sans geometrica, pesos 400-800 carregados via Google Fonts.
+       Substitui o monospace antigo que ficava "falhado" na termica 58mm
+       por traços finos. Manrope 600+ tem stroke largo, imprime nitido. */
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+    font-size: 10.5pt; line-height: 1.32; font-weight: 600;
+    -webkit-font-smoothing: antialiased;
   }
   .print-area .pa-kicker {
     text-align: center; font-size: 8pt; font-weight: 800; letter-spacing: 1.6px;
@@ -3292,8 +3296,12 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .etq-card {
   width: 320px; max-width: 100%;
   background: #fff; color: #000;
-  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
-  font-size: 15px; line-height: 1.35; font-weight: 700;
+  /* Manrope: tipografia robusta para etiqueta (visualmente coerente com o
+     que sai impresso na termica). Pesos 600-800 dao traço largo, sem o
+     visual "falhado" do monospace antigo. */
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-size: 15px; line-height: 1.38; font-weight: 600;
+  -webkit-font-smoothing: antialiased;
   padding: 17px 15px 15px;
   border: 1px solid #ececec;
   border-radius: 6px;
@@ -4040,7 +4048,12 @@ select:focus-visible {
     var(--bg-elev-2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 18px;
   padding: 14px 16px; max-width: 360px; width: calc(100% - 32px);
-  box-shadow: 0 18px 42px rgba(0,0,0,0.36); z-index: 9000;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.36);
+  /* z-index ALTO: precisa ficar acima de TODOS os modais/overlays
+     (ajustes 13500, scanner 13000, np-overlays 9200-9500, etc) — senao
+     o toast aparece atras do modal e o operador nao consegue clicar
+     "Desfazer". Era a causa de "undo nao funciona". */
+  z-index: 14000;
   transition:
     opacity 0.25s ease,
     transform 0.25s ease,
@@ -4343,6 +4356,7 @@ select:focus-visible {
         <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="openCashModal()">+ Lançamento manual</button>
         <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
         <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
+        <button class="np-btn np-tertiary" onclick="printCashClosing()">🖨 Imprimir fechamento</button>
       </div>
 
       <div class="cf-label" style="margin-top:10px">Lançamentos manuais</div>
@@ -4403,7 +4417,12 @@ select:focus-visible {
     </div>
 
     <div class="screen" data-screen="compras">
-      <div class="section-label">Faltou o quê?</div>
+      <div class="section-label section-label-with-links">
+        <span>Faltou o quê?</span>
+        <span class="sl-links">
+          <a href="#" onclick="event.preventDefault(); printShoppingList()">🖨 Imprimir lista</a>
+        </span>
+      </div>
       <div class="input-box">
         <input id="shopInput" placeholder="ex: farinha 00, 5kg" onkeydown="if(event.key==='Enter')addShop()">
       </div>
@@ -6860,15 +6879,32 @@ function confirmCloseCashDay() {
   if (!cashClosings) cashClosings = [];
   cashClosings.push(closing);
   persistAll();
-  logAction({
-    action: 'cash.day_close', entityType: 'cash', entityId: closing.id,
-    summary: `Caixa fechado · ${closing.dateKey} · saldo ${money(sum.balance)}` + (notes ? ' · ' + notes : '')
-  });
   closeCashCloseModal();
   pendingCloseDateKey = null;
   renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
-  showToast(`🔒 Caixa de ${fmtDateKey(k)} fechado`);
+  // Undo toast (5s pra reverter). Audit log so dispara apos commit
+  // (onCommit) — se operador desfez, o fechamento nem entra no log.
+  const closingId = closing.id;
+  showUndoToast(
+    `<span class="hi">🔒 Caixa de ${escapeHtml(fmtDateKey(k))}</span> fechado · saldo ${money(sum.balance)}`,
+    function () {
+      // Undo: remove o closing recem criado
+      cashClosings = (cashClosings || []).filter(c => c.id !== closingId);
+      persistAll();
+      renderHome();
+      if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+      if (typeof renderCashDetails === 'function') renderCashDetails();
+    },
+    {
+      onCommit: function () {
+        logAction({
+          action: 'cash.day_close', entityType: 'cash', entityId: closingId,
+          summary: `Caixa fechado · ${closing.dateKey} · saldo ${money(sum.balance)}` + (notes ? ' · ' + notes : '')
+        });
+      }
+    }
+  );
 }
 
 function reopenCashDay() {
@@ -10674,6 +10710,115 @@ function orderLabelHtml(o) {
       ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
     </div>
     </div>`;
+}
+
+// ================================================================
+// IMPRESSAO — Fechamento de caixa (recibo Z) e Lista de compras
+// Reusa printAreaHtml (mesmo pipeline das etiquetas/recibos: 58mm, fonte
+// Manrope, @media print). Visualmente alinhado ao recibo de pedido.
+// ================================================================
+
+function cashClosingPrintHtml(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
+  const closing = getActiveCashClosing(k);
+  const empresa = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const ordersHtml = dayOrders.length
+    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-6))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem vendas no dia</span></span></div>';
+  const entriesHtml = dayEntries.length
+    ? dayEntries.map(e => {
+        const sign = e.type === 'expense' ? '-' : '+';
+        return `<div class="pa-item"><span class="pi-main"><span class="pi-name">${sign} ${escapeHtml(e.description || (e.type === 'expense' ? 'Saída' : 'Entrada'))}</span></span><span class="pi-price">${money(e.amount)}</span></div>`;
+      }).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem lançamentos manuais</span></span></div>';
+  const conf = closing?.summary?.conferredBalance;
+  const diff = (typeof conf === 'number' && !isNaN(conf)) ? (conf - sum.balance) : null;
+  return `
+    <div class="pa-receipt">
+    <div class="pa-kicker">Fechamento de caixa</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
+    <div class="pa-center"><span class="pa-order-ref pa-bold">Dia ${escapeHtml(fmtDateKey(k))}</span></div>
+    <div class="pa-meta">${closing ? '🔒 Fechado ' + new Date(closing.closedAt).toLocaleString('pt-BR') + (closing.closedBy ? ' · ' + escapeHtml(closing.closedBy) : '') : '⚠ Caixa ainda aberto'}</div>
+
+    <div class="pa-grid">
+      <div class="pa-label">Resumo do dia</div>
+      <div class="pa-row"><span>Vendas (${sum.ordersCount})</span><span class="pa-bold">${money(sum.sold)}</span></div>
+      <div class="pa-row"><span>Entradas extras</span><span class="pa-bold">+${money(sum.in)}</span></div>
+      <div class="pa-row"><span>Saídas</span><span class="pa-bold">-${money(sum.out)}</span></div>
+    </div>
+
+    <div class="pa-total-box">
+      <div class="pa-row pa-bold pa-large"><span>SALDO</span><span>${money(sum.balance)}</span></div>
+      ${typeof conf === 'number' && !isNaN(conf) ? `
+        <div class="pa-row" style="margin-top:4px"><span>Conferido</span><span class="pa-bold">${money(conf)}</span></div>
+        <div class="pa-row"><span>Diferença</span><span class="pa-bold">${diff > 0 ? '+' : ''}${money(diff)}</span></div>
+      ` : ''}
+    </div>
+
+    <div class="pa-block">
+      <div class="pa-label">Pedidos entregues (${sum.ordersCount})</div>
+      ${ordersHtml}
+    </div>
+
+    <div class="pa-block">
+      <div class="pa-label">Lançamentos manuais (${sum.entriesCount})</div>
+      ${entriesHtml}
+    </div>
+
+    ${closing?.notes ? `<div class="pa-note"><div class="pa-label">Observação</div><div>${escapeHtml(closing.notes)}</div></div>` : ''}
+
+    <div class="pa-meta" style="margin-top:8px;text-align:center">${operatorName ? 'Operador: ' + escapeHtml(operatorName) : ''}</div>
+    </div>`;
+}
+
+function printCashClosing(dateKey) {
+  const k = dateKey || dateKeyOf();
+  printAreaHtml(cashClosingPrintHtml(k));
+}
+
+function shoppingListPrintHtml() {
+  const rows = getShoppingRows();
+  if (!rows.length) {
+    showToast('Lista de compras vazia');
+    return null;
+  }
+  const empresa = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
+  const pending = rows.filter(r => !r.done);
+  const done = rows.filter(r => r.done);
+  const pendingHtml = pending.length
+    ? pending.map(r => `<div class="pa-item"><span class="pi-main"><span class="pi-name">☐ ${escapeHtml(r.name)}</span></span></div>`).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Nenhum item pendente</span></span></div>';
+  const doneHtml = done.length
+    ? done.map(r => `<div class="pa-item"><span class="pi-main"><span class="pi-name">☑ <s>${escapeHtml(r.name)}</s></span></span></div>`).join('')
+    : '';
+  return `
+    <div class="pa-receipt">
+    <div class="pa-kicker">Lista de compras</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
+    <div class="pa-meta">${new Date().toLocaleString('pt-BR')}</div>
+
+    <div class="pa-block">
+      <div class="pa-label">A comprar (${pending.length})</div>
+      ${pendingHtml}
+    </div>
+
+    ${done.length ? `
+    <div class="pa-block">
+      <div class="pa-label">Já comprados (${done.length})</div>
+      ${doneHtml}
+    </div>
+    ` : ''}
+
+    <div class="pa-meta" style="margin-top:8px;text-align:center">${operatorName ? 'Operador: ' + escapeHtml(operatorName) : ''}</div>
+    </div>`;
+}
+
+function printShoppingList() {
+  const html = shoppingListPrintHtml();
+  if (html) printAreaHtml(html);
 }
 
 // Botões +/- explícitos nos tiles de produção
