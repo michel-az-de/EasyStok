@@ -48,6 +48,49 @@ if [ "$WEB_HASH" != "$PUB_HASH" ]; then
 fi
 echo "==> OK: web/ e assets/public/ sincronizados (sha256 $WEB_HASH)."
 
+# ASSERCAO #1.5: roda testes unitarios da PWA antes de empacotar.
+# Falha = build aborta. Cobre logica de pedido, caixa, producao e
+# conferencia + helpers de error log e scan mode.
+# WSL geralmente nao tem node instalado, mas o PATH do Windows fica
+# montado em /mnt/c/... — busca node.exe nas localizacoes comuns.
+NODE_BIN=""
+if command -v node >/dev/null 2>&1; then
+  NODE_BIN="node"
+else
+  for cand in \
+    "/mnt/c/Program Files/nodejs/node.exe" \
+    "/mnt/c/Program Files (x86)/nodejs/node.exe" \
+    "/mnt/c/Users/$USER/AppData/Roaming/nvm/node.exe" \
+    "$(command -v node.exe 2>/dev/null)"; do
+    if [ -n "$cand" ] && [ -x "$cand" ]; then NODE_BIN="$cand"; break; fi
+  done
+fi
+if [ -n "$NODE_BIN" ]; then
+  echo ""
+  echo "==> Rodando testes unitarios (node: $NODE_BIN)..."
+  # Se node e o Windows node.exe, paths Linux precisam ser convertidos
+  # pra Windows. Detecta pelo .exe no nome.
+  if [[ "$NODE_BIN" == *.exe ]] && command -v wslpath >/dev/null 2>&1; then
+    TEST_RUN="$(wslpath -w "$DST/tests/run.js")"
+    PWA_FILE="$(wslpath -w "$DST/web/index.html")"
+  else
+    TEST_RUN="$DST/tests/run.js"
+    PWA_FILE="$DST/web/index.html"
+  fi
+  if PWA_HTML="$PWA_FILE" "$NODE_BIN" "$TEST_RUN"; then
+    echo "==> OK: testes unitarios passaram."
+  else
+    echo ""
+    echo "==> ERRO: testes unitarios FALHARAM. Build abortado."
+    echo "    Corrija os testes em casa-da-baba-mobile/apk/tests/ ou a logica"
+    echo "    em wwwroot/pwa/index.html antes de gerar o APK."
+    exit 1
+  fi
+else
+  echo "==> AVISO: node nao encontrado (WSL ou Windows) — testes pulados."
+  echo "    Instale Node 18+ ou rode 'sudo apt install nodejs' no WSL."
+fi
+
 cd "$DST/android"
 chmod +x ./gradlew
 

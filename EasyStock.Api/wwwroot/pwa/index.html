@@ -8441,7 +8441,8 @@ function collectDiagnostics() {
     integrity: { issues, cashTodayCount, cashTodayBalance },
     printer: { plugin: !!TP, shim: !!bs, native: !!(bs && bs.__cdbNative),
       saved: printer, trailLen: btTrail.length },
-    camera: { detectorAvailable, scanMode, errors: camErrors }
+    camera: { detectorAvailable, scanMode, errors: camErrors },
+    errors: getErrorLog()
   };
 }
 
@@ -8552,6 +8553,18 @@ function openDiagnostics() {
         + _diagRow('Erros recentes', d.camera.errors.length || 'nenhum',
             d.camera.errors.length ? 'warn' : '')
       , '', camErrorsHtml)
+    + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
+        + _diagRow('Total registrado', d.errors.length || 'nenhum',
+            d.errors.length ? 'warn' : '')
+        + (d.errors.length ? _diagRow('Mais recente', _fmtRelTime(d.errors[d.errors.length-1].t)) : '')
+      , ''
+        + (d.errors.length ? '<button class="diag-action" onclick="exportErrorLog()">Exportar</button>' : '')
+        + (d.errors.length ? '<button class="diag-action danger" onclick="diagClearErrorLog()">Limpar</button>' : '')
+      , (d.errors.length
+          ? '<div class="diag-issues">' + d.errors.slice(-5).reverse().map(e =>
+              '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.ctx || '') + ': ' + escapeHtml(e.msg) + '</div>'
+            ).join('') + '</div>'
+          : ''))
     + section('Atalhos de emergência', 'ok',
         '<div style="font-size:11px;color:var(--ink-mute);line-height:1.5;margin-bottom:8px">Use só se algo estiver claramente travado.</div>'
       , ''
@@ -8560,6 +8573,12 @@ function openDiagnostics() {
       , '');
 
   toggleModal('diagnosticsModal', true);
+}
+function diagClearErrorLog() {
+  if (!confirm('Limpar log de erros?\n\nIrreversivel — exporte antes se precisar investigar.')) return;
+  clearErrorLog();
+  showToast('Log de erros limpo');
+  openDiagnostics();
 }
 function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
 
@@ -9179,10 +9198,79 @@ let scannerOrigin = null;
 // Ring buffer dos ultimos erros do BarcodeDetector — antes era catch{} mudo,
 // operador nao tinha como saber que cam falhou. Agora persiste em localStorage
 // (visivel via Diagnostico) e fecha scanner se acumular muitos erros seguidos.
+// ============================================================
+// ERROR LOG GLOBAL — captura window.onerror + unhandledrejection
+// + try/catch dos fluxos criticos. Expostos em Ajustes -> Diagnostico
+// (Ver / Exportar / Limpar). Ring buffer em localStorage.
+// ============================================================
+const ERROR_LOG_KEY = 'cdb-error-log';
+const ERROR_LOG_MAX = 500;
+
+function logError(err, context) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    const entry = {
+      t: Date.now(),
+      ctx: String(context || '').slice(0, 80),
+      msg: String((err && (err.message || err.toString())) || err || '').slice(0, 400),
+      stack: String((err && err.stack) || '').split('\n').slice(0, 8).join('\n').slice(0, 800),
+      screen: (typeof currentScreen !== 'undefined' && currentScreen) || '',
+      operator: (typeof operatorName !== 'undefined' && operatorName) || ''
+    };
+    arr.push(entry);
+    if (arr.length > ERROR_LOG_MAX) arr.splice(0, arr.length - ERROR_LOG_MAX);
+    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(arr));
+  } catch (e) { /* localStorage cheio: silencioso */ }
+  try { console.warn('[cdb-error]', context, err); } catch (e) {}
+}
+function getErrorLog() {
+  try { return JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function clearErrorLog() {
+  try { localStorage.removeItem(ERROR_LOG_KEY); } catch (e) {}
+}
+function exportErrorLog() {
+  const arr = getErrorLog();
+  if (!arr.length) { showToast('Sem erros pra exportar'); return; }
+  const lines = ['=== ERROR LOG ==='];
+  lines.push((typeof getEmpresaName === 'function' ? getEmpresaName() : '') || 'Easy Stock Mobile');
+  lines.push('Exportado: ' + new Date().toLocaleString('pt-BR'));
+  lines.push('Total: ' + arr.length);
+  lines.push('');
+  arr.slice().reverse().forEach(e => {
+    lines.push('[' + new Date(e.t).toLocaleString('pt-BR') + '] ' + (e.ctx || '-') + (e.screen ? ' (' + e.screen + ')' : ''));
+    lines.push('  ' + e.msg);
+    if (e.stack) e.stack.split('\n').forEach(l => lines.push('    ' + l));
+    lines.push('');
+  });
+  if (typeof shareTextNative === 'function') {
+    shareTextNative('Error log Easy Stock', lines.join('\n'));
+  } else {
+    alert(lines.join('\n').slice(0, 4000));
+  }
+}
+
+// Hooks globais — sao registrados no boot (init block) via setupGlobalErrorHandlers
+function setupGlobalErrorHandlers() {
+  if (window.__cdbErrorHooked) return;
+  window.__cdbErrorHooked = true;
+  window.addEventListener('error', function (ev) {
+    const err = ev && ev.error ? ev.error : (ev && ev.message ? new Error(ev.message) : new Error('window.onerror'));
+    logError(err, 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : ''));
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    const reason = ev && ev.reason;
+    logError(reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection')), 'unhandledrejection');
+  });
+}
+
 const CAM_ERRORS_KEY = 'cdb-cam-errors';
 const CAM_ERRORS_MAX = 10;
 let _scannerConsecutiveErrors = 0;
 function recordCameraError(msg) {
+  // Continua especifico — mantem feedback visual proprio do scanner
+  try { logError(new Error(msg || 'camera error'), 'scanner'); } catch (e) {}
   try {
     const arr = JSON.parse(localStorage.getItem(CAM_ERRORS_KEY) || '[]');
     arr.push({ t: Date.now(), msg: String(msg || '').slice(0, 200) });
@@ -12362,6 +12450,10 @@ window.addEventListener('load', () => {
     }
   }, 2000);
 });
+
+// Hooks globais de erro — registram window.onerror e unhandledrejection
+// pra alimentar o cdb-error-log. Diagnostico mostra/exporta/limpa.
+try { setupGlobalErrorHandlers(); } catch (e) { console.warn('setupGlobalErrorHandlers falhou', e); }
 
 // Atalho de campo: tap longo (>=800ms) no chip de sync abre o Diagnostico.
 // Tap curto continua chamando syncNow() via onclick existente.
