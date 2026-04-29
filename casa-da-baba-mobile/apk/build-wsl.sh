@@ -33,6 +33,21 @@ cp -f "$DST/web/manifest.json"  "$ASSETS_PUB/manifest.json"
 [ -d "$DST/web/icons" ]          && rsync -a "$DST/web/icons/" "$ASSETS_PUB/icons/"
 ls -la "$ASSETS_PUB/index.html"
 
+# ASSERCAO #1: garante que web/ e assets/public/ tem o MESMO index.html
+# byte a byte. Se falhar, build aborta antes do gradle — evita gastar
+# tempo empacotando uma versao errada.
+WEB_HASH=$(sha256sum "$DST/web/index.html" | cut -d' ' -f1)
+PUB_HASH=$(sha256sum "$ASSETS_PUB/index.html" | cut -d' ' -f1)
+if [ "$WEB_HASH" != "$PUB_HASH" ]; then
+  echo ""
+  echo "==> ERRO: web/index.html != assets/public/index.html"
+  echo "    web/    sha256: $WEB_HASH"
+  echo "    public/ sha256: $PUB_HASH"
+  echo "    Cheque se a copia acima rodou. Build abortado."
+  exit 1
+fi
+echo "==> OK: web/ e assets/public/ sincronizados (sha256 $WEB_HASH)."
+
 cd "$DST/android"
 chmod +x ./gradlew
 
@@ -47,4 +62,22 @@ echo "==> Iniciando build..."
 ./gradlew assembleDebug 2>&1 | tail -80
 echo ""
 echo "==> APK final:"
-find . -path "*/outputs/apk/debug/*.apk" -exec ls -la {} \;
+APK_PATH=$(find . -path "*/outputs/apk/debug/*.apk" | head -1)
+ls -la "$APK_PATH"
+
+# ASSERCAO #2: extrai index.html DO APK e compara byte-a-byte com a fonte.
+# Se diverge, o APK saiu errado mesmo com a copia OK — algo no build do
+# gradle empacotou outro arquivo. Falha loud antes de instalar no celular.
+echo ""
+echo "==> Validando index.html dentro do APK..."
+APK_HASH=$(unzip -p "$APK_PATH" assets/public/index.html | sha256sum | cut -d' ' -f1)
+SRC_HASH=$(sha256sum "$DST/web/index.html" | cut -d' ' -f1)
+if [ "$APK_HASH" != "$SRC_HASH" ]; then
+  echo ""
+  echo "==> ERRO: index.html dentro do APK NAO bate com a fonte."
+  echo "    APK    sha256: $APK_HASH"
+  echo "    fonte  sha256: $SRC_HASH"
+  echo "    O APK saiu errado. Nao instale."
+  exit 1
+fi
+echo "==> OK: APK contem o index.html correto (sha256 $APK_HASH)."
