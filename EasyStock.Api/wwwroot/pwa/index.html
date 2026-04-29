@@ -231,6 +231,15 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+:where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 3px solid rgba(240, 184, 74, 0.34);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  transform: none !important;
+}
+
 /* Section labels */
 .section-label {
   font-size: 10px;
@@ -259,6 +268,7 @@ body {
 .section-label-with-links .sl-links {
   display: inline-flex; gap: 6px;
   text-transform: none; letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 .section-label-with-links .sl-links a {
   color: var(--gold); font-size: 10px; font-weight: 800;
@@ -394,16 +404,16 @@ body {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin: 8px 0 2px;
+  margin: 10px 0 4px;
 }
 .home-command {
   min-width: 0;
-  min-height: 58px;
+  min-height: 64px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  padding: 10px 9px;
+  padding: 11px 10px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background:
@@ -427,6 +437,7 @@ body {
   font-weight: 900;
   letter-spacing: 0.11em;
   text-transform: uppercase;
+  min-width: 0;
 }
 .home-command .hc-k svg {
   width: 13px;
@@ -443,13 +454,21 @@ body {
   font-size: 11px;
   font-weight: 750;
   line-height: 1.25;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 [data-theme="light"] .home-command {
   background: #fff;
   border-color: #dbe2ec;
   box-shadow: 0 10px 24px rgba(21,31,49,0.06);
+}
+@media (max-width: 360px) {
+  .content { padding-left: 16px; padding-right: 16px; }
+  .home-command-bar { gap: 6px; }
+  .home-command { padding: 10px 7px; }
+  .home-command .hc-k { font-size: 9px; gap: 4px; letter-spacing: 0.08em; }
+  .home-command .hc-v { font-size: 10px; }
 }
 .home-shopping-head {
   display: flex;
@@ -2111,10 +2130,11 @@ body {
   gap: 3px;
   cursor: pointer;
   font-family: inherit;
-  padding: 7px 0 6px;
+  padding: 8px 3px 7px;
   border-radius: 14px;
   transition: color var(--transition), background var(--transition);
   position: relative;
+  min-height: 54px;
 }
 .nav-icon {
   width: 24px;
@@ -2133,15 +2153,23 @@ body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.nav-btn:hover {
+  color: var(--ink-dim);
+  background: rgba(255,255,255,0.035);
+}
 .nav-btn.active .nav-icon {
   color: var(--accent);
   transform: scale(1.08);
 }
 .nav-btn .label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nav-btn { color: var(--ink-mute); }
 .nav-btn.active {
@@ -9466,6 +9494,113 @@ function unpairDevice() {
   }
 }
 
+// Onda 6 — modal de conflito de sincronização. Em vez de toast efêmero,
+// operador vê o que aconteceu, qual o motivo, e pode escolher recarregar
+// (força pull) ou só fechar. Nunca apaga dados locais — server já
+// alinhou via pull automático em background.
+function showConflictModal(conflicts) {
+  if (!Array.isArray(conflicts) || conflicts.length === 0) return;
+
+  // Cria o overlay on-the-fly se não existir (módulo isolado, evita
+  // poluir HTML estático). Reaproveita estilos .historico-overlay.
+  let overlay = document.getElementById('conflictModal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'conflictModal';
+    overlay.className = 'historico-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="historico-sheet">
+        <div class="cobranca-head">
+          <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Conflitos de sincronização</h3>
+          <button class="cobranca-close" onclick="closeConflictModal()" aria-label="Fechar">×</button>
+        </div>
+        <div id="conflictBody"></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="diag-action" onclick="diagPingServer && diagPingServer()">Verificar servidor</button>
+          <button class="diag-action" onclick="closeConflictModal()">OK, entendi</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  const body = document.getElementById('conflictBody');
+  const items = conflicts.slice(0, 10).map(c => {
+    const reason = (c.reason || '').replace(/^conflict:\s*/i, '');
+    return `
+      <div class="diag-section">
+        <div class="diag-section-head">
+          <div class="diag-section-title">⚠ ${escapeHtml((c.id || '').slice(-12))}</div>
+          <span class="diag-status warn">conflito</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);line-height:1.5;padding:6px 0">
+          ${escapeHtml(reason || 'Outra pessoa editou primeiro.')}
+        </div>
+      </div>`;
+  }).join('');
+  const extra = conflicts.length > 10
+    ? `<div style="font-size:11px;color:var(--ink-mute);text-align:center;padding:8px">+${conflicts.length - 10} mais. Veja em Diagnóstico → Erros do sistema.</div>`
+    : '';
+  body.innerHTML = `
+    <div style="font-size:12.5px;color:var(--ink-dim);margin-bottom:10px;line-height:1.5">
+      <strong style="color:var(--ink)">${conflicts.length}</strong> edição${conflicts.length === 1 ? '' : 'ões'} foram rejeitadas porque
+      outro dispositivo modificou os mesmos itens depois de você.
+      A versão do servidor já foi carregada automaticamente — sua tela está atualizada.
+    </div>
+    ${items}${extra}`;
+  toggleModal('conflictModal', true);
+}
+function closeConflictModal() { toggleModal('conflictModal', false); }
+
+// Onda 6: troca de loja sem re-parear. Empresa fixa.
+async function switchLojaPrompt() {
+  if (!window.cdbSync || typeof window.cdbSync.listLojasDisponiveis !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  showToast('Carregando lojas…');
+  let lojas;
+  try {
+    lojas = await window.cdbSync.listLojasDisponiveis();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    return;
+  }
+  if (!Array.isArray(lojas) || lojas.length === 0) {
+    alert('Nenhuma loja ativa disponível pra esta empresa.');
+    return;
+  }
+  if (lojas.length === 1) {
+    alert('Esta empresa só tem 1 loja ("' + lojas[0].nome + '"). Sem opções pra trocar.');
+    return;
+  }
+  // Diálogo simples — modal HTML dedicado fica na próxima evolução.
+  const linhas = lojas.map((l, i) =>
+    (i + 1) + ') ' + l.nome + (l.atual ? ' [atual]' : '') + (l.endereco ? ' · ' + l.endereco : '')
+  ).join('\n');
+  const escolha = window.prompt(
+    'Escolha o número da loja:\n\n' + linhas + '\n\n(digite 0 pra cancelar)'
+  );
+  const idx = parseInt(escolha, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= lojas.length) return;
+  const loja = lojas[idx];
+  if (loja.atual) { showToast('Já está nesta loja'); return; }
+  if (!confirm('Trocar pra ' + loja.nome + '?\n\nDados da loja anterior serão sincronizados antes da troca.')) return;
+  showToast('Trocando…');
+  try {
+    const r = await window.cdbSync.switchLoja(loja.id);
+    if (r && r.changed) {
+      showToast('Agora você está em ' + (r.lojaNome || loja.nome));
+    } else {
+      showToast('Sem mudança');
+    }
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'switchLojaPrompt'); } catch (_) {}
+  }
+}
+
 function _diagBadge(level) {
   if (level === 'err') return '<span class="diag-status err">erro</span>';
   if (level === 'warn') return '<span class="diag-status warn">atenção</span>';
@@ -9610,6 +9745,9 @@ function openDiagnostics() {
               : '')
         , ''
           + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
+          + (p
+              ? '<button class="diag-action" onclick="switchLojaPrompt()">Trocar loja</button>'
+              : '')
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
               : '<button class="diag-action" onclick="pairDevicePrompt()">Parear dispositivo</button>')
@@ -13367,15 +13505,17 @@ window.cdbApp = {
     try { showToast('Pareamento invalidado — abra Ajustes > Diagnostico pra re-parear'); } catch (e) {}
     try { logError(new Error('pairing invalidated by server'), 'sync.pairing'); } catch (_) {}
   },
-  // Onda 5: edits conflitaram com versão mais nova no servidor.
+  // Onda 5/6: edits conflitaram com versão mais nova no servidor.
+  // Onda 6: UX rica — em vez de só toast, abre modal claro com lista
+  // dos conflitos + opção de "Recarregar do servidor" pra alinhar UI.
   onSyncConflict: function (conflicts) {
-    try {
-      const n = (conflicts || []).length;
-      showToast(n + ' edicao' + (n === 1 ? '' : 'es') + ' conflitou — versao do servidor prevaleceu');
-    } catch (e) {}
     (conflicts || []).forEach(c => {
       try { logError(new Error(c.reason || 'conflict'), 'sync.conflict:' + (c.id || '?')); } catch (_) {}
     });
+    try { showConflictModal(conflicts); } catch (e) {
+      const n = (conflicts || []).length;
+      try { showToast(n + ' edicao' + (n === 1 ? '' : 'es') + ' conflitou'); } catch (_) {}
+    }
   }
 };
 </script>

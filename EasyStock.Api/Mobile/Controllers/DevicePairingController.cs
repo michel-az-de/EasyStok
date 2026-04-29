@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using EasyStock.Api.Mobile.Security;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -248,6 +250,65 @@ public class DevicePairingController(
         return Ok(new { id = cmd.Id, commandType = cmd.CommandType, expiresAt = cmd.ExpiresAt });
     }
 
+    /// <summary>
+    /// Onda 6 — App pareado pega lista de lojas da empresa pra trocar.
+    /// Apenas lojas <c>Ativa</c>. Empresa do device é a única visível.
+    /// </summary>
+    [HttpGet("me/lojas-disponiveis")]
+    [MobileApiKey]
+    public async Task<ActionResult<LojaDisponivelDto[]>> ListarLojasDisponiveis(CancellationToken ct)
+    {
+        var device = HttpContext.GetMobileDevice();
+        if (device == null) return Unauthorized(new { error = "device não pareado" });
+
+        var lojas = await _db.Set<Loja>().AsNoTracking()
+            .Where(l => l.EmpresaId == device.EmpresaId && l.Ativa)
+            .OrderBy(l => l.Nome)
+            .Select(l => new LojaDisponivelDto(
+                l.Id, l.Nome, l.Descricao, l.Endereco, l.Id == device.LojaId
+            ))
+            .ToListAsync(ct);
+
+        return Ok(lojas);
+    }
+
+    /// <summary>
+    /// Onda 6 — Operador troca a loja do próprio device. Empresa fixa.
+    /// Audita a mudança em <c>created_by_user_id</c>=null + log.
+    /// </summary>
+    [HttpPost("me/switch-loja")]
+    [MobileApiKey]
+    public async Task<IActionResult> SwitchLoja(
+        [FromBody] SwitchLojaRequest req,
+        CancellationToken ct)
+    {
+        var device = HttpContext.GetMobileDevice();
+        if (device == null) return Unauthorized(new { error = "device não pareado" });
+        if (req == null || req.LojaId == Guid.Empty)
+            return BadRequest(new { error = "lojaId obrigatório" });
+        if (req.LojaId == device.LojaId)
+            return Ok(new { changed = false });
+
+        // Valida que a loja pertence à empresa do device + está ativa.
+        var loja = await _db.Set<Loja>().AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Id == req.LojaId && l.EmpresaId == device.EmpresaId && l.Ativa, ct);
+        if (loja == null)
+            return BadRequest(new { error = "loja não encontrada nesta empresa ou inativa" });
+
+        // Atualiza via SQL pra evitar tracking issues (device veio AsNoTracking).
+        var oldLojaId = device.LojaId;
+        await _db.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE mobile_devices
+            SET loja_id = {loja.Id},
+                updated_at = {DateTime.UtcNow}
+            WHERE ""Id"" = {device.Id}", ct);
+
+        _log.LogInformation("Device {DeviceId} trocou de loja {Old} → {New} ({LojaNome})",
+            device.Id, oldLojaId, loja.Id, loja.Nome);
+
+        return Ok(new { changed = true, lojaId = loja.Id, lojaNome = loja.Nome });
+    }
+
     /// <summary>Web autenticado — revoga device. App correspondente para de funcionar.</summary>
     [HttpDelete("{id}")]
     [Authorize]
@@ -333,3 +394,11 @@ public record DeviceSummary(
 
 /// <summary>Onda 4 — request pra enfileirar comando remoto.</summary>
 public record EnqueueCommandRequest(string CommandType, string? PayloadJson);
+
+/// <summary>Onda 6 — item da lista de lojas disponíveis pro device.</summary>
+public record LojaDisponivelDto(
+    Guid Id, string Nome, string? Descricao, string? Endereco, bool Atual
+);
+
+/// <summary>Onda 6 — request pra trocar de loja.</summary>
+public record SwitchLojaRequest(Guid LojaId);

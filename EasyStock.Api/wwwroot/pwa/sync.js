@@ -348,6 +348,64 @@
   // Resposta vai pro localStorage pra Diagnóstico exibir e pra UI
   // condicional (ex: avisar quando ApiKeyEnforced virar true).
   // Falha silenciosa: se offline ou rede ruim, deixa cache antigo.
+  // ---- Multi-loja (Onda 6) ----
+  // App pareado pode trocar de loja sem re-parear. Empresa fixa (vem
+  // do pareamento original); só lojaId muda. Após trocar, força flush
+  // + pull pra alinhar dados da loja nova (estoque, pedidos, etc).
+  async function listLojasDisponiveis() {
+    if (!navigator.onLine) throw new Error('sem rede');
+    if (!getApiKey()) throw new Error('nao pareado');
+    const url = API_BASE_URL + API_PREFIX + '/devices/me/lojas-disponiveis';
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
+      if (resp.status === 401) { _pairingInvalid = true; throw new Error('pareamento invalidado'); }
+      if (!resp.ok) throw new Error('servidor recusou: ' + resp.status);
+      return await resp.json();
+    } finally { clearTimeout(timeoutId); }
+  }
+
+  async function switchLoja(lojaId) {
+    if (!navigator.onLine) throw new Error('sem rede');
+    if (!getApiKey()) throw new Error('nao pareado');
+    if (!lojaId) throw new Error('lojaId obrigatorio');
+    const url = API_BASE_URL + API_PREFIX + '/devices/me/switch-loja';
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 10000);
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ lojaId }),
+        signal: ctrl.signal
+      });
+    } finally { clearTimeout(timeoutId); }
+    if (resp.status === 401) { _pairingInvalid = true; throw new Error('pareamento invalidado'); }
+    if (!resp.ok) {
+      let msg = 'falha ao trocar loja';
+      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    // Atualiza pairing local com nova loja
+    if (data.changed) {
+      const p = loadPairing();
+      if (p) {
+        p.lojaId = data.lojaId;
+        p.label = p.label; // preserva
+        savePairing(p);
+      }
+      // Drena fila atual + pega dados da loja nova
+      try { await flush(); } catch (_) {}
+      try { await pull(); } catch (_) {}
+      // Reinicia SSE pra pegar grupo da nova loja
+      try { stopRealtime(); startRealtime(); } catch (_) {}
+    }
+    return data;
+  }
+
   // ---- Realtime via SSE (Onda 5) ----
   // Conecta no /api/mobile/operation/stream?apiKey=... e escuta eventos
   // server-pushed. Quando outro device da mesma loja sincroniza, recebe
@@ -578,6 +636,7 @@
     fetchCommands: fetchAndProcessCommands,
     startRealtime, stopRealtime,
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
+    listLojasDisponiveis, switchLoja,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
     deviceId,
