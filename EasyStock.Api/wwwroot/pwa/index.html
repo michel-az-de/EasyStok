@@ -5142,7 +5142,18 @@ function logAction(opts) {
     };
     const log = loadAuditLog();
     log.unshift(entry); // mais recentes primeiro
-    if (log.length > AUDIT_LOG_MAX) log.length = AUDIT_LOG_MAX;
+    // F5: ao ultrapassar o limite, arquiva os mais antigos em
+    // cdb-audit-log-archive (cap 5000) ao inves de dropar. Operador
+    // recupera via export. Diagnostico mostra contagem do archive.
+    if (log.length > AUDIT_LOG_MAX) {
+      const overflow = log.splice(AUDIT_LOG_MAX);
+      try {
+        let archive = JSON.parse(localStorage.getItem('cdb-audit-log-archive') || '[]') || [];
+        archive = overflow.concat(archive);
+        if (archive.length > 5000) archive.length = 5000;
+        localStorage.setItem('cdb-audit-log-archive', JSON.stringify(archive));
+      } catch (e) { /* archive cheio/corrupto: dropa silencioso (igual antes) */ }
+    }
     localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(log));
   } catch (e) {
     console.warn('[logAction] falhou:', e);
@@ -6460,6 +6471,18 @@ async function factoryReset() {
     action: 'op.factory_reset', entityType: 'settings',
     summary: 'Reset total realizado pelo operador'
   });
+  // F2: snapshot do estado atual (TTL 24h) — rede de seguranca caso o
+  // operador se arrependa. Nao substitui backup mas ajuda quando esquecem.
+  try {
+    const snap = {
+      ts: Date.now(),
+      ttlMs: 24 * 60 * 60 * 1000,
+      data: {}
+    };
+    Object.keys(localStorage).filter(k => k.indexOf('cdb-') === 0)
+      .forEach(k => { snap.data[k] = localStorage.getItem(k); });
+    localStorage.setItem('cdb-pre-reset-backup', JSON.stringify(snap));
+  } catch (e) { /* localStorage cheio: aceita perder snapshot */ }
   // Limpa tudo
   products = [];
   clients  = [];
@@ -6467,8 +6490,8 @@ async function factoryReset() {
   batches  = [];
   cashEntries = [];
   cashClosings = [];
-  // localStorage: mantém device-id (pra sync) e tema, limpa o resto
-  const keep = ['cdb-device-id', 'cdb-theme'];
+  // localStorage: mantém device-id (pra sync), tema e o snapshot pre-reset.
+  const keep = ['cdb-device-id', 'cdb-theme', 'cdb-pre-reset-backup'];
   const allKeys = Object.keys(localStorage).filter(k => k.startsWith('cdb-'));
   allKeys.forEach(k => { if (!keep.includes(k)) try { localStorage.removeItem(k); } catch (e) {} });
   showToast('App resetado · recarregando...');
@@ -6815,7 +6838,9 @@ function _silentRestoreBatch(batchId) {
   if (typeof renderHome === 'function') renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
   if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
-  showToast(`Lote ${batch.lote || batch.code} restaurado`);
+  // F1 (Onda diagnostico): undo nao mostra toast — a action-toast com a
+  // barra ainda esta dispensando, e o handleUndoClick ja deu o feedback.
+  // Evita 2 toasts visualmente empilhados.
 }
 function restoreBatch(batchId) {
   const batch = (batches || []).find(b => b.id === batchId);
@@ -11206,6 +11231,7 @@ function archiveProduct(productId) {
   );
 }
 // Reverte archive sem confirm/log/toast — usado pelo undo.
+// F1: sem showToast — evita stacking visual com a action-toast da barra.
 function _silentRestoreProduct(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
@@ -11213,7 +11239,6 @@ function _silentRestoreProduct(productId) {
   persistAll();
   renderProductGrid();
   if (typeof renderCatalogList === 'function') renderCatalogList();
-  showToast((p.name || 'Produto') + ' restaurado');
 }
 
 // Helper pra formatar preco no input (R$ nao tem cifrao no input)
@@ -11549,6 +11574,15 @@ updateSync();
 renderOperatorBadge();
 renderBrandName();
 window.CDB_OPERATOR = operatorName;
+
+// F4: pivô de versionamento de schema. Se ausente, marca como '2' (atual).
+// Migracao 'apt → address' no load() ja roda independente. Proxima mudanca
+// de shape de entity vai ler esse pivo e migrar incrementalmente.
+try {
+  if (!localStorage.getItem('cdb-schema-version')) {
+    localStorage.setItem('cdb-schema-version', '2');
+  }
+} catch (e) {}
 
 // Welcome flow: se ainda não informou o nome, bloqueia o app até preencher.
 // Depois, se é primeira vez (sem flag onboarding), inicia o tour.

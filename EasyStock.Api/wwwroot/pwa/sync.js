@@ -198,7 +198,12 @@
     });
     if (changed) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
-      setTimeout(() => location.reload(), 500);
+      // F6 (estabilizacao): tenta flushar mutacoes locais pendentes ANTES
+      // do reload — se o operador acabou de salvar algo offline e nesse
+      // momento chegou um pull do servidor, sem isso a mutacao local
+      // poderia ficar so na fila e o reload mascararia o estado.
+      // flush() ja é idempotente (flushing flag) e respeita online.
+      flush().finally(() => setTimeout(() => location.reload(), 500));
     }
   }
 
