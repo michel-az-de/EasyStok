@@ -143,6 +143,9 @@ builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 builder.Services.AddHttpClient(); // for DiagnosticoInfraController self-testing
 builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
 
+// ── Mobile module services (Onda 2 parte 2: stock reconciliation) ────────────
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
+
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 

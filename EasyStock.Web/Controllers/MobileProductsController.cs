@@ -69,4 +69,26 @@ public class MobileProductsController(
             result.Success ? "Aprovação desfeita." : (result.ErrorMessage ?? "Falha ao desfazer."));
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>Aba "Divergências" — lista e permite reconciliar (Onda 2 p2).</summary>
+    [HttpGet("/produtos-mobile/divergencias")]
+    public async Task<IActionResult> Divergencias()
+    {
+        ViewBag.Title = "Divergências de estoque";
+        ViewBag.ActiveMenuItem = "ProdutosMobile";
+
+        var result = await svc.ListarDivergenciasAsync();
+        if (HasError(result)) return View(new List<StockDivergenceApi>());
+        return View(result.Data ?? []);
+    }
+
+    [HttpPost("/produtos-mobile/{id}/reconciliar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reconciliar(string id)
+    {
+        var result = await svc.ReconciliarAsync(id);
+        Toast(result.Success ? "success" : "error",
+            result.Success ? "Estoque reconciliado." : (result.ErrorMessage ?? "Falha ao reconciliar."));
+        return RedirectToAction(nameof(Divergencias));
+    }
 }

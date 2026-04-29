@@ -1,0 +1,117 @@
+@using EasyStock.Web.Services
+@model List<StockDivergenceApi>
+@{
+    ViewBag.Title = "Divergências de estoque";
+    Layout = "_Layout";
+    var semItem = Model.Where(d => !d.ItemEstoqueExists).ToList();
+    var comItem = Model.Where(d => d.ItemEstoqueExists).ToList();
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Divergências de estoque</h1>
+        <p>@Model.Count divergência@(Model.Count == 1 ? "" : "s") · mobile vs ERP</p>
+    </div>
+    <a href="/produtos-mobile" class="text-sm text-slate-500 hover:text-slate-700">← Voltar pra produtos do mobile</a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="ws p-12 text-center">
+        <div class="text-6xl mb-4">✅</div>
+        <h2 class="text-lg font-semibold text-slate-900 mb-2">Tudo conciliado</h2>
+        <p class="text-sm text-slate-500">Estoque do mobile bate com o ERP em todos os produtos linkados.</p>
+    </div>
+}
+
+@if (semItem.Any())
+{
+    <div class="ws mb-6">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-amber-700">⚠ Sem ItemEstoque no ERP</h2>
+            <span class="text-xs text-slate-500">Crie estoque inicial pelo módulo Estoque ERP</span>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th class="px-4 py-3">Produto</th>
+                    <th class="px-4 py-3">Mobile</th>
+                    <th class="px-4 py-3 text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var d in semItem)
+                {
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-slate-900">@d.Emoji @d.ProductName</div>
+                            <div class="text-xs text-slate-500 font-mono">ERP: @d.ErpProductId.ToString().Substring(0, 8)…</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700">@d.MobileStock</td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="/estoque/novo?produtoId=@d.ErpProductId" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                Criar estoque inicial →
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (comItem.Any())
+{
+    <div class="ws">
+        <div class="px-6 py-4 border-b border-slate-200">
+            <h2 class="text-base font-semibold text-slate-900">Mobile vs ERP — divergente</h2>
+        </div>
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th class="px-4 py-3">Produto</th>
+                    <th class="px-4 py-3 text-right">Mobile</th>
+                    <th class="px-4 py-3 text-right">ERP</th>
+                    <th class="px-4 py-3 text-right">Delta</th>
+                    <th class="px-4 py-3">Última alteração</th>
+                    <th class="px-4 py-3 text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var d in comItem)
+                {
+                    var deltaCor = d.Delta > 0 ? "text-emerald-600" : "text-red-600";
+                    var deltaPrefix = d.Delta > 0 ? "+" : "";
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-slate-900">@d.Emoji @d.ProductName</div>
+                            <div class="text-xs text-slate-500 font-mono">@d.MobileProductId</div>
+                        </td>
+                        <td class="px-4 py-3 text-right text-sm font-mono text-slate-700">@d.MobileStock</td>
+                        <td class="px-4 py-3 text-right text-sm font-mono text-slate-900 font-semibold">@d.ErpStock</td>
+                        <td class="px-4 py-3 text-right text-sm font-mono font-semibold @deltaCor">@deltaPrefix@d.Delta</td>
+                        <td class="px-4 py-3 text-xs text-slate-500">
+                            <span title="@d.UpdatedAt">@d.UpdatedAt.ToString("dd/MM HH:mm")</span>
+                            @if (!string.IsNullOrEmpty(d.LastOperatorName))
+                            {
+                                <span class="block text-xs text-slate-400">por @d.LastOperatorName</span>
+                            }
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <form method="post" action="/produtos-mobile/@d.MobileProductId/reconciliar" class="inline"
+                                  onsubmit="return confirm('Reconciliar estoque?\n\nMobile @(d.MobileStock) → ERP @(d.ErpStock).\nO valor do ERP vai prevalecer.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                    Usar valor do ERP
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="text-xs text-slate-500 mt-4 px-4">
+        ℹ Próxima sincronização do app vai trazer o valor reconciliado (mobile.Stock atualizado).
+    </div>
+}

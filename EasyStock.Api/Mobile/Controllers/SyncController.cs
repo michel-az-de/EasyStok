@@ -1,7 +1,9 @@
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,9 +33,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 // Quando false (modo de transição), aceita anônimo e segue como pré-Onda-1.
 [MobileApiKey]
 [AllowAnonymous]
-public class SyncController(EasyStockDbContext db) : ControllerBase
+public class SyncController(
+    EasyStockDbContext db,
+    MobileStockReconciler stockReconciler) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly MobileStockReconciler _stockReconciler = stockReconciler;
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -279,7 +284,7 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             // Status transicionou? Aplica regra de estoque.
             if (existing.Status != dto.Status)
             {
-                await ApplyStockRule(existing.Status, dto.Status, dto.Items);
+                await ApplyStockRule(existing.Status, dto.Status, dto.Items, dto.Id);
             }
             existing.Status = dto.Status;
             existing.Notes = dto.Notes;
@@ -308,8 +313,12 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
     /// <summary>
     /// Regra de estoque central: o app já desconta localmente, mas o backend
     /// é fonte da verdade ao conciliar com outros devices.
+    ///
+    /// Onda 2 parte 2: quando o produto está linkado ao ERP (ErpProductId),
+    /// reconciler espelha a movimentação em <c>itens_estoque</c> +
+    /// <c>movimentacoes_estoque</c>. Falha do reconciler NÃO interrompe sync.
     /// </summary>
-    private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items)
+    private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items, string? orderId = null)
     {
         // Transição para "pronto"/"entregue": desconta
         if (oldStatus != "pronto" && oldStatus != "entregue"
@@ -318,7 +327,15 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             foreach (var i in items)
             {
                 var p = await _db.Set<Product>().FindAsync(i.ProductId);
-                if (p != null) p.Stock -= i.Qty;
+                if (p == null) continue;
+                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                    p, -i.Qty, NaturezaMovimentacaoEstoque.Venda,
+                    descricao: $"Pedido mobile {orderId ?? p.Id} -> {newStatus}",
+                    referenciaDocumento: orderId);
+                // Se reconciler aplicou no ERP, ele tambem ja sincronizou p.Stock.
+                // Se nao (sem link / falha), faz update local-only pra preservar
+                // comportamento legado.
+                if (!reconciliouNoErp) p.Stock -= i.Qty;
             }
         }
         // Cancelamento de pedido que já havia reservado: devolve
@@ -327,7 +344,12 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
             foreach (var i in items)
             {
                 var p = await _db.Set<Product>().FindAsync(i.ProductId);
-                if (p != null) p.Stock += i.Qty;
+                if (p == null) continue;
+                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                    p, +i.Qty, NaturezaMovimentacaoEstoque.Estorno,
+                    descricao: $"Cancelamento de pedido mobile {orderId ?? p.Id}",
+                    referenciaDocumento: orderId);
+                if (!reconciliouNoErp) p.Stock += i.Qty;
             }
         }
     }
@@ -362,9 +384,14 @@ public class SyncController(EasyStockDbContext db) : ControllerBase
                     ? DateTimeOffset.FromUnixTimeMilliseconds(i.ExpiresAt.Value).UtcDateTime
                     : (DateTime?)null
             });
-            // Incrementa estoque
+            // Incrementa estoque (Onda 2 parte 2: reconciliação ERP se linkado).
             var p = await _db.Set<Product>().FindAsync(i.ProductId);
-            if (p != null) p.Stock += i.Qty;
+            if (p == null) continue;
+            var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                p, +i.Qty, NaturezaMovimentacaoEstoque.Producao,
+                descricao: $"Lote mobile {dto.Lote ?? dto.Code} unidade {i.Name}",
+                referenciaDocumento: dto.Id);
+            if (!reconciliouNoErp) p.Stock += i.Qty;
         }
         _db.Add(batch);
     }

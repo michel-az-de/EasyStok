@@ -28,6 +28,32 @@ public class MobileProductsService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> DesfazerAsync(string id) =>
         api.PostAsync<bool>($"mobile/products/{id}/unlink", new { });
+
+    /// <summary>Lista divergências de estoque (Onda 2 parte 2).</summary>
+    public Task<ApiResult<List<StockDivergenceApi>>> ListarDivergenciasAsync() =>
+        api.GetAsync<List<StockDivergenceApi>>(
+            $"mobile/stock/divergences?empresaId={GetEmpresaId()}");
+
+    /// <summary>Reconcilia 1 produto — força mobile.Stock = ERP.Quantidade.</summary>
+    public Task<ApiResult<object>> ReconciliarAsync(string id) =>
+        api.PostAsync<object>($"mobile/products/{id}/reconcile-stock", new { });
+}
+
+/// <summary>Item da aba Divergências.</summary>
+public class StockDivergenceApi
+{
+    public string MobileProductId { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string? Emoji { get; set; }
+    public Guid ErpProductId { get; set; }
+    public Guid? LojaId { get; set; }
+    public int MobileStock { get; set; }
+    public int ErpStock { get; set; }
+    public int Delta { get; set; }
+    public bool ItemEstoqueExists { get; set; }
+    public string? LastDeviceId { get; set; }
+    public string? LastOperatorName { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>Resposta do GET /api/mobile/products.</summary>

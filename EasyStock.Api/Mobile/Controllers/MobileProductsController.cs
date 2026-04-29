@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -134,6 +135,92 @@ public class MobileProductsController(
     }
 
     /// <summary>
+    /// Lista divergências entre <c>mobile_products.Stock</c> e
+    /// <c>itens_estoque.QuantidadeAtual</c> pra produtos linkados ao ERP.
+    /// Painel /produtos-mobile usa pra mostrar aba "Divergências".
+    /// </summary>
+    [HttpGet("/api/mobile/stock/divergences")]
+    [Authorize]
+    public async Task<ActionResult<StockDivergence[]>> ListDivergences(
+        [FromQuery] Guid empresaId,
+        CancellationToken ct)
+    {
+        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+
+        // Produtos mobile linkados ao ERP — único caso onde reconciliação faz sentido.
+        var mobileLinked = await _db.Set<Product>().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.ErpProductId != null)
+            .ToListAsync(ct);
+
+        if (mobileLinked.Count == 0) return Ok(Array.Empty<StockDivergence>());
+
+        var produtoIds = mobileLinked.Select(p => p.ErpProductId!.Value).Distinct().ToList();
+        var itensEstoque = await _db.Set<ItemEstoque>().AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId && produtoIds.Contains(i.ProdutoId))
+            .ToListAsync(ct);
+
+        // Match (ProdutoId, LojaId) — se LojaId é null no ItemEstoque, casa
+        // com qualquer mobile. Senão exige loja igual.
+        var divergences = new List<StockDivergence>();
+        foreach (var mp in mobileLinked)
+        {
+            var item = itensEstoque.FirstOrDefault(i =>
+                i.ProdutoId == mp.ErpProductId &&
+                (i.LojaId == null || i.LojaId == mp.LojaId));
+            var erpStock = item?.QuantidadeAtual?.Value ?? 0;
+            if (mp.Stock == erpStock) continue; // bate, sem divergência
+            divergences.Add(new StockDivergence(
+                MobileProductId: mp.Id,
+                ProductName: mp.Name,
+                Emoji: mp.Emoji,
+                ErpProductId: mp.ErpProductId!.Value,
+                LojaId: mp.LojaId,
+                MobileStock: mp.Stock,
+                ErpStock: erpStock,
+                Delta: erpStock - mp.Stock,
+                ItemEstoqueExists: item != null,
+                LastDeviceId: mp.LastDeviceId,
+                LastOperatorName: mp.LastOperatorName,
+                UpdatedAt: mp.UpdatedAt
+            ));
+        }
+        return Ok(divergences.OrderByDescending(d => Math.Abs(d.Delta)).ToArray());
+    }
+
+    /// <summary>
+    /// Reconcilia 1 produto: força o stock do mobile pra bater com o ERP.
+    /// Use quando o operador confirma que o ERP está certo (ex: contagem física).
+    /// </summary>
+    [HttpPost("{id}/reconcile-stock")]
+    [Authorize]
+    public async Task<IActionResult> ReconcileStock(string id, CancellationToken ct)
+    {
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product == null) return NotFound();
+        if (product.ErpProductId == null)
+            return BadRequest(new { error = "Produto não está linkado ao ERP" });
+
+        var item = await _db.Set<ItemEstoque>().AsNoTracking().FirstOrDefaultAsync(i =>
+            i.EmpresaId == product.EmpresaId &&
+            i.ProdutoId == product.ErpProductId &&
+            (i.LojaId == null || i.LojaId == product.LojaId), ct);
+
+        if (item == null)
+            return BadRequest(new { error = "ItemEstoque não existe no ERP. Crie o estoque inicial primeiro." });
+
+        var oldStock = product.Stock;
+        product.Stock = item.QuantidadeAtual?.Value ?? 0;
+        product.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation(
+            "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP item={ItemId})",
+            id, oldStock, product.Stock, item.Id);
+
+        return Ok(new { mobileStock = product.Stock, previousStock = oldStock });
+    }
+
+    /// <summary>
     /// Desfaz a aprovação/link. Útil em caso de erro de operador.
     /// </summary>
     [HttpPost("{id}/unlink")]
@@ -185,3 +272,21 @@ public record MobileProductSummary(
 );
 
 public record LinkRequest(Guid ErpProductId);
+
+/// <summary>
+/// Item retornado pela aba "Divergências" do painel /produtos-mobile.
+/// </summary>
+public record StockDivergence(
+    string MobileProductId,
+    string ProductName,
+    string? Emoji,
+    Guid ErpProductId,
+    Guid? LojaId,
+    int MobileStock,
+    int ErpStock,
+    int Delta,
+    bool ItemEstoqueExists,
+    string? LastDeviceId,
+    string? LastOperatorName,
+    DateTime UpdatedAt
+);

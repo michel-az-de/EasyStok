@@ -15,6 +15,12 @@
         <h1>Produtos do mobile</h1>
         <p>@pendentes.Count pendente@(pendentes.Count == 1 ? "" : "s") · @linkados.Count linkado@(linkados.Count == 1 ? "" : "s") ao ERP · @aprovadosMobileOnly.Count aprovado@(aprovadosMobileOnly.Count == 1 ? "" : "s") só no mobile</p>
     </div>
+    @if (linkados.Any())
+    {
+        <a href="/produtos-mobile/divergencias" class="text-sm text-slate-600 hover:text-indigo-700 font-medium">
+            Ver divergências de estoque →
+        </a>
+    }
 </div>
 
 @if (pendentes.Any())
