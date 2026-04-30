@@ -68,6 +68,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<UsuarioPerfil> UsuariosPerfis { get; set; } = null!;
         public DbSet<Plano> Planos { get; set; } = null!;
         public DbSet<AssinaturaEmpresa> AssinaturasEmpresa { get; set; } = null!;
+        public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
+        public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {

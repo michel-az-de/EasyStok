@@ -30,7 +30,7 @@ public class AdminAuditController(EasyStockDbContext db) : EasyStockControllerBa
             query = query.Where(l => l.CriadoEm >= de.Value.ToUniversalTime());
 
         if (ate.HasValue)
-            query = query.Where(l => l.CriadoEm <= ate.Value.ToUniversalTime().AddDays(1));
+            query = query.Where(l => l.CriadoEm < ate.Value.ToUniversalTime().AddDays(1));
 
         var total = await query.CountAsync();
 

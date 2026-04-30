@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration _cfg
 <!DOCTYPE html>
 <html lang="pt-BR" class="h-full">
 <head>
@@ -105,7 +106,7 @@
             </a>
 
             <div class="pt-4 mt-4 space-y-1" style="border-top:1px solid rgba(247,242,232,0.08)">
-                <a href="http://localhost:5000" target="_blank" class="sidebar-link">
+                <a href="@(_cfg["EasyStockWebUrl"]?.TrimEnd('/') ?? "http://localhost:5000")" target="_blank" class="sidebar-link">
                     <span class="text-base">🔗</span>
                     <span class="text-sm font-medium">Abrir EasyStock</span>
                 </a>

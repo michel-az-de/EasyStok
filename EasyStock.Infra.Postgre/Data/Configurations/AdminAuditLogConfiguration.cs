@@ -8,7 +8,7 @@ public class AdminAuditLogConfiguration : IEntityTypeConfiguration<AdminAuditLog
 {
     public void Configure(EntityTypeBuilder<AdminAuditLog> b)
     {
-        b.ToTable("AdminAuditLogs");
+        b.ToTable("admin_audit_logs");
         b.HasKey(x => x.Id);
         b.Property(x => x.AdminEmail).HasMaxLength(256).IsRequired();
         b.Property(x => x.Acao).HasMaxLength(100).IsRequired();

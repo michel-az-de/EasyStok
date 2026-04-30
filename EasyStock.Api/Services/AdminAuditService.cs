@@ -13,6 +13,6 @@ public class AdminAuditService(EasyStockDbContext db, IHttpContextAccessor http)
                     ?? "system";
         var ip = http.HttpContext?.Connection.RemoteIpAddress?.ToString();
         db.AdminAuditLogs.Add(AdminAuditLog.Criar(email, acao, detalhes, tenantId, ip));
-        await db.SaveChangesAsync();
+        await db.CommitAsync();
     }
 }

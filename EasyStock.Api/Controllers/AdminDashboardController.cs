@@ -22,15 +22,11 @@ public class AdminDashboardController(EasyStockDbContext db) : EasyStockControll
 
         var totalTenants = await db.Empresas.CountAsync();
 
-        var assinaturas = await db.AssinaturasEmpresa
-            .Include(a => a.Plano)
-            .ToListAsync();
-
-        var tenantsAtivos = assinaturas.Count(a => a.Status == StatusAssinatura.Ativa);
-        var tenantsSuspensos = assinaturas.Count(a => a.Status == StatusAssinatura.Suspensa);
-        var receitaMensal = assinaturas
+        var tenantsAtivos = await db.AssinaturasEmpresa.CountAsync(a => a.Status == StatusAssinatura.Ativa);
+        var tenantsSuspensos = await db.AssinaturasEmpresa.CountAsync(a => a.Status == StatusAssinatura.Suspensa);
+        var receitaMensal = await db.AssinaturasEmpresa
             .Where(a => a.Status == StatusAssinatura.Ativa && a.Plano != null)
-            .Sum(a => a.Plano!.PrecoMensal);
+            .SumAsync(a => a.Plano!.PrecoMensal);
 
         var tenantsNovos = await db.Empresas.CountAsync(e => e.CriadoEm >= d30);
 
