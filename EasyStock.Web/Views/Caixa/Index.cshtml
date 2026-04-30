@@ -74,7 +74,7 @@ else
             @if (d.Fechado && d.Fechamento != null)
             {
                 <span class="text-sm text-slate-600">
-                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime():dd/MM HH:mm
+                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().ToString("dd/MM HH:mm")
                     @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span class="text-slate-400">por @d.Fechamento.FechadoPorNome</span> }
                     · Saldo final: <strong>@d.Fechamento.SaldoFinal.ToString("C")</strong>
                 </span>

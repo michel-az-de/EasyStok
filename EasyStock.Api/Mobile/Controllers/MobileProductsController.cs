@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -15,14 +16,15 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// no app (<c>IsCustom=true</c>, <c>IsApproved=false</c>, <c>ErpProductId=null</c>),
 /// linkar a um <c>Produto</c> ERP existente OU rejeitar.
 ///
-/// Stock unificado vem na parte 2 desta onda — exige reconciliação com
-/// <c>itens_estoque</c> por loja, é mais profundo. Por ora link manual.
+/// Auditoria 2026-04-30: tenant guard via <see cref="MobileManagementControllerBase"/>.
 /// </summary>
 [ApiController]
 [Route("api/mobile/products")]
+[Authorize]
 public class MobileProductsController(
     EasyStockDbContext db,
-    ILogger<MobileProductsController> log) : ControllerBase
+    ICurrentUserAccessor currentUser,
+    ILogger<MobileProductsController> log) : MobileManagementControllerBase(currentUser)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly ILogger<MobileProductsController> _log = log;
@@ -32,16 +34,15 @@ public class MobileProductsController(
     /// /produtos-mobile pra mostrar "pendentes de aprovação".
     /// </summary>
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<MobileProductSummary[]>> List(
-        [FromQuery] Guid empresaId,
+    public async Task<IActionResult> List(
+        [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
         [FromQuery] bool? customOnly,
         CancellationToken ct)
     {
-        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = _db.Set<Product>().AsNoTracking().Where(p => p.EmpresaId == empresaId);
+        var q = _db.Set<Product>().AsNoTracking().Where(p => p.EmpresaId == emp);
         if (pendingOnly == true) q = q.Where(p => p.IsCustom && !p.IsApproved && p.ErpProductId == null);
         if (customOnly == true) q = q.Where(p => p.IsCustom);
 
@@ -74,10 +75,10 @@ public class MobileProductsController(
     /// precisa entrar no catálogo principal.
     /// </summary>
     [HttpPost("{id}/approve")]
-    [Authorize]
-    public async Task<IActionResult> Approve(string id, CancellationToken ct)
+    public async Task<IActionResult> Approve(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
 
         product.IsApproved = true;
@@ -98,13 +99,13 @@ public class MobileProductsController(
     /// for ativada — também valor de estoque.
     /// </summary>
     [HttpPost("{id}/link")]
-    [Authorize]
-    public async Task<IActionResult> Link(string id, [FromBody] LinkRequest req, CancellationToken ct)
+    public async Task<IActionResult> Link(string id, [FromBody] LinkRequest req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (req == null || req.ErpProductId == Guid.Empty)
             return BadRequest(new { error = "erpProductId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
 
         // Verifica que o Produto ERP existe e pertence à mesma empresa.
@@ -140,23 +141,22 @@ public class MobileProductsController(
     /// Painel /produtos-mobile usa pra mostrar aba "Divergências".
     /// </summary>
     [HttpGet("/api/mobile/stock/divergences")]
-    [Authorize]
-    public async Task<ActionResult<StockDivergence[]>> ListDivergences(
-        [FromQuery] Guid empresaId,
+    public async Task<IActionResult> ListDivergences(
+        [FromQuery] Guid? empresaId,
         CancellationToken ct)
     {
-        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
         // Produtos mobile linkados ao ERP — único caso onde reconciliação faz sentido.
         var mobileLinked = await _db.Set<Product>().AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId && p.ErpProductId != null)
+            .Where(p => p.EmpresaId == emp && p.ErpProductId != null)
             .ToListAsync(ct);
 
         if (mobileLinked.Count == 0) return Ok(Array.Empty<StockDivergence>());
 
         var produtoIds = mobileLinked.Select(p => p.ErpProductId!.Value).Distinct().ToList();
         var itensEstoque = await _db.Set<ItemEstoque>().AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && produtoIds.Contains(i.ProdutoId))
+            .Where(i => i.EmpresaId == emp && produtoIds.Contains(i.ProdutoId))
             .ToListAsync(ct);
 
         // Match (ProdutoId, LojaId) — se LojaId é null no ItemEstoque, casa
@@ -192,10 +192,10 @@ public class MobileProductsController(
     /// Use quando o operador confirma que o ERP está certo (ex: contagem física).
     /// </summary>
     [HttpPost("{id}/reconcile-stock")]
-    [Authorize]
-    public async Task<IActionResult> ReconcileStock(string id, CancellationToken ct)
+    public async Task<IActionResult> ReconcileStock(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
         if (product.ErpProductId == null)
             return BadRequest(new { error = "Produto não está linkado ao ERP" });
@@ -224,10 +224,10 @@ public class MobileProductsController(
     /// Desfaz a aprovação/link. Útil em caso de erro de operador.
     /// </summary>
     [HttpPost("{id}/unlink")]
-    [Authorize]
-    public async Task<IActionResult> Unlink(string id, CancellationToken ct)
+    public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
 
         product.ErpProductId = null;

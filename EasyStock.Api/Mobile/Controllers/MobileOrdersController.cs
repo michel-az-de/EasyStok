@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarPedido;
 // IClienteRepository nao usado: cliente eh resolvido via mobile_clients.erp_cliente_id (lookup direto no DbContext).
@@ -12,32 +13,28 @@ namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>
 /// Onda P2 — Revisão e linkagem de pedidos mobile↔ERP.
-///
-/// Espelha <see cref="MobileClientsController"/>: gestor revisa pedidos
-/// criados no app pelo operador e pode:
-///  - linkar a um <c>Pedido</c> ERP existente (se já existe espelho);
-///  - **promover**: cria um Pedido ERP novo a partir do mobile_order;
-///  - desfazer link.
+/// Auditoria 2026-04-30: tenant guard via <see cref="MobileManagementControllerBase"/>.
 /// </summary>
 [ApiController]
 [Route("api/mobile/orders")]
+[Authorize]
 public class MobileOrdersController(
     EasyStockDbContext db,
     IPedidoRepository pedidoRepo,
     CriarPedidoUseCase criarPedidoUseCase,
-    ILogger<MobileOrdersController> log) : ControllerBase
+    ICurrentUserAccessor currentUser,
+    ILogger<MobileOrdersController> log) : MobileManagementControllerBase(currentUser)
 {
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<MobileOrderSummary[]>> List(
-        [FromQuery] Guid empresaId,
+    public async Task<IActionResult> List(
+        [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
         [FromQuery] string? status,
         CancellationToken ct)
     {
-        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = db.Set<Order>().AsNoTracking().Where(o => o.EmpresaId == empresaId);
+        var q = db.Set<Order>().AsNoTracking().Where(o => o.EmpresaId == emp);
         if (pendingOnly == true) q = q.Where(o => o.ErpPedidoId == null);
         if (!string.IsNullOrWhiteSpace(status)) q = q.Where(o => o.Status == status);
 
@@ -57,11 +54,12 @@ public class MobileOrdersController(
     /// (com snapshot do cliente + items) e linka.
     /// </summary>
     [HttpPost("{id}/link")]
-    [Authorize]
-    public async Task<IActionResult> Link(string id, [FromBody] LinkPedidoRequest? req, CancellationToken ct)
+    public async Task<IActionResult> Link(string id, [FromBody] LinkPedidoRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+
         var mobile = await db.Set<Order>().Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
+            .FirstOrDefaultAsync(o => o.Id == id && o.EmpresaId == emp, ct);
         if (mobile == null) return NotFound();
         if (mobile.EmpresaId == null || mobile.EmpresaId == Guid.Empty)
             return BadRequest(new { error = "mobile_order sem empresa associada" });
@@ -79,6 +77,19 @@ public class MobileOrdersController(
         else
         {
             // Modo 2: promove — cria Pedido ERP novo do mobile.
+
+            // Auditoria 2026-04-30 (idempotência): se já existe Pedido ERP
+            // com este MobileOrderId, retorna sem duplicar (double-click safe).
+            var jaPromovido = await pedidoRepo.FindByMobileOrderIdAsync(mobile.EmpresaId.Value, mobile.Id);
+            if (jaPromovido != null)
+            {
+                mobile.ErpPedidoId = jaPromovido.Id;
+                mobile.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+                log.LogInformation("Mobile order {MobileId} já promovido a {ErpId} (idempotente).", id, jaPromovido.Id);
+                return Ok(new { erpPedidoId = jaPromovido.Id });
+            }
+
             // Resolve cliente via mobile_clients.erp_cliente_id se já houver link.
             Guid? clienteIdResolved = null;
             if (!string.IsNullOrWhiteSpace(mobile.ClientId))
@@ -124,10 +135,10 @@ public class MobileOrdersController(
     }
 
     [HttpPost("{id}/unlink")]
-    [Authorize]
-    public async Task<IActionResult> Unlink(string id, CancellationToken ct)
+    public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var mobile = await db.Set<Order>().FirstOrDefaultAsync(o => o.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var mobile = await db.Set<Order>().FirstOrDefaultAsync(o => o.Id == id && o.EmpresaId == emp, ct);
         if (mobile == null) return NotFound();
 
         mobile.ErpPedidoId = null;

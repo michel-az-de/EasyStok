@@ -65,6 +65,13 @@ public class ListasComprasController(ListasComprasService svc, SessionService se
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddItem(string id, string texto, decimal? quantidade, string? unidade, string? categoria)
     {
+        // Auditoria 2026-04-30 (HIGH fix): validar texto não-vazio.
+        if (string.IsNullOrWhiteSpace(texto))
+        {
+            Toast("error", "Texto do item é obrigatório.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.AddItemAsync(id, texto, quantidade, unidade, categoria, null);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
         return RedirectToAction(nameof(Detail), new { id });

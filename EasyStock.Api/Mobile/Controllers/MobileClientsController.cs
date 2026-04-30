@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarCliente;
 using EasyStock.Domain.Entities.Mobile;
@@ -13,33 +14,35 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// <summary>
 /// Onda P1 — Revisão e linkagem de clientes mobile↔ERP.
 ///
-/// Espelha a arquitetura de <see cref="MobileProductsController"/>: gestor
-/// usa estes endpoints pra revisar clientes criados no app pelo operador,
-/// linkar a um <c>Cliente</c> ERP existente OU promover o mobile_client
-/// pra um Cliente novo no ERP.
+/// Auditoria 2026-04-30 (CRITICAL fix tenant): tenant guard via
+/// <see cref="MobileManagementControllerBase"/>. Antes, usuário do
+/// tenant A passava ?empresaId=&lt;tenant-B&gt; e operava livremente.
+/// Agora: usuário comum só opera na própria empresa; SuperAdmin precisa
+/// informar empresaId explícito.
 /// </summary>
 [ApiController]
 [Route("api/mobile/clients")]
+[Authorize]
 public class MobileClientsController(
     EasyStockDbContext db,
     IClienteRepository clienteRepo,
     CriarClienteUseCase criarClienteUseCase,
-    ILogger<MobileClientsController> log) : ControllerBase
+    ICurrentUserAccessor currentUser,
+    ILogger<MobileClientsController> log) : MobileManagementControllerBase(currentUser)
 {
     /// <summary>
     /// Lista mobile_clients da empresa. Filtros para o painel:
     /// - <c>pendingOnly</c>: ainda não linkados ao ERP (erp_cliente_id null)
     /// </summary>
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<MobileClientSummary[]>> List(
-        [FromQuery] Guid empresaId,
+    public async Task<IActionResult> List(
+        [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
         CancellationToken ct)
     {
-        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = db.Set<Client>().AsNoTracking().Where(c => c.EmpresaId == empresaId);
+        var q = db.Set<Client>().AsNoTracking().Where(c => c.EmpresaId == emp);
         if (pendingOnly == true) q = q.Where(c => c.ErpClienteId == null);
 
         var items = await q.OrderByDescending(c => c.UpdatedAt).Take(500).ToListAsync(ct);
@@ -58,10 +61,12 @@ public class MobileClientsController(
     /// cria um Cliente novo no ERP a partir dos dados do mobile_client e linka.
     /// </summary>
     [HttpPost("{id}/link")]
-    [Authorize]
-    public async Task<IActionResult> Link(string id, [FromBody] LinkClienteRequest? req, CancellationToken ct)
+    public async Task<IActionResult> Link(string id, [FromBody] LinkClienteRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var mobile = await db.Set<Client>().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+
+        // Tenant-scoped lookup: usuário só vê mobile_clients da própria empresa.
+        var mobile = await db.Set<Client>().FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == emp, ct);
         if (mobile == null) return NotFound();
         if (mobile.EmpresaId == null || mobile.EmpresaId == Guid.Empty)
             return BadRequest(new { error = "mobile_client sem empresa associada" });
@@ -101,10 +106,10 @@ public class MobileClientsController(
 
     /// <summary>Desfaz o link. Cliente ERP permanece — só remove a associação.</summary>
     [HttpPost("{id}/unlink")]
-    [Authorize]
-    public async Task<IActionResult> Unlink(string id, CancellationToken ct)
+    public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var mobile = await db.Set<Client>().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var mobile = await db.Set<Client>().FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == emp, ct);
         if (mobile == null) return NotFound();
 
         mobile.ErpClienteId = null;

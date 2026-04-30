@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -10,29 +11,26 @@ namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>
 /// Onda P3 — Revisão e linkagem de lançamentos de caixa mobile↔ERP.
-///
-/// Espelha <see cref="MobileClientsController"/>/<see cref="MobileOrdersController"/>:
-/// gestor revisa entradas/saídas registradas no app pelo operador e pode
-/// linkar a um <c>MovimentoCaixa</c> existente OU **promover** criando
-/// um movimento ERP novo a partir do <c>mobile_cash_entries</c>.
+/// Auditoria 2026-04-30: tenant guard via <see cref="MobileManagementControllerBase"/>.
 /// </summary>
 [ApiController]
 [Route("api/mobile/cash")]
+[Authorize]
 public class MobileCashController(
     EasyStockDbContext db,
     RegistrarMovimentoCaixaUseCase registrarMovUseCase,
-    ILogger<MobileCashController> log) : ControllerBase
+    ICurrentUserAccessor currentUser,
+    ILogger<MobileCashController> log) : MobileManagementControllerBase(currentUser)
 {
     [HttpGet]
-    [Authorize]
-    public async Task<ActionResult<MobileCashSummary[]>> List(
-        [FromQuery] Guid empresaId,
+    public async Task<IActionResult> List(
+        [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
         CancellationToken ct)
     {
-        if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == empresaId);
+        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp);
         if (pendingOnly == true) q = q.Where(c => c.ErpMovimentoCaixaId == null);
 
         var items = await q.OrderByDescending(c => c.CreatedAt).Take(500).ToListAsync(ct);
@@ -50,10 +48,10 @@ public class MobileCashController(
     /// tem que ser representado 1:1 no ERP — sempre promove se não estiver linkado.)
     /// </summary>
     [HttpPost("{id}/promover")]
-    [Authorize]
-    public async Task<IActionResult> Promover(string id, CancellationToken ct)
+    public async Task<IActionResult> Promover(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var entry = await db.Set<CashEntry>().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var entry = await db.Set<CashEntry>().FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == emp, ct);
         if (entry == null) return NotFound();
         if (entry.EmpresaId == null || entry.EmpresaId == Guid.Empty)
             return BadRequest(new { error = "mobile_cash_entry sem empresa associada" });
@@ -82,10 +80,10 @@ public class MobileCashController(
     }
 
     [HttpPost("{id}/unlink")]
-    [Authorize]
-    public async Task<IActionResult> Unlink(string id, CancellationToken ct)
+    public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
-        var entry = await db.Set<CashEntry>().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        var entry = await db.Set<CashEntry>().FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == emp, ct);
         if (entry == null) return NotFound();
 
         entry.ErpMovimentoCaixaId = null;

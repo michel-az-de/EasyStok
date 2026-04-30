@@ -174,7 +174,11 @@ public class SyncController(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<ProductDto>(JsonOpts)!;
-        var existing = await _db.Set<Product>().FindAsync(dto.Id);
+        // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
+        // Antes: FindAsync(dto.Id) sem filtro permitia device do tenant A
+        // sobrescrever produto do tenant B com `dto.Id` arbitrário.
+        var existing = await _db.Set<Product>()
+            .FirstOrDefaultAsync(p => p.Id == dto.Id && p.EmpresaId == empresaId);
 
         // Onda 5: conflict detection. Se servidor tem versão mais nova
         // (UpdatedAt > timestamp da mutation), rejeita pra evitar
@@ -237,7 +241,9 @@ public class SyncController(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<ClientDto>(JsonOpts)!;
-        var existing = await _db.Set<Client>().FindAsync(dto.Id);
+        // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
+        var existing = await _db.Set<Client>()
+            .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)
         {
@@ -271,7 +277,9 @@ public class SyncController(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<OrderDto>(JsonOpts)!;
-        var existing = await _db.Set<Order>().Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == dto.Id);
+        // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
+        var existing = await _db.Set<Order>().Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
@@ -412,7 +420,9 @@ public class SyncController(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<BatchDto>(JsonOpts)!;
-        var existing = await _db.Set<Batch>().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == dto.Id);
+        // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
+        var existing = await _db.Set<Batch>().Include(b => b.Items)
+            .FirstOrDefaultAsync(b => b.Id == dto.Id && b.EmpresaId == empresaId);
         if (existing != null) return; // Batches são imutáveis — ignora re-envio
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
@@ -454,7 +464,9 @@ public class SyncController(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = m.Payload.Deserialize<CashEntryDto>(JsonOpts)!;
-        var existing = await _db.Set<CashEntry>().FindAsync(dto.Id);
+        // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
+        var existing = await _db.Set<CashEntry>()
+            .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
         if (existing != null) return; // imutável
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;

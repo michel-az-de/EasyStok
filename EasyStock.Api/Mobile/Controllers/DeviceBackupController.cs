@@ -1,5 +1,7 @@
 using EasyStock.Api.Mobile.Security;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +16,38 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// considerar oportuno (auto-diário ou manual via Diagnóstico).
 /// Web (gestor) lista (GET /devices/{id}/backups) e baixa
 /// (GET /devices/{id}/backups/{backupId}).
+///
+/// Auditoria 2026-04-30 (CRITICAL fix tenant): List/Download agora fazem
+/// JOIN com mobile_devices.empresa_id e validam contra o usuário logado.
+/// Antes, qualquer Authorize listava/baixava snapshot completo de qualquer
+/// device de qualquer empresa.
 /// </summary>
 [ApiController]
 [Route("api/mobile")]
 public class DeviceBackupController(
     EasyStockDbContext db,
+    ICurrentUserAccessor currentUser,
     ILogger<DeviceBackupController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly ILogger<DeviceBackupController> _log = log;
+
+    /// <summary>
+    /// Verifica que o device pertence à empresa do usuário logado.
+    /// SuperAdmin passa direto. Outros: device.EmpresaId == currentUser.EmpresaId.
+    /// </summary>
+    private async Task<bool> DeviceBelongsToCurrentTenantAsync(string deviceId, CancellationToken ct)
+    {
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) return true;
+        if (_currentUser.EmpresaId == Guid.Empty) return false;
+
+        var deviceEmpresa = await _db.Set<MobileDevice>().AsNoTracking()
+            .Where(d => d.Id == deviceId)
+            .Select(d => (Guid?)d.EmpresaId)
+            .FirstOrDefaultAsync(ct);
+        return deviceEmpresa.HasValue && deviceEmpresa.Value == _currentUser.EmpresaId;
+    }
 
     /// <summary>Quantos backups manter por device. Rotaciona em FIFO.</summary>
     private const int RetainPerDevice = 7;
@@ -97,6 +122,8 @@ public class DeviceBackupController(
     [Authorize]
     public async Task<ActionResult<DeviceBackupSummary[]>> List(string id, CancellationToken ct)
     {
+        if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
+
         var backups = await _db.Set<DeviceBackup>().AsNoTracking()
             .Where(b => b.DeviceId == id)
             .OrderByDescending(b => b.CreatedAt)
@@ -112,6 +139,8 @@ public class DeviceBackupController(
     [Authorize]
     public async Task<IActionResult> Download(string id, Guid backupId, CancellationToken ct)
     {
+        if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
+
         var backup = await _db.Set<DeviceBackup>().AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == backupId && b.DeviceId == id, ct);
         if (backup == null) return NotFound();

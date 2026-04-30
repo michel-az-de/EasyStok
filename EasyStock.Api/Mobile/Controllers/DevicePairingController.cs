@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using EasyStock.Api.Mobile.Security;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,10 +29,37 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Route("api/mobile/devices")]
 public class DevicePairingController(
     EasyStockDbContext db,
+    ICurrentUserAccessor currentUser,
     ILogger<DevicePairingController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly ILogger<DevicePairingController> _log = log;
+
+    /// <summary>
+    /// Auditoria 2026-04-30 — valida que o EmpresaId requerido pelo endpoint
+    /// bate com o do usuário logado (SuperAdmin pode operar em qualquer).
+    /// Antes existia TODO confessado, brecha crítica de cross-tenant.
+    /// </summary>
+    private bool RequestedEmpresaMatchesCurrentUser(Guid requestedEmpresaId)
+    {
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) return true;
+        return _currentUser.EmpresaId != Guid.Empty
+            && _currentUser.EmpresaId == requestedEmpresaId;
+    }
+
+    /// <summary>Para endpoints `/{id}` (commands/revoke) — valida que o device pertence ao tenant.</summary>
+    private async Task<bool> DeviceBelongsToCurrentTenantAsync(string deviceId, CancellationToken ct)
+    {
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) return true;
+        if (_currentUser.EmpresaId == Guid.Empty) return false;
+
+        var deviceEmpresa = await _db.Set<MobileDevice>().AsNoTracking()
+            .Where(d => d.Id == deviceId)
+            .Select(d => (Guid?)d.EmpresaId)
+            .FirstOrDefaultAsync(ct);
+        return deviceEmpresa.HasValue && deviceEmpresa.Value == _currentUser.EmpresaId;
+    }
 
     /// <summary>
     /// Web autenticado — gera código de pareamento de 6 dígitos válido por 10min.
@@ -46,10 +75,9 @@ public class DevicePairingController(
         if (req.EmpresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
         if (req.LojaId == Guid.Empty) return BadRequest(new { error = "lojaId obrigatório" });
 
-        // TODO Onda futura: validar que o usuário logado pertence à empresa/loja
-        // Por enquanto confia no claim. Padrão do projeto usa atributo
-        // [ValidateEmpresaId] em outros controllers — quando esse attribute
-        // suportar Mobile, plugar aqui.
+        // Auditoria 2026-04-30 (CRITICAL fix): TODO antigo era brecha real.
+        // Agora valida que o usuário logado pode parear devices nessa empresa.
+        if (!RequestedEmpresaMatchesCurrentUser(req.EmpresaId)) return Forbid();
         var userId = ResolveUserId();
 
         var code = GeneratePairingCode();
@@ -185,6 +213,8 @@ public class DevicePairingController(
         CancellationToken ct)
     {
         if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+        // Auditoria 2026-04-30 (CRITICAL fix): só listo devices da empresa do usuário.
+        if (!RequestedEmpresaMatchesCurrentUser(empresaId)) return Forbid();
 
         var devices = await _db.Set<MobileDevice>()
             .AsNoTracking()
@@ -225,6 +255,9 @@ public class DevicePairingController(
     {
         if (req == null || string.IsNullOrWhiteSpace(req.CommandType))
             return BadRequest(new { error = "commandType obrigatório" });
+
+        // Auditoria 2026-04-30 (CRITICAL fix): só comanda devices da própria empresa.
+        if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
 
         var device = await _db.Set<MobileDevice>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id, ct);
         if (device == null) return NotFound();
@@ -318,6 +351,9 @@ public class DevicePairingController(
     [Authorize]
     public async Task<IActionResult> Revoke(string id, CancellationToken ct)
     {
+        // Auditoria 2026-04-30 (CRITICAL fix): só revoga devices da própria empresa.
+        if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
+
         var device = await _db.Set<MobileDevice>().FirstOrDefaultAsync(d => d.Id == id, ct);
         if (device == null) return NotFound();
 
