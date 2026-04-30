@@ -75,6 +75,11 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
             vm.QuantidadePedidos = stats.QuantidadePedidos;
         }
 
+        // Onda P4 — trail de alterações.
+        var alteracoesResult = await svc.ObterAlteracoesAsync(id);
+        if (alteracoesResult.Success && alteracoesResult.Data is not null)
+            vm.Alteracoes = alteracoesResult.Data;
+
         return View(vm);
     }
 

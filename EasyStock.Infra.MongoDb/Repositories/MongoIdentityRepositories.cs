@@ -117,6 +117,24 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
         EnqueueReplaceScoped(Collection, fornecedor.Id, fornecedor.EmpresaId, fornecedor);
         return Task.CompletedTask;
     }
+
+    // ── Audit (Onda P4) ───────────────────────────────────────
+    // Mongo backend não está em produção (Postgre é o ativo). Stub
+    // mantém o contrato sem custo: retorna lista vazia e ignora write.
+    private IMongoCollection<FornecedorAlteracao> AlteracoesCollection =>
+        Context.Database.GetCollection<FornecedorAlteracao>("fornecedor_alteracoes");
+
+    public Task AddAlteracaoAsync(FornecedorAlteracao alteracao)
+    {
+        EnqueueInsert(AlteracoesCollection, alteracao);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IEnumerable<FornecedorAlteracao>> GetAlteracoesAsync(Guid fornecedorId, int max = 200) =>
+        await AlteracoesCollection.Find(a => a.FornecedorId == fornecedorId)
+            .SortByDescending(a => a.AlteradoEm)
+            .Limit(max)
+            .ToListAsync();
 }
 
 public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

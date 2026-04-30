@@ -10,5 +10,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IEnumerable<Fornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
         Task AddAsync(Fornecedor fornecedor);
         Task UpdateAsync(Fornecedor fornecedor);
+
+        // ── Audit (Onda P4) ───────────────────────────────────────
+        Task AddAlteracaoAsync(FornecedorAlteracao alteracao);
+        Task<IEnumerable<FornecedorAlteracao>> GetAlteracoesAsync(Guid fornecedorId, int max = 200);
     }
 }

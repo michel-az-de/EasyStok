@@ -51,7 +51,10 @@ public class FornecedoresService(ApiClient api, SessionService session)
         {
             fornecedorId = fid,
             empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
-            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
+            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes,
+            // Onda P4 — audit context (backend escreve em FornecedorAlteracao).
+            alteradoPorNome = session.GetUsuarioNome(),
+            origem = "web"
         });
     }
 
@@ -71,6 +74,10 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
     public Task<ApiResult<FornecedorEstatisticas>> ObterEstatisticasAsync(string id) =>
         api.GetAsync<FornecedorEstatisticas>($"fornecedores/{id}/estatisticas?empresaId={GetEmpresaId()}");
+
+    /// <summary>Onda P4 — histórico de alterações (audit log).</summary>
+    public Task<ApiResult<List<FornecedorAlteracaoDto>>> ObterAlteracoesAsync(string id, int max = 200) =>
+        api.GetAsync<List<FornecedorAlteracaoDto>>($"fornecedores/{id}/alteracoes?empresaId={GetEmpresaId()}&max={max}");
 
     public Task<ApiResult<List<PedidoAberto>>> ListarPedidosAbertosAsync() =>
         api.GetAsync<List<PedidoAberto>>($"fornecedores/pedidos-abertos?empresaId={GetEmpresaId()}");

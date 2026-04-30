@@ -37,6 +37,7 @@ using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
+using EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarCliente;
 using EasyStock.Application.UseCases.ListarClientes;
@@ -143,6 +144,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ListarMovimentosCaixaUseCase>();
         services.AddScoped<ObterCaixaDiaUseCase>();
         services.AddScoped<ListarFechamentosCaixaUseCase>();
+
+        // Onda P4 — Audit expandido
+        services.AddScoped<ObterHistoricoAlteracoesFornecedorUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

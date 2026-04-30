@@ -249,5 +249,51 @@
                 <p class="text-xs mt-1 text-slate-400">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
             </div>
         }
+
+        <!-- Onda P4 — Histórico de alterações cadastrais -->
+        <div class="ws" x-data="{ expanded: false }">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-semibold text-slate-900">Histórico de Alterações <span class="text-xs text-slate-400 font-normal">(@Model.Alteracoes.Count)</span></h2>
+                @if (Model.Alteracoes.Count > 10)
+                {
+                    <button type="button" @@click="expanded = !expanded" class="text-sm text-indigo-600 hover:text-indigo-700">
+                        <span x-text="expanded ? 'Mostrar menos' : 'Ver tudo'"></span>
+                    </button>
+                }
+            </div>
+            @if (!Model.Alteracoes.Any())
+            {
+                <p class="text-sm text-slate-500">Nenhuma alteração registrada ainda. Quando alguém editar dados cadastrais, o diff aparece aqui.</p>
+            }
+            else
+            {
+                <ul class="divide-y divide-slate-100">
+                @{
+                    var visiveis = Model.Alteracoes;
+                }
+                @for (int idx = 0; idx < visiveis.Count; idx++)
+                {
+                    var a = visiveis[idx];
+                    var classeOculta = idx >= 10 ? "alt-extra" : "";
+                    <li class="py-2 text-sm @classeOculta" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                            <span class="font-medium text-slate-900">@a.Campo</span>
+                            <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(a.Origem ?? "?")</span>
+                        </div>
+                        <div class="text-xs text-slate-600 ml-2">
+                            <span class="line-through text-slate-400">@(a.ValorAntigo ?? "—")</span>
+                            <span class="mx-1">→</span>
+                            <span class="font-medium">@(a.ValorNovo ?? "—")</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(a.AlteradoPorNome))
+                        {
+                            <div class="text-xs text-slate-400 ml-2">por @a.AlteradoPorNome</div>
+                        }
+                    </li>
+                }
+                </ul>
+            }
+        </div>
     </div>
 </div>

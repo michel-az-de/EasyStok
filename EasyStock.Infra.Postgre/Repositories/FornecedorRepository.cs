@@ -79,5 +79,19 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.Fornecedores.Update(fornecedor);
             return Task.CompletedTask;
         }
+
+        // ── Audit (Onda P4) ───────────────────────────────────────
+        public Task AddAlteracaoAsync(FornecedorAlteracao alteracao)
+        {
+            dbContext.FornecedorAlteracoes.Add(alteracao);
+            return Task.CompletedTask;
+        }
+
+        public async Task<IEnumerable<FornecedorAlteracao>> GetAlteracoesAsync(Guid fornecedorId, int max = 200) =>
+            await dbContext.FornecedorAlteracoes.AsNoTracking()
+                .Where(a => a.FornecedorId == fornecedorId)
+                .OrderByDescending(a => a.AlteradoEm)
+                .Take(max)
+                .ToListAsync();
     }
 }

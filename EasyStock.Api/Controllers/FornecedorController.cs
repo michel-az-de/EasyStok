@@ -2,6 +2,7 @@ using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
+using EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
 using EasyStock.Application.UseCases.ReativarFornecedor;
@@ -33,6 +34,7 @@ public class FornecedorController(
     CriarPedidoFornecedorUseCase criarPedidoUseCase,
     ReceberPedidoFornecedorUseCase receberPedidoUseCase,
     CancelarPedidoFornecedorUseCase cancelarPedidoUseCase,
+    ObterHistoricoAlteracoesFornecedorUseCase obterAlteracoesUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List suppliers (paginated)", Description = "Supports filtering by active status and text search. Requires Operador role.")]
@@ -126,6 +128,19 @@ public class FornecedorController(
         return DataOk(await obterHistoricoUseCase.ExecuteAsync(new ObterHistoricoFornecedorQuery(resolvedEmpresaId, id)));
     }
 
+    [SwaggerOperation(Summary = "Get supplier audit log (P4)", Description = "Returns the full diff history (campo, antigo, novo, quem, quando, origem) for a supplier.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id}/alteracoes")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> GetAlteracoes(Guid id, [FromQuery] Guid? empresaId, [FromQuery] int max = 200)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var result = await obterAlteracoesUseCase.ExecuteAsync(
+            new ObterHistoricoAlteracoesFornecedorQuery(emp, id, Math.Clamp(max, 1, 1000)));
+        return result == null ? DataNotFound("Fornecedor não encontrado.") : DataOk(result);
+    }
+
     [SwaggerOperation(Summary = "Get supplier statistics (Operador only)", Description = "Returns average lead time, total purchases, on-time delivery rate.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -165,7 +180,13 @@ public class FornecedorController(
         if (id != command.FornecedorId)
             return DataBadRequest("FornecedorId da rota difere do corpo.");
 
-        await atualizarUseCase.ExecuteAsync(command with { EmpresaId = empresaId });
+        await atualizarUseCase.ExecuteAsync(command with
+        {
+            EmpresaId = empresaId,
+            // Onda P4 — audit context.
+            AlteradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            Origem = command.Origem ?? "web"
+        });
         return NoContent();
     }
 

@@ -9,4 +9,6 @@ public class FornecedorDetailViewModel
     public decimal TotalGasto { get; set; }
     public decimal? LeadRealMedio { get; set; }
     public int QuantidadePedidos { get; set; }
+    /// <summary>Onda P4 — trail de alterações.</summary>
+    public List<FornecedorAlteracaoDto> Alteracoes { get; set; } = [];
 }
