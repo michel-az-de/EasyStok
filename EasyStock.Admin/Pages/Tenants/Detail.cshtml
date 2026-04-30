@@ -116,8 +116,8 @@
         {
             <button type="button"
                     @@click="tab = '@t'"
-                    :class="tab === '@t' ? 'bg-es-accent text-es-ink' : 'text-es-ink-mute hover:text-es-ink'"
-                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">@l</button>
+                    x-bind:style="tab === '@t' ? 'background:#f47920;color:#f7f2e8' : 'color:#8793a7'"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">@l</button>
         }
     </div>
 

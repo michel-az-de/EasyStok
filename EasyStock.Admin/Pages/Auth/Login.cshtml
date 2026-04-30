@@ -11,6 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -65,7 +66,7 @@
                 <label class="block text-xs font-bold text-es-ink-mute uppercase tracking-widest mb-1.5">E-mail</label>
                 <input asp-for="Email" type="email" required
                        class="w-full bg-es-bg rounded-lg text-es-ink px-3 py-2.5 text-sm outline-none transition-all placeholder-es-ink-mute"
-                       style="border:1px solid rgba(247,242,232,0.18); focus:border-color:#e76845"
+                       style="border:1px solid rgba(247,242,232,0.18)"
                        onfocus="this.style.borderColor='#f47920';this.style.boxShadow='0 0 0 3px rgba(244,121,32,.16)'"
                        onblur="this.style.borderColor='rgba(247,242,232,0.18)';this.style.boxShadow='none'"
                        placeholder="admin@easystock.com.br" />
@@ -83,8 +84,8 @@
 
             <button type="submit"
                     class="w-full bg-es-accent text-es-ink font-bold py-2.5 rounded-lg text-sm transition-all mt-2"
-                    onmouseover="this.style.background='#cf5738'"
-                    onmouseout="this.style.background='#e76845'"
+                    onmouseover="this.style.background='#d96610'"
+                    onmouseout="this.style.background='#f47920'"
                     onmousedown="this.style.transform='scale(0.98)'"
                     onmouseup="this.style.transform='scale(1)'">
                 Entrar

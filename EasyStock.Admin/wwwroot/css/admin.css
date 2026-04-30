@@ -89,16 +89,17 @@
 .btn-secondary:active { transform: scale(0.97); }
 
 .btn-danger {
-    background:    rgba(231, 104, 69, .12);
-    color:         var(--es-accent);
-    border:        1px solid rgba(231, 104, 69, .25);
+    background:    rgba(239, 68, 68, .12);
+    color:         #f87171;
+    border:        1px solid rgba(239, 68, 68, .25);
     padding:       0.4rem 0.8rem;
     border-radius: var(--es-radius-sm);
     font-size:     0.8rem;
     font-weight:   600;
-    transition:    background var(--es-transition);
+    transition:    background var(--es-transition), transform var(--es-transition);
 }
-.btn-danger:hover { background: rgba(231, 104, 69, .22); }
+.btn-danger:hover  { background: rgba(239, 68, 68, .22); }
+.btn-danger:active { transform: scale(0.97); }
 
 /* ── Table ─────────────────────────────────────────────────── */
 
