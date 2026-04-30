@@ -34,11 +34,14 @@
     padding:       1.5rem;
 }
 
+/* p-0 override: admin.css carrega depois do Tailwind, então .card vence na cascata */
+.card.p-0 { padding: 0; }
+
 /* ── Status badges ─────────────────────────────────────────── */
 
 .badge-ativa    { background: var(--es-basil-soft);  color: var(--es-basil);   border: 1px solid rgba(79,191,159,.30); }
 .badge-suspensa { background: var(--es-gold-soft);   color: var(--es-gold);    border: 1px solid rgba(240,184,74,.30); }
-.badge-cancelada{ background: rgba(244,121,32,.12);  color: var(--es-accent);  border: 1px solid rgba(244,121,32,.25); }
+.badge-cancelada{ background: rgba(239, 68, 68, .12); color: #f87171;           border: 1px solid rgba(239, 68, 68, .25); }
 .badge-expirada { background: rgba(135,147,167,.10); color: var(--es-ink-mute); border: 1px solid rgba(135,147,167,.22); }
 
 .badge-aberto        { background: rgba(79,191,159,.10); color: var(--es-basil);    border: 1px solid rgba(79,191,159,.22); }
@@ -48,7 +51,7 @@
 
 .badge-normal  { background: rgba(135,147,167,.10); color: var(--es-ink-mute); border: 1px solid rgba(135,147,167,.22); }
 .badge-alta    { background: var(--es-gold-soft);   color: var(--es-gold);     border: 1px solid rgba(240,184,74,.30); }
-.badge-critica { background: rgba(244,121,32,.12);  color: var(--es-accent);   border: 1px solid rgba(244,121,32,.25); }
+.badge-critica { background: rgba(239, 68, 68, .12); color: #f87171;           border: 1px solid rgba(239, 68, 68, .25); }
 
 .status-badge {
     display:        inline-flex;
@@ -142,6 +145,14 @@
     box-shadow:   0 0 0 3px var(--es-accent-soft);
 }
 .form-input::placeholder { color: var(--es-ink-mute); }
+
+select.form-input {
+    appearance:       none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238793a7' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:   no-repeat;
+    background-position: right 0.75rem center;
+    padding-right:       2.25rem;
+}
 
 .form-label {
     display:        block;
