@@ -50,4 +50,18 @@ public class Client
 
     [Column("loja_id")]
     public Guid? LojaId { get; set; }
+
+    /// <summary>
+    /// Onda P1 — link opcional pra <c>Cliente</c> do ERP. NULL = só vive
+    /// no mobile, ainda não aprovado pelo gestor. Quando linkado, gestor
+    /// pode editar pelo painel web e mudanças refletem no app via pull.
+    /// </summary>
+    [Column("erp_cliente_id")]
+    public Guid? ErpClienteId { get; set; }
+
+    [Column("approved_at")]
+    public DateTime? ApprovedAt { get; set; }
+
+    [Column("approved_by_user_id")]
+    public Guid? ApprovedByUserId { get; set; }
 }
