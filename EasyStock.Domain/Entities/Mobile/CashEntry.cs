@@ -41,4 +41,12 @@ public class CashEntry
 
     [Column("loja_id")]
     public Guid? LojaId { get; set; }
+
+    /// <summary>
+    /// Onda P3 — link pra <see cref="EasyStock.Domain.Entities.MovimentoCaixa"/>
+    /// no ERP. NULL = ainda não promovido pro ERP. Quando linkado, o
+    /// fechamento de caixa do ERP enxerga esse movimento.
+    /// </summary>
+    [Column("erp_movimento_caixa_id")]
+    public Guid? ErpMovimentoCaixaId { get; set; }
 }

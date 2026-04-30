@@ -64,6 +64,7 @@ builder.Services.AddScoped<SaidasService>();
 builder.Services.AddScoped<FornecedoresService>();
 builder.Services.AddScoped<ClientesService>();
 builder.Services.AddScoped<PedidosService>();
+builder.Services.AddScoped<CaixaService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<InteligenciaService>();
 builder.Services.AddScoped<NotificacoesService>();

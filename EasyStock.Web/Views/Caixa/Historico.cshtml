@@ -1,0 +1,43 @@
+@model CaixaHistoricoViewModel
+@{
+    ViewBag.Title = "Histórico de Caixa";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Histórico de fechamentos</h1>
+        <p>Snapshots dos dias já fechados</p>
+    </div>
+    <a href="/caixa" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">← Caixa do dia</a>
+</div>
+
+<div class="ws">
+    @if (!Model.Fechamentos.Any())
+    {
+        <p class="text-sm text-slate-500">Nenhum fechamento registrado ainda.</p>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead><tr><th>Data</th><th class="text-right">Saldo inicial</th><th class="text-right">Vendas</th><th class="text-right">Pagamentos</th><th class="text-right">Entradas</th><th class="text-right">Saídas</th><th class="text-right">Saldo final</th><th>Por</th></tr></thead>
+            <tbody>
+            @foreach (var f in Model.Fechamentos)
+            {
+                <tr>
+                    <td class="font-medium">@f.Data.ToString("dd/MM/yyyy")</td>
+                    <td class="text-right">@f.SaldoInicial.ToString("C")</td>
+                    <td class="text-right text-green-700">@f.TotalVendas.ToString("C")</td>
+                    <td class="text-right text-green-700">@f.TotalPagamentosPedidos.ToString("C")</td>
+                    <td class="text-right">+@f.TotalEntradasExtras.ToString("C")</td>
+                    <td class="text-right text-red-700">-@f.TotalSaidasExtras.ToString("C")</td>
+                    <td class="text-right font-bold text-slate-900">@f.SaldoFinal.ToString("C")</td>
+                    <td class="text-xs text-slate-500">@(f.FechadoPorNome ?? "—") <div class="text-slate-400">@f.FechadoEm.ToLocalTime().ToString("HH:mm")</div></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>

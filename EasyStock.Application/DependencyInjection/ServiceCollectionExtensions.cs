@@ -30,6 +30,13 @@ using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
+using EasyStock.Application.UseCases.AbrirCaixa;
+using EasyStock.Application.UseCases.FecharCaixa;
+using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
+using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
+using EasyStock.Application.UseCases.ListarMovimentosCaixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
+using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarCliente;
 using EasyStock.Application.UseCases.ListarClientes;
@@ -127,6 +134,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RemoverItemPedidoUseCase>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
+
+        // Onda P3 — Caixa
+        services.AddScoped<AbrirCaixaUseCase>();
+        services.AddScoped<FecharCaixaUseCase>();
+        services.AddScoped<RegistrarMovimentoCaixaUseCase>();
+        services.AddScoped<EstornarMovimentoCaixaUseCase>();
+        services.AddScoped<ListarMovimentosCaixaUseCase>();
+        services.AddScoped<ObterCaixaDiaUseCase>();
+        services.AddScoped<ListarFechamentosCaixaUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

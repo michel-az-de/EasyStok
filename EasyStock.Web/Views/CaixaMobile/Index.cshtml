@@ -1,0 +1,89 @@
+@model CaixaMobileViewModel
+@{
+    ViewBag.Title = "Caixa (mobile)";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Lançamentos do app</h1>
+        <p>Revise entradas/saídas registradas no app pelo operador e promova pro caixa do ERP</p>
+    </div>
+    <a href="/caixa" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">← Caixa</a>
+</div>
+
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 items-center">
+        @foreach (var (val, label) in new[] { ("false", "Todos"), ("true", "Pendentes (sem link)") })
+        {
+            var isActive = (val == "true") == Model.PendingOnly;
+            <a href="@Url.Action("Index", "CaixaMobile", new { pendingOnly = val == "true" })"
+               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                @label
+            </a>
+        }
+        <span class="text-sm text-slate-500 ml-auto">@Model.Items.Count lançamento(s)</span>
+    </form>
+</div>
+
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "💰" },
+            { "EmptyTitle", "Nenhum lançamento do app" },
+            { "EmptyDescription", "Entradas e saídas extras feitas no app aparecerão aqui pra revisão." }
+        })
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Origem</th><th>ERP</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in Model.Items)
+            {
+                var isExpense = c.Type == "expense";
+                <tr>
+                    <td class="text-xs text-slate-500">@c.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                    <td>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium @(isExpense ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700")">
+                            @(isExpense ? "saída" : "entrada")
+                        </span>
+                    </td>
+                    <td class="font-medium @(isExpense ? "text-red-700" : "text-green-700")">@(isExpense ? "-" : "+")@c.Amount.ToString("C")</td>
+                    <td class="text-sm text-slate-600">@c.Description</td>
+                    <td class="text-xs text-slate-500">@(c.LastOperatorName ?? "—") @if (!string.IsNullOrEmpty(c.LastDeviceId)) { <div class="text-slate-400">@c.LastDeviceId</div> }</td>
+                    <td>
+                        @if (c.Linked)
+                        {
+                            <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ linkado</span>
+                        }
+                        else
+                        {
+                            <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">pendente</span>
+                        }
+                    </td>
+                    <td class="text-right">
+                        @if (!c.Linked)
+                        {
+                            <form asp-action="Promover" asp-controller="CaixaMobile" asp-route-id="@c.Id" method="post">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-sm text-indigo-600 hover:text-indigo-700">Promover pro ERP</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form asp-action="Unlink" asp-controller="CaixaMobile" asp-route-id="@c.Id" method="post" onsubmit="return confirm('Desfazer link com ERP?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
