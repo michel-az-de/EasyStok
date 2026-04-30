@@ -1,10 +1,11 @@
 using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Tenants;
 
-public class DetailModel(AdminApiClient api, AdminSessionService session) : AdminPageBase(session)
+public class DetailModel(AdminApiClient api, AdminSessionService session, IConfiguration config) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
@@ -34,7 +35,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session) : Admi
             TenantData = await api.GetAsync<JsonElement>($"api/admin/tenants/{Id}");
             var planosRaw = await api.GetAsync<JsonElement>("api/admin/planos");
             PlanosList = planosRaw.ValueKind == JsonValueKind.Array
-                ? planosRaw.EnumerateArray()
+                ? planosRaw.EnumerateArray().ToList()
                 : Enumerable.Empty<JsonElement>();
         }
         catch (Exception ex) { Erro = ex.Message; }
@@ -64,6 +65,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session) : Admi
     {
         var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/impersonate", new { });
         var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
-        return Redirect($"http://localhost:5000/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
+        var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
+        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
     }
 }

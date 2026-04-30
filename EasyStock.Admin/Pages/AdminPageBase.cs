@@ -18,4 +18,18 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
         }
         base.OnPageHandlerExecuting(context);
     }
+
+    public override async Task OnPageHandlerExecutionAsync(
+        PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
+    {
+        try
+        {
+            await next();
+        }
+        catch (SessionExpiredException)
+        {
+            session.ClearSession();
+            context.HttpContext.Response.Redirect("/Auth/Login");
+        }
+    }
 }

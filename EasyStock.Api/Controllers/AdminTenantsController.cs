@@ -204,7 +204,9 @@ public class AdminTenantsController(
             .Where(up => up.UsuarioId == ue.UsuarioId && up.EmpresaId == id)
             .FirstOrDefaultAsync();
 
-        var nivel = perfil?.Perfil?.Nivel ?? NivelAcesso.Admin;
+        // Cap at Admin — impersonation must never produce a SuperAdmin token
+        var rawNivel = perfil?.Perfil?.Nivel ?? NivelAcesso.Admin;
+        var nivel = rawNivel == NivelAcesso.SuperAdmin ? NivelAcesso.Admin : rawNivel;
 
         var secretKey = configuration["Jwt:SecretKey"]!;
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
