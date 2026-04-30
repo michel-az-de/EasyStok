@@ -1,10 +1,11 @@
 using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Tenants;
 
-public class IndexModel(AdminApiClient api, AdminSessionService session) : AdminPageBase(session)
+public class IndexModel(AdminApiClient api, AdminSessionService session, IConfiguration config) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public new int Page { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public string? Search { get; set; }
@@ -55,6 +56,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
     {
         var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{id}/impersonate", new { });
         var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
-        return Redirect($"http://localhost:5000/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
+        var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
+        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
     }
 }

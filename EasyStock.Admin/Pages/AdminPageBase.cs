@@ -9,19 +9,15 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
 {
     protected AdminSessionService Session => session;
 
-    public override void OnPageHandlerExecuting(PageHandlerExecutingContext context)
+    public override async Task OnPageHandlerExecutionAsync(
+        PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {
         if (string.IsNullOrEmpty(session.GetToken()))
         {
             context.Result = new RedirectToPageResult("/Auth/Login");
             return;
         }
-        base.OnPageHandlerExecuting(context);
-    }
 
-    public override async Task OnPageHandlerExecutionAsync(
-        PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
-    {
         try
         {
             await next();
