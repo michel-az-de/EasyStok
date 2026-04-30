@@ -129,11 +129,14 @@ body {
   flex-shrink: 0;
 }
 .header .header-row1 {
-  display: flex; align-items: center; gap: 10px; justify-content: space-between;
-  margin-bottom: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 .header .header-row1 .sync-chip {
-  margin-top: 0; padding: 4px 10px; font-size: 10px; flex-shrink: 0;
+  margin-top: 0; padding: 4px 9px; font-size: 9px; flex-shrink: 0;
 }
 .header .header-row1 .sync-chip svg { display: none; }
 .header .greeting {
@@ -149,19 +152,20 @@ body {
 .header .title {
   font-family: 'Fraunces', serif;
   font-weight: 700;
-  font-size: 22px;
-  line-height: 0.95;
+  font-size: 20px;
+  line-height: 1.02;
   letter-spacing: 0;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 3px;
   flex: 1; min-width: 0;
 }
 .brand-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
   object-fit: cover;
   flex: 0 0 auto;
   border: 1px solid var(--border);
@@ -178,19 +182,24 @@ body {
   color: var(--ink);
   font-style: normal;
   font-weight: 700;
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .header .title .suffix {
   font-family: 'Manrope', sans-serif;
-  font-size: 11px;
+  font-size: 9px;
   font-style: normal;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-mute);
-  padding: 4px 7px;
+  padding: 3px 6px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  transform: translateY(-2px);
+  transform: none;
 }
 
 /* Sync chip */
@@ -463,6 +472,94 @@ button:disabled {
   border-top: 1px solid var(--border);
 }
 .home-ops-body .section-label { margin-top: 16px; }
+.home-focus-card {
+  margin: 2px 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(240,184,74,0.16), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.045), transparent 120px),
+    var(--bg-card, var(--bg-elev));
+  box-shadow: var(--glow);
+}
+.home-focus-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.home-focus-kicker {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.home-focus-title {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.12;
+}
+.home-focus-sub {
+  margin-top: 4px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.home-focus-score {
+  flex: 0 0 auto;
+  min-width: 58px;
+  border-radius: 16px;
+  padding: 9px 8px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.home-focus-score strong {
+  display: block;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+}
+.home-focus-score span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-mute);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-focus-actions {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.home-focus-actions button {
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.home-focus-actions button.primary {
+  background: var(--gold);
+  border-color: rgba(240,184,74,0.46);
+  color: #1c1408;
+}
+.home-command-bar.is-redundant { display: none; }
+[data-theme="light"] .home-focus-card { background: #fff; border-color: #dbe2ec; box-shadow: 0 12px 28px rgba(21,31,49,0.08); }
+[data-theme="light"] .home-focus-score,
+[data-theme="light"] .home-focus-actions button:not(.primary) { background: #f8fafc; border-color: #dbe2ec; }
 /* Home Command Bar — 3 atalhos premium na home: Novo Pedido / Lote / Conferir.
    Felipe iterou no visual: chips compactos, kicker em gold uppercase, valor em
    ink-dim com truncamento, mini-svg como icone do kicker. */
@@ -759,8 +856,185 @@ button:disabled {
   border-color: #dbe2ec;
   box-shadow: 0 8px 20px rgba(21,31,49,0.055);
 }
+.more-menu {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  display: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), transparent 110px),
+    var(--bg-elev);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.34);
+}
+.more-menu.show { display: block; animation: slideUp 0.18s ease-out; }
+.more-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 10px;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.more-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.more-menu-item {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.035);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.more-menu-item strong { display: block; font-size: 13px; font-weight: 900; }
+.more-menu-item span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.3;
+}
+[data-theme="light"] .more-menu { background: #fff; border-color: #dbe2ec; box-shadow: 0 16px 36px rgba(21,31,49,0.15); }
+[data-theme="light"] .more-menu-item { background: #f8fafc; border-color: #dbe2ec; }
+
+.client-value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.client-value-card,
+.client-card {
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 90px),
+    var(--bg-card, var(--bg-elev));
+  box-shadow: var(--glow);
+}
+.client-value-card {
+  border-radius: 15px;
+  padding: 11px 10px;
+}
+.client-value-card .k {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.client-value-card .v {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+.client-card {
+  border-radius: 18px;
+  padding: 13px;
+  margin-bottom: 10px;
+}
+.client-card-top,
+.client-card-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.client-name {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+.client-meta {
+  margin-top: 3px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.client-rank {
+  flex: 0 0 auto;
+  border: 1px solid rgba(240,184,74,0.36);
+  background: var(--gold-soft);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 950;
+}
+.client-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 12px 0;
+}
+.client-stat {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+}
+.client-stat span {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.client-stat strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-card-foot button {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.client-card-foot button.primary {
+  background: var(--gold);
+  color: #1c1408;
+  border-color: rgba(240,184,74,0.44);
+}
+[data-theme="light"] .client-value-card,
+[data-theme="light"] .client-card { background: #fff; border-color: #dbe2ec; box-shadow: 0 8px 20px rgba(21,31,49,0.055); }
+[data-theme="light"] .client-stat { background: #f8fafc; border-color: #dbe2ec; }
+
 @media (max-width: 360px) {
   .content { padding-left: 16px; padding-right: 16px; }
+  .home-focus-actions { grid-template-columns: 1fr; }
+  .client-value-grid,
+  .client-stats { grid-template-columns: 1fr; }
   .home-command-bar { gap: 6px; }
   .home-command { padding: 10px 7px; }
   .home-command .hc-k { font-size: 9px; gap: 4px; letter-spacing: 0.08em; }
@@ -1080,6 +1354,145 @@ button:disabled {
   transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
   box-shadow: var(--glow);
 }
+.home-pipeline-label { margin-top: 8px; }
+.home-pipeline {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.home-lane {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.026), transparent 90px),
+    var(--surface);
+  overflow: hidden;
+}
+.home-lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-dim);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.home-lane-head .count {
+  min-width: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  text-align: center;
+  letter-spacing: 0;
+}
+.home-lane[data-status="aguardando"] .home-lane-head { color: #cf8a3a; }
+.home-lane[data-status="preparando"] .home-lane-head { color: #60a5fa; }
+.home-lane[data-status="pronto"] .home-lane-head { color: #4ade80; }
+.home-lane-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+.home-order-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 11px;
+  background: rgba(255,255,255,0.035);
+}
+.home-order-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.home-order-who {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.18;
+}
+.home-order-who .ref {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  font-weight: 650;
+}
+.home-order-total {
+  flex: 0 0 auto;
+  color: var(--gold);
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+.home-order-items {
+  margin-top: 7px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.home-order-actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  margin-top: 10px;
+}
+.home-order-actions button {
+  min-width: 0;
+  min-height: 34px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.home-order-actions button.primary {
+  background: linear-gradient(135deg, var(--accent), #f08a56);
+  border-color: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.home-lane-empty {
+  padding: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--ink-mute);
+  font-size: 12px;
+  text-align: center;
+}
+.home-lane-more {
+  width: 100%;
+  min-height: 34px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+[data-theme="light"] .home-lane,
+[data-theme="light"] .home-order-card {
+  background: #fff;
+  border-color: #dbe2ec;
+}
+[data-theme="light"] .home-lane-empty,
+[data-theme="light"] .home-lane-more { background: #f8fafc; border-color: #dbe2ec; }
 .open-order:has(.oo-advance:hover) {
   border-color: var(--border-strong);
   box-shadow: 0 10px 26px rgba(0,0,0,0.18);
@@ -4701,7 +5114,7 @@ select:focus-visible {
   min-width: 0;
 }
 .sync-chip {
-  max-width: 44%;
+  max-width: 34%;
 }
 .sync-chip #syncText {
   overflow: hidden;
@@ -4984,29 +5397,17 @@ select:focus-visible {
            movimentacao e sem fechamento. -->
       <div id="openCashDaysBanner" class="open-days-banner" style="display:none"></div>
 
-      <!-- Mini-stats colapsadas atras de <details> nativo HTML.
-           Default fechado, expandido persiste em localStorage. -->
-      <details class="mini-stats-wrap" id="miniStatsDetails">
-        <summary>
-          <span class="ms-summary-text"><b id="msOpenSummary">0</b> em aberto · <span class="ms-summary-hint">toque pra ver mais</span></span>
-        </summary>
-        <div class="mini-stats">
-          <div class="mini-stat">
-            <div class="v accent" id="msOpen">0</div>
-            <div class="l">em aberto</div>
-          </div>
-          <div class="mini-stat">
-            <div class="v" id="msProduced">0</div>
-            <div class="l">produzido</div>
-          </div>
-          <div class="mini-stat">
-            <div class="v basil" id="msRevenue">R$ 0</div>
-            <div class="l">vendido</div>
-          </div>
-        </div>
-      </details>
+      <div class="section-label section-label-with-links home-pipeline-label">
+        <span>Esteira de pedidos <span class="count" id="openCount">0</span></span>
+        <span class="sl-links">
+          <a href="javascript:void(0)" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir kanban →</a>
+        </span>
+      </div>
+      <div id="openOrdersList"></div>
 
-      <div class="home-command-bar" aria-label="Atalhos principais">
+      <div class="home-focus-card" id="homeFocusCard"></div>
+
+      <div class="home-command-bar is-redundant" aria-label="Atalhos principais">
         <button class="home-command" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('novo'); } catch(e){} }, 50)">
           <span class="hc-k"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo</span>
           <span class="hc-v">Pedido rapido</span>
@@ -5020,17 +5421,6 @@ select:focus-visible {
           <span class="hc-v">QR, lote ou pedido</span>
         </button>
       </div>
-      <div class="trust-badges" id="trustBadges" aria-label="Confianca operacional"></div>
-      <div class="premium-panel" id="premiumOpsPanel"></div>
-
-      <div class="section-label section-label-with-links">
-        <span>Pedidos em aberto <span class="count" id="openCount">0</span></span>
-        <span class="sl-links">
-          <a href="javascript:void(0)" onclick="go('finalizados')">Finalizados →</a>
-          <a href="javascript:void(0)" onclick="go('compras')">Compras →</a>
-        </span>
-      </div>
-      <div id="openOrdersList"></div>
 
       <!-- Cash card colapsado: so saldo + botao Detalhes. As 4 linhas
            detalhadas e os botoes Lançamento/Fechar/Reabrir migraram pro
@@ -5054,6 +5444,29 @@ select:focus-visible {
           <span class="home-ops-chip" id="homeOpsChip">ver</span>
         </summary>
         <div class="home-ops-body">
+          <div class="trust-badges" id="trustBadges" aria-label="Confianca operacional"></div>
+          <div class="premium-panel" id="premiumOpsPanel"></div>
+
+          <details class="mini-stats-wrap" id="miniStatsDetails">
+            <summary>
+              <span class="ms-summary-text"><b id="msOpenSummary">0</b> em aberto · <span class="ms-summary-hint">toque pra ver mais</span></span>
+            </summary>
+            <div class="mini-stats">
+              <div class="mini-stat">
+                <div class="v accent" id="msOpen">0</div>
+                <div class="l">em aberto</div>
+              </div>
+              <div class="mini-stat">
+                <div class="v" id="msProduced">0</div>
+                <div class="l">produzido</div>
+              </div>
+              <div class="mini-stat">
+                <div class="v basil" id="msRevenue">R$ 0</div>
+                <div class="l">vendido</div>
+              </div>
+            </div>
+          </details>
+
           <div class="section-label">Painel gerencial</div>
           <div class="home-insights" id="homeInsights"></div>
 
@@ -5233,6 +5646,22 @@ select:focus-visible {
     </div>
 
     <!-- CONFERENCIA — scanner híbrido (pedido + produção) -->
+    <div class="screen" data-screen="clientes">
+      <div class="section-label section-label-with-links">
+        <span>Clientes e recorrência</span>
+        <span class="sl-links">
+          <a href="javascript:void(0)" onclick="openClientModal()">+ Cliente</a>
+        </span>
+      </div>
+      <div class="client-value-grid" id="clientValueGrid"></div>
+      <div class="mov-filter" id="clientFilter">
+        <button data-f="todos" class="active" onclick="setClientFilter('todos')">Todos</button>
+        <button data-f="recorrentes" onclick="setClientFilter('recorrentes')">Recorrentes</button>
+        <button data-f="sumidos" onclick="setClientFilter('sumidos')">Sumidos</button>
+      </div>
+      <div id="clientRecurrenceList"></div>
+    </div>
+
     <div class="screen" data-screen="conferencia">
       <div class="confer-pro-panel" id="conferProPanel"></div>
       <button class="confer-scan-cta" onclick="openScanner('tela')">
@@ -5973,6 +6402,22 @@ select:focus-visible {
     </div>
   </div>
 
+  <div class="more-menu" id="moreMenu" aria-label="Mais paginas">
+    <div class="more-menu-head">
+      <span>Mais ferramentas</span>
+      <span>sem bagunca</span>
+    </div>
+    <div class="more-menu-grid">
+      <button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
+      <button class="more-menu-item" onclick="go('clientes')"><strong>Clientes</strong><span>Recorrencia, ticket e retorno.</span></button>
+      <button class="more-menu-item" onclick="go('compras')"><strong>Compras</strong><span>Itens que faltam para produzir.</span></button>
+      <button class="more-menu-item" onclick="go('caixa')"><strong>Caixa</strong><span>Saldo, lancamentos e fechamento.</span></button>
+      <button class="more-menu-item" onclick="go('finalizados')"><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></button>
+      <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><strong>Ajustes</strong><span>Loja, impressora, backup e demo.</span></button>
+      <button class="more-menu-item" onclick="closeMoreMenu(); openGlobalSearch()"><strong>Busca</strong><span>Cliente, pedido, produto ou lote.</span></button>
+    </div>
+  </div>
+
   <!-- Bottom nav -->
   <div class="nav">
     <button class="nav-btn active" data-nav="home" onclick="go('home')">
@@ -5987,13 +6432,13 @@ select:focus-visible {
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span>
       <span class="label">Pedidos</span>
     </button>
-    <button class="nav-btn" data-nav="historico" onclick="go('historico')">
-      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
-      <span class="label">Histórico</span>
-    </button>
     <button class="nav-btn" data-nav="conferencia" onclick="go('conferencia')">
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="17" y1="14" x2="17" y2="17"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="17" y2="17"/><line x1="20" y1="17" x2="20" y2="17"/><line x1="17" y1="20" x2="21" y2="20"/></svg></span>
       <span class="label">Conferir</span>
+    </button>
+    <button class="nav-btn" data-nav="more" onclick="toggleMoreMenu()">
+      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>
+      <span class="label">Mais</span>
     </button>
   </div>
 
@@ -6801,9 +7246,28 @@ function updateFab(screen) {
 }
 function onFabClick() { if (typeof _currentFabAction === 'function') _currentFabAction(); }
 
+function closeMoreMenu() {
+  document.getElementById('moreMenu')?.classList.remove('show');
+  document.querySelector('.nav-btn[data-nav="more"]')?.classList.remove('active');
+}
+
+function toggleMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  if (!menu) return;
+  const willOpen = !menu.classList.contains('show');
+  menu.classList.toggle('show', willOpen);
+  document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
+  document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
+}
+
 function go(screen) {
+  closeMoreMenu();
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
-  document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.nav === screen));
+  const moreScreens = ['historico', 'clientes', 'compras', 'caixa', 'finalizados'];
+  document.querySelectorAll('.nav-btn').forEach(n => {
+    const nav = n.dataset.nav;
+    n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
+  });
   document.getElementById('content').scrollTop = 0;
   if (screen === 'home')         renderHome();
   if (screen === 'pedidos') {
@@ -6814,6 +7278,7 @@ function go(screen) {
     goPedidosTab(hasDraft ? 'novo' : 'andamento');
   }
   if (screen === 'historico')    renderHistoricoScreen();
+  if (screen === 'clientes')     renderClientesScreen();
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
   if (screen === 'caixa')        renderCashDetails();
@@ -6964,21 +7429,47 @@ const STATUS = {
   CRIADO: 'criado', CONFERIDO: 'conferido'
 };
 
-function openOrders() {
+// ── Cache curto-circuito por render ──────────────────────────────────
+// renderHome chama 10 sub-renders, e varios deles invocam os mesmos
+// derivadores (openOrders, buildAttentionItems, getShoppingRows,
+// getDayBusinessSummary). Antes: 6+ filtros redundantes sobre orders por
+// render, 2+ walks em batches, 2+ varreduras DOM da lista de compras.
+//
+// Solucao: cache OPT-IN ativo so durante renderHome (try/finally garante
+// limpeza). Fora de renderHome, comportamento original — evita servir
+// cache stale se algo mutar orders/products entre eventos.
+let _derivBatching = false;
+let _derivCache = Object.create(null);
+function _memoByNonce(key, fn) {
+  if (!_derivBatching) return fn();
+  if (!(key in _derivCache)) _derivCache[key] = fn();
+  return _derivCache[key];
+}
+function _openOrdersImpl() {
   return orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado');
 }
+function openOrders() { return _memoByNonce('openOrders', _openOrdersImpl); }
 
 function renderHome() {
-  renderMiniStats();
-  renderOpenOrders();
-  renderCash();
-  renderTrustBadges();
-  renderPremiumOpsPanel();
-  renderOpenCashDaysBanner();
-  renderHomeInsights();
-  renderAttentionCenter();
-  renderHomeShopping();
-  renderHomeOpsDisclosure();
+  // Liga cache de derivadores apenas durante este render.
+  _derivBatching = true;
+  _derivCache = Object.create(null);
+  try {
+    renderMiniStats();
+    renderHomeFocusCard();
+    renderOpenOrders();
+    renderCash();
+    renderTrustBadges();
+    renderPremiumOpsPanel();
+    renderOpenCashDaysBanner();
+    renderHomeInsights();
+    renderAttentionCenter();
+    renderHomeShopping();
+    renderHomeOpsDisclosure();
+  } finally {
+    _derivBatching = false;
+    _derivCache = Object.create(null);
+  }
 }
 
 function trustRelativeTime(ts) {
@@ -6991,6 +7482,69 @@ function trustRelativeTime(ts) {
   if (h < 24) return h + 'h';
   const d = Math.floor(h / 24);
   return d + 'd';
+}
+
+function renderHomeFocusCard() {
+  const el = document.getElementById('homeFocusCard');
+  if (!el) return;
+  const open = typeof openOrders === 'function' ? openOrders() : [];
+  el.style.display = open.length ? 'none' : '';
+  const ready = open.filter(o => o.status === STATUS.PRONTO);
+  const preparing = open.filter(o => o.status === STATUS.PREPARANDO);
+  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO);
+  const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE);
+  const shopping = typeof getShoppingRows === 'function' ? getShoppingRows().filter(x => !x.done) : [];
+  const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, balance: 0 };
+  let title = 'Comece pelo pedido certo';
+  let sub = `${open.length} em aberto · ${money(sum.balance || 0)} no caixa hoje`;
+  let primaryLabel = 'Novo pedido';
+  let primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('novo'); } catch(e){} }, 50)";
+
+  if (pendingConfer.length) {
+    const o = pendingConfer[0];
+    title = 'Conferir antes de entregar';
+    sub = `${o.clientSnapshot?.name || 'Pedido'} · ${money(o.total || 0)} · evita erro na saida`;
+    primaryLabel = 'Conferir agora';
+    primaryAction = `go('conferencia')`;
+  } else if (ready.length) {
+    const o = ready[0];
+    title = 'Pedido pronto para sair';
+    sub = `${o.clientSnapshot?.name || 'Cliente'} · ${money(o.total || 0)} a receber/entregar`;
+    primaryLabel = 'Ver pedidos';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (preparing.length) {
+    const o = preparing[0];
+    title = 'Preparo em andamento';
+    sub = `${o.clientSnapshot?.name || 'Cliente'} · marque pronto quando finalizar`;
+    primaryLabel = 'Continuar';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (waiting.length) {
+    title = 'Pedidos aguardando preparo';
+    sub = `${waiting.length} pedido${waiting.length === 1 ? '' : 's'} para iniciar`;
+    primaryLabel = 'Iniciar fila';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (shopping.length) {
+    title = 'Compras pendentes';
+    sub = `${shopping.length} item${shopping.length === 1 ? '' : 's'} para destravar producao`;
+    primaryLabel = 'Abrir compras';
+    primaryAction = "go('compras')";
+  }
+
+  const score = Math.max(0, 100 - Math.min(40, pendingConfer.length * 10) - Math.min(20, shopping.length * 4) - Math.min(18, waiting.length * 3));
+  el.innerHTML = `
+    <div class="home-focus-top">
+      <div>
+        <div class="home-focus-kicker">Proximo passo</div>
+        <div class="home-focus-title">${escapeHtml(title)}</div>
+        <div class="home-focus-sub">${escapeHtml(sub)}</div>
+      </div>
+      <div class="home-focus-score"><strong>${score}</strong><span>controle</span></div>
+    </div>
+    <div class="home-focus-actions">
+      <button class="primary" onclick="${primaryAction}">${escapeHtml(primaryLabel)}</button>
+      <button onclick="go('producao')">Produzir</button>
+      <button onclick="go('conferencia')">Conferir</button>
+    </div>`;
 }
 
 function renderTrustBadges() {
@@ -7031,7 +7585,7 @@ function renderTrustBadges() {
   ).join('');
 }
 
-function getDayBusinessSummary() {
+function _getDayBusinessSummaryImpl() {
   const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, in: 0, out: 0, balance: 0, ordersCount: 0 };
   const open = typeof openOrders === 'function' ? openOrders() : [];
   const receivable = open
@@ -7041,6 +7595,7 @@ function getDayBusinessSummary() {
   const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE).length;
   return { ...sum, openCount: open.length, receivable, lowStockCount: lowStock.length, pendingConfer };
 }
+function getDayBusinessSummary() { return _memoByNonce('daySummary', _getDayBusinessSummaryImpl); }
 
 function buildDaySummaryText() {
   const d = getDayBusinessSummary();
@@ -7122,7 +7677,7 @@ function _attentionFmtElapsed(ms) {
   return h + 'h' + (r ? ' ' + r : '');
 }
 
-function buildAttentionItems() {
+function _buildAttentionItemsImpl() {
   const items = [];
   try {
     const now = Date.now();
@@ -7299,6 +7854,7 @@ function buildAttentionItems() {
   items.sort((a, b) => (ATTENTION_SEVERITY_ORDER[a.severity] ?? 9) - (ATTENTION_SEVERITY_ORDER[b.severity] ?? 9));
   return items.slice(0, 5);
 }
+function buildAttentionItems() { return _memoByNonce('attention', _buildAttentionItemsImpl); }
 
 function renderAttentionCenter() {
   const host = document.getElementById('attentionCenter');
@@ -7359,6 +7915,8 @@ const GS_SHORTCUTS = [
     keywords: 'conferencia conferir scanner qr', action: function () { go('conferencia'); } },
   { key: 'compras', label: 'Ir pra compras', icon: '🛒', kind: 'shortcut',
     keywords: 'compras lista comprar shopping', action: function () { go('compras'); } },
+  { key: 'clientes', label: 'Clientes e recorrência', icon: '👤', kind: 'shortcut',
+    keywords: 'clientes recorrencia cliente retorno whatsapp vendas', action: function () { go('clientes'); } },
   { key: 'caixa', label: 'Abrir caixa', icon: '💰', kind: 'shortcut',
     keywords: 'caixa fechamento dia saldo', action: function () { go('caixa'); } },
   { key: 'diagnostico', label: 'Diagnóstico', icon: '🔍', kind: 'shortcut',
@@ -7745,7 +8303,7 @@ function renderHomeInsights() {
   `;
 }
 
-function getShoppingRows() {
+function _getShoppingRowsImpl() {
   const list = document.getElementById('shopList');
   if (!list) return [];
   return Array.from(list.querySelectorAll('.shop-item')).map(el => ({
@@ -7753,6 +8311,7 @@ function getShoppingRows() {
     done: el.classList.contains('done')
   })).filter(item => item.name);
 }
+function getShoppingRows() { return _memoByNonce('shopRows', _getShoppingRowsImpl); }
 
 function renderHomeShopping() {
   const card = document.getElementById('homeShoppingCard');
@@ -7865,45 +8424,71 @@ function renderOpenOrders() {
   // ordena por status (aguardando primeiro, pronto por último) depois por createdAt
   const order = { aguardando: 0, preparando: 1, pronto: 2 };
   open.sort((a,b) => (order[a.status] - order[b.status]) || a.createdAt - b.createdAt);
-  open.forEach(o => {
-    const card = document.createElement('div');
-    card.className = 'open-order';
-    const itemsLine = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
-    // F2: a primeira acao primaria de getOrderPrimaryActions vira o botao
-    // .oo-advance (gold, full-width). Substitui o NEXT_LABEL fixo por algo
-    // contextual: pedido pronto sem conferencia mostra "✅ Conferir" em vez
-    // de "Marcar entregue", evitando entregar sem checar.
-    const primaryActions = (typeof getOrderPrimaryActions === 'function')
-      ? getOrderPrimaryActions(o) : [];
-    const primaryAction = primaryActions.find(a => a.primary) || null;
-    const advanceLabel = primaryAction
-      ? `${primaryAction.icon} ${escapeHtml(primaryAction.label)}`
-      : (NEXT_LABEL[o.status] || ''); // fallback se status desconhecido
-    const advanceClick = primaryAction
-      ? `runOrderAction('${o.id}', '${primaryAction.key}')`
-      : `advanceOrder('${o.id}')`;
-    card.innerHTML = `
-      <button class="oo-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar">&times;</button>
-      <div class="oo-head">
-        <div class="oo-who">
-          ${escapeHtml(o.clientSnapshot.name)}
-          <span class="ref">${escapeHtml(o.clientSnapshot.ref || '')}</span>
+  const lanes = [
+    { key: STATUS.AGUARDANDO, label: 'Aguardando' },
+    { key: STATUS.PREPARANDO, label: 'Preparando' },
+    { key: STATUS.PRONTO, label: 'Pronto' }
+  ];
+  const board = document.createElement('div');
+  board.className = 'home-pipeline';
+  lanes.forEach(lane => {
+    const items = open.filter(o => o.status === lane.key);
+    const visibleItems = items.slice(0, 2);
+    const hiddenCount = items.length - visibleItems.length;
+    const laneEl = document.createElement('section');
+    laneEl.className = 'home-lane';
+    laneEl.dataset.status = lane.key;
+    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${items.length}</span></div>`;
+    const body = document.createElement('div');
+    body.className = 'home-lane-body';
+    if (!items.length) {
+      body.innerHTML = '<div class="home-lane-empty">Nada aqui agora</div>';
+    }
+    visibleItems.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'home-order-card';
+      const itemsLine = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+      const primaryActions = (typeof getOrderPrimaryActions === 'function')
+        ? getOrderPrimaryActions(o) : [];
+      const primaryAction = primaryActions.find(a => a.primary) || null;
+      const advanceLabel = primaryAction
+        ? `${primaryAction.icon} ${escapeHtml(primaryAction.label)}`
+        : (NEXT_LABEL[o.status] || '');
+      const advanceClick = primaryAction
+        ? `runOrderAction('${o.id}', '${primaryAction.key}')`
+        : `advanceOrder('${o.id}')`;
+      card.innerHTML = `
+        <div class="home-order-top">
+          <div class="home-order-who">
+            ${escapeHtml(o.clientSnapshot.name)}
+            <span class="ref">${escapeHtml(o.clientSnapshot.ref || timeOf(o.createdAt))}</span>
+          </div>
+          <div class="home-order-total">${money(o.total)}</div>
         </div>
-        <div class="oo-time">${timeOf(o.createdAt)}</div>
-      </div>
-      <div class="oo-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
-      ${o.notes ? `<div class="oo-notes">${escapeHtml(o.notes)}</div>` : ''}
-      ${renderProgressDots(o.status, { showLabel: true })}
-      <div class="oo-foot">
-        <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
-        <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>
-        <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
-        <span class="oo-total">${money(o.total)}</span>
-      </div>
-      ${advanceLabel ? `<button class="oo-advance" onclick="${advanceClick}">${advanceLabel}</button>` : ''}
-    `;
-    list.appendChild(card);
+        <div class="home-order-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
+        <div class="home-order-actions">
+          ${advanceLabel ? `<button class="primary" onclick="${advanceClick}">${advanceLabel}</button>` : `<button class="primary" onclick="openHistorico('${o.id}')">Abrir</button>`}
+          <button onclick="openCobranca('${o.id}')" title="Gerar cobranca">Cobrar</button>
+          <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>
+        </div>
+      `;
+      body.appendChild(card);
+    });
+    if (hiddenCount > 0) {
+      const more = document.createElement('button');
+      more.className = 'home-lane-more';
+      more.type = 'button';
+      more.textContent = `Ver mais ${hiddenCount} no kanban completo`;
+      more.onclick = function () {
+        go('pedidos');
+        setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50);
+      };
+      body.appendChild(more);
+    }
+    laneEl.appendChild(body);
+    board.appendChild(laneEl);
   });
+  list.appendChild(board);
 }
 
 function renderCash() {
@@ -9015,6 +9600,110 @@ function purgeOrderRecord(id) {
   if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
   showToast(`Pedido #${ref} apagado`);
+}
+
+// ===== CLIENTES E RECORRENCIA =====
+let clientFilter = 'todos';
+
+function setClientFilter(filter) {
+  clientFilter = filter || 'todos';
+  document.querySelectorAll('#clientFilter button').forEach(b => b.classList.toggle('active', b.dataset.f === clientFilter));
+  renderClientesScreen();
+}
+
+function clientRecencyLabel(ts) {
+  if (!ts) return 'sem pedido';
+  const days = Math.floor((Date.now() - Number(ts)) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return 'hoje';
+  if (days === 1) return 'ontem';
+  return days + ' dias';
+}
+
+function buildClientInsights() {
+  const byId = new Map();
+  (clients || []).forEach(c => {
+    byId.set(c.id, { client: c, orders: 0, total: 0, lastAt: Number(c.lastOrder) || 0, products: new Map() });
+  });
+  (orders || []).forEach(o => {
+    if (o.status === STATUS.CANCELADO) return;
+    const key = o.clientId || ('snapshot:' + (o.clientSnapshot?.name || 'sem cliente'));
+    if (!byId.has(key)) {
+      byId.set(key, { client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' }, orders: 0, total: 0, lastAt: 0, products: new Map() });
+    }
+    const row = byId.get(key);
+    row.orders += 1;
+    row.total += Number(o.total) || 0;
+    row.lastAt = Math.max(row.lastAt || 0, Number(o.factAt || o.updatedAt || o.createdAt) || 0);
+    (o.items || []).forEach(it => {
+      const name = it.name || 'Produto';
+      row.products.set(name, (row.products.get(name) || 0) + (Number(it.qty) || 1));
+    });
+  });
+  return Array.from(byId.values()).map(row => {
+    const favorite = Array.from(row.products.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'sem favorito';
+    const avg = row.orders ? row.total / row.orders : 0;
+    const days = row.lastAt ? Math.floor((Date.now() - row.lastAt) / (24 * 60 * 60 * 1000)) : 9999;
+    return { ...row, favorite, avg, days };
+  }).sort((a, b) => (b.total - a.total) || (b.orders - a.orders) || (b.lastAt - a.lastAt));
+}
+
+function buildClientReturnMessage(row) {
+  const first = (row.client?.name || '').split(' ')[0] || 'Oi';
+  const favorite = row.favorite && row.favorite !== 'sem favorito' ? row.favorite : 'uma massa fresca';
+  return `${first}, tudo bem? Aqui é da ${getEmpresaName()}. Passando pra avisar que estamos organizando a produção da semana. Posso reservar ${favorite} pra você?`;
+}
+
+function copyClientReturnMessage(clientId) {
+  const row = buildClientInsights().find(x => x.client.id === clientId);
+  if (!row) { showToast('Cliente nao encontrado'); return; }
+  copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
+}
+
+function renderClientesScreen() {
+  const summary = document.getElementById('clientValueGrid');
+  const host = document.getElementById('clientRecurrenceList');
+  if (!summary || !host) return;
+  const rows = buildClientInsights();
+  const activeRows = rows.filter(r => r.orders > 0);
+  const recurring = activeRows.filter(r => r.orders >= 2);
+  const top = activeRows[0];
+  summary.innerHTML = `
+    <div class="client-value-card"><span class="k">Clientes</span><span class="v">${clients.length}</span></div>
+    <div class="client-value-card"><span class="k">Recorrentes</span><span class="v">${recurring.length}</span></div>
+    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(top.client.name).split(' ')[0] : '—'}</span></div>
+  `;
+  let filtered = rows;
+  if (clientFilter === 'recorrentes') filtered = rows.filter(r => r.orders >= 2);
+  if (clientFilter === 'sumidos') filtered = rows.filter(r => r.orders > 0 && r.days >= 21);
+  if (!filtered.length) {
+    host.innerHTML = '<div class="empty"><span class="big">👤</span>Nenhum cliente nesse filtro</div>';
+    return;
+  }
+  host.innerHTML = filtered.slice(0, 20).map((row, idx) => {
+    const c = row.client || {};
+    const phone = c.phone ? ' · ' + c.phone : '';
+    const ref = c.address || c.ref || '';
+    const name = c.name || 'Cliente sem nome';
+    return `<div class="client-card">
+      <div class="client-card-top">
+        <div>
+          <div class="client-name">${escapeHtml(name)}</div>
+          <div class="client-meta">${escapeHtml(clientRecencyLabel(row.lastAt))}${escapeHtml(phone)}${ref ? ' · ' + escapeHtml(ref) : ''}</div>
+        </div>
+        <div class="client-rank">#${idx + 1}</div>
+      </div>
+      <div class="client-stats">
+        <div class="client-stat"><span>Pedidos</span><strong>${row.orders}</strong></div>
+        <div class="client-stat"><span>Ticket</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
+      </div>
+      <div class="client-card-foot">
+        <button class="primary" onclick="copyClientReturnMessage('${escapeHtml(c.id)}')">Mensagem</button>
+        <button onclick="openClientModal({editId: '${escapeHtml(c.id)}'})">Editar</button>
+        <button onclick="openGlobalSearch(); setTimeout(function(){ try { document.getElementById('globalSearchInput').value='${escapeHtml(name)}'; onGlobalSearchInput(); } catch(e){} }, 80)">Histórico</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // Soft delete de batch — marca como deletado, reverte estoque, audit log.
