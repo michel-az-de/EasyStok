@@ -41,6 +41,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
     {
         await api.PostAsync<JsonElement>("api/admin/tickets",
             new { empresaId, titulo, descricao, categoria, prioridade });
+        SetSucesso("Ticket criado com sucesso.");
         return RedirectToPage(new { Page, Status, Prioridade, Search });
     }
 }

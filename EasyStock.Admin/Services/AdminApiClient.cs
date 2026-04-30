@@ -88,4 +88,14 @@ public class AdminApiClient(HttpClient httpClient, AdminSessionService session)
         ThrowIfUnauthorized(response);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<(byte[] Bytes, string ContentType)> GetBytesAsync(string path)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Get, path));
+        ThrowIfUnauthorized(response);
+        response.EnsureSuccessStatusCode();
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var ct = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+        return (bytes, ct);
+    }
 }

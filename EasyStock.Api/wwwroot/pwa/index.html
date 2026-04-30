@@ -5832,6 +5832,101 @@ select:focus-visible {
   gap: 8px;
   margin-bottom: 14px;
 }
+.stock-ledger {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+.stock-ledger-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 80px),
+    var(--bg-card, var(--surface));
+  padding: 12px;
+  box-shadow: var(--glow);
+}
+.stock-ledger-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.stock-ledger-name {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.stock-ledger-meta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  margin-top: 3px;
+}
+.stock-ledger-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.stock-ledger-badge.low { background: rgba(207,87,56,0.12); color: var(--accent); border-color: rgba(207,87,56,0.24); }
+.stock-ledger-badge.ok { background: rgba(74,222,128,0.10); color: var(--basil); border-color: rgba(74,222,128,0.22); }
+.stock-ledger-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.stock-ledger-progress .mini {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.02);
+}
+.stock-ledger-progress .mini strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.stock-ledger-progress .mini span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.stock-ledger-tail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stock-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 800;
+}
+.stock-source-chip.in { border-color: rgba(74,222,128,0.22); color: #8df0ab; }
+.stock-source-chip.out { border-color: rgba(239,107,107,0.22); color: #ffb0b0; }
+.stock-source-chip.sales { border-color: rgba(147,197,253,0.26); color: #c8e2ff; }
+.stock-source-chip.batch { border-color: rgba(240,184,74,0.26); color: #ffd66f; }
 .stock-stat {
   border: 1px solid var(--line);
   background: rgba(255,255,255,0.03);
@@ -5855,6 +5950,7 @@ select:focus-visible {
 .mov-item.sales .mov-type { color: #93c5fd; }
 .mov-item.in .mov-type { color: var(--basil); }
 .mov-item.out .mov-type { color: var(--accent); }
+.mov-item .mov-items .muted { color: var(--ink-mute); font-size: 12px; display: block; margin-top: 4px; }
 .batch-action:disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -9852,6 +9948,65 @@ function renderStockScreen() {
   `;
 
   const moves = buildStockMovements();
+  const buckets = new Map();
+  prods.forEach(p => buckets.set(p.id, { product: p, in: 0, out: 0, last: null, refs: [] }));
+  moves.forEach(m => {
+    if (!m.productId || !buckets.has(m.productId)) return;
+    const b = buckets.get(m.productId);
+    if (m.qty > 0) b.in += m.qty;
+    if (m.qty < 0) b.out += Math.abs(m.qty);
+    if (!b.last || (m.ts || 0) > (b.last.ts || 0)) b.last = m;
+    const refLabel = `${m.refType || 'mov'}:${m.ref || ''}`;
+    if (m.ref && !b.refs.includes(refLabel) && b.refs.length < 3) b.refs.push(refLabel);
+  });
+
+  const highlighted = prods
+    .filter(p => (p.stock || 0) > 0 || (buckets.get(p.id)?.last))
+    .sort((a, b) => {
+      const sa = Number(a.stock) || 0;
+      const sb = Number(b.stock) || 0;
+      const ta = buckets.get(a.id)?.last?.ts || 0;
+      const tb = buckets.get(b.id)?.last?.ts || 0;
+      return (sb - sa) || (tb - ta);
+    })
+    .slice(0, 6);
+
+  const ledgerHtml = highlighted.length ? `
+    <div class="stock-ledger">
+      ${highlighted.map(p => {
+        const bucket = buckets.get(p.id) || { in: 0, out: 0, last: null, refs: [] };
+        const stock = Number(p.stock) || 0;
+        const last = bucket.last;
+        const lastType = last ? (last.kind === 'batch' ? 'produção' : last.kind === 'sales' ? 'venda' : last.kind === 'in' ? 'entrada' : 'saída') : 'sem histórico';
+        const lastLabel = last ? `${lastType} · ${new Date(last.ts).toLocaleDateString('pt-BR')} ${String(new Date(last.ts).getHours()).padStart(2,'0')}:${String(new Date(last.ts).getMinutes()).padStart(2,'0')}` : 'sem histórico';
+        const badgeClass = stock <= 0 ? 'low' : 'ok';
+        const sourceChips = bucket.refs.length ? bucket.refs.map(ref => {
+          const kind = ref.split(':')[0];
+          const txt = kind === 'batch' ? 'produção' : kind === 'sales' ? 'venda' : kind === 'in' ? 'entrada' : 'saída';
+          return `<span class="stock-source-chip ${kind}">${txt}</span>`;
+        }).join('') : '<span class="stock-source-chip">sem origem recente</span>';
+        return `
+          <div class="stock-ledger-card">
+            <div class="stock-ledger-top">
+              <div>
+                <div class="stock-ledger-name">${escapeHtml(p.emoji || '•')} ${escapeHtml(p.name || '')}</div>
+                <div class="stock-ledger-meta">${escapeHtml(p.unit || '')} · saldo atual e trilha recente</div>
+              </div>
+              <span class="stock-ledger-badge ${badgeClass}">${stock > 0 ? `${stock} disp.` : 'sem saldo'}</span>
+            </div>
+            <div class="stock-ledger-progress">
+              <div class="mini"><strong>${bucket.in}</strong><span>entradas</span></div>
+              <div class="mini"><strong>${bucket.out}</strong><span>saídas</span></div>
+              <div class="mini"><strong>${bucket.in - bucket.out}</strong><span>líquido</span></div>
+            </div>
+            <div class="stock-ledger-tail">
+              <span class="stock-source-chip">${escapeHtml(lastLabel)}</span>
+              ${sourceChips}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+  ` : '';
   const filtered = stockFilter === 'all' ? moves : moves.filter(m => {
     if (stockFilter === 'batch') return m.kind === 'batch';
     if (stockFilter === 'sales') return m.kind === 'sales';
@@ -9861,22 +10016,26 @@ function renderStockScreen() {
   });
 
   if (!filtered.length) {
-    timelineHost.innerHTML = '<div class="empty"><span class="big">📦</span>Sem movimentações para este filtro</div>';
+    timelineHost.innerHTML = ledgerHtml + '<div class="empty"><span class="big">📦</span>Sem movimentações para este filtro</div>';
     return;
   }
 
-  timelineHost.innerHTML = filtered.slice(0, 80).map(m => {
+  timelineHost.innerHTML = ledgerHtml + filtered.slice(0, 80).map(m => {
     const dt = new Date(m.ts);
     const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
     const qty = m.qty > 0 ? `+${m.qty}` : (m.qty < 0 ? `${m.qty}` : '•');
     const badge = m.kind === 'batch' ? 'Produção' : m.kind === 'sales' ? 'Venda' : m.kind === 'in' ? 'Entrada' : 'Saída';
+    const productName = m.productId ? (products.find(p => p.id === m.productId)?.name || m.productName || '') : (m.productName || '');
     return `<div class="mov-item ${m.kind}">
       <div class="mov-head">
         <span class="mov-type">${badge}</span>
         <span>${dateStr}</span>
       </div>
-      <div class="mov-items">${escapeHtml(m.title)}${m.detail ? ' · ' + escapeHtml(m.detail) : ''}</div>
-      <div class="mov-ref"><span class="op">${escapeHtml(qty)}${m.productName ? ' · ' + escapeHtml(m.productName) : ''}</span></div>
+      <div class="mov-items">
+        ${escapeHtml(m.title)}
+        ${m.detail ? `<span class="muted">${escapeHtml(m.detail)}</span>` : ''}
+      </div>
+      <div class="mov-ref"><span class="op">${escapeHtml(qty)}${productName ? ' · ' + escapeHtml(productName) : ''}</span></div>
     </div>`;
   }).join('');
 }

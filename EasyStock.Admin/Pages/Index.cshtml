@@ -11,47 +11,68 @@
     </div>
 }
 
-<!-- Métricas principais -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
-        <div class="text-3xl font-bold text-es-ink">@Model.TenantsAtivos</div>
-        <div class="text-es-ink-mute text-xs mt-1">de @Model.TotalTenants total</div>
-    </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
-        <div class="text-3xl font-bold text-es-gold">@Model.TenantsSuspensos</div>
-        <div class="text-es-ink-mute text-xs mt-1">+@Model.TenantsNovos novos (30d)</div>
-    </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
-        <div class="text-3xl font-bold text-es-basil">@Model.TicketsAbertos</div>
-        <div class="text-red-400 text-xs mt-1 font-medium">@Model.TicketsCriticos críticos</div>
-    </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
-        <div class="text-3xl font-bold text-es-accent">R$ @Model.ReceitaMensal.ToString("N0")</div>
-        <div class="text-es-ink-mute text-xs mt-1">mensal (assinaturas ativas)</div>
-    </div>
-</div>
+<!-- Container reativo — usa $root.dash do adminApp() no body, seed com valores server-side -->
+<div x-init="Object.assign($root.dash, {
+    tenantsAtivos: @Model.TenantsAtivos,
+    totalTenants: @Model.TotalTenants,
+    tenantsSuspensos: @Model.TenantsSuspensos,
+    tenantsNovos: @Model.TenantsNovos,
+    ticketsAbertos: @Model.TicketsAbertos,
+    ticketsCriticos: @Model.TicketsCriticos,
+    ticketsEmAtendimento: @Model.TicketsEmAtendimento,
+    totalUsuariosAtivos: @Model.TotalUsuariosAtivos,
+    logins24h: @Model.Logins24h,
+    receitaMensalEstimada: @((double)Model.ReceitaMensal)
+})">
 
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
-        <div class="text-2xl font-bold text-es-ink">@Model.TotalUsuariosAtivos</div>
+    <!-- Indicador de atualização -->
+    <div class="flex items-center justify-end mb-3 gap-2 text-xs text-es-ink-mute">
+        <span class="w-1.5 h-1.5 rounded-full bg-es-basil animate-pulse"></span>
+        <span x-text="$root.dashSecsAgo > 0 ? 'Atualizado há ' + $root.dashSecsAgo + 's' : 'Atualizando…'"></span>
     </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
-        <div class="text-2xl font-bold text-es-ink">@Model.Logins24h</div>
+
+    <!-- Métricas principais -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
+            <div class="text-3xl font-bold text-es-ink" x-text="$root.dash.tenantsAtivos">@Model.TenantsAtivos</div>
+            <div class="text-es-ink-mute text-xs mt-1">de <span x-text="$root.dash.totalTenants">@Model.TotalTenants</span> total</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
+            <div class="text-3xl font-bold text-es-gold" x-text="$root.dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
+            <div class="text-es-ink-mute text-xs mt-1">+<span x-text="$root.dash.tenantsNovos">@Model.TenantsNovos</span> novos (30d)</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
+            <div class="text-3xl font-bold text-es-basil" x-text="$root.dash.ticketsAbertos">@Model.TicketsAbertos</div>
+            <div class="text-red-400 text-xs mt-1 font-medium"><span x-text="$root.dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
+            <div class="text-3xl font-bold text-es-accent">R$ <span x-text="($root.dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0})">@Model.ReceitaMensal.ToString("N0")</span></div>
+            <div class="text-es-ink-mute text-xs mt-1">mensal (assinaturas ativas)</div>
+        </div>
     </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
-        <div class="text-2xl font-bold text-es-gold">@Model.TicketsEmAtendimento</div>
-    </div>
-    <div class="card">
-        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
-        <div class="text-2xl font-bold text-es-basil">@Model.TenantsNovos</div>
-        <div class="text-es-ink-mute text-xs mt-1">últimos 30 dias</div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
+            <div class="text-2xl font-bold text-es-ink" x-text="$root.dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
+            <div class="text-2xl font-bold text-es-ink" x-text="$root.dash.logins24h">@Model.Logins24h</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
+            <div class="text-2xl font-bold text-es-gold" x-text="$root.dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
+            <div class="text-2xl font-bold text-es-basil" x-text="$root.dash.tenantsNovos">@Model.TenantsNovos</div>
+            <div class="text-es-ink-mute text-xs mt-1">últimos 30 dias</div>
+        </div>
     </div>
 </div>
 

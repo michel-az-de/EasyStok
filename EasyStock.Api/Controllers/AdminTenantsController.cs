@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -19,7 +20,8 @@ namespace EasyStock.Api.Controllers;
 public class AdminTenantsController(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    IConfiguration configuration) : EasyStockControllerBase
+    IConfiguration configuration,
+    AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetTenants(
@@ -133,6 +135,10 @@ public class AdminTenantsController(
                 assinatura.Status,
                 assinatura.DataInicio,
                 assinatura.DataFim,
+                assinatura.TrialFim,
+                trialAtivo = assinatura.TrialAtivo,
+                assinatura.CupomCodigo,
+                assinatura.DescontoAplicado,
                 plano = assinatura.Plano is null ? null : new
                 {
                     assinatura.Plano.Id,
@@ -179,6 +185,7 @@ public class AdminTenantsController(
             null));
 
         await db.CommitAsync();
+        await audit.LogAsync("TenantStatusAlterado", $"Status={novoStatus}, Motivo={req.Motivo}", id);
         return DataOk(new { status = novoStatus.ToString() });
     }
 
@@ -240,6 +247,7 @@ public class AdminTenantsController(
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? ""));
 
         await db.CommitAsync();
+        await audit.LogAsync("TenantImpersonado", $"EmpresaId={id}", id);
         return DataOk(new { token, expiresIn = 900 });
     }
 
@@ -259,6 +267,7 @@ public class AdminTenantsController(
         assinatura.PlanoId = req.PlanoId;
         assinatura.AlteradoEm = DateTime.UtcNow;
         await db.CommitAsync();
+        await audit.LogAsync("TenantPlanoAlterado", $"PlanoId={req.PlanoId}, PlanoNome={plano.Nome}", id);
 
         return DataOk(new { planoId = req.PlanoId, planoNome = plano.Nome });
     }
@@ -285,7 +294,52 @@ public class AdminTenantsController(
 
         return DataPaged(logs, total, page, pageSize);
     }
+
+    [HttpPost("{id:guid}/trial")]
+    public async Task<IActionResult> GrantTrial(Guid id, [FromBody] GrantTrialRequest req)
+    {
+        if (req.DiasTrial < 1 || req.DiasTrial > 90)
+            return DataBadRequest("DiasTrial deve estar entre 1 e 90.");
+
+        var assinatura = await db.AssinaturasEmpresa
+            .Where(a => a.EmpresaId == id)
+            .OrderByDescending(a => a.DataInicio)
+            .FirstOrDefaultAsync();
+
+        if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
+
+        assinatura.AtivarTrial(req.DiasTrial);
+        await db.CommitAsync();
+        await audit.LogAsync("TrialConcedido", $"Dias={req.DiasTrial}, TrialFim={assinatura.TrialFim:O}", id);
+
+        return DataOk(new { trialFim = assinatura.TrialFim });
+    }
+
+    [HttpPost("{id:guid}/aplicar-cupom")]
+    public async Task<IActionResult> AplicarCupom(Guid id, [FromBody] AplicarCupomRequest req)
+    {
+        var assinatura = await db.AssinaturasEmpresa
+            .Where(a => a.EmpresaId == id)
+            .OrderByDescending(a => a.DataInicio)
+            .FirstOrDefaultAsync();
+
+        if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
+
+        var cupom = await db.Cupons.FirstOrDefaultAsync(c => c.Codigo == req.Codigo.ToUpperInvariant());
+        if (cupom is null) return DataNotFound("Cupom não encontrado.");
+
+        if (!cupom.PodeUsarEm(DateTime.UtcNow))
+            return Conflict(new { error = new { code = "CUPOM_INVALIDO", message = "Cupom inválido, expirado ou esgotado." } });
+
+        assinatura.AplicarCupom(cupom);
+        await db.CommitAsync();
+        await audit.LogAsync("CupomAplicado", $"Codigo={cupom.Codigo}, Desconto={cupom.Valor}", id);
+
+        return DataOk(new { cupomCodigo = cupom.Codigo, descontoAplicado = cupom.Valor });
+    }
 }
 
 public record PatchTenantStatusRequest(string Status, string? Motivo);
 public record PatchTenantPlanoRequest(Guid PlanoId);
+public record GrantTrialRequest(int DiasTrial);
+public record AplicarCupomRequest(string Codigo);

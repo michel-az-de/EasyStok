@@ -101,6 +101,7 @@
                     var tid = t.TryGetProperty("id", out var tidP) ? tidP.GetString() : "";
                     var titulo = t.TryGetProperty("titulo", out var titP) ? titP.GetString() : "";
                     var empresa = t.TryGetProperty("empresaNome", out var empP) ? empP.GetString() : "—";
+                    var naoLidos = t.TryGetProperty("mensagensNaoLidas", out var nlP) ? nlP.GetInt32() : 0;
                     var cat = t.TryGetProperty("categoria", out var catP) ? catP.GetString() : "";
                     var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
                     var status = t.TryGetProperty("status", out var stP) ? stP.GetString() : "";
@@ -116,7 +117,13 @@
                         _ => "badge-fechado"
                     };
                     <tr class="cursor-pointer" style="transition:background .15s" onmouseover="this.style.background='rgba(32,43,66,.5)'" onmouseout="this.style.background=''" onclick="location.href='/Tickets/Detail/@tid'">
-                        <td class="text-es-ink font-medium">@titulo</td>
+                        <td class="text-es-ink font-medium">
+                            @titulo
+                            @if (naoLidos > 0)
+                            {
+                                <span class="ml-2 bg-es-accent text-white text-xs font-bold rounded-full px-1.5 py-0.5">@naoLidos</span>
+                            }
+                        </td>
                         <td class="text-es-ink-dim text-sm">@empresa</td>
                         <td class="text-es-ink-dim text-sm">@cat</td>
                         <td><span class="status-badge @priClass">@pri</span></td>

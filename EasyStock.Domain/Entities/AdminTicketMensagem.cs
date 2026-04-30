@@ -9,6 +9,7 @@ namespace EasyStock.Domain.Entities
         public Guid AutorId { get; set; }
         public string Conteudo { get; set; } = null!;
         public bool IsAdmin { get; set; }
+        public bool LidoPeloAdmin { get; set; }
         public DateTime CriadoEm { get; set; }
 
         public AdminTicket? Ticket { get; set; }

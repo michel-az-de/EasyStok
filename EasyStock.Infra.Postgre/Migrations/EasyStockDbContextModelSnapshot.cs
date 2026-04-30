@@ -22,6 +22,45 @@ namespace EasyStock.Infra.Postgre.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.AdminAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AdminEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detalhes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CriadoEm");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("AdminAuditLogs", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.AdminImpersonationLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -126,6 +165,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<bool>("IsAdmin")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("LidoPeloAdmin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("TicketId")
                         .HasColumnType("uuid");
 
@@ -197,11 +241,18 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CupomCodigo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime?>("DataFim")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("DataInicio")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DescontoAplicado")
+                        .HasColumnType("decimal(10,2)");
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
@@ -213,6 +264,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("TrialFim")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -627,6 +681,53 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique();
 
                     b.ToTable("configuracoes_loja", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Cupom", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("LimiteUsos")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("PlanoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TipoDesconto")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("TotalUsos")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ValidoAte")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Ativo");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.ToTable("Cupons", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Empresa", b =>

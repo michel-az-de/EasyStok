@@ -1,0 +1,111 @@
+@page
+@model EasyStock.Admin.Pages.AuditLogs.IndexModel
+@{
+    ViewData["Title"] = "Audit Logs";
+}
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<!-- Filtros -->
+<form method="get" class="card mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
+            <label class="form-label">Tenant ID</label>
+            <input type="text" name="TenantId" value="@Model.TenantId" class="form-input" placeholder="UUID do tenant..." />
+        </div>
+        <div>
+            <label class="form-label">Ação</label>
+            <select name="Acao" class="form-input">
+                <option value="">Todas</option>
+                @foreach (var a in new[] { "PlanoAdicionado", "PlanoAtualizado", "PlanoToggle",
+                    "TenantStatusAlterado", "TenantImpersonado", "TenantPlanoAlterado",
+                    "TrialConcedido", "CupomAplicado", "CupomCriado", "CupomAtualizado",
+                    "TicketStatusAlterado" })
+                {
+                    <option value="@a" selected="@(Model.Acao == a)">@a</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label">De</label>
+            <input type="date" name="From" value="@Model.From" class="form-input" />
+        </div>
+        <div>
+            <label class="form-label">Até</label>
+            <input type="date" name="To" value="@Model.To" class="form-input" />
+        </div>
+    </div>
+    <div class="flex items-center justify-between mt-3">
+        <div class="flex gap-2">
+            <button type="submit" class="btn-primary text-sm">Filtrar</button>
+            <a href="/AuditLogs" class="btn-secondary text-sm">Limpar</a>
+        </div>
+        <a href="@Model.BuildCsvUrl()" class="btn-secondary text-sm">↓ Exportar CSV</a>
+    </div>
+</form>
+
+<!-- Tabela -->
+<div class="card p-0 overflow-hidden">
+    <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.10)">
+        <span class="text-es-ink-mute text-sm">@Model.Total registro(s)</span>
+    </div>
+    <table class="table-admin">
+        <thead>
+            <tr>
+                <th>Admin</th>
+                <th>Ação</th>
+                <th>Tenant</th>
+                <th>Detalhes</th>
+                <th>IP</th>
+                <th>Data/Hora</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var log in Model.Logs)
+            {
+                var email = log.TryGetProperty("adminEmail", out var ep) ? ep.GetString() : "—";
+                var acao = log.TryGetProperty("acao", out var ap) ? ap.GetString() : "—";
+                var tenantId = log.TryGetProperty("tenantId", out var tp) && tp.ValueKind != System.Text.Json.JsonValueKind.Null ? tp.GetString() : "—";
+                var detalhes = log.TryGetProperty("detalhes", out var dp) && dp.ValueKind != System.Text.Json.JsonValueKind.Null ? dp.GetString() : "—";
+                var ip = log.TryGetProperty("ip", out var ip2) && ip2.ValueKind != System.Text.Json.JsonValueKind.Null ? ip2.GetString() : "—";
+                var criado = log.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : null;
+                DateTime.TryParse(criado, out var criadoDt);
+                <tr>
+                    <td class="text-es-ink text-xs font-medium">@email</td>
+                    <td><span class="font-mono text-xs text-es-accent">@acao</span></td>
+                    <td class="text-es-ink-dim text-xs font-mono">@(tenantId?.Length > 8 ? tenantId[..8] + "…" : tenantId)</td>
+                    <td class="text-es-ink-dim text-xs max-w-xs truncate" title="@detalhes">@detalhes</td>
+                    <td class="text-es-ink-dim text-xs">@ip</td>
+                    <td class="text-es-ink-dim text-xs">@(criadoDt != default ? criadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
+                </tr>
+            }
+            @if (!Model.Logs.Any())
+            {
+                <tr><td colspan="6" class="text-center text-es-ink-mute py-8">Nenhum registro encontrado.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Paginação -->
+@if (Model.TotalPages > 1)
+{
+    <div class="flex items-center justify-between mt-4">
+        <span class="text-es-ink-mute text-sm">Página @Model.CurrentPage de @Model.TotalPages</span>
+        <div class="flex gap-2">
+            @if (Model.CurrentPage > 1)
+            {
+                <a href="?PageNum=@(Model.CurrentPage - 1)&TenantId=@Model.TenantId&Acao=@Model.Acao&From=@Model.From&To=@Model.To"
+                   class="btn-secondary text-sm">← Anterior</a>
+            }
+            @if (Model.CurrentPage < Model.TotalPages)
+            {
+                <a href="?PageNum=@(Model.CurrentPage + 1)&TenantId=@Model.TenantId&Acao=@Model.Acao&From=@Model.From&To=@Model.To"
+                   class="btn-primary text-sm">Próxima →</a>
+            }
+        </div>
+    </div>
+}

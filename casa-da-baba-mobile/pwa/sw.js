@@ -1,19 +1,32 @@
 // Service Worker - Casa da Baba PWA
-// Estrategia: cache-first para estaticos, network-only para API.
+//
+// Estrategia para suportar AUTO-UPDATE silencioso:
+// - index.html / navegacao: NETWORK-FIRST com timeout 1.5s
+//   (garante que update novo chega rapido se a rede estiver OK; cai pro cache se offline)
+// - Resto dos estaticos (CSS, JS, icones): STALE-WHILE-REVALIDATE
+//   (serve do cache rapido, atualiza em background)
+// - /api/*: bypass total (sync precisa estar online sempre)
+//
+// CACHE_VERSION e substituida pelo CI a cada deploy (cdb-<sha>) — isso garante
+// que o activate descarte caches antigos, forcando o conteudo cacheado a ser
+// re-baixado apos cada release.
 
-const CACHE_VERSION = 'cdb-v1';
+const CACHE_VERSION = 'cdb-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './sync.js',
+  './icons/favicon.png',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_VERSION)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -26,38 +39,63 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function networkFirstWithTimeout(req, ms) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      caches.match(req).then(c => {
+        if (settled) return;
+        if (c) { settled = true; resolve(c); }
+      });
+    }, ms);
+    fetch(req).then((resp) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      if (resp.ok && new URL(req.url).origin === self.location.origin) {
+        const copy = resp.clone();
+        caches.open(CACHE_VERSION).then(c => c.put(req, copy));
+      }
+      resolve(resp);
+    }).catch(() => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      caches.match(req).then(c => resolve(c || caches.match('./index.html')));
+    });
+  });
+}
+
+function staleWhileRevalidate(req, url) {
+  return caches.match(req).then((cached) => {
+    const network = fetch(req).then((resp) => {
+      if (resp.ok && url.origin === self.location.origin) {
+        const copy = resp.clone();
+        caches.open(CACHE_VERSION).then(c => c.put(req, copy));
+      }
+      return resp;
+    }).catch(() => undefined);
+    return cached || network;
+  });
+}
+
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Bypass total pra requests de API (sincronizacao de dados)
-  if (url.pathname.includes('/api/mobile/') || url.pathname.includes('/api/')) {
-    return; // deixa a rede cuidar, sem cache
-  }
+  // API: bypass (sync precisa de rede)
+  if (url.pathname.includes('/api/')) return;
 
-  // Bypass pras fontes do Google (cacheadas pelo browser)
-  if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) {
-    return;
-  }
+  // Google Fonts: deixa o browser cachear nativamente
+  if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) return;
 
-  // Cache-first pros estaticos
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((resp) => {
-          // Cacheia o que for do mesmo origin e deu 200
-          if (resp.ok && url.origin === self.location.origin) {
-            const copy = resp.clone();
-            caches.open(CACHE_VERSION).then((c) => c.put(event.request, copy));
-          }
-          return resp;
-        }).catch(() => {
-          // Fallback offline: volta pra index.html se for navegacao
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-        });
-      })
-    );
+  const isHtml = event.request.mode === 'navigate'
+              || url.pathname === '/'
+              || url.pathname.endsWith('/')
+              || url.pathname.endsWith('index.html');
+
+  if (isHtml) {
+    event.respondWith(networkFirstWithTimeout(event.request, 1500));
+  } else {
+    event.respondWith(staleWhileRevalidate(event.request, url));
   }
 });

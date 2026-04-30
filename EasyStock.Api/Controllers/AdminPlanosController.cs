@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Services;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -11,7 +12,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/admin/planos")]
 [Authorize(Policy = "SuperAdmin")]
-public class AdminPlanosController(EasyStockDbContext db) : EasyStockControllerBase
+public class AdminPlanosController(EasyStockDbContext db, AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetPlanos()
@@ -56,6 +57,7 @@ public class AdminPlanosController(EasyStockDbContext db) : EasyStockControllerB
 
         db.Planos.Add(plano);
         await db.CommitAsync();
+        await audit.LogAsync("PlanoAdicionado", $"Nome={plano.Nome}");
 
         return DataCreated($"/api/admin/planos/{plano.Id}", new { plano.Id, plano.Nome });
     }
@@ -75,6 +77,7 @@ public class AdminPlanosController(EasyStockDbContext db) : EasyStockControllerB
         if (req.PrecoMensal.HasValue) plano.PrecoMensal = req.PrecoMensal.Value;
 
         await db.CommitAsync();
+        await audit.LogAsync("PlanoAtualizado", $"PlanoId={id}");
         return DataOk(new { plano.Id, plano.Nome });
     }
 
@@ -86,6 +89,7 @@ public class AdminPlanosController(EasyStockDbContext db) : EasyStockControllerB
 
         plano.Ativo = !plano.Ativo;
         await db.CommitAsync();
+        await audit.LogAsync("PlanoToggle", $"PlanoId={id}, Ativo={plano.Ativo}");
 
         return DataOk(new { plano.Id, plano.Ativo });
     }

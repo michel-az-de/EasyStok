@@ -11,6 +11,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.ToTable("admin_ticket_mensagens");
             builder.HasKey(m => m.Id);
             builder.Property(m => m.Conteudo).IsRequired().HasMaxLength(8000);
+            builder.Property(m => m.LidoPeloAdmin).HasDefaultValue(false);
 
             builder.HasOne(m => m.Autor)
                 .WithMany()

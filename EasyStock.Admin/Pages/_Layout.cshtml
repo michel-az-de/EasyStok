@@ -91,6 +91,18 @@
                 <span class="text-base">📋</span>
                 <span class="text-sm font-medium">Planos</span>
             </a>
+            <a href="/Cupons" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Cupons") == true ? "active" : "")">
+                <span class="text-base">🏷️</span>
+                <span class="text-sm font-medium">Cupons</span>
+            </a>
+            <a href="/AuditLogs" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/AuditLogs") == true ? "active" : "")">
+                <span class="text-base">🔍</span>
+                <span class="text-sm font-medium">Audit Logs</span>
+            </a>
+            <a href="/Status" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Status") == true ? "active" : "")">
+                <span class="text-base">💚</span>
+                <span class="text-sm font-medium">Status</span>
+            </a>
 
             <div class="pt-4 mt-4 space-y-1" style="border-top:1px solid rgba(247,242,232,0.08)">
                 <a href="http://localhost:5000" target="_blank" class="sidebar-link">
@@ -144,21 +156,52 @@
 
 @await RenderSectionAsync("Scripts", required: false)
 
+@{
+    var _toastSucesso = TempData["Sucesso"] as string;
+    var _toastErro    = TempData["Erro"] as string;
+}
+@if (_toastSucesso != null || _toastErro != null)
+{
+    var _isOk = _toastSucesso != null;
+    var _msg  = _toastSucesso ?? _toastErro;
+    <div x-data="{ show: true }"
+         x-show="show"
+         x-cloak
+         x-init="setTimeout(() => show = false, 4000)"
+         style="transition:opacity .4s; background:#1a2540; border:1px solid @(_isOk ? "rgba(79,191,159,.35)" : "rgba(248,113,113,.35)");"
+         class="fixed bottom-6 right-6 z-[200] flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium"
+         :style="show ? 'opacity:1' : 'opacity:0'">
+        <span class="text-base @(_isOk ? "text-es-basil" : "text-red-400")">@(_isOk ? "✓" : "✗")</span>
+        <span class="text-es-ink">@_msg</span>
+        <button @@click="show=false" class="text-es-ink-mute hover:text-es-ink ml-2 leading-none">✕</button>
+    </div>
+}
+
 <script>
     function adminApp() {
         return {
-            dash: { totalTenants: 0, ticketsBadge: 0 },
+            dash: {
+                totalTenants: 0, tenantsAtivos: 0, tenantsSuspensos: 0, tenantsNovos: 0,
+                ticketsAbertos: 0, ticketsCriticos: 0, ticketsEmAtendimento: 0,
+                ticketsComNovaMensagem: 0, totalUsuariosAtivos: 0, logins24h: 0,
+                receitaMensalEstimada: 0, ticketsBadge: 0
+            },
+            dashSecsAgo: 0,
+            _lastFetch: 0,
             async init() {
                 await this.fetchDashBadges();
                 setInterval(() => this.fetchDashBadges(), 60000);
+                setInterval(() => { if (this._lastFetch) this.dashSecsAgo = Math.floor((Date.now() - this._lastFetch) / 1000); }, 5000);
             },
             async fetchDashBadges() {
                 try {
                     const r = await fetch('/api-proxy/dashboard-badges');
                     if (r.ok) {
                         const d = await r.json();
-                        this.dash.totalTenants = d.totalTenants ?? 0;
-                        this.dash.ticketsBadge = (d.ticketsCriticos ?? 0) + (d.ticketsAbertos ?? 0);
+                        Object.assign(this.dash, d);
+                        this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + (d.ticketsCriticos ?? 0);
+                        this._lastFetch = Date.now();
+                        this.dashSecsAgo = 0;
                     }
                 } catch {}
             }

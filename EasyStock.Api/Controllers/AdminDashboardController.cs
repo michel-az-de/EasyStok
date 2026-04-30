@@ -43,6 +43,10 @@ public class AdminDashboardController(EasyStockDbContext db) : EasyStockControll
         var totalUsuariosAtivos = await db.Usuarios.CountAsync(u => u.Ativo);
         var logins24h = await db.AuditLogs.CountAsync(a => a.DataHora >= h24 && a.Acao == "Login" && a.Sucesso);
 
+        var ticketsComNovaMensagem = await db.AdminTickets
+            .CountAsync(t => t.Status != TicketStatus.Fechado && t.Status != TicketStatus.Resolvido
+                && db.AdminTicketMensagens.Any(m => m.TicketId == t.Id && !m.IsAdmin && !m.LidoPeloAdmin));
+
         var ultimosTicketsCriticos = await db.AdminTickets
             .Include(t => t.Empresa)
             .Where(t => t.Prioridade == TicketPrioridade.Critica && t.Status != TicketStatus.Fechado)
@@ -75,6 +79,7 @@ public class AdminDashboardController(EasyStockDbContext db) : EasyStockControll
             ticketsAbertos,
             ticketsCriticos,
             ticketsEmAtendimento,
+            ticketsComNovaMensagem,
             totalUsuariosAtivos,
             logins24h,
             receitaMensalEstimada = receitaMensal,

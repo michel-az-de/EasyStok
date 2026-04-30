@@ -1,0 +1,151 @@
+@page
+@model EasyStock.Admin.Pages.Status.IndexModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Status do Sistema";
+}
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div x-data="statusPage()" x-init="init()">
+
+    <!-- Header com auto-refresh indicator -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="text-es-ink-mute text-sm">
+            Última atualização: <span x-text="lastUpdated" class="text-es-ink"></span>
+        </div>
+        <button type="button" @@click="refresh()" class="btn-secondary text-sm">↻ Atualizar</button>
+    </div>
+
+    <!-- Cards grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+        <!-- Database -->
+        <div class="card">
+            <div class="flex items-center gap-2 mb-3">
+                <span x-bind:class="dbDotClass()" class="w-2.5 h-2.5 rounded-full inline-block"></span>
+                <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Database</span>
+            </div>
+            <div class="text-2xl font-bold text-es-ink" x-text="data.database?.latencyMs + ' ms'">—</div>
+            <div class="text-xs mt-1" x-bind:class="dbTextClass()" x-text="data.database?.status ?? '—'"></div>
+        </div>
+
+        <!-- API -->
+        <div class="card">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-green-400 inline-block"></span>
+                <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">API</span>
+            </div>
+            <div class="text-2xl font-bold text-es-ink" x-text="formatUptime(data.api?.uptimeSeconds)">—</div>
+            <div class="text-xs text-es-basil mt-1" x-text="'v' + (data.api?.version ?? '—')"></div>
+        </div>
+
+        <!-- Errors -->
+        <div class="card">
+            <div class="flex items-center gap-2 mb-3">
+                <span x-bind:class="errorDotClass()" class="w-2.5 h-2.5 rounded-full inline-block"></span>
+                <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Erros (24h)</span>
+            </div>
+            <div class="text-2xl font-bold" x-bind:class="data.erros24h?.total > 0 ? 'text-red-400' : 'text-es-ink'" x-text="data.erros24h?.total ?? 0">—</div>
+            <div class="text-xs text-es-ink-mute mt-1" x-text="(data.erros24h?.ultimaHora ?? 0) + ' na última hora'"></div>
+        </div>
+
+        <!-- Usage -->
+        <div class="card">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-es-accent inline-block"></span>
+                <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Uso</span>
+            </div>
+            <div class="text-2xl font-bold text-es-ink" x-text="data.uso?.usuariosAtivos24h ?? 0">—</div>
+            <div class="text-xs text-es-ink-mute mt-1">usuários ativos (24h)</div>
+            <div class="flex gap-3 mt-2 text-xs text-es-ink-mute">
+                <span>IA: <b class="text-es-ink" x-text="data.uso?.iaGeracoesMes ?? 0"></b>/mês</span>
+                <span>Tickets: <b class="text-es-ink" x-text="data.uso?.ticketsAbertos ?? 0"></b> abertos</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Erros recentes -->
+    <div class="card">
+        <h3 class="text-es-ink font-semibold text-sm mb-4">Erros Recentes</h3>
+        <template x-if="(data.errosRecentes ?? []).length === 0">
+            <p class="text-es-ink-mute text-sm text-center py-4">Nenhum erro recente.</p>
+        </template>
+        <table class="table-admin" x-show="(data.errosRecentes ?? []).length > 0">
+            <thead>
+                <tr>
+                    <th>Ação</th>
+                    <th>Detalhes</th>
+                    <th>Data/Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="e in (data.errosRecentes ?? [])" :key="e.dataHora">
+                    <tr>
+                        <td class="font-mono text-xs text-es-ink" x-text="e.acao"></td>
+                        <td class="text-es-ink-dim text-xs max-w-xs truncate" x-text="e.detalhes ?? '—'"></td>
+                        <td class="text-es-ink-dim text-xs" x-text="formatDate(e.dataHora)"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function statusPage() {
+    return {
+        data: @(Model.StatusData.ValueKind != System.Text.Json.JsonValueKind.Undefined
+            ? Model.StatusData.GetRawText()
+            : "{}"),
+        lastUpdated: new Date().toLocaleTimeString('pt-BR'),
+
+        init() {
+            setInterval(() => this.refresh(), 30000);
+        },
+
+        async refresh() {
+            try {
+                const r = await fetch('/api-proxy/status');
+                if (r.ok) {
+                    this.data = await r.json();
+                    this.lastUpdated = new Date().toLocaleTimeString('pt-BR');
+                }
+            } catch {}
+        },
+
+        dbDotClass() {
+            const s = this.data.database?.status;
+            return s === 'ok' ? 'bg-green-400' : s === 'degraded' ? 'bg-yellow-400' : 'bg-red-400';
+        },
+
+        dbTextClass() {
+            const s = this.data.database?.status;
+            return s === 'ok' ? 'text-es-basil' : s === 'degraded' ? 'text-es-gold' : 'text-red-400';
+        },
+
+        errorDotClass() {
+            const n = this.data.erros24h?.total ?? 0;
+            return n === 0 ? 'bg-green-400' : n < 10 ? 'bg-yellow-400' : 'bg-red-400';
+        },
+
+        formatUptime(seconds) {
+            if (!seconds) return '—';
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
+        },
+
+        formatDate(iso) {
+            if (!iso) return '—';
+            return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        }
+    }
+}
+</script>
+}

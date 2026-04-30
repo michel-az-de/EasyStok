@@ -9,6 +9,9 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
 {
     protected AdminSessionService Session => session;
 
+    protected void SetSucesso(string mensagem) => TempData["Sucesso"] = mensagem;
+    protected void SetErro(string mensagem)    => TempData["Erro"] = mensagem;
+
     public override async Task OnPageHandlerExecutionAsync(
         PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {

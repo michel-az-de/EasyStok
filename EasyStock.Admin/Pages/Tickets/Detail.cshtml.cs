@@ -39,18 +39,21 @@ public class DetailModel(AdminApiClient api, AdminSessionService session) : Admi
     public async Task<IActionResult> OnPostResponderAsync(string conteudo)
     {
         await api.PostAsync<JsonElement>($"api/admin/tickets/{Id}/mensagens", new { conteudo });
+        SetSucesso("Resposta enviada.");
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostResolverAsync()
     {
         await api.PatchAsync<JsonElement>($"api/admin/tickets/{Id}", new { status = "Resolvido" });
+        SetSucesso("Ticket marcado como resolvido.");
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostAlterarStatusAsync(string status)
     {
         await api.PatchAsync<JsonElement>($"api/admin/tickets/{Id}", new { status });
+        SetSucesso("Status do ticket atualizado.");
         return RedirectToPage(new { Id });
     }
 }

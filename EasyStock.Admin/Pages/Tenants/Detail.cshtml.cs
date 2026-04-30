@@ -45,6 +45,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     {
         await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
             new { status = "Suspensa", motivo });
+        SetSucesso("Tenant suspenso com sucesso.");
         return RedirectToPage(new { Id });
     }
 
@@ -52,12 +53,14 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     {
         await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
             new { status = "Ativa", motivo = "Reativado pelo admin" });
+        SetSucesso("Tenant reativado com sucesso.");
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostTrocarPlanoAsync(Guid planoId)
     {
         await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/plano", new { planoId });
+        SetSucesso("Plano alterado com sucesso.");
         return RedirectToPage(new { Id });
     }
 
@@ -67,5 +70,19 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
         var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
         return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
+    }
+
+    public async Task<IActionResult> OnPostConcederTrialAsync(int diasTrial)
+    {
+        try { await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/trial", new { diasTrial }); }
+        catch (Exception ex) { Erro = ex.Message; }
+        return RedirectToPage(new { Id });
+    }
+
+    public async Task<IActionResult> OnPostAplicarCupomAsync(string codigo)
+    {
+        try { await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/aplicar-cupom", new { codigo }); }
+        catch (Exception ex) { Erro = ex.Message; }
+        return RedirectToPage(new { Id });
     }
 }

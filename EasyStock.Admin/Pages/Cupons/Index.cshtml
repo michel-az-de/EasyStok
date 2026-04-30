@@ -1,0 +1,187 @@
+@page
+@model EasyStock.Admin.Pages.Cupons.IndexModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Cupons";
+}
+
+<div class="flex items-center justify-between mb-6" x-data="{ modalNovo: false }">
+    <div class="text-es-ink-mute text-sm">@Model.Cupons.Count() cupom(ns)</div>
+    <button type="button" @@click="modalNovo = true" class="btn-primary">+ Novo Cupom</button>
+
+    <!-- Modal novo cupom -->
+    <div x-show="modalNovo" x-cloak class="modal-overlay" @@click.self="modalNovo = false">
+        <div class="modal-box" @@click.stop>
+            <h3 class="text-es-ink font-semibold mb-4">Novo Cupom</h3>
+            <form method="post" asp-page-handler="Criar" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2">
+                        <label class="form-label">Código</label>
+                        <input type="text" name="codigo" class="form-input" placeholder="Ex: PROMO10" required
+                               style="text-transform:uppercase" />
+                    </div>
+                    <div>
+                        <label class="form-label">Tipo de Desconto</label>
+                        <select name="tipoDesconto" class="form-input" required>
+                            <option value="Percentual">Percentual (%)</option>
+                            <option value="ValorFixo">Valor Fixo (R$)</option>
+                            <option value="MesesGratis">Meses Grátis</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Valor</label>
+                        <input type="number" name="valor" class="form-input" step="0.01" min="0" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite de Usos <small class="text-es-ink-mute">(vazio = ilimitado)</small></label>
+                        <input type="number" name="limiteUsos" class="form-input" min="1" />
+                    </div>
+                    <div>
+                        <label class="form-label">Válido até <small class="text-es-ink-mute">(vazio = sem expiração)</small></label>
+                        <input type="date" name="validoAte" class="form-input" />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Restringir ao Plano <small class="text-es-ink-mute">(vazio = qualquer plano)</small></label>
+                        <select name="planoId" class="form-input">
+                            <option value="">Todos os planos</option>
+                            @foreach (var p in Model.Planos)
+                            {
+                                var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
+                                var pnome = p.TryGetProperty("nome", out var pnP) ? pnP.GetString() : "";
+                                <option value="@pid">@pnome</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-end pt-2">
+                    <button type="button" @@click="modalNovo = false" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div class="space-y-3">
+    @foreach (var c in Model.Cupons)
+    {
+        var cid = c.TryGetProperty("id", out var cidP) ? cidP.GetString() : "";
+        var codigo = c.TryGetProperty("codigo", out var codigoP) ? codigoP.GetString() : "";
+        var tipo = c.TryGetProperty("tipoDesconto", out var tipoP) ? tipoP.GetString() : "";
+        var valor = c.TryGetProperty("valor", out var valorP) ? valorP.GetDecimal() : 0m;
+        var limiteUsos = c.TryGetProperty("limiteUsos", out var luP) && luP.ValueKind != JsonValueKind.Null ? (int?)luP.GetInt32() : null;
+        var totalUsos = c.TryGetProperty("totalUsos", out var tuP) ? tuP.GetInt32() : 0;
+        var validoAte = c.TryGetProperty("validoAte", out var vaP) && vaP.ValueKind != JsonValueKind.Null ? vaP.GetString() : null;
+        var ativo = c.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
+        var planoId = c.TryGetProperty("planoId", out var plP) && plP.ValueKind != JsonValueKind.Null ? plP.GetString() : null;
+        DateTime.TryParse(validoAte, out var validoAteDt);
+
+        var tipoLabel = tipo switch { "Percentual" => $"{valor:N0}%", "ValorFixo" => $"R$ {valor:N2}", "MesesGratis" => $"{valor:N0} mês(es) grátis", _ => tipo };
+
+        <div class="card" x-data="{ editing: false }">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-1 flex-wrap">
+                        <span class="font-mono font-bold text-es-ink text-lg tracking-widest">@codigo</span>
+                        <span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span>
+                        <span class="text-es-accent font-bold text-sm">@tipoLabel</span>
+                    </div>
+                    <div class="flex gap-4 text-xs text-es-ink-mute flex-wrap">
+                        <span>Usos: <b class="text-es-ink">@totalUsos@(limiteUsos.HasValue ? $"/{limiteUsos}" : "")</b></span>
+                        @if (validoAte != null)
+                        {
+                            <span>Válido até: <b class="text-es-ink">@validoAteDt.ToLocalTime().ToString("dd/MM/yyyy")</b></span>
+                        }
+                        else
+                        {
+                            <span>Sem expiração</span>
+                        }
+                        @if (planoId != null)
+                        {
+                            <span>Restrito a plano específico</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-4 pt-4 flex-wrap" style="border-top:1px solid rgba(247,242,232,0.10)">
+                <button type="button" @@click="editing = !editing" class="btn-secondary text-sm">
+                    <span x-text="editing ? 'Cancelar' : 'Editar'"></span>
+                </button>
+                <form method="post" asp-page-handler="Toggle" class="inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@cid" />
+                    <button type="submit" class="@(ativo ? "btn-danger" : "btn-primary") text-sm">
+                        @(ativo ? "Desativar" : "Ativar")
+                    </button>
+                </form>
+                <form method="post" asp-page-handler="Deletar" class="inline"
+                      onsubmit="return confirm('Excluir cupom @codigo?')">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@cid" />
+                    <button type="submit" class="btn-danger text-sm" @(totalUsos > 0 ? "disabled title=\"Cupom já utilizado\"" : "")>
+                        Excluir
+                    </button>
+                </form>
+            </div>
+
+            <!-- Inline edit -->
+            <div x-show="editing" x-cloak class="mt-4 pt-4" style="border-top:1px solid rgba(247,242,232,0.10)">
+                <form method="post" asp-page-handler="Editar" class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@cid" />
+                    <div>
+                        <label class="form-label">Código</label>
+                        <input type="text" name="codigo" value="@codigo" class="form-input" required
+                               style="text-transform:uppercase" />
+                    </div>
+                    <div>
+                        <label class="form-label">Tipo</label>
+                        <select name="tipoDesconto" class="form-input">
+                            <option value="Percentual" selected="@(tipo == "Percentual")">Percentual (%)</option>
+                            <option value="ValorFixo" selected="@(tipo == "ValorFixo")">Valor Fixo (R$)</option>
+                            <option value="MesesGratis" selected="@(tipo == "MesesGratis")">Meses Grátis</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Valor</label>
+                        <input type="number" name="valor" value="@valor" step="0.01" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite de Usos</label>
+                        <input type="number" name="limiteUsos" value="@limiteUsos" class="form-input" min="1" />
+                    </div>
+                    <div>
+                        <label class="form-label">Válido até</label>
+                        <input type="date" name="validoAte" value="@(validoAte != null ? validoAteDt.ToString("yyyy-MM-dd") : "")" class="form-input" />
+                    </div>
+                    <div>
+                        <label class="form-label">Plano</label>
+                        <select name="planoId" class="form-input">
+                            <option value="">Todos os planos</option>
+                            @foreach (var p in Model.Planos)
+                            {
+                                var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
+                                var pnome = p.TryGetProperty("nome", out var pnP) ? pnP.GetString() : "";
+                                <option value="@pid" selected="@(pid == planoId)">@pnome</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-span-2 lg:col-span-3 flex justify-end">
+                        <button type="submit" class="btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+    @if (!Model.Cupons.Any())
+    {
+        <div class="card text-center text-es-ink-mute py-8">Nenhum cupom cadastrado.</div>
+    }
+</div>

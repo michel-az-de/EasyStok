@@ -25,6 +25,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
     {
         await api.PostAsync<JsonElement>("api/admin/planos",
             new { nome, descricao, limiteLojas, limiteUsuarios, limiteProdutos, limiteGeracoesIaMensais, precoMensal });
+        SetSucesso($"Plano \"{nome}\" criado com sucesso.");
         return RedirectToPage();
     }
 
@@ -34,12 +35,14 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
     {
         await api.PatchAsync<JsonElement>($"api/admin/planos/{id}",
             new { nome, descricao, limiteLojas, limiteUsuarios, limiteProdutos, limiteGeracoesIaMensais, precoMensal });
+        SetSucesso("Plano atualizado com sucesso.");
         return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostToggleAsync(Guid id)
     {
         await api.PatchAsync<JsonElement>($"api/admin/planos/{id}/toggle", new { });
+        SetSucesso("Status do plano alterado.");
         return RedirectToPage();
     }
 }

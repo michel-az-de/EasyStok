@@ -78,17 +78,64 @@ app.MapGet("/api-proxy/dashboard-badges", async (
     try
     {
         var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/dashboard");
+        int G(string k) => data.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
+        decimal GD(string k) => data.TryGetProperty(k, out var v) ? v.GetDecimal() : 0m;
         return Results.Ok(new
         {
-            totalTenants = data.TryGetProperty("totalTenants", out var tt) ? tt.GetInt32() : 0,
-            ticketsCriticos = data.TryGetProperty("ticketsCriticos", out var tc) ? tc.GetInt32() : 0,
-            ticketsAbertos = data.TryGetProperty("ticketsAbertos", out var ta) ? ta.GetInt32() : 0
+            totalTenants              = G("totalTenants"),
+            tenantsAtivos             = G("tenantsAtivos"),
+            tenantsSuspensos          = G("tenantsSuspensos"),
+            tenantsNovos              = G("tenantsNovosUltimos30Dias"),
+            ticketsAbertos            = G("ticketsAbertos"),
+            ticketsCriticos           = G("ticketsCriticos"),
+            ticketsEmAtendimento      = G("ticketsEmAtendimento"),
+            ticketsComNovaMensagem    = G("ticketsComNovaMensagem"),
+            totalUsuariosAtivos       = G("totalUsuariosAtivos"),
+            logins24h                 = G("logins24h"),
+            receitaMensalEstimada     = GD("receitaMensalEstimada")
         });
     }
     catch
     {
-        return Results.Ok(new { totalTenants = 0, ticketsCriticos = 0, ticketsAbertos = 0 });
+        return Results.Ok(new
+        {
+            totalTenants = 0, tenantsAtivos = 0, tenantsSuspensos = 0, tenantsNovos = 0,
+            ticketsAbertos = 0, ticketsCriticos = 0, ticketsEmAtendimento = 0,
+            ticketsComNovaMensagem = 0, totalUsuariosAtivos = 0, logins24h = 0,
+            receitaMensalEstimada = 0m
+        });
     }
+});
+
+// Proxy endpoint para Status Page (polling JS a cada 30s)
+app.MapGet("/api-proxy/status", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/status");
+        return Results.Ok(data);
+    }
+    catch
+    {
+        return Results.Ok(new { });
+    }
+});
+
+// Proxy endpoint para exportação CSV de Audit Logs
+app.MapGet("/api-proxy/audit-logs-csv", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+    var (bytes, ct) = await api.GetBytesAsync($"api/admin/audit-logs?{qs}");
+    return Results.File(bytes, ct, "admin-audit-logs.csv");
 });
 
 app.Run();

@@ -42,6 +42,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     {
         await api.PatchAsync<JsonElement>($"api/admin/tenants/{id}/status",
             new { status = "Suspensa", motivo });
+        SetSucesso("Tenant suspenso com sucesso.");
         return RedirectToPage(new { Page, Search, Status });
     }
 
@@ -49,6 +50,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     {
         await api.PatchAsync<JsonElement>($"api/admin/tenants/{id}/status",
             new { status = "Ativa", motivo = "Reativado pelo admin" });
+        SetSucesso("Tenant reativado com sucesso.");
         return RedirectToPage(new { Page, Search, Status });
     }
 

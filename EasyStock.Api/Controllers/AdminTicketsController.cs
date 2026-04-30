@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -12,7 +13,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/admin/tickets")]
 [Authorize(Policy = "SuperAdmin")]
-public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor currentUser) : EasyStockControllerBase
+public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor currentUser, AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetTickets(
@@ -59,7 +60,9 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
                 atendenteNome = t.Atendente == null ? null : t.Atendente.Nome,
                 t.AtendenteId,
                 t.CriadoEm,
-                t.AlteradoEm
+                t.AlteradoEm,
+                mensagensNaoLidas = db.AdminTicketMensagens
+                    .Count(m => m.TicketId == t.Id && !m.IsAdmin && !m.LidoPeloAdmin)
             })
             .ToListAsync();
 
@@ -77,6 +80,11 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (ticket is null) return DataNotFound("Ticket não encontrado.");
+
+        // Marcar mensagens do cliente como lidas
+        await db.AdminTicketMensagens
+            .Where(m => m.TicketId == id && !m.IsAdmin && !m.LidoPeloAdmin)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.LidoPeloAdmin, true));
 
         return DataOk(new
         {
@@ -121,6 +129,7 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
         ticket.AtendenteId = currentUser.UsuarioId;
         db.AdminTickets.Add(ticket);
         await db.CommitAsync();
+        await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}", req.EmpresaId);
 
         return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
     }
@@ -142,6 +151,8 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
 
         ticket.AlteradoEm = DateTime.UtcNow;
         await db.CommitAsync();
+        if (!string.IsNullOrWhiteSpace(req.Status))
+            await audit.LogAsync("TicketStatusAlterado", $"TicketId={id}, Status={ticket.Status}", ticket.EmpresaId);
 
         return DataOk(new { ticket.Id, status = ticket.Status.ToString() });
     }
@@ -162,6 +173,7 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
         }
 
         await db.CommitAsync();
+        await audit.LogAsync("TicketRespondido", $"TicketId={id}", ticket.EmpresaId);
         return DataCreated($"/api/admin/tickets/{id}/mensagens/{mensagem.Id}", new { mensagem.Id });
     }
 
@@ -174,6 +186,7 @@ public class AdminTicketsController(EasyStockDbContext db, ICurrentUserAccessor 
         ticket.Status = TicketStatus.Fechado;
         ticket.AlteradoEm = DateTime.UtcNow;
         await db.CommitAsync();
+        await audit.LogAsync("TicketFechado", $"TicketId={id}", ticket.EmpresaId);
 
         return DataOk(new { id, status = "Fechado" });
     }

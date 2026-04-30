@@ -15,6 +15,14 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
 
+        // Trial
+        public DateTime? TrialFim { get; set; }
+        public bool TrialAtivo => TrialFim.HasValue && TrialFim.Value > DateTime.UtcNow;
+
+        // Coupon snapshot
+        public string? CupomCodigo { get; set; }
+        public decimal? DescontoAplicado { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Plano? Plano { get; set; }
 
@@ -43,6 +51,20 @@ namespace EasyStock.Domain.Entities
                 throw new RegraDeDominioVioladaException("Assinatura cancelada nao pode ser reativada. Crie uma nova assinatura.");
             DataFim = null;
             Status = StatusAssinatura.Ativa;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void AtivarTrial(int dias)
+        {
+            TrialFim = DateTime.UtcNow.AddDays(dias);
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void AplicarCupom(Cupom cupom)
+        {
+            CupomCodigo = cupom.Codigo;
+            DescontoAplicado = cupom.Valor;
+            cupom.IncrementarUso();
             AlteradoEm = DateTime.UtcNow;
         }
     }

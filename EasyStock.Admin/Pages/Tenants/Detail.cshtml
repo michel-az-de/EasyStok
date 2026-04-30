@@ -122,7 +122,7 @@
     </div>
 
     <!-- Visão geral -->
-    <div x-show="tab === 'visao'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div x-show="tab === 'visao'" class="space-y-4">
         @{
             var usuarios = Model.Usuarios.Count();
             var lojas = Model.Lojas.Count();
@@ -130,24 +130,103 @@
                 && Model.Assinatura.TryGetProperty("plano", out var planoProp) && planoProp.ValueKind != System.Text.Json.JsonValueKind.Null
                 ? planoProp : default;
         }
-        <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Usuários</div><div class="text-2xl font-bold text-es-ink">@usuarios</div></div>
-        <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Lojas</div><div class="text-2xl font-bold text-es-ink">@lojas</div></div>
-        @if (planoJson.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-        {
-            var limLojas = planoJson.TryGetProperty("limiteLojas", out var ll) ? ll.GetInt32() : 0;
-            var limUsuarios = planoJson.TryGetProperty("limiteUsuarios", out var lu) ? lu.GetInt32() : 0;
-            var limProdutos = planoJson.TryGetProperty("limiteProdutos", out var lp) ? lp.GetInt32() : 0;
-            var preco = planoJson.TryGetProperty("precoMensal", out var pr) ? pr.GetDecimal() : 0m;
+        <!-- Métricas rápidas -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Usuários</div><div class="text-2xl font-bold text-es-ink">@usuarios</div></div>
+            <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Lojas</div><div class="text-2xl font-bold text-es-ink">@lojas</div></div>
+            @if (planoJson.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+            {
+                var limLojas = planoJson.TryGetProperty("limiteLojas", out var ll) ? ll.GetInt32() : 0;
+                var limUsuarios = planoJson.TryGetProperty("limiteUsuarios", out var lu) ? lu.GetInt32() : 0;
+                var limProdutos = planoJson.TryGetProperty("limiteProdutos", out var lp) ? lp.GetInt32() : 0;
+                var preco = planoJson.TryGetProperty("precoMensal", out var pr) ? pr.GetDecimal() : 0m;
+                <div class="card">
+                    <div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Limites do Plano</div>
+                    <div class="text-xs text-es-ink-dim space-y-0.5 mt-1">
+                        <div>Lojas: @(limLojas == -1 ? "Ilimitado" : limLojas.ToString())</div>
+                        <div>Usuários: @(limUsuarios == -1 ? "Ilimitado" : limUsuarios.ToString())</div>
+                        <div>Produtos: @(limProdutos == -1 ? "Ilimitado" : limProdutos.ToString())</div>
+                    </div>
+                </div>
+                <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Mensalidade</div><div class="text-2xl font-bold text-es-accent">R$ @preco.ToString("N2")</div></div>
+            }
+        </div>
+
+        <!-- Trial & Coupon panel -->
+        @{
+            var trialAtivo = Model.Assinatura.TryGetProperty("trialAtivo", out var tap) && tap.GetBoolean();
+            var trialFim = Model.Assinatura.TryGetProperty("trialFim", out var tfp) && tfp.ValueKind != System.Text.Json.JsonValueKind.Null ? tfp.GetString() : null;
+            var cupomCodigo = Model.Assinatura.TryGetProperty("cupomCodigo", out var ccp) && ccp.ValueKind != System.Text.Json.JsonValueKind.Null ? ccp.GetString() : null;
+            var desconto = Model.Assinatura.TryGetProperty("descontoAplicado", out var dap) && dap.ValueKind != System.Text.Json.JsonValueKind.Null ? (decimal?)dap.GetDecimal() : null;
+            DateTime.TryParse(trialFim, out var trialFimDt);
+        }
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" x-data="{ showTrial: false, showCupom: false }">
+
+            <!-- Trial card -->
             <div class="card">
-                <div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Limites do Plano</div>
-                <div class="text-xs text-es-ink-dim space-y-0.5 mt-1">
-                    <div>Lojas: @(limLojas == -1 ? "Ilimitado" : limLojas.ToString())</div>
-                    <div>Usuários: @(limUsuarios == -1 ? "Ilimitado" : limUsuarios.ToString())</div>
-                    <div>Produtos: @(limProdutos == -1 ? "Ilimitado" : limProdutos.ToString())</div>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-es-ink font-semibold text-sm">Trial</h3>
+                    @if (trialAtivo)
+                    {
+                        <span class="status-badge badge-ativa">Ativo até @trialFimDt.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                    }
+                    else if (trialFim != null)
+                    {
+                        <span class="status-badge badge-expirada">Expirado</span>
+                    }
+                    else
+                    {
+                        <span class="text-es-ink-mute text-xs">Sem trial</span>
+                    }
+                </div>
+                <button type="button" @@click="showTrial = !showTrial" class="btn-secondary text-xs w-full">
+                    Conceder Trial
+                </button>
+                <div x-show="showTrial" x-cloak class="mt-3">
+                    <form method="post" asp-page-handler="ConcederTrial" class="flex gap-2 items-end">
+                        @Html.AntiForgeryToken()
+                        <div class="flex-1">
+                            <label class="form-label">Dias</label>
+                            <input type="number" name="diasTrial" value="30" min="1" max="90" class="form-input" required />
+                        </div>
+                        <button type="submit" class="btn-primary text-sm">Conceder</button>
+                    </form>
                 </div>
             </div>
-            <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Mensalidade</div><div class="text-2xl font-bold text-es-accent">R$ @preco.ToString("N2")</div></div>
-        }
+
+            <!-- Cupom card -->
+            <div class="card">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-es-ink font-semibold text-sm">Cupom</h3>
+                    @if (cupomCodigo != null)
+                    {
+                        <span class="font-mono text-xs text-es-accent font-bold">@cupomCodigo</span>
+                    }
+                    else
+                    {
+                        <span class="text-es-ink-mute text-xs">Nenhum aplicado</span>
+                    }
+                </div>
+                @if (desconto.HasValue)
+                {
+                    <div class="text-xs text-es-ink-dim mb-3">Desconto aplicado: <b class="text-es-accent">@desconto.Value.ToString("N2")</b></div>
+                }
+                <button type="button" @@click="showCupom = !showCupom" class="btn-secondary text-xs w-full">
+                    Aplicar Cupom
+                </button>
+                <div x-show="showCupom" x-cloak class="mt-3">
+                    <form method="post" asp-page-handler="AplicarCupom" class="flex gap-2 items-end">
+                        @Html.AntiForgeryToken()
+                        <div class="flex-1">
+                            <label class="form-label">Código</label>
+                            <input type="text" name="codigo" class="form-input" placeholder="Ex: PROMO10"
+                                   style="text-transform:uppercase" required />
+                        </div>
+                        <button type="submit" class="btn-primary text-sm">Aplicar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Usuários -->

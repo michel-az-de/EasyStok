@@ -1,15 +1,21 @@
 // Casa da Baba - Sync Layer
 // Espelha o estado local pro backend via REST. Tolera offline.
 //
-// Configuracao: ajuste API_BASE_URL abaixo.
-// - Mesmo host servindo o PWA: deixe '' (relativo)
-// - Host separado (dev): 'http://localhost:5000'
-// - Producao: 'https://easystock.seu-dominio.com'
+// Configuração:
+//  - API_BASE_URL: base da API. Padrão: mesmo host que serve o PWA.
+//    Para rodar num APK empacotado apontando pra backend remoto,
+//    setar window.CDB_CONFIG = { apiBaseUrl: 'https://easystock.exemplo.com' }
+//    ANTES de carregar este script (via config.js ou capacitor.config).
+//
+// Offline-first: toda mutação vai pra uma fila persistente em localStorage.
+// Fila é drenada quando a rede volta ou a cada 30s. O app funciona 100% sem
+// rede — sync é oportunístico, nunca bloqueante.
 
 (function () {
   'use strict';
 
-  const API_BASE_URL = '';              // vazio = mesmo host
+  const CFG = (window.CDB_CONFIG || {});
+  const API_BASE_URL = CFG.apiBaseUrl ?? '';  // vazio = mesmo host
   const API_PREFIX = '/api/mobile';
   const DEVICE_ID_KEY = 'cdb-device-id';
   const QUEUE_KEY = 'cdb-sync-queue';
@@ -26,6 +32,10 @@
   }
   const deviceId = getDeviceId();
 
+  function baseHeaders(extra) {
+    return Object.assign({ 'X-Device-Id': deviceId }, extra || {});
+  }
+
   // ---- Fila persistente ----
   function loadQueue() {
     try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
@@ -41,20 +51,19 @@
   function computeMutations(prev, curr) {
     const muts = [];
 
-    // Helpers: comparar colecoes por id + updatedAt/lastOrder
     function diffCollection(coll, prevColl, typeName, getUpdatedAt) {
       const prevById = new Map((prevColl || []).map(x => [x.id, x]));
       coll.forEach(item => {
-        const prev = prevById.get(item.id);
-        if (!prev) {
+        const p = prevById.get(item.id);
+        if (!p) {
           muts.push({ type: typeName + '.upsert', payload: item });
         } else if (getUpdatedAt) {
-          const a = getUpdatedAt(prev);
+          const a = getUpdatedAt(p);
           const b = getUpdatedAt(item);
-          if (a !== b || JSON.stringify(prev) !== JSON.stringify(item)) {
+          if (a !== b || JSON.stringify(p) !== JSON.stringify(item)) {
             muts.push({ type: typeName + '.upsert', payload: item });
           }
-        } else if (JSON.stringify(prev) !== JSON.stringify(item)) {
+        } else if (JSON.stringify(p) !== JSON.stringify(item)) {
           muts.push({ type: typeName + '.upsert', payload: item });
         }
       });
@@ -105,10 +114,15 @@
     flushing = true;
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
+      // Operador lido dinamicamente a cada sync — se o usuário trocar o nome
+      // no header, as próximas sincronizações já carregam o nome atualizado.
+      const operatorName = (window.cdbApp && window.cdbApp.getOperator)
+        ? window.cdbApp.getOperator()
+        : (localStorage.getItem('cdb-operator-name') || null);
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
-        body: JSON.stringify({ deviceId, mutations: queue })
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ deviceId, operatorName, mutations: queue })
       });
 
       if (!resp.ok) {
@@ -117,7 +131,6 @@
       }
 
       const result = await resp.json().catch(() => ({}));
-      // Servidor pode devolver ids aceitos; por padrao limpa tudo
       if (result.acceptedIds && Array.isArray(result.acceptedIds)) {
         const accepted = new Set(result.acceptedIds);
         const remaining = queue.filter(m => !accepted.has(m.id));
@@ -134,16 +147,15 @@
     }
   }
 
-  // ---- Pull: traz mudancas do servidor (outros devices) ----
+  // ---- Pull: traz mudanças do servidor (outros devices) ----
   async function pull() {
     if (!navigator.onLine) return;
     try {
       const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
-      const url = API_BASE_URL + API_PREFIX + '/sync/pull?since=' + since + '&deviceId=' + deviceId;
-      const resp = await fetch(url, { headers: { 'X-Device-Id': deviceId } });
+      const url = API_BASE_URL + API_PREFIX + '/sync/pull?since=' + since + '&deviceId=' + encodeURIComponent(deviceId);
+      const resp = await fetch(url, { headers: baseHeaders() });
       if (!resp.ok) return;
       const data = await resp.json();
-      // Aplica mudancas no state (sobrescreve por id)
       if (data && data.mutations && Array.isArray(data.mutations)) {
         applyServerMutations(data.mutations);
       }
@@ -185,14 +197,17 @@
       try { localStorage.setItem(key, JSON.stringify(coll)); } catch (e) {}
     });
     if (changed) {
-      // Recarrega a tela pra refletir as mudancas
-      // (solucao simples; alternativa seria re-renderizar parcialmente)
-      console.log('Mudancas do servidor aplicadas, recarregando...');
-      setTimeout(() => location.reload(), 500);
+      console.log('Mudanças do servidor aplicadas, recarregando...');
+      // F6 (estabilizacao): tenta flushar mutacoes locais pendentes ANTES
+      // do reload — se o operador acabou de salvar algo offline e nesse
+      // momento chegou um pull do servidor, sem isso a mutacao local
+      // poderia ficar so na fila e o reload mascararia o estado.
+      // flush() ja é idempotente (flushing flag) e respeita online.
+      flush().finally(() => setTimeout(() => location.reload(), 500));
     }
   }
 
-  // ---- Hook de persistencia: chamado pelo app toda vez que salva ----
+  // ---- Hook de persistência: chamado pelo app a cada save ----
   window.cdbOnPersist = function (state) {
     const muts = computeMutations(lastSnapshot, state);
     lastSnapshot = JSON.parse(JSON.stringify({
@@ -216,9 +231,8 @@
   });
   window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
 
-  // ---- Inicializacao ----
+  // ---- Inicialização ----
   setTimeout(() => {
-    // Snapshot inicial do estado pra calcular deltas depois
     if (window.cdbApp) {
       const s = window.cdbApp.getState();
       lastSnapshot = JSON.parse(JSON.stringify({
@@ -230,18 +244,17 @@
       }));
     }
     updatePendingCount();
-    // Tenta pull inicial e flush se tiver coisa pendente
-    if (API_BASE_URL !== null) {
-      flush().then(pull);
-    }
-    // Flush periodico a cada 30s
+    flush().then(pull);
+    // Flush periódico a cada 30s
     setInterval(flush, 30000);
   }, 500);
 
-  // Expoe utilitarios pra debug
+  // Expõe utilitários pra debug
   window.cdbSync = {
-    flush, pull, queueSize: () => loadQueue().length,
+    flush, pull,
+    queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
-    deviceId
+    deviceId,
+    apiBaseUrl: API_BASE_URL
   };
 })();
