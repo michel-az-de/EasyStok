@@ -21,6 +21,15 @@ using EasyStock.Application.UseCases.AdicionarClienteTelefone;
 using EasyStock.Application.UseCases.AtualizarCliente;
 using EasyStock.Application.UseCases.BuscarCliente;
 using EasyStock.Application.UseCases.CriarCliente;
+using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.AtualizarStatusPedido;
+using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.ListarPedidosCliente;
+using EasyStock.Application.UseCases.ObterPedidoDetalhes;
+using EasyStock.Application.UseCases.AdicionarItemPedido;
+using EasyStock.Application.UseCases.RemoverItemPedido;
+using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.RemoverPagamentoPedido;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarCliente;
 using EasyStock.Application.UseCases.ListarClientes;
@@ -107,6 +116,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RemoverClienteTelefoneUseCase>();
         services.AddScoped<AdicionarClienteDocumentoUseCase>();
         services.AddScoped<RemoverClienteDocumentoUseCase>();
+
+        // Onda P2 — Pedidos
+        services.AddScoped<CriarPedidoUseCase>();
+        services.AddScoped<AtualizarStatusPedidoUseCase>();
+        services.AddScoped<CancelarPedidoUseCase>();
+        services.AddScoped<ListarPedidosUseCase>();
+        services.AddScoped<ObterPedidoDetalhesUseCase>();
+        services.AddScoped<AdicionarItemPedidoUseCase>();
+        services.AddScoped<RemoverItemPedidoUseCase>();
+        services.AddScoped<RegistrarPagamentoPedidoUseCase>();
+        services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

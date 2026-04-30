@@ -1,0 +1,80 @@
+using System.ComponentModel.DataAnnotations;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Domain.Entities;
+using Microsoft.Extensions.Logging;
+
+namespace EasyStock.Application.UseCases.AdicionarItemPedido;
+
+public sealed record AdicionarItemPedidoCommand(
+    [property: Required] Guid EmpresaId,
+    [property: Required] Guid PedidoId,
+    [property: Required][property: MaxLength(150)] string Nome,
+    decimal Quantidade,
+    decimal PrecoUnitario,
+    Guid? ProdutoId = null,
+    [property: MaxLength(16)] string? Emoji = null,
+    [property: MaxLength(32)] string? Unidade = null,
+    string? Observacao = null,
+    Guid? UsuarioId = null,
+    [property: MaxLength(120)] string? UsuarioNome = null,
+    [property: MaxLength(20)] string? Origem = "web");
+
+public class AdicionarItemPedidoUseCase(
+    IPedidoRepository repo,
+    IUnitOfWork uow,
+    ILogger<AdicionarItemPedidoUseCase> logger)
+{
+    public async Task<PedidoResult?> ExecuteAsync(AdicionarItemPedidoCommand cmd)
+    {
+        UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
+        if (cmd.Quantidade <= 0)
+            throw new UseCaseValidationException("Quantidade deve ser maior que zero.");
+
+        var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
+        if (pedido == null) return null;
+        if (pedido.EstaFinalizado)
+            throw new UseCaseValidationException("Não é permitido alterar itens de pedido finalizado.");
+
+        var item = new PedidoItem
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            ProdutoId = cmd.ProdutoId,
+            Nome = cmd.Nome.Trim(),
+            Emoji = cmd.Emoji,
+            Unidade = cmd.Unidade,
+            Quantidade = cmd.Quantidade,
+            PrecoUnitario = cmd.PrecoUnitario,
+            Observacao = cmd.Observacao,
+            CriadoEm = DateTime.UtcNow
+        };
+        item.RecalcularSubtotal();
+
+        await repo.AddItemAsync(item);
+        pedido.Itens.Add(item);
+        pedido.RecalcularTotal();
+
+        await repo.AddEventoAsync(new PedidoEvento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            Tipo = "item_added",
+            UsuarioId = cmd.UsuarioId,
+            UsuarioNome = cmd.UsuarioNome,
+            Origem = cmd.Origem,
+            OcorridoEm = DateTime.UtcNow,
+            Detalhes = $"+{item.Quantidade} {item.Nome} ({item.Subtotal:C})"
+        });
+
+        await repo.UpdateAsync(pedido);
+        await uow.CommitAsync();
+
+        logger.LogInformation("Pedido {Id}: item {Item} adicionado, novo total {Total}.",
+            pedido.Id, item.Nome, pedido.Total);
+        return CriarPedidoUseCase.Map(pedido);
+    }
+}

@@ -1,0 +1,231 @@
+@model PedidoDetailViewModel
+@{
+    var p = Model.Detalhe.Pedido;
+    ViewBag.Title = $"Pedido {p.Id.Substring(0, 8)}";
+    Layout = "_Layout";
+
+    string statusBadgeClass(string? s) => s switch
+    {
+        "aguardando" => "bg-amber-100 text-amber-700",
+        "preparando" => "bg-blue-100 text-blue-700",
+        "pronto"     => "bg-violet-100 text-violet-700",
+        "entregue"   => "bg-green-100 text-green-700",
+        "cancelado"  => "bg-slate-100 text-slate-500",
+        _            => "bg-slate-100 text-slate-600"
+    };
+    string nextStatus(string s) => s switch
+    {
+        "aguardando" => "preparando",
+        "preparando" => "pronto",
+        "pronto"     => "entregue",
+        _            => null!
+    } ?? "";
+    string nextLabel(string s) => s switch
+    {
+        "aguardando" => "▶ Iniciar preparo",
+        "preparando" => "✓ Marcar pronto",
+        "pronto"     => "✓ Marcar entregue",
+        _            => ""
+    };
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a asp-action="Index" asp-controller="Pedidos" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+    <div class="ml-auto flex gap-2">
+        @if (p.Status != "entregue" && p.Status != "cancelado")
+        {
+            var nxt = nextStatus(p.Status);
+            if (!string.IsNullOrEmpty(nxt))
+            {
+                <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="status" value="@nxt" />
+                    <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
+                        @nextLabel(p.Status)
+                    </button>
+                </form>
+            }
+            <form asp-action="Cancelar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                  onsubmit="return confirm('Cancelar pedido?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
+                    Cancelar
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1 space-y-4">
+        <div class="ws">
+            <h2 class="font-semibold text-slate-900 mb-3">Resumo</h2>
+            <dl class="space-y-2 text-sm">
+                @if (p.ClienteId.HasValue)
+                {
+                    <div><dt class="text-slate-500">Cliente</dt>
+                         <dd class="font-medium"><a href="/clientes/@p.ClienteId" class="text-indigo-600 hover:text-indigo-700">@p.ClienteNome</a></dd></div>
+                }
+                else if (!string.IsNullOrEmpty(p.ClienteNome))
+                {
+                    <div><dt class="text-slate-500">Cliente (ad-hoc)</dt><dd class="font-medium">@p.ClienteNome</dd></div>
+                }
+                @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt</dt><dd>@p.ClienteApt</dd></div> }
+                @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
+                <div class="pt-2 border-t"><dt class="text-slate-500">Total</dt><dd class="text-lg font-bold text-slate-900">@p.Total.ToString("C")</dd></div>
+                <div><dt class="text-slate-500">Pago</dt>
+                     <dd>@p.TotalPago.ToString("C") @if (p.Quitado) {<span class="ml-1 text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded">quitado</span>}
+                                                   else if (p.TotalPago > 0) {<span class="ml-1 text-xs px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded">parcial</span>}
+                     </dd></div>
+                <div><dt class="text-slate-500">Pendente</dt><dd class="font-medium @(p.Pendente > 0 ? "text-amber-700" : "text-green-700")">@p.Pendente.ToString("C")</dd></div>
+                <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
+                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                @if (p.CanceladoEm.HasValue){ <div><dt class="text-slate-500">Cancelado</dt><dd>@p.CanceladoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                @if (!string.IsNullOrEmpty(p.MobileOrderId))
+                {
+                    <div><dt class="text-slate-500">Mobile order</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
+                }
+                @if (p.VendaId.HasValue)
+                {
+                    <div><dt class="text-slate-500">Venda ERP</dt><dd class="font-mono text-xs">@p.VendaId</dd></div>
+                }
+                @if (!string.IsNullOrEmpty(p.Observacoes))
+                {
+                    <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line">@p.Observacoes</dd></div>
+                }
+            </dl>
+        </div>
+    </div>
+
+    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'itens' }">
+        <div class="ws p-0">
+            <div class="flex border-b border-slate-200 px-4 pt-2 gap-1 overflow-x-auto">
+                @foreach (var (key, label, count) in new[] {
+                    ("itens",       "Itens",       Model.Detalhe.Itens.Count),
+                    ("pagamentos",  "Pagamentos",  Model.Detalhe.Pagamentos.Count),
+                    ("eventos",     "Histórico",   Model.Detalhe.Eventos.Count)
+                })
+                {
+                    <button type="button" @@click="tab = '@key'"
+                            :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-3 py-2 text-sm font-medium border-b-2">
+                        @label <span class="text-xs text-slate-400">(@count)</span>
+                    </button>
+                }
+            </div>
+
+            <!-- Itens -->
+            <div x-show="tab === 'itens'" class="p-4">
+                @if (Model.Detalhe.Itens.Any())
+                {
+                    <table class="w-full text-sm mb-4">
+                        <thead class="text-xs text-slate-500"><tr><th class="text-left py-1">Item</th><th class="text-right py-1">Qtd</th><th class="text-right py-1">Preço</th><th class="text-right py-1">Subtotal</th><th></th></tr></thead>
+                        <tbody class="divide-y divide-slate-100">
+                        @foreach (var i in Model.Detalhe.Itens)
+                        {
+                            <tr>
+                                <td class="py-2"><span class="font-medium">@i.Emoji @i.Nome</span> @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400">@i.Unidade</span>}</td>
+                                <td class="text-right">@i.Quantidade</td>
+                                <td class="text-right">@i.PrecoUnitario.ToString("C")</td>
+                                <td class="text-right font-medium">@i.Subtotal.ToString("C")</td>
+                                <td class="text-right">
+                                    @if (p.Status != "entregue" && p.Status != "cancelado")
+                                    {
+                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" onsubmit="return confirm('Remover item?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum item.</p> }
+
+                @if (p.Status != "entregue" && p.Status != "cancelado")
+                {
+                    <form asp-action="AddItem" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t">
+                        @Html.AntiForgeryToken()
+                        <input type="text"   name="nome"          placeholder="Nome *"      required class="ui-field text-sm col-span-5" />
+                        <input type="number" name="quantidade"    placeholder="Qtd"   step="0.01" min="0.01" required class="ui-field text-sm col-span-2" />
+                        <input type="number" name="precoUnitario" placeholder="Preço" step="0.01" min="0"   required class="ui-field text-sm col-span-2" />
+                        <input type="text"   name="unidade"       placeholder="Un"           class="ui-field text-sm col-span-1" />
+                        <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Item</button>
+                    </form>
+                }
+            </div>
+
+            <!-- Pagamentos -->
+            <div x-show="tab === 'pagamentos'" x-cloak class="p-4">
+                @if (Model.Detalhe.Pagamentos.Any())
+                {
+                    <ul class="divide-y divide-slate-100 mb-4">
+                    @foreach (var pg in Model.Detalhe.Pagamentos)
+                    {
+                        <li class="py-3 flex items-center justify-between gap-2">
+                            <div class="text-sm">
+                                <div class="font-medium text-slate-900">@pg.Valor.ToString("C") <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded uppercase">@pg.Metodo</span></div>
+                                <div class="text-xs text-slate-500">@pg.PagoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm") @(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : "· por " + pg.RegistradoPorNome) @(string.IsNullOrEmpty(pg.Referencia) ? "" : "· ref: " + pg.Referencia)</div>
+                                @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
+                            </div>
+                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" onsubmit="return confirm('Remover pagamento?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum pagamento registrado.</p> }
+
+                <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t">
+                    @Html.AntiForgeryToken()
+                    <select name="metodo" required class="ui-select text-sm col-span-3">
+                        <option value="pix">PIX</option><option value="dinheiro">Dinheiro</option>
+                        <option value="credito">Crédito</option><option value="debito">Débito</option>
+                        <option value="transferencia">Transferência</option><option value="outro">Outro</option>
+                    </select>
+                    <input type="number" name="valor" placeholder="Valor *" step="0.01" min="0.01" required class="ui-field text-sm col-span-3" />
+                    <input type="text" name="referencia" placeholder="Referência (txid, NSU)" class="ui-field text-sm col-span-3" />
+                    <input type="text" name="observacao" placeholder="Observação" class="ui-field text-sm col-span-3" />
+                    <button type="submit" class="app-primary-btn col-span-12 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Registrar Pagamento</button>
+                </form>
+            </div>
+
+            <!-- Eventos -->
+            <div x-show="tab === 'eventos'" x-cloak class="p-4">
+                @if (Model.Detalhe.Eventos.Any())
+                {
+                    <ul class="divide-y divide-slate-100">
+                    @foreach (var e in Model.Detalhe.Eventos)
+                    {
+                        <li class="py-2 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                <span class="font-medium text-slate-900">@e.Tipo</span>
+                                @if (!string.IsNullOrEmpty(e.StatusAntigo) && !string.IsNullOrEmpty(e.StatusNovo))
+                                {
+                                    <span class="text-xs text-slate-500">@e.StatusAntigo → @e.StatusNovo</span>
+                                }
+                                @if (!string.IsNullOrEmpty(e.Origem)) { <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@e.Origem</span> }
+                            </div>
+                            @if (!string.IsNullOrEmpty(e.Detalhes)) { <div class="text-xs text-slate-600 ml-2">@e.Detalhes</div> }
+                            @if (!string.IsNullOrEmpty(e.UsuarioNome)) { <div class="text-xs text-slate-400 ml-2">por @e.UsuarioNome</div> }
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500">Nenhum evento.</p> }
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,207 @@
+@model PedidosListViewModel
+@{
+    ViewBag.Title = "Pedidos";
+    Layout = "_Layout";
+
+    string statusBadgeClass(string? s) => s switch
+    {
+        "aguardando" => "bg-amber-100 text-amber-700",
+        "preparando" => "bg-blue-100 text-blue-700",
+        "pronto"     => "bg-violet-100 text-violet-700",
+        "entregue"   => "bg-green-100 text-green-700",
+        "cancelado"  => "bg-slate-100 text-slate-500 line-through",
+        _            => "bg-slate-100 text-slate-600"
+    };
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Pedidos</h1>
+        <p>Encomendas em curso — vinculadas a clientes do cadastro central</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/pedidos-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+            📱 Pedidos do app
+        </a>
+        <button type="button" x-data
+                @@click="$dispatch('open-modal', 'novo-pedido')"
+                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            + Novo Pedido
+        </button>
+    </div>
+</div>
+
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 flex-wrap items-center">
+        <div class="flex flex-1 min-w-48 gap-3">
+            <input type="text" name="search" value="@Model.Search" placeholder="Buscar por cliente, apt, telefone..."
+                   class="ui-field flex-1 min-w-48" />
+            <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
+                Buscar
+            </button>
+        </div>
+        <div class="flex gap-2">
+            @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Preparando"), ("pronto", "Pronto"), ("entregue", "Entregue") })
+            {
+                var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
+                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = val == "" ? null : val })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                    @label
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "📋" },
+            { "EmptyTitle", "Nenhum pedido" },
+            { "EmptyDescription", "Crie seu primeiro pedido vinculando a um cliente cadastrado." },
+            { "EmptyCta", "+ Novo Pedido" },
+            { "EmptyCtaModal", "novo-pedido" }
+        })
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead>
+                <tr><th>Cliente</th><th>Status</th><th>Itens</th><th>Total</th><th>Pago</th><th>Criado</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="font-medium text-slate-900">@(p.ClienteNome ?? "—")</div>
+                            @if (!string.IsNullOrEmpty(p.ClienteApt) || !string.IsNullOrEmpty(p.ClienteTelefone))
+                            {
+                                <div class="text-xs text-slate-500">@p.ClienteApt @(string.IsNullOrEmpty(p.ClienteApt) ? "" : "·") @p.ClienteTelefone</div>
+                            }
+                        </td>
+                        <td>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+                        </td>
+                        <td class="text-slate-600 text-sm">@p.ItensCount</td>
+                        <td class="text-slate-600">@p.Total.ToString("C")</td>
+                        <td>
+                            @if (p.Quitado)   { <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">quitado</span> }
+                            else if (p.TotalPago > 0) { <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded">@(p.TotalPago.ToString("C")) / @(p.Total.ToString("C"))</span> }
+                            else              { <span class="text-xs text-slate-400">—</span> }
+                        </td>
+                        <td class="text-xs text-slate-500">@p.CriadoEm.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                        <td>
+                            <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id"
+                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
+
+<!-- Modal novo pedido -->
+<div x-data="novoPedidoModal()" @@open-modal.window="if ($event.detail === 'novo-pedido') open = true"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     @@click.self="open = false" @@keydown.escape.window="open = false">
+    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[92vh]">
+        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Pedido</h2>
+        <p class="text-sm text-slate-500 mb-4">Vincule a um cliente cadastrado ou cadastre dados ad-hoc.</p>
+
+        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
+
+        @Html.AntiForgeryToken()
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
+                <select x-model="form.clienteId" class="ui-select w-full text-sm">
+                    <option value="">— ad-hoc (preencher abaixo) —</option>
+                    @foreach (var c in Model.Clientes)
+                    {
+                        <option value="@c.Id">@c.Nome @(string.IsNullOrEmpty(c.Apt) ? "" : "(" + c.Apt + ")")</option>
+                    }
+                </select>
+            </div>
+            <div class="grid grid-cols-3 gap-3" x-show="!form.clienteId">
+                <input type="text" x-model="form.nomeAdHoc"     placeholder="Nome (ad-hoc)" class="ui-field text-sm" />
+                <input type="text" x-model="form.aptAdHoc"      placeholder="Apt"          class="ui-field text-sm" />
+                <input type="text" x-model="form.telefoneAdHoc" placeholder="Telefone"     class="ui-field text-sm" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Itens</label>
+                <template x-for="(it, i) in form.itens" :key="i">
+                    <div class="grid grid-cols-12 gap-2 mb-2">
+                        <input type="text"   x-model="it.nome"          placeholder="Nome"  class="ui-field text-sm col-span-5" />
+                        <input type="number" x-model.number="it.quantidade" step="0.01" min="0.01" placeholder="Qtd" class="ui-field text-sm col-span-2" />
+                        <input type="number" x-model.number="it.precoUnitario" step="0.01" min="0" placeholder="Preço" class="ui-field text-sm col-span-3" />
+                        <button type="button" @@click="form.itens.splice(i, 1)" class="col-span-2 text-xs text-red-600 hover:text-red-700">Remover</button>
+                    </div>
+                </template>
+                <button type="button" @@click="form.itens.push({nome:'',quantidade:1,precoUnitario:0})"
+                        class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
+                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
+            <button type="button" @@click="open = false"
+                    class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                Cancelar
+            </button>
+            <button type="button" @@click="submitForm()" :disabled="loading"
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                <span x-show="!loading">Criar Pedido</span>
+                <span x-show="loading" x-cloak>Salvando...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function novoPedidoModal() {
+    return {
+        open: false, loading: false, erroMsg: '',
+        form: { clienteId: '', nomeAdHoc:'', aptAdHoc:'', telefoneAdHoc:'',
+                observacoes: '', itens: [] },
+        async submitForm() {
+            if (!this.form.clienteId && !this.form.nomeAdHoc.trim()) {
+                this.erroMsg = 'Informe um cliente OU um nome ad-hoc.'; return;
+            }
+            this.loading = true; this.erroMsg = '';
+            try {
+                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const payload = {
+                    clienteId: this.form.clienteId || null,
+                    nomeAdHoc: this.form.clienteId ? null : this.form.nomeAdHoc,
+                    aptAdHoc: this.form.clienteId ? null : this.form.aptAdHoc,
+                    telefoneAdHoc: this.form.clienteId ? null : this.form.telefoneAdHoc,
+                    observacoes: this.form.observacoes,
+                    itens: this.form.itens.filter(i => i.nome && i.quantidade > 0)
+                };
+                const res = await fetch('/pedidos/json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data.success) window.location.href = '/pedidos/' + data.id;
+                else this.erroMsg = data.errorMessage || 'Erro ao criar pedido.';
+            } catch { this.erroMsg = 'Não foi possível conectar ao servidor.'; }
+            finally { this.loading = false; }
+        }
+    };
+}
+</script>
+}

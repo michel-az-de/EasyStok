@@ -87,6 +87,14 @@ public class Order
     [Column("erp_venda_id")]
     public Guid? ErpVendaId { get; set; }
 
+    /// <summary>
+    /// Onda P2 — link pra <see cref="EasyStock.Domain.Entities.Pedido"/>
+    /// no ERP (camada PRÉ-Venda, em curso). NULL = pedido vive só no app
+    /// ainda. Quando linkado, gestor pode editar pelo painel /pedidos.
+    /// </summary>
+    [Column("erp_pedido_id")]
+    public Guid? ErpPedidoId { get; set; }
+
     public List<OrderItem> Items { get; set; } = new();
 }
 
