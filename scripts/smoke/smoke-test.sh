@@ -2,10 +2,23 @@
 # EasyStok Smoke Test Script
 # Uso: ./scripts/smoke/smoke-test.sh [BASE_URL]
 # Default: http://localhost:8080
+#
+# Variáveis de ambiente necessárias:
+#   SMOKE_EMAIL    — e-mail de uma conta ativa (ex: export SMOKE_EMAIL=admin@empresa.com)
+#   SMOKE_PASSWORD — senha da conta         (ex: export SMOKE_PASSWORD=SenhaSegura123)
+#
+# NUNCA commitar credenciais reais neste script.
 
 set -euo pipefail
 
 BASE="${1:-http://localhost:8080}"
+
+if [ -z "${SMOKE_EMAIL:-}" ] || [ -z "${SMOKE_PASSWORD:-}" ]; then
+    echo "❌ Variáveis SMOKE_EMAIL e SMOKE_PASSWORD não definidas."
+    echo "   export SMOKE_EMAIL=seu@email.com"
+    echo "   export SMOKE_PASSWORD=SuaSenha"
+    exit 1
+fi
 PASS=0
 FAIL=0
 TOTAL=0
@@ -69,7 +82,7 @@ echo "--- AUTENTICAÇÃO ---"
 # Login
 LOGIN_RESPONSE=$(curl -s --max-time 10 -X POST "$BASE/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d '{"email":"felipe@easystok.com","senha":"Admin@2026!Secure"}' 2>/dev/null || echo '{}')
+    -d "{\"email\":\"${SMOKE_EMAIL}\",\"senha\":\"${SMOKE_PASSWORD}\"}" 2>/dev/null || echo '{}')
 
 TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*"' | head -1 | cut -d'"' -f4)
 

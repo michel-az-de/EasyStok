@@ -82,11 +82,14 @@ public class TokenRefreshHandler(
     {
         try
         {
-            httpContextAccessor.HttpContext?.Response.Cookies.Append(
+            var ctx = httpContextAccessor.HttpContext;
+            if (ctx is null) return;
+            ctx.Response.Cookies.Append(
                 "_se", "1",
                 new CookieOptions
                 {
-                    HttpOnly = false,
+                    HttpOnly = true,
+                    Secure = ctx.Request.IsHttps,  // obrigatório em HTTPS (produção)
                     Path = "/",
                     Expires = DateTimeOffset.UtcNow.AddSeconds(30),
                     SameSite = SameSiteMode.Strict

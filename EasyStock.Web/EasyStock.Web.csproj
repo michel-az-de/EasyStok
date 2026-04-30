@@ -7,7 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.9" />
+    <!-- Authentication.Cookies é implícito no SDK Web do .NET 9 — não referenciar versão antiga -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

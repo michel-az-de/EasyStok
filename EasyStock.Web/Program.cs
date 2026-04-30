@@ -14,8 +14,13 @@ var ptBR = new CultureInfo("pt-BR");
 CultureInfo.DefaultThreadCurrentCulture = ptBR;
 CultureInfo.DefaultThreadCurrentUICulture = ptBR;
 
-// 2. Session
-builder.Services.AddDistributedMemoryCache();
+// 2. Session — usa Redis se disponível (persistência entre deploys/réplicas), fallback in-memory
+var redisCs = config.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisCs))
+    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redisCs);
+else
+    builder.Services.AddDistributedMemoryCache();
+
 builder.Services.AddSession(o =>
 {
     o.IdleTimeout = TimeSpan.FromMinutes(config.GetValue<int>("Session:IdleTimeoutMinutes"));
@@ -163,5 +168,10 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Dashboard}/{action=Index}/{id?}");
+
+// Health check — exigido pelo Dockerfile.Web e pelo Azure App Service
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+   .AllowAnonymous()
+   .ExcludeFromDescription();
 
 app.Run();

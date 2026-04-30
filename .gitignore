@@ -4,7 +4,9 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # Secrets — nunca commitar
+# Valores reais devem vir de variáveis de ambiente do Azure App Service / Key Vault
 appsettings.Development.json
+appsettings.Production.json
 appsettings.*.local.json
 .env
 .env.*

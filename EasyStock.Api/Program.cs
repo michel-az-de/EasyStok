@@ -92,6 +92,12 @@ var resolvedProvider = await ResolveDatabaseProviderAsync(
 var isFallback = !string.Equals(databaseProvider.Trim(), resolvedProvider, StringComparison.OrdinalIgnoreCase)
     && !(databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase) && resolvedProvider == "postgresql");
 
+// Fail-fast: nunca subir em produção usando SQLite (seria banco local efêmero no container)
+if (resolvedProvider == "sqlite" && builder.Environment.IsProduction())
+    throw new InvalidOperationException(
+        "PostgreSQL indisponível e SQLite não é permitido em Production. " +
+        "Verifique a connection string 'DefaultConnection' e a conectividade com o banco.");
+
 var infraState = new ResolvedInfrastructureState
 {
     DatabaseProvider = resolvedProvider,
@@ -108,7 +114,7 @@ switch (resolvedProvider)
         builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString!, mongoDatabaseName, builder.Configuration);
         builder.Services.AddHealthChecks()
             .AddCheck<MongoDatabaseHealthCheck>("MongoDB", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
@@ -116,7 +122,7 @@ switch (resolvedProvider)
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
             .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
@@ -124,7 +130,7 @@ switch (resolvedProvider)
         builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
         builder.Services.AddHealthChecks()
             .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis", tags: ["ready"])
+            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
         break;
 
@@ -156,7 +162,10 @@ builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>()
 var app = builder.Build();
 
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
-if (resolvedProvider is "postgresql")
+// Em produção com múltiplas réplicas, desabilitar via RunMigrationsOnStartup=false
+// e rodar migrations em init-container ou job separado antes do deploy.
+var runMigrationsOnStartup = builder.Configuration.GetValue("RunMigrationsOnStartup", defaultValue: !app.Environment.IsProduction());
+if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
     try
     {
