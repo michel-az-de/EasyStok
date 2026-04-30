@@ -68,8 +68,9 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     {
         var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/impersonate", new { });
         var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
+        if (string.IsNullOrEmpty(token)) { SetErro("Falha ao gerar token de impersonação."); return RedirectToPage(new { Id }); }
         var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
-        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
+        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token)}");
     }
 
     public async Task<IActionResult> OnPostConcederTrialAsync(int diasTrial)

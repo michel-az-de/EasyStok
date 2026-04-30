@@ -216,7 +216,9 @@ public class AdminTenantsController(
         var rawNivel = perfil?.Perfil?.Nivel ?? NivelAcesso.Admin;
         var nivel = rawNivel == NivelAcesso.SuperAdmin ? NivelAcesso.Admin : rawNivel;
 
-        var secretKey = configuration["Jwt:SecretKey"]!;
+        var secretKey = configuration["Jwt:SecretKey"];
+        if (string.IsNullOrEmpty(secretKey))
+            return DataBadRequest("Configuração JWT ausente.", "Jwt:SecretKey não configurado.");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

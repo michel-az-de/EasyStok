@@ -28,7 +28,7 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
         catch (SessionExpiredException)
         {
             session.ClearSession();
-            context.HttpContext.Response.Redirect("/Auth/Login");
+            context.Result = new RedirectToPageResult("/Auth/Login");
         }
     }
 }
