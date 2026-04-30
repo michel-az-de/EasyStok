@@ -1,0 +1,230 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Tenants.DetailModel
+@{
+    var nome = Model.Empresa.ValueKind != System.Text.Json.JsonValueKind.Undefined && Model.Empresa.TryGetProperty("nome", out var np) ? np.GetString() : "Tenant";
+    ViewData["Title"] = nome;
+
+    var assinaturaStatus = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+        && Model.Assinatura.TryGetProperty("status", out var sp) ? sp.GetString() : null;
+    var statusClass = assinaturaStatus?.ToLower() switch {
+        "ativa" => "badge-ativa",
+        "suspensa" => "badge-suspensa",
+        "cancelada" => "badge-cancelada",
+        _ => "badge-expirada"
+    };
+}
+
+<a href="/Tenants" class="text-slate-400 hover:text-white text-sm mb-4 inline-flex items-center gap-1">← Voltar</a>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<!-- Header -->
+<div class="card mb-6" x-data="{ modal: null }">
+    <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+            <div class="flex items-center gap-3 mb-1">
+                <h2 class="text-white text-xl font-bold">@nome</h2>
+                <span class="status-badge @statusClass">@(assinaturaStatus ?? "Sem assinatura")</span>
+            </div>
+            @{
+                var doc = Model.Empresa.TryGetProperty("documento", out var dp) ? dp.GetString() : null;
+                var criado = Model.Empresa.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : null;
+                DateTime.TryParse(criado, out var criadoDt);
+                var planoNome = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                    && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
+                    && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
+            }
+            <div class="text-slate-400 text-sm">@(doc ?? "Sem documento") · Criado em @criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+            <div class="text-slate-400 text-sm mt-1">Plano: <span class="text-white font-medium">@planoNome</span></div>
+        </div>
+
+        <div class="flex gap-2 flex-wrap">
+            <form method="post" asp-page-handler="Impersonar" class="inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-secondary text-sm">🎭 Impersonar</button>
+            </form>
+
+            @if (assinaturaStatus == "Ativa")
+            {
+                <button type="button" @@click="modal = 'suspender'" class="btn-danger text-sm">Suspender</button>
+            }
+            else if (assinaturaStatus == "Suspensa")
+            {
+                <form method="post" asp-page-handler="Reativar">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn-primary text-sm">Reativar</button>
+                </form>
+            }
+
+            <!-- Trocar plano -->
+            <button type="button" @@click="modal = 'plano'" class="btn-secondary text-sm">Trocar Plano</button>
+        </div>
+    </div>
+
+    <!-- Modal Suspender -->
+    <div x-show="modal === 'suspender'" x-cloak class="modal-overlay" @@click.self="modal = null">
+        <div class="modal-box" @@click.stop>
+            <h3 class="text-white font-semibold mb-4">Suspender Tenant</h3>
+            <form method="post" asp-page-handler="Suspender">
+                @Html.AntiForgeryToken()
+                <div class="mb-4">
+                    <label class="form-label">Motivo</label>
+                    <input type="text" name="motivo" class="form-input" placeholder="Motivo da suspensão..." required />
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @@click="modal = null" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-danger">Suspender</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Trocar Plano -->
+    <div x-show="modal === 'plano'" x-cloak class="modal-overlay" @@click.self="modal = null">
+        <div class="modal-box" @@click.stop>
+            <h3 class="text-white font-semibold mb-4">Trocar Plano</h3>
+            <form method="post" asp-page-handler="TrocarPlano">
+                @Html.AntiForgeryToken()
+                <div class="mb-4">
+                    <label class="form-label">Plano</label>
+                    <select name="planoId" class="form-input" required>
+                        @foreach (var p in Model.PlanosList)
+                        {
+                            var pid = p.TryGetProperty("id", out var pidp) ? pidp.GetString() : "";
+                            var pnome = p.TryGetProperty("nome", out var pnp2) ? pnp2.GetString() : "";
+                            var preco = p.TryGetProperty("precoMensal", out var precoP) ? precoP.GetDecimal() : 0;
+                            <option value="@pid">@pnome — R$ @preco.ToString("N2")</option>
+                        }
+                    </select>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @@click="modal = null" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div x-data="{ tab: 'visao' }" class="space-y-4">
+    <div class="flex gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1 w-fit">
+        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log") })
+        {
+            <button type="button"
+                    @@click="tab = '@t'"
+                    :class="tab === '@t' ? 'bg-violet-700 text-white' : 'text-slate-400 hover:text-white'"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">@l</button>
+        }
+    </div>
+
+    <!-- Visão geral -->
+    <div x-show="tab === 'visao'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        @{
+            var usuarios = Model.Usuarios.Count();
+            var lojas = Model.Lojas.Count();
+            var planoJson = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                && Model.Assinatura.TryGetProperty("plano", out var planoProp) && planoProp.ValueKind != System.Text.Json.JsonValueKind.Null
+                ? planoProp : default;
+        }
+        <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Usuários</div><div class="text-2xl font-bold text-white">@usuarios</div></div>
+        <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Lojas</div><div class="text-2xl font-bold text-white">@lojas</div></div>
+        @if (planoJson.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+        {
+            var limLojas = planoJson.TryGetProperty("limiteLojas", out var ll) ? ll.GetInt32() : 0;
+            var limUsuarios = planoJson.TryGetProperty("limiteUsuarios", out var lu) ? lu.GetInt32() : 0;
+            var limProdutos = planoJson.TryGetProperty("limiteProdutos", out var lp) ? lp.GetInt32() : 0;
+            var preco = planoJson.TryGetProperty("precoMensal", out var pr) ? pr.GetDecimal() : 0m;
+            <div class="card">
+                <div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Limites do Plano</div>
+                <div class="text-xs text-slate-300 space-y-0.5 mt-1">
+                    <div>Lojas: @(limLojas == -1 ? "Ilimitado" : limLojas.ToString())</div>
+                    <div>Usuários: @(limUsuarios == -1 ? "Ilimitado" : limUsuarios.ToString())</div>
+                    <div>Produtos: @(limProdutos == -1 ? "Ilimitado" : limProdutos.ToString())</div>
+                </div>
+            </div>
+            <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Mensalidade</div><div class="text-2xl font-bold text-violet-400">R$ @preco.ToString("N2")</div></div>
+        }
+    </div>
+
+    <!-- Usuários -->
+    <div x-show="tab === 'usuarios'" x-cloak>
+        <div class="card p-0 overflow-hidden">
+            <table class="table-admin">
+                <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var u in Model.Usuarios)
+                    {
+                        var unome = u.TryGetProperty("nome", out var unp) ? unp.GetString() : "";
+                        var uemail = u.TryGetProperty("email", out var uep) ? uep.GetString() : "";
+                        var nivel = u.TryGetProperty("nivelAcesso", out var univelP) && univelP.ValueKind != System.Text.Json.JsonValueKind.Null ? univelP.GetString() : "—";
+                        var ativo = u.TryGetProperty("ativo", out var uap) && uap.GetBoolean();
+                        var ultimo = u.TryGetProperty("ultimoAcessoEm", out var uup) && uup.ValueKind != System.Text.Json.JsonValueKind.Null ? uup.GetString() : null;
+                        DateTime.TryParse(ultimo, out var ultimoDt);
+                        <tr>
+                            <td class="text-white font-medium">@unome</td>
+                            <td class="text-slate-400">@uemail</td>
+                            <td class="text-slate-400">@nivel</td>
+                            <td class="text-slate-400">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
+                            <td><span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Lojas -->
+    <div x-show="tab === 'lojas'" x-cloak>
+        <div class="card p-0 overflow-hidden">
+            <table class="table-admin">
+                <thead><tr><th>Nome</th></tr></thead>
+                <tbody>
+                    @foreach (var l in Model.Lojas)
+                    {
+                        var lnome = l.TryGetProperty("nome", out var lnp) ? lnp.GetString() : "";
+                        <tr><td class="text-white">@lnome</td></tr>
+                    }
+                    @if (!Model.Lojas.Any())
+                    {
+                        <tr><td class="text-center text-slate-500 py-6">Nenhuma loja cadastrada.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Audit Log -->
+    <div x-show="tab === 'audit'" x-cloak>
+        <div class="card p-0 overflow-hidden">
+            <table class="table-admin">
+                <thead><tr><th>Ação</th><th>Sucesso</th><th>Detalhes</th><th>IP</th><th>Data/Hora</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.AuditLogs)
+                    {
+                        var acao = a.TryGetProperty("acao", out var aap) ? aap.GetString() : "";
+                        var sucesso = a.TryGetProperty("sucesso", out var asp2) && asp2.GetBoolean();
+                        var detalhes = a.TryGetProperty("detalhes", out var adp) && adp.ValueKind != System.Text.Json.JsonValueKind.Null ? adp.GetString() : "—";
+                        var ip = a.TryGetProperty("ip", out var aip) ? aip.GetString() : "—";
+                        var dh = a.TryGetProperty("dataHora", out var adhp) ? adhp.GetString() : null;
+                        DateTime.TryParse(dh, out var dhDt);
+                        <tr>
+                            <td class="font-mono text-xs text-slate-300">@acao</td>
+                            <td><span class="status-badge @(sucesso ? "badge-ativa" : "badge-cancelada")">@(sucesso ? "Sim" : "Não")</span></td>
+                            <td class="text-slate-400 text-xs max-w-xs truncate">@detalhes</td>
+                            <td class="text-slate-400 text-xs">@ip</td>
+                            <td class="text-slate-400 text-xs">@dhDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                        </tr>
+                    }
+                    @if (!Model.AuditLogs.Any())
+                    {
+                        <tr><td colspan="5" class="text-center text-slate-500 py-6">Nenhuma ação auditada.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

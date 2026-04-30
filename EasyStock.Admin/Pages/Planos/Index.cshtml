@@ -1,0 +1,153 @@
+@page
+@model EasyStock.Admin.Pages.Planos.IndexModel
+@{
+    ViewData["Title"] = "Planos";
+}
+
+<div class="flex items-center justify-between mb-6" x-data="{ modalNovo: false }">
+    <div class="text-slate-400 text-sm">@Model.Planos.Count() plano(s)</div>
+    <button type="button" @@click="modalNovo = true" class="btn-primary">+ Novo Plano</button>
+
+    <!-- Modal novo plano -->
+    <div x-show="modalNovo" x-cloak class="modal-overlay" @@click.self="modalNovo = false">
+        <div class="modal-box" @@click.stop>
+            <h3 class="text-white font-semibold mb-4">Novo Plano</h3>
+            <form method="post" asp-page-handler="Criar" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" class="form-input" required />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Descrição</label>
+                        <input type="text" name="descricao" class="form-input" />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Lojas <small class="text-slate-500">(-1 = ilimitado)</small></label>
+                        <input type="number" name="limiteLojas" value="1" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Usuários</label>
+                        <input type="number" name="limiteUsuarios" value="5" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Produtos</label>
+                        <input type="number" name="limiteProdutos" value="500" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite IA/mês</label>
+                        <input type="number" name="limiteGeracoesIaMensais" value="10" class="form-input" required />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Preço Mensal (R$)</label>
+                        <input type="number" name="precoMensal" value="0" step="0.01" class="form-input" required />
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-end pt-2">
+                    <button type="button" @@click="modalNovo = false" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div class="space-y-4">
+    @foreach (var p in Model.Planos)
+    {
+        var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
+        var nome = p.TryGetProperty("nome", out var nP) ? nP.GetString() : "";
+        var descricao = p.TryGetProperty("descricao", out var dP) && dP.ValueKind != System.Text.Json.JsonValueKind.Null ? dP.GetString() : "";
+        var limLojas = p.TryGetProperty("limiteLojas", out var llP) ? llP.GetInt32() : 0;
+        var limUsuarios = p.TryGetProperty("limiteUsuarios", out var luP) ? luP.GetInt32() : 0;
+        var limProdutos = p.TryGetProperty("limiteProdutos", out var lpP) ? lpP.GetInt32() : 0;
+        var limIa = p.TryGetProperty("limiteGeracoesIaMensais", out var liaP) ? liaP.GetInt32() : 0;
+        var preco = p.TryGetProperty("precoMensal", out var prP) ? prP.GetDecimal() : 0m;
+        var ativo = p.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
+        var totalTenants = p.TryGetProperty("totalTenants", out var ttP) ? ttP.GetInt32() : 0;
+
+        <div class="card" x-data="{ editing: false }">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-1">
+                        <h3 class="text-white font-semibold">@nome</h3>
+                        <span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span>
+                        <span class="text-slate-400 text-xs">@totalTenants tenant(s)</span>
+                    </div>
+                    <div class="text-slate-400 text-sm">@descricao</div>
+                    <div class="flex gap-4 mt-2 text-xs text-slate-400">
+                        <span>Lojas: <b class="text-slate-200">@(limLojas == -1 ? "∞" : limLojas.ToString())</b></span>
+                        <span>Usuários: <b class="text-slate-200">@(limUsuarios == -1 ? "∞" : limUsuarios.ToString())</b></span>
+                        <span>Produtos: <b class="text-slate-200">@(limProdutos == -1 ? "∞" : limProdutos.ToString())</b></span>
+                        <span>IA/mês: <b class="text-slate-200">@(limIa == -1 ? "∞" : limIa.ToString())</b></span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-violet-400 font-bold text-xl">R$ @preco.ToString("N2")</div>
+                    <div class="text-slate-400 text-xs">/ mês</div>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4 border-t border-slate-700 pt-4">
+                <button type="button" @@click="editing = !editing" class="btn-secondary text-sm">
+                    <span x-text="editing ? 'Cancelar' : 'Editar'"></span>
+                </button>
+                <form method="post" asp-page-handler="Toggle" class="inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@pid" />
+                    <button type="submit" class="@(ativo ? "btn-danger" : "btn-primary") text-sm">
+                        @(ativo ? "Desativar" : "Ativar")
+                    </button>
+                </form>
+            </div>
+
+            <!-- Inline edit form -->
+            <div x-show="editing" x-cloak class="mt-4 pt-4 border-t border-slate-700">
+                <form method="post" asp-page-handler="Editar" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@pid" />
+                    <div class="col-span-2 lg:col-span-4">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" value="@nome" class="form-input" required />
+                    </div>
+                    <div class="col-span-2 lg:col-span-4">
+                        <label class="form-label">Descrição</label>
+                        <input type="text" name="descricao" value="@descricao" class="form-input" />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Lojas</label>
+                        <input type="number" name="limiteLojas" value="@limLojas" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Usuários</label>
+                        <input type="number" name="limiteUsuarios" value="@limUsuarios" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite Produtos</label>
+                        <input type="number" name="limiteProdutos" value="@limProdutos" class="form-input" required />
+                    </div>
+                    <div>
+                        <label class="form-label">Limite IA/mês</label>
+                        <input type="number" name="limiteGeracoesIaMensais" value="@limIa" class="form-input" required />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Preço Mensal</label>
+                        <input type="number" name="precoMensal" value="@preco" step="0.01" class="form-input" required />
+                    </div>
+                    <div class="col-span-2 flex justify-end items-end">
+                        <button type="submit" class="btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+    @if (!Model.Planos.Any())
+    {
+        <div class="card text-center text-slate-500 py-8">Nenhum plano cadastrado.</div>
+    }
+</div>

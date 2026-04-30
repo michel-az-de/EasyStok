@@ -1,0 +1,138 @@
+@page
+@model EasyStock.Admin.Pages.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-6">
+        Erro ao carregar dados: @Model.Erro
+    </div>
+}
+
+<!-- Métricas principais -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
+        <div class="text-3xl font-bold text-white">@Model.TenantsAtivos</div>
+        <div class="text-slate-500 text-xs mt-1">de @Model.TotalTenants total</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
+        <div class="text-3xl font-bold text-orange-400">@Model.TenantsSuspensos</div>
+        <div class="text-slate-500 text-xs mt-1">+@Model.TenantsNovos novos (30d)</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
+        <div class="text-3xl font-bold text-blue-400">@Model.TicketsAbertos</div>
+        <div class="text-red-400 text-xs mt-1 font-medium">@Model.TicketsCriticos críticos</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
+        <div class="text-3xl font-bold text-violet-400">R$ @Model.ReceitaMensal.ToString("N0")</div>
+        <div class="text-slate-500 text-xs mt-1">mensal (assinaturas ativas)</div>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
+        <div class="text-2xl font-bold text-white">@Model.TotalUsuariosAtivos</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
+        <div class="text-2xl font-bold text-white">@Model.Logins24h</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
+        <div class="text-2xl font-bold text-yellow-400">@Model.TicketsEmAtendimento</div>
+    </div>
+    <div class="card">
+        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
+        <div class="text-2xl font-bold text-green-400">@Model.TenantsNovos</div>
+        <div class="text-slate-500 text-xs mt-1">últimos 30 dias</div>
+    </div>
+</div>
+
+<!-- Tabelas -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Últimos tickets críticos -->
+    <div class="card p-0 overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+            <h2 class="text-white font-semibold text-sm">Tickets Críticos</h2>
+            <a href="/Tickets?prioridade=Critica" class="text-violet-400 hover:text-violet-300 text-xs">Ver todos →</a>
+        </div>
+        @if (!Model.UltimosTicketsCriticos.Any())
+        {
+            <div class="px-4 py-8 text-center text-slate-500 text-sm">Nenhum ticket crítico 🎉</div>
+        }
+        else
+        {
+            <table class="table-admin">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Empresa</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.UltimosTicketsCriticos)
+                    {
+                        var id = t.TryGetProperty("id", out var idProp) ? idProp.GetString() : "";
+                        var titulo = t.TryGetProperty("titulo", out var tp) ? tp.GetString() : "";
+                        var empresa = t.TryGetProperty("empresaNome", out var ep) ? ep.GetString() : "";
+                        var status = t.TryGetProperty("status", out var sp) ? sp.GetString() : "";
+                        <tr>
+                            <td><a href="/Tickets/Detail/@id" class="text-violet-400 hover:text-violet-300">@titulo</a></td>
+                            <td class="text-slate-400">@empresa</td>
+                            <td><span class="status-badge badge-@(status?.ToLower().Replace(" ", ""))">@status</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <!-- Tenants recentes -->
+    <div class="card p-0 overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+            <h2 class="text-white font-semibold text-sm">Tenants Recentes</h2>
+            <a href="/Tenants" class="text-violet-400 hover:text-violet-300 text-xs">Ver todos →</a>
+        </div>
+        @if (!Model.TenantsRecentes.Any())
+        {
+            <div class="px-4 py-8 text-center text-slate-500 text-sm">Nenhum tenant novo nos últimos 30 dias</div>
+        }
+        else
+        {
+            <table class="table-admin">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Documento</th>
+                        <th>Criado em</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.TenantsRecentes)
+                    {
+                        var id = t.TryGetProperty("id", out var idProp) ? idProp.GetString() : "";
+                        var nome = t.TryGetProperty("nome", out var np) ? np.GetString() : "";
+                        var doc = t.TryGetProperty("documento", out var dp) ? dp.GetString() : "—";
+                        var criado = t.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : "";
+                        DateTime.TryParse(criado, out var criadoDt);
+                        <tr>
+                            <td><a href="/Tenants/Detail/@id" class="text-violet-400 hover:text-violet-300">@nome</a></td>
+                            <td class="text-slate-400">@(doc ?? "—")</td>
+                            <td class="text-slate-400">@criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+</div>

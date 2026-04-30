@@ -89,6 +89,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddAuthorization(opts =>
         {
+            opts.AddPolicy("SuperAdmin", p => p.RequireClaim("nivel", "SuperAdmin"));
             opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));

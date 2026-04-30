@@ -1,0 +1,141 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Tickets.DetailModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.Titulo;
+    var priClass = Model.Prioridade.ToLower() switch { "critica" => "badge-critica", "alta" => "badge-alta", _ => "badge-normal" };
+    var stClass = Model.Status.ToLower().Replace(" ", "") switch {
+        "aberto" => "badge-aberto",
+        "ematendimento" => "badge-ematendimento",
+        "resolvido" => "badge-resolvido",
+        _ => "badge-fechado"
+    };
+}
+
+<a href="/Tickets" class="text-slate-400 hover:text-white text-sm mb-4 inline-flex items-center gap-1">← Voltar</a>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Conversa principal -->
+    <div class="lg:col-span-2 space-y-4">
+        <!-- Header do ticket -->
+        <div class="card">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <h2 class="text-white text-lg font-bold mb-1">@Model.Titulo</h2>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="status-badge @stClass">@Model.Status</span>
+                        <span class="status-badge @priClass">@Model.Prioridade</span>
+                        <span class="text-slate-400 text-xs">@Model.Categoria</span>
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    @if (Model.Status != "Resolvido" && Model.Status != "Fechado")
+                    {
+                        <form method="post" asp-page-handler="Resolver">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn-primary text-sm">✓ Resolver</button>
+                        </form>
+                    }
+                    <form method="post" asp-page-handler="AlterarStatus" x-data class="flex items-center gap-2">
+                        @Html.AntiForgeryToken()
+                        <select name="status" class="form-input text-sm py-1.5" style="width:140px"
+                                onchange="this.form.submit()">
+                            <option value="Aberto" selected="@(Model.Status == "Aberto")">Aberto</option>
+                            <option value="EmAtendimento" selected="@(Model.Status == "EmAtendimento")">Em Atend.</option>
+                            <option value="Resolvido" selected="@(Model.Status == "Resolvido")">Resolvido</option>
+                            <option value="Fechado" selected="@(Model.Status == "Fechado")">Fechado</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagens -->
+        <div class="space-y-3">
+            @foreach (var m in Model.Mensagens)
+            {
+                var isAdmin = m.TryGetProperty("isAdmin", out var iap) && iap.GetBoolean();
+                var autor = m.TryGetProperty("autorNome", out var anp) && anp.ValueKind != JsonValueKind.Null ? anp.GetString() : "?";
+                var conteudo = m.TryGetProperty("conteudo", out var cp2) ? cp2.GetString() : "";
+                var criado = m.TryGetProperty("criadoEm", out var mp) ? mp.GetString() : null;
+                DateTime.TryParse(criado, out var criadoDt);
+
+                if (isAdmin)
+                {
+                    <div class="flex justify-end">
+                        <div class="max-w-lg">
+                            <div class="text-right text-xs text-slate-400 mb-1">@autor · @criadoDt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                            <div class="bg-violet-700/30 border border-violet-600/30 rounded-xl rounded-tr-sm px-4 py-3 text-sm text-white">@conteudo</div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="flex justify-start">
+                        <div class="max-w-lg">
+                            <div class="text-left text-xs text-slate-400 mb-1">@autor · @criadoDt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                            <div class="bg-slate-700 border border-slate-600 rounded-xl rounded-tl-sm px-4 py-3 text-sm text-slate-200">@conteudo</div>
+                        </div>
+                    </div>
+                }
+            }
+            @if (!Model.Mensagens.Any())
+            {
+                <div class="text-center text-slate-500 text-sm py-6">Nenhuma mensagem ainda.</div>
+            }
+        </div>
+
+        <!-- Responder -->
+        @if (Model.Status != "Fechado")
+        {
+            <div class="card">
+                <form method="post" asp-page-handler="Responder" class="space-y-3">
+                    @Html.AntiForgeryToken()
+                    <label class="form-label">Resposta</label>
+                    <textarea name="conteudo" class="form-input" rows="4" placeholder="Digite sua resposta..." required></textarea>
+                    <div class="flex justify-end">
+                        <button type="submit" class="btn-primary">Enviar Resposta</button>
+                    </div>
+                </form>
+            </div>
+        }
+    </div>
+
+    <!-- Sidebar de info -->
+    <div class="space-y-4">
+        <div class="card">
+            <h3 class="text-white font-semibold text-sm mb-3">Empresa</h3>
+            <div class="text-slate-300 font-medium">@Model.EmpresaNome</div>
+            <a href="/Tenants/Detail/@Model.EmpresaId"
+               class="text-violet-400 hover:text-violet-300 text-xs mt-1 inline-block">Ver tenant →</a>
+        </div>
+
+        <div class="card">
+            <h3 class="text-white font-semibold text-sm mb-3">Detalhes</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Categoria</span>
+                    <span class="text-slate-200">@Model.Categoria</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Prioridade</span>
+                    <span class="status-badge @priClass">@Model.Prioridade</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Atendente</span>
+                    <span class="text-slate-200">@(string.IsNullOrEmpty(Model.AtendenteNome) ? "—" : Model.AtendenteNome)</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Mensagens</span>
+                    <span class="text-slate-200">@Model.Mensagens.Count()</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

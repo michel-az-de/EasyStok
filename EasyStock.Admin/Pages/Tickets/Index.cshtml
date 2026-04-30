@@ -1,0 +1,150 @@
+@page
+@model EasyStock.Admin.Pages.Tickets.IndexModel
+@{
+    ViewData["Title"] = "Tickets";
+}
+
+<div class="flex items-center justify-between mb-6 flex-wrap gap-4" x-data="{ modalNovo: false }">
+    <form method="get" class="flex items-center gap-3 flex-wrap">
+        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por título..."
+               class="form-input max-w-xs" />
+        <select name="status" class="form-input max-w-[160px]">
+            <option value="">Todos status</option>
+            <option value="Aberto" selected="@(Model.Status == "Aberto")">Aberto</option>
+            <option value="EmAtendimento" selected="@(Model.Status == "EmAtendimento")">Em Atendimento</option>
+            <option value="Resolvido" selected="@(Model.Status == "Resolvido")">Resolvido</option>
+            <option value="Fechado" selected="@(Model.Status == "Fechado")">Fechado</option>
+        </select>
+        <select name="prioridade" class="form-input max-w-[140px]">
+            <option value="">Todas prioridades</option>
+            <option value="Normal" selected="@(Model.Prioridade == "Normal")">Normal</option>
+            <option value="Alta" selected="@(Model.Prioridade == "Alta")">Alta</option>
+            <option value="Critica" selected="@(Model.Prioridade == "Critica")">Crítica</option>
+        </select>
+        <button type="submit" class="btn-primary">Filtrar</button>
+        @if (!string.IsNullOrEmpty(Model.Status) || !string.IsNullOrEmpty(Model.Prioridade) || !string.IsNullOrEmpty(Model.Search))
+        {
+            <a href="/Tickets" class="btn-secondary">Limpar</a>
+        }
+    </form>
+
+    <button type="button" @@click="modalNovo = true" class="btn-primary">+ Novo Ticket</button>
+
+    <!-- Modal novo ticket -->
+    <div x-show="modalNovo" x-cloak class="modal-overlay" @@click.self="modalNovo = false">
+        <div class="modal-box" @@click.stop>
+            <h3 class="text-white font-semibold mb-4">Novo Ticket</h3>
+            <form method="post" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div>
+                    <label class="form-label">Empresa ID</label>
+                    <input type="text" name="empresaId" class="form-input" placeholder="UUID da empresa" required />
+                </div>
+                <div>
+                    <label class="form-label">Título</label>
+                    <input type="text" name="titulo" class="form-input" required />
+                </div>
+                <div>
+                    <label class="form-label">Descrição</label>
+                    <textarea name="descricao" class="form-input" rows="3" required></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Categoria</label>
+                        <select name="categoria" class="form-input">
+                            <option>Bug</option>
+                            <option>Duvida</option>
+                            <option>Financeiro</option>
+                            <option>Outro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Prioridade</label>
+                        <select name="prioridade" class="form-input">
+                            <option>Normal</option>
+                            <option>Alta</option>
+                            <option>Critica</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-end pt-2">
+                    <button type="button" @@click="modalNovo = false" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div class="card p-0 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="table-admin">
+            <thead>
+                <tr>
+                    <th>Título</th>
+                    <th>Empresa</th>
+                    <th>Categoria</th>
+                    <th>Prioridade</th>
+                    <th>Status</th>
+                    <th>Atendente</th>
+                    <th>Criado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model.Tickets)
+                {
+                    var tid = t.TryGetProperty("id", out var tidP) ? tidP.GetString() : "";
+                    var titulo = t.TryGetProperty("titulo", out var titP) ? titP.GetString() : "";
+                    var empresa = t.TryGetProperty("empresaNome", out var empP) ? empP.GetString() : "—";
+                    var cat = t.TryGetProperty("categoria", out var catP) ? catP.GetString() : "";
+                    var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
+                    var status = t.TryGetProperty("status", out var stP) ? stP.GetString() : "";
+                    var atendente = t.TryGetProperty("atendenteNome", out var atP) && atP.ValueKind != System.Text.Json.JsonValueKind.Null ? atP.GetString() : "—";
+                    var criado = t.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : null;
+                    DateTime.TryParse(criado, out var criadoDt);
+
+                    var priClass = pri?.ToLower() switch { "critica" => "badge-critica", "alta" => "badge-alta", _ => "badge-normal" };
+                    var stClass = status?.ToLower().Replace(" ", "") switch {
+                        "aberto" => "badge-aberto",
+                        "ematendimento" => "badge-ematendimento",
+                        "resolvido" => "badge-resolvido",
+                        _ => "badge-fechado"
+                    };
+                    <tr class="cursor-pointer hover:bg-slate-800/50" onclick="location.href='/Tickets/Detail/@tid'">
+                        <td class="text-white font-medium">@titulo</td>
+                        <td class="text-slate-400 text-sm">@empresa</td>
+                        <td class="text-slate-400 text-sm">@cat</td>
+                        <td><span class="status-badge @priClass">@pri</span></td>
+                        <td><span class="status-badge @stClass">@status</span></td>
+                        <td class="text-slate-400 text-sm">@atendente</td>
+                        <td class="text-slate-400 text-sm">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+                    </tr>
+                }
+                @if (!Model.Tickets.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-slate-500 py-8">Nenhum ticket encontrado.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <div class="flex items-center justify-center gap-2 mt-6">
+        @if (Model.Page > 1)
+        {
+            <a href="?page=@(Model.Page-1)&status=@Model.Status&prioridade=@Model.Prioridade&search=@Model.Search" class="btn-secondary text-sm">← Anterior</a>
+        }
+        <span class="text-slate-400 text-sm">@Model.Page / @Model.TotalPages</span>
+        @if (Model.Page < Model.TotalPages)
+        {
+            <a href="?page=@(Model.Page+1)&status=@Model.Status&prioridade=@Model.Prioridade&search=@Model.Search" class="btn-secondary text-sm">Próximo →</a>
+        }
+    </div>
+}

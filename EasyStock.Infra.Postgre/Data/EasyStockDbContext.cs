@@ -50,6 +50,11 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
 
+        // Admin Module DbSets
+        public DbSet<AdminTicket> AdminTickets { get; set; } = null!;
+        public DbSet<AdminTicketMensagem> AdminTicketMensagens { get; set; } = null!;
+        public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
+
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;

@@ -1,0 +1,289 @@
+using EasyStock.Api.Http;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
+using EasyStock.Infra.Postgre.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace EasyStock.Api.Controllers;
+
+[ApiController]
+[Route("api/admin/tenants")]
+[Authorize(Policy = "SuperAdmin")]
+public class AdminTenantsController(
+    EasyStockDbContext db,
+    ICurrentUserAccessor currentUser,
+    IConfiguration configuration) : EasyStockControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> GetTenants(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null)
+    {
+        (page, pageSize) = NormalisePage(page, pageSize);
+
+        var query = db.Empresas.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(e => e.Nome.Contains(search) || (e.Documento != null && e.Documento.Contains(search)));
+
+        StatusAssinatura? filtroStatus = null;
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<StatusAssinatura>(status, out var se))
+            filtroStatus = se;
+
+        if (filtroStatus.HasValue)
+            query = query.Where(e => db.AssinaturasEmpresa.Any(a => a.EmpresaId == e.Id && a.Status == filtroStatus.Value));
+
+        var total = await query.CountAsync();
+
+        var ids = await query
+            .OrderByDescending(e => e.CriadoEm)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => e.Id)
+            .ToListAsync();
+
+        var empresas = await db.Empresas
+            .Where(e => ids.Contains(e.Id))
+            .Select(e => new
+            {
+                e.Id,
+                e.Nome,
+                e.Documento,
+                e.CriadoEm,
+                totalUsuarios = db.UsuariosEmpresas.Count(ue => ue.EmpresaId == e.Id),
+                totalLojas = db.Lojas.Count(l => l.EmpresaId == e.Id),
+                planoNome = db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.Plano != null ? a.Plano.Nome : null)
+                    .FirstOrDefault(),
+                statusAssinatura = db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => (StatusAssinatura?)a.Status)
+                    .FirstOrDefault(),
+                dataRenovacao = db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.DataFim)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        return DataPaged(empresas.OrderByDescending(e => e.CriadoEm), total, page, pageSize);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetTenant(Guid id)
+    {
+        var empresa = await db.Empresas.FindAsync(id);
+        if (empresa is null) return DataNotFound("Tenant não encontrado.");
+
+        var assinatura = await db.AssinaturasEmpresa
+            .Include(a => a.Plano)
+            .Where(a => a.EmpresaId == id)
+            .OrderByDescending(a => a.DataInicio)
+            .FirstOrDefaultAsync();
+
+        var lojas = await db.Lojas
+            .Where(l => l.EmpresaId == id)
+            .Select(l => new { l.Id, l.Nome })
+            .ToListAsync();
+
+        var usuarios = await db.UsuariosEmpresas
+            .Include(ue => ue.Usuario)
+            .Where(ue => ue.EmpresaId == id)
+            .Select(ue => new
+            {
+                ue.Usuario!.Id,
+                ue.Usuario.Nome,
+                ue.Usuario.Email,
+                ue.Usuario.Ativo,
+                ue.Usuario.UltimoAcessoEm,
+                nivelAcesso = db.UsuariosPerfis
+                    .Where(up => up.UsuarioId == ue.UsuarioId && up.EmpresaId == id)
+                    .Select(up => up.Perfil != null ? (NivelAcesso?)up.Perfil.Nivel : null)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var usuariosIds = usuarios.Select(u => u.Id).ToList();
+        var auditLogs = await db.AuditLogs
+            .Where(a => usuariosIds.Contains(a.UsuarioId))
+            .OrderByDescending(a => a.DataHora)
+            .Take(20)
+            .Select(a => new { a.Id, a.Acao, a.Sucesso, a.Detalhes, a.Ip, dataHora = a.DataHora })
+            .ToListAsync();
+
+        return DataOk(new
+        {
+            empresa = new { empresa.Id, empresa.Nome, empresa.Documento, empresa.CriadoEm },
+            assinatura = assinatura is null ? null : new
+            {
+                assinatura.Id,
+                assinatura.Status,
+                assinatura.DataInicio,
+                assinatura.DataFim,
+                plano = assinatura.Plano is null ? null : new
+                {
+                    assinatura.Plano.Id,
+                    assinatura.Plano.Nome,
+                    assinatura.Plano.PrecoMensal,
+                    assinatura.Plano.LimiteLojas,
+                    assinatura.Plano.LimiteUsuarios,
+                    assinatura.Plano.LimiteProdutos
+                }
+            },
+            lojas,
+            usuarios,
+            auditLogRecentes = auditLogs
+        });
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    public async Task<IActionResult> PatchStatus(Guid id, [FromBody] PatchTenantStatusRequest req)
+    {
+        var assinatura = await db.AssinaturasEmpresa
+            .Where(a => a.EmpresaId == id)
+            .OrderByDescending(a => a.DataInicio)
+            .FirstOrDefaultAsync();
+
+        if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
+
+        if (!Enum.TryParse<StatusAssinatura>(req.Status, out var novoStatus))
+            return DataBadRequest("Status inválido.", "Valores aceitos: Ativa, Suspensa, Cancelada");
+
+        switch (novoStatus)
+        {
+            case StatusAssinatura.Suspensa: assinatura.Suspender(); break;
+            case StatusAssinatura.Cancelada: assinatura.Cancelar(); break;
+            case StatusAssinatura.Ativa: assinatura.Reativar(); break;
+            default: return DataBadRequest("Status não suportado.");
+        }
+
+        db.AuditLogs.Add(AuditLog.Criar(
+            currentUser.UsuarioId,
+            $"AdminAlterarStatusTenant:{novoStatus}",
+            true,
+            $"EmpresaId={id}. Motivo: {req.Motivo}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            null));
+
+        await db.CommitAsync();
+        return DataOk(new { status = novoStatus.ToString() });
+    }
+
+    [HttpPost("{id:guid}/impersonate")]
+    public async Task<IActionResult> Impersonate(Guid id)
+    {
+        var empresa = await db.Empresas.FindAsync(id);
+        if (empresa is null) return DataNotFound("Tenant não encontrado.");
+
+        // Busca o usuário com perfil Admin na empresa (ou o primeiro usuário ativo)
+        var ue = await db.UsuariosEmpresas
+            .Include(x => x.Usuario)
+            .Where(x => x.EmpresaId == id && x.Usuario!.Ativo)
+            .OrderBy(x => x.CriadoEm)
+            .FirstOrDefaultAsync();
+
+        if (ue?.Usuario is null)
+            return DataNotFound("Nenhum usuário ativo encontrado nesta empresa.");
+
+        // Busca o perfil/nivel do usuário nesta empresa
+        var perfil = await db.UsuariosPerfis
+            .Include(up => up.Perfil)
+            .Where(up => up.UsuarioId == ue.UsuarioId && up.EmpresaId == id)
+            .FirstOrDefaultAsync();
+
+        var nivel = perfil?.Perfil?.Nivel ?? NivelAcesso.Admin;
+
+        var secretKey = configuration["Jwt:SecretKey"]!;
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new("sub", ue.Usuario.Id.ToString()),
+            new("email", ue.Usuario.Email),
+            new("nome", ue.Usuario.Nome),
+            new("nivel", nivel.ToString()),
+            new("empresaId", id.ToString()),
+            new("impersonated_by", currentUser.UsuarioId.ToString())
+        };
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddSeconds(900),
+            Issuer = configuration["Jwt:Issuer"],
+            Audience = configuration["Jwt:Audience"],
+            SigningCredentials = credentials
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+
+        db.AdminImpersonationLogs.Add(AdminImpersonationLog.Criar(
+            currentUser.UsuarioId,
+            id,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? ""));
+
+        await db.CommitAsync();
+        return DataOk(new { token, expiresIn = 900 });
+    }
+
+    [HttpPatch("{id:guid}/plano")]
+    public async Task<IActionResult> PatchPlano(Guid id, [FromBody] PatchTenantPlanoRequest req)
+    {
+        var assinatura = await db.AssinaturasEmpresa
+            .Where(a => a.EmpresaId == id && a.Status == StatusAssinatura.Ativa)
+            .OrderByDescending(a => a.DataInicio)
+            .FirstOrDefaultAsync();
+
+        if (assinatura is null) return DataNotFound("Assinatura ativa não encontrada.");
+
+        var plano = await db.Planos.FindAsync(req.PlanoId);
+        if (plano is null) return DataNotFound("Plano não encontrado.");
+
+        assinatura.PlanoId = req.PlanoId;
+        assinatura.AlteradoEm = DateTime.UtcNow;
+        await db.CommitAsync();
+
+        return DataOk(new { planoId = req.PlanoId, planoNome = plano.Nome });
+    }
+
+    [HttpGet("{id:guid}/audit")]
+    public async Task<IActionResult> GetAudit(Guid id, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        (page, pageSize) = NormalisePage(page, pageSize);
+
+        var usuariosIds = await db.UsuariosEmpresas
+            .Where(ue => ue.EmpresaId == id)
+            .Select(ue => ue.UsuarioId)
+            .ToListAsync();
+
+        var query = db.AuditLogs.Where(a => usuariosIds.Contains(a.UsuarioId));
+        var total = await query.CountAsync();
+
+        var logs = await query
+            .OrderByDescending(a => a.DataHora)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new { a.Id, a.UsuarioId, a.Acao, a.Sucesso, a.Detalhes, a.Ip, a.DataHora })
+            .ToListAsync();
+
+        return DataPaged(logs, total, page, pageSize);
+    }
+}
+
+public record PatchTenantStatusRequest(string Status, string? Motivo);
+public record PatchTenantPlanoRequest(Guid PlanoId);
