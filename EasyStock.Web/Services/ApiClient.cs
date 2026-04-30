@@ -238,9 +238,6 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             catch (JsonException ex)
             {
                 log.LogWarning(ex, "JSON deserialization to {Type} failed (HTTP {Status}).", typeof(T).Name, status);
-                // 201 Created may have extra fields the DTO can't parse — return success with default
-                if (status == 201)
-                    return ApiResult<T>.Ok(default!) with { HttpStatus = status };
                 return ApiResult<T>.Fail("PARSE_ERROR", "Erro ao processar resposta do servidor.", status);
             }
         }

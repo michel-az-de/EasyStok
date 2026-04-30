@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +28,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 public class OperationController(
     EasyStockDbContext db,
     MobileEventBroker eventBroker,
+    ICurrentUserAccessor currentUser,
     ILogger<OperationController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly ILogger<OperationController> _log = log;
 
     /// <summary>
@@ -44,6 +48,12 @@ public class OperationController(
         CancellationToken ct)
     {
         if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+
+        // Isolamento de tenant: usuários normais só podem ver dados da própria empresa.
+        if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
+            _currentUser.EmpresaId != Guid.Empty &&
+            _currentUser.EmpresaId != empresaId)
+            return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 
         var todayStart = DateTime.UtcNow.Date;
 
@@ -204,6 +214,12 @@ public class OperationController(
         CancellationToken ct)
     {
         if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
+
+        // Isolamento de tenant: usuários normais só podem ver devices da própria empresa.
+        if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
+            _currentUser.EmpresaId != Guid.Empty &&
+            _currentUser.EmpresaId != empresaId)
+            return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 
         var devices = await _db.Set<MobileDevice>().AsNoTracking()
             .Where(d => d.EmpresaId == empresaId)

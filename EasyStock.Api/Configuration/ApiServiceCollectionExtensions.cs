@@ -65,6 +65,14 @@ public static class ApiServiceCollectionExtensions
             ?? throw new InvalidOperationException(
                 "Jwt:SecretKey não configurado. Defina a variavel de ambiente 'Jwt__SecretKey' ou configure appsettings.Development.json.");
 
+        var jwtIssuer = configuration[ConfigurationKeys.JwtIssuer]
+            ?? throw new InvalidOperationException(
+                "Jwt:Issuer não configurado. Sem ele, todos os tokens JWT serão rejeitados em produção.");
+
+        var jwtAudience = configuration[ConfigurationKeys.JwtAudience]
+            ?? throw new InvalidOperationException(
+                "Jwt:Audience não configurado. Sem ele, todos os tokens JWT serão rejeitados em produção.");
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
@@ -81,8 +89,8 @@ public static class ApiServiceCollectionExtensions
                     ValidateAudience         = true,
                     ValidateLifetime         = true,
                     ValidateIssuerSigningKey  = true,
-                    ValidIssuer              = configuration[ConfigurationKeys.JwtIssuer],
-                    ValidAudience            = configuration[ConfigurationKeys.JwtAudience],
+                    ValidIssuer              = jwtIssuer,
+                    ValidAudience            = jwtAudience,
                     IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
                 };
             });

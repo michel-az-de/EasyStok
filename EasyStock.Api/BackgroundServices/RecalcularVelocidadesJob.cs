@@ -59,12 +59,12 @@ public sealed class RecalcularVelocidadesJob(
         const int pageSize = 500;
         var page = 1;
         var totalProcessados = 0;
-        IEnumerable<ItemEstoque> itens;
+        List<ItemEstoque> itensList;
 
         do
         {
-            (itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, page, pageSize);
-            var itensList = itens.ToList();
+            (var itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, page, pageSize);
+            itensList = itens.ToList();
             if (itensList.Count == 0) break;
 
             // Busca todas as taxas de saída em uma única query em vez de 1 por item
@@ -93,7 +93,7 @@ public sealed class RecalcularVelocidadesJob(
             totalProcessados += itensList.Count;
             page++;
         }
-        while (itens.Count() == pageSize);
+        while (itensList.Count == pageSize);
 
         logger.LogInformation("Velocidades recalculadas para {Total} itens da empresa {EmpresaId}", totalProcessados, empresa.Id);
     }

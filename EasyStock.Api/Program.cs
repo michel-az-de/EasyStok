@@ -419,9 +419,9 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
 // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
 EasyStock.Api.Mobile.MobileModule.UseMobilePwa(app);
 
+app.UseExceptionHandler(); // deve ser o primeiro para capturar exceções de qualquer middleware abaixo
 app.UseCors();
 app.UseRateLimiter();
-app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
