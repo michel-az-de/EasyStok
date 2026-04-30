@@ -1,0 +1,204 @@
+@model ClientesListViewModel
+@{
+    ViewBag.Title = "Clientes";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Clientes</h1>
+        <p>Cadastro central — campos primários + endereços, telefones e documentos extras</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/clientes-mobile"
+           class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+            📱 Clientes do app
+        </a>
+        <button type="button" x-data
+                @@click="$dispatch('open-modal', 'novo-cliente')"
+                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            + Novo Cliente
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 flex-wrap items-center">
+        <div class="flex flex-1 min-w-48 gap-3">
+            <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome, telefone, documento, e-mail ou apt..."
+                   class="ui-field flex-1 min-w-48" />
+            <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
+                Buscar
+            </button>
+        </div>
+        <div class="flex gap-2">
+            @foreach (var (val, label) in new[] { ("", "Todos"), ("ativo", "Ativos"), ("inativo", "Inativos") })
+            {
+                var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
+                <a href="@Url.Action("Index", "Clientes", new { search = Model.Search, status = val == "" ? null : val })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                    @label
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<!-- Lista -->
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "👤" },
+            { "EmptyTitle", "Nenhum cliente cadastrado" },
+            { "EmptyDescription", "Adicione seu primeiro cliente para começar a registrar pedidos." },
+            { "EmptyCta", "+ Novo Cliente" },
+            { "EmptyCtaModal", "novo-cliente" }
+        })
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Apt</th>
+                    <th>Telefone</th>
+                    <th>Documento</th>
+                    <th>Pedidos</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="font-medium text-slate-900">@c.Nome</div>
+                            @if (!string.IsNullOrEmpty(c.Email))
+                            {
+                                <div class="text-xs text-slate-500">@c.Email</div>
+                            }
+                        </td>
+                        <td class="text-slate-600 text-sm">@(c.Apt ?? "—")</td>
+                        <td class="text-slate-600">@(c.Telefone ?? "—")</td>
+                        <td class="text-slate-500 text-sm">@(c.Documento ?? "—")</td>
+                        <td class="text-slate-600 text-sm">
+                            @c.OrderCount
+                            @if (c.LastOrderAt.HasValue)
+                            {
+                                <span class="text-xs text-slate-400 block">último: @c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(c.Ativo ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
+                                @(c.Ativo ? "Ativo" : "Inativo")
+                            </span>
+                        </td>
+                        <td>
+                            <a asp-action="Detail" asp-controller="Clientes" asp-route-id="@c.Id"
+                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
+
+<!-- Modal novo cliente -->
+<div x-data="criarClienteModal()" @@open-modal.window="if ($event.detail === 'novo-cliente') open = true"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     @@click.self="open = false" @@keydown.escape.window="open = false">
+    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 overflow-y-auto max-h-[92vh]">
+        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Cliente</h2>
+        <p class="text-sm text-slate-500 mb-4">Cadastre nome + dados primários. Endereços, telefones e documentos extras podem ser adicionados na tela de detalhe.</p>
+
+        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
+
+        @Html.AntiForgeryToken()
+        <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                <input type="text" x-model="form.nome" required @@input="erroMsg = ''" class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Apt</label>
+                <input type="text" x-model="form.apt" class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                <input type="text" x-model="form.telefone" class="ui-field w-full text-sm" />
+            </div>
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
+                <input type="text" x-model="form.endereco" class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                <input type="email" x-model="form.email" class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
+                <input type="text" x-model="form.documento" class="ui-field w-full text-sm" />
+            </div>
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
+                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
+            <button type="button" @@click="open = false"
+                    class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                Cancelar
+            </button>
+            <button type="button" @@click="submitForm()" :disabled="loading || !form.nome.trim()"
+                    :class="{ 'opacity-50 cursor-not-allowed': loading || !form.nome.trim() }"
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                <span x-show="!loading">Criar Cliente</span>
+                <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function criarClienteModal() {
+    return {
+        open: false,
+        loading: false,
+        erroMsg: '',
+        form: { nome: '', apt: '', endereco: '', telefone: '', email: '', documento: '', observacoes: '' },
+        async submitForm() {
+            if (!this.form.nome.trim()) { this.erroMsg = 'Nome é obrigatório.'; return; }
+            this.loading = true; this.erroMsg = '';
+            try {
+                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const res = await fetch('/clientes/json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                    body: JSON.stringify(this.form)
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    window.location.href = '/clientes/' + data.id;
+                } else {
+                    this.erroMsg = data.errorMessage || 'Erro ao criar cliente.';
+                }
+            } catch {
+                this.erroMsg = 'Não foi possível conectar ao servidor.';
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+}

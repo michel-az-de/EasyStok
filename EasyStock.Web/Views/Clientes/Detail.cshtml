@@ -1,0 +1,252 @@
+@model ClienteDetailViewModel
+@{
+    var c = Model.Detalhe.Cliente;
+    ViewBag.Title = c.Nome;
+    Layout = "_Layout";
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a asp-action="Index" asp-controller="Clientes" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <h1 class="text-2xl font-bold text-slate-900">@c.Nome</h1>
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(c.Ativo ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
+        @(c.Ativo ? "Ativo" : "Inativo")
+    </span>
+    <div class="ml-auto flex gap-2">
+        @if (c.Ativo)
+        {
+            <form asp-action="Excluir" asp-controller="Clientes" asp-route-id="@c.Id" method="post"
+                  onsubmit="return confirm('Desativar cliente?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
+                    Desativar
+                </button>
+            </form>
+        }
+        else
+        {
+            <form asp-action="Reativar" asp-controller="Clientes" asp-route-id="@c.Id" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-white border border-green-300 text-green-700 text-sm font-semibold rounded-lg hover:bg-green-50">
+                    Reativar
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Coluna esquerda: dados primários (editáveis) ────────────── -->
+    <div class="lg:col-span-1 space-y-4">
+        <div class="ws" x-data="{ editando: false }">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold text-slate-900">Dados Cadastrais</h2>
+                <button type="button" @@click="editando = !editando" class="text-sm text-indigo-600 hover:text-indigo-700">
+                    <span x-text="editando ? 'Cancelar' : 'Editar'"></span>
+                </button>
+            </div>
+
+            <div x-show="!editando">
+                <dl class="space-y-3 text-sm">
+                    @if (!string.IsNullOrEmpty(c.Apt))      { <div><dt class="text-slate-500">Apt</dt><dd class="font-medium">@c.Apt</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Endereco)) { <div><dt class="text-slate-500">Endereço</dt><dd class="font-medium">@c.Endereco</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Telefone)) { <div><dt class="text-slate-500">Telefone</dt><dd class="font-medium">@c.Telefone</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Email))    { <div><dt class="text-slate-500">E-mail</dt><dd class="font-medium">@c.Email</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Documento)){ <div><dt class="text-slate-500">CPF/CNPJ</dt><dd class="font-medium">@c.Documento</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Observacoes)) { <div><dt class="text-slate-500">Observações</dt><dd class="font-medium whitespace-pre-line">@c.Observacoes</dd></div> }
+                    <div class="pt-2 border-t"><dt class="text-slate-500">Pedidos</dt><dd class="font-medium">@c.OrderCount @(c.LastOrderAt.HasValue ? $"(último: {c.LastOrderAt.Value.ToLocalTime():dd/MM/yy})" : "")</dd></div>
+                    <div><dt class="text-slate-500">Cadastrado em</dt><dd class="font-medium">@c.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                </dl>
+            </div>
+
+            <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
+                @Html.AntiForgeryToken()
+                <div class="space-y-3">
+                    <div><label class="block text-xs text-slate-500 mb-1">Nome *</label><input type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">Apt</label><input type="text" name="apt" value="@c.Apt" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">Endereço</label><input type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">E-mail</label><input type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">Observações</label><textarea name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
+                    <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Coluna direita: abas de sub-recursos ───────────────────── -->
+    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'enderecos' }">
+        <div class="ws p-0">
+            <div class="flex border-b border-slate-200 px-4 pt-2 gap-1 overflow-x-auto">
+                @foreach (var (key, label, count) in new[] {
+                    ("enderecos", "Endereços",   Model.Detalhe.Enderecos.Count),
+                    ("telefones", "Telefones",   Model.Detalhe.Telefones.Count),
+                    ("documentos","Documentos",  Model.Detalhe.Documentos.Count),
+                    ("alteracoes","Histórico",   Model.Detalhe.Alteracoes.Count)
+                })
+                {
+                    <button type="button" @@click="tab = '@key'"
+                            :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-3 py-2 text-sm font-medium border-b-2">
+                        @label <span class="text-xs text-slate-400">(@count)</span>
+                    </button>
+                }
+            </div>
+
+            <!-- Endereços ─────────────────────────────────────── -->
+            <div x-show="tab === 'enderecos'" class="p-4">
+                @if (Model.Detalhe.Enderecos.Any())
+                {
+                    <ul class="divide-y divide-slate-100 mb-4">
+                    @foreach (var e in Model.Detalhe.Enderecos)
+                    {
+                        <li class="py-3 flex items-start justify-between gap-2">
+                            <div class="text-sm">
+                                <div class="font-medium text-slate-900">
+                                    @(e.Tipo ?? "endereço") @if (e.Padrao) { <span class="ml-1 text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded">padrão</span> }
+                                </div>
+                                <div class="text-slate-600">@e.Logradouro @e.Numero @e.Complemento</div>
+                                <div class="text-xs text-slate-500">@e.Bairro @(string.IsNullOrEmpty(e.Cidade) ? "" : "— ") @e.Cidade @(string.IsNullOrEmpty(e.Estado) ? "" : "/" + e.Estado) @e.Cep</div>
+                                @if (!string.IsNullOrEmpty(e.Referencia)) { <div class="text-xs text-slate-400 mt-1">@e.Referencia</div> }
+                            </div>
+                            <form asp-action="RemoveEndereco" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-enderecoId="@e.Id" method="post" onsubmit="return confirm('Remover endereço?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum endereço extra cadastrado.</p> }
+
+                <form asp-action="AddEndereco" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="tipo" placeholder="Tipo (residencial/comercial)" class="ui-field text-sm" />
+                    <input type="text" name="cep" placeholder="CEP" class="ui-field text-sm" />
+                    <input type="text" name="logradouro" placeholder="Logradouro" class="ui-field text-sm col-span-2" />
+                    <input type="text" name="numero" placeholder="Número" class="ui-field text-sm" />
+                    <input type="text" name="complemento" placeholder="Complemento" class="ui-field text-sm" />
+                    <input type="text" name="bairro" placeholder="Bairro" class="ui-field text-sm" />
+                    <input type="text" name="cidade" placeholder="Cidade" class="ui-field text-sm" />
+                    <input type="text" name="estado" placeholder="UF" maxlength="2" class="ui-field text-sm" />
+                    <input type="text" name="pais" placeholder="País" class="ui-field text-sm" />
+                    <input type="text" name="referencia" placeholder="Referência" class="ui-field text-sm col-span-2" />
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="padrao" value="true" /> padrão</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Endereço</button>
+                </form>
+            </div>
+
+            <!-- Telefones ─────────────────────────────────────── -->
+            <div x-show="tab === 'telefones'" x-cloak class="p-4">
+                @if (Model.Detalhe.Telefones.Any())
+                {
+                    <ul class="divide-y divide-slate-100 mb-4">
+                    @foreach (var t in Model.Detalhe.Telefones)
+                    {
+                        <li class="py-3 flex items-center justify-between gap-2">
+                            <div class="text-sm">
+                                <div class="font-medium text-slate-900">@t.Numero
+                                    @if (t.Principal) { <span class="ml-1 text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded">principal</span> }
+                                    @if (t.Whatsapp)  { <span class="ml-1 text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded">whatsapp</span> }
+                                </div>
+                                <div class="text-xs text-slate-500">@(t.Tipo ?? "—") @(string.IsNullOrEmpty(t.Observacao) ? "" : "· " + t.Observacao)</div>
+                            </div>
+                            <form asp-action="RemoveTelefone" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-telefoneId="@t.Id" method="post" onsubmit="return confirm('Remover telefone?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum telefone extra.</p> }
+
+                <form asp-action="AddTelefone" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="numero" placeholder="Número *" required class="ui-field text-sm col-span-2" />
+                    <input type="text" name="tipo" placeholder="Tipo (celular/fixo/...)" class="ui-field text-sm" />
+                    <input type="text" name="observacao" placeholder="Observação" class="ui-field text-sm" />
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> principal</label>
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="whatsapp" value="true" /> whatsapp</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Telefone</button>
+                </form>
+            </div>
+
+            <!-- Documentos ───────────────────────────────────── -->
+            <div x-show="tab === 'documentos'" x-cloak class="p-4">
+                @if (Model.Detalhe.Documentos.Any())
+                {
+                    <ul class="divide-y divide-slate-100 mb-4">
+                    @foreach (var d in Model.Detalhe.Documentos)
+                    {
+                        <li class="py-3 flex items-center justify-between gap-2">
+                            <div class="text-sm">
+                                <div class="font-medium text-slate-900 uppercase">@d.Tipo: @d.Valor
+                                    @if (d.Principal) { <span class="ml-1 text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded normal-case">principal</span> }
+                                </div>
+                                <div class="text-xs text-slate-500">
+                                    @(d.Emissor ?? "—")
+                                    @if (d.EmitidoEm.HasValue) { <text> · emitido @d.EmitidoEm.Value.ToLocalTime():dd/MM/yyyy</text> }
+                                    @if (d.ValidoAte.HasValue) { <text> · válido até @d.ValidoAte.Value.ToLocalTime():dd/MM/yyyy</text> }
+                                </div>
+                            </div>
+                            <form asp-action="RemoveDocumento" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-documentoId="@d.Id" method="post" onsubmit="return confirm('Remover documento?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum documento extra cadastrado.</p> }
+
+                <form asp-action="AddDocumento" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
+                    @Html.AntiForgeryToken()
+                    <select name="tipo" required class="ui-select text-sm">
+                        <option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="rg">RG</option>
+                        <option value="cnh">CNH</option><option value="passaporte">Passaporte</option><option value="outro">Outro</option>
+                    </select>
+                    <input type="text" name="valor" placeholder="Valor *" required class="ui-field text-sm" />
+                    <input type="text" name="emissor" placeholder="Emissor" class="ui-field text-sm" />
+                    <input type="date" name="emitidoEm" class="ui-field text-sm" />
+                    <input type="date" name="validoAte" class="ui-field text-sm" />
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> principal</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Documento</button>
+                </form>
+            </div>
+
+            <!-- Histórico de Alterações ────────────────────── -->
+            <div x-show="tab === 'alteracoes'" x-cloak class="p-4">
+                @if (Model.Detalhe.Alteracoes.Any())
+                {
+                    <ul class="divide-y divide-slate-100">
+                    @foreach (var a in Model.Detalhe.Alteracoes)
+                    {
+                        <li class="py-2 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                <span class="font-medium text-slate-900">@a.Campo</span>
+                                <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(a.Origem ?? "?")</span>
+                            </div>
+                            <div class="text-xs text-slate-600 ml-2">
+                                <span class="line-through text-slate-400">@(a.ValorAntigo ?? "—")</span>
+                                <span class="mx-1">→</span>
+                                <span class="font-medium">@(a.ValorNovo ?? "—")</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(a.AlteradoPorNome))
+                            {
+                                <div class="text-xs text-slate-400 ml-2">por @a.AlteradoPorNome</div>
+                            }
+                        </li>
+                    }
+                    </ul>
+                }
+                else { <p class="text-sm text-slate-500">Nenhuma alteração registrada ainda.</p> }
+            </div>
+        </div>
+    </div>
+</div>

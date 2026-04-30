@@ -1,0 +1,134 @@
+@model ClientesMobileViewModel
+@{
+    ViewBag.Title = "Clientes (mobile)";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Clientes do app</h1>
+        <p>Revise clientes criados pelo operador no app e linke ao cadastro central do ERP</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/clientes" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+            ← Cadastro central
+        </a>
+    </div>
+</div>
+
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 items-center">
+        @foreach (var (val, label) in new[] { ("false", "Todos"), ("true", "Pendentes (sem link)") })
+        {
+            var isActive = (val == "true") == Model.PendingOnly;
+            <a href="@Url.Action("Index", "ClientesMobile", new { pendingOnly = val == "true" })"
+               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                @label
+            </a>
+        }
+        <span class="text-sm text-slate-500 ml-auto">@Model.Items.Count cliente(s)</span>
+    </form>
+</div>
+
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "📱" },
+            { "EmptyTitle", "Nenhum cliente do app" },
+            { "EmptyDescription", "Quando os operadores criarem clientes pelo app, eles aparecerão aqui para revisão." }
+        })
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Apt</th>
+                    <th>Telefone</th>
+                    <th>Pedidos</th>
+                    <th>Origem</th>
+                    <th>ERP</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="font-medium text-slate-900">@m.Name</div>
+                            @if (!string.IsNullOrEmpty(m.Address))
+                            {
+                                <div class="text-xs text-slate-500">@m.Address</div>
+                            }
+                        </td>
+                        <td class="text-slate-600 text-sm">@(m.Apt ?? "—")</td>
+                        <td class="text-slate-600">@(m.Phone ?? "—")</td>
+                        <td class="text-slate-600 text-sm">@m.OrderCount</td>
+                        <td class="text-xs text-slate-500">
+                            @(m.LastOperatorName ?? "—")
+                            @if (!string.IsNullOrEmpty(m.LastDeviceId))
+                            {
+                                <div class="text-slate-400">@m.LastDeviceId</div>
+                            }
+                        </td>
+                        <td>
+                            @if (m.Linked)
+                            {
+                                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ linkado</span>
+                                <a href="/clientes/@m.ErpClienteId" class="text-xs text-indigo-600 hover:text-indigo-700 ml-1">abrir</a>
+                            }
+                            else
+                            {
+                                <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">pendente</span>
+                            }
+                        </td>
+                        <td class="text-right">
+                            @if (!m.Linked)
+                            {
+                                <div x-data="{ openLink: false }" class="inline-block relative">
+                                    <button type="button" @@click="openLink = !openLink"
+                                            class="text-sm text-indigo-600 hover:text-indigo-700">Linkar / Promover</button>
+                                    <div x-show="openLink" x-cloak @@click.outside="openLink = false"
+                                         class="absolute right-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-lg z-10 p-3">
+                                        <form asp-action="Promover" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" class="mb-3">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="w-full px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700">
+                                                ➕ Promover (criar Cliente ERP)
+                                            </button>
+                                        </form>
+                                        <form asp-action="Link" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" class="border-t pt-3">
+                                            @Html.AntiForgeryToken()
+                                            <label class="block text-xs text-slate-600 mb-1">Linkar a Cliente ERP existente:</label>
+                                            <select name="erpClienteId" required class="ui-select w-full text-sm mb-2">
+                                                <option value="">— escolha —</option>
+                                                @foreach (var ec in Model.ErpClientes)
+                                                {
+                                                    <option value="@ec.Id">@ec.Nome @(string.IsNullOrEmpty(ec.Apt) ? "" : "(" + ec.Apt + ")")</option>
+                                                }
+                                            </select>
+                                            <button type="submit" class="w-full px-3 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded hover:bg-slate-50">
+                                                🔗 Linkar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <form asp-action="Unlink" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" onsubmit="return confirm('Desfazer link com ERP?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
