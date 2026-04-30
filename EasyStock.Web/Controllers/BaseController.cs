@@ -1,3 +1,4 @@
+using System.Reflection;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -38,6 +39,8 @@ public abstract class BaseController(SessionService session) : Controller
         ViewBag.LojaAtualEmoji = session.GetLojaEmoji() ?? "🏪";
         ViewBag.Role = session.GetUsuarioRole();
         ViewBag.UserTheme = session.GetTemaPreferido();
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        ViewBag.AppVersion = version is not null ? $"v{version.Major}.{version.Minor}" : "v1.0";
         base.OnActionExecuting(context);
     }
 }
