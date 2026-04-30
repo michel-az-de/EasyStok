@@ -3,6 +3,8 @@ namespace EasyStock.Web.Models.ViewModels.Assinatura;
 public class AssinaturaViewModel
 {
     public List<PlanoInfo> Planos { get; set; } = [];
+    public string? LimiteAtingidoRecurso { get; set; }
+    public bool MostrarUpgradeWall => LimiteAtingidoRecurso is not null;
 }
 
 public class PlanoInfo

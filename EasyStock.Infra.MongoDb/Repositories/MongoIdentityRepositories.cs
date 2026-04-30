@@ -480,6 +480,30 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
         foreach (var assinatura in assinaturas)
             assinatura.Plano = planos.FirstOrDefault(x => x.Id == assinatura.PlanoId);
     }
+
+    public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var limite = now.AddDays(diasAte);
+        var assinaturas = await Collection.Find(a =>
+            a.Status == StatusAssinatura.Ativa &&
+            ((a.TrialFim != null && a.TrialFim >= now && a.TrialFim <= limite) ||
+             (a.DataFim != null && a.DataFim >= now && a.DataFim <= limite)))
+            .ToListAsync(ct);
+        await HydratePlanosAsync(assinaturas);
+        return assinaturas;
+    }
+
+    public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var assinaturas = await Collection.Find(a =>
+            a.Status == StatusAssinatura.Ativa &&
+            ((a.TrialFim != null && a.TrialFim < now) ||
+             (a.DataFim != null && a.DataFim < now)))
+            .ToListAsync(ct);
+        return assinaturas;
+    }
 }
 
 public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

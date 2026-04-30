@@ -39,6 +39,28 @@ public static class ServiceCollectionExtensions
         // Storage Service
         services.AddSingleton<IStorageService, S3StorageService>();
 
+        // Efí Bank Pix Gateway
+        var efiClientId = configuration["Efi:ClientId"];
+        if (!string.IsNullOrWhiteSpace(efiClientId))
+        {
+            var isSandboxStr = configuration["Efi:Sandbox"];
+            var isSandbox = !bool.TryParse(isSandboxStr, out var sb) || sb;
+            var baseUrl = isSandbox ? "https://pix-h.api.efipay.com.br" : "https://pix.api.efipay.com.br";
+            services.AddTransient<IEfiPixService>(sp =>
+            {
+                var http = new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUrl) };
+                return new EfiPixService(
+                    http,
+                    sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+                    configuration,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfiPixService>>());
+            });
+        }
+        else
+        {
+            services.AddSingleton<IEfiPixService, NoopEfiPixService>();
+        }
+
         return services;
     }
 }

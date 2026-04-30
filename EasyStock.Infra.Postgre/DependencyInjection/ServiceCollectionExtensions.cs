@@ -67,6 +67,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
+            services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // AI: OpenAI tem prioridade; Anthropic como fallback; stub se nenhum habilitado

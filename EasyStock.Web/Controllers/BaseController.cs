@@ -23,6 +23,16 @@ public abstract class BaseController(SessionService session) : Controller
         return false;
     }
 
+    protected IActionResult? RedirectIfLimitReached<T>(ApiResult<T> result)
+    {
+        if (result.Success) return null;
+        var code = result.ErrorCode ?? string.Empty;
+        if (!code.StartsWith("LIMITE_PLANO")) return null;
+        var recurso = code.Contains(':') ? code[(code.IndexOf(':') + 1)..] : null;
+        TempData["UpgradeLimite"] = recurso ?? "recurso";
+        return RedirectToAction("Index", "Assinatura");
+    }
+
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         var token = session.GetToken();

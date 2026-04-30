@@ -59,6 +59,7 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
         }
 
         var result = await svc.CriarAsync(empresaId, vm.Nome, vm.Email, vm.Senha, vm.PerfilId, vm.LojaId);
+        if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         Toast("success", $"Usuário {vm.Nome} criado com sucesso!");

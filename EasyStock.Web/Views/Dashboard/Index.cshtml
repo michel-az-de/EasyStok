@@ -83,6 +83,37 @@
     </a>
 </div>
 
+@if (Model.IaConfigurada)
+{
+    <div class="ws mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-slate-800">Gerações de IA este mês</h2>
+            <a href="/anuncios" class="text-xs text-indigo-600 hover:underline">Gerar anúncio →</a>
+        </div>
+        @if (Model.IaIlimitada)
+        {
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Ilimitado</span>
+                <span class="text-sm text-slate-500">@Model.GeracoesIaUsadas geração(ões) realizadas</span>
+            </div>
+        }
+        else
+        {
+            var pct = Model.GeracoesIaPercent;
+            var barColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-400" : "bg-emerald-500";
+            var textColor = pct >= 90 ? "text-red-600" : pct >= 70 ? "text-amber-600" : "text-emerald-600";
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-2xl font-bold @textColor">@Model.GeracoesIaUsadas</span>
+                <span class="text-slate-400 text-sm">/ @Model.GeracoesIaLimite gerações</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2">
+                <div class="@barColor h-2 rounded-full transition-all" style="width:@(pct)%"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">@pct% utilizado</p>
+        }
+    </div>
+}
+
 <div class="grid grid-cols-1 gap-6 mb-6">
     <div class="ws">
         <div class="flex items-center justify-between mb-4">

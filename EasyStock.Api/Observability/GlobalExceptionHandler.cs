@@ -52,7 +52,10 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 : "Ocorreu um erro inesperado. Use o CorrelationId para rastreamento.";
         }
 
-        var envelope = new ApiErrorResponse(new ApiError(code, title, errorDetail, correlationId));
+        var apiError = new ApiError(code, title, errorDetail, correlationId);
+        if (exception is EasyStock.Domain.Exceptions.PlanoLimiteAtingidoException planEx)
+            apiError = apiError with { Recurso = planEx.Recurso };
+        var envelope = new ApiErrorResponse(apiError);
 
         httpContext.Response.StatusCode = statusCode;
         httpContext.Response.ContentType = "application/json";

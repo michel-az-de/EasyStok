@@ -14,4 +14,7 @@ public sealed record ApiError(
     string Code,
     string Message,
     string? Detail,
-    string? CorrelationId);
+    string? CorrelationId)
+{
+    public string? Recurso { get; init; }
+}

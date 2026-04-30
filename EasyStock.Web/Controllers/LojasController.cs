@@ -28,6 +28,7 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         }
 
         var result = await svc.CriarAsync(nome.Trim());
+        if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         Toast("success", $"Loja \"{nome.Trim()}\" criada!");

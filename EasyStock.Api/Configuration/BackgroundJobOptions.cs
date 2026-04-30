@@ -16,4 +16,5 @@ public sealed class BackgroundJobOptions
     public bool EnableRecalcularVelocidadesJob { get; set; }
     public bool EnableRelatorioMensalJob { get; set; }
     public bool EnableDiagnosticoEmailReport { get; set; }
+    public bool EnableCobrancaAssinaturaJob { get; set; }
 }

@@ -49,6 +49,9 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableDiagnosticoEmailReport)
             services.AddHostedService<DiagnosticoEmailReportJob>();
 
+        if (options.EnableCobrancaAssinaturaJob)
+            services.AddHostedService<CobrancaAssinaturaJob>();
+
         return services;
     }
 }

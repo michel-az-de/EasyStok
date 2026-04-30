@@ -14,6 +14,9 @@ public class AssinaturaController(AssinaturaService svc, SessionService session)
 
         var vm = new AssinaturaViewModel();
 
+        if (TempData["UpgradeLimite"] is string limiteRecurso)
+            vm.LimiteAtingidoRecurso = limiteRecurso;
+
         var result = await svc.ListarPlanosAsync();
         if (result.Success && result.Data is { } planos)
         {

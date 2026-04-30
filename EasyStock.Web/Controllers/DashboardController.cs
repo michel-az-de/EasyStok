@@ -24,11 +24,13 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
         var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>($"analytics/receita?meses={meses}");
+        var iaUsoTask = api.GetAsync<IaUsoApi>("ia/uso");
 
         var dashResult = await dashTask;
         var reposResult = await reposTask;
         var movsResult = await movsTask;
         var receitaResult = await receitaTask;
+        var iaUsoResult = await iaUsoTask;
 
         if (dashResult.Success && dashResult.Data is { } d)
         {
@@ -64,6 +66,14 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
             vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
             vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
+        }
+
+        if (iaUsoResult.Success && iaUsoResult.Data is { } ia)
+        {
+            vm.IaConfigurada = true;
+            vm.IaIlimitada = ia.Ilimitado;
+            vm.GeracoesIaUsadas = ia.TotalGeracoes;
+            vm.GeracoesIaLimite = ia.LimiteMensal ?? 0;
         }
 
         return View(vm);

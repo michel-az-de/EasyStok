@@ -253,8 +253,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         {
             HttpStatusCode.Unauthorized =>
                 ApiResult<T>.Fail("AUTH_TOKEN_EXPIRED", "Sessão expirada. Faça login novamente.", status),
-            HttpStatusCode.PaymentRequired =>
-                ApiResult<T>.Fail("LIMITE_PLANO", "Limite do plano atingido.", status),
+            HttpStatusCode.PaymentRequired => await ParseLimitError<T>(response, status),
             HttpStatusCode.Forbidden =>
                 ApiResult<T>.Fail("PERMISSAO_INSUFICIENTE", "Você não tem permissão para esta ação.", status),
             HttpStatusCode.NotFound =>
@@ -315,6 +314,25 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             return ApiResult<T>.Fail("API_ERROR", "Erro na requisicao.", status);
         }
     }
+    private async Task<ApiResult<T>> ParseLimitError<T>(HttpResponseMessage response, int status)
+    {
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            string? recurso = null;
+            if (root.TryGetProperty("error", out var errEl) && errEl.TryGetProperty("recurso", out var r))
+                recurso = r.GetString();
+            var code = recurso != null ? $"LIMITE_PLANO:{recurso}" : "LIMITE_PLANO";
+            return ApiResult<T>.Fail(code, "Limite do plano atingido.", status);
+        }
+        catch
+        {
+            return ApiResult<T>.Fail("LIMITE_PLANO", "Limite do plano atingido.", status);
+        }
+    }
+
     private static bool IsPagedResultType(Type type) =>
         type.IsGenericType && type.GetGenericTypeDefinition() == typeof(PagedResult<>);
 }

@@ -179,7 +179,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var result = await api.PostAsync<object>("empresas/registrar", new
+        var result = await api.PostAsync<JsonElement>("empresas/registrar", new
         {
             nomeEmpresa = vm.NomeEmpresa,
             documento = vm.Documento,
@@ -194,8 +194,48 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
             return View(vm);
         }
 
-        TempData["Toast"] = "success|Conta criada com sucesso! Faça login para continuar.";
-        return RedirectToAction(nameof(Login));
+        var data = result.Data;
+        var token = GetString(data, "token");
+        var refreshToken = GetString(data, "refreshToken");
+
+        if (string.IsNullOrEmpty(token))
+        {
+            TempData["Toast"] = "success|Conta criada! Faça login para continuar.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        session.SetTokens(token, refreshToken ?? string.Empty);
+
+        var empresaId = ExtractClaim(token, "empresaId");
+        if (!string.IsNullOrEmpty(empresaId))
+            session.SetEmpresaId(empresaId);
+
+        session.SetUsuario(
+            GetString(data.TryGetProperty("usuario", out var u) ? u : data, "id") ?? string.Empty,
+            vm.NomeAdmin,
+            "Admin");
+
+        session.SetTemaPreferido("light");
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, vm.NomeAdmin),
+            new(ClaimTypes.Email, vm.Email),
+            new(ClaimTypes.Role, "Admin")
+        };
+        if (!string.IsNullOrEmpty(empresaId))
+            claims.Add(new Claim("empresaId", empresaId));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var authProps = new AuthenticationProperties
+        {
+            IsPersistent = false,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(480)
+        };
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProps);
+
+        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias está ativo.";
+        return RedirectToAction("Index", "Dashboard");
     }
 
     [AllowAnonymous]

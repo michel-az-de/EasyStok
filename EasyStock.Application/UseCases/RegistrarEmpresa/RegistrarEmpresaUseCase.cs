@@ -63,6 +63,7 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
                 AlteradoEm = agora
             };
 
+            assinatura.AtivarTrial(14);
             await assinaturaRepository.AddAsync(assinatura);
 
             var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.SenhaAdmin);

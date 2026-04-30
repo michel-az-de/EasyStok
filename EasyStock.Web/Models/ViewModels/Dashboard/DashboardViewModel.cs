@@ -15,6 +15,14 @@ public class DashboardViewModel
     public List<MovimentacaoRecente> MovimentacoesRecentes { get; set; } = [];
     public List<string> GraficoLabels { get; set; } = [];
     public List<decimal> GraficoDados { get; set; } = [];
+
+    public bool IaConfigurada { get; set; }
+    public bool IaIlimitada { get; set; }
+    public int GeracoesIaUsadas { get; set; }
+    public int GeracoesIaLimite { get; set; }
+    public int GeracoesIaPercent => IaIlimitada || GeracoesIaLimite == 0
+        ? 0
+        : (int)Math.Min(100, Math.Round((double)GeracoesIaUsadas / GeracoesIaLimite * 100));
 }
 
 public class MovimentacaoRecente

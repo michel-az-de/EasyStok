@@ -28,5 +28,27 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.AssinaturasEmpresa.Update(assinatura);
             return Task.CompletedTask;
         }
+
+        public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default)
+        {
+            var now = DateTime.UtcNow;
+            var limite = now.AddDays(diasAte);
+            return await dbContext.AssinaturasEmpresa
+                .Include(a => a.Empresa)
+                .Where(a => a.Status == StatusAssinatura.Ativa &&
+                    ((a.TrialFim != null && a.TrialFim >= now && a.TrialFim <= limite) ||
+                     (a.DataFim != null && a.DataFim >= now && a.DataFim <= limite)))
+                .ToListAsync(ct);
+        }
+
+        public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default)
+        {
+            var now = DateTime.UtcNow;
+            return await dbContext.AssinaturasEmpresa
+                .Where(a => a.Status == StatusAssinatura.Ativa &&
+                    ((a.TrialFim != null && a.TrialFim < now) ||
+                     (a.DataFim != null && a.DataFim < now)))
+                .ToListAsync(ct);
+        }
     }
 }
