@@ -38,6 +38,14 @@ using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor;
+using EasyStock.Application.UseCases.CriarLote;
+using EasyStock.Application.UseCases.AdicionarItemLote;
+using EasyStock.Application.UseCases.RemoverItemLote;
+using EasyStock.Application.UseCases.FinalizarLote;
+using EasyStock.Application.UseCases.ListarLotes;
+using EasyStock.Application.UseCases.ObterLoteDetalhes;
+using EasyStock.Application.UseCases.ConferirEtiqueta;
+using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarCliente;
 using EasyStock.Application.UseCases.ListarClientes;
@@ -147,6 +155,25 @@ public static class ServiceCollectionExtensions
 
         // Onda P4 — Audit expandido
         services.AddScoped<ObterHistoricoAlteracoesFornecedorUseCase>();
+
+        // Onda P5.A — Lotes
+        services.AddScoped<CriarLoteUseCase>();
+        services.AddScoped<AdicionarItemLoteUseCase>();
+        services.AddScoped<RemoverItemLoteUseCase>();
+        services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<ListarLotesUseCase>();
+        services.AddScoped<ObterLoteDetalhesUseCase>();
+        services.AddScoped<ConferirEtiquetaUseCase>();
+
+        // Onda P5.B — Listas de compras
+        services.AddScoped<ListarListasComprasUseCase>();
+        services.AddScoped<ObterListaComprasUseCase>();
+        services.AddScoped<CriarListaComprasUseCase>();
+        services.AddScoped<ArquivarListaComprasUseCase>();
+        services.AddScoped<ReabrirListaComprasUseCase>();
+        services.AddScoped<AdicionarItemListaComprasUseCase>();
+        services.AddScoped<ToggleItemListaComprasUseCase>();
+        services.AddScoped<RemoverItemListaComprasUseCase>();
         services.AddScoped<ObterConfiguracaoLojaUseCase>();
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();

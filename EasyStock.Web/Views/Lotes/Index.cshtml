@@ -1,0 +1,155 @@
+@model LotesListViewModel
+@{
+    ViewBag.Title = "Lotes";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Lotes de produção</h1>
+        <p>Cada turno gera 1 lote com itens + etiquetas individuais</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/lotes-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">📱 Lotes do app</a>
+        <button type="button" x-data @@click="$dispatch('open-modal', 'novo-lote')"
+                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Novo Lote</button>
+    </div>
+</div>
+
+<div class="ws mb-6">
+    <form method="get" class="flex gap-3 flex-wrap items-center">
+        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por código, operador, obs..." class="ui-field flex-1 min-w-48" />
+        <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">Buscar</button>
+        <div class="flex gap-2">
+            @foreach (var (val, label) in new[] { ("", "Todos"), ("em_producao", "Em produção"), ("finalizado", "Finalizados") })
+            {
+                var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
+                <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = val == "" ? null : val })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">@label</a>
+            }
+        </div>
+    </form>
+</div>
+
+<div class="ws">
+    @if (!Model.Items.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "🏷️" },
+            { "EmptyTitle", "Nenhum lote" },
+            { "EmptyDescription", "Crie seu primeiro lote pra começar a produzir e gerar etiquetas." },
+            { "EmptyCta", "+ Novo Lote" },
+            { "EmptyCtaModal", "novo-lote" }
+        })
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+        <table class="tbl-full">
+            <thead><tr><th>Código</th><th>Status</th><th>Data</th><th>Operador</th><th>Itens</th><th>Etiquetas</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var l in Model.Items)
+            {
+                string statusClass = l.Status switch {
+                    "em_producao" => "bg-blue-100 text-blue-700",
+                    "finalizado"  => "bg-green-100 text-green-700",
+                    "expirado"    => "bg-red-100 text-red-700",
+                    _             => "bg-slate-100 text-slate-600"
+                };
+                <tr>
+                    <td class="font-mono text-sm">@l.Codigo</td>
+                    <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @statusClass">@l.Status</span></td>
+                    <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                    <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
+                    <td class="text-slate-600 text-sm">@l.ItensCount item(s) · @l.TotalUnidades un</td>
+                    <td class="text-sm text-slate-600">
+                        @if (l.TotalUnidades > 0) { <span>@l.EtiquetasConferidas/@l.TotalUnidades</span> }
+                        else { <span class="text-slate-400">—</span> }
+                        @if (l.EtiquetasDivergentes > 0) { <span class="text-xs text-red-600">· @l.EtiquetasDivergentes div</span> }
+                    </td>
+                    <td><a asp-action="Detail" asp-controller="Lotes" asp-route-id="@l.Id" class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>
+
+<!-- Modal novo lote -->
+<div x-data="novoLoteModal()" @@open-modal.window="if ($event.detail === 'novo-lote') open = true"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     @@click.self="open = false" @@keydown.escape.window="open = false">
+    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[92vh]">
+        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Lote</h2>
+        <p class="text-sm text-slate-500 mb-4">Código auto-gerado se vazio (LOT-YYMMDD-NNN). Etiquetas geram ao finalizar.</p>
+
+        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
+
+        @Html.AntiForgeryToken()
+        <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+                <input type="text" x-model="form.codigoCustom" placeholder="Código (opcional)" class="ui-field text-sm" />
+                <input type="text" x-model="form.operadorNome" placeholder="Operador" class="ui-field text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Itens</label>
+                <template x-for="(it, i) in form.itens" :key="i">
+                    <div class="grid grid-cols-12 gap-2 mb-2">
+                        <input type="text"   x-model="it.nome"             placeholder="Nome"   class="ui-field text-sm col-span-4" />
+                        <input type="number" x-model.number="it.quantidade" min="1" placeholder="Qtd" class="ui-field text-sm col-span-2" />
+                        <input type="number" x-model.number="it.pesoG"     placeholder="g/un"  class="ui-field text-sm col-span-2" />
+                        <input type="number" x-model.number="it.validadeDias" placeholder="Val. (dias)" class="ui-field text-sm col-span-2" />
+                        <button type="button" @@click="form.itens.splice(i, 1)" class="col-span-2 text-xs text-red-600 hover:text-red-700">Remover</button>
+                    </div>
+                </template>
+                <button type="button" @@click="form.itens.push({nome:'',quantidade:1,pesoG:null,validadeDias:35})" class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
+                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
+            <button type="button" @@click="open = false" class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
+            <button type="button" @@click="submitForm()" :disabled="loading" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                <span x-show="!loading">Criar Lote</span>
+                <span x-show="loading" x-cloak>Salvando...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function novoLoteModal() {
+    return {
+        open: false, loading: false, erroMsg: '',
+        form: { codigoCustom: '', operadorNome: '', observacoes: '', itens: [] },
+        async submitForm() {
+            this.loading = true; this.erroMsg = '';
+            try {
+                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const payload = {
+                    codigoCustom: this.form.codigoCustom || null,
+                    operadorNome: this.form.operadorNome || null,
+                    observacoes: this.form.observacoes,
+                    itens: this.form.itens.filter(i => i.nome && i.quantidade > 0)
+                };
+                const res = await fetch('/lotes/json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data.success) window.location.href = '/lotes/' + data.id;
+                else this.erroMsg = data.errorMessage || 'Erro ao criar lote.';
+            } catch { this.erroMsg = 'Não foi possível conectar ao servidor.'; }
+            finally { this.loading = false; }
+        }
+    };
+}
+</script>
+}

@@ -48,6 +48,20 @@ public class PedidosController(
         return View(new PedidoDetailViewModel { Detalhe = result.Data });
     }
 
+    /// <summary>
+    /// Onda P5.C — Recibo print-friendly. View renderiza HTML otimizado pra
+    /// CTRL+P → "Salvar como PDF" do browser. Sem dependência de lib de PDF.
+    /// </summary>
+    [HttpGet("/pedidos/{id}/recibo")]
+    public async Task<IActionResult> Recibo(string id)
+    {
+        var result = await svc.ObterAsync(id);
+        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Detail), new { id });
+
+        ViewBag.Title = "Recibo";
+        return View(new PedidoDetailViewModel { Detalhe = result.Data });
+    }
+
     [HttpPost("/pedidos/json")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CriarJson([FromBody] CriarPedidoWebRequest req)

@@ -1,0 +1,159 @@
+@model LoteDetailViewModel
+@{
+    var l = Model.Detalhe.Lote;
+    ViewBag.Title = $"Lote {l.Codigo}";
+    Layout = "_Layout";
+
+    string statusClass = l.Status switch {
+        "em_producao" => "bg-blue-100 text-blue-700",
+        "finalizado"  => "bg-green-100 text-green-700",
+        "expirado"    => "bg-red-100 text-red-700",
+        _             => "bg-slate-100 text-slate-600"
+    };
+
+    string etqStatusClass(string s) => s switch {
+        "conferida"  => "bg-green-100 text-green-700",
+        "divergente" => "bg-red-100 text-red-700",
+        "consumida"  => "bg-slate-200 text-slate-600",
+        _            => "bg-amber-100 text-amber-700"
+    };
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a asp-action="Index" asp-controller="Lotes" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <h1 class="text-2xl font-bold text-slate-900 font-mono">@l.Codigo</h1>
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusClass">@l.Status</span>
+    <div class="ml-auto flex gap-2">
+        @if (l.Status == "em_producao")
+        {
+            <form asp-action="Finalizar" asp-controller="Lotes" asp-route-id="@l.Id" method="post" onsubmit="return confirm('Finalizar lote? Isso vai gerar @l.TotalUnidades etiqueta(s) e congelar alterações.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
+                    🏁 Finalizar lote
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-1 space-y-4">
+        <div class="ws">
+            <h2 class="font-semibold text-slate-900 mb-3">Resumo</h2>
+            <dl class="space-y-2 text-sm">
+                <div><dt class="text-slate-500">Data produção</dt><dd>@l.DataProducao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                @if (!string.IsNullOrEmpty(l.OperadorNome)) { <div><dt class="text-slate-500">Operador</dt><dd>@l.OperadorNome</dd></div> }
+                <div><dt class="text-slate-500">Itens</dt><dd>@l.ItensCount item(s) · @l.TotalUnidades unidades</dd></div>
+                <div><dt class="text-slate-500">Etiquetas</dt>
+                     <dd>
+                        @if (l.TotalUnidades == 0) { <span class="text-slate-400">— (finalizar pra gerar)</span> }
+                        else { <span>@l.EtiquetasConferidas/@l.TotalUnidades conferidas</span> }
+                        @if (l.EtiquetasDivergentes > 0) { <div class="text-xs text-red-600 mt-1">@l.EtiquetasDivergentes divergente(s)</div> }
+                     </dd></div>
+                @if (l.FinalizadoEm.HasValue) { <div><dt class="text-slate-500">Finalizado</dt><dd>@l.FinalizadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                @if (!string.IsNullOrEmpty(l.Observacoes)) { <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line">@l.Observacoes</dd></div> }
+                @if (!string.IsNullOrEmpty(l.MobileBatchId)) { <div class="pt-2 border-t"><dt class="text-slate-500">Mobile batch</dt><dd class="font-mono text-xs">@l.MobileBatchId</dd></div> }
+            </dl>
+        </div>
+    </div>
+
+    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'itens' }">
+        <div class="ws p-0">
+            <div class="flex border-b border-slate-200 px-4 pt-2 gap-1">
+                @foreach (var (key, label, count) in new[] {
+                    ("itens",     "Itens",     Model.Detalhe.Itens.Count),
+                    ("etiquetas", "Etiquetas", Model.Detalhe.Etiquetas.Count)
+                })
+                {
+                    <button type="button" @@click="tab = '@key'"
+                            :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-3 py-2 text-sm font-medium border-b-2">
+                        @label <span class="text-xs text-slate-400">(@count)</span>
+                    </button>
+                }
+            </div>
+
+            <!-- Itens -->
+            <div x-show="tab === 'itens'" class="p-4">
+                @if (Model.Detalhe.Itens.Any())
+                {
+                    <table class="w-full text-sm mb-4">
+                        <thead class="text-xs text-slate-500"><tr><th class="text-left py-1">Item</th><th class="text-right py-1">Qtd</th><th class="text-right py-1">Peso/un</th><th class="text-right py-1">Validade</th><th></th></tr></thead>
+                        <tbody class="divide-y divide-slate-100">
+                        @foreach (var it in Model.Detalhe.Itens)
+                        {
+                            <tr>
+                                <td class="py-2"><span class="font-medium">@it.Emoji @it.Nome</span> @if (!string.IsNullOrEmpty(it.Unidade)) {<span class="text-xs text-slate-400">@it.Unidade</span>}</td>
+                                <td class="text-right">@it.Quantidade</td>
+                                <td class="text-right">@(it.PesoG.HasValue ? it.PesoG + "g" : "—")</td>
+                                <td class="text-right text-xs">@(it.ExpiraEm.HasValue ? it.ExpiraEm.Value.ToLocalTime().ToString("dd/MM/yy") : "—")</td>
+                                <td class="text-right">
+                                    @if (l.Status == "em_producao")
+                                    {
+                                        <form asp-action="RemoveItem" asp-controller="Lotes" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="inline" onsubmit="return confirm('Remover item?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-sm text-slate-500 mb-4">Nenhum item.</p> }
+
+                @if (l.Status == "em_producao")
+                {
+                    <form asp-action="AddItem" asp-controller="Lotes" asp-route-id="@l.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t">
+                        @Html.AntiForgeryToken()
+                        <input type="text"   name="nome"          placeholder="Nome *"  required class="ui-field text-sm col-span-4" />
+                        <input type="number" name="quantidade"    min="1" required placeholder="Qtd"  class="ui-field text-sm col-span-2" />
+                        <input type="text"   name="unidade"       placeholder="Un"      class="ui-field text-sm col-span-1" />
+                        <input type="number" name="pesoG"         placeholder="g/un"    class="ui-field text-sm col-span-2" />
+                        <input type="number" name="validadeDias"  placeholder="Val (d)" class="ui-field text-sm col-span-1" />
+                        <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Item</button>
+                    </form>
+                }
+            </div>
+
+            <!-- Etiquetas -->
+            <div x-show="tab === 'etiquetas'" x-cloak class="p-4">
+                @if (Model.Detalhe.Etiquetas.Any())
+                {
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    @foreach (var e in Model.Detalhe.Etiquetas)
+                    {
+                        <div class="border border-slate-200 rounded-lg p-2 text-xs">
+                            <div class="font-mono text-slate-700">@e.Codigo</div>
+                            <div class="flex items-center justify-between mt-1">
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-medium @etqStatusClass(e.Status)">@e.Status</span>
+                                <span class="text-slate-400">#@e.Sequencial</span>
+                            </div>
+                            @if (e.ConferidaEm.HasValue)
+                            {
+                                <div class="text-[10px] text-slate-400 mt-1">@e.ConferidaEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(e.ConferidaPorNome) ? "" : "· " + e.ConferidaPorNome)</div>
+                            }
+                            @if (!string.IsNullOrEmpty(e.ObservacaoConferencia))
+                            {
+                                <div class="text-[10px] text-amber-700 mt-1">⚠ @e.ObservacaoConferencia</div>
+                            }
+                        </div>
+                    }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-sm text-slate-500">
+                        @if (l.Status == "em_producao") { <text>Etiquetas serão geradas ao finalizar o lote.</text> }
+                        else { <text>Nenhuma etiqueta.</text> }
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+</div>

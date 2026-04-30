@@ -1,0 +1,95 @@
+@model ListaComprasDetailViewModel
+@{
+    var l = Model.Detalhe.Lista;
+    ViewBag.Title = l.Nome;
+    Layout = "_Layout";
+    var pct = l.TotalItens > 0 ? (l.ItensFeitos * 100 / l.TotalItens) : 0;
+}
+
+<div class="flex items-center gap-3 mb-6">
+    <a asp-action="Index" asp-controller="ListasCompras" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <h1 class="text-2xl font-bold text-slate-900">@l.Nome</h1>
+    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(l.Status == "aberta" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")">@l.Status</span>
+    <div class="ml-auto flex gap-2">
+        @if (l.Status == "aberta")
+        {
+            <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" onsubmit="return confirm('Arquivar lista?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">📦 Arquivar</button>
+            </form>
+        }
+        else
+        {
+            <form asp-action="Reabrir" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">↩️ Reabrir</button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="ws mb-6">
+    <div class="flex items-center justify-between mb-2">
+        <span class="text-sm text-slate-700">@l.ItensFeitos / @l.TotalItens comprados</span>
+        <span class="text-sm font-semibold text-slate-900">@pct%</span>
+    </div>
+    <div class="w-full bg-slate-100 rounded-full h-3"><div class="bg-indigo-600 h-3 rounded-full transition-all" style="width: @pct%"></div></div>
+</div>
+
+@if (l.Status == "aberta")
+{
+    <form asp-action="AddItem" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" class="ws mb-6">
+        @Html.AntiForgeryToken()
+        <div class="grid grid-cols-12 gap-2">
+            <input type="text"   name="texto"      placeholder="O que comprar?"  required class="ui-field text-sm col-span-5" />
+            <input type="number" name="quantidade" step="0.01" min="0"  placeholder="Qtd" class="ui-field text-sm col-span-2" />
+            <input type="text"   name="unidade"    placeholder="Un (kg, un, l...)" class="ui-field text-sm col-span-2" />
+            <input type="text"   name="categoria"  placeholder="Categoria (mercado, açougue...)" class="ui-field text-sm col-span-2" />
+            <button type="submit" class="app-primary-btn col-span-1 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+</button>
+        </div>
+    </form>
+}
+
+<div class="ws">
+    <h2 class="font-semibold text-slate-900 mb-3">Itens</h2>
+    @if (!Model.Detalhe.Itens.Any())
+    {
+        <p class="text-sm text-slate-500">Nenhum item ainda.</p>
+    }
+    else
+    {
+        <ul class="divide-y divide-slate-100">
+        @foreach (var it in Model.Detalhe.Itens)
+        {
+            <li class="py-2 flex items-center gap-3">
+                <form asp-action="ToggleItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="done" value="@(!it.Done)" />
+                    <button type="submit" class="w-6 h-6 rounded border-2 @(it.Done ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 hover:border-indigo-400") flex items-center justify-center text-xs">
+                        @(it.Done ? "✓" : "")
+                    </button>
+                </form>
+                <div class="flex-1 min-w-0 @(it.Done ? "text-slate-400 line-through" : "text-slate-900")">
+                    <div class="text-sm font-medium truncate">
+                        @it.Texto
+                        @if (it.Quantidade.HasValue) { <span class="text-xs text-slate-400 font-normal">· @it.Quantidade @it.Unidade</span> }
+                    </div>
+                    @if (it.Done && it.DoneEm.HasValue)
+                    {
+                        <div class="text-xs text-slate-400">@it.DoneEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(it.Categoria)) { <span class="text-xs text-slate-400">@it.Categoria</span> }
+                <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0" onsubmit="return confirm('Remover item?');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="text-xs text-red-600 hover:text-red-700">×</button>
+                </form>
+            </li>
+        }
+        </ul>
+    }
+</div>

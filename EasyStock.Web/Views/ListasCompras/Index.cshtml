@@ -1,0 +1,77 @@
+@model ListasComprasIndexViewModel
+@{
+    ViewBag.Title = "Listas de compras";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Listas de compras</h1>
+        <p>Liste o que falta comprar e marque conforme passa pelo mercado</p>
+    </div>
+    <button type="button" x-data @@click="$dispatch('open-modal', 'nova-lista')"
+            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Nova Lista</button>
+</div>
+
+<div class="ws mb-6">
+    <div class="flex gap-2">
+        @foreach (var (val, label) in new[] { ("", "Todas"), ("aberta", "Abertas"), ("arquivada", "Arquivadas") })
+        {
+            var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
+            <a href="@Url.Action("Index", "ListasCompras", new { status = val == "" ? null : val })"
+               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">@label</a>
+        }
+    </div>
+</div>
+
+<div class="ws">
+    @if (!Model.Listas.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIcon", "🛒" },
+            { "EmptyTitle", "Nenhuma lista" },
+            { "EmptyDescription", "Crie uma lista pra organizar as compras do dia." },
+            { "EmptyCta", "+ Nova Lista" },
+            { "EmptyCtaModal", "nova-lista" }
+        })
+    }
+    else
+    {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @foreach (var l in Model.Listas)
+        {
+            var pct = l.TotalItens > 0 ? (l.ItensFeitos * 100 / l.TotalItens) : 0;
+            <a href="/listas-compras/@l.Id" class="block ws hover:bg-slate-50 transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold text-slate-900 truncate">@l.Nome</h3>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(l.Status == "aberta" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")">@l.Status</span>
+                </div>
+                <div class="text-xs text-slate-500 mb-2">@l.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy") @(string.IsNullOrEmpty(l.CriadaPorNome) ? "" : "· " + l.CriadaPorNome)</div>
+                <div class="text-sm text-slate-700 mb-2">@l.ItensFeitos / @l.TotalItens itens</div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                    <div class="bg-indigo-600 h-2 rounded-full" style="width: @pct%"></div>
+                </div>
+            </a>
+        }
+        </div>
+    }
+</div>
+
+<!-- Modal nova lista -->
+<div x-data="{ open: false, nome: '', obs: '' }" @@open-modal.window="if ($event.detail === 'nova-lista') open = true"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     @@click.self="open = false" @@keydown.escape.window="open = false">
+    <form asp-action="Criar" asp-controller="ListasCompras" method="post" class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        @Html.AntiForgeryToken()
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Nova lista de compras</h2>
+        <div class="space-y-3">
+            <input type="text" name="nome" x-model="nome" placeholder="Nome (ex: Compras de quarta)" required class="ui-field w-full text-sm" />
+            <textarea name="observacoes" x-model="obs" placeholder="Observações (opcional)" rows="2" class="ui-textarea w-full text-sm"></textarea>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
+            <button type="button" @@click="open = false" class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
+            <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Criar</button>
+        </div>
+    </form>
+</div>

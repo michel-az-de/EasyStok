@@ -43,6 +43,14 @@ public class Batch
     [Column("loja_id")]
     public Guid? LojaId { get; set; }
 
+    /// <summary>
+    /// Onda P5 — link pra <see cref="EasyStock.Domain.Entities.Lote"/> ERP.
+    /// NULL = ainda só vive no app. Quando linkado, gestor pode editar pelo
+    /// painel /lotes e mudanças refletem no app via pull.
+    /// </summary>
+    [Column("erp_lote_id")]
+    public Guid? ErpLoteId { get; set; }
+
     public List<BatchItem> Items { get; set; } = new();
 }
 
