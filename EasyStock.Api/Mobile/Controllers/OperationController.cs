@@ -295,8 +295,10 @@ public class OperationController(
     /// </summary>
     [HttpGet("stream")]
     [AllowAnonymous]
-    public async Task Stream([FromQuery] string apiKey, CancellationToken ct)
+    public async Task Stream([FromQuery] string? apiKey, CancellationToken ct)
     {
+        // Mantém apiKey opcional pra que ASP.NET não dispare 400 antes
+        // do nosso check — preferimos 401 explícito pra clareza no PWA.
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             Response.StatusCode = 401;
