@@ -21,7 +21,7 @@
             <a href="/Tenants" class="btn-secondary">Limpar</a>
         }
     </form>
-    <div class="text-slate-400 text-sm">@Model.Total resultado(s)</div>
+    <div class="text-es-ink-mute text-sm">@Model.Total resultado(s)</div>
 </div>
 
 @if (Model.Erro != null)
@@ -63,21 +63,21 @@
                         _ => "badge-expirada"
                     };
                     <tr>
-                        <td class="font-medium text-white">@nome</td>
-                        <td class="text-slate-400">@(doc ?? "—")</td>
-                        <td class="text-slate-400">@(plano ?? "—")</td>
+                        <td class="font-medium text-es-ink">@nome</td>
+                        <td class="text-es-ink-dim">@(doc ?? "—")</td>
+                        <td class="text-es-ink-dim">@(plano ?? "—")</td>
                         <td><span class="status-badge @statusClass">@(status ?? "—")</span></td>
-                        <td class="text-slate-400 text-center">@usuarios</td>
-                        <td class="text-slate-400 text-center">@lojas</td>
-                        <td class="text-slate-400">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+                        <td class="text-es-ink-dim text-center">@usuarios</td>
+                        <td class="text-es-ink-dim text-center">@lojas</td>
+                        <td class="text-es-ink-dim">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
-                                <a href="/Tenants/Detail/@id" class="text-violet-400 hover:text-violet-300 text-xs font-medium">Ver</a>
+                                <a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream text-xs font-medium">Ver</a>
                                 @if (status == "Ativa")
                                 {
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'suspender'"
-                                            class="text-orange-400 hover:text-orange-300 text-xs font-medium">
+                                            class="text-es-gold hover:text-es-cream text-xs font-medium">
                                         Suspender
                                     </button>
                                 }
@@ -85,14 +85,14 @@
                                 {
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'reativar'"
-                                            class="text-green-400 hover:text-green-300 text-xs font-medium">
+                                            class="text-es-basil hover:text-es-cream text-xs font-medium">
                                         Reativar
                                     </button>
                                 }
                                 <form method="post" asp-page-handler="Impersonar">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@id" />
-                                    <button type="submit" class="text-slate-400 hover:text-white text-xs font-medium">
+                                    <button type="submit" class="text-es-ink-mute hover:text-es-ink text-xs font-medium">
                                         Impersonar
                                     </button>
                                 </form>
@@ -103,7 +103,7 @@
                 @if (!Model.Tenants.Any())
                 {
                     <tr>
-                        <td colspan="8" class="text-center text-slate-500 py-8">Nenhum tenant encontrado.</td>
+                        <td colspan="8" class="text-center text-es-ink-mute py-8">Nenhum tenant encontrado.</td>
                     </tr>
                 }
             </tbody>
@@ -113,8 +113,8 @@
     <!-- Modal de confirmação -->
     <div x-show="confirmId !== null" x-cloak class="modal-overlay" @@click.self="confirmId = null">
         <div class="modal-box" @@click.stop>
-            <h3 class="text-white font-semibold mb-4" x-text="confirmAcao === 'suspender' ? 'Suspender tenant?' : 'Reativar tenant?'"></h3>
-            <p class="text-slate-400 text-sm mb-4" x-show="confirmAcao === 'suspender'">
+            <h3 class="text-es-ink font-semibold mb-4" x-text="confirmAcao === 'suspender' ? 'Suspender tenant?' : 'Reativar tenant?'"></h3>
+            <p class="text-es-ink-dim text-sm mb-4" x-show="confirmAcao === 'suspender'">
                 O acesso da empresa será bloqueado. Você pode reativar depois.
             </p>
             <form method="post" x-bind:action="confirmAcao === 'suspender' ? '?handler=Suspender' : '?handler=Reativar'">
@@ -145,7 +145,7 @@
             <a href="?page=@(Model.Page - 1)&search=@Model.Search&status=@Model.Status"
                class="btn-secondary text-sm">← Anterior</a>
         }
-        <span class="text-slate-400 text-sm">@Model.Page / @Model.TotalPages</span>
+        <span class="text-es-ink-mute text-sm">@Model.Page / @Model.TotalPages</span>
         @if (Model.Page < Model.TotalPages)
         {
             <a href="?page=@(Model.Page + 1)&search=@Model.Search&status=@Model.Status"

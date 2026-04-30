@@ -14,7 +14,7 @@
     };
 }
 
-<a href="/Tenants" class="text-slate-400 hover:text-white text-sm mb-4 inline-flex items-center gap-1">← Voltar</a>
+<a href="/Tenants" class="text-es-ink-mute hover:text-es-ink text-sm mb-4 inline-flex items-center gap-1">← Voltar</a>
 
 @if (Model.Erro != null)
 {
@@ -26,7 +26,7 @@
     <div class="flex items-start justify-between flex-wrap gap-4">
         <div>
             <div class="flex items-center gap-3 mb-1">
-                <h2 class="text-white text-xl font-bold">@nome</h2>
+                <h2 class="text-es-ink text-xl font-bold">@nome</h2>
                 <span class="status-badge @statusClass">@(assinaturaStatus ?? "Sem assinatura")</span>
             </div>
             @{
@@ -37,8 +37,8 @@
                     && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
                     && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
             }
-            <div class="text-slate-400 text-sm">@(doc ?? "Sem documento") · Criado em @criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</div>
-            <div class="text-slate-400 text-sm mt-1">Plano: <span class="text-white font-medium">@planoNome</span></div>
+            <div class="text-es-ink-dim text-sm">@(doc ?? "Sem documento") · Criado em @criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+            <div class="text-es-ink-dim text-sm mt-1">Plano: <span class="text-es-ink font-medium">@planoNome</span></div>
         </div>
 
         <div class="flex gap-2 flex-wrap">
@@ -67,7 +67,7 @@
     <!-- Modal Suspender -->
     <div x-show="modal === 'suspender'" x-cloak class="modal-overlay" @@click.self="modal = null">
         <div class="modal-box" @@click.stop>
-            <h3 class="text-white font-semibold mb-4">Suspender Tenant</h3>
+            <h3 class="text-es-ink font-semibold mb-4">Suspender Tenant</h3>
             <form method="post" asp-page-handler="Suspender">
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
@@ -85,7 +85,7 @@
     <!-- Modal Trocar Plano -->
     <div x-show="modal === 'plano'" x-cloak class="modal-overlay" @@click.self="modal = null">
         <div class="modal-box" @@click.stop>
-            <h3 class="text-white font-semibold mb-4">Trocar Plano</h3>
+            <h3 class="text-es-ink font-semibold mb-4">Trocar Plano</h3>
             <form method="post" asp-page-handler="TrocarPlano">
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
@@ -111,12 +111,12 @@
 
 <!-- Tabs -->
 <div x-data="{ tab: 'visao' }" class="space-y-4">
-    <div class="flex gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1 w-fit">
+    <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
         @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log") })
         {
             <button type="button"
                     @@click="tab = '@t'"
-                    :class="tab === '@t' ? 'bg-violet-700 text-white' : 'text-slate-400 hover:text-white'"
+                    :class="tab === '@t' ? 'bg-es-accent text-es-ink' : 'text-es-ink-mute hover:text-es-ink'"
                     class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">@l</button>
         }
     </div>
@@ -130,8 +130,8 @@
                 && Model.Assinatura.TryGetProperty("plano", out var planoProp) && planoProp.ValueKind != System.Text.Json.JsonValueKind.Null
                 ? planoProp : default;
         }
-        <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Usuários</div><div class="text-2xl font-bold text-white">@usuarios</div></div>
-        <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Lojas</div><div class="text-2xl font-bold text-white">@lojas</div></div>
+        <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Usuários</div><div class="text-2xl font-bold text-es-ink">@usuarios</div></div>
+        <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Lojas</div><div class="text-2xl font-bold text-es-ink">@lojas</div></div>
         @if (planoJson.ValueKind != System.Text.Json.JsonValueKind.Undefined)
         {
             var limLojas = planoJson.TryGetProperty("limiteLojas", out var ll) ? ll.GetInt32() : 0;
@@ -139,14 +139,14 @@
             var limProdutos = planoJson.TryGetProperty("limiteProdutos", out var lp) ? lp.GetInt32() : 0;
             var preco = planoJson.TryGetProperty("precoMensal", out var pr) ? pr.GetDecimal() : 0m;
             <div class="card">
-                <div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Limites do Plano</div>
-                <div class="text-xs text-slate-300 space-y-0.5 mt-1">
+                <div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Limites do Plano</div>
+                <div class="text-xs text-es-ink-dim space-y-0.5 mt-1">
                     <div>Lojas: @(limLojas == -1 ? "Ilimitado" : limLojas.ToString())</div>
                     <div>Usuários: @(limUsuarios == -1 ? "Ilimitado" : limUsuarios.ToString())</div>
                     <div>Produtos: @(limProdutos == -1 ? "Ilimitado" : limProdutos.ToString())</div>
                 </div>
             </div>
-            <div class="card"><div class="text-slate-400 text-xs uppercase tracking-wide mb-1">Mensalidade</div><div class="text-2xl font-bold text-violet-400">R$ @preco.ToString("N2")</div></div>
+            <div class="card"><div class="text-es-ink-mute text-xs uppercase tracking-wide mb-1">Mensalidade</div><div class="text-2xl font-bold text-es-accent">R$ @preco.ToString("N2")</div></div>
         }
     </div>
 
@@ -165,10 +165,10 @@
                         var ultimo = u.TryGetProperty("ultimoAcessoEm", out var uup) && uup.ValueKind != System.Text.Json.JsonValueKind.Null ? uup.GetString() : null;
                         DateTime.TryParse(ultimo, out var ultimoDt);
                         <tr>
-                            <td class="text-white font-medium">@unome</td>
-                            <td class="text-slate-400">@uemail</td>
-                            <td class="text-slate-400">@nivel</td>
-                            <td class="text-slate-400">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
+                            <td class="text-es-ink font-medium">@unome</td>
+                            <td class="text-es-ink-dim">@uemail</td>
+                            <td class="text-es-ink-dim">@nivel</td>
+                            <td class="text-es-ink-dim">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
                             <td><span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span></td>
                         </tr>
                     }
@@ -186,11 +186,11 @@
                     @foreach (var l in Model.Lojas)
                     {
                         var lnome = l.TryGetProperty("nome", out var lnp) ? lnp.GetString() : "";
-                        <tr><td class="text-white">@lnome</td></tr>
+                        <tr><td class="text-es-ink">@lnome</td></tr>
                     }
                     @if (!Model.Lojas.Any())
                     {
-                        <tr><td class="text-center text-slate-500 py-6">Nenhuma loja cadastrada.</td></tr>
+                        <tr><td class="text-center text-es-ink-mute py-6">Nenhuma loja cadastrada.</td></tr>
                     }
                 </tbody>
             </table>
@@ -212,16 +212,16 @@
                         var dh = a.TryGetProperty("dataHora", out var adhp) ? adhp.GetString() : null;
                         DateTime.TryParse(dh, out var dhDt);
                         <tr>
-                            <td class="font-mono text-xs text-slate-300">@acao</td>
+                            <td class="font-mono text-xs text-es-ink-dim">@acao</td>
                             <td><span class="status-badge @(sucesso ? "badge-ativa" : "badge-cancelada")">@(sucesso ? "Sim" : "Não")</span></td>
-                            <td class="text-slate-400 text-xs max-w-xs truncate">@detalhes</td>
-                            <td class="text-slate-400 text-xs">@ip</td>
-                            <td class="text-slate-400 text-xs">@dhDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                            <td class="text-es-ink-dim text-xs max-w-xs truncate">@detalhes</td>
+                            <td class="text-es-ink-dim text-xs">@ip</td>
+                            <td class="text-es-ink-dim text-xs">@dhDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
                         </tr>
                     }
                     @if (!Model.AuditLogs.Any())
                     {
-                        <tr><td colspan="5" class="text-center text-slate-500 py-6">Nenhuma ação auditada.</td></tr>
+                        <tr><td colspan="5" class="text-center text-es-ink-mute py-6">Nenhuma ação auditada.</td></tr>
                     }
                 </tbody>
             </table>

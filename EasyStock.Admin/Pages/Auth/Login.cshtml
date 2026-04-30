@@ -10,20 +10,47 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'es-bg':       '#111827',
+                        'es-surface':  '#172033',
+                        'es-card':     '#151f31',
+                        'es-accent':   '#f47920',
+                        'es-accent-h': '#d96610',
+                        'es-ink':      '#f7f2e8',
+                        'es-ink-dim':  '#c8c1b4',
+                        'es-ink-mute': '#8793a7',
+                    },
+                    fontFamily: { sans: ['Manrope', '-apple-system', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="min-h-screen bg-slate-950 flex items-center justify-center">
+<body class="min-h-screen bg-es-bg font-sans flex items-center justify-center">
 <div class="w-full max-w-sm mx-auto px-4">
 
     <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-14 h-14 bg-violet-700 rounded-2xl mb-4">
-            <span class="text-white font-bold text-xl">ES</span>
+        <div class="inline-flex items-center justify-center mb-4">
+            <svg width="56" height="56" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="50,4 96,28 50,52 4,28" fill="#f47920"/>
+                <polygon points="4,28 4,72 50,96 50,52" fill="#1d3461"/>
+                <polygon points="96,28 96,72 50,96 50,52" fill="#253a6e"/>
+            </svg>
         </div>
-        <h1 class="text-white text-2xl font-bold">EasyStock Admin</h1>
-        <p class="text-slate-400 text-sm mt-1">Painel restrito a Super Administradores</p>
+        <h1 class="text-es-ink text-2xl font-bold">
+            <span>Easy</span><span style="color:#f47920">Stok</span> Admin
+        </h1>
+        <p class="text-es-ink-dim text-sm mt-1">Painel restrito a Super Administradores</p>
     </div>
 
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <div class="bg-es-card rounded-xl p-6" style="border:1px solid rgba(247,242,232,0.18)">
         @if (Model.Erro != null)
         {
             <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">
@@ -35,27 +62,37 @@
             @Html.AntiForgeryToken()
 
             <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">E-mail</label>
+                <label class="block text-xs font-bold text-es-ink-mute uppercase tracking-widest mb-1.5">E-mail</label>
                 <input asp-for="Email" type="email" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg text-white px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500 transition-colors placeholder-slate-500"
+                       class="w-full bg-es-bg rounded-lg text-es-ink px-3 py-2.5 text-sm outline-none transition-all placeholder-es-ink-mute"
+                       style="border:1px solid rgba(247,242,232,0.18); focus:border-color:#e76845"
+                       onfocus="this.style.borderColor='#f47920';this.style.boxShadow='0 0 0 3px rgba(244,121,32,.16)'"
+                       onblur="this.style.borderColor='rgba(247,242,232,0.18)';this.style.boxShadow='none'"
                        placeholder="admin@easystock.com.br" />
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Senha</label>
+                <label class="block text-xs font-bold text-es-ink-mute uppercase tracking-widest mb-1.5">Senha</label>
                 <input asp-for="Senha" type="password" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg text-white px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500 transition-colors placeholder-slate-500"
+                       class="w-full bg-es-bg rounded-lg text-es-ink px-3 py-2.5 text-sm outline-none transition-all placeholder-es-ink-mute"
+                       style="border:1px solid rgba(247,242,232,0.18)"
+                       onfocus="this.style.borderColor='#f47920';this.style.boxShadow='0 0 0 3px rgba(244,121,32,.16)'"
+                       onblur="this.style.borderColor='rgba(247,242,232,0.18)';this.style.boxShadow='none'"
                        placeholder="••••••••" />
             </div>
 
             <button type="submit"
-                    class="w-full bg-violet-700 hover:bg-violet-600 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors mt-2">
+                    class="w-full bg-es-accent text-es-ink font-bold py-2.5 rounded-lg text-sm transition-all mt-2"
+                    onmouseover="this.style.background='#cf5738'"
+                    onmouseout="this.style.background='#e76845'"
+                    onmousedown="this.style.transform='scale(0.98)'"
+                    onmouseup="this.style.transform='scale(1)'">
                 Entrar
             </button>
         </form>
     </div>
 
-    <p class="text-center text-slate-600 text-xs mt-6">EasyStock Admin Panel • Acesso restrito</p>
+    <p class="text-center text-es-ink-mute text-xs mt-6">EasyStock Admin Panel • Acesso restrito</p>
 </div>
 </body>
 </html>

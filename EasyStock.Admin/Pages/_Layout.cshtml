@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@(ViewData["Title"] ?? "EasyStock Admin")</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,800;1,400&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
@@ -11,9 +13,22 @@
             theme: {
                 extend: {
                     colors: {
-                        'admin-bg': '#0f172a',
-                        'admin-sidebar': '#1e293b',
-                        'admin-accent': '#7c3aed',
+                        'es-bg':        '#111827',
+                        'es-surface':   '#172033',
+                        'es-surface-2': '#202b42',
+                        'es-card':      '#151f31',
+                        'es-accent':    '#f47920',
+                        'es-accent-h':  '#d96610',
+                        'es-basil':     '#4fbf9f',
+                        'es-gold':      '#f0b84a',
+                        'es-cream':     '#f1dcc0',
+                        'es-ink':       '#f7f2e8',
+                        'es-ink-dim':   '#c8c1b4',
+                        'es-ink-mute':  '#8793a7',
+                    },
+                    fontFamily: {
+                        sans:  ['Manrope', '-apple-system', 'sans-serif'],
+                        serif: ['Fraunces', 'serif'],
                     }
                 }
             }
@@ -21,26 +36,34 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
-        .sidebar-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; border-radius: 0.5rem; color: #94a3b8; transition: all 0.15s; }
-        .sidebar-link:hover { color: white; background: #334155; }
-        .sidebar-link.active { background: #7c3aed; color: white; }
+        .sidebar-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; border-radius: 0.5rem; color: #8793a7; transition: all 0.15s; }
+        .sidebar-link:hover { color: #f7f2e8; background: #202b42; }
+        .sidebar-link.active { background: #f47920; color: #f7f2e8; }
     </style>
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
-<body class="h-full bg-slate-950 text-white" x-data="adminApp()" x-init="init()">
+<body class="h-full bg-es-bg text-es-ink font-sans" x-data="adminApp()" x-init="init()">
 
 <div class="flex h-full min-h-screen">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-slate-800 flex flex-col fixed inset-y-0 left-0 z-50">
+    <aside class="w-64 bg-es-surface flex flex-col fixed inset-y-0 left-0 z-50" style="border-right:1px solid rgba(247,242,232,0.08)">
         <!-- Logo -->
-        <div class="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
-            <div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center">
-                <span class="text-white font-bold text-sm">ES</span>
-            </div>
+        <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid rgba(247,242,232,0.08)">
+            <!-- Box icon SVG -->
+            <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+                <!-- top diamond -->
+                <polygon points="50,4 96,28 50,52 4,28" fill="#f47920"/>
+                <!-- left face -->
+                <polygon points="4,28 4,72 50,96 50,52" fill="#1d3461"/>
+                <!-- right face -->
+                <polygon points="96,28 96,72 50,96 50,52" fill="#253a6e"/>
+            </svg>
             <div>
-                <div class="text-white font-semibold text-sm">EasyStock</div>
-                <div class="text-violet-400 text-xs font-medium">Admin Panel</div>
+                <div class="text-sm font-bold" style="line-height:1.2">
+                    <span style="color:#f7f2e8">Easy</span><span style="color:#f47920">Stok</span>
+                </div>
+                <div class="text-xs font-medium" style="color:#8793a7">Admin Panel</div>
             </div>
         </div>
 
@@ -54,7 +77,7 @@
                 <span class="text-base">🏢</span>
                 <span class="text-sm font-medium">Tenants</span>
                 <span x-show="dash.totalTenants > 0" x-text="dash.totalTenants"
-                      class="ml-auto bg-slate-600 text-slate-300 text-xs rounded-full px-2 py-0.5" x-cloak></span>
+                      class="ml-auto bg-es-surface-2 text-es-ink-dim text-xs rounded-full px-2 py-0.5" x-cloak></span>
             </a>
             <a href="/Tickets" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tickets") == true ? "active" : "")">
                 <span class="text-base">🎫</span>
@@ -68,7 +91,7 @@
                 <span class="text-sm font-medium">Planos</span>
             </a>
 
-            <div class="pt-4 border-t border-slate-700 mt-4 space-y-1">
+            <div class="pt-4 mt-4 space-y-1" style="border-top:1px solid rgba(247,242,232,0.08)">
                 <a href="http://localhost:5000" target="_blank" class="sidebar-link">
                     <span class="text-base">🔗</span>
                     <span class="text-sm font-medium">Abrir EasyStock</span>
@@ -84,14 +107,14 @@
         </nav>
 
         <!-- User info -->
-        <div class="px-4 py-3 border-t border-slate-700">
+        <div class="px-4 py-3" style="border-top:1px solid rgba(247,242,232,0.08)">
             <div class="flex items-center gap-2">
-                <div class="w-7 h-7 bg-violet-700 rounded-full flex items-center justify-center text-xs font-bold">
+                <div class="w-7 h-7 bg-es-accent rounded-full flex items-center justify-center text-xs font-bold text-es-ink">
                     @(Context.Session.GetString("admin_nome")?.Substring(0, 1).ToUpper() ?? "A")
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-xs font-medium text-white truncate">@Context.Session.GetString("admin_nome")</div>
-                    <div class="text-xs text-slate-400 truncate">@Context.Session.GetString("admin_email")</div>
+                    <div class="text-xs font-semibold text-es-ink truncate">@Context.Session.GetString("admin_nome")</div>
+                    <div class="text-xs text-es-ink-mute truncate">@Context.Session.GetString("admin_email")</div>
                 </div>
             </div>
         </div>
@@ -101,13 +124,13 @@
     <div class="flex-1 ml-64 flex flex-col min-h-screen">
 
         <!-- Topbar -->
-        <header class="bg-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+        <header class="bg-es-surface px-6 py-4 flex items-center justify-between sticky top-0 z-40" style="border-bottom:1px solid rgba(247,242,232,0.08)">
             <div class="flex items-center gap-3">
-                <h1 class="text-white font-semibold text-lg">@(ViewData["Title"] ?? "Dashboard")</h1>
+                <h1 class="text-es-ink font-semibold text-lg">@(ViewData["Title"] ?? "Dashboard")</h1>
             </div>
             <div class="flex items-center gap-3">
-                <span class="bg-violet-700 text-violet-100 text-xs font-semibold px-2.5 py-1 rounded-full">ADMIN</span>
-                <span class="text-slate-400 text-sm">@Context.Session.GetString("admin_nome")</span>
+                <span class="bg-es-accent text-es-ink text-xs font-bold px-2.5 py-1 rounded-full tracking-wide">ADMIN</span>
+                <span class="text-es-ink-dim text-sm">@Context.Session.GetString("admin_nome")</span>
             </div>
         </header>
 

@@ -14,44 +14,44 @@
 <!-- Métricas principais -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
-        <div class="text-3xl font-bold text-white">@Model.TenantsAtivos</div>
-        <div class="text-slate-500 text-xs mt-1">de @Model.TotalTenants total</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
+        <div class="text-3xl font-bold text-es-ink">@Model.TenantsAtivos</div>
+        <div class="text-es-ink-mute text-xs mt-1">de @Model.TotalTenants total</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
-        <div class="text-3xl font-bold text-orange-400">@Model.TenantsSuspensos</div>
-        <div class="text-slate-500 text-xs mt-1">+@Model.TenantsNovos novos (30d)</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
+        <div class="text-3xl font-bold text-es-gold">@Model.TenantsSuspensos</div>
+        <div class="text-es-ink-mute text-xs mt-1">+@Model.TenantsNovos novos (30d)</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
-        <div class="text-3xl font-bold text-blue-400">@Model.TicketsAbertos</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
+        <div class="text-3xl font-bold text-es-basil">@Model.TicketsAbertos</div>
         <div class="text-red-400 text-xs mt-1 font-medium">@Model.TicketsCriticos críticos</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
-        <div class="text-3xl font-bold text-violet-400">R$ @Model.ReceitaMensal.ToString("N0")</div>
-        <div class="text-slate-500 text-xs mt-1">mensal (assinaturas ativas)</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
+        <div class="text-3xl font-bold text-es-accent">R$ @Model.ReceitaMensal.ToString("N0")</div>
+        <div class="text-es-ink-mute text-xs mt-1">mensal (assinaturas ativas)</div>
     </div>
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
-        <div class="text-2xl font-bold text-white">@Model.TotalUsuariosAtivos</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
+        <div class="text-2xl font-bold text-es-ink">@Model.TotalUsuariosAtivos</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
-        <div class="text-2xl font-bold text-white">@Model.Logins24h</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
+        <div class="text-2xl font-bold text-es-ink">@Model.Logins24h</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
-        <div class="text-2xl font-bold text-yellow-400">@Model.TicketsEmAtendimento</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
+        <div class="text-2xl font-bold text-es-gold">@Model.TicketsEmAtendimento</div>
     </div>
     <div class="card">
-        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
-        <div class="text-2xl font-bold text-green-400">@Model.TenantsNovos</div>
-        <div class="text-slate-500 text-xs mt-1">últimos 30 dias</div>
+        <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
+        <div class="text-2xl font-bold text-es-basil">@Model.TenantsNovos</div>
+        <div class="text-es-ink-mute text-xs mt-1">últimos 30 dias</div>
     </div>
 </div>
 
@@ -61,12 +61,12 @@
     <!-- Últimos tickets críticos -->
     <div class="card p-0 overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-            <h2 class="text-white font-semibold text-sm">Tickets Críticos</h2>
-            <a href="/Tickets?prioridade=Critica" class="text-violet-400 hover:text-violet-300 text-xs">Ver todos →</a>
+            <h2 class="text-es-ink font-semibold text-sm">Tickets Críticos</h2>
+            <a href="/Tickets?prioridade=Critica" class="text-es-accent hover:text-es-cream text-xs">Ver todos →</a>
         </div>
         @if (!Model.UltimosTicketsCriticos.Any())
         {
-            <div class="px-4 py-8 text-center text-slate-500 text-sm">Nenhum ticket crítico 🎉</div>
+            <div class="px-4 py-8 text-center text-es-ink-mute text-sm">Nenhum ticket crítico 🎉</div>
         }
         else
         {
@@ -86,8 +86,8 @@
                         var empresa = t.TryGetProperty("empresaNome", out var ep) ? ep.GetString() : "";
                         var status = t.TryGetProperty("status", out var sp) ? sp.GetString() : "";
                         <tr>
-                            <td><a href="/Tickets/Detail/@id" class="text-violet-400 hover:text-violet-300">@titulo</a></td>
-                            <td class="text-slate-400">@empresa</td>
+                            <td><a href="/Tickets/Detail/@id" class="text-es-accent hover:text-es-cream">@titulo</a></td>
+                            <td class="text-es-ink-dim">@empresa</td>
                             <td><span class="status-badge badge-@(status?.ToLower().Replace(" ", ""))">@status</span></td>
                         </tr>
                     }
@@ -99,12 +99,12 @@
     <!-- Tenants recentes -->
     <div class="card p-0 overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-            <h2 class="text-white font-semibold text-sm">Tenants Recentes</h2>
-            <a href="/Tenants" class="text-violet-400 hover:text-violet-300 text-xs">Ver todos →</a>
+            <h2 class="text-es-ink font-semibold text-sm">Tenants Recentes</h2>
+            <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs">Ver todos →</a>
         </div>
         @if (!Model.TenantsRecentes.Any())
         {
-            <div class="px-4 py-8 text-center text-slate-500 text-sm">Nenhum tenant novo nos últimos 30 dias</div>
+            <div class="px-4 py-8 text-center text-es-ink-mute text-sm">Nenhum tenant novo nos últimos 30 dias</div>
         }
         else
         {
@@ -125,9 +125,9 @@
                         var criado = t.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : "";
                         DateTime.TryParse(criado, out var criadoDt);
                         <tr>
-                            <td><a href="/Tenants/Detail/@id" class="text-violet-400 hover:text-violet-300">@nome</a></td>
-                            <td class="text-slate-400">@(doc ?? "—")</td>
-                            <td class="text-slate-400">@criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                            <td><a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream">@nome</a></td>
+                            <td class="text-es-ink-dim">@(doc ?? "—")</td>
+                            <td class="text-es-ink-dim">@criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                         </tr>
                     }
                 </tbody>
