@@ -112,7 +112,7 @@
 <!-- Tabs -->
 <div x-data="{ tab: 'visao' }" class="space-y-4">
     <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
-        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log") })
+        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log"), ("features","Features") })
         {
             <button type="button"
                     @@click="tab = '@t'"
@@ -273,6 +273,38 @@
                     }
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Feature Flags -->
+    <div x-show="tab === 'features'" x-cloak>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var f in Model.Features)
+            {
+                var fkey     = f.TryGetProperty("feature", out var fkp) ? fkp.GetString() : "";
+                var fdesc    = f.TryGetProperty("descricao", out var fdp) ? fdp.GetString() : fkey;
+                var fativo   = f.TryGetProperty("ativo", out var fap) && fap.GetBoolean();
+                <div class="card flex items-start justify-between gap-4">
+                    <div>
+                        <div class="text-sm font-semibold text-es-ink font-mono">@fkey</div>
+                        <div class="text-xs text-es-ink-mute mt-0.5">@fdesc</div>
+                    </div>
+                    <form method="post" asp-page-handler="ToggleFeature">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="feature" value="@fkey" />
+                        <input type="hidden" name="ativo" value="@(!fativo ? "true" : "false")" />
+                        <button type="submit"
+                                style="@(fativo ? "background:rgba(79,191,159,0.15);color:#4fbf9f;border:1px solid rgba(79,191,159,0.3)" : "background:rgba(135,147,167,0.1);color:#8793a7;border:1px solid rgba(135,147,167,0.2)")"
+                                class="text-xs px-3 py-1 rounded-full font-medium transition-all whitespace-nowrap">
+                            @(fativo ? "✓ Ativo" : "Inativo")
+                        </button>
+                    </form>
+                </div>
+            }
+            @if (!Model.Features.Any())
+            {
+                <div class="col-span-3 text-center text-es-ink-mute py-6">Nenhuma feature disponível.</div>
+            }
         </div>
     </div>
 

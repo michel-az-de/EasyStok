@@ -27,6 +27,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     public IEnumerable<JsonElement> Usuarios => TenantData.ValueKind != JsonValueKind.Undefined && TenantData.TryGetProperty("usuarios", out var v) ? v.EnumerateArray() : Enumerable.Empty<JsonElement>();
     public IEnumerable<JsonElement> AuditLogs => TenantData.ValueKind != JsonValueKind.Undefined && TenantData.TryGetProperty("auditLogRecentes", out var v) ? v.EnumerateArray() : Enumerable.Empty<JsonElement>();
     public IEnumerable<JsonElement> PlanosList { get; private set; } = Enumerable.Empty<JsonElement>();
+    public IEnumerable<JsonElement> Features { get; private set; } = Enumerable.Empty<JsonElement>();
 
     public async Task OnGetAsync()
     {
@@ -36,6 +37,11 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             var planosRaw = await api.GetAsync<JsonElement>("api/admin/planos");
             PlanosList = planosRaw.ValueKind == JsonValueKind.Array
                 ? planosRaw.EnumerateArray().ToList()
+                : Enumerable.Empty<JsonElement>();
+
+            var featuresRaw = await api.GetRawAsync($"api/admin/tenants/{Id}/features");
+            Features = featuresRaw.TryGetProperty("data", out var fd)
+                ? fd.EnumerateArray().ToList()
                 : Enumerable.Empty<JsonElement>();
         }
         catch (Exception ex) { Erro = ex.Message; }
@@ -83,6 +89,13 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     public async Task<IActionResult> OnPostAplicarCupomAsync(string codigo)
     {
         try { await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/aplicar-cupom", new { codigo }); }
+        catch (Exception ex) { Erro = ex.Message; }
+        return RedirectToPage(new { Id });
+    }
+
+    public async Task<IActionResult> OnPostToggleFeatureAsync(string feature, bool ativo)
+    {
+        try { await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/features/{feature}", new { ativo }); }
         catch (Exception ex) { Erro = ex.Message; }
         return RedirectToPage(new { Id });
     }
