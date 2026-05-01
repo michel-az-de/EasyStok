@@ -74,7 +74,8 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         IUnitOfWork unitOfWork,
         ILogger<RegistrarSaidaEstoqueUseCase> logger,
         IPublicadorEventos? publicadorEventos = null,
-        EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null)
+        EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null,
+        IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
     {
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
@@ -83,6 +84,13 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
             logger.LogInformation("Iniciando registro de sa�da de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",
                 command.EmpresaId, command.Itens.Count, command.Natureza);
+
+            var configuracao = configuracaoLojaRepository is not null
+                ? await configuracaoLojaRepository.GetByLojaIdAsync(command.EmpresaId)
+                : null;
+            // FifoAtivo=true → FEFO (saída pelo lote mais próximo do vencimento).
+            // FifoAtivo=false → FIFO puro (por data de entrada).
+            var fefo = configuracao?.FifoAtivo ?? true;
 
             // Transação explícita — necessária para que o FOR UPDATE adquirido
             // em GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantenha
@@ -135,7 +143,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
                 var lotes = comandoItem.ItemEstoqueId.HasValue
                     ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
-                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId)).ToArray();
+                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo)).ToArray();
 
                 var produtoId = comandoItem.ItemEstoqueId.HasValue
                     ? lotes.Single().ProdutoId

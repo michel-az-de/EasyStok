@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
@@ -39,6 +40,7 @@ public class AuthController(
     LogoutUseCase logoutUseCase,
     EsqueciSenhaUseCase esqueciSenhaUseCase,
     ResetarSenhaUseCase resetarSenhaUseCase,
+    ConfirmEmailUseCase confirmEmailUseCase,
     ObterUsuarioAtualUseCase obterUsuarioAtualUseCase,
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
     AlterarSenhaUseCase alterarSenhaUseCase) : EasyStockControllerBase
@@ -167,4 +169,22 @@ public class AuthController(
     [HttpPatch("me/password")]
     public async Task<IActionResult> ChangePassword([FromBody] AlterarSenhaCommand command)
         => DataOk(await alterarSenhaUseCase.ExecuteAsync(command));
+
+    [SwaggerOperation(Summary = "Confirm email address", Description = "Validates and marks an email address as confirmed using a token. Allows login access.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [AllowAnonymous]
+    [HttpPost("confirmar-email")]
+    public async Task<IActionResult> ConfirmarEmail([FromQuery] string token)
+    {
+        try
+        {
+            var command = new ConfirmEmailCommand(token);
+            var result = await confirmEmailUseCase.ExecuteAsync(command);
+            return Ok(result);
+        }
+        catch (Domain.Exceptions.RegraDeDominioVioladaException ex)
+        {
+            return BadRequest(new { erro = ex.Message });
+        }
+    }
 }

@@ -12,6 +12,7 @@ namespace EasyStock.Domain.Entities
         public string TemaPreferido { get; set; } = "light";
         public string SenhaHash { get; set; } = null!;
         public bool Ativo { get; set; }
+        public bool EmailConfirmado { get; set; }
         public DateTime? UltimoAcessoEm { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
@@ -31,6 +32,7 @@ namespace EasyStock.Domain.Entities
                 Email = email,
                 SenhaHash = senhaHash,
                 Ativo = true,
+                EmailConfirmado = false,
                 CriadoEm = agora,
                 AlteradoEm = agora,
                 FailedLoginAttempts = 0,

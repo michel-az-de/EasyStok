@@ -63,6 +63,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Usuario> Usuarios { get; set; } = null!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
         public DbSet<ResetToken> ResetTokens { get; set; } = null!;
+        public DbSet<EmailConfirmationToken> EmailConfirmationTokens { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
         public DbSet<UsuarioEmpresa> UsuariosEmpresas { get; set; } = null!;
         public DbSet<Perfil> Perfis { get; set; } = null!;

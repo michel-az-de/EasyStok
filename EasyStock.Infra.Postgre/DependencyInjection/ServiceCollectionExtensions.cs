@@ -68,6 +68,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
+            services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
             services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
             services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();

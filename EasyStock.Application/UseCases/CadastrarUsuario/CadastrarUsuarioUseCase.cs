@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -9,6 +10,8 @@ namespace EasyStock.Application.UseCases.CadastrarUsuario;
 public sealed class CadastrarUsuarioUseCase(
     IUsuarioRepository usuarioRepository,
     IAuditLogRepository auditLogRepository,
+    IEmailConfirmationTokenRepository emailTokenRepository,
+    IEmailService? emailService,
     IUnitOfWork unitOfWork,
     ILogger<CadastrarUsuarioUseCase> logger) : IUseCase<CadastrarUsuarioCommand, CadastrarUsuarioResult>
 {
@@ -38,6 +41,33 @@ public sealed class CadastrarUsuarioUseCase(
             null,
             null);
         await auditLogRepository.AddAsync(auditLog);
+
+        var confirmationToken = Guid.NewGuid().ToString();
+        var emailToken = EmailConfirmationToken.Criar(usuario.Id, confirmationToken, null, null);
+        await emailTokenRepository.AddAsync(emailToken);
+
+        if (emailService is not null)
+        {
+            try
+            {
+                var confirmLink = $"{command.BaseUrl.TrimEnd('/')}/auth/confirmar-email?token={Uri.EscapeDataString(confirmationToken)}";
+                var body = $@"<html><body style=""font-family:sans-serif;max-width:600px;margin:auto"">
+<h2 style=""color:#4f46e5"">Confirme seu email</h2>
+<p>Olá {System.Net.WebUtility.HtmlEncode(usuario.Nome)},</p>
+<p>Bem-vindo ao EasyStock! Clique no link abaixo para confirmar seu email:</p>
+<p><a href=""{confirmLink}"" style=""background:#4f46e5;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block"">Confirmar Email</a></p>
+<p>Este link expira em 24 horas.</p>
+<p>Se você não se registrou, ignore este email.</p>
+</body></html>";
+
+                await emailService.SendAsync(usuario.Email, "Confirme seu email - EasyStock", body, isHtml: true);
+                logger.LogInformation("Email de confirmação enviado para {Email}", usuario.Email);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha ao enviar email de confirmação para {Email}. Token gerado normalmente.", usuario.Email);
+            }
+        }
 
         await unitOfWork.CommitAsync();
 

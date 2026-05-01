@@ -43,6 +43,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(u => u.Ativo)
                 .HasColumnType("boolean");
 
+            builder.Property(u => u.EmailConfirmado)
+                .IsRequired()
+                .HasColumnType("boolean")
+                .HasDefaultValue(false);
+
             builder.Property(u => u.UltimoAcessoEm)
                 .HasColumnType("timestamp with time zone");
 

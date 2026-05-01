@@ -45,6 +45,11 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
             }
 
+            if (!usuario.EmailConfirmado)
+            {
+                logger.LogWarning("Tentativa de login com email não confirmado: {Email}", command.Email);
+            }
+
             // Se a janela de lockout expirou, zera o contador de falhas para não
             // bloquear o usuário na próxima falha "herdada" da sessão anterior.
             if (usuario.LockoutEnd.HasValue && usuario.LockoutEnd.Value <= DateTime.UtcNow)

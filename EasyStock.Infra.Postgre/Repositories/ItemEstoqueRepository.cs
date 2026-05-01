@@ -190,7 +190,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync();
 
-        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId)
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
         {
             // FOR UPDATE garante serialização: requests concorrentes aguardam o lock
             // antes de ler a quantidade, evitando estoque negativo.
@@ -200,13 +200,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 ? "AND \"ProdutoVariacaoId\" = {2}"
                 : "AND \"ProdutoVariacaoId\" IS NULL";
 
+            // FEFO: lotes com validade mais próxima saem primeiro (NULLS LAST = sem validade saem por último).
+            // FIFO: lotes mais antigos (por data de entrada) saem primeiro.
+            var orderBy = fefo
+                ? "\"ValidadeEm\" NULLS LAST, \"EntradaEm\", \"CriadoEm\""
+                : "\"EntradaEm\", \"CriadoEm\"";
+
             var sql = $@"
                     SELECT * FROM itens_estoque
                     WHERE ""EmpresaId"" = {{0}}
                       AND ""ProdutoId"" = {{1}}
                       AND ""QuantidadeAtual"" > 0
                       {variacaoFilter}
-                    ORDER BY ""EntradaEm"", ""CriadoEm""
+                    ORDER BY {orderBy}
                     FOR UPDATE";
 
             var query = produtoVariacaoId.HasValue
