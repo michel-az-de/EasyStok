@@ -19,12 +19,17 @@ public sealed record CriarPedidoFornecedorResult(Guid PedidoId);
 
 public class CriarPedidoFornecedorUseCase(
     IPedidoFornecedorRepository pedidoRepository,
+    IFornecedorRepository fornecedorRepository,
     IUnitOfWork unitOfWork,
     ILogger<CriarPedidoFornecedorUseCase> logger)
 {
     public async Task<CriarPedidoFornecedorResult> ExecuteAsync(CriarPedidoFornecedorCommand command)
     {
         ValidateCommand(command);
+
+        // Tenant isolation: fornecedor precisa pertencer à empresa do request.
+        var fornecedor = await fornecedorRepository.GetByIdAsync(command.EmpresaId, command.FornecedorId)
+            ?? throw new UseCaseValidationException("Fornecedor não pertence a esta empresa.");
 
         var pedido = new PedidoFornecedor
         {

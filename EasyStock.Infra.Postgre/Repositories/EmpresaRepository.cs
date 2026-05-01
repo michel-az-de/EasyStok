@@ -11,6 +11,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Empresa?> GetByIdAsync(Guid id) =>
             dbContext.Empresas.FirstOrDefaultAsync(e => e.Id == id);
 
+        public Task<Empresa?> GetByDocumentoAsync(string documento) =>
+            string.IsNullOrWhiteSpace(documento)
+                ? Task.FromResult<Empresa?>(null)
+                : dbContext.Empresas.AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.Documento == documento);
+
         public async Task<IEnumerable<Empresa>> GetAllAsync() =>
             await dbContext.Empresas.AsNoTracking().ToListAsync();
 

@@ -50,5 +50,14 @@ public class CobrancaAssinatura
         PagoEm = DateTime.UtcNow;
     }
 
+    public void MarcarComoFalhada() => Status = StatusCobranca.Falhada;
+
+    public void AtualizarDadosPix(string pixCopiaCola, string qrCodeBase64, DateTime expiracaoEm)
+    {
+        PixCopiaCola = pixCopiaCola;
+        QrCodeBase64 = qrCodeBase64;
+        ExpiracaoEm = expiracaoEm;
+    }
+
     public void Expirar() => Status = StatusCobranca.Expirada;
 }

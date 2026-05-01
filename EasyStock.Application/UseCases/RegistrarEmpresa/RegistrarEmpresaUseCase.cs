@@ -39,6 +39,15 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
             if (emailExistente is not null)
                 throw new UseCaseValidationException("Email ja cadastrado.");
 
+            // Bloqueio anti-abuso: mesmo CNPJ/CPF não pode esticar trial
+            // criando empresas novas com emails diferentes.
+            if (!string.IsNullOrWhiteSpace(command.Documento))
+            {
+                var docExistente = await empresaRepository.GetByDocumentoAsync(command.Documento.Trim());
+                if (docExistente is not null)
+                    throw new UseCaseValidationException("CNPJ/CPF já está em uso por outra empresa.");
+            }
+
             var planos = await planoRepository.GetAtivosAsync();
             var planoLista = planos.ToList();
 

@@ -7,6 +7,7 @@ public class PedidoFornecedor
     public Guid Id { get; set; }
     public Guid EmpresaId { get; set; }
     public Guid FornecedorId { get; set; }
+    public Guid? LojaId { get; set; }
     public DateTime DataPedido { get; set; }
     public DateTime? PrevisaoEntrega { get; set; }
     public DateTime? DataRecebimento { get; set; }
@@ -19,4 +20,9 @@ public class PedidoFornecedor
     public DateTime AlteradoEm { get; set; }
 
     public Fornecedor? Fornecedor { get; set; }
+
+    // TODO(deploy seguinte): adicionar migration "AddPedidoFornecedorItem" e
+    // remover [NotMapped] para persistir itens no banco.
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public ICollection<PedidoFornecedorItem> Itens { get; set; } = new List<PedidoFornecedorItem>();
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
@@ -18,16 +19,41 @@ public sealed record AtualizarStatusPedidoCommand(
 
 /// <summary>
 /// Atualiza o status do pedido (aguardando → preparando → pronto → entregue).
-/// Registra evento de mudança e mantém AlteradoEm/EntreguEm consistentes.
+///
+/// State machine explícita (transições válidas):
+///   aguardando  → {preparando, cancelado}
+///   preparando  → {pronto, cancelado}
+///   pronto      → {entregue, cancelado}
+///   entregue    → {cancelado}  (cancelamento pós-entrega devolve estoque)
+///   cancelado   → ∅
+///
+/// Integração com estoque (PedidoEstoqueIntegrationService):
+///   - Transição → "pronto" ou "entregue" (e estoque ainda não foi descontado):
+///     desconta itens com ProdutoId.
+///   - Transição → "cancelado" (e estoque havia sido descontado):
+///     devolve itens com ProdutoId.
+///   - Idempotente: usa MovimentacaoEstoque.ReferenciaDocumento = pedidoId
+///     pra evitar duplicação em retries.
 /// </summary>
 public class AtualizarStatusPedidoUseCase(
     IPedidoRepository pedidoRepo,
+    PedidoEstoqueIntegrationService estoqueIntegration,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
-    private static readonly HashSet<string> StatusValidos = new(StringComparer.OrdinalIgnoreCase)
+    // Matriz de transições válidas (origem → conjunto de destinos permitidos).
+    private static readonly Dictionary<string, HashSet<string>> Transicoes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "aguardando", "preparando", "pronto", "entregue", "cancelado"
+        ["aguardando"] = new(StringComparer.OrdinalIgnoreCase) { "preparando", "cancelado" },
+        ["preparando"] = new(StringComparer.OrdinalIgnoreCase) { "pronto", "cancelado" },
+        ["pronto"]     = new(StringComparer.OrdinalIgnoreCase) { "entregue", "cancelado" },
+        ["entregue"]   = new(StringComparer.OrdinalIgnoreCase) { "cancelado" },
+        ["cancelado"]  = new(StringComparer.OrdinalIgnoreCase)
+    };
+
+    private static readonly HashSet<string> StatusQueDescontamEstoque = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pronto", "entregue"
     };
 
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
@@ -36,23 +62,44 @@ public class AtualizarStatusPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.Id, "Id");
 
         var status = (cmd.Status ?? "").Trim().ToLowerInvariant();
-        if (!StatusValidos.Contains(status))
+        if (!Transicoes.ContainsKey(status))
             throw new UseCaseValidationException($"Status inválido: {cmd.Status}");
 
         var pedido = await pedidoRepo.GetByIdAsync(cmd.EmpresaId, cmd.Id);
         if (pedido == null) return null;
 
-        if (pedido.EstaFinalizado)
-            throw new UseCaseValidationException("Pedido finalizado não pode mudar de status. Use reabrir/duplicar.");
+        var statusAtual = (pedido.Status ?? "").Trim().ToLowerInvariant();
 
-        if (pedido.Status == status)
+        if (statusAtual == status)
             return CriarPedidoUseCase.Map(pedido); // idempotente
 
+        // Validação de transição.
+        if (!Transicoes.TryGetValue(statusAtual, out var destinosValidos)
+            || !destinosValidos.Contains(status))
+        {
+            throw new UseCaseValidationException(
+                $"Transição inválida: {statusAtual} → {status}.");
+        }
+
         var statusAntigo = pedido.Status;
+        var eraEstoqueDescontado = StatusQueDescontamEstoque.Contains(statusAtual);
+        var seraEstoqueDescontado = StatusQueDescontamEstoque.Contains(status);
 
         if (status == "entregue") pedido.MarcarEntregue();
         else if (status == "cancelado") pedido.Cancelar();
         else { pedido.Status = status; pedido.AlteradoEm = DateTime.UtcNow; }
+
+        // Integração estoque.
+        if (!eraEstoqueDescontado && seraEstoqueDescontado)
+        {
+            try { await estoqueIntegration.DescontarAsync(pedido); }
+            catch (Exception ex) { logger.LogError(ex, "Falha ao descontar estoque do pedido {Id}", pedido.Id); }
+        }
+        else if (eraEstoqueDescontado && status == "cancelado")
+        {
+            try { await estoqueIntegration.DevolverAsync(pedido); }
+            catch (Exception ex) { logger.LogError(ex, "Falha ao devolver estoque do pedido {Id}", pedido.Id); }
+        }
 
         await pedidoRepo.AddEventoAsync(new PedidoEvento
         {

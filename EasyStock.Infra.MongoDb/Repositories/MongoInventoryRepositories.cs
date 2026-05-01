@@ -352,6 +352,15 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
             .SortByDescending(x => x.DataMovimentacao)
             .Limit(maxResults).ToListAsync();
     }
+
+    public async Task<bool> ExisteReferenciaAsync(Guid empresaId, Guid produtoId, string referenciaDocumento, NaturezaMovimentacaoEstoque natureza, CancellationToken ct = default)
+    {
+        var filter = Builders<MovimentacaoEstoque>.Filter.Eq(x => x.EmpresaId, empresaId) &
+                     Builders<MovimentacaoEstoque>.Filter.Eq(x => x.ProdutoId, produtoId) &
+                     Builders<MovimentacaoEstoque>.Filter.Eq(x => x.DocumentoReferencia, referenciaDocumento) &
+                     Builders<MovimentacaoEstoque>.Filter.Eq(x => x.Natureza, natureza);
+        return await Collection.Find(filter).AnyAsync(ct);
+    }
 }
 
 public sealed class VendaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

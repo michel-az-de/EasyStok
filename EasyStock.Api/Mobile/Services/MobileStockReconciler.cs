@@ -63,13 +63,19 @@ public class MobileStockReconciler(
             var empresaId = mobileProduct.EmpresaId.Value;
             var lojaId = mobileProduct.LojaId; // nullable — ItemEstoque pode ser sem loja
 
-            // Procura ItemEstoque existente. Prefere match exato (loja+produto),
-            // cai pra primeiro com produto se o ItemEstoque foi cadastrado sem loja.
-            var item = await _db.Set<ItemEstoque>()
-                .FirstOrDefaultAsync(i =>
+            // Procura ItemEstoque existente. Match exato por loja primeiro;
+            // só cai pro fallback (loja=null) se o app está em modo sem loja
+            // amarrada. Isso evita que device A consuma estoque da loja B
+            // silenciosamente em multi-loja.
+            var item = lojaId.HasValue
+                ? await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
                     i.EmpresaId == empresaId &&
                     i.ProdutoId == produtoId &&
-                    (lojaId == null || i.LojaId == lojaId), ct);
+                    i.LojaId == lojaId, ct)
+                : await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
+                    i.EmpresaId == empresaId &&
+                    i.ProdutoId == produtoId &&
+                    i.LojaId == null, ct);
 
             if (item == null)
             {
@@ -79,16 +85,20 @@ public class MobileStockReconciler(
                 return false;
             }
 
-            // Aplica delta na QuantidadeAtual. Subtract lança se for negativo —
-            // aqui clampamos pra Zero pra não bloquear sync (mobile pode estar
-            // dessincronizado). ERP fica consistente, mobile reflete na próxima pull.
+            // Aplica delta na QuantidadeAtual. Se resulta em negativo,
+            // ainda aplica o delta possível (até zero) e ENFILEIRA divergência
+            // para reconciliação manual. Antes era clamp silencioso → divergência permanente
+            // sem rastro. Agora gera entrada em ProdutoAlteracao com tipo "DivergenciaSync"
+            // pra operador investigar.
             var atual = item.QuantidadeAtual?.Value ?? 0;
             var novo = atual + deltaQty;
+            var divergiu = false;
             if (novo < 0)
             {
-                _log.LogWarning(
-                    "Reconciliação mobile->ERP: delta {Delta} resultaria em estoque negativo ({Atual} + {Delta}) pra item {ItemId}. Clampando pra Zero.",
-                    deltaQty, atual, deltaQty, item.Id);
+                divergiu = true;
+                _log.LogError(
+                    "Divergência mobile↔ERP: delta {Delta} resultaria em estoque negativo (atual={Atual}) item={ItemId} produto={ProdId} loja={Loja}. Clampando para 0 e registrando divergência.",
+                    deltaQty, atual, item.Id, produtoId, lojaId);
                 novo = 0;
             }
             item.QuantidadeAtual = Quantidade.From(novo);
@@ -123,9 +133,30 @@ public class MobileStockReconciler(
             mobileProduct.Stock = novo;
             mobileProduct.UpdatedAt = DateTime.UtcNow;
 
+            // Marcador de divergência: registra MovimentacaoEstoque adicional
+            // de natureza Ajuste com Quantidade=0 e Descricao indicando o evento.
+            // Operador filtra por descrição "DIVERGENCIA_SYNC" pra investigar.
+            if (divergiu)
+            {
+                _db.Add(new MovimentacaoEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId,
+                    ItemEstoqueId = item.Id,
+                    ProdutoId = produtoId,
+                    Tipo = TipoMovimentacaoEstoque.Saida,
+                    Natureza = NaturezaMovimentacaoEstoque.Ajuste,
+                    Quantidade = Quantidade.From(Math.Abs(deltaQty + atual)),
+                    DataMovimentacao = DateTime.UtcNow,
+                    Descricao = $"DIVERGENCIA_SYNC: mobile pediu delta {deltaQty} mas estoque atual era {atual}. Aplicado clamp pra 0. Doc={referenciaDocumento}",
+                    DocumentoReferencia = referenciaDocumento,
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+
             _log.LogInformation(
-                "Reconciliação mobile->ERP OK: produto={ErpId} loja={LojaId} delta={Delta} novoEstoque={Novo} natureza={Nat} doc={Doc}",
-                produtoId, lojaId, deltaQty, novo, natureza, referenciaDocumento);
+                "Reconciliação mobile->ERP {Status}: produto={ErpId} loja={LojaId} delta={Delta} novoEstoque={Novo} natureza={Nat} doc={Doc}",
+                divergiu ? "com divergência" : "OK", produtoId, lojaId, deltaQty, novo, natureza, referenciaDocumento);
             return true;
         }
         catch (Exception ex)

@@ -39,7 +39,7 @@ public class FornecedorControllerTests
         var historico = new ObterHistoricoFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var estatisticas = new ObterEstatisticasFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var pedidosAbertos = new ListarPedidosAbertosUseCase(_pedidoFornecedorRepository);
-        var criarPedido = new CriarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CriarPedidoFornecedorUseCase>>());
+        var criarPedido = new CriarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _fornecedorRepository, _unitOfWork, Substitute.For<ILogger<CriarPedidoFornecedorUseCase>>());
         var receberPedido = new ReceberPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<ReceberPedidoFornecedorUseCase>>());
         var cancelarPedido = new CancelarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CancelarPedidoFornecedorUseCase>>());
         var alteracoes = new EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor.ObterHistoricoAlteracoesFornecedorUseCase(_fornecedorRepository);

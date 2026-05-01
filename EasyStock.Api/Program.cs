@@ -86,8 +86,25 @@ var mongoConnectionString = builder.Configuration.GetConnectionString(Configurat
 var mongoDatabaseName = builder.Configuration[ConfigurationKeys.DatabaseMongoDatabase] ?? "EasyStockDbMongo";
 var sqliteConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionSqlite) ?? "Data Source=easystock.db";
 
-var resolvedProvider = await ResolveDatabaseProviderAsync(
-    databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
+// Em produção, pula a checagem de auto-detect (custa 3-5s no cold start)
+// quando o provider está explicitamente configurado.
+string resolvedProvider;
+if (builder.Environment.IsProduction() &&
+    !databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase))
+{
+    resolvedProvider = databaseProvider.Trim().ToLowerInvariant() switch
+    {
+        "postgres" or "postgresql" => "postgresql",
+        "mongodb" or "mongo" => "mongodb",
+        "sqlite" => "sqlite",
+        _ => "postgresql"
+    };
+}
+else
+{
+    resolvedProvider = await ResolveDatabaseProviderAsync(
+        databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
+}
 
 var isFallback = !string.Equals(databaseProvider.Trim(), resolvedProvider, StringComparison.OrdinalIgnoreCase)
     && !(databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase) && resolvedProvider == "postgresql");
@@ -178,6 +195,16 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 
         app.Logger.LogInformation("{Count} migrations pendentes.", pendingMigrations.Count);
 
+        // Migrations conhecidas que historicamente colidem com schema mobile pré-existente
+        // (porque criam tabelas que mobile schema raw também cria com IF NOT EXISTS).
+        // Para essas, aceitamos 42P07/42701 e registramos manualmente. Para qualquer
+        // outra migration, falha real é fail-fast.
+        var migrationsComColisaoConhecida = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "20260430193546_AddAdminModule",
+            "20260430210354_RenameAdminAuditLogsTable_AddMissingDbSets"
+        };
+
         foreach (var migrationId in pendingMigrations)
         {
             try
@@ -188,10 +215,12 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                 await migrator.MigrateAsync(migrationId);
                 app.Logger.LogInformation("Migration {MigrationId} aplicada.", migrationId);
             }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState is "42701" or "42P07")
+            catch (Npgsql.PostgresException ex) when (
+                ex.SqlState is "42701" or "42P07" &&
+                migrationsComColisaoConhecida.Contains(migrationId))
             {
                 app.Logger.LogWarning(
-                    "Migration {MigrationId}: schema já existe ({SqlState}), registrando.",
+                    "Migration {MigrationId}: schema já existe ({SqlState}), registrando como aplicada.",
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -424,6 +453,7 @@ app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<EasyStock.Api.Middleware.SubscriptionGateMiddleware>();
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))

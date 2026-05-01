@@ -111,6 +111,15 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Os dados foram alterados por outro processo. Recarregue as informações e tente novamente.",
                 false),
 
+            // Postgres unique constraint violation (23505) — duplicação detectada
+            // só na hora do INSERT (corrida de 2 requests). Mapear pra 409.
+            DbUpdateException dbex when IsUniqueViolation(dbex) => (
+                StatusCodes.Status409Conflict,
+                "DUPLICATE_RESOURCE",
+                "Registro duplicado",
+                "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
+                false),
+
             // Exceções de domínio (todas herdam de RegraDeDominioVioladaException - case genérico)
             RegraDeDominioVioladaException ex => (
                 StatusCodes.Status409Conflict,
@@ -169,4 +178,15 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Ocorreu um erro inesperado. Tente novamente mais tarde.",
                 true)
         };
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        var inner = ex.InnerException;
+        while (inner is not null)
+        {
+            if (inner is Npgsql.PostgresException pg && pg.SqlState == "23505") return true;
+            inner = inner.InnerException;
+        }
+        return false;
+    }
 }

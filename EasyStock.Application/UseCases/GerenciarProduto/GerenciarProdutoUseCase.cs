@@ -149,7 +149,8 @@ public sealed class GerenciarProdutoUseCase(
     IUnitOfWork unitOfWork,
     ICacheService? cacheService = null,
     IProdutoAlteracaoRepository? alteracaoRepository = null,
-    IUsuarioRepository? usuarioRepository = null)
+    IUsuarioRepository? usuarioRepository = null,
+    IPedidoRepository? pedidoRepository = null)
 {
     public async Task AtualizarAsync(AtualizarProdutoCommand command)
     {
@@ -374,6 +375,15 @@ public sealed class GerenciarProdutoUseCase(
 
         if (await itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produtoId))
             throw new UseCaseValidationException("Nao e permitido inativar produto com estoque disponivel.");
+
+        // Bloqueia inativação enquanto há pedido aberto (aguardando/preparando/pronto)
+        // referenciando este produto — evita orfanar itens em produção.
+        if (pedidoRepository is not null &&
+            await pedidoRepository.ExistemPedidosAbertosComProdutoAsync(empresaId, produtoId))
+        {
+            throw new UseCaseValidationException(
+                "Nao e permitido inativar produto com pedidos abertos. Finalize ou cancele os pedidos primeiro.");
+        }
 
         produto.Status = StatusProduto.Inativo;
         produto.AlteradoPor = usuarioId != Guid.Empty ? usuarioId : null;

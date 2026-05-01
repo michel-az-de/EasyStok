@@ -1,6 +1,8 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Infra.Postgre.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.BackgroundServices;
 
@@ -8,6 +10,43 @@ public sealed class CobrancaAssinaturaJob(
     IServiceProvider serviceProvider,
     ILogger<CobrancaAssinaturaJob> logger) : BackgroundService
 {
+    private const long LockKeyJob = 0x4B69_6C6C_4561_7379L; // arbitrary stable key
+
+    private async Task RunWithAdvisoryLockAsync(long key, Func<CancellationToken, Task> action, CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
+        if (db is null) { await action(ct); return; }
+
+        // Tenta adquirir lock — se outra réplica já tem, sai sem rodar.
+        await db.Database.OpenConnectionAsync(ct);
+        try
+        {
+            using var cmd = db.Database.GetDbConnection().CreateCommand();
+            cmd.CommandText = "SELECT pg_try_advisory_lock(@key)";
+            var p = cmd.CreateParameter(); p.ParameterName = "key"; p.Value = key; cmd.Parameters.Add(p);
+            var got = (bool)(await cmd.ExecuteScalarAsync(ct) ?? false);
+            if (!got)
+            {
+                logger.LogInformation("CobrancaAssinaturaJob: outra réplica está executando — pulando esta rodada.");
+                return;
+            }
+
+            try { await action(ct); }
+            finally
+            {
+                using var unlock = db.Database.GetDbConnection().CreateCommand();
+                unlock.CommandText = "SELECT pg_advisory_unlock(@key)";
+                var pu = unlock.CreateParameter(); pu.ParameterName = "key"; pu.Value = key; unlock.Parameters.Add(pu);
+                await unlock.ExecuteScalarAsync(ct);
+            }
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("Job de cobrança de assinatura iniciado");
@@ -25,8 +64,16 @@ public sealed class CobrancaAssinaturaJob(
                 if (delay > TimeSpan.Zero)
                     await Task.Delay(delay, stoppingToken);
 
-                await ProcessarCobrancasAsync(stoppingToken);
-                await SuspenderVencidasAsync(stoppingToken);
+                // Distributed lock via Postgres advisory lock — garante que
+                // apenas UMA instância (de N réplicas Cloud Run) execute o
+                // job no mesmo dia. Sem isso, múltiplas réplicas geram
+                // cobranças Pix duplicadas. Lock é liberado ao fim da
+                // transação. Key arbitrária estável: hash de "easystock-cobranca-job".
+                await RunWithAdvisoryLockAsync(LockKeyJob, async ct =>
+                {
+                    await ProcessarCobrancasAsync(ct);
+                    await SuspenderVencidasAsync(ct);
+                }, stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -63,12 +110,31 @@ public sealed class CobrancaAssinaturaJob(
                 var valor = plano?.PrecoMensal ?? 0m;
                 if (valor <= 0)
                 {
-                    logger.LogDebug("Assinatura {Id} sem preço definido — ignorando.", assinatura.Id);
+                    // Plano grátis: apenas estende vigência, sem gerar Pix.
+                    assinatura.DataFim = DateTime.UtcNow.AddDays(30);
+                    await assinaturaRepo.UpdateAsync(assinatura);
+                    await unitOfWork.CommitAsync();
                     continue;
                 }
 
                 var txid = Guid.NewGuid().ToString("N")[..35];
                 var descricao = $"Assinatura EasyStock — {plano?.Nome ?? "Plano"}";
+
+                // 1) Persiste cobrança como Pendente ANTES de chamar Efí.
+                //    Se Efí responde 200 mas commit local falha, na próxima
+                //    rodada o ExistePendenteAsync evita gerar nova cobrança.
+                //    Se Efí falha após persist, marcamos como Falhada e seguimos.
+                var cobranca = CobrancaAssinatura.Criar(
+                    assinatura.EmpresaId,
+                    assinatura.Id,
+                    txid,
+                    valor,
+                    pixCopiaCola: string.Empty,
+                    qrCodeBase64: string.Empty,
+                    expiracaoEm: DateTime.UtcNow.AddDays(1));
+
+                await cobrancaRepo.AddAsync(cobranca);
+                await unitOfWork.CommitAsync();
 
                 EfiCobrancaResult pixResult;
                 try
@@ -77,20 +143,15 @@ public sealed class CobrancaAssinaturaJob(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Falha ao criar cobrança Pix para empresa {EmpresaId}", assinatura.EmpresaId);
+                    logger.LogWarning(ex, "Falha ao criar cobrança Pix para empresa {EmpresaId} — marcando como falhada", assinatura.EmpresaId);
+                    cobranca.MarcarComoFalhada();
+                    await cobrancaRepo.UpdateAsync(cobranca);
+                    await unitOfWork.CommitAsync();
                     continue;
                 }
 
-                var cobranca = CobrancaAssinatura.Criar(
-                    assinatura.EmpresaId,
-                    assinatura.Id,
-                    txid,
-                    valor,
-                    pixResult.PixCopiaCola,
-                    pixResult.QrCodeBase64,
-                    pixResult.ExpiracaoEm);
-
-                await cobrancaRepo.AddAsync(cobranca);
+                cobranca.AtualizarDadosPix(pixResult.PixCopiaCola, pixResult.QrCodeBase64, pixResult.ExpiracaoEm);
+                await cobrancaRepo.UpdateAsync(cobranca);
                 await unitOfWork.CommitAsync();
 
                 await EnviarEmailCobrancaAsync(emailService, usuarioRepo, assinatura, cobranca, ct);

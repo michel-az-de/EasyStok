@@ -18,7 +18,9 @@ namespace EasyStock.Api.Controllers;
 public class AdminAdminsController(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    AdminAuditService audit) : EasyStockControllerBase
+    AdminAuditService audit,
+    EasyStock.Application.Ports.Output.IEmailService emailService,
+    ILogger<AdminAdminsController> logger) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAdmins()
@@ -116,13 +118,26 @@ public class AdminAdminsController(
         var usuario = await db.Usuarios.FindAsync(id);
         if (usuario is null) return DataNotFound("Admin não encontrado.");
 
-        var novaSenha = GerarSenhaAleatoria(12);
+        var novaSenha = GerarSenhaAleatoria(16);
         usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(novaSenha);
         usuario.AlteradoEm = DateTime.UtcNow;
         await db.CommitAsync();
         await audit.LogAsync("AdminSenhaReset", $"AdminId={id}");
 
-        return DataOk(new { novaSenha });
+        // Enviar por email — NUNCA retornar plaintext na response (vaza em logs/history).
+        try
+        {
+            var body = $@"<p>Sua senha do painel admin EasyStock foi resetada.</p>
+<p><strong>Nova senha:</strong> <code>{System.Net.WebUtility.HtmlEncode(novaSenha)}</code></p>
+<p>Recomendamos trocar essa senha após o primeiro login.</p>";
+            await emailService.SendAsync(usuario.Email, "EasyStock Admin — Senha resetada", body, isHtml: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao enviar email de reset de senha para admin {Id}", id);
+        }
+
+        return DataOk(new { id, mensagem = "Senha resetada. Nova senha enviada por email." });
     }
 
     private static string GerarSenhaAleatoria(int length)

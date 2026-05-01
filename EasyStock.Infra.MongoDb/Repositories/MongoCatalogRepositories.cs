@@ -68,6 +68,11 @@ public sealed class EmpresaRepository(MongoEasyStockContext context, MongoUnitOf
     public async Task<Empresa?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
+    public async Task<Empresa?> GetByDocumentoAsync(string documento) =>
+        string.IsNullOrWhiteSpace(documento)
+            ? null
+            : await Collection.Find(x => x.Documento == documento).FirstOrDefaultAsync();
+
     public async Task<IEnumerable<Empresa>> GetAllAsync() =>
         await Collection.Find(FilterDefinition<Empresa>.Empty).ToListAsync();
 

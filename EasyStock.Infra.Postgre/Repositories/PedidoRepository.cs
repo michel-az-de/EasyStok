@@ -86,5 +86,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task AddPagamentoAsync(PedidoPagamento pagamento) { db.Set<PedidoPagamento>().Add(pagamento); return Task.CompletedTask; }
         public Task RemovePagamentoAsync(Guid pagamentoId) =>
             db.Set<PedidoPagamento>().Where(p => p.Id == pagamentoId).ExecuteDeleteAsync();
+
+        public Task<bool> ExistemPedidosAbertosComProdutoAsync(Guid empresaId, Guid produtoId)
+        {
+            var statusAbertos = new[] { "aguardando", "preparando", "pronto" };
+            return db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && statusAbertos.Contains(p.Status))
+                .SelectMany(p => p.Itens)
+                .AnyAsync(i => i.ProdutoId == produtoId);
+        }
     }
 }

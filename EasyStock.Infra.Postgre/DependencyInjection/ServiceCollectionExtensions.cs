@@ -21,6 +21,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
         {
             services.Configure<CacheOptions>(configuration.GetSection("Cache"));
 
+            // Garante limites de pool sãos quando a connection string vem sem
+            // controle (ex: Cloud SQL f1-micro aceita ~25 conexões totais; com
+            // múltiplas réplicas, pool default 100 estoura imediatamente).
+            connectionString = EnsurePoolLimits(connectionString, configuration);
+
             services.AddDbContext<EasyStockDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
@@ -96,6 +101,28 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             }
 
             return services;
+        }
+
+        private static string EnsurePoolLimits(string connectionString, IConfiguration configuration)
+        {
+            // Default conservador. Pode ser sobrescrito via Postgres:Pool:* (config) ou
+            // se a connection string já tiver "Maximum Pool Size", respeita.
+            if (string.IsNullOrWhiteSpace(connectionString)) return connectionString;
+            if (connectionString.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
+                return connectionString;
+
+            var maxPool = configuration.GetValue<int?>("Postgres:Pool:Max") ?? 10;
+            var minPool = configuration.GetValue<int?>("Postgres:Pool:Min") ?? 0;
+            var idleSec = configuration.GetValue<int?>("Postgres:Pool:IdleSeconds") ?? 60;
+            var timeout = configuration.GetValue<int?>("Postgres:Pool:TimeoutSeconds") ?? 15;
+
+            var sep = connectionString.TrimEnd().EndsWith(";") ? "" : ";";
+            return connectionString + sep +
+                $"Maximum Pool Size={maxPool};" +
+                $"Minimum Pool Size={minPool};" +
+                $"Connection Idle Lifetime={idleSec};" +
+                $"Timeout={timeout};" +
+                "Pooling=true;Keepalive=30";
         }
     }
 }

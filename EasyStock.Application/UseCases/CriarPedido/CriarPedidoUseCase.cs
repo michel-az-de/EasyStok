@@ -43,6 +43,7 @@ public sealed record CriarPedidoCommand(
 public class CriarPedidoUseCase(
     IPedidoRepository pedidoRepo,
     IClienteRepository clienteRepo,
+    IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<CriarPedidoUseCase> logger)
 {
@@ -77,6 +78,15 @@ public class CriarPedidoUseCase(
             {
                 if (input.Quantidade <= 0)
                     throw new UseCaseValidationException("Quantidade do item deve ser maior que zero.");
+
+                // Valida que o ProdutoId, se informado, pertence à mesma empresa.
+                // Sem isso, item pode referenciar produto de outro tenant via FK direta.
+                if (input.ProdutoId.HasValue && input.ProdutoId.Value != Guid.Empty)
+                {
+                    var produto = await produtoRepo.GetByIdAsync(cmd.EmpresaId, input.ProdutoId.Value);
+                    if (produto is null)
+                        throw new UseCaseValidationException("Produto do item não pertence a esta empresa.");
+                }
 
                 var item = new PedidoItem
                 {

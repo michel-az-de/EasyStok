@@ -62,19 +62,32 @@ public class WebhookPixController(
     private bool ValidarAssinatura(string body)
     {
         var secret = configuration["Efi:WebhookSecret"];
-        // Em desenvolvimento ou quando não há secret configurado, exige token via querystring
-        // (?hmac=...). Se o secret existir, valida HMAC-SHA256 contra body+timestamp.
         if (string.IsNullOrWhiteSpace(secret))
         {
-            // Modo permissivo apenas se explicitamente liberado.
             return string.Equals(configuration["Efi:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase);
         }
 
         var headerSig = Request.Headers["X-Efi-Signature"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerSig)) return false;
 
+        // Replay protection: header X-Efi-Timestamp em ms unix; aceita janela ±5min.
+        var tsHeader = Request.Headers["X-Efi-Timestamp"].FirstOrDefault();
+        if (long.TryParse(tsHeader, out var ts))
+        {
+            var diff = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - ts);
+            if (diff > 5 * 60 * 1000)
+            {
+                logger.LogWarning("Webhook Pix: timestamp fora da janela ({Diff}ms). Recusando.", diff);
+                return false;
+            }
+        }
+
+        // Inclui timestamp no payload assinado se presente (defesa contra replay
+        // mesmo se atacante reenviar com timestamp atualizado).
+        var toSign = string.IsNullOrWhiteSpace(tsHeader) ? body : $"{tsHeader}.{body}";
+
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(body));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(toSign));
         var expected = Convert.ToHexString(hash).ToLowerInvariant();
         return CryptographicOperations.FixedTimeEquals(
             Encoding.ASCII.GetBytes(expected),
@@ -106,10 +119,31 @@ public class WebhookPixController(
 
         if (assinatura is not null)
         {
-            assinatura.Reativar();
-            assinatura.DataFim = DateTime.UtcNow.AddDays(30);
+            try
+            {
+                // Reativar lança se status for Cancelada — nesse caso
+                // criamos nova vigência sem chamar Reativar.
+                if (assinatura.Status == Domain.Enums.StatusAssinatura.Suspensa ||
+                    assinatura.Status == Domain.Enums.StatusAssinatura.Expirada)
+                {
+                    assinatura.Reativar();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Não foi possível reativar assinatura {Id}; renovando vigência apenas.", assinatura.Id);
+            }
+
+            // ACUMULA vigência: se DataFim ainda no futuro, soma a partir dela
+            // (evita perder dias quando paga adiantado). Senão, soma a partir de hoje.
+            var now = DateTime.UtcNow;
+            var baseDate = (assinatura.DataFim.HasValue && assinatura.DataFim.Value > now)
+                ? assinatura.DataFim.Value
+                : now;
+            assinatura.DataFim = baseDate.AddDays(30);
             await assinaturaRepo.UpdateAsync(assinatura);
-            logger.LogInformation("Assinatura renovada via Pix. EmpresaId: {EmpresaId}, Txid: {Txid}", cobranca.EmpresaId, txid);
+            logger.LogInformation("Assinatura renovada via Pix. EmpresaId: {EmpresaId}, Txid: {Txid}, novo DataFim: {Fim}",
+                cobranca.EmpresaId, txid, assinatura.DataFim);
         }
 
         await unitOfWork.CommitAsync();
