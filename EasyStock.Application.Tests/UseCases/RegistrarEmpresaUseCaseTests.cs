@@ -118,7 +118,7 @@ public class RegistrarEmpresaUseCaseTests
     }
 
     [Fact]
-    public async Task Registrar_DeveLancarValidation_QuandoPerfilAdminNaoEncontrado()
+    public async Task Registrar_DeveCriarPerfilAdmin_QuandoNaoExisteTemplateGlobal()
     {
         var usuarioRepository = Substitute.For<IUsuarioRepository>();
         var planoRepository = Substitute.For<IPlanoRepository>();
@@ -141,6 +141,9 @@ public class RegistrarEmpresaUseCaseTests
         var useCase = CriarUseCase(usuarioRepository, planoRepository, perfilRepository, assinaturaRepository, empresaRepository, usuarioEmpresaRepository, usuarioPerfilRepository, unitOfWork);
         var command = new RegistrarEmpresaCommand("Empresa Teste", null, "Admin Teste", "admin@teste.com", "senha123");
 
-        await Assert.ThrowsAsync<UseCaseValidationException>(() => useCase.ExecuteAsync(command));
+        var result = await useCase.ExecuteAsync(command);
+
+        Assert.NotEqual(Guid.Empty, result.EmpresaId);
+        await perfilRepository.Received(1).AddAsync(Arg.Is<Perfil>(p => p.Nome == "Admin" && p.EmpresaId == result.EmpresaId));
     }
 }

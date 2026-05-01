@@ -883,6 +883,20 @@ button:disabled {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+.ux-density-toggle {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
 .more-menu-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5927,6 +5941,68 @@ select:focus-visible {
 .stock-source-chip.out { border-color: rgba(239,107,107,0.22); color: #ffb0b0; }
 .stock-source-chip.sales { border-color: rgba(147,197,253,0.26); color: #c8e2ff; }
 .stock-source-chip.batch { border-color: rgba(240,184,74,0.26); color: #ffd66f; }
+.detail-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.detail-kpi {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255,255,255,0.03);
+}
+.detail-kpi strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.detail-kpi span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.detail-section {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.detail-section h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.detail-list {
+  display: grid;
+  gap: 8px;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  border-bottom: 1px dashed rgba(255,255,255,0.08);
+  padding-bottom: 8px;
+}
+.detail-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.detail-row strong { display: block; font-size: 13px; }
+.detail-row span { display: block; font-size: 12px; color: var(--ink-mute); }
+.detail-row .right { text-align: right; flex-shrink: 0; }
+.detail-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.detail-actions .hist-action { width: 100%; justify-content: center; }
 .stock-stat {
   border: 1px solid var(--line);
   background: rgba(255,255,255,0.03);
@@ -5951,6 +6027,103 @@ select:focus-visible {
 .mov-item.in .mov-type { color: var(--basil); }
 .mov-item.out .mov-type { color: var(--accent); }
 .mov-item .mov-items .muted { color: var(--ink-mute); font-size: 12px; display: block; margin-top: 4px; }
+.mov-item .mov-more { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* UX calm: reduz carga cognitiva sem remover funcionalidades. */
+body.ux-calm .home-cash-label,
+body.ux-calm .cash-card-collapsed {
+  display: none;
+}
+body.ux-calm .home-command-bar,
+body.ux-calm .screen-subtitle {
+  display: none;
+}
+body.ux-calm .home-pipeline {
+  gap: 8px;
+}
+body.ux-calm .home-lane {
+  border-radius: 14px;
+}
+body.ux-calm .home-lane-head {
+  min-height: 42px;
+  padding: 9px 11px;
+  letter-spacing: 0.06em;
+}
+body.ux-calm .home-lane-body {
+  padding: 8px;
+}
+body.ux-calm .home-order-card {
+  padding: 10px;
+  border-radius: 12px;
+}
+body.ux-calm .home-order-items {
+  display: none;
+}
+body.ux-calm .home-order-actions {
+  grid-template-columns: 1fr auto;
+  margin-top: 8px;
+}
+body.ux-calm .home-order-actions button:not(.primary):not(.open-full) {
+  display: none;
+}
+body.ux-calm .home-order-total {
+  font-size: 15px;
+}
+body.ux-calm .home-order-who {
+  font-size: 13px;
+}
+body.ux-calm .home-ops-disclosure {
+  margin-top: 12px;
+  border-radius: 14px;
+}
+body.ux-calm .home-ops-sub,
+body.ux-calm .more-menu-head > span:last-child,
+body.ux-calm .more-menu-item span {
+  display: none;
+}
+body.ux-calm .home-ops-disclosure > summary {
+  min-height: 48px;
+}
+body.ux-calm .more-menu {
+  padding: 12px;
+}
+body.ux-calm .more-menu-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+body.ux-calm .more-menu-item {
+  min-height: 44px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  text-align: center;
+}
+body.ux-calm .more-menu-item strong {
+  font-size: 12px;
+}
+body.ux-calm .premium-panel-sub,
+body.ux-calm .trust-badges {
+  display: none;
+}
+body.ux-calm [data-screen="producao"] .prod-hero {
+  padding: 12px;
+  border-radius: 14px;
+  margin-bottom: 10px;
+}
+body.ux-calm [data-screen="producao"] .prod-hero::after,
+body.ux-calm [data-screen="producao"] .prod-eyebrow,
+body.ux-calm [data-screen="producao"] .prod-hero p,
+body.ux-calm [data-screen="producao"] .prod-metrics {
+  display: none;
+}
+body.ux-calm [data-screen="producao"] .prod-hero h2 {
+  font-size: 22px;
+}
+body.ux-calm [data-screen="producao"] .prod-hero-actions {
+  margin: 8px 0 0;
+}
+body.ux-calm [data-screen="producao"] .section-label {
+  margin-top: 10px;
+}
 .batch-action:disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -6082,7 +6255,7 @@ select:focus-visible {
       <!-- Cash card colapsado: so saldo + botao Detalhes. As 4 linhas
            detalhadas e os botoes Lançamento/Fechar/Reabrir migraram pro
            cashDetailsModal. -->
-      <div class="section-label">Caixa de hoje</div>
+      <div class="section-label home-cash-label">Caixa de hoje</div>
       <button class="cash-card-collapsed" onclick="openCashDetails()">
         <div class="ccc-info">
           <div class="ccc-label">Saldo</div>
@@ -6280,7 +6453,7 @@ select:focus-visible {
          cashEntryModal continuam como modais por cima desta screen. -->
     <div class="screen" data-screen="caixa">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6309,7 +6482,7 @@ select:focus-visible {
 
     <div class="screen" data-screen="finalizados">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6334,7 +6507,7 @@ select:focus-visible {
     <!-- CONFERENCIA — scanner híbrido (pedido + produção) -->
     <div class="screen" data-screen="clientes">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6354,7 +6527,7 @@ select:focus-visible {
 
     <div class="screen" data-screen="suporte">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6424,7 +6597,7 @@ select:focus-visible {
 
     <div class="screen" data-screen="compras">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6466,7 +6639,7 @@ select:focus-visible {
     <!-- HISTÓRICO (substitui Movimentos — engloba auditoria completa) -->
     <div class="screen" data-screen="historico">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -6496,7 +6669,7 @@ select:focus-visible {
     <!-- ESTOQUE (rastreabilidade e movimentações) -->
     <div class="screen" data-screen="estoque">
       <div class="screen-header">
-        <button class="screen-back" onclick="go('home')" aria-label="Voltar">
+        <button class="screen-back" onclick="goBack()" aria-label="Voltar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
@@ -7005,6 +7178,17 @@ select:focus-visible {
     </div>
   </div>
 
+  <!-- Detalhe completo de lote -->
+  <div class="historico-overlay" id="batchDetailsModal" role="dialog" aria-modal="true">
+    <div class="historico-sheet">
+      <div class="cobranca-head">
+        <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Detalhes do lote</h3>
+        <button class="cobranca-close" onclick="closeBatchDetails()" aria-label="Fechar">×</button>
+      </div>
+      <div id="batchDetailsBody"></div>
+    </div>
+  </div>
+
   <!-- Diagnostico operacional — substitui o alert() antigo do printerDiagnostics.
        Modal scrollavel com seções: APP, SYNC, STORAGE, INTEGRIDADE, IMPRESSORA,
        CAMERA, ATALHOS. Util em campo quando algo nao esta bem. Conteudo
@@ -7168,7 +7352,7 @@ select:focus-visible {
   <div class="more-menu" id="moreMenu" aria-label="Mais paginas">
     <div class="more-menu-head">
       <span>Mais ferramentas</span>
-      <span>sem bagunca</span>
+      <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
     </div>
     <div class="more-menu-grid">
       <button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
@@ -7246,6 +7430,26 @@ function load(key, fallback) {
 function save(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
 }
+
+function isCalmUx() {
+  try { return (localStorage.getItem('cdb-ux-density') || 'calm') !== 'full'; }
+  catch (e) { return true; }
+}
+function applyUxDensity() {
+  const calm = isCalmUx();
+  if (document.body) document.body.classList.toggle('ux-calm', calm);
+  const btn = document.getElementById('uxDensityToggle');
+  if (btn) btn.textContent = calm ? 'Simples' : 'Completo';
+}
+function toggleUxDensity(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const next = isCalmUx() ? 'full' : 'calm';
+  try { localStorage.setItem('cdb-ux-density', next); } catch (e) {}
+  applyUxDensity();
+  if (typeof renderHome === 'function' && currentScreen === 'home') renderHome();
+  showToast(next === 'full' ? 'Modo completo ativado' : 'Modo simples ativado');
+}
+applyUxDensity();
 
 let products = load('cdb-products', null);
 if (!products) products = defaultProducts.map(p => ({...p}));
@@ -8043,16 +8247,33 @@ function closeMoreMenu() {
 function toggleMoreMenu() {
   const menu = document.getElementById('moreMenu');
   if (!menu) return;
+  if (typeof applyUxDensity === 'function') applyUxDensity();
   const willOpen = !menu.classList.contains('show');
   menu.classList.toggle('show', willOpen);
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
 }
 
-function go(screen) {
+let currentScreen = 'home';
+let screenHistory = ['home'];
+function syncScreenHistory(nextScreen) {
+  const prev = screenHistory[screenHistory.length - 1];
+  if (prev !== nextScreen) screenHistory.push(nextScreen);
+  if (screenHistory.length > 20) screenHistory.shift();
+  currentScreen = nextScreen;
+}
+function goBack() {
+  if (screenHistory.length > 1) screenHistory.pop();
+  const target = screenHistory[screenHistory.length - 1] || 'home';
+  go(target, { preserveHistory: true });
+}
+function go(screen, opts) {
+  opts = opts || {};
   closeMoreMenu();
+  if (!opts.preserveHistory) syncScreenHistory(screen);
+  currentScreen = screen;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
-  const moreScreens = ['historico', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte'];
+  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte'];
   document.querySelectorAll('.nav-btn').forEach(n => {
     const nav = n.dataset.nav;
     n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
@@ -9205,8 +9426,9 @@ function renderHomeOpsDisclosure() {
   try { attention = buildAttentionItems(); } catch (e) { attention = []; }
   const shopping = getShoppingRows().filter(item => !item.done).length;
   const urgent = attention.filter(item => item.severity === 'err' || item.severity === 'warn').length;
+  const shouldOpen = urgent > 0 || shopping > 0;
   box.ontoggle = function () {
-    if (chip) chip.textContent = box.open ? 'ocultar' : (urgent > 0 || shopping > 0 ? 'pendente' : 'ver');
+    if (chip) chip.textContent = box.open ? 'ocultar' : (shouldOpen ? 'pendente' : 'ver');
   };
   if (sub) {
     const parts = [];
@@ -9271,6 +9493,7 @@ function renderOpenOrders() {
   const list = document.getElementById('openOrdersList');
   const counter = document.getElementById('openCount');
   const open = openOrders();
+  const calm = typeof isCalmUx === 'function' && isCalmUx();
   counter.textContent = open.length;
   list.innerHTML = '';
   if (open.length === 0) {
@@ -9289,7 +9512,8 @@ function renderOpenOrders() {
   board.className = 'home-pipeline';
   lanes.forEach(lane => {
     const items = open.filter(o => o.status === lane.key);
-    const visibleItems = items.slice(0, 2);
+    if (calm && !items.length) return;
+    const visibleItems = items.slice(0, calm ? 1 : 2);
     const hiddenCount = items.length - visibleItems.length;
     const laneEl = document.createElement('section');
     laneEl.className = 'home-lane';
@@ -9313,6 +9537,10 @@ function renderOpenOrders() {
       const advanceClick = primaryAction
         ? `runOrderAction('${o.id}', '${primaryAction.key}')`
         : `advanceOrder('${o.id}')`;
+      const secondaryActions = calm
+        ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
+        : `<button onclick="openCobranca('${o.id}')" title="Gerar cobranca">Cobrar</button>
+          <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>`;
       card.innerHTML = `
         <div class="home-order-top">
           <div class="home-order-who">
@@ -9324,8 +9552,7 @@ function renderOpenOrders() {
         <div class="home-order-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
         <div class="home-order-actions">
           ${advanceLabel ? `<button class="primary" onclick="${advanceClick}">${advanceLabel}</button>` : `<button class="primary" onclick="openHistorico('${o.id}')">Abrir</button>`}
-          <button onclick="openCobranca('${o.id}')" title="Gerar cobranca">Cobrar</button>
-          <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>
+          ${secondaryActions}
         </div>
       `;
       body.appendChild(card);
@@ -9334,7 +9561,7 @@ function renderOpenOrders() {
       const more = document.createElement('button');
       more.className = 'home-lane-more';
       more.type = 'button';
-      more.textContent = `Ver mais ${hiddenCount} no kanban completo`;
+      more.textContent = calm ? `+${hiddenCount} no kanban` : `Ver mais ${hiddenCount} no kanban completo`;
       more.onclick = function () {
         go('pedidos');
         setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50);
@@ -10170,6 +10397,10 @@ function renderHistoricoScreen() {
   if (!list) return;
   const all = buildHistoryEvents();
   const filtered = histFilter === 'all' ? all : all.filter(e => e.type === histFilter);
+  const batchCount = all.filter(e => e.type === 'batch').length;
+  const orderCount = all.filter(e => e.type === 'order').length;
+  const cashCount = all.filter(e => e.type === 'cash').length;
+  const otherCount = all.length - batchCount - orderCount - cashCount;
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty"><span class="big">📜</span>Nada por aqui ainda.<br><span style="font-size:12px;color:var(--ink-mute)">Cada produção, pedido, edição de cadastro etc. aparece aqui automaticamente.</span></div>`;
@@ -10178,12 +10409,30 @@ function renderHistoricoScreen() {
   }
 
   const visible = filtered.slice(0, histShown);
-  list.innerHTML = visible.map(e => {
+  const summaryHtml = `
+    <div class="stock-ledger" style="margin-bottom:12px">
+      <div class="stock-ledger-card">
+        <div class="stock-ledger-top">
+          <div>
+            <div class="stock-ledger-name">Auditoria operacional</div>
+            <div class="stock-ledger-meta">Eventos rastreáveis, lotes, pedidos e caixa</div>
+          </div>
+          <span class="stock-ledger-badge ok">${all.length} eventos</span>
+        </div>
+        <div class="detail-kpis">
+          <div class="detail-kpi"><strong>${batchCount}</strong><span>produção</span></div>
+          <div class="detail-kpi"><strong>${orderCount}</strong><span>pedidos</span></div>
+          <div class="detail-kpi"><strong>${cashCount + otherCount}</strong><span>outros</span></div>
+        </div>
+      </div>
+    </div>`;
+  list.innerHTML = summaryHtml + visible.map(e => {
     const dt = new Date(e.ts);
     const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
       String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
     // Acoes contextuais por tipo de evento. Batch -> Reimprimir + Excluir/Recuperar.
     let actions = '';
+    let extra = '';
     if (e.type === 'batch' && e.entityId) {
       const batch = batches.find(b => b.id === e.entityId);
       if (batch) {
@@ -10194,8 +10443,12 @@ function renderHistoricoScreen() {
         } else {
           btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')">↩️ Recuperar lote</button>`);
         }
+        btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')">Detalhes</button>`);
         actions = `<div class="mov-actions">${btns.join('')}</div>`;
       }
+    }
+    if (e.type === 'order' && e.entityId) {
+      extra = `<div class="mov-more"><button class="hist-action" onclick="go('finalizados'); setTimeout(function(){ try { goFinalizadosTab('todos'); } catch(e){} }, 50)">Ver pedidos</button></div>`;
     }
     return `
       <div class="mov-item ${e.type}">
@@ -10206,6 +10459,7 @@ function renderHistoricoScreen() {
         <div class="mov-items">${escapeHtml(e.summary || '')}</div>
         <div class="mov-ref"><span class="op">por ${escapeHtml(e.operator || '—')}</span></div>
         ${actions}
+        ${extra}
       </div>
     `;
   }).join('');
@@ -13919,15 +14173,54 @@ function mergeBatchesFlow() {
 function openBatchHistory(batchId) {
   const batch = getBatchById(batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
-  go('estoque');
-  setStockFilter('batch');
-  showToast(`Histórico operacional de ${batch.lote || batch.code}`);
+  openBatchDetails(batchId);
 }
+function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
 function openBatchDetails(batchId) {
   const batch = getBatchById(batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
-  const items = (batch.items || []).map(i => `${i.qty}x ${i.name}`).join('\n') || 'Sem itens.';
-  alert(`Detalhes do lote ${batch.lote || batch.code}\n\nStatus: ${getBatchStatus(batch) === 'closed' ? 'Fechado' : 'Aberto'}\nItens:\n${items}`);
+  const host = document.getElementById('batchDetailsBody');
+  if (!host) return;
+  const status = getBatchStatus(batch);
+  const ets = etiquetasFromBatch(batch);
+  const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
+  const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
+  const items = (batch.items || []).slice();
+  const logsForBatch = (logs || []).filter(l => l.entityType === 'batch' && l.entityId === batch.id).slice(-10).reverse();
+  const created = new Date(batch.createdAt || Date.now()).toLocaleString('pt-BR');
+  const closed = batch.closedAt ? new Date(batch.closedAt).toLocaleString('pt-BR') : '—';
+  host.innerHTML = `
+    <div class="detail-kpis">
+      <div class="detail-kpi"><strong>${items.reduce((s, i) => s + (Number(i.qty) || 0), 0)}</strong><span>unidades</span></div>
+      <div class="detail-kpi"><strong>${conferidos}/${ets.length}</strong><span>conferidas</span></div>
+      <div class="detail-kpi"><strong>${divergencias}</strong><span>divergências</span></div>
+    </div>
+    <div class="detail-section">
+      <h4>Resumo</h4>
+      <div class="detail-list">
+        <div class="detail-row"><div><strong>${escapeHtml(batch.lote || batch.code || batch.id)}</strong><span>${status === 'closed' ? 'Fechado' : 'Aberto'}</span></div><div class="right"><strong>${created}</strong><span>criado</span></div></div>
+        <div class="detail-row"><div><strong>${escapeHtml(batch.lastOperatorName || batch.closedBy || '—')}</strong><span>operador</span></div><div class="right"><strong>${closed}</strong><span>fechado</span></div></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Itens do lote</h4>
+      <div class="detail-list">
+        ${items.length ? items.map(it => `<div class="detail-row"><div><strong>${escapeHtml(it.name)}</strong><span>${escapeHtml(it.unit || '')}</span></div><div class="right"><strong>${Number(it.qty) || 0}</strong><span>qtd</span></div></div>`).join('') : '<div class="hint">Sem itens.</div>'}
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Rastreabilidade</h4>
+      <div class="detail-list">
+        ${logsForBatch.length ? logsForBatch.map(l => `<div class="detail-row"><div><strong>${escapeHtml(l.summary || l.action)}</strong><span>${new Date(l.ts || Date.now()).toLocaleString('pt-BR')}</span></div><div class="right"><strong>${escapeHtml(l.action || '')}</strong><span>${escapeHtml(l.operator || '—')}</span></div></div>`).join('') : '<div class="hint">Sem eventos de auditoria.</div>'}
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="hist-action" onclick="reprintFromBatchId('${batch.id}')">Reimprimir</button>
+      <button class="hist-action danger" onclick="deleteBatch('${batch.id}')">Excluir</button>
+      <button class="hist-action" onclick="go('estoque'); setStockFilter('batch'); closeBatchDetails()">Ir ao estoque</button>
+    </div>
+  `;
+  toggleModal('batchDetailsModal', true);
 }
 function conferRowHtml(o) {
   const code = (o.id || '').slice(-8);

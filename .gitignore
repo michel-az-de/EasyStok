@@ -374,3 +374,10 @@ FodyWeavers.xsd
 .claude/
 .claire/
 builds/
+
+# Build artifacts
+publish-api/
+publish-web/
+publish-admin/
+*.zip
+EasyStock.Api/easystock.db*

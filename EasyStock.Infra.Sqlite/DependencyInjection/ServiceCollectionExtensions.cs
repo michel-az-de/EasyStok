@@ -39,6 +39,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILojaRepository, LojaRepository>();
         services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
         services.AddScoped<IFornecedorRepository, FornecedorRepository>();
+        services.AddScoped<IClienteRepository, ClienteRepository>();
+        services.AddScoped<IPedidoRepository, PedidoRepository>();
+        services.AddScoped<ICaixaRepository, CaixaRepository>();
+        services.AddScoped<ILoteRepository, LoteRepository>();
         services.AddScoped<IPedidoFornecedorRepository, PedidoFornecedorRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IPerfilRepository, PerfilRepository>();
@@ -50,6 +54,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
         services.AddScoped<IUsoIaRepository, UsoIaRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IListaComprasRepository, ListaComprasRepository>();
+        services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
+        services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
         services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();

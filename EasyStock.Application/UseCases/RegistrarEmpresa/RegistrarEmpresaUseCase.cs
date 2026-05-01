@@ -83,8 +83,21 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
             await usuarioEmpresaRepository.AddAsync(usuarioEmpresa);
 
             var perfispadrao = await perfilRepository.GetPadroesAsync();
-            var perfilAdmin = perfispadrao.FirstOrDefault(p => p.Nome == "Admin")
-                ?? throw new UseCaseValidationException("Perfil 'Admin' padrao nao encontrado. Configure os planos e perfis antes de registrar empresas.");
+            var perfilAdmin = perfispadrao.FirstOrDefault(p => p.Nome == "Admin");
+
+            if (perfilAdmin is null)
+            {
+                perfilAdmin = new Perfil
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresa.Id,
+                    Nome = "Admin",
+                    Descricao = "Administrador com acesso total",
+                    Nivel = NivelAcesso.Admin,
+                    CriadoEm = agora
+                };
+                await perfilRepository.AddAsync(perfilAdmin);
+            }
 
             var usuarioPerfil = new UsuarioPerfil
             {

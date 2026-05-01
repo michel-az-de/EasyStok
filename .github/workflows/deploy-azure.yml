@@ -62,7 +62,33 @@ jobs:
             --startup-project EasyStock.Api \
             --no-build || true
 
-  # ── 3. Build & deploy Web ────────────────────────────────────────────────────
+  # ── 3. Build & deploy Admin ──────────────────────────────────────────────────
+  deploy-admin:
+    name: Admin → Azure
+    runs-on: ubuntu-latest
+    needs: deploy-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Publish Admin
+        run: |
+          dotnet restore EasyStock.Admin/EasyStock.Admin.csproj
+          dotnet publish EasyStock.Admin/EasyStock.Admin.csproj \
+            -c Release -o ./publish-admin --no-restore
+
+      - name: Deploy Admin to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: easystock-admin
+          publish-profile: ${{ secrets.AZURE_ADMIN_PUBLISH_PROFILE }}
+          package: ./publish-admin
+
+  # ── 4. Build & deploy Web ────────────────────────────────────────────────────
   deploy-web:
     name: Web → Azure
     runs-on: ubuntu-latest
@@ -92,7 +118,7 @@ jobs:
   health-check:
     name: Health check
     runs-on: ubuntu-latest
-    needs: [ deploy-api, deploy-web ]
+    needs: [ deploy-api, deploy-web, deploy-admin ]
     steps:
       - name: Wait for warm-up (30s)
         run: sleep 30
