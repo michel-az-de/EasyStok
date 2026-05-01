@@ -84,7 +84,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // API: bypass (sync precisa de rede)
-  if (url.pathname.includes('/api/')) return;
+  if (url.pathname.startsWith('/api/')) return;
 
   // Google Fonts: deixa o browser cachear nativamente
   if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) return;

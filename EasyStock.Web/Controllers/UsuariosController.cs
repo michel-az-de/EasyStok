@@ -24,9 +24,9 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
                 .ToList();
         }
 
-        if (result.Success)
+        if (result.Success && result.Data is { } usuarios)
         {
-            vm.Usuarios = result.Data!.Select(u => new UsuarioInfo
+            vm.Usuarios = usuarios.Select(u => new UsuarioInfo
             {
                 Id = u.UsuarioId.ToString(),
                 Nome = u.Nome,
@@ -34,8 +34,8 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
                 Role = u.Nivel
             }).ToList();
 
-            vm.TotalAdmins = result.Data!.Count(u => u.Nivel is "Admin" or "SuperAdmin");
-            vm.TotalColaboradores = result.Data!.Count(u => u.Nivel is not "Admin" and not "SuperAdmin");
+            vm.TotalAdmins = usuarios.Count(u => u.Nivel is "Admin" or "SuperAdmin");
+            vm.TotalColaboradores = usuarios.Count(u => u.Nivel is not "Admin" and not "SuperAdmin");
         }
 
         return View(vm);

@@ -11,12 +11,13 @@
 // que o activate descarte caches antigos, forcando o conteudo cacheado a ser
 // re-baixado apos cada release.
 
-const CACHE_VERSION = 'cdb-v2';
+const CACHE_VERSION = 'cdb-v3-20260501a';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './sync.js',
+  './qrcode.min.js',
   './icons/favicon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -83,7 +84,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // API: bypass (sync precisa de rede)
-  if (url.pathname.includes('/api/')) return;
+  if (url.pathname.startsWith('/api/')) return;
 
   // Google Fonts: deixa o browser cachear nativamente
   if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) return;

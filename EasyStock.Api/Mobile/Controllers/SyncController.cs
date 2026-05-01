@@ -334,7 +334,7 @@ public class SyncController(
             var oldStatus = existing.Status;
             if (oldStatus != dto.Status)
             {
-                await ApplyStockRule(oldStatus, dto.Status, dto.Items, dto.Id);
+                await ApplyStockRule(oldStatus, dto.Status, dto.Items, empresaId, dto.Id);
             }
             existing.Status = dto.Status;
             existing.Notes = dto.Notes;
@@ -380,7 +380,7 @@ public class SyncController(
     /// reconciler espelha a movimentação em <c>itens_estoque</c> +
     /// <c>movimentacoes_estoque</c>. Falha do reconciler NÃO interrompe sync.
     /// </summary>
-    private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items, string? orderId = null)
+    private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items, Guid? empresaId, string? orderId = null)
     {
         // Transição para "pronto"/"entregue": desconta
         if (oldStatus != "pronto" && oldStatus != "entregue"
@@ -388,15 +388,13 @@ public class SyncController(
         {
             foreach (var i in items)
             {
-                var p = await _db.Set<Product>().FindAsync(i.ProductId);
+                var p = await _db.Set<Product>()
+                    .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
                 var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
                     p, -i.Qty, NaturezaMovimentacaoEstoque.Venda,
                     descricao: $"Pedido mobile {orderId ?? p.Id} -> {newStatus}",
                     referenciaDocumento: orderId);
-                // Se reconciler aplicou no ERP, ele tambem ja sincronizou p.Stock.
-                // Se nao (sem link / falha), faz update local-only pra preservar
-                // comportamento legado.
                 if (!reconciliouNoErp) p.Stock -= i.Qty;
             }
         }
@@ -405,7 +403,8 @@ public class SyncController(
         {
             foreach (var i in items)
             {
-                var p = await _db.Set<Product>().FindAsync(i.ProductId);
+                var p = await _db.Set<Product>()
+                    .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
                 var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
                     p, +i.Qty, NaturezaMovimentacaoEstoque.Estorno,
@@ -449,7 +448,8 @@ public class SyncController(
                     : (DateTime?)null
             });
             // Incrementa estoque (Onda 2 parte 2: reconciliação ERP se linkado).
-            var p = await _db.Set<Product>().FindAsync(i.ProductId);
+            var p = await _db.Set<Product>()
+                .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
             if (p == null) continue;
             var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
                 p, +i.Qty, NaturezaMovimentacaoEstoque.Producao,

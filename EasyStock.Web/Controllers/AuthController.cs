@@ -163,6 +163,53 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         return RedirectToAction("Index", "Dashboard");
     }
 
+    /// <summary>
+    /// Handoff de impersonation vindo do EasyStock.Admin. Recebe o JWT por POST
+    /// (form body) — nunca por querystring — para que o token não vaze em logs
+    /// de servidor, history do browser ou referrer headers.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("/auth/impersonate")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Impersonate([FromForm] string token, [FromForm] string? refreshToken = null)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction(nameof(Login));
+
+        session.Clear();
+        session.SetTokens(token, refreshToken ?? string.Empty);
+
+        var nome = ExtractClaim(token, "nome") ?? ExtractClaim(token, ClaimTypes.Name) ?? "Operador";
+        var email = ExtractClaim(token, "email") ?? "";
+        var nivel = ExtractClaim(token, "nivel") ?? "Admin";
+        var empresaId = ExtractClaim(token, "empresaId");
+        var userId = ExtractClaim(token, "sub") ?? "";
+
+        if (!string.IsNullOrEmpty(empresaId))
+            session.SetEmpresaId(empresaId);
+        session.SetUsuario(userId, nome, nivel);
+
+        var lojas = await api.GetAsync<List<Loja>>("lojas");
+        if (lojas.Success && lojas.Data is { Count: > 0 } ls)
+            session.SetLoja(ls[0].Id, ls[0].Nome, ls[0].Emoji, ls[0].EmpresaId);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, nome),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Role, nivel)
+        };
+        if (!string.IsNullOrEmpty(empresaId))
+            claims.Add(new Claim("empresaId", empresaId));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var props = new AuthenticationProperties { IsPersistent = false, ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(60) };
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
+
+        TempData["Toast"] = "info|Sessão de suporte iniciada. Saia ao terminar.";
+        return RedirectToAction("Index", "Dashboard");
+    }
+
     [AllowAnonymous]
     [HttpGet("/auth/registrar")]
     public IActionResult Registrar()
@@ -216,6 +263,21 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
             "Admin");
 
         session.SetTemaPreferido("light");
+
+        // Após signup: usuário ainda não tem lojas. Cria uma loja default para que
+        // o dashboard e demais controllers que dependem de LojaAtual não quebrem.
+        var lojasResult = await api.GetAsync<List<Loja>>("lojas");
+        if (lojasResult.Success && lojasResult.Data is { Count: > 0 } lojas)
+        {
+            session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji, lojas[0].EmpresaId);
+        }
+        else
+        {
+            // Cria loja default sob demanda — usuário pode renomear depois.
+            var criar = await api.PostAsync<Loja>("lojas", new { nome = "Minha Loja", cidade = "" });
+            if (criar.Success && criar.Data is { } nova)
+                session.SetLoja(nova.Id, nova.Nome, nova.Emoji, nova.EmpresaId);
+        }
 
         var claims = new List<Claim>
         {

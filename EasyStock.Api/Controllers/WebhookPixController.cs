@@ -1,6 +1,9 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace EasyStock.Api.Controllers;
@@ -12,11 +15,28 @@ public class WebhookPixController(
     ICobrancaAssinaturaRepository cobrancaRepo,
     IAssinaturaEmpresaRepository assinaturaRepo,
     IUnitOfWork unitOfWork,
+    IConfiguration configuration,
     ILogger<WebhookPixController> logger) : ControllerBase
 {
     [HttpPost("pix")]
-    public async Task<IActionResult> Pix([FromBody] JsonElement payload)
+    public async Task<IActionResult> Pix()
     {
+        // Lê body bruto pra calcular HMAC e desserializar.
+        Request.EnableBuffering();
+        using var reader = new StreamReader(Request.Body, Encoding.UTF8, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        Request.Body.Position = 0;
+
+        if (!ValidarAssinatura(rawBody))
+        {
+            logger.LogWarning("Webhook Pix: assinatura HMAC inválida ou ausente. Recusando.");
+            return Unauthorized();
+        }
+
+        JsonElement payload;
+        try { payload = JsonDocument.Parse(rawBody).RootElement; }
+        catch { return BadRequest(); }
+
         try
         {
             if (!payload.TryGetProperty("pix", out var pixArray) || pixArray.ValueKind != JsonValueKind.Array)
@@ -37,6 +57,28 @@ public class WebhookPixController(
         }
 
         return Ok();
+    }
+
+    private bool ValidarAssinatura(string body)
+    {
+        var secret = configuration["Efi:WebhookSecret"];
+        // Em desenvolvimento ou quando não há secret configurado, exige token via querystring
+        // (?hmac=...). Se o secret existir, valida HMAC-SHA256 contra body+timestamp.
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            // Modo permissivo apenas se explicitamente liberado.
+            return string.Equals(configuration["Efi:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        var headerSig = Request.Headers["X-Efi-Signature"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(headerSig)) return false;
+
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(body));
+        var expected = Convert.ToHexString(hash).ToLowerInvariant();
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.ASCII.GetBytes(expected),
+            Encoding.ASCII.GetBytes(headerSig.Trim().ToLowerInvariant()));
     }
 
     private async Task ProcessarPagamentoAsync(string txid)

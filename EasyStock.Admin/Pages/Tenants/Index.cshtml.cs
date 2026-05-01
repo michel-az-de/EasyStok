@@ -56,9 +56,40 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
 
     public async Task<IActionResult> OnPostImpersonarAsync(Guid id)
     {
-        var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{id}/impersonate", new { });
-        var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
-        var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
-        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token ?? "")}");
+        try
+        {
+            var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{id}/impersonate", new { });
+            var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                SetErro("API não retornou token de impersonation.");
+                return RedirectToPage(new { Page, Search, Status });
+            }
+            var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
+            // POST handoff em vez de GET com token na URL — token não vaza em
+            // logs/history/referrer. Renderiza HTML com auto-submit form.
+            return Content(BuildHandoffHtml(webUrl, token), "text/html; charset=utf-8");
+        }
+        catch (Exception ex)
+        {
+            SetErro($"Falha ao impersonar: {ex.Message}");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+    }
+
+    internal static string BuildHandoffHtml(string webUrl, string token)
+    {
+        var safeToken = System.Net.WebUtility.HtmlEncode(token);
+        return $$"""
+        <!doctype html><html><head><meta charset="utf-8"><title>Conectando…</title></head>
+        <body style="font-family:system-ui;background:#0f172a;color:#cbd5e1;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <form id="f" method="POST" action="{{webUrl}}/auth/impersonate">
+            <input type="hidden" name="token" value="{{safeToken}}" />
+            <p>Iniciando sessão de suporte…</p>
+            <noscript><button type="submit">Continuar</button></noscript>
+        </form>
+        <script>document.getElementById('f').submit();</script>
+        </body></html>
+        """;
     }
 }

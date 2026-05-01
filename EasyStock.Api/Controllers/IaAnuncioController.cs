@@ -173,8 +173,18 @@ public class IaAnuncioController(
         }
     }
 
-    private Guid ResolverEmpresaId(Guid? solicitada) =>
-        (solicitada.HasValue && solicitada != Guid.Empty) ? solicitada.Value : currentUser.EmpresaId;
+    private Guid ResolverEmpresaId(Guid? solicitada)
+    {
+        var minha = currentUser.EmpresaId;
+        if (!solicitada.HasValue || solicitada == Guid.Empty || solicitada == minha)
+            return minha;
+
+        if (currentUser.Nivel == EasyStock.Domain.Enums.NivelAcesso.SuperAdmin)
+            return solicitada.Value;
+
+        throw new EasyStock.Application.UseCases.Common.UseCaseValidationException(
+            "EmpresaId inválido para o usuário atual.");
+    }
 }
 
 public sealed record GerarAnuncioRequest(

@@ -30,5 +30,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task InsertAsync(Produto produto);
         Task UpdateAsync(Produto produto);
         Task<IReadOnlyList<string>> GetMarcasAsync(Guid empresaId, string? filtro = null, int max = 20);
+        Task<int> CountByEmpresaAsync(Guid empresaId);
     }
 }

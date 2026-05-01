@@ -45,13 +45,28 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IProdutoVariacaoRepository variacaoRepository,
         IUnitOfWork unitOfWork,
         ILogger<CadastrarProdutoUseCase> logger,
-        IProdutoAlteracaoRepository? alteracaoRepository = null)
+        IProdutoAlteracaoRepository? alteracaoRepository = null,
+        IAssinaturaEmpresaRepository? assinaturaRepository = null)
     {
         public async Task<CadastrarProdutoResult> ExecuteAsync(CadastrarProdutoCommand command)
         {
             logger.LogInformation("Iniciando cadastro de produto. EmpresaId: {EmpresaId}, Nome: {Nome}", command.EmpresaId, command.Nome);
 
             Validar(command);
+
+            // Limite do plano (upgrade wall): conta produtos existentes contra o
+            // teto do plano da assinatura ativa. assinaturaRepository é opcional
+            // por compat — se ausente, segue sem cap (não regride v1).
+            if (assinaturaRepository is not null)
+            {
+                var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
+                if (assinatura?.Plano is not null && !assinatura.Plano.ProdutosSaoIlimitados)
+                {
+                    var totalProdutos = await produtoRepository.CountByEmpresaAsync(command.EmpresaId);
+                    if (totalProdutos >= assinatura.Plano.LimiteProdutos)
+                        throw new EasyStock.Domain.Exceptions.PlanoLimiteAtingidoException("produtos");
+                }
+            }
 
             var categoria = await categoriaRepository.GetByIdAsync(command.CategoriaId)
                 ?? throw new UseCaseValidationException("Categoria nao encontrada.");

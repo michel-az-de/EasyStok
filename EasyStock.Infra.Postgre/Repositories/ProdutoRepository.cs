@@ -176,6 +176,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             await InvalidarCacheAsync(produto.EmpresaId);
         }
 
+        public Task<int> CountByEmpresaAsync(Guid empresaId) =>
+            dbContext.Produtos.AsNoTracking()
+                .CountAsync(p => p.EmpresaId == empresaId);
+
         public async Task UpdateAsync(Produto produto)
         {
             dbContext.Produtos.Update(produto);

@@ -82,6 +82,21 @@ public class MobileVersionController(
             Diagnostics: true
         );
 
+        // OTA / atualização do app (PWA + APK).
+        // PwaCacheVersion: usado pelo PWA para decidir se chama
+        // ServiceWorkerRegistration.update() — se o valor mudou desde o último
+        // boot, força revalidação do SW e dos assets.
+        // ApkUrl/ApkVersion/ApkSha256: APK lê esses campos no boot e oferece
+        // download da nova build quando ApkVersion > versão local. URL aponta
+        // pro Azure Blob Storage do bucket easystock-apk.
+        var ota = new MobileOtaInfo(
+            PwaCacheVersion: _configuration["Mobile:PwaCacheVersion"] ?? "cdb-v3-20260429a",
+            ApkVersion: _configuration["Mobile:Apk:Version"] ?? "0.0.0",
+            ApkUrl: _configuration["Mobile:Apk:Url"] ?? "",
+            ApkSha256: _configuration["Mobile:Apk:Sha256"] ?? "",
+            MinSupportedSchemaVersion: _configuration.GetValue<int>("Mobile:MinSupportedSchemaVersion", 1)
+        );
+
         return Ok(new MobileVersionResponse(
             ApiVersion: asmVer,
             MobileSchemaVersion: mobileSchemaVersion,
@@ -89,7 +104,8 @@ public class MobileVersionController(
             Status: dbOk ? "ok" : "degraded",
             DatabaseOk: dbOk,
             SupportedMutations: supportedMutations,
-            Features: features
+            Features: features,
+            Ota: ota
         ));
     }
 }
@@ -102,7 +118,17 @@ public record MobileVersionResponse(
     string Status,
     bool DatabaseOk,
     string[] SupportedMutations,
-    MobileFeatures Features
+    MobileFeatures Features,
+    MobileOtaInfo Ota
+);
+
+/// <summary>Metadados de atualização (OTA) — usados pelo PWA e pelo APK.</summary>
+public record MobileOtaInfo(
+    string PwaCacheVersion,
+    string ApkVersion,
+    string ApkUrl,
+    string ApkSha256,
+    int MinSupportedSchemaVersion
 );
 
 /// <summary>Capabilities do servidor que o PWA usa pra UI condicional.</summary>

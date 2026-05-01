@@ -26,6 +26,40 @@ public sealed class EfiPixService(
         string descricao,
         CancellationToken ct = default)
     {
+        var (response, content) = await EnviarCobrancaAsync(txid, valor, descricao, forceTokenRefresh: false, ct);
+
+        // Se Efí rotacionou/revogou o token antes do TTL local de 3500s,
+        // recebemos 401. Invalida cache e tenta uma vez mais.
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            logger.LogWarning("Efí retornou 401 com token cacheado. Invalidando e tentando novamente.");
+            cache.Remove(TokenCacheKey);
+            response.Dispose();
+            (response, content) = await EnviarCobrancaAsync(txid, valor, descricao, forceTokenRefresh: true, ct);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("Efí Bank retornou {Status} ao criar cobrança {Txid}: {Body}", (int)response.StatusCode, txid, content);
+            throw new InvalidOperationException($"Falha ao criar cobrança Pix: {(int)response.StatusCode} — {content}");
+        }
+
+        using var doc = JsonDocument.Parse(content);
+        var root = doc.RootElement;
+
+        var pixCopiaCola = root.TryGetProperty("pixCopiaECola", out var pcc) ? pcc.GetString() ?? string.Empty : string.Empty;
+        var qrCodeBase64 = root.TryGetProperty("imagemQrcode", out var qr) ? qr.GetString() ?? string.Empty : string.Empty;
+        var expiracaoEm = DateTime.UtcNow.AddDays(1);
+
+        logger.LogInformation("Cobrança Pix criada. Txid: {Txid}, Valor: {Valor}", txid, valor);
+
+        return new EfiCobrancaResult(txid, pixCopiaCola, qrCodeBase64, expiracaoEm);
+    }
+
+    private async Task<(HttpResponseMessage Response, string Content)> EnviarCobrancaAsync(
+        string txid, decimal valor, string descricao, bool forceTokenRefresh, CancellationToken ct)
+    {
+        if (forceTokenRefresh) cache.Remove(TokenCacheKey);
         var token = await ObterTokenAsync(ct);
 
         var body = new
@@ -45,23 +79,7 @@ public sealed class EfiPixService(
 
         var response = await http.SendAsync(request, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.LogError("Efí Bank retornou {Status} ao criar cobrança {Txid}: {Body}", (int)response.StatusCode, txid, content);
-            throw new InvalidOperationException($"Falha ao criar cobrança Pix: {(int)response.StatusCode} — {content}");
-        }
-
-        using var doc = JsonDocument.Parse(content);
-        var root = doc.RootElement;
-
-        var pixCopiaCola = root.TryGetProperty("pixCopiaECola", out var pcc) ? pcc.GetString() ?? string.Empty : string.Empty;
-        var qrCodeBase64 = root.TryGetProperty("imagemQrcode", out var qr) ? qr.GetString() ?? string.Empty : string.Empty;
-        var expiracaoEm = DateTime.UtcNow.AddDays(1);
-
-        logger.LogInformation("Cobrança Pix criada. Txid: {Txid}, Valor: {Valor}", txid, valor);
-
-        return new EfiCobrancaResult(txid, pixCopiaCola, qrCodeBase64, expiracaoEm);
+        return (response, content);
     }
 
     private async Task<string> ObterTokenAsync(CancellationToken ct)

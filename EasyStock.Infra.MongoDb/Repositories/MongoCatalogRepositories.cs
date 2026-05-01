@@ -204,6 +204,12 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         EnqueueReplaceScoped(Collection, produto.Id, produto.EmpresaId, produto);
         return Task.CompletedTask;
     }
+
+    public async Task<int> CountByEmpresaAsync(Guid empresaId)
+    {
+        var filter = MongoDB.Driver.Builders<Produto>.Filter.Eq(p => p.EmpresaId, empresaId);
+        return (int)await Collection.CountDocumentsAsync(filter);
+    }
 }
 
 public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

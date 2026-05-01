@@ -72,11 +72,19 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
 
     public async Task<IActionResult> OnPostImpersonarAsync()
     {
-        var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/impersonate", new { });
-        var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
-        if (string.IsNullOrEmpty(token)) { SetErro("Falha ao gerar token de impersonação."); return RedirectToPage(new { Id }); }
-        var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
-        return Redirect($"{webUrl}/auth/impersonate?token={Uri.EscapeDataString(token)}");
+        try
+        {
+            var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/impersonate", new { });
+            var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
+            if (string.IsNullOrEmpty(token)) { SetErro("Falha ao gerar token de impersonação."); return RedirectToPage(new { Id }); }
+            var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
+            return Content(IndexModel.BuildHandoffHtml(webUrl, token), "text/html; charset=utf-8");
+        }
+        catch (Exception ex)
+        {
+            SetErro($"Falha ao impersonar: {ex.Message}");
+            return RedirectToPage(new { Id });
+        }
     }
 
     public async Task<IActionResult> OnPostConcederTrialAsync(int diasTrial)
