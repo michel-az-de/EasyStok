@@ -15,6 +15,7 @@ public class ConfiguracaoLojaConfiguration : IEntityTypeConfiguration<Configurac
         builder.Property(x => x.DiasAlertaValidade).HasDefaultValue(OperacionalDefaults.DiasAlertaValidade);
         builder.Property(x => x.DiasAlertaParado).HasDefaultValue(OperacionalDefaults.DiasAlertaParado);
         builder.Property(x => x.QuantidadeMinimaPadrao).HasDefaultValue(OperacionalDefaults.QuantidadeMinima);
+        builder.Property(x => x.QuantidadeCriticaPadrao).HasDefaultValue(OperacionalDefaults.QuantidadeCritica);
         builder.Property(x => x.NotificarEstoqueCritico).HasDefaultValue(true);
         builder.Property(x => x.NotificarValidade).HasDefaultValue(true);
         builder.Property(x => x.NotificarParado).HasDefaultValue(true);

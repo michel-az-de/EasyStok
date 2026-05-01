@@ -7,8 +7,6 @@ namespace EasyStock.Domain.Entities
 {
     public class ItemEstoque
     {
-        // Limiar de quantidade abaixo do qual o item é considerado crítico
-        private const int LimiarQuantidadeCritica = 2;
         public Guid Id { get; set; }
         public Guid EmpresaId { get; set; }
         public Guid ProdutoId { get; set; }
@@ -33,6 +31,7 @@ namespace EasyStock.Domain.Entities
         public Quantidade QuantidadeInicial { get; set; } = null!;
         public Quantidade QuantidadeAtual { get; set; } = null!;
         public int QuantidadeMinima { get; set; } = OperacionalDefaults.QuantidadeMinima;
+        public int QuantidadeCritica { get; set; } = OperacionalDefaults.QuantidadeCritica;
         public decimal VelocidadeSaidaDiaria { get; set; }
         public int DiasSemMovimentacao { get; set; }
         public int? PrevisaoZeramentoDias { get; set; }
@@ -98,6 +97,7 @@ namespace EasyStock.Domain.Entities
                 QuantidadeInicial = quantidade,
                 QuantidadeAtual = quantidade,
                 QuantidadeMinima = OperacionalDefaults.QuantidadeMinima,
+                QuantidadeCritica = OperacionalDefaults.QuantidadeCritica,
                 VelocidadeSaidaDiaria = 0m,
                 DiasSemMovimentacao = 0,
                 PrevisaoZeramentoDias = null,
@@ -214,7 +214,7 @@ namespace EasyStock.Domain.Entities
             AtualizarDiasSemMovimentacao(dataReferencia);
             AtualizarPrevisao();
 
-            if (QuantidadeAtual.Value <= LimiarQuantidadeCritica)
+            if (QuantidadeAtual.Value <= QuantidadeCritica)
             {
                 Status = StatusItemEstoque.Critical;
                 return;

@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Services;
 using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -127,11 +128,12 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 agora);
 
             if (command.LojaId.HasValue)
-            {
                 item.LojaId = command.LojaId.Value;
-                item.QuantidadeMinima = configuracaoLoja?.QuantidadeMinimaPadrao ?? item.QuantidadeMinima;
-                item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? OperacionalDefaults.DiasAlertaParado);
-            }
+
+            var limiares = LimiarEstoqueResolver.Resolver(produto, produto.Categoria, configuracaoLoja);
+            item.QuantidadeMinima = limiares.QuantidadeMinima;
+            item.QuantidadeCritica = limiares.QuantidadeCritica;
+            item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? OperacionalDefaults.DiasAlertaParado);
 
             var movimentacao = MovimentacaoEstoque.CriarEntrada(
                 Guid.NewGuid(),

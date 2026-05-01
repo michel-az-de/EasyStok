@@ -10,6 +10,7 @@ public sealed record AtualizarConfiguracaoLojaCommand(
     int? DiasAlertaValidade,
     int? DiasAlertaParado,
     int? QuantidadeMinimaPadrao,
+    int? QuantidadeCriticaPadrao,
     bool? NotificarEstoqueCritico,
     bool? NotificarValidade,
     bool? NotificarParado,
@@ -45,7 +46,8 @@ public class AtualizarConfiguracaoLojaUseCase(
             command.NotificarReposicao,
             command.FifoAtivo,
             command.Moeda,
-            command.Timezone);
+            command.Timezone,
+            command.QuantidadeCriticaPadrao);
 
         if (nova) await configuracaoRepository.AddAsync(configuracao);
         else await configuracaoRepository.UpdateAsync(configuracao);
@@ -59,6 +61,7 @@ public class AtualizarConfiguracaoLojaUseCase(
             configuracao.DiasAlertaValidade,
             configuracao.DiasAlertaParado,
             configuracao.QuantidadeMinimaPadrao,
+            configuracao.QuantidadeCriticaPadrao,
             configuracao.NotificarEstoqueCritico,
             configuracao.NotificarValidade,
             configuracao.NotificarParado,

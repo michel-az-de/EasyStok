@@ -9,6 +9,7 @@ public class ConfiguracaoLoja
     public int DiasAlertaValidade { get; set; } = OperacionalDefaults.DiasAlertaValidade;
     public int DiasAlertaParado { get; set; } = OperacionalDefaults.DiasAlertaParado;
     public int QuantidadeMinimaPadrao { get; set; } = OperacionalDefaults.QuantidadeMinima;
+    public int QuantidadeCriticaPadrao { get; set; } = OperacionalDefaults.QuantidadeCritica;
     public bool NotificarEstoqueCritico { get; set; } = true;
     public bool NotificarValidade { get; set; } = true;
     public bool NotificarParado { get; set; } = true;
@@ -43,11 +44,13 @@ public class ConfiguracaoLoja
         bool? notificarReposicao,
         bool? fifoAtivo,
         string? moeda,
-        string? timezone)
+        string? timezone,
+        int? quantidadeCriticaPadrao = null)
     {
         if (diasAlertaValidade.HasValue) DiasAlertaValidade = diasAlertaValidade.Value;
         if (diasAlertaParado.HasValue) DiasAlertaParado = diasAlertaParado.Value;
         if (quantidadeMinimaPadrao.HasValue) QuantidadeMinimaPadrao = quantidadeMinimaPadrao.Value;
+        if (quantidadeCriticaPadrao.HasValue) QuantidadeCriticaPadrao = quantidadeCriticaPadrao.Value;
         if (notificarEstoqueCritico.HasValue) NotificarEstoqueCritico = notificarEstoqueCritico.Value;
         if (notificarValidade.HasValue) NotificarValidade = notificarValidade.Value;
         if (notificarParado.HasValue) NotificarParado = notificarParado.Value;
@@ -63,6 +66,7 @@ public class ConfiguracaoLoja
         DiasAlertaValidade = OperacionalDefaults.DiasAlertaValidade;
         DiasAlertaParado = OperacionalDefaults.DiasAlertaParado;
         QuantidadeMinimaPadrao = OperacionalDefaults.QuantidadeMinima;
+        QuantidadeCriticaPadrao = OperacionalDefaults.QuantidadeCritica;
         NotificarEstoqueCritico = true;
         NotificarValidade = true;
         NotificarParado = true;

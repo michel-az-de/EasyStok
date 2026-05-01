@@ -29,6 +29,10 @@ namespace EasyStock.Domain.Entities
         public string? FotosJson { get; set; }
         public string? SugestaoDescricaoAnuncio { get; set; }
 
+        // Overrides hierarquicos de limiar (null = herdar da Categoria/ConfiguracaoLoja/Default global).
+        public int? QuantidadeMinima { get; set; }
+        public int? QuantidadeCritica { get; set; }
+
         public StatusProduto Status { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }

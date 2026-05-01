@@ -46,6 +46,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                     value => value >= 0 ? Quantidade.From(value) : Quantidade.Zero);
             builder.Property(i => i.QuantidadeMinima)
                 .HasDefaultValue(5);
+            builder.Property(i => i.QuantidadeCritica)
+                .HasDefaultValue(2);
             builder.Property(i => i.VelocidadeSaidaDiaria)
                 .HasColumnType("decimal(10,2)");
             builder.Property(i => i.DiasSemMovimentacao);

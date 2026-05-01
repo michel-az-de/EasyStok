@@ -19,6 +19,7 @@ public class ObterConfiguracaoLojaUseCase(
             config.DiasAlertaValidade,
             config.DiasAlertaParado,
             config.QuantidadeMinimaPadrao,
+            config.QuantidadeCriticaPadrao,
             config.NotificarEstoqueCritico,
             config.NotificarValidade,
             config.NotificarParado,

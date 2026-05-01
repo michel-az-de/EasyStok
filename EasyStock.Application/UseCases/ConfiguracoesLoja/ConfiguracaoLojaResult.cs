@@ -5,6 +5,7 @@ public sealed record ConfiguracaoLojaResult(
     int DiasAlertaValidade,
     int DiasAlertaParado,
     int QuantidadeMinimaPadrao,
+    int QuantidadeCriticaPadrao,
     bool NotificarEstoqueCritico,
     bool NotificarValidade,
     bool NotificarParado,

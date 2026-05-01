@@ -34,6 +34,7 @@ public class ConfiguracaoLojaUseCaseTests
             DiasAlertaValidade: 7,
             DiasAlertaParado: null,
             QuantidadeMinimaPadrao: 12,
+            QuantidadeCriticaPadrao: null,
             NotificarEstoqueCritico: null,
             NotificarValidade: false,
             NotificarParado: null,

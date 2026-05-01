@@ -36,6 +36,7 @@ public class ResetarConfiguracaoLojaUseCase(
             configuracao.DiasAlertaValidade,
             configuracao.DiasAlertaParado,
             configuracao.QuantidadeMinimaPadrao,
+            configuracao.QuantidadeCriticaPadrao,
             configuracao.NotificarEstoqueCritico,
             configuracao.NotificarValidade,
             configuracao.NotificarParado,
