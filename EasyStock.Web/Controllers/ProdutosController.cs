@@ -161,9 +161,17 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         if (newId != Guid.Empty)
         {
             if (vm.QuantidadeMinima.HasValue || vm.QuantidadeCritica.HasValue)
-                await svc.AtualizarLimiarAsync(newId.ToString(), vm.QuantidadeMinima, vm.QuantidadeCritica);
-
-            Toast("success", "Produto criado com sucesso!");
+            {
+                var lim = await svc.AtualizarLimiarAsync(newId.ToString(), vm.QuantidadeMinima, vm.QuantidadeCritica);
+                if (!lim.Success)
+                    Toast("warning", $"Produto criado, mas limiares não foram salvos: {lim.ErrorMessage ?? "erro desconhecido"}.");
+                else
+                    Toast("success", "Produto criado com sucesso!");
+            }
+            else
+            {
+                Toast("success", "Produto criado com sucesso!");
+            }
             return RedirectToAction(nameof(Detail), new { id = newId });
         }
 
@@ -275,7 +283,12 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         }
 
         // Persiste limiares (chamada secundaria — endpoint dedicado).
-        await svc.AtualizarLimiarAsync(id, vm.QuantidadeMinima, vm.QuantidadeCritica);
+        var lim = await svc.AtualizarLimiarAsync(id, vm.QuantidadeMinima, vm.QuantidadeCritica);
+        if (!lim.Success)
+        {
+            Toast("warning", $"Produto atualizado, mas limiares não foram salvos: {lim.ErrorMessage ?? "erro desconhecido"}.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
 
         Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });

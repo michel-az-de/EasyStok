@@ -223,6 +223,11 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             try
             {
                 var json = await response.Content.ReadAsStringAsync();
+                // 204 NoContent (e respostas com corpo vazio em geral): tratar como sucesso
+                // sem tentar deserializar — o tipo T pode ser object/bool/etc.
+                if (string.IsNullOrWhiteSpace(json))
+                    return ApiResult<T>.Ok(default!) with { HttpStatus = status };
+
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
