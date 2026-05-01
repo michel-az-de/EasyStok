@@ -111,6 +111,32 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         return Collection.Find(filter).AnyAsync();
     }
 
+    public Task<bool> ExistsCodigoBarrasAsync(Guid empresaId, string codigoBarras, Guid? ignoreProdutoId = null)
+    {
+        var cb = codigoBarras.Trim();
+        var filter = Builders<Produto>.Filter.And(
+            Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<Produto>.Filter.Eq(x => x.CodigoBarras, cb),
+            ignoreProdutoId.HasValue
+                ? Builders<Produto>.Filter.Ne(x => x.Id, ignoreProdutoId.Value)
+                : Builders<Produto>.Filter.Empty);
+
+        return Collection.Find(filter).AnyAsync();
+    }
+
+    public Task<bool> ExistsNomeAsync(Guid empresaId, string nome, Guid? ignoreProdutoId = null)
+    {
+        var n = nome.Trim();
+        var filter = Builders<Produto>.Filter.And(
+            Builders<Produto>.Filter.Eq(x => x.EmpresaId, empresaId),
+            Builders<Produto>.Filter.Eq(x => x.Nome, n),
+            ignoreProdutoId.HasValue
+                ? Builders<Produto>.Filter.Ne(x => x.Id, ignoreProdutoId.Value)
+                : Builders<Produto>.Filter.Empty);
+
+        return Collection.Find(filter).AnyAsync();
+    }
+
     public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
     {
         if (string.IsNullOrWhiteSpace(termo))

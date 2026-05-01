@@ -94,6 +94,24 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(command.CodigoBarras))
+            {
+                var codigoBarras = command.CodigoBarras.Trim();
+                if (await produtoRepository.ExistsCodigoBarrasAsync(command.EmpresaId, codigoBarras))
+                {
+                    throw new UseCaseValidationException("Código de barras (EAN) duplicado para esta empresa.");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.Nome))
+            {
+                var nome = command.Nome.Trim();
+                if (await produtoRepository.ExistsNomeAsync(command.EmpresaId, nome))
+                {
+                    throw new UseCaseValidationException("Nome de produto duplicado para esta empresa.");
+                }
+            }
+
             foreach (var skuVariacao in (command.Variacoes ?? [])
                          .Select(v => v.Sku?.Trim())
                          .Where(v => !string.IsNullOrWhiteSpace(v))

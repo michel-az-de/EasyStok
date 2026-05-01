@@ -49,6 +49,26 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
+        public Task<bool> ExistsCodigoBarrasAsync(Guid empresaId, string codigoBarras, Guid? ignoreProdutoId = null)
+        {
+            var cb = codigoBarras.Trim();
+            return dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.CodigoBarras == cb)
+                .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
+                .AnyAsync();
+        }
+
+        public Task<bool> ExistsNomeAsync(Guid empresaId, string nome, Guid? ignoreProdutoId = null)
+        {
+            var n = nome.Trim();
+            return dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.Nome == n)
+                .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
+                .AnyAsync();
+        }
+
         public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
             termo = termo.Trim();

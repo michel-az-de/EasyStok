@@ -208,6 +208,24 @@ public sealed class GerenciarProdutoUseCase(
             produto.SkuBase = null;
         }
 
+        if (!string.IsNullOrWhiteSpace(command.CodigoBarras))
+        {
+            var codigoBarras = command.CodigoBarras.Trim();
+            if (await produtoRepository.ExistsCodigoBarrasAsync(command.EmpresaId, codigoBarras, command.ProdutoId))
+            {
+                throw new UseCaseValidationException("Código de barras (EAN) duplicado para esta empresa.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(command.Nome))
+        {
+            var nome = command.Nome.Trim();
+            if (await produtoRepository.ExistsNomeAsync(command.EmpresaId, nome, command.ProdutoId))
+            {
+                throw new UseCaseValidationException("Nome de produto duplicado para esta empresa.");
+            }
+        }
+
         produto.CategoriaId = command.CategoriaId;
         produto.SubcategoriaId = command.SubcategoriaId;
         produto.Nome = command.Nome.Trim();
