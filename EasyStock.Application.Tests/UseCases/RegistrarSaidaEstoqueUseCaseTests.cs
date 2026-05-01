@@ -60,7 +60,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetLotesDisponiveisParaSaidaAsync(produto.EmpresaId, produto.Id, null)
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(produto.EmpresaId, produto.Id, null, Arg.Any<bool>())
             .Returns([loteAntigo, loteNovo]);
         movimentacaoRepository.GetTaxaSaidaDiariaAsync(produto.EmpresaId, produto.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(0m);
@@ -334,7 +334,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             Status = StatusProduto.Ativo
         };
 
-        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null)
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>())
             .Returns([
                 new ItemEstoque
                 {

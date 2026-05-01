@@ -126,8 +126,8 @@
         <h2 class="font-semibold text-slate-900 mb-4">Operacional</h2>
         <div class="flex items-center justify-between py-2">
             <div>
-                <div class="text-sm font-medium text-slate-700">Método FIFO (Primeiro a Entrar, Primeiro a Sair)</div>
-                <div class="text-xs text-slate-500">Prioriza o consumo de lotes mais antigos nas saídas</div>
+                <div class="text-sm font-medium text-slate-700">Estratégia de saída: <span x-text="fifo ? 'FEFO (Primeiro a Vencer, Primeiro a Sair)' : 'FIFO (Primeiro a Entrar, Primeiro a Sair)'"></span></div>
+                <div class="text-xs text-slate-500" x-text="fifo ? 'Reduz perdas por vencimento — recomendado para produtos perecíveis' : 'Prioriza lotes mais antigos independente da validade'"></div>
             </div>
             <div class="relative">
                 <input type="hidden" name="Fifo" :value="fifo ? 'true' : 'false'" />

@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
+using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
@@ -59,7 +60,8 @@ public class AuthControllerTests
         var alterarSenhaLogger = Substitute.For<ILogger<AlterarSenhaUseCase>>();
         var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
-        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, unitOfWork2, cadastrarLogger);
+        var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
+        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, cadastrarLogger);
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, esqueciSenhaLogger);
@@ -67,6 +69,8 @@ public class AuthControllerTests
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
         var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, alterarSenhaLogger);
+        var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
+        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
 
         _controller = new AuthController(
             _autenticarUseCase,
@@ -79,6 +83,7 @@ public class AuthControllerTests
             logoutUseCase,
             esqueciSenhaUseCase,
             resetarSenhaUseCase,
+            confirmEmailUseCase,
             obterUsuarioAtualUseCase,
             atualizarUsuarioAtualUseCase,
             alterarSenhaUseCase);

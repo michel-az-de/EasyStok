@@ -126,7 +126,7 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             .SortByDescending(x => x.EntradaEm)
             .ToListAsync();
 
-    public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId)
+    public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
     {
         var filter = Builders<ItemEstoque>.Filter.And(
             Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId),
@@ -136,9 +136,13 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
                 ? Builders<ItemEstoque>.Filter.Eq(x => x.ProdutoVariacaoId, produtoVariacaoId.Value)
                 : Builders<ItemEstoque>.Filter.Eq(x => x.ProdutoVariacaoId, null));
 
-        return await Collection.Find(filter)
-            .Sort(Builders<ItemEstoque>.Sort.Ascending(x => x.EntradaEm).Ascending(x => x.CriadoEm))
-            .ToListAsync();
+        // FEFO: lotes mais próximos do vencimento saem primeiro (null validade = último).
+        // FIFO: lotes pela data de entrada.
+        var sort = fefo
+            ? Builders<ItemEstoque>.Sort.Ascending(x => x.ValidadeEm).Ascending(x => x.EntradaEm).Ascending(x => x.CriadoEm)
+            : Builders<ItemEstoque>.Sort.Ascending(x => x.EntradaEm).Ascending(x => x.CriadoEm);
+
+        return await Collection.Find(filter).Sort(sort).ToListAsync();
     }
 
     public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>

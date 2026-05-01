@@ -62,8 +62,9 @@ namespace EasyStock.Api.Services
             {
                 NivelAcesso.SuperAdmin or NivelAcesso.Admin => true,
                 NivelAcesso.Gerente => permissao is not Permissao.GerenciarUsuarios,
-                NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos,
-                _ => permissao is Permissao.VisualizarRelatorios
+                NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos
+                    or Permissao.VisualizarTickets or Permissao.ResponderTickets,
+                _ => permissao is Permissao.VisualizarRelatorios or Permissao.VisualizarTickets
             };
         }
 

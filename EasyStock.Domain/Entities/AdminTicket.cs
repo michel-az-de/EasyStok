@@ -13,11 +13,13 @@ namespace EasyStock.Domain.Entities
         public TicketStatus Status { get; set; }
         public TicketCategoria Categoria { get; set; }
         public TicketPrioridade Prioridade { get; set; }
+        public Guid? CriadoPorId { get; set; }
         public Guid? AtendenteId { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
 
         public Empresa? Empresa { get; set; }
+        public Usuario? CriadoPor { get; set; }
         public Usuario? Atendente { get; set; }
         public ICollection<AdminTicketMensagem> Mensagens { get; set; } = new List<AdminTicketMensagem>();
 

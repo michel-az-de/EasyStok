@@ -9,6 +9,9 @@ namespace EasyStock.Domain.Enums
         GerenciarFornecedores,
         VisualizarRelatorios,
         GerarRelatorioVendas,
-        AcessarInteligencia
+        AcessarInteligencia,
+        VisualizarTickets,
+        ResponderTickets,
+        GerenciarTickets
     }
 }
