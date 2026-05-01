@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260501202407_AuditoriaCompletaMovimentacaoEstoque")]
+    partial class AuditoriaCompletaMovimentacaoEstoque
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1017,49 +1020,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("FornecedorId", "AlteradoEm");
 
                     b.ToTable("fornecedor_alteracoes", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.IdempotencyKey", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ExpiraEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("HttpStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("MetodoRecurso")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("RespostaJson")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiraEm")
-                        .HasDatabaseName("ix_idempotency_expira");
-
-                    b.HasIndex("Key", "EmpresaId", "MetodoRecurso")
-                        .IsUnique()
-                        .HasDatabaseName("ux_idempotency_key_empresa_recurso");
-
-                    b.ToTable("idempotency_keys", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ItemEstoque", b =>

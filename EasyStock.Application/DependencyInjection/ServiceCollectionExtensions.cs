@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
+using EasyStock.Application.UseCases.GerenciarUsuario;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.Logout;
@@ -196,6 +197,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ObterUsoIaUseCase>();
         services.AddScoped<GerenciarCategoriaUseCase>();
         services.AddScoped<ListarPlanosUseCase>();
+        services.AddScoped<DeleteUserAuditDataUseCase>();
 
         return services;
     }

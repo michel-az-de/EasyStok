@@ -33,12 +33,20 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         }
     }
 
-    public async Task<ApiResult<T>> PostAsync<T>(string path, object body)
+    public async Task<ApiResult<T>> PostAsync<T>(string path, object body, string? idempotencyKey = null)
     {
         try
         {
             var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
-            var response = await http.PostAsync(path, content);
+            using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
+            // Idempotencia: P0-3. Auto-gera UUID se path bate com whitelist conhecida
+            // ou se chamador explicitar uma chave. Server (whitelist em Program.cs)
+            // ignora chaves em paths nao-criticos.
+            var key = idempotencyKey ?? IdempotencyKeyHelper.AutoGenerateIfApplicable(path);
+            if (!string.IsNullOrWhiteSpace(key))
+                request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
+
+            var response = await http.SendAsync(request);
             return await ParseResponse<T>(response);
         }
         catch (TaskCanceledException)

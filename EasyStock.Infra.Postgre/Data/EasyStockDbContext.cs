@@ -33,6 +33,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Venda> Vendas { get; set; } = null!;
         public DbSet<ItemVenda> ItensVenda { get; set; } = null!;
         public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
+        public DbSet<MovimentacaoEstoqueAlteracao> MovimentacaoEstoqueAlteracoes { get; set; } = null!;
         public DbSet<Notificacao> Notificacoes { get; set; } = null!;
         public DbSet<Loja> Lojas { get; set; } = null!;
         public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
@@ -49,6 +50,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
+        public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
 
         // Admin Module DbSets
         public DbSet<AdminTicket> AdminTickets { get; set; } = null!;

@@ -5,6 +5,7 @@ using EasyStock.Api.Observability;
 using EasyStock.Api.Services;
 using Microsoft.AspNetCore.Builder;
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Services;
 using EasyStock.Application.Validators;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
@@ -68,6 +69,7 @@ builder.Services.AddControllers()
         opts.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
@@ -456,6 +458,14 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<EasyStock.Api.Middleware.SubscriptionGateMiddleware>();
+// Idempotencia: aplicado APOS auth para que ICurrentUserAccessor.EmpresaId esteja disponivel.
+// Whitelist de POSTs criticos (R5: dedup retry de mobile/web).
+EasyStock.Api.Middleware.IdempotencyMiddlewareExtensions.UseIdempotency(app, opts => opts
+    .Add("/api/itensestoque")
+    .Add("/api/itensestoque/estorno")
+    .Add("/api/vendas")
+    .Add("/api/movimentacoes")
+    .Add("/api/itensestoque/repor"));
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
