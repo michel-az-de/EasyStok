@@ -47,7 +47,16 @@ public class WebhookPixController(
                 var txid = item.TryGetProperty("txid", out var t) ? t.GetString() : null;
                 if (string.IsNullOrEmpty(txid)) continue;
 
-                await ProcessarPagamentoAsync(txid);
+                decimal? valorPago = null;
+                if (item.TryGetProperty("valor", out var v))
+                {
+                    var raw = v.ValueKind == JsonValueKind.String ? v.GetString() : v.ToString();
+                    if (decimal.TryParse(raw, System.Globalization.NumberStyles.Number,
+                            System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                        valorPago = parsed;
+                }
+
+                await ProcessarPagamentoAsync(txid, valorPago);
             }
         }
         catch (Exception ex)
@@ -94,7 +103,7 @@ public class WebhookPixController(
             Encoding.ASCII.GetBytes(headerSig.Trim().ToLowerInvariant()));
     }
 
-    private async Task ProcessarPagamentoAsync(string txid)
+    private async Task ProcessarPagamentoAsync(string txid, decimal? valorPago)
     {
         var cobranca = await cobrancaRepo.GetByTxidAsync(txid);
         if (cobranca is null)
@@ -106,6 +115,23 @@ public class WebhookPixController(
         if (cobranca.Status != Domain.Enums.StatusCobranca.Pendente)
         {
             logger.LogDebug("Webhook Pix: cobrança {Txid} já processada (status {Status})", txid, cobranca.Status);
+            return;
+        }
+
+        // Validação de valor: o pago precisa ser >= esperado (tolerância 1 centavo
+        // pra arredondamento). Subpagamento não ativa plano. Webhook sem campo
+        // valor é recusado pra evitar bypass.
+        if (valorPago is null)
+        {
+            logger.LogWarning("Webhook Pix: txid {Txid} sem campo valor — recusando.", txid);
+            return;
+        }
+
+        if (valorPago.Value + 0.01m < cobranca.Valor)
+        {
+            logger.LogWarning(
+                "Webhook Pix: valor pago ({Pago}) menor que esperado ({Esperado}) para txid {Txid}. Recusando.",
+                valorPago.Value, cobranca.Valor, txid);
             return;
         }
 
