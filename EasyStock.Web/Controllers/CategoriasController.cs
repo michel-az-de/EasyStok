@@ -51,6 +51,23 @@ public class CategoriasController(CategoriasService svc, SessionService session)
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost("/categorias/{id}/limiar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarLimiar(string id, int? quantidadeMinima, int? quantidadeCritica)
+    {
+        if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
+        {
+            Toast("error", "A quantidade crítica precisa ser menor que a mínima.");
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await svc.AtualizarLimiarAsync(id, quantidadeMinima, quantidadeCritica);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Limiares da categoria atualizados.");
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost("/categorias/{id}/excluir")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Excluir(string id)

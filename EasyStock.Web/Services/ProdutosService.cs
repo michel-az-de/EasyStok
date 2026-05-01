@@ -165,6 +165,13 @@ public class ProdutosService(ApiClient api, SessionService session)
             observacaoInterna = vm.ObservacaoInterna
         });
 
+    public Task<ApiResult<object>> AtualizarLimiarAsync(string id, int? quantidadeMinima, int? quantidadeCritica) =>
+        api.PatchAsync<object>($"produtos/{id}/limiar?empresaId={GetEmpresaId()}", new
+        {
+            quantidadeMinima,
+            quantidadeCritica
+        });
+
     public Task<ApiResult<object>> AtualizarPrecoAsync(string id, decimal preco) =>
         api.PatchAsync<object>($"produtos/{id}", new
         {

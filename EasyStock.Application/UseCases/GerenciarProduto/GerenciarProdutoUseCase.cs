@@ -64,7 +64,9 @@ public sealed record ProdutoDetalheResult(
     string? AlteradoPorNome = null,
     string? ObservacaoInterna = null,
     DateTime? CriadoEm = null,
-    DateTime? AlteradoEm = null);
+    DateTime? AlteradoEm = null,
+    int? QuantidadeMinima = null,
+    int? QuantidadeCritica = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -365,6 +367,29 @@ public sealed class GerenciarProdutoUseCase(
             await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(command.EmpresaId, command.ProdutoId));
     }
 
+    public async Task AtualizarLimiaresAsync(Guid empresaId, Guid produtoId, int? quantidadeMinima, int? quantidadeCritica)
+    {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
+
+        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+            ?? throw new UseCaseValidationException("Produto nao encontrado.");
+
+        if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
+            throw new UseCaseValidationException("Quantidade minima nao pode ser negativa.");
+        if (quantidadeCritica.HasValue && quantidadeCritica.Value < 0)
+            throw new UseCaseValidationException("Quantidade critica nao pode ser negativa.");
+        if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
+            throw new UseCaseValidationException("Quantidade critica precisa ser menor que a minima.");
+
+        produto.QuantidadeMinima = quantidadeMinima;
+        produto.QuantidadeCritica = quantidadeCritica;
+        produto.AlteradoEm = DateTime.UtcNow;
+
+        await produtoRepository.UpdateAsync(produto);
+        await unitOfWork.CommitAsync();
+    }
+
     public async Task RemoverAsync(Guid empresaId, Guid produtoId, Guid usuarioId = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
@@ -539,7 +564,9 @@ public sealed class GerenciarProdutoUseCase(
             AlteradoPorNome: alteradoPorNome,
             ObservacaoInterna: produto.ObservacaoInterna,
             CriadoEm: produto.CriadoEm,
-            AlteradoEm: produto.AlteradoEm);
+            AlteradoEm: produto.AlteradoEm,
+            QuantidadeMinima: produto.QuantidadeMinima,
+            QuantidadeCritica: produto.QuantidadeCritica);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));

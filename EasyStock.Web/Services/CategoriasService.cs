@@ -33,4 +33,11 @@ public class CategoriasService(ApiClient api, SessionService session)
 
     public Task<ApiResult<bool>> ExcluirAsync(string id) =>
         api.DeleteAsync($"categorias/{id}?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<object>> AtualizarLimiarAsync(string id, int? quantidadeMinima, int? quantidadeCritica) =>
+        api.PatchAsync<object>($"categorias/{id}/limiar?empresaId={GetEmpresaId()}", new
+        {
+            quantidadeMinima,
+            quantidadeCritica
+        });
 }

@@ -133,6 +133,23 @@ public class ProdutoController(
         return NoContent();
     }
 
+    public sealed record AtualizarLimiarProdutoBody(int? QuantidadeMinima, int? QuantidadeCritica);
+
+    [SwaggerOperation(Summary = "Update product stock thresholds (override)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPatch("{id:guid}/limiar")]
+    public async Task<IActionResult> UpdateLimiar(Guid id, [FromQuery] Guid empresaId, [FromBody] AtualizarLimiarProdutoBody body)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await gerenciarProdutoUseCase.AtualizarLimiaresAsync(resolvedEmpresaId, id, body.QuantidadeMinima, body.QuantidadeCritica);
+        return NoContent();
+    }
+
     [SwaggerOperation(Summary = "Delete product (Admin only)")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

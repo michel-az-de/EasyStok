@@ -37,6 +37,9 @@ public record ProdutoDetalhe
     public DateTime? CriadoEm { get; init; }
     public DateTime? AlteradoEm { get; init; }
 
+    public int? QuantidadeMinima { get; init; }
+    public int? QuantidadeCritica { get; init; }
+
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 }
 

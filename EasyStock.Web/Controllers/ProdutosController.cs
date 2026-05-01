@@ -160,6 +160,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var newId = result.Data?.ProdutoId ?? Guid.Empty;
         if (newId != Guid.Empty)
         {
+            if (vm.QuantidadeMinima.HasValue || vm.QuantidadeCritica.HasValue)
+                await svc.AtualizarLimiarAsync(newId.ToString(), vm.QuantidadeMinima, vm.QuantidadeCritica);
+
             Toast("success", "Produto criado com sucesso!");
             return RedirectToAction(nameof(Detail), new { id = newId });
         }
@@ -228,7 +231,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
                 Padrao = e.Padrao
             }).ToList(),
             ObservacaoInterna = p.ObservacaoInterna,
-            ExistingPhotos = p.Fotos
+            ExistingPhotos = p.Fotos,
+            QuantidadeMinima = p.QuantidadeMinima,
+            QuantidadeCritica = p.QuantidadeCritica
         };
         await LoadCategoriasAsync();
         return View("Form", vm);
@@ -268,6 +273,9 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
             await LoadCategoriasAsync();
             return View("Form", vm);
         }
+
+        // Persiste limiares (chamada secundaria — endpoint dedicado).
+        await svc.AtualizarLimiarAsync(id, vm.QuantidadeMinima, vm.QuantidadeCritica);
 
         Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });

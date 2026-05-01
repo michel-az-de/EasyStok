@@ -25,7 +25,9 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         string? Descricao,
         DateTime CriadoEm,
         DateTime AlteradoEm,
-        IReadOnlyCollection<CategoriaResult> SubCategorias);
+        IReadOnlyCollection<CategoriaResult> SubCategorias,
+        int? QuantidadeMinima = null,
+        int? QuantidadeCritica = null);
 
     public class GerenciarCategoriaUseCase(
         ICategoriaRepository categoriaRepository,
@@ -91,6 +93,27 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             return ToResult(categoria);
         }
 
+        public async Task AtualizarLimiaresAsync(Guid empresaId, Guid id, int? quantidadeMinima, int? quantidadeCritica)
+        {
+            var categoria = await categoriaRepository.GetByIdAsync(id);
+            if (categoria == null || categoria.EmpresaId != empresaId)
+                throw new UseCaseValidationException("Categoria nao encontrada.");
+
+            if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
+                throw new UseCaseValidationException("Quantidade minima nao pode ser negativa.");
+            if (quantidadeCritica.HasValue && quantidadeCritica.Value < 0)
+                throw new UseCaseValidationException("Quantidade critica nao pode ser negativa.");
+            if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
+                throw new UseCaseValidationException("Quantidade critica precisa ser menor que a minima.");
+
+            categoria.QuantidadeMinima = quantidadeMinima;
+            categoria.QuantidadeCritica = quantidadeCritica;
+            categoria.AlteradoEm = DateTime.UtcNow;
+
+            await categoriaRepository.UpdateAsync(categoria);
+            await unitOfWork.CommitAsync();
+        }
+
         public async Task RemoverAsync(Guid id, Guid empresaId)
         {
             var categoria = await categoriaRepository.GetByIdAsync(id);
@@ -128,6 +151,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             c.Descricao,
             c.CriadoEm,
             c.AlteradoEm,
-            c.SubCategorias?.Select(ToResult).ToArray() ?? []);
+            c.SubCategorias?.Select(ToResult).ToArray() ?? [],
+            c.QuantidadeMinima,
+            c.QuantidadeCritica);
     }
 }

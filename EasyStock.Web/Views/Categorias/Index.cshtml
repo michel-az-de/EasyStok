@@ -33,12 +33,17 @@
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
-                <tr><th>Nome</th><th>Ações</th></tr>
+                <tr>
+                    <th>Nome</th>
+                    <th class="text-center">Qtd. mínima</th>
+                    <th class="text-center">Qtd. crítica</th>
+                    <th>Ações</th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var c in Model)
                 {
-                    <tr x-data="{ editando: false, nomeEdit: '' }"
+                    <tr x-data="{ editando: false, editandoLimiar: false, nomeEdit: '' }"
                         x-init="nomeEdit = $el.dataset.nome"
                         data-nome="@c.Nome">
                         <td>
@@ -58,8 +63,14 @@
                                 </button>
                             </form>
                         </td>
+                        <td class="text-center text-sm text-slate-600">
+                            @(c.QuantidadeMinima.HasValue ? c.QuantidadeMinima.Value.ToString() : "—")
+                        </td>
+                        <td class="text-center text-sm text-slate-600">
+                            @(c.QuantidadeCritica.HasValue ? c.QuantidadeCritica.Value.ToString() : "—")
+                        </td>
                         <td>
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-3" x-show="!editandoLimiar">
                                 <button type="button" @@click="editando = !editando"
                                         class="grid-action-btn grid-action-btn--primary"
                                         x-show="!editando">
@@ -68,16 +79,39 @@
                                     </svg>
                                     Editar
                                 </button>
+                                <button type="button" @@click="editandoLimiar = true"
+                                        class="grid-action-btn grid-action-btn--secondary"
+                                        x-show="!editando">
+                                    Limiares
+                                </button>
                                 <button type="button"
                                         @@click="$dispatch('confirm-action', { titulo: 'Remover categoria', mensagem: 'Remover <strong>' + nomeEdit + '</strong>? Produtos nessa categoria ficarão sem categoria.', textoBotao: 'Remover', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/categorias/@c.Id/excluir' })"
-                                        class="grid-action-btn grid-action-btn--danger">
+                                        class="grid-action-btn grid-action-btn--danger"
+                                        x-show="!editando">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                     Remover
                                 </button>
                             </div>
-
+                            <form action="/categorias/@c.Id/limiar" method="post"
+                                  x-show="editandoLimiar" x-cloak class="flex gap-2 items-center">
+                                @Html.AntiForgeryToken()
+                                <input type="number" name="quantidadeMinima" min="0" max="9999" placeholder="mín"
+                                       value="@(c.QuantidadeMinima?.ToString() ?? "")"
+                                       class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center" />
+                                <input type="number" name="quantidadeCritica" min="0" max="9999" placeholder="crít"
+                                       value="@(c.QuantidadeCritica?.ToString() ?? "")"
+                                       class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center" />
+                                <button type="submit"
+                                        class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
+                                    Salvar
+                                </button>
+                                <button type="button" @@click="editandoLimiar = false"
+                                        class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700">
+                                    Cancelar
+                                </button>
+                            </form>
                         </td>
                     </tr>
                 }

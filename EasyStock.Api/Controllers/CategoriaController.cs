@@ -56,6 +56,20 @@ public class CategoriaController(GerenciarCategoriaUseCase useCase) : EasyStockC
         return DataOk(await useCase.AtualizarAsync(command));
     }
 
+    public sealed record AtualizarLimiarCategoriaBody(int? QuantidadeMinima, int? QuantidadeCritica);
+
+    [SwaggerOperation(Summary = "Update category stock thresholds (override)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPatch("{id:guid}/limiar")]
+    public async Task<IActionResult> UpdateLimiar(Guid id, [FromQuery] Guid empresaId, [FromBody] AtualizarLimiarCategoriaBody body)
+    {
+        await useCase.AtualizarLimiaresAsync(empresaId, id, body.QuantidadeMinima, body.QuantidadeCritica);
+        return NoContent();
+    }
+
     [SwaggerOperation(Summary = "Delete category")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -32,6 +32,13 @@ public class ProdutoFormViewModel
 
     public decimal? MargemEstimada { get; set; }
 
+    // Overrides hierarquicos de limiar (null = herdar da categoria/loja/default).
+    [Range(0, 9999, ErrorMessage = "Quantidade minima precisa estar entre 0 e 9999")]
+    public int? QuantidadeMinima { get; set; }
+
+    [Range(0, 9999, ErrorMessage = "Quantidade critica precisa estar entre 0 e 9999")]
+    public int? QuantidadeCritica { get; set; }
+
     // TipoProduto: 0 = Fisico, 1 = Alimento, 2 = Servico
     public int Tipo { get; set; } = 0;
 

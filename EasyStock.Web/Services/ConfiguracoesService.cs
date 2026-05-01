@@ -17,6 +17,7 @@ public class ConfiguracoesService(ApiClient api, SessionService session)
     public Task<ApiResult<Configuracoes>> ObterAsync() =>
         api.GetAsync<Configuracoes>($"configuracoes{BuildContextQuery()}");
 
+    // Payload alinhado ao AtualizarConfiguracaoLojaCommand da API.
     public Task<ApiResult<object>> SalvarAsync(ConfiguracoesViewModel vm) =>
         api.PatchAsync<object>("configuracoes", new
         {
@@ -24,11 +25,12 @@ public class ConfiguracoesService(ApiClient api, SessionService session)
             lojaId = Guid.TryParse(session.GetLojaId(), out var lojaId) ? lojaId : Guid.Empty,
             diasAlertaValidade = vm.DiasAlertaValidade,
             diasAlertaParado = vm.DiasAlertaParado,
-            qtyMinPadrao = vm.QtyMinPadrao,
-            notifEstoqueCritico = vm.NotifEstoqueCritico,
-            notifValidade = vm.NotifValidade,
-            notifParado = vm.NotifParado,
-            notifReposicao = vm.NotifReposicao,
-            fifo = vm.Fifo
+            quantidadeMinimaPadrao = vm.QtyMinPadrao,
+            quantidadeCriticaPadrao = vm.QtyCritPadrao,
+            notificarEstoqueCritico = vm.NotifEstoqueCritico,
+            notificarValidade = vm.NotifValidade,
+            notificarParado = vm.NotifParado,
+            notificarReposicao = vm.NotifReposicao,
+            fifoAtivo = vm.Fifo
         });
 }

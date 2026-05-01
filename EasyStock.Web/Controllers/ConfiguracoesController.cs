@@ -23,6 +23,7 @@ public class ConfiguracoesController(ConfiguracoesService svc, SessionService se
             DiasAlertaValidade = cfg.DiasAlertaValidade,
             DiasAlertaParado = cfg.DiasAlertaParado,
             QtyMinPadrao = cfg.QtyMinPadrao,
+            QtyCritPadrao = cfg.QtyCritPadrao,
             NotifEstoqueCritico = cfg.NotifEstoqueCritico,
             NotifValidade = cfg.NotifValidade,
             NotifParado = cfg.NotifParado,
