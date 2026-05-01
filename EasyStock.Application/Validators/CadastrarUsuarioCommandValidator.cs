@@ -18,7 +18,7 @@ public class CadastrarUsuarioCommandValidator : AbstractValidator<CadastrarUsuar
 
         RuleFor(x => x.Senha)
             .NotEmpty().WithMessage("Senha e obrigatoria.")
-            .MinimumLength(8).WithMessage("Senha deve ter pelo menos 8 caracteres.")
+            .MinimumLength(10).WithMessage("Senha deve ter pelo menos 10 caracteres.")
             .Matches(@"[A-Z]").WithMessage("Senha deve conter pelo menos uma letra maiuscula.")
             .Matches(@"[a-z]").WithMessage("Senha deve conter pelo menos uma letra minuscula.")
             .Matches(@"[0-9]").WithMessage("Senha deve conter pelo menos um numero.")

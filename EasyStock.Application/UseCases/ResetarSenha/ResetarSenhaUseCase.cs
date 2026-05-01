@@ -8,6 +8,7 @@ namespace EasyStock.Application.UseCases.ResetarSenha;
 
 public sealed class ResetarSenhaUseCase(
     IResetTokenRepository resetTokenRepository,
+    IRefreshTokenRepository refreshTokenRepository,
     IUsuarioRepository usuarioRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
@@ -39,11 +40,21 @@ public sealed class ResetarSenhaUseCase(
         resetToken.MarcarComoUsado();
         await resetTokenRepository.UpdateAsync(resetToken);
 
+        // Revogar todos os refresh tokens anteriores para invalidar sessões
+        var refreshTokensAntigos = await refreshTokenRepository.GetByUsuarioIdAsync(usuario.Id);
+        var tokensRevogados = 0;
+        foreach (var token in refreshTokensAntigos.Where(t => t.EstaValido()))
+        {
+            token.Revogar();
+            await refreshTokenRepository.UpdateAsync(token);
+            tokensRevogados++;
+        }
+
         var auditLog = AuditLog.Criar(
             usuario.Id,
             "reset-password",
             true,
-            "Senha resetada com sucesso",
+            $"Senha resetada com sucesso. {tokensRevogados} refresh tokens revogados.",
             null,
             null);
         await auditLogRepository.AddAsync(auditLog);

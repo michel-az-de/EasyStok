@@ -63,7 +63,7 @@ public class AuthControllerTests
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, esqueciSenhaLogger);
-        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, resetarSenhaLogger);
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, resetarSenhaLogger);
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
         var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, alterarSenhaLogger);

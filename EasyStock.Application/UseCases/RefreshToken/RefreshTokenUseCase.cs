@@ -52,11 +52,17 @@ public sealed class RefreshTokenUseCase(
             null);
         await refreshTokenRepository.AddAsync(novoRefreshToken);
 
+        var empresaId = ResolveEmpresaIdPadrao(usuario);
+
         var nivel = NivelAcesso.Visualizador;
         IReadOnlyCollection<Permissao> permissoes = [];
-        if (usuario.Perfis is not null && usuario.Perfis.Any())
+
+        if (empresaId.HasValue && usuario.Perfis is not null)
         {
-            var perfil = usuario.Perfis.OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue).FirstOrDefault();
+            var perfil = usuario.Perfis
+                .Where(p => p.EmpresaId == empresaId.Value)
+                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
+                .FirstOrDefault();
             if (perfil?.Perfil is not null)
             {
                 nivel = perfil.Perfil.Nivel;
@@ -66,7 +72,7 @@ public sealed class RefreshTokenUseCase(
 
         var autenticarResult = new AutenticarUsuarioResult(
             usuario.Id,
-            null, // EmpresaId
+            empresaId,
             usuario.Nome,
             usuario.Email,
             nivel,
@@ -86,5 +92,16 @@ public sealed class RefreshTokenUseCase(
 
         logger.LogInformation("Refresh token executado com sucesso para usuario {UsuarioId}", usuario.Id);
         return new RefreshTokenResult(accessToken, novoRefreshTokenValue, jwtTokenService.ExpiresInSeconds);
+    }
+
+    private static Guid? ResolveEmpresaIdPadrao(UsuarioEntity usuario)
+    {
+        var empresasAtivas = usuario.Empresas?
+            .Where(e => e.Ativo)
+            .Select(e => e.EmpresaId)
+            .Distinct()
+            .ToArray() ?? [];
+
+        return empresasAtivas.Length == 1 ? empresasAtivas[0] : null;
     }
 }
