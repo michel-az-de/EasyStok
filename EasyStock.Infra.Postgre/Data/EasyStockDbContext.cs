@@ -94,6 +94,40 @@ namespace EasyStock.Infra.Postgre.Data
             }
         }
 
+        public async Task<IAsyncDisposable> BeginTransactionAsync(CancellationToken ct = default)
+        {
+            var tx = await Database.BeginTransactionAsync(ct);
+            return new TransactionScope(tx);
+        }
+
+        private sealed class TransactionScope : IAsyncDisposable
+        {
+            private readonly Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction _tx;
+            private bool _committed;
+
+            public TransactionScope(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx)
+            {
+                _tx = tx;
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    if (!_committed) await _tx.CommitAsync();
+                }
+                catch
+                {
+                    try { await _tx.RollbackAsync(); } catch { }
+                    throw;
+                }
+                finally
+                {
+                    await _tx.DisposeAsync();
+                }
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

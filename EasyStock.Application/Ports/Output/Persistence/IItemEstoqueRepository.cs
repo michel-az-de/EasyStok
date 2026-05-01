@@ -6,6 +6,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task<ItemEstoque?> GetByIdAsync(Guid id);
         Task<ItemEstoque?> GetByIdAsync(Guid empresaId, Guid id);
+
+        /// <summary>
+        /// Versão com lock pessimista (FOR UPDATE no Postgres) — usar quando o
+        /// ItemEstoqueId vem direto do client (caminho "saída direta" sem FIFO),
+        /// pra evitar saldo negativo em concorrência.
+        /// </summary>
+        Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id);
         Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20, Guid? lojaId = null);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null);

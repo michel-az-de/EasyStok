@@ -141,8 +141,8 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item1.Id).Returns(item1);
-        itemRepository.GetByIdAsync(item2.Id).Returns(item2);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item1.Id).Returns(item1);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item2.Id).Returns(item2);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -221,7 +221,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -284,7 +284,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -416,7 +416,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -480,7 +480,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -543,7 +543,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -617,8 +617,8 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(itemValido.Id).Returns(itemValido);
-        itemRepository.GetByIdAsync(itemSemSaldo.Id).Returns(itemSemSaldo);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), itemValido.Id).Returns(itemValido);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), itemSemSaldo.Id).Returns(itemSemSaldo);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
@@ -686,7 +686,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        itemRepository.GetByIdAsync(item.Id).Returns(item);
+        itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
         var useCase = new RegistrarSaidaEstoqueUseCase(

@@ -12,6 +12,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
         {
             builder.ToTable("produtos");
             builder.HasKey(p => p.Id);
+
+            // Optimistic concurrency via xmin (system column do Postgres,
+            // sempre presente — não exige migration). EF compara versão
+            // ao SaveChanges; se mudou no meio, lança DbUpdateConcurrencyException.
+            builder.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .IsRowVersion();
+
             builder.Property(p => p.Nome).IsRequired().HasMaxLength(180);
             builder.Property(p => p.Marca).HasMaxLength(120);
             builder.Property(p => p.Tipo).HasConversion<string>().IsRequired().HasMaxLength(50);

@@ -18,6 +18,20 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.EmpresaId == empresaId && i.Id == id);
 
+        /// <summary>
+        /// FOR UPDATE garante que o registro fique locked até o final da
+        /// transação. Usar quando o caller vai modificar (ex: saída via
+        /// ItemEstoqueId direto). Sem isso, dois usuários podem ler 5
+        /// unidades, ambos validar, e ambos descontar — saldo negativo.
+        /// </summary>
+        public async Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id)
+        {
+            var sql = "SELECT * FROM itens_estoque WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
+            return await dbContext.ItensEstoque
+                .FromSqlRaw(sql, empresaId, id)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
         {
             termo = termo.Trim();

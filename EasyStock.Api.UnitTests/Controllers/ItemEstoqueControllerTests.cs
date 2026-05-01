@@ -243,7 +243,7 @@ public class ItemEstoqueControllerTests
             NaturezaMovimentacaoEstoque.Venda,
             CanalVenda.MercadoLivre,
             "Saida teste");
-        _itemEstoqueRepository.GetByIdAsync(itemId).Returns(new ItemEstoque
+        _itemEstoqueRepository.GetByIdComLockAsync(empresaId, itemId).Returns(new ItemEstoque
         {
             Id = itemId,
             EmpresaId = empresaId,

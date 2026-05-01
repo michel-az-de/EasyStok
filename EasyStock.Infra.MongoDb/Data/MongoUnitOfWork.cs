@@ -58,4 +58,13 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
             mongoCommandException.Message.Contains("replica set", StringComparison.OrdinalIgnoreCase)) ||
         ex is MongoClientException mongoClientException &&
         mongoClientException.Message.Contains("Transaction", StringComparison.OrdinalIgnoreCase);
+
+    // Mongo já tem transação implícita via session — Begin é no-op aqui.
+    public Task<IAsyncDisposable> BeginTransactionAsync(CancellationToken ct = default)
+        => Task.FromResult<IAsyncDisposable>(new NoopScope());
+
+    private sealed class NoopScope : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
     }

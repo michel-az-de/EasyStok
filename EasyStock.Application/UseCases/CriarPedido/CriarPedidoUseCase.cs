@@ -51,6 +51,21 @@ public class CriarPedidoUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
+        // Pedido sem itens é permitido (operador pode adicionar depois via
+        // AdicionarItemPedido), mas se itens vieram, todos devem ser válidos.
+        if (cmd.Itens != null && cmd.Itens.Count > 0)
+        {
+            foreach (var i in cmd.Itens)
+            {
+                if (i.Quantidade <= 0)
+                    throw new UseCaseValidationException("Item com quantidade <= 0 não é permitido.");
+                if (string.IsNullOrWhiteSpace(i.Nome))
+                    throw new UseCaseValidationException("Item sem nome não é permitido.");
+                if (i.PrecoUnitario < 0)
+                    throw new UseCaseValidationException("Item com preço negativo não é permitido.");
+            }
+        }
+
         // Resolve cliente (se informado) — snapshot vem dele.
         ClienteEntity? cliente = null;
         if (cmd.ClienteId.HasValue && cmd.ClienteId.Value != Guid.Empty)

@@ -83,6 +83,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             logger.LogInformation("Iniciando registro de sa�da de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",
                 command.EmpresaId, command.Itens.Count, command.Natureza);
 
+            // Transação explícita — necessária para que o FOR UPDATE adquirido
+            // em GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantenha
+            // o lock até o CommitAsync. Sem isso, EF abre transação implícita
+            // só no SaveChanges e o lock libera ao fim de cada statement.
+            await using var tx = await unitOfWork.BeginTransactionAsync();
+
             var agora = DateTime.UtcNow;
 
             var venda = Venda.Criar(
@@ -103,6 +109,20 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             foreach (var comandoItem in command.Itens)
             {
                 if (comandoItem.Quantidade <= 0) throw new QuantidadeInvalidaException(comandoItem.Quantidade);
+
+                // Aceita 0 apenas em saídas não-comerciais (Perda, Ajuste, Doacao);
+                // venda real exige preço > 0 para auditoria contábil.
+                var ehVendaComercial = command.Natureza == NaturezaMovimentacaoEstoque.Venda;
+                if (ehVendaComercial && comandoItem.ValorVendaUnitario <= 0)
+                    throw new UseCaseValidationException(
+                        "Saída do tipo Venda requer ValorVendaUnitario maior que zero.");
+
+                // Sanidade: valor absurdo (provavelmente erro de digitação) — limite
+                // configurável via appsettings, default 100 milhões.
+                const decimal valorMaximoSanidade = 100_000_000m;
+                if (comandoItem.ValorVendaUnitario > valorMaximoSanidade)
+                    throw new UseCaseValidationException(
+                        $"ValorVendaUnitario excede o teto de sanidade ({valorMaximoSanidade:C}).");
 
                 var quantidadeSolicitada = Quantidade.From(comandoItem.Quantidade);
                 var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
@@ -222,9 +242,14 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
         private async Task<ItemEstoque> ObterItemDiretoAsync(Guid empresaId, Guid itemEstoqueId)
         {
-            var item = await itemEstoqueRepository.GetByIdAsync(itemEstoqueId)
+            // FOR UPDATE: dois usuários dando saída do mesmo lote ao mesmo
+            // tempo precisam serializar via lock pessimista. Sem isso, ambos
+            // leem 5, ambos validam, ambos descontam → saldo negativo.
+            var item = await itemEstoqueRepository.GetByIdComLockAsync(empresaId, itemEstoqueId)
                 ?? throw new UseCaseValidationException("Item de estoque nao encontrado.");
 
+            // Garantia adicional além do filtro WHERE — repositório já filtra
+            // por EmpresaId, mas defensivo aqui.
             if (item.EmpresaId != empresaId)
                 throw new UseCaseValidationException("O item de estoque nao pertence a empresa.");
 

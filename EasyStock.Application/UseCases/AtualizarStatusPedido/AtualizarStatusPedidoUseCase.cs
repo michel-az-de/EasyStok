@@ -65,7 +65,10 @@ public class AtualizarStatusPedidoUseCase(
         if (!Transicoes.ContainsKey(status))
             throw new UseCaseValidationException($"Status inválido: {cmd.Status}");
 
-        var pedido = await pedidoRepo.GetByIdAsync(cmd.EmpresaId, cmd.Id);
+        // CRITICAL: usar GetByIdWithDetailsAsync para carregar Itens (Include).
+        // Sem isso, pedido.Itens vem vazio e a integração com estoque vira
+        // no-op silencioso quando a transição deveria descontar.
+        var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
         if (pedido == null) return null;
 
         var statusAtual = (pedido.Status ?? "").Trim().ToLowerInvariant();
@@ -85,21 +88,23 @@ public class AtualizarStatusPedidoUseCase(
         var eraEstoqueDescontado = StatusQueDescontamEstoque.Contains(statusAtual);
         var seraEstoqueDescontado = StatusQueDescontamEstoque.Contains(status);
 
-        if (status == "entregue") pedido.MarcarEntregue();
-        else if (status == "cancelado") pedido.Cancelar();
-        else { pedido.Status = status; pedido.AlteradoEm = DateTime.UtcNow; }
-
-        // Integração estoque.
+        // Integração estoque PRIMEIRO — se falhar (ex: estoque insuficiente),
+        // status não é alterado e o caller recebe a exceção. Atomicidade
+        // a nível de aplicação: ou ambos (status + estoque) mudam, ou nada.
+        // Idempotência via DocumentoReferencia evita double-debit em retries.
         if (!eraEstoqueDescontado && seraEstoqueDescontado)
         {
-            try { await estoqueIntegration.DescontarAsync(pedido); }
-            catch (Exception ex) { logger.LogError(ex, "Falha ao descontar estoque do pedido {Id}", pedido.Id); }
+            await estoqueIntegration.DescontarAsync(pedido);
         }
         else if (eraEstoqueDescontado && status == "cancelado")
         {
-            try { await estoqueIntegration.DevolverAsync(pedido); }
-            catch (Exception ex) { logger.LogError(ex, "Falha ao devolver estoque do pedido {Id}", pedido.Id); }
+            await estoqueIntegration.DevolverAsync(pedido);
         }
+
+        // Só agora muda o status (estoque já reservado/devolvido com sucesso).
+        if (status == "entregue") pedido.MarcarEntregue();
+        else if (status == "cancelado") pedido.Cancelar();
+        else { pedido.Status = status; pedido.AlteradoEm = DateTime.UtcNow; }
 
         await pedidoRepo.AddEventoAsync(new PedidoEvento
         {

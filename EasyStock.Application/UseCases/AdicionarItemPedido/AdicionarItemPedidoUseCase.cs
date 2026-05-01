@@ -24,6 +24,7 @@ public sealed record AdicionarItemPedidoCommand(
 
 public class AdicionarItemPedidoUseCase(
     IPedidoRepository repo,
+    IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<AdicionarItemPedidoUseCase> logger)
 {
@@ -33,6 +34,21 @@ public class AdicionarItemPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         if (cmd.Quantidade <= 0)
             throw new UseCaseValidationException("Quantidade deve ser maior que zero.");
+
+        if (string.IsNullOrWhiteSpace(cmd.Nome))
+            throw new UseCaseValidationException("Nome do item é obrigatório.");
+
+        if (cmd.PrecoUnitario < 0)
+            throw new UseCaseValidationException("PrecoUnitario não pode ser negativo.");
+
+        // Tenant isolation: ProdutoId, se informado, precisa pertencer a esta empresa.
+        // Sem isso, atacante autenticado pode anexar produto de outro tenant ao pedido.
+        if (cmd.ProdutoId.HasValue && cmd.ProdutoId.Value != Guid.Empty)
+        {
+            var produto = await produtoRepo.GetByIdAsync(cmd.EmpresaId, cmd.ProdutoId.Value);
+            if (produto is null)
+                throw new UseCaseValidationException("Produto do item não pertence a esta empresa.");
+        }
 
         var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
         if (pedido == null) return null;

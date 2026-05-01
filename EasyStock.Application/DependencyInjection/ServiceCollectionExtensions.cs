@@ -134,6 +134,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RemoverClienteDocumentoUseCase>();
 
         // Onda P2 — Pedidos
+        services.AddOptions<EasyStock.Application.Services.PedidoEstoqueOptions>();
         services.AddScoped<EasyStock.Application.Services.PedidoEstoqueIntegrationService>();
         services.AddScoped<CriarPedidoUseCase>();
         services.AddScoped<AtualizarStatusPedidoUseCase>();

@@ -11,6 +11,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.ToTable("pedidos");
             b.HasKey(p => p.Id);
 
+            // Optimistic concurrency via xmin (sem migration nova).
+            b.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .IsRowVersion();
+
             b.Property(p => p.ClienteNome).HasMaxLength(150);
             b.Property(p => p.ClienteApt).HasMaxLength(32);
             b.Property(p => p.ClienteTelefone).HasMaxLength(32);

@@ -20,6 +20,12 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
     public async Task<ItemEstoque?> GetByIdAsync(Guid empresaId, Guid id) =>
         await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
 
+    // MongoDB não suporta FOR UPDATE; mesmo comportamento do GetByIdAsync.
+    // (Para concorrência forte em Mongo seria via findAndModify; não relevante
+    // pra demo atual que usa Postgres.)
+    public Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id) =>
+        GetByIdAsync(empresaId, id);
+
     public async Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100)
     {
         if (string.IsNullOrWhiteSpace(termo))
