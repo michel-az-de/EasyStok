@@ -108,6 +108,7 @@
                     <th>Data</th>
                     <th>Documento</th>
                     <th>Descrição</th>
+                    <th title="Quem registrou / De onde">Auditoria</th>
                     <th></th>
                 </tr>
             </thead>
@@ -166,15 +167,76 @@
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
                         <td class="text-slate-500 text-sm">@(s.DocumentoReferencia ?? "—")</td>
                         <td class="text-slate-500 text-sm">@(s.Descricao ?? "—")</td>
+                        <td class="text-xs text-slate-500">
+                            @if (!string.IsNullOrEmpty(s.UsuarioId) || !string.IsNullOrEmpty(s.Ip) || !string.IsNullOrEmpty(s.MotivoEstorno))
+                            {
+                                if (!string.IsNullOrEmpty(s.UsuarioId))
+                                {
+                                    <div title="Usuário ID: @s.UsuarioId" class="font-mono text-[10px]">@(s.UsuarioId.Length > 8 ? s.UsuarioId[..8] : s.UsuarioId)…</div>
+                                }
+                                if (!string.IsNullOrEmpty(s.Ip))
+                                {
+                                    <div title="@s.UserAgentResumo">IP: @s.Ip</div>
+                                }
+                                if (!string.IsNullOrEmpty(s.MotivoEstorno))
+                                {
+                                    <div class="text-amber-700" title="Motivo">↪ @s.MotivoEstorno</div>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-slate-300">—</span>
+                            }
+                        </td>
                         <td>
                             @if (!isEstornada && !isEstorno)
                             {
                                 <form asp-action="Estornar" asp-route-id="@s.Id" method="post"
-                                      onsubmit="return confirm('Confirma o estorno desta saída? O estoque será restaurado.');">
+                                      x-data="{ open: false, motivo: '' }"
+                                      @@submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); alert('Informe o motivo do estorno (mín. 3 caracteres).'); }">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium">
+                                    <input type="hidden" name="motivo" :value="motivo" />
+                                    <button type="button" @@click="open = true; setTimeout(() => $refs.motivoInput?.focus(), 50)"
+                                            class="text-xs text-red-500 hover:text-red-700 font-medium">
                                         Estornar
                                     </button>
+                                    <div x-show="open" x-cloak
+                                         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                                         @@click.self="open = false">
+                                        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                                            <h3 class="text-lg font-semibold text-slate-900 mb-3">Estornar saída</h3>
+                                            <p class="text-sm text-slate-600 mb-4">
+                                                O estoque será restaurado. Informe o motivo para registro de auditoria.
+                                            </p>
+                                            <label class="block text-sm font-medium text-slate-700 mb-1">Motivo *</label>
+                                            <select x-model="motivo"
+                                                    class="w-full mb-3 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                                                <option value="">Selecione...</option>
+                                                <option value="Erro de digitação">Erro de digitação</option>
+                                                <option value="Cancelamento de venda">Cancelamento de venda</option>
+                                                <option value="Cliente devolveu">Cliente devolveu</option>
+                                                <option value="Item errado">Item errado</option>
+                                                <option value="Outro">Outro</option>
+                                            </select>
+                                            <input x-show="motivo === 'Outro'" x-cloak x-ref="motivoInput"
+                                                   type="text" placeholder="Descreva o motivo (mín. 3 caracteres)"
+                                                   x-model="motivo" :value="motivo === 'Outro' ? '' : motivo"
+                                                   minlength="3" maxlength="300"
+                                                   class="w-full mb-3 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                                            <div class="flex justify-end gap-2">
+                                                <button type="button" @@click="open = false; motivo = ''"
+                                                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                                                    Cancelar
+                                                </button>
+                                                <button type="submit"
+                                                        :disabled="!motivo || motivo.length < 3"
+                                                        :class="(!motivo || motivo.length < 3) ? 'opacity-50 cursor-not-allowed' : ''"
+                                                        class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                                                    Confirmar estorno
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </form>
                             }
                             else if (isEstornada)

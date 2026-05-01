@@ -187,18 +187,23 @@ public class ItemEstoqueController(
         return DataOk(await reporEstoqueUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId }));
     }
 
-    [SwaggerOperation(Summary = "Reverse a stock exit (estorno)", Description = "Creates a reversal entry restoring the stock quantity.")]
+    public sealed record EstornarSaidaBody(string Motivo);
+
+    [SwaggerOperation(Summary = "Reverse a stock exit (estorno)", Description = "Creates a reversal entry restoring the stock quantity. Motivo is required (min 3 chars).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("estorno/{movimentacaoId}")]
-    public async Task<IActionResult> Estornar(Guid movimentacaoId, [FromQuery] Guid empresaId)
+    public async Task<IActionResult> Estornar(Guid movimentacaoId, [FromQuery] Guid empresaId, [FromBody] EstornarSaidaBody body)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
+        if (string.IsNullOrWhiteSpace(body?.Motivo))
+            return DataBadRequest("Motivo do estorno e obrigatorio.");
+
         var result = await estornarSaidaUseCase.ExecuteAsync(
-            new EstornarSaidaCommand(resolvedEmpresaId, movimentacaoId, null));
+            new EstornarSaidaCommand(resolvedEmpresaId, movimentacaoId, body.Motivo));
         return DataOk(result);
     }
 }

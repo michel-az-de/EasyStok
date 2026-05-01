@@ -20,6 +20,32 @@ namespace EasyStock.Api.Services
 
         public NivelAcesso Nivel => GetNivelClaimOrDefault();
 
+        public string? Ip
+        {
+            get
+            {
+                var ctx = httpContextAccessor.HttpContext;
+                if (ctx is null) return null;
+                // Honra X-Forwarded-For (proxy/load balancer) antes de cair em RemoteIpAddress.
+                var fwd = ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(fwd))
+                    return fwd.Split(',')[0].Trim();
+                return ctx.Connection.RemoteIpAddress?.ToString();
+            }
+        }
+
+        public string? UserAgent
+        {
+            get
+            {
+                var ua = httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].FirstOrDefault();
+                return string.IsNullOrWhiteSpace(ua) ? null : ua.Length > 500 ? ua[..500] : ua;
+            }
+        }
+
+        public string? DispositivoId =>
+            httpContextAccessor.HttpContext?.Request.Headers["X-Device-Id"].FirstOrDefault();
+
         public bool TemPermissao(Permissao permissao)
         {
             if (!IsAuthenticated)

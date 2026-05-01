@@ -22,10 +22,22 @@ public record Movimentacao
     public Produto? Produto { get; init; }
     public Variacao? ProdutoVariacao { get; init; }
 
+    // Auditoria de movimentacao (P0-2): quem/de onde/qual dispositivo.
+    public string? UsuarioId { get; init; }
+    public string? Ip { get; init; }
+    public string? UserAgent { get; init; }
+    public string? DispositivoId { get; init; }
+    public string? MotivoEstorno { get; init; }
+
     // Computed view helpers
     public int Qty => Quantidade?.Value ?? 0;
     public decimal? Custo => ValorUnitario?.Valor;
     public DateOnly Data => DateOnly.FromDateTime(DataMovimentacao);
+
+    // Resumo curto pra exibir na UI: "Chrome 120 / Mac" -> apenas "Chrome 120 / Mac" abreviado.
+    public string? UserAgentResumo => string.IsNullOrWhiteSpace(UserAgent)
+        ? null
+        : UserAgent.Length > 60 ? UserAgent[..60] + "…" : UserAgent;
 }
 
 [JsonConverter(typeof(QuantidadeDtoJsonConverter))]

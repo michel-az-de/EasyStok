@@ -55,6 +55,11 @@ public class MovimentacaoController(
             documentoReferencia = m.DocumentoReferencia,
             estornadaEm = m.EstornadaEm,
             movimentacaoEstornadaId = m.MovimentacaoEstornadaId?.ToString(),
+            usuarioId = m.UsuarioId?.ToString(),
+            ip = m.Ip,
+            userAgent = m.UserAgent,
+            dispositivoId = m.DispositivoId,
+            motivoEstorno = m.MotivoEstorno,
             produto = m.Produto != null ? new
             {
                 id = m.Produto.Id.ToString(),

@@ -55,7 +55,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null,
         IPublicadorEventos? publicadorEventos = null,
         ILojaRepository? lojaRepository = null,
-        IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
+        IConfiguracaoLojaRepository? configuracaoLojaRepository = null,
+        EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null)
     {
         public async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
@@ -135,6 +136,12 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             item.QuantidadeCritica = limiares.QuantidadeCritica;
             item.RecalcularIndicadores(command.DataEntrada, configuracaoLoja?.DiasAlertaParado ?? OperacionalDefaults.DiasAlertaParado);
 
+            var auditoria = currentUser is null ? null : new AuditoriaContexto(
+                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                Ip: currentUser.Ip,
+                UserAgent: currentUser.UserAgent,
+                DispositivoId: currentUser.DispositivoId);
+
             var movimentacao = MovimentacaoEstoque.CriarEntrada(
                 Guid.NewGuid(),
                 command.EmpresaId,
@@ -145,7 +152,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 command.DataEntrada,
                 descricaoAnuncio,
                 command.DocumentoReferencia,
-                agora);
+                agora,
+                auditoria);
 
             await itemEstoqueRepository.InsertAsync(item);
             await movimentacaoEstoqueRepository.InsertAsync(movimentacao);

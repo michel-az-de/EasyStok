@@ -131,9 +131,15 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
 
     [HttpPost("/saidas/{id}/estornar")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Estornar(string id)
+    public async Task<IActionResult> Estornar(string id, string motivo)
     {
-        var result = await svc.EstornarAsync(id);
+        if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 3)
+        {
+            Toast("error", "Informe um motivo do estorno (mínimo 3 caracteres).");
+            return RedirectToAction(nameof(Historico));
+        }
+
+        var result = await svc.EstornarAsync(id, motivo.Trim());
         if (HasError(result)) return RedirectToAction(nameof(Historico));
 
         Toast("success", "Saída estornada com sucesso! O estoque foi restaurado.");

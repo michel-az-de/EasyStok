@@ -75,8 +75,8 @@ public class SaidasService(ApiClient api, SessionService session)
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
-    public Task<ApiResult<object>> EstornarAsync(string id) =>
-        api.PostAsync<object>($"estoque/estorno/{Uri.EscapeDataString(id)}?empresaId={GetEmpresaId()}", new { });
+    public Task<ApiResult<object>> EstornarAsync(string id, string motivo) =>
+        api.PostAsync<object>($"estoque/estorno/{Uri.EscapeDataString(id)}?empresaId={GetEmpresaId()}", new { motivo });
 
     // Maps lowercase UI natureza values to PascalCase API enum names.
     private static string MapNatureza(string? natureza) => natureza?.ToLowerInvariant() switch

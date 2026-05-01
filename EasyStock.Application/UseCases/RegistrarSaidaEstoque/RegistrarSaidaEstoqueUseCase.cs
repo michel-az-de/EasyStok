@@ -73,7 +73,8 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
         IUnitOfWork unitOfWork,
         ILogger<RegistrarSaidaEstoqueUseCase> logger,
-        IPublicadorEventos? publicadorEventos = null)
+        IPublicadorEventos? publicadorEventos = null,
+        EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null)
     {
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
@@ -90,6 +91,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             await using var tx = await unitOfWork.BeginTransactionAsync();
 
             var agora = DateTime.UtcNow;
+
+            var auditoria = currentUser is null ? null : new AuditoriaContexto(
+                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                Ip: currentUser.Ip,
+                UserAgent: currentUser.UserAgent,
+                DispositivoId: currentUser.DispositivoId);
 
             var venda = Venda.Criar(
                 Guid.NewGuid(),
@@ -194,7 +201,8 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                         command.DataSaida,
                         itemVenda.DescricaoSnapshot,
                         command.NotaFiscal,
-                        agora);
+                        agora,
+                        auditoria);
 
                     itensVenda.Add(itemVenda);
                     movimentacoes.Add(movimentacao);
