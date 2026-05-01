@@ -87,8 +87,17 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             page,
             pageSize);
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20) =>
-        PaginateAsync(Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId), Builders<ItemEstoque>.Sort.Ascending(x => x.ProdutoId), page, pageSize);
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null)
+    {
+        var filter = Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
+
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
+        {
+            filter = Builders<ItemEstoque>.Filter.And(filter, Builders<ItemEstoque>.Filter.Eq(x => x.Status, statusEnum));
+        }
+
+        return PaginateAsync(filter, Builders<ItemEstoque>.Sort.Ascending(x => x.ProdutoId), page, pageSize);
+    }
 
     public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
     {
