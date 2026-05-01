@@ -145,8 +145,15 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
                     : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo)).ToArray();
 
+                if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
+                    throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
+
+                var item = lotes.SingleOrDefault();
+                if (item is null && comandoItem.ItemEstoqueId.HasValue)
+                    throw new UseCaseValidationException($"Esperado exatamente 1 item, mas encontrado {lotes.Length}.");
+
                 var produtoId = comandoItem.ItemEstoqueId.HasValue
-                    ? lotes.Single().ProdutoId
+                    ? item!.ProdutoId
                     : comandoItem.ProdutoId;
 
                 if (produtoId == Guid.Empty)

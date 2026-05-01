@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Utilities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -50,13 +51,17 @@ public class AdminAuditLogsController(EasyStockDbContext db) : EasyStockControll
             var sb = new StringBuilder();
             sb.AppendLine("AdminEmail,Acao,TenantId,Detalhes,IP,CriadoEm");
             foreach (var r in all)
-                sb.AppendLine($"\"{r.AdminEmail}\",\"{r.Acao}\",\"{r.TenantId}\",\"{r.Detalhes?.Replace("\"", "\"\"")}\",\"{r.Ip}\",\"{r.CriadoEm:O}\"");
+            {
+                var maskedEmail = PiiMaskingHelper.MaskEmail(r.AdminEmail);
+                var maskedIp = PiiMaskingHelper.MaskIpAddress(r.Ip);
+                sb.AppendLine($"\"{maskedEmail}\",\"{r.Acao}\",\"{r.TenantId}\",\"{r.Detalhes?.Replace("\"", "\"\"")}\",\"{maskedIp}\",\"{r.CriadoEm:O}\"");
+            }
 
             return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "admin-audit-logs.csv");
         }
 
         var total = await query.CountAsync();
-        var logs = await query
+        var logRecords = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new
@@ -70,6 +75,18 @@ public class AdminAuditLogsController(EasyStockDbContext db) : EasyStockControll
                 x.CriadoEm
             })
             .ToListAsync();
+
+        // Mask PII before returning
+        var logs = logRecords.Select(x => new
+        {
+            x.Id,
+            AdminEmail = PiiMaskingHelper.MaskEmail(x.AdminEmail),
+            x.Acao,
+            x.TenantId,
+            x.Detalhes,
+            Ip = PiiMaskingHelper.MaskIpAddress(x.Ip),
+            x.CriadoEm
+        }).ToList();
 
         return DataPaged(logs, total, page, pageSize);
     }

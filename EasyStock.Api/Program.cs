@@ -272,9 +272,22 @@ if (resolvedProvider is "sqlite" && !app.Environment.IsDevelopment())
         "ATENCAO: Banco SQLite em uso em ambiente {Env}. Isso pode indicar falha de conexao com banco principal.",
         app.Environment.EnvironmentName);
 
-var jwtKeyLen = builder.Configuration[ConfigurationKeys.JwtSecretKey]?.Length ?? 0;
-if (jwtKeyLen < 32)
-    throw new InvalidOperationException("JWT_SECRET deve ter pelo menos 32 caracteres.");
+var jwtSecret = builder.Configuration[ConfigurationKeys.JwtSecretKey];
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Contains("${JWT_SECRET_KEY}"))
+    throw new InvalidOperationException("JWT_SECRET_KEY environment variable is required (min 32 chars). Set it before starting the API.");
+if (jwtSecret.Length < 32)
+    throw new InvalidOperationException("JWT_SECRET_KEY must be at least 32 characters long.");
+
+// Validar connection strings não têm placeholders
+if (postgresConnectionString?.Contains("${") == true)
+    throw new InvalidOperationException("Database connection string contains placeholders. Set environment variables: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD.");
+
+if (mongoConnectionString?.Contains("${") == true)
+    throw new InvalidOperationException("MongoDB connection string contains placeholders. Set MONGO_CONNECTION_STRING environment variable.");
+
+// Validar que database credentials não são defaults/placeholders
+if (postgresConnectionString?.Contains("Username=postgres") == true && postgresConnectionString?.Contains("Password=postgres") == true)
+    throw new InvalidOperationException("CRITICAL: Default PostgreSQL credentials detected. Set DB_PASSWORD to a secure value before deployment.");
 
 Log.Information("""
 

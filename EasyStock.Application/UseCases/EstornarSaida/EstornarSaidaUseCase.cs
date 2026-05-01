@@ -36,6 +36,9 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             if (string.IsNullOrWhiteSpace(command.Motivo) || command.Motivo.Trim().Length < 3)
                 throw new UseCaseValidationException("Motivo do estorno e obrigatorio (minimo 3 caracteres).");
 
+            // Explícita transação garante que FOR UPDATE lock é mantido até CommitAsync
+            await using var tx = await unitOfWork.BeginTransactionAsync();
+
             // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
             var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)
                 ?? throw new UseCaseValidationException("Movimentacao nao encontrada.");
@@ -46,6 +49,7 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             if (original.Tipo != TipoMovimentacaoEstoque.Saida)
                 throw new UseCaseValidationException("Somente movimentacoes de saida podem ser estornadas.");
 
+            // Re-validação dentro da transação (com lock) previne race condition de duplo estorno
             if (original.EstornadaEm.HasValue)
                 throw new MovimentacaoJaEstornadaException(original.Id);
 
@@ -53,6 +57,10 @@ namespace EasyStock.Application.UseCases.EstornarSaida
 
             var itemEstoque = await itemEstoqueRepository.GetByIdAsync(original.ItemEstoqueId)
                 ?? throw new UseCaseValidationException("Item de estoque da movimentacao nao encontrado.");
+
+            // SEGURANÇA: Validar que itemEstoque pertence à empresa solicitada (multi-tenant isolation)
+            if (itemEstoque.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("O item de estoque nao pertence a empresa informada.");
 
             itemEstoque.RestaurarQuantidade(original.Quantidade, agora);
 
