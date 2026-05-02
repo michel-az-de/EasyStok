@@ -1,6 +1,8 @@
 using EasyStock.Application.Configuration;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
+using EasyStock.Domain.Entities;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -22,7 +24,7 @@ public class ObterEstoqueBaixoUseCaseTests
         var empresaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, 50, 1, 20, null)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterEstoqueBaixoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterEstoqueBaixoCommand(empresaId, null, null, 1, 20);
@@ -43,7 +45,7 @@ public class ObterEstoqueBaixoUseCaseTests
         var limite = 100;
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, limite, 1, 20, null)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterEstoqueBaixoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterEstoqueBaixoCommand(empresaId, null, limite, 1, 20);
@@ -62,9 +64,10 @@ public class ObterEstoqueBaixoUseCaseTests
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
-        _configuracaoRepository.GetByLojaIdAsync(lojaId).Returns((dynamic?)null);
+        _configuracaoRepository.GetByLojaIdAsync(lojaId)
+            .Returns(Task.FromResult((ConfiguracaoLoja?)null));
         _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, 50, 1, 20, lojaId)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterEstoqueBaixoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterEstoqueBaixoCommand(empresaId, lojaId, null, 1, 20);
@@ -95,7 +98,7 @@ public class ObterEstoqueBaixoUseCaseTests
         var empresaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetEstoqueBaixoAsync(empresaId, 50, 3, 50, null)
-            .Returns((Enumerable.Empty<dynamic>(), 200));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 200)));
 
         var useCase = new ObterEstoqueBaixoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterEstoqueBaixoCommand(empresaId, null, null, 3, 50);

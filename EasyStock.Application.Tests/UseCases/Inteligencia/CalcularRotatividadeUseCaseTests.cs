@@ -1,9 +1,11 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Inteligencia.Rotatividade;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
+using static NSubstitute.Arg;
 
 namespace EasyStock.Application.Tests.UseCases.Inteligencia;
 
@@ -17,8 +19,8 @@ public class CalcularRotatividadeUseCaseTests
     {
         // Arrange
         var empresaId = Guid.NewGuid();
-        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Arg.Any<DateTime>(), Arg.Any<DateTime>())
-            .Returns(10m);
+        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Any<DateTime>(), Any<DateTime>())
+            .Returns(Task.FromResult(10m));
 
         var useCase = new CalcularRotatividadeUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularRotatividadeCommand(empresaId, null, 30);
@@ -41,8 +43,8 @@ public class CalcularRotatividadeUseCaseTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
-        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, Arg.Any<DateTime>(), Arg.Any<DateTime>())
-            .Returns(5m);
+        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, Any<DateTime>(), Any<DateTime>())
+            .Returns(Task.FromResult(5m));
 
         var useCase = new CalcularRotatividadeUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularRotatividadeCommand(empresaId, produtoId, 30);
@@ -62,8 +64,8 @@ public class CalcularRotatividadeUseCaseTests
     {
         // Arrange
         var empresaId = Guid.NewGuid();
-        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Arg.Any<DateTime>(), Arg.Any<DateTime>())
-            .Returns(0m);
+        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Any<DateTime>(), Any<DateTime>())
+            .Returns(Task.FromResult(0m));
 
         var useCase = new CalcularRotatividadeUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularRotatividadeCommand(empresaId, null, 30);
@@ -82,8 +84,8 @@ public class CalcularRotatividadeUseCaseTests
     {
         // Arrange
         var empresaId = Guid.NewGuid();
-        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Arg.Any<DateTime>(), Arg.Any<DateTime>())
-            .Returns(2.5m);
+        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Any<DateTime>(), Any<DateTime>())
+            .Returns(Task.FromResult(2.5m));
 
         var useCase = new CalcularRotatividadeUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularRotatividadeCommand(empresaId, null, 15);
@@ -114,8 +116,8 @@ public class CalcularRotatividadeUseCaseTests
     {
         // Arrange
         var empresaId = Guid.NewGuid();
-        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Arg.Any<DateTime>(), Arg.Any<DateTime>())
-            .Returns(3.333333m);
+        _movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, null, Any<DateTime>(), Any<DateTime>())
+            .Returns(Task.FromResult(3.333333m));
 
         var useCase = new CalcularRotatividadeUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularRotatividadeCommand(empresaId, null, 30);

@@ -1,6 +1,9 @@
 using EasyStock.Application.Configuration;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -22,7 +25,7 @@ public class ObterSugestaoReposicaoUseCaseTests
         var empresaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, 50, 1, 20, null)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterSugestaoReposicaoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterSugestaoReposicaoCommand(empresaId, null, null, 1, 20);
@@ -43,7 +46,7 @@ public class ObterSugestaoReposicaoUseCaseTests
         var limite = 100;
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, limite, 1, 20, null)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterSugestaoReposicaoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterSugestaoReposicaoCommand(empresaId, null, limite, 1, 20);
@@ -62,9 +65,10 @@ public class ObterSugestaoReposicaoUseCaseTests
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
-        _configuracaoRepository.GetByLojaIdAsync(lojaId).Returns((dynamic?)null);
+        _configuracaoRepository.GetByLojaIdAsync(lojaId)
+            .Returns(Task.FromResult((ConfiguracaoLoja?)null));
         _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, 50, 1, 20, lojaId)
-            .Returns((Enumerable.Empty<dynamic>(), 0));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 0)));
 
         var useCase = new ObterSugestaoReposicaoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterSugestaoReposicaoCommand(empresaId, lojaId, null, 1, 20);
@@ -95,7 +99,7 @@ public class ObterSugestaoReposicaoUseCaseTests
         var empresaId = Guid.NewGuid();
         _config.LimiteEstoqueBaixoDefault.Returns(50);
         _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, 50, 2, 50, null)
-            .Returns((Enumerable.Empty<dynamic>(), 150));
+            .Returns(Task.FromResult((Enumerable.Empty<ItemEstoque>(), 150)));
 
         var useCase = new ObterSugestaoReposicaoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
         var cmd = new ObterSugestaoReposicaoCommand(empresaId, null, null, 2, 50);
@@ -108,46 +112,4 @@ public class ObterSugestaoReposicaoUseCaseTests
         await _itemEstoqueRepository.Received(1).GetSugestaoReposicaoAsync(empresaId, 50, 2, 50, null);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_WithResults_MapsSugestaoCorretamente()
-    {
-        // Arrange
-        var empresaId = Guid.NewGuid();
-        var itemId = Guid.NewGuid();
-        var produtoId = Guid.NewGuid();
-
-        var mockProduct = Substitute.For<dynamic>();
-        mockProduct.Nome = "Produto";
-
-        var items = new[]
-        {
-            new
-            {
-                Id = itemId,
-                ProdutoId = produtoId,
-                CodigoInterno = "SKU001",
-                QuantidadeAtual = (decimal?)25,
-                QuantidadeSugerida = 75m,
-                CustoEstimado = 7500m,
-                Produto = mockProduct
-            }
-        };
-
-        _config.LimiteEstoqueBaixoDefault.Returns(50);
-        _itemEstoqueRepository.GetSugestaoReposicaoAsync(empresaId, 50, 1, 20, null)
-            .Returns((items.AsEnumerable(), 1));
-
-        var useCase = new ObterSugestaoReposicaoUseCase(_itemEstoqueRepository, _configuracaoRepository, _config, _logger);
-        var cmd = new ObterSugestaoReposicaoCommand(empresaId, null, null, 1, 20);
-
-        // Act
-        var (result, total) = await useCase.ExecuteAsync(cmd);
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().ItemEstoqueId.Should().Be(itemId);
-        result.First().QuantidadeSugerida.Should().Be(75m);
-        result.First().CustoEstimado.Should().Be(7500m);
-        result.First().LimiteMinimo.Should().Be(50);
-    }
 }

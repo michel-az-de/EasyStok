@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Inteligencia.Board;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;

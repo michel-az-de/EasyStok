@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Inteligencia.Sazonalidade;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -18,14 +19,14 @@ public class CalcularSazonalidadeInteligenciaUseCaseTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
-        var dados = new[]
+        IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)> dados = new[]
         {
-            new { Ano = 2025, Mes = 1, TotalSaidas = 100, ValorTotal = 10000m },
-            new { Ano = 2025, Mes = 2, TotalSaidas = 120, ValorTotal = 12000m }
+            (2025, 1, 100, 10000m),
+            (2025, 2, 120, 12000m)
         };
 
         _movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, 12)
-            .Returns(Task.FromResult(dados.AsEnumerable()));
+            .Returns(Task.FromResult(dados));
 
         var useCase = new CalcularSazonalidadeInteligenciaUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularSazonalidadeInteligenciaCommand(empresaId, produtoId, 12);
@@ -47,16 +48,12 @@ public class CalcularSazonalidadeInteligenciaUseCaseTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
-        var dados = Enumerable.Range(1, 24).Select(m => new
-        {
-            Ano = 2024 + (m - 1) / 12,
-            Mes = ((m - 1) % 12) + 1,
-            TotalSaidas = m * 10,
-            ValorTotal = m * 1000m
-        });
+        IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)> dados = Enumerable.Range(1, 24).Select(m =>
+            (2024 + (m - 1) / 12, ((m - 1) % 12) + 1, m * 10, (decimal)(m * 1000m))
+        ).ToList();
 
         _movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, 24)
-            .Returns(dados.AsEnumerable());
+            .Returns(Task.FromResult(dados));
 
         var useCase = new CalcularSazonalidadeInteligenciaUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularSazonalidadeInteligenciaCommand(empresaId, produtoId, 24);
@@ -98,8 +95,10 @@ public class CalcularSazonalidadeInteligenciaUseCaseTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)> dados = Enumerable.Empty<(int, int, int, decimal)>();
+
         _movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, 12)
-            .Returns(Enumerable.Empty<dynamic>());
+            .Returns(Task.FromResult(dados));
 
         var useCase = new CalcularSazonalidadeInteligenciaUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularSazonalidadeInteligenciaCommand(empresaId, produtoId, 12);
@@ -117,16 +116,12 @@ public class CalcularSazonalidadeInteligenciaUseCaseTests
         // Arrange
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
-        var dados = Enumerable.Range(1, 36).Select(m => new
-        {
-            Ano = 2023 + (m - 1) / 12,
-            Mes = ((m - 1) % 12) + 1,
-            TotalSaidas = 100,
-            ValorTotal = 10000m
-        });
+        IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)> dados = Enumerable.Range(1, 36).Select(m =>
+            (2023 + (m - 1) / 12, ((m - 1) % 12) + 1, 100, 10000m)
+        ).ToList();
 
         _movimentacaoRepository.GetAgregacaoMensalAsync(empresaId, produtoId, 36)
-            .Returns(dados.AsEnumerable());
+            .Returns(Task.FromResult(dados));
 
         var useCase = new CalcularSazonalidadeInteligenciaUseCase(_movimentacaoRepository, _logger);
         var cmd = new CalcularSazonalidadeInteligenciaCommand(empresaId, produtoId, 36);
