@@ -51,7 +51,8 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
                 items = items.Where(p => p.CategoriaId == categoriaId.Value).ToList();
 
             totalItems = items.Count;
-            totalPages = 1;
+            totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)PageSize));
+            items = items.Skip((page - 1) * PageSize).Take(PageSize).ToList();
         }
         else
         {
@@ -147,7 +148,7 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
 
         var result = await svc.CriarAsync(vm);
 
-        if (!result.Success && result.HttpStatus is not (200 or 201))
+        if (!result.Success)
         {
             var erro = result.ErrorMessage ?? "Erro ao salvar produto.";
             if (isFetch)

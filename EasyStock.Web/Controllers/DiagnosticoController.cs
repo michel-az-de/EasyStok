@@ -7,7 +7,7 @@ namespace EasyStock.Web.Controllers;
 
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
     {
@@ -22,12 +22,12 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         ViewBag.Timestamp = DateTimeOffset.UtcNow;
         ViewBag.LatenciaApiMs = latenciaApiMs;
 
-        ViewBag.IsAdmin = true; // Diagnóstico é público — todas as funcionalidades liberadas
+        ViewBag.IsAdmin = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
 
         return View(apiResult);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico/json")]
     public async Task<IActionResult> Json()
     {
@@ -46,7 +46,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     // Proxy endpoints para Alpine.js (async client-side loading)
     // ──────────────────────────────────────────────────────────────────────
 
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico/api/endpoints")]
     public async Task<IActionResult> ProxyEndpoints()
     {
@@ -56,7 +56,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico/api/historico")]
     public async Task<IActionResult> ProxyHistorico()
     {
@@ -66,7 +66,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico/api/logs-enhanced")]
     public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 48)
     {
@@ -76,7 +76,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/limpar")]
@@ -88,7 +88,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [Route("diagnostico/api/logs/exportar")]
     public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
     {
@@ -99,7 +99,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return File(stream, "text/plain; charset=utf-8", fileName ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/salvar-storage")]
@@ -113,7 +113,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
 
     // ── Novos proxies ──────────────────────────────────────────────────────
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/logs/lixeira")]
     public async Task<IActionResult> ProxyLixeira()
@@ -123,7 +123,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/lixeira/esvaziar")]
@@ -134,7 +134,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/eventos")]
     public async Task<IActionResult> ProxyEventos([FromQuery] int hours = 48)
@@ -144,7 +144,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/slo")]
     public async Task<IActionResult> ProxySlo([FromQuery] int hours = 24)
@@ -154,7 +154,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/alertas/{alertaId}/ack")]
@@ -165,7 +165,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/alertas/acks")]
     public async Task<IActionResult> ProxyGetAcks([FromQuery] string? ids = null)
@@ -175,7 +175,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/alertas/acks")]
@@ -192,7 +192,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/queries-lentas")]
     public async Task<IActionResult> ProxyQueriesLentas()
@@ -202,7 +202,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/health/empresas")]
     public async Task<IActionResult> ProxyHealthEmpresas()
@@ -212,7 +212,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/historico/zerar")]
@@ -223,7 +223,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/expurgar")]
@@ -234,7 +234,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/logs/storage")]
     public async Task<IActionResult> ProxyStorageFiles()
@@ -244,7 +244,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet]
     [Route("diagnostico/api/logs/storage/conteudo")]
     public async Task<IActionResult> ProxyStorageFileContent([FromQuery] string file)

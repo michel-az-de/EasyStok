@@ -290,7 +290,7 @@
             <!-- Grid de previews (existentes + novas) -->
             <div x-show="totalPhotoCount > 0" x-transition class="mb-4">
                 <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                    <!-- Fotos existentes (BUG C fix: badge Capa em idx===0 sempre) -->
+                    <!-- Fotos existentes -->
                     <template x-for="(foto, idx) in existingPhotos" :key="'ex-' + foto.fotoId">
                         <div class="relative aspect-square rounded-xl overflow-hidden border-2 group"
                              :class="idx === 0 ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'">
@@ -299,7 +299,7 @@
                                   class="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Capa</span>
                             <span class="absolute bottom-1.5 left-1.5 text-[10px] font-semibold text-white bg-black/50 backdrop-blur px-1.5 py-0.5 rounded"
                                   x-text="'Foto ' + (idx + 1)"></span>
-                            <!-- BUG D: botão remover foto existente (só em modo edição) -->
+                            <!-- Botão remover (apenas em modo edição) -->
                             <template x-if="productId">
                                 <button type="button" @@click="deleteExistingPhoto(foto.fotoId)"
                                         aria-label="Remover foto"
@@ -338,7 +338,7 @@
                 </p>
             </div>
 
-            <!-- Área de upload: slots visuais quando vazio (BUG A fix: grid-cols-5 uniforme) -->
+            <!-- Área de upload: slots visuais quando vazio -->
             <div x-show="totalPhotoCount === 0" x-cloak class="mb-4">
                 <div class="grid grid-cols-5 gap-2">
                     <!-- Slot 1: Capa (destaque indigo, mesmo tamanho dos outros) -->

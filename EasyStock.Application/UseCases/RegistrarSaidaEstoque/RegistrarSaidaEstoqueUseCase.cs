@@ -148,9 +148,17 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
                     throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
 
-                var item = lotes.SingleOrDefault();
-                if (item is null && comandoItem.ItemEstoqueId.HasValue)
-                    throw new UseCaseValidationException($"Esperado exatamente 1 item, mas encontrado {lotes.Length}.");
+                // Só faz sentido validar "exatamente 1 lote" quando o caller passou
+                // ItemEstoqueId (saída direta de um lote específico). No caminho
+                // FIFO/FEFO por ProdutoId, esperamos N lotes — SingleOrDefault aqui
+                // estouraria com >1 elemento e quebrava a saída automática por lotes.
+                ItemEstoque? item = null;
+                if (comandoItem.ItemEstoqueId.HasValue)
+                {
+                    if (lotes.Length != 1)
+                        throw new UseCaseValidationException($"Esperado exatamente 1 item, mas encontrado {lotes.Length}.");
+                    item = lotes[0];
+                }
 
                 var produtoId = comandoItem.ItemEstoqueId.HasValue
                     ? item!.ProdutoId

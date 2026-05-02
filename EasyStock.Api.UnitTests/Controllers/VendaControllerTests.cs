@@ -2,10 +2,12 @@ using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -15,12 +17,21 @@ public class VendaControllerTests
 {
     private readonly IVendaRepository _vendaRepository = Substitute.For<IVendaRepository>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
+    private readonly RegistrarSaidaEstoqueUseCase _registrarSaidaUseCase;
     private readonly VendaController _controller;
 
     public VendaControllerTests()
     {
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new VendaController(_vendaRepository, _currentUser);
+        _registrarSaidaUseCase = new RegistrarSaidaEstoqueUseCase(
+            Substitute.For<IProdutoRepository>(),
+            Substitute.For<IItemEstoqueRepository>(),
+            _vendaRepository,
+            Substitute.For<IItemVendaRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<IUnitOfWork>(),
+            Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>());
+        _controller = new VendaController(_vendaRepository, _registrarSaidaUseCase, _currentUser);
     }
 
     [Fact]
