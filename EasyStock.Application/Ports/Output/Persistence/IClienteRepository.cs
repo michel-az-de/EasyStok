@@ -29,11 +29,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         // ── Sub-recursos (1:N) ────────────────────────────────────
         Task AddEnderecoAsync(ClienteEndereco endereco);
-        Task RemoveEnderecoAsync(Guid enderecoId);
+        Task<bool> RemoveEnderecoAsync(Guid empresaId, Guid clienteId, Guid enderecoId);
         Task AddTelefoneAsync(ClienteTelefone telefone);
-        Task RemoveTelefoneAsync(Guid telefoneId);
+        Task<bool> RemoveTelefoneAsync(Guid empresaId, Guid clienteId, Guid telefoneId);
         Task AddDocumentoAsync(ClienteDocumento documento);
-        Task RemoveDocumentoAsync(Guid documentoId);
+        Task<bool> RemoveDocumentoAsync(Guid empresaId, Guid clienteId, Guid documentoId);
 
         // ── Audit ─────────────────────────────────────────────────
         Task AddAlteracaoAsync(ClienteAlteracao alteracao);

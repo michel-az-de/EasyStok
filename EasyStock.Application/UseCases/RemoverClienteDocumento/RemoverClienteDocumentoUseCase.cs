@@ -17,10 +17,9 @@ public class RemoverClienteDocumentoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.ClienteId, "ClienteId");
         UseCaseGuards.EnsureNotEmpty(cmd.DocumentoId, "DocumentoId");
 
-        var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
-        if (cliente == null) return false;
+        var removed = await repo.RemoveDocumentoAsync(cmd.EmpresaId, cmd.ClienteId, cmd.DocumentoId);
+        if (!removed) return false;
 
-        await repo.RemoveDocumentoAsync(cmd.DocumentoId);
         await uow.CommitAsync();
 
         logger.LogInformation("Documento {Id} removido do cliente {ClienteId}.", cmd.DocumentoId, cmd.ClienteId);

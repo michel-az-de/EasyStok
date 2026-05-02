@@ -17,10 +17,9 @@ public class RemoverClienteTelefoneUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.ClienteId, "ClienteId");
         UseCaseGuards.EnsureNotEmpty(cmd.TelefoneId, "TelefoneId");
 
-        var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
-        if (cliente == null) return false;
+        var removed = await repo.RemoveTelefoneAsync(cmd.EmpresaId, cmd.ClienteId, cmd.TelefoneId);
+        if (!removed) return false;
 
-        await repo.RemoveTelefoneAsync(cmd.TelefoneId);
         await uow.CommitAsync();
 
         logger.LogInformation("Telefone {Id} removido do cliente {ClienteId}.", cmd.TelefoneId, cmd.ClienteId);

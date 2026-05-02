@@ -17,10 +17,9 @@ public class RemoverClienteEnderecoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.ClienteId, "ClienteId");
         UseCaseGuards.EnsureNotEmpty(cmd.EnderecoId, "EnderecoId");
 
-        var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
-        if (cliente == null) return false;
+        var removed = await repo.RemoveEnderecoAsync(cmd.EmpresaId, cmd.ClienteId, cmd.EnderecoId);
+        if (!removed) return false;
 
-        await repo.RemoveEnderecoAsync(cmd.EnderecoId);
         await uow.CommitAsync();
 
         logger.LogInformation("Endereco {Id} removido do cliente {ClienteId}.", cmd.EnderecoId, cmd.ClienteId);

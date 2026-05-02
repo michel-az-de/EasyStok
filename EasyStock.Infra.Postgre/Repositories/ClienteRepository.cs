@@ -83,16 +83,39 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // ── Sub-recursos ──────────────────────────────────────────
         public Task AddEnderecoAsync(ClienteEndereco e) { db.Set<ClienteEndereco>().Add(e); return Task.CompletedTask; }
-        public Task RemoveEnderecoAsync(Guid id) =>
-            db.Set<ClienteEndereco>().Where(e => e.Id == id).ExecuteDeleteAsync();
+        public async Task<bool> RemoveEnderecoAsync(Guid empresaId, Guid clienteId, Guid enderecoId)
+        {
+            // Defesa em profundidade contra IDOR cross-tenant: valida endereço∈cliente∈empresa
+            // numa única query, mesmo que o caller já tenha validado upstream.
+            var rows = await db.Set<ClienteEndereco>()
+                .Where(e => e.Id == enderecoId
+                            && e.ClienteId == clienteId
+                            && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
+                .ExecuteDeleteAsync();
+            return rows > 0;
+        }
 
         public Task AddTelefoneAsync(ClienteTelefone t) { db.Set<ClienteTelefone>().Add(t); return Task.CompletedTask; }
-        public Task RemoveTelefoneAsync(Guid id) =>
-            db.Set<ClienteTelefone>().Where(t => t.Id == id).ExecuteDeleteAsync();
+        public async Task<bool> RemoveTelefoneAsync(Guid empresaId, Guid clienteId, Guid telefoneId)
+        {
+            var rows = await db.Set<ClienteTelefone>()
+                .Where(t => t.Id == telefoneId
+                            && t.ClienteId == clienteId
+                            && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
+                .ExecuteDeleteAsync();
+            return rows > 0;
+        }
 
         public Task AddDocumentoAsync(ClienteDocumento d) { db.Set<ClienteDocumento>().Add(d); return Task.CompletedTask; }
-        public Task RemoveDocumentoAsync(Guid id) =>
-            db.Set<ClienteDocumento>().Where(d => d.Id == id).ExecuteDeleteAsync();
+        public async Task<bool> RemoveDocumentoAsync(Guid empresaId, Guid clienteId, Guid documentoId)
+        {
+            var rows = await db.Set<ClienteDocumento>()
+                .Where(d => d.Id == documentoId
+                            && d.ClienteId == clienteId
+                            && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
+                .ExecuteDeleteAsync();
+            return rows > 0;
+        }
 
         public Task AddAlteracaoAsync(ClienteAlteracao a) { db.Set<ClienteAlteracao>().Add(a); return Task.CompletedTask; }
 
