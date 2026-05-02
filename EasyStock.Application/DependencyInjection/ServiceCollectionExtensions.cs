@@ -92,6 +92,14 @@ using EasyStock.Application.UseCases.Analytics.Movimentacoes;
 using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.Parados;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
+using EasyStock.Application.UseCases.Inteligencia.Board;
+using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
+using EasyStock.Application.UseCases.Inteligencia.Rotatividade;
+using EasyStock.Application.UseCases.Inteligencia.Sazonalidade;
+using EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
+using EasyStock.Application.UseCases.Inteligencia.ProximoVencimento;
+using EasyStock.Application.UseCases.Inteligencia.ItensParados;
+using EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -232,6 +240,16 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ObterParadosUseCase>();
         services.AddScoped<ObterDiasAlertaParadoUseCase>();
         services.AddScoped<ObterVendasPorCanalUseCase>();
+
+        // Inteligencia Use Cases
+        services.AddScoped<GetBoardUseCase>();
+        services.AddScoped<CalcularProjecaoRupturaUseCase>();
+        services.AddScoped<CalcularRotatividadeUseCase>();
+        services.AddScoped<CalcularSazonalidadeInteligenciaUseCase>();
+        services.AddScoped<ObterEstoqueBaixoUseCase>();
+        services.AddScoped<ObterProximoVencimentoUseCase>();
+        services.AddScoped<ObterItensParadosUseCase>();
+        services.AddScoped<ObterSugestaoReposicaoUseCase>();
 
         return services;
     }
