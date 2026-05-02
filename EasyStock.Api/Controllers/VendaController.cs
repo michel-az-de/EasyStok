@@ -1,10 +1,13 @@
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Api.Controllers;
 
@@ -15,6 +18,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/vendas")]
 public class VendaController(
     IVendaRepository vendaRepository,
+    RegistrarSaidaEstoqueUseCase registrarSaidaUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List sales (paginated)")]
@@ -64,5 +68,59 @@ public class VendaController(
 
         var itens = venda.ItensVenda ?? Enumerable.Empty<Domain.Entities.ItemVenda>();
         return DataOk(itens);
+    }
+
+    public sealed record CriarVendaItemRequest(
+        [Required] Guid ItemEstoqueId,
+        [Range(1, int.MaxValue)] int Quantidade,
+        [Range(0.01, double.MaxValue)] decimal PrecoUnitario,
+        string? Descricao = null);
+
+    public sealed record CriarVendaRequest(
+        [Required] Guid EmpresaId,
+        [Required][MinLength(1)] IReadOnlyList<CriarVendaItemRequest> Itens,
+        CanalVenda Canal = CanalVenda.LojaPropria,
+        NaturezaMovimentacaoEstoque Natureza = NaturezaMovimentacaoEstoque.Venda,
+        Guid? LojaId = null,
+        string? NumeroNotaFiscal = null,
+        string? Observacoes = null,
+        DateTime? DataVenda = null);
+
+    [SwaggerOperation(
+        Summary = "Create a sale (canonical)",
+        Description = "Registers a direct sale, decrements stock, and creates audit movement. " +
+                      "Idempotent via Idempotency-Key header.")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpPost]
+    public async Task<IActionResult> CriarVenda([FromBody] CriarVendaRequest request)
+    {
+        if (!TryResolveEmpresaId(currentUser, request.EmpresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var agora = DateTime.UtcNow;
+        var dataVenda = request.DataVenda?.ToUniversalTime() ?? agora;
+
+        var command = new RegistrarSaidaEstoqueCommand(
+            EmpresaId: resolvedEmpresaId,
+            Itens: request.Itens
+                .Select(i => new RegistrarSaidaEstoqueItemCommand(
+                    i.ItemEstoqueId,
+                    i.Quantidade,
+                    i.PrecoUnitario,
+                    i.Descricao))
+                .ToList(),
+            DataVenda: dataVenda,
+            DataSaida: agora,
+            DataEnvio: null,
+            NotaFiscal: request.NumeroNotaFiscal,
+            Natureza: request.Natureza,
+            Canal: request.Canal,
+            Observacoes: request.Observacoes);
+
+        var result = await registrarSaidaUseCase.ExecuteAsync(command);
+
+        return DataCreated($"/api/vendas/{result.VendaId}", result);
     }
 }
