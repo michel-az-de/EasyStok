@@ -12934,28 +12934,46 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('pdvMsg').textContent = '';
   };
 
+  // Pequeno cache em memória para o onclick não precisar serializar o item no atributo HTML
+  var pdvSearchCache = {};
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   window.pdvSearchProducts = function () {
     var q = (document.getElementById('pdvSearch').value || '').trim();
-    if (q.length < 2) return;
+    if (q.length < 2) {
+      document.getElementById('pdvResults').innerHTML = '';
+      return;
+    }
     var apiKey = localStorage.getItem('cdb-api-key') || '';
-    var empresaId = localStorage.getItem('cdb-empresa-id') || '';
-    fetch('/api/estoque/buscar?q=' + encodeURIComponent(q) + '&empresaId=' + empresaId, {
-      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cdb-jwt') || '', 'X-Mobile-Api-Key': apiKey }
-    }).then(function (r) { return r.json(); }).then(function (data) {
-      var items = (data && data.data) ? data.data : [];
-      var html = items.slice(0, 10).map(function (item) {
-        return '<button class="pdv-result-item" onclick="pdvAddItem(' + JSON.stringify(JSON.stringify(item)) + ')">' +
-          '<span class="pdv-item-name">' + (item.descricaoAnuncio || item.variacao || item.produto || item.id) + '</span>' +
+    fetch('/api/mobile/estoque/buscar?q=' + encodeURIComponent(q) + '&limit=10', {
+      headers: { 'X-Mobile-Api-Key': apiKey }
+    }).then(function (r) { return r.ok ? r.json() : []; }).then(function (items) {
+      var arr = Array.isArray(items) ? items : [];
+      pdvSearchCache = {};
+      var html = arr.map(function (item) {
+        pdvSearchCache[item.id] = item;
+        var price = item.precoVendaSugerido != null ? item.precoVendaSugerido : (item.custoUnitario || 0);
+        return '<button class="pdv-result-item" onclick="pdvAddItemById(\'' + escapeHtml(item.id) + '\')">' +
+          '<span class="pdv-item-name">' + escapeHtml(item.descricao || item.codigoInterno || item.id) + '</span>' +
           '<span class="pdv-item-qty">Qtd: ' + (item.quantidadeAtual || 0) + '</span>' +
-          '<span class="pdv-item-price">R$ ' + ((item.precoVendaSugerido || item.custoUnitario || 0).toFixed(2)) + '</span>' +
+          '<span class="pdv-item-price">R$ ' + Number(price).toFixed(2) + '</span>' +
           '</button>';
       }).join('');
       document.getElementById('pdvResults').innerHTML = html || '<p class="hint">Nenhum resultado.</p>';
-    }).catch(function () {});
+    }).catch(function () {
+      document.getElementById('pdvResults').innerHTML = '<p class="hint">Falha na busca.</p>';
+    });
   };
 
-  window.pdvAddItem = function (itemJson) {
-    var item = JSON.parse(itemJson);
+  window.pdvAddItemById = function (id) {
+    var item = pdvSearchCache[id];
+    if (!item) return;
+    var price = item.precoVendaSugerido != null ? item.precoVendaSugerido : (item.custoUnitario || 0);
     var existing = pdvCart.find(function (c) { return c.itemEstoqueId === item.id; });
     if (existing) {
       existing.quantidade++;
@@ -12963,8 +12981,8 @@ document.addEventListener('DOMContentLoaded', function () {
       pdvCart.push({
         itemEstoqueId: item.id,
         quantidade: 1,
-        precoUnitario: item.precoVendaSugerido || item.custoUnitario || 0,
-        descricao: item.descricaoAnuncio || item.variacao || ''
+        precoUnitario: Number(price),
+        descricao: item.descricao || ''
       });
     }
     renderPdvCart();
@@ -12987,7 +13005,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var html = pdvCart.length === 0 ? '<p class="hint" style="text-align:center;padding:24px">Carrinho vazio</p>' :
       pdvCart.map(function (item, idx) {
         return '<div class="pdv-cart-item">' +
-          '<span class="pdv-cart-name">' + item.descricao + '</span>' +
+          '<span class="pdv-cart-name">' + escapeHtml(item.descricao) + '</span>' +
           '<div class="pdv-cart-controls">' +
           '<button onclick="pdvChangeQty(' + idx + ',-1)">-</button>' +
           '<span>' + item.quantidade + '</span>' +

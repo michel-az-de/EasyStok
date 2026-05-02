@@ -41,6 +41,9 @@ public class SaidasService(ApiClient api, SessionService session)
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
             return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
+        // ItemEstoqueId, quando presente, sinaliza saída de lote específico (sem FIFO).
+        // Senão, ProdutoId aciona FIFO/FEFO no use case.
+        Guid? itemEstoqueId = Guid.TryParse(vm.ItemEstoqueId, out var iid) ? iid : null;
         return await api.PostAsync<object>("estoque/saida", new
         {
             empresaId,
@@ -48,6 +51,7 @@ public class SaidasService(ApiClient api, SessionService session)
             {
                 new
                 {
+                    itemEstoqueId,
                     produtoId = Guid.TryParse(vm.ProdutoId, out var pid) ? pid : Guid.Empty,
                     produtoVariacaoId = Guid.TryParse(vm.VarId, out var vid) ? vid : (Guid?)null,
                     quantidade = vm.Qty,

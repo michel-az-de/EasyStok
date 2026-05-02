@@ -103,8 +103,12 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
         if (!DateOnly.TryParse(req.Data, out var data))
             data = DateOnly.FromDateTime(DateTime.Today);
 
+        // Saída rápida a partir da listagem de estoque é sempre de um lote específico
+        // (o que o usuário clicou). ItemEstoqueId força a API a consumir esse lote
+        // em vez de cair na rota FIFO/FEFO por ProdutoId.
         var saidaVm = new SaidaFormViewModel
         {
+            ItemEstoqueId = req.EstoqueId,
             ProdutoId = item.ProdutoId,
             VarId = item.VarId,
             Natureza = req.Natureza ?? "venda",

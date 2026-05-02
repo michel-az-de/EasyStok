@@ -54,6 +54,7 @@ namespace EasyStock.Domain.Entities
                 throw new RegraDeDominioVioladaException("Assinatura cancelada nao pode ser reativada. Crie uma nova assinatura.");
             DataFim = null;
             Status = StatusAssinatura.Ativa;
+            SuspensaEm = null;
             AlteradoEm = DateTime.UtcNow;
         }
 

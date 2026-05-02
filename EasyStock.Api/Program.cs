@@ -478,6 +478,7 @@ EasyStock.Api.Middleware.IdempotencyMiddlewareExtensions.UseIdempotency(app, opt
     .Add("/api/itensestoque")
     .Add("/api/itensestoque/estorno")
     .Add("/api/vendas")
+    .Add("/api/mobile/vendas")
     .Add("/api/movimentacoes")
     .Add("/api/itensestoque/repor"));
 app.MapControllers();

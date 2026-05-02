@@ -7,6 +7,9 @@ public class SaidaFormViewModel
 {
     public string? ProdutoId { get; set; }
     public string? VarId { get; set; }
+    // Quando preenchido, força saída do lote específico (não FIFO/FEFO).
+    // Setado pelo fluxo "saída rápida" a partir da listagem de estoque.
+    public string? ItemEstoqueId { get; set; }
 
     [Required(ErrorMessage = "Natureza é obrigatória")]
     public string Natureza { get; set; } = "venda";
