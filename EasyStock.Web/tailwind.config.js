@@ -23,10 +23,18 @@ module.exports = {
         'sidebar-text': 'rgba(255,255,255,.74)',
         'sidebar-active':'#F26B25',
 
-        // Paleta DS completa
+        // Paleta DS completa (navy)
         navy: {
-          900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
-          600: '#15388A', 500: '#1E48A8',
+          950: '#04102B', 900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
+          600: '#15388A', 500: '#1E48A8', 400: '#3B5BB8', 300: '#7B91D0',
+          200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9',
+        },
+        // Override do `indigo` default para que classes existentes nas Views
+        // (bg-indigo-600, text-indigo-700, ring-indigo-500…) renderizem em navy,
+        // alinhando ao DS sem precisar reescrever cada cshtml.
+        indigo: {
+          950: '#04102B', 900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
+          600: '#15388A', 500: '#1E48A8', 400: '#3B5BB8', 300: '#7B91D0',
           200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9',
         },
         orange: {

@@ -8,7 +8,7 @@
         --mobile-text: #E2E8F0;
         --mobile-muted: #94A3B8;
         --mobile-muted-2: #64748B;
-        --mobile-indigo: #6366F1;
+        --mobile-navy: #1E48A8;
         --mobile-violet: #8B5CF6;
         --space-xs: 4px;
         --space-sm: 8px;
@@ -39,11 +39,11 @@
 
     html.theme-dark .app-body {
         background:
-            radial-gradient(circle at top, rgba(99, 102, 241, 0.18), transparent 34%),
+            radial-gradient(circle at top, rgba(30, 72, 168, 0.18), transparent 34%),
             linear-gradient(180deg, #09111f 0%, #08101c 100%);
         background-attachment: fixed;
         background-image:
-            radial-gradient(circle at top, rgba(99, 102, 241, 0.18), transparent 34%),
+            radial-gradient(circle at top, rgba(30, 72, 168, 0.18), transparent 34%),
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Ccircle cx='12' cy='14' r='1'/%3E%3Ccircle cx='74' cy='36' r='1'/%3E%3Ccircle cx='38' cy='82' r='1'/%3E%3Ccircle cx='102' cy='96' r='1'/%3E%3C/g%3E%3C/svg%3E"),
             linear-gradient(180deg, #09111f 0%, #08101c 100%);
     }
@@ -72,7 +72,7 @@
 
     html.theme-dark .app-topbar {
         background: rgba(9, 17, 31, 0.88) !important;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.2) !important;
+        border-bottom: 1px solid rgba(30, 72, 168, 0.2) !important;
         box-shadow: 0 8px 30px rgba(2, 6, 23, 0.22);
     }
 
@@ -136,13 +136,13 @@
     }
 
     html.theme-dark .app-avatar-trigger {
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.6);
+        box-shadow: 0 0 0 2px rgba(30, 72, 168, 0.6);
         background: rgba(255, 255, 255, 0.04);
     }
 
     html:not(.theme-dark) .app-avatar-trigger {
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
-        background: rgba(99, 102, 241, 0.06);
+        box-shadow: 0 0 0 2px rgba(30, 72, 168, 0.3);
+        background: rgba(30, 72, 168, 0.06);
     }
 
     #topbar-notif-badge,
@@ -270,11 +270,11 @@
     }
 
     .bottom-nav-item--active {
-        background: rgba(99, 102, 241, 0.15);
+        background: rgba(30, 72, 168, 0.15);
     }
 
-    html.theme-dark .bottom-nav-item--active { color: #C7D2FE; }
-    html:not(.theme-dark) .bottom-nav-item--active { color: #4F46E5; }
+    html.theme-dark .bottom-nav-item--active { color: #DDE4F2; }
+    html:not(.theme-dark) .bottom-nav-item--active { color: #0E2A6E; }
 
     .bottom-nav-item--active svg {
         transform: scale(1.1);
@@ -284,7 +284,7 @@
         font-weight: 700;
     }
 
-    html.theme-dark .bottom-nav-item--active span { color: #A5B4FC; }
+    html.theme-dark .bottom-nav-item--active span { color: #BCC8E5; }
     html:not(.theme-dark) .bottom-nav-item--active span { color: #4338CA; }
 
     .bottom-nav-item--fab {
@@ -295,8 +295,8 @@
         width: 46px !important;
         height: 46px !important;
         padding: 10px;
-        background: linear-gradient(135deg, #6366F1, #8B5CF6) !important;
-        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+        background: linear-gradient(135deg, #1E48A8, #8B5CF6) !important;
+        box-shadow: 0 8px 24px rgba(30, 72, 168, 0.5);
     }
 
     .quick-actions-sheet {
@@ -422,7 +422,7 @@
     html.theme-dark .dashboard-kpi-grid > *:has(.text-emerald-500) {
         background-image:
             linear-gradient(rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.92)),
-            linear-gradient(135deg, rgba(99, 102, 241, 0.55), rgba(139, 92, 246, 0.2));
+            linear-gradient(135deg, rgba(30, 72, 168, 0.55), rgba(139, 92, 246, 0.2));
         background-origin: border-box;
         background-clip: padding-box, border-box;
         border: 1px solid transparent !important;
@@ -430,8 +430,8 @@
 
     html:not(.theme-dark) .dashboard-kpi-grid > *:has(.text-emerald-600),
     html:not(.theme-dark) .dashboard-kpi-grid > *:has(.text-emerald-500) {
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.03));
-        border: 1px solid rgba(99, 102, 241, 0.15) !important;
+        background: linear-gradient(135deg, rgba(30, 72, 168, 0.06), rgba(139, 92, 246, 0.03));
+        border: 1px solid rgba(30, 72, 168, 0.15) !important;
     }
 
     form[novalidate] .product-stepper-sticky {

@@ -11,8 +11,14 @@
 
     <!-- Logo -->
     <div class="px-5 py-4 flex items-center gap-2.5 border-b border-white/5">
-        <span class="text-xl leading-none">📦</span>
-        <span class="brand-name text-white font-bold text-base tracking-tight">EasyStock</span>
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock" class="flex-shrink-0">
+            <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+            <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+            <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
+        </svg>
+        <span class="brand-name font-bold text-base tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
+            <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stok</span>
+        </span>
     </div>
 
     <!-- Seletor de Loja -->
@@ -170,7 +176,7 @@
             <div class="text-[10px] text-slate-700">Gestão inteligente de estoque</div>
         </div>
         <a href="/diagnostico" title="Diagnóstico"
-           class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-white/5 transition-colors @(activeItem == "Diagnostico" ? "text-indigo-400" : "text-slate-600")">
+           class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-white/5 transition-colors @(activeItem == "Diagnostico" ? "text-orange-400" : "text-slate-500")">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
