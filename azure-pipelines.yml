@@ -43,6 +43,21 @@ stages:
               command: restore
               projects: "**/*.csproj"
 
+          - script: |
+              set -euo pipefail
+              echo "Scanning for vulnerable NuGet packages (transitive included)..."
+              output=$(dotnet list EasyStok.sln package --vulnerable --include-transitive 2>&1 || true)
+              echo "$output"
+              # Falha em High/Critical (mantem Moderate como warning para nao bloquear PRs por CVEs ainda sem patch)
+              if echo "$output" | grep -E ">.*(High|Critical)" >/dev/null; then
+                echo "##vso[task.logissue type=error]Vulnerabilidades High/Critical detectadas em dependencias NuGet."
+                exit 1
+              fi
+              if echo "$output" | grep -E ">.*Moderate" >/dev/null; then
+                echo "##vso[task.logissue type=warning]Vulnerabilidades Moderate detectadas — revisar."
+              fi
+            displayName: "Security: NuGet vulnerable packages"
+
           - task: DotNetCoreCLI@2
             displayName: "Build"
             inputs:
@@ -113,6 +128,18 @@ stages:
                 latest
                 $(Build.BuildId)
                 $(Build.SourceVersion)
+
+          - script: |
+              set -euo pipefail
+              docker run --rm \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                aquasec/trivy:latest image \
+                  --severity HIGH,CRITICAL \
+                  --exit-code 1 \
+                  --ignore-unfixed \
+                  --no-progress \
+                  $(acrName).azurecr.io/$(imageName):$(Build.BuildId)
+            displayName: "Security: Trivy scan da imagem"
 
           - task: Docker@2
             displayName: "Push imagem API para ACR"
