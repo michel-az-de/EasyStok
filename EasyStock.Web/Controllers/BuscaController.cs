@@ -12,9 +12,9 @@ public class BuscaController(BuscaUnificadaService svc, SessionService session) 
             return Json(Array.Empty<object>());
 
         var result = await svc.BuscarAsync(q.Trim(), Math.Min(limit, 50));
-        if (!result.Success) return Json(Array.Empty<object>());
+        if (!result.Success || result.Data is null) return Json(Array.Empty<object>());
 
-        return Json(result.Data!.Select(r => new
+        return Json(result.Data.Select(r => new
         {
             tipo = r.Tipo,
             id = r.Id,

@@ -29,8 +29,8 @@ public class AnunciosController(
     {
         if (string.IsNullOrWhiteSpace(produtoId)) return Json(Array.Empty<object>());
         var result = await anunciosSvc.ListarSalvosAsync(produtoId);
-        if (!result.Success) return Json(Array.Empty<object>());
-        return Json(result.Data!.Select(a => new
+        if (!result.Success || result.Data is null) return Json(Array.Empty<object>());
+        return Json(result.Data.Select(a => new
         {
             id = a.Id,
             titulo = a.Titulo,
