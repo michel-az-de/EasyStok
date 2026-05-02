@@ -166,6 +166,10 @@ builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
 
+// Registrar IEasyStockConfiguracoes para injeção em use cases
+builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfiguracoes>(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EasyStockConfiguracoes>>().Value);
+
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 builder.Services.AddHttpClient(); // for DiagnosticoInfraController self-testing

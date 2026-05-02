@@ -80,6 +80,18 @@ using EasyStock.Application.UseCases.Pedido;
 using EasyStock.Application.UseCases.ReativarFornecedor;
 using EasyStock.Application.UseCases.ReativarLoja;
 using EasyStock.Application.UseCases.ReporEstoque;
+using EasyStock.Application.UseCases.Analytics.Dashboard;
+using EasyStock.Application.UseCases.Analytics.Projecoes;
+using EasyStock.Application.UseCases.Analytics.Reposicao;
+using EasyStock.Application.UseCases.Analytics.Sazonalidade;
+using EasyStock.Application.UseCases.Analytics.Alertas;
+using EasyStock.Application.UseCases.Analytics.AlertasDias;
+using EasyStock.Application.UseCases.Analytics.Receita;
+using EasyStock.Application.UseCases.Analytics.Margem;
+using EasyStock.Application.UseCases.Analytics.Movimentacoes;
+using EasyStock.Application.UseCases.Analytics.Validade;
+using EasyStock.Application.UseCases.Analytics.Parados;
+using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -205,6 +217,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.ListarFaturas.ListarFaturasUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.CancelarAssinatura.CancelarAssinaturaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.AlterarPlano.AlterarPlanoUseCase>();
+
+        // Analytics Use Cases
+        services.AddScoped<GetDashboardUseCase>();
+        services.AddScoped<CalcularProjecoesUseCase>();
+        services.AddScoped<CalcularReposicaoUseCase>();
+        services.AddScoped<CalcularSazonalidadeUseCase>();
+        services.AddScoped<ObterAlertasUseCase>();
+        services.AddScoped<ObterDiasAlertaValidadeUseCase>();
+        services.AddScoped<CalcularReceitaUseCase>();
+        services.AddScoped<CalcularMargemUseCase>();
+        services.AddScoped<ObterMovimentacoesUseCase>();
+        services.AddScoped<ObterValidadeUseCase>();
+        services.AddScoped<ObterParadosUseCase>();
+        services.AddScoped<ObterDiasAlertaParadoUseCase>();
+        services.AddScoped<ObterVendasPorCanalUseCase>();
 
         return services;
     }

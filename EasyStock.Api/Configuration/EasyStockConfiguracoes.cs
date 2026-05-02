@@ -1,8 +1,9 @@
 using EasyStock.Domain.Defaults;
+using EasyStock.Application.Configuration;
 
 namespace EasyStock.Api.Configuration
 {
-    public sealed class EasyStockConfiguracoes
+    public sealed class EasyStockConfiguracoes : IEasyStockConfiguracoes
     {
         public int LimiteEstoqueBaixoDefault { get; set; } = OperacionalDefaults.QuantidadeMinima;
         public int DiasAlertaVencimento { get; set; } = OperacionalDefaults.DiasAlertaValidade;
