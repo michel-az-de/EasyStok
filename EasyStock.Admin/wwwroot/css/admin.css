@@ -44,6 +44,12 @@
     --es-transition:    .15s ease;
 }
 
+/* ── Ticket row hover (substitui onmouseover inline antigo) ── */
+.ticket-row { transition: background .15s ease; }
+.ticket-row:hover,
+.ticket-row:focus-visible { background: rgba(32, 43, 66, .5); outline: none; }
+.ticket-row:focus-visible { box-shadow: inset 3px 0 0 var(--es-accent); }
+
 .card {
     background:    var(--es-card);
     border:        1px solid var(--es-border-strong);

@@ -60,134 +60,25 @@
     @await Html.PartialAsync("_BottomNav")
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="~/js/toast.js"></script>
+    <script src="~/js/toast.js" asp-append-version="true"></script>
+    <script src="~/js/api.js" asp-append-version="true"></script>
+    <script src="~/js/locale.js" asp-append-version="true"></script>
+    <script src="~/js/notifications.js" asp-append-version="true"></script>
     <script>
+        // Topbar scroll state binding (depende de .app-main e .app-topbar no DOM).
         (function () {
             function bindTopbarScrollState() {
                 var scroller = document.querySelector('.app-main');
                 var topbar = document.querySelector('.app-topbar');
                 if (!scroller || !topbar) return;
-
                 var sync = function () {
                     topbar.classList.toggle('app-topbar--scrolled', scroller.scrollTop > 20);
                 };
-
                 sync();
                 scroller.addEventListener('scroll', sync, { passive: true });
             }
-
             document.addEventListener('DOMContentLoaded', bindTopbarScrollState);
             window.addEventListener('pageshow', bindTopbarScrollState);
-        })();
-    </script>
-    <script>
-        /* ── Decimal separator normalizer (BR locale: vírgula → ponto) ──
-           Intercepts comma keypresses on number inputs and converts to period,
-           allowing Brazilian users to type "10,50" and get "10.50".
-        ── */
-        document.addEventListener('keydown', function (e) {
-            if ((e.key === ',' || e.key === 'Decimal') && e.target.tagName === 'INPUT') {
-                var t = e.target;
-                if (t.type === 'number' || t.inputMode === 'decimal' || t.inputMode === 'numeric') {
-                    e.preventDefault();
-                    // For type=text/decimal inputs, insert a period at cursor position
-                    if (t.type !== 'number') {
-                        var s = t.selectionStart, end = t.selectionEnd;
-                        t.value = t.value.slice(0, s) + '.' + t.value.slice(end);
-                        t.setSelectionRange(s + 1, s + 1);
-                        t.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                    // For type=number, only block the comma (browsers natively reject it)
-                }
-            }
-        }, true);
-    </script>
-    <script>
-        /* ── Notification polling ──────────────────────────────────────
-           Polls /notificacoes/resumo every 45s.
-           - Updates badge counters on first poll
-           - On count increase: shakes bell, shows push toast for criticals
-        ─────────────────────────────────────────────────────────────── */
-        (function () {
-            var lastCount    = -1;
-            var lastCritical = 0;
-            var INTERVAL     = 45000;
-
-            function updateBadge(id, count) {
-                var el = document.getElementById(id);
-                if (!el) return;
-                if (count > 0) {
-                    el.textContent = count > 99 ? '99+' : String(count);
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            }
-
-            function shakeBell() {
-                var bell = document.getElementById('notif-bell-icon');
-                if (!bell) return;
-                bell.classList.remove('bell-shake');
-                void bell.offsetWidth; // force reflow
-                bell.classList.add('bell-shake');
-                setTimeout(function () { bell.classList.remove('bell-shake'); }, 800);
-            }
-
-            async function poll() {
-                if (document.hidden) return;
-                try {
-                    var r = await fetch('/notificacoes/resumo');
-                    if (!r.ok) return;
-                    var data = await r.json();
-                    var count    = data.totalNaoLidas ?? 0;
-                    var critical = data.criticas      ?? 0;
-
-                    updateBadge('topbar-notif-badge', count);
-
-                    // Expor resumo para reutilização (ex: dropdown de notificações)
-                    window.__notifResumo = { data: data, ts: Date.now() };
-
-                    if (lastCount === -1) {
-                        lastCount    = count;
-                        lastCritical = critical;
-                        return;
-                    }
-
-                    if (count > lastCount) {
-                        shakeBell();
-                        var delta = count - lastCount;
-                        if (critical > lastCritical) {
-                            var dc = critical - lastCritical;
-                            window.showToast && window.showToast(
-                                dc + ' nova' + (dc > 1 ? 's' : '') + ' notificação' + (dc > 1 ? 'ões' : '') + ' crítica' + (dc > 1 ? 's' : ''),
-                                'error'
-                            );
-                        } else {
-                            window.showToast && window.showToast(
-                                delta + ' nova' + (delta > 1 ? 's' : '') + ' notificação' + (delta > 1 ? 'ões' : ''),
-                                'info'
-                            );
-                        }
-                    }
-
-                    lastCount    = count;
-                    lastCritical = critical;
-                } catch (e) { /* silent */ }
-            }
-
-            var timerId = null;
-            function startPolling() { if (!timerId) timerId = setInterval(poll, INTERVAL); }
-            function stopPolling()  { clearInterval(timerId); timerId = null; }
-
-            document.addEventListener('visibilitychange', function () {
-                if (document.hidden) { stopPolling(); }
-                else { poll(); startPolling(); }
-            });
-
-            document.addEventListener('DOMContentLoaded', function () {
-                poll();
-                startPolling();
-            });
         })();
     </script>
     @RenderSection("Scripts", required: false)

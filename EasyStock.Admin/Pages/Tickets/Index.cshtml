@@ -116,7 +116,10 @@
                         "resolvido" => "badge-resolvido",
                         _ => "badge-fechado"
                     };
-                    <tr class="cursor-pointer" style="transition:background .15s" onmouseover="this.style.background='rgba(32,43,66,.5)'" onmouseout="this.style.background=''" onclick="location.href='/Tickets/Detail/@tid'">
+                    <tr class="ticket-row cursor-pointer" tabindex="0"
+                        @@click="window.location.href='/Tickets/Detail/@tid'"
+                        @@keydown.enter="window.location.href='/Tickets/Detail/@tid'"
+                        x-data>
                         <td class="text-es-ink font-medium">
                             @titulo
                             @if (naoLidos > 0)

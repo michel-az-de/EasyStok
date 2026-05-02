@@ -191,15 +191,19 @@
             },
             async fetchDashBadges() {
                 try {
-                    const r = await fetch('/api-proxy/dashboard-badges');
-                    if (r.ok) {
-                        const d = await r.json();
-                        Object.assign(this.dash, d);
-                        this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + (d.ticketsCriticos ?? 0);
-                        this._lastFetch = Date.now();
-                        this.dashSecsAgo = 0;
+                    const r = await fetch('/api-proxy/dashboard-badges', { credentials: 'same-origin' });
+                    if (!r.ok) {
+                        console.warn('[admin] dashboard-badges retornou', r.status);
+                        return;
                     }
-                } catch {}
+                    const d = await r.json();
+                    Object.assign(this.dash, d);
+                    this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + (d.ticketsCriticos ?? 0);
+                    this._lastFetch = Date.now();
+                    this.dashSecsAgo = 0;
+                } catch (e) {
+                    console.error('[admin] fetchDashBadges falhou:', e);
+                }
             }
         }
     }

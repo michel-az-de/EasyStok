@@ -9,9 +9,10 @@
     var loggedEmail = HttpContext.Session.GetString("admin_email");
 }
 
+<div x-data="{ modalNovo: false }" class="contents">
 <div class="flex items-center justify-between mb-6">
     <div class="text-es-ink-mute text-sm">@Model.Admins.Count() admin(s)</div>
-    <button type="button" onclick="document.getElementById('modal-novo').classList.remove('hidden')"
+    <button type="button" @@click="modalNovo = true"
             class="btn-primary">+ Novo Admin</button>
 </div>
 
@@ -109,11 +110,14 @@
 </div>
 
 <!-- Modal Novo Admin -->
-<div id="modal-novo" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+<div x-show="modalNovo" x-cloak @@keydown.escape.window="modalNovo = false" @@click.self="modalNovo = false"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+     role="dialog" aria-modal="true" aria-labelledby="modal-novo-title">
     <div class="card w-full max-w-md p-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-es-ink">Novo Admin</h2>
-            <button onclick="document.getElementById('modal-novo').classList.add('hidden')" class="text-es-ink-mute hover:text-es-ink text-xl">×</button>
+            <h2 id="modal-novo-title" class="text-lg font-semibold text-es-ink">Novo Admin</h2>
+            <button type="button" @@click="modalNovo = false" aria-label="Fechar"
+                    class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
         </div>
         <form method="post" asp-page-handler="Criar" class="space-y-4">
             @Html.AntiForgeryToken()
@@ -131,8 +135,10 @@
             </div>
             <div class="flex gap-3 pt-2">
                 <button type="submit" class="btn-primary flex-1">Criar Admin</button>
-                <button type="button" onclick="document.getElementById('modal-novo').classList.add('hidden')" class="btn-secondary flex-1">Cancelar</button>
+                <button type="button" @@click="modalNovo = false" class="btn-secondary flex-1">Cancelar</button>
             </div>
         </form>
     </div>
 </div>
+</div><!-- /x-data -->
+
