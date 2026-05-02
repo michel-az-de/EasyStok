@@ -130,12 +130,13 @@ builder.Services.AddSingleton(infraState);
 switch (resolvedProvider)
 {
     case "mongodb":
-        builder.Services.AddEasyStockMongoInfrastructure(mongoConnectionString!, mongoDatabaseName, builder.Configuration);
-        builder.Services.AddHealthChecks()
-            .AddCheck<MongoDatabaseHealthCheck>("MongoDB", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
-        break;
+        // MongoDB foi descontinuado como provedor transacional (B2 do plano de a��o).
+        // Paridade incompleta com Postgres (sem Venda, ItemVenda, MovimentacaoEstoque,
+        // Caixa, Lote, Pedido) gerava risco de bug silencioso. Postgres � o �nico
+        // provedor transacional suportado. Rever ADR 0001-mongo-discarded.
+        throw new NotSupportedException(
+            "MongoDB foi descontinuado como provedor transacional. " +
+            "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
 
     case "postgresql":
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
@@ -552,14 +553,11 @@ static async Task<string> ResolveDatabaseProviderAsync(
 
     if (normalized is "mongodb" or "mongo")
     {
-        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
-            await IsMongoAvailableAsync(mongoConnectionString, logger))
-            return "mongodb";
-
-        logger.Warning(
-            "MongoDB não disponível (connection string: {HasCs}). Usando SQLite como fallback.",
-            !string.IsNullOrWhiteSpace(mongoConnectionString));
-        return "sqlite";
+        // B2: Mongo descontinuado como provedor transacional. Falha r�pido para
+        // operador notar que precisa migrar para Postgres.
+        throw new NotSupportedException(
+            "MongoDB foi descontinuado como provedor transacional. " +
+            "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
     }
 
     if (normalized is "auto")
@@ -571,14 +569,8 @@ static async Task<string> ResolveDatabaseProviderAsync(
             return "postgresql";
         }
 
-        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
-            await IsMongoAvailableAsync(mongoConnectionString, logger))
-        {
-            logger.Information("Auto-deteccao: usando MongoDB.");
-            return "mongodb";
-        }
-
-        logger.Warning("Auto-deteccao: nenhum banco externo disponivel. Usando SQLite.");
+        // Auto n�o cai mais em Mongo (B2). PostgreSQL indispon�vel + Auto = SQLite (dev only).
+        logger.Warning("Auto-deteccao: PostgreSQL indispon�vel. Usando SQLite (dev/fallback).");
         return "sqlite";
     }
 
@@ -601,23 +593,6 @@ static async Task<bool> IsPostgresAvailableAsync(string connectionString, Serilo
     catch (Exception ex)
     {
         logger.Debug(ex, "PostgreSQL indisponivel.");
-        return false;
-    }
-}
-
-static async Task<bool> IsMongoAvailableAsync(string connectionString, Serilog.ILogger logger)
-{
-    try
-    {
-        var settings = MongoDB.Driver.MongoClientSettings.FromConnectionString(connectionString);
-        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(3);
-        var client = new MongoDB.Driver.MongoClient(settings);
-        await client.ListDatabaseNamesAsync();
-        return true;
-    }
-    catch (Exception ex)
-    {
-        logger.Debug(ex, "MongoDB indisponivel.");
         return false;
     }
 }
