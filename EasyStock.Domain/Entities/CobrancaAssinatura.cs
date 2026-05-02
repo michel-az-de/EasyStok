@@ -16,6 +16,12 @@ public class CobrancaAssinatura
     public DateTime ExpiracaoEm { get; set; }
     public DateTime? PagoEm { get; set; }
 
+    public string? MetodoPagamento { get; set; } // "Pix" | "Boleto" | "Cartao"
+    public string? BoletoUrl { get; set; }
+    public string? BoletoCodigo { get; set; }
+    public int TentativasLembrete { get; set; }
+    public DateTime? UltimoLembreteEm { get; set; }
+
     public Empresa? Empresa { get; set; }
     public AssinaturaEmpresa? Assinatura { get; set; }
 
@@ -60,4 +66,17 @@ public class CobrancaAssinatura
     }
 
     public void Expirar() => Status = StatusCobranca.Expirada;
+
+    public void RegistrarLembrete()
+    {
+        TentativasLembrete++;
+        UltimoLembreteEm = DateTime.UtcNow;
+    }
+
+    public void AtualizarDadosBoleto(string boletoCodigo, string? boletoUrl)
+    {
+        MetodoPagamento = "Boleto";
+        BoletoCodigo = boletoCodigo;
+        BoletoUrl = boletoUrl;
+    }
 }

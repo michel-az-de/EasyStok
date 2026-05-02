@@ -73,6 +73,8 @@ public sealed class CobrancaAssinaturaJob(
                 {
                     await ProcessarCobrancasAsync(ct);
                     await SuspenderVencidasAsync(ct);
+                    await DunningAsync(ct);
+                    await CancelarSuspensasAntigasAsync(ct);
                 }, stoppingToken);
             }
             catch (OperationCanceledException)
@@ -186,6 +188,131 @@ public sealed class CobrancaAssinaturaJob(
         }
 
         await unitOfWork.CommitAsync();
+    }
+
+    /// <summary>
+    /// Dunning: envia lembretes por email para assinaturas suspensas com cobrança pendente.
+    /// Escalonamento: D+1, D+3, D+7 a partir de SuspensaEm. Máx 3 lembretes.
+    /// </summary>
+    private async Task DunningAsync(CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var cobrancaRepo = scope.ServiceProvider.GetRequiredService<ICobrancaAssinaturaRepository>();
+        var usuarioRepo = scope.ServiceProvider.GetRequiredService<IUsuarioRepository>();
+        var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        // Dias a esperar entre lembretes (D+1, D+3, D+7 = gaps de 1, 2, 4 dias)
+        var gapsDias = new[] { 1, 2, 4 };
+
+        var candidatas = await cobrancaRepo.GetPendentesParaDunningAsync(ct);
+
+        foreach (var cobranca in candidatas)
+        {
+            try
+            {
+                var assinatura = cobranca.Assinatura!;
+                var suspensaEm = assinatura.SuspensaEm ?? assinatura.AlteradoEm;
+                var tentativa = cobranca.TentativasLembrete; // 0, 1, 2
+
+                if (tentativa >= 3) continue;
+
+                var gapNecessario = tentativa < gapsDias.Length ? gapsDias[tentativa] : int.MaxValue;
+                var dataMinima = suspensaEm.AddDays(gapNecessario);
+
+                if (DateTime.UtcNow < dataMinima) continue;
+
+                // Verifica que o último lembrete não foi hoje (evita spam em caso de retry do job)
+                if (cobranca.UltimoLembreteEm.HasValue
+                    && cobranca.UltimoLembreteEm.Value.Date == DateTime.UtcNow.Date)
+                    continue;
+
+                await EnviarEmailDunningAsync(emailService, usuarioRepo, assinatura, cobranca, tentativa + 1, ct);
+                cobranca.RegistrarLembrete();
+                await cobrancaRepo.UpdateAsync(cobranca);
+                logger.LogInformation("Dunning lembrete #{Num} enviado. EmpresaId={EmpresaId}", tentativa + 1, assinatura.EmpresaId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erro no dunning para cobrança {CobrancaId}", cobranca.Id);
+            }
+        }
+
+        await unitOfWork.CommitAsync();
+    }
+
+    /// <summary>
+    /// Cancela automaticamente assinaturas suspensas há mais de 30 dias sem pagamento.
+    /// </summary>
+    private async Task CancelarSuspensasAntigasAsync(CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var assinaturaRepo = scope.ServiceProvider.GetRequiredService<IAssinaturaEmpresaRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var todasSuspensas = (await assinaturaRepo.GetSuspensasAntigasAsync(30, ct)).ToList();
+
+        foreach (var assinatura in todasSuspensas)
+        {
+            try
+            {
+                assinatura.Cancelar();
+                await assinaturaRepo.UpdateAsync(assinatura);
+                logger.LogInformation("Assinatura cancelada por inadimplência (30d+). EmpresaId={EmpresaId}", assinatura.EmpresaId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erro ao cancelar assinatura {Id} por inadimplência", assinatura.Id);
+            }
+        }
+
+        if (todasSuspensas.Count > 0)
+            await unitOfWork.CommitAsync();
+    }
+
+    private async Task EnviarEmailDunningAsync(
+        IEmailService emailService,
+        IUsuarioRepository usuarioRepo,
+        Domain.Entities.AssinaturaEmpresa assinatura,
+        Domain.Entities.CobrancaAssinatura cobranca,
+        int numeroLembrete,
+        CancellationToken ct)
+    {
+        try
+        {
+            var (usuarios, _) = await usuarioRepo.GetByEmpresaAsync(assinatura.EmpresaId, 1, 1);
+            var admin = usuarios.FirstOrDefault();
+            if (admin is null) return;
+
+            var valorFormatado = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+            var urgencia = numeroLembrete switch
+            {
+                1 => "Seu acesso está suspenso.",
+                2 => "⚠️ Segundo aviso — regularize sua assinatura.",
+                _ => "🚨 Último aviso antes do cancelamento definitivo."
+            };
+            var qrCodeImg = string.IsNullOrEmpty(cobranca.QrCodeBase64)
+                ? string.Empty
+                : $"<img src=\"data:image/png;base64,{cobranca.QrCodeBase64}\" alt=\"QR Code Pix\" style=\"width:200px;height:200px\" />";
+
+            var body = $@"
+<html><body style=""font-family:sans-serif;max-width:600px;margin:auto"">
+<h2 style=""color:#dc2626"">EasyStock — Pagamento pendente</h2>
+<p>Olá, <strong>{admin.Nome}</strong>!</p>
+<p><strong>{urgencia}</strong></p>
+<p>Regularize o pagamento de <strong>{valorFormatado}</strong> via Pix para restaurar o acesso ao EasyStock:</p>
+{qrCodeImg}
+<p style=""margin-top:16px""><strong>Pix Copia e Cola:</strong></p>
+<pre style=""background:#f3f4f6;padding:12px;border-radius:6px;word-break:break-all;font-size:12px"">{cobranca.PixCopiaCola}</pre>
+<p style=""color:#6b7280;font-size:12px"">Após o pagamento seu acesso será restaurado automaticamente em minutos.</p>
+</body></html>";
+
+            await emailService.SendAsync(admin.Email, $"EasyStock — Pagamento pendente (aviso {numeroLembrete}/3)", body, isHtml: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao enviar email dunning #{Num} para empresa {EmpresaId}", numeroLembrete, assinatura.EmpresaId);
+        }
     }
 
     private async Task EnviarEmailCobrancaAsync(

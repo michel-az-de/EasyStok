@@ -61,6 +61,28 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IEfiPixService, NoopEfiPixService>();
         }
 
+        // Efí Bank Boleto Gateway (reutiliza mesmo baseUrl que Pix, só muda endpoint v1)
+        var efiClientIdBoleto = configuration["Efi:ClientId"];
+        if (!string.IsNullOrWhiteSpace(efiClientIdBoleto))
+        {
+            var isSandboxStr = configuration["Efi:Sandbox"];
+            var isSandbox = !bool.TryParse(isSandboxStr, out var sb2) || sb2;
+            var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
+            services.AddTransient<IEfiBoletoService>(sp =>
+            {
+                var http = new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUrl) };
+                return new EfiBoletoService(
+                    http,
+                    sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+                    configuration,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfiBoletoService>>());
+            });
+        }
+        else
+        {
+            services.AddSingleton<IEfiBoletoService, NoopEfiBoletoService>();
+        }
+
         return services;
     }
 }

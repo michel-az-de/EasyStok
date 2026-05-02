@@ -105,6 +105,10 @@ public class MobileDevice
     [Column("revoked_by_user_id")]
     public Guid? RevokedByUserId { get; set; }
 
+    [MaxLength(512)]
+    [Column("push_token")]
+    public string? PushToken { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -23,6 +23,8 @@ namespace EasyStock.Domain.Entities
         public string? CupomCodigo { get; set; }
         public decimal? DescontoAplicado { get; set; }
 
+        public DateTime? SuspensaEm { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Plano? Plano { get; set; }
 
@@ -33,14 +35,15 @@ namespace EasyStock.Domain.Entities
             if (Status == StatusAssinatura.Cancelada)
                 throw new RegraDeDominioVioladaException("Assinatura cancelada nao pode ser suspensa.");
             Status = StatusAssinatura.Suspensa;
+            SuspensaEm ??= DateTime.UtcNow;
             AlteradoEm = DateTime.UtcNow;
         }
 
-        public void Cancelar()
+        public void Cancelar(DateTime? dataFimEfetiva = null)
         {
             if (Status == StatusAssinatura.Cancelada)
                 return;
-            DataFim = DateTime.UtcNow;
+            DataFim = dataFimEfetiva ?? DateTime.UtcNow;
             Status = StatusAssinatura.Cancelada;
             AlteradoEm = DateTime.UtcNow;
         }

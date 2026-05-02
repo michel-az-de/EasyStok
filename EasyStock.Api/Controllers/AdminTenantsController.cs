@@ -1,6 +1,7 @@
 using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Constants;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -20,6 +21,7 @@ namespace EasyStock.Api.Controllers;
 [Authorize(Policy = "SuperAdmin")]
 public class AdminTenantsController(
     EasyStockDbContext db,
+    IAdminTenantsQueries tenantsQueries,
     ICurrentUserAccessor currentUser,
     IConfiguration configuration,
     AdminAuditService audit) : EasyStockControllerBase
@@ -33,128 +35,27 @@ public class AdminTenantsController(
     {
         (page, pageSize) = NormalisePage(page, pageSize);
 
-        var query = db.Empresas.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(e => e.Nome.Contains(search) || (e.Documento != null && e.Documento.Contains(search)));
-
         StatusAssinatura? filtroStatus = null;
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<StatusAssinatura>(status, out var se))
             filtroStatus = se;
 
-        if (filtroStatus.HasValue)
-            query = query.Where(e => db.AssinaturasEmpresa.Any(a => a.EmpresaId == e.Id && a.Status == filtroStatus.Value));
-
-        var total = await query.CountAsync();
-
-        var ids = await query
-            .OrderByDescending(e => e.CriadoEm)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(e => e.Id)
-            .ToListAsync();
-
-        var empresas = await db.Empresas
-            .Where(e => ids.Contains(e.Id))
-            .Select(e => new
-            {
-                e.Id,
-                e.Nome,
-                e.Documento,
-                e.CriadoEm,
-                totalUsuarios = db.UsuariosEmpresas.Count(ue => ue.EmpresaId == e.Id),
-                totalLojas = db.Lojas.Count(l => l.EmpresaId == e.Id),
-                planoNome = db.AssinaturasEmpresa
-                    .Where(a => a.EmpresaId == e.Id)
-                    .OrderByDescending(a => a.DataInicio)
-                    .Select(a => a.Plano != null ? a.Plano.Nome : null)
-                    .FirstOrDefault(),
-                statusAssinatura = db.AssinaturasEmpresa
-                    .Where(a => a.EmpresaId == e.Id)
-                    .OrderByDescending(a => a.DataInicio)
-                    .Select(a => (StatusAssinatura?)a.Status)
-                    .FirstOrDefault(),
-                dataRenovacao = db.AssinaturasEmpresa
-                    .Where(a => a.EmpresaId == e.Id)
-                    .OrderByDescending(a => a.DataInicio)
-                    .Select(a => a.DataFim)
-                    .FirstOrDefault()
-            })
-            .ToListAsync();
-
-        return DataPaged(empresas.OrderByDescending(e => e.CriadoEm), total, page, pageSize);
+        var (items, total) = await tenantsQueries.ListarAsync(page, pageSize, search, filtroStatus);
+        return DataPaged(items, total, page, pageSize);
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetTenant(Guid id)
     {
-        var empresa = await db.Empresas.FindAsync(id);
-        if (empresa is null) return DataNotFound("Tenant não encontrado.");
-
-        var assinatura = await db.AssinaturasEmpresa
-            .Include(a => a.Plano)
-            .Where(a => a.EmpresaId == id)
-            .OrderByDescending(a => a.DataInicio)
-            .FirstOrDefaultAsync();
-
-        var lojas = await db.Lojas
-            .Where(l => l.EmpresaId == id)
-            .Select(l => new { l.Id, l.Nome })
-            .ToListAsync();
-
-        var usuarios = await db.UsuariosEmpresas
-            .Include(ue => ue.Usuario)
-            .Where(ue => ue.EmpresaId == id)
-            .Select(ue => new
-            {
-                ue.Usuario!.Id,
-                ue.Usuario.Nome,
-                ue.Usuario.Email,
-                ue.Usuario.Ativo,
-                ue.Usuario.UltimoAcessoEm,
-                nivelAcesso = db.UsuariosPerfis
-                    .Where(up => up.UsuarioId == ue.UsuarioId && up.EmpresaId == id)
-                    .Select(up => up.Perfil != null ? (NivelAcesso?)up.Perfil.Nivel : null)
-                    .FirstOrDefault()
-            })
-            .ToListAsync();
-
-        var usuariosIds = usuarios.Select(u => u.Id).ToList();
-        var auditLogs = await db.AuditLogs
-            .Where(a => usuariosIds.Contains(a.UsuarioId))
-            .OrderByDescending(a => a.DataHora)
-            .Take(20)
-            .Select(a => new { a.Id, a.Acao, a.Sucesso, a.Detalhes, a.Ip, dataHora = a.DataHora })
-            .ToListAsync();
-
-        return DataOk(new
-        {
-            empresa = new { empresa.Id, empresa.Nome, empresa.Documento, empresa.CriadoEm },
-            assinatura = assinatura is null ? null : new
-            {
-                assinatura.Id,
-                assinatura.Status,
-                assinatura.DataInicio,
-                assinatura.DataFim,
-                assinatura.TrialFim,
-                trialAtivo = assinatura.TrialAtivo,
-                assinatura.CupomCodigo,
-                assinatura.DescontoAplicado,
-                plano = assinatura.Plano is null ? null : new
-                {
-                    assinatura.Plano.Id,
-                    assinatura.Plano.Nome,
-                    assinatura.Plano.PrecoMensal,
-                    assinatura.Plano.LimiteLojas,
-                    assinatura.Plano.LimiteUsuarios,
-                    assinatura.Plano.LimiteProdutos
-                }
-            },
-            lojas,
-            usuarios,
-            auditLogRecentes = auditLogs
-        });
+        var detalhe = await tenantsQueries.ObterDetalheAsync(id);
+        if (detalhe is null) return DataNotFound("Tenant não encontrado.");
+        return DataOk(detalhe);
     }
+
+    // TODO B4 follow-up: extrair os 6 endpoints de mutação abaixo para UseCases dedicados
+    // (PatchStatus, Impersonate, PatchPlano, GetAudit, GrantTrial, AplicarCupom). Hoje
+    // ainda dependem de db.AssinaturasEmpresa / db.AdminImpersonationLogs / db.Cupons /
+    // db.AuditLogs direto — violação leve, gated por SuperAdmin policy. As leituras
+    // complexas (GetTenants/GetTenant) já foram migradas para IAdminTenantsQueries.
 
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> PatchStatus(Guid id, [FromBody] PatchTenantStatusRequest req)

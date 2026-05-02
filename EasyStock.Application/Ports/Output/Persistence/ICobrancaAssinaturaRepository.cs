@@ -8,4 +8,6 @@ public interface ICobrancaAssinaturaRepository
     Task UpdateAsync(CobrancaAssinatura cobranca);
     Task<CobrancaAssinatura?> GetByTxidAsync(string txid);
     Task<bool> ExistePendenteAsync(Guid empresaId);
+    Task<IEnumerable<CobrancaAssinatura>> GetByEmpresaAsync(Guid empresaId, int limit = 24);
+    Task<IEnumerable<CobrancaAssinatura>> GetPendentesParaDunningAsync(CancellationToken ct = default);
 }

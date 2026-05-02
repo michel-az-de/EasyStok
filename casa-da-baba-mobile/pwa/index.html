@@ -12872,5 +12872,253 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<!-- ===== SUBSCRIPTION WALL ===== -->
+<div id="subscriptionWall" class="sub-wall hidden" role="dialog" aria-modal="true">
+  <div class="sub-wall-card">
+    <div class="sub-wall-icon">🔒</div>
+    <h2>Acesso suspenso</h2>
+    <p>Sua assinatura está inativa. Regularize o pagamento para continuar usando o EasyStock.</p>
+    <button class="sub-wall-btn primary" onclick="subWallRenew()">Renovar assinatura</button>
+    <button class="sub-wall-btn subtle" onclick="subWallRetry()">Já paguei — verificar</button>
+  </div>
+</div>
+
+<!-- ===== PDV SCREEN (added inline into content) ===== -->
+<script>
+(function () {
+  // ---- Subscription Wall ----
+  var SUB_WALL_KEY = 'cdb-sub-wall-dismissed';
+  function showSubWall() {
+    var wall = document.getElementById('subscriptionWall');
+    if (wall) wall.classList.remove('hidden');
+  }
+  function hideSubWall() {
+    var wall = document.getElementById('subscriptionWall');
+    if (wall) wall.classList.add('hidden');
+  }
+  window.subWallRenew = function () {
+    var url = (window.CDB_CONFIG && window.CDB_CONFIG.portalUrl)
+      ? window.CDB_CONFIG.portalUrl
+      : '/api/assinatura';
+    window.open(url, '_blank');
+  };
+  window.subWallRetry = function () {
+    hideSubWall();
+    // Tenta uma chamada simples pra ver se o acesso voltou
+    fetch('/api/mobile/sync/pull?since=0&deviceId=' + (localStorage.getItem('cdb-device-id') || 'test'), {
+      headers: { 'X-Mobile-Api-Key': localStorage.getItem('cdb-api-key') || '' }
+    }).then(function (r) {
+      if (r.status === 402) showSubWall();
+    }).catch(function () {});
+  };
+
+  // Interceptor global de fetch para capturar 402 (Payment Required)
+  var origFetch = window.fetch;
+  window.fetch = function () {
+    return origFetch.apply(this, arguments).then(function (response) {
+      if (response.status === 402) {
+        showSubWall();
+      }
+      return response;
+    });
+  };
+
+  // ---- PDV (Ponto de Venda Rápido) ----
+  var pdvCart = [];
+
+  window.initPdv = function () {
+    pdvCart = [];
+    renderPdvCart();
+    document.getElementById('pdvSearch').value = '';
+    document.getElementById('pdvResults').innerHTML = '';
+    document.getElementById('pdvMsg').textContent = '';
+  };
+
+  window.pdvSearchProducts = function () {
+    var q = (document.getElementById('pdvSearch').value || '').trim();
+    if (q.length < 2) return;
+    var apiKey = localStorage.getItem('cdb-api-key') || '';
+    var empresaId = localStorage.getItem('cdb-empresa-id') || '';
+    fetch('/api/estoque/buscar?q=' + encodeURIComponent(q) + '&empresaId=' + empresaId, {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cdb-jwt') || '', 'X-Mobile-Api-Key': apiKey }
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      var items = (data && data.data) ? data.data : [];
+      var html = items.slice(0, 10).map(function (item) {
+        return '<button class="pdv-result-item" onclick="pdvAddItem(' + JSON.stringify(JSON.stringify(item)) + ')">' +
+          '<span class="pdv-item-name">' + (item.descricaoAnuncio || item.variacao || item.produto || item.id) + '</span>' +
+          '<span class="pdv-item-qty">Qtd: ' + (item.quantidadeAtual || 0) + '</span>' +
+          '<span class="pdv-item-price">R$ ' + ((item.precoVendaSugerido || item.custoUnitario || 0).toFixed(2)) + '</span>' +
+          '</button>';
+      }).join('');
+      document.getElementById('pdvResults').innerHTML = html || '<p class="hint">Nenhum resultado.</p>';
+    }).catch(function () {});
+  };
+
+  window.pdvAddItem = function (itemJson) {
+    var item = JSON.parse(itemJson);
+    var existing = pdvCart.find(function (c) { return c.itemEstoqueId === item.id; });
+    if (existing) {
+      existing.quantidade++;
+    } else {
+      pdvCart.push({
+        itemEstoqueId: item.id,
+        quantidade: 1,
+        precoUnitario: item.precoVendaSugerido || item.custoUnitario || 0,
+        descricao: item.descricaoAnuncio || item.variacao || ''
+      });
+    }
+    renderPdvCart();
+    document.getElementById('pdvResults').innerHTML = '';
+    document.getElementById('pdvSearch').value = '';
+  };
+
+  window.pdvRemoveItem = function (idx) {
+    pdvCart.splice(idx, 1);
+    renderPdvCart();
+  };
+
+  window.pdvChangeQty = function (idx, delta) {
+    pdvCart[idx].quantidade = Math.max(1, (pdvCart[idx].quantidade || 1) + delta);
+    renderPdvCart();
+  };
+
+  function renderPdvCart() {
+    var total = pdvCart.reduce(function (acc, i) { return acc + i.quantidade * i.precoUnitario; }, 0);
+    var html = pdvCart.length === 0 ? '<p class="hint" style="text-align:center;padding:24px">Carrinho vazio</p>' :
+      pdvCart.map(function (item, idx) {
+        return '<div class="pdv-cart-item">' +
+          '<span class="pdv-cart-name">' + item.descricao + '</span>' +
+          '<div class="pdv-cart-controls">' +
+          '<button onclick="pdvChangeQty(' + idx + ',-1)">-</button>' +
+          '<span>' + item.quantidade + '</span>' +
+          '<button onclick="pdvChangeQty(' + idx + ',1)">+</button>' +
+          '</div>' +
+          '<span class="pdv-cart-price">R$ ' + (item.quantidade * item.precoUnitario).toFixed(2) + '</span>' +
+          '<button class="pdv-cart-remove" onclick="pdvRemoveItem(' + idx + ')">✕</button>' +
+          '</div>';
+      }).join('') +
+      '<div class="pdv-cart-total">Total: <strong>R$ ' + total.toFixed(2) + '</strong></div>';
+    document.getElementById('pdvCart').innerHTML = html;
+    document.getElementById('pdvFinalizarBtn').disabled = pdvCart.length === 0;
+  }
+
+  window.pdvFinalizar = function () {
+    if (pdvCart.length === 0) return;
+    var btn = document.getElementById('pdvFinalizarBtn');
+    btn.disabled = true;
+    btn.textContent = 'Registrando...';
+    var apiKey = localStorage.getItem('cdb-api-key') || '';
+    fetch('/api/mobile/vendas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Mobile-Api-Key': apiKey },
+      body: JSON.stringify({ itens: pdvCart, canal: 'LojaPropria' })
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (e) { throw e; });
+      return r.json();
+    }).then(function (data) {
+      var msg = document.getElementById('pdvMsg');
+      msg.textContent = '✓ Venda registrada! Total: R$ ' + (data.valorTotal || 0).toFixed(2);
+      msg.style.color = 'var(--green, #22c55e)';
+      pdvCart = [];
+      renderPdvCart();
+      btn.textContent = 'Finalizar Venda';
+    }).catch(function (err) {
+      var msg = document.getElementById('pdvMsg');
+      msg.textContent = 'Erro: ' + ((err && err.detail) || (err && err.title) || 'Tente novamente.');
+      msg.style.color = 'var(--red, #ef4444)';
+      btn.disabled = false;
+      btn.textContent = 'Finalizar Venda';
+    });
+  };
+
+  // Adiciona a tela PDV ao DOM se ainda não existir
+  document.addEventListener('DOMContentLoaded', function () {
+    var content = document.getElementById('content');
+    if (!content || document.querySelector('[data-screen="pdv"]')) return;
+    var pdvScreen = document.createElement('div');
+    pdvScreen.className = 'screen';
+    pdvScreen.setAttribute('data-screen', 'pdv');
+    pdvScreen.innerHTML = [
+      '<div class="pdv-header">',
+      '  <h2>PDV — Venda Rápida</h2>',
+      '  <button class="pdv-clear-btn" onclick="initPdv()">Limpar</button>',
+      '</div>',
+      '<div class="pdv-search-wrap">',
+      '  <input id="pdvSearch" type="search" placeholder="Buscar produto..." autocomplete="off"',
+      '    oninput="pdvSearchProducts()" class="pdv-search-input" />',
+      '</div>',
+      '<div id="pdvResults" class="pdv-results"></div>',
+      '<div id="pdvCart" class="pdv-cart"></div>',
+      '<div id="pdvMsg" class="pdv-msg"></div>',
+      '<button id="pdvFinalizarBtn" class="pdv-finalizar-btn" onclick="pdvFinalizar()" disabled>',
+      '  Finalizar Venda',
+      '</button>'
+    ].join('');
+    content.appendChild(pdvScreen);
+  });
+
+  // Adiciona item PDV à navbar se ainda não existir
+  document.addEventListener('DOMContentLoaded', function () {
+    var nav = document.querySelector('nav.tab-bar, nav, .bottom-nav, [role="navigation"]');
+    if (!nav || document.querySelector('[data-nav="pdv"]')) return;
+    var btn = document.createElement('button');
+    btn.className = 'nav-btn';
+    btn.setAttribute('data-nav', 'pdv');
+    btn.setAttribute('onclick', 'showScreen("pdv"); initPdv()');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><span>PDV</span>';
+    nav.appendChild(btn);
+  });
+})();
+</script>
+
+<style>
+/* Subscription Wall */
+.sub-wall {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 99999; padding: 24px;
+}
+.sub-wall.hidden { display: none; }
+.sub-wall-card {
+  background: var(--surface, #fff); border-radius: 20px;
+  padding: 32px 28px; max-width: 380px; width: 100%;
+  text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+}
+.sub-wall-icon { font-size: 52px; margin-bottom: 12px; }
+.sub-wall-card h2 { font-size: 22px; margin: 0 0 10px; color: var(--ink, #111); }
+.sub-wall-card p { color: var(--ink-mute, #666); font-size: 14px; line-height: 1.6; margin: 0 0 24px; }
+.sub-wall-btn {
+  width: 100%; padding: 13px; border-radius: 12px;
+  font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+  margin-bottom: 10px; border: 0;
+}
+.sub-wall-btn.primary { background: var(--accent, #4f46e5); color: #fff; }
+.sub-wall-btn.subtle { background: transparent; color: var(--ink-mute, #666); border: 1px solid var(--line, #ddd); }
+
+/* PDV Screen */
+.pdv-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px; }
+.pdv-header h2 { font-size: 18px; margin: 0; color: var(--ink, #111); }
+.pdv-clear-btn { background: transparent; border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 6px 12px; font-size: 12px; color: var(--ink-mute, #666); cursor: pointer; font-family: inherit; }
+.pdv-search-wrap { padding: 0 16px 8px; }
+.pdv-search-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line, #ddd); border-radius: 12px; background: var(--surface, #fff); font-size: 15px; color: var(--ink, #111); font-family: inherit; box-sizing: border-box; }
+.pdv-search-input:focus { outline: none; border-color: var(--accent, #4f46e5); }
+.pdv-results { padding: 0 16px; max-height: 200px; overflow-y: auto; }
+.pdv-result-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-elev, #f8f8f8); border: 1px solid var(--line, #ddd); border-radius: 10px; cursor: pointer; font-family: inherit; text-align: left; }
+.pdv-result-item:active { transform: scale(0.98); }
+.pdv-item-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--ink, #111); }
+.pdv-item-qty, .pdv-item-price { font-size: 11px; color: var(--ink-mute, #666); }
+.pdv-cart { padding: 8px 16px; min-height: 100px; }
+.pdv-cart-item { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line, #eee); }
+.pdv-cart-name { flex: 1; font-size: 13px; color: var(--ink, #111); }
+.pdv-cart-controls { display: flex; align-items: center; gap: 6px; }
+.pdv-cart-controls button { width: 28px; height: 28px; border: 1px solid var(--line, #ddd); border-radius: 8px; background: var(--bg-elev, #f8f8f8); font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pdv-cart-price { font-size: 13px; font-weight: 600; color: var(--ink, #111); min-width: 60px; text-align: right; }
+.pdv-cart-remove { background: transparent; border: 0; color: var(--red, #ef4444); font-size: 16px; cursor: pointer; padding: 4px; }
+.pdv-cart-total { padding: 12px 0 4px; font-size: 15px; text-align: right; color: var(--ink, #111); }
+.pdv-msg { padding: 8px 16px; font-size: 13px; text-align: center; min-height: 20px; }
+.pdv-finalizar-btn { width: calc(100% - 32px); margin: 8px 16px 20px; padding: 15px; background: var(--accent, #4f46e5); color: #fff; border: 0; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pdv-finalizar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+
 </body>
 </html>

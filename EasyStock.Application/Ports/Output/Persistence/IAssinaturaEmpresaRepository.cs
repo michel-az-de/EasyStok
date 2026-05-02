@@ -10,5 +10,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateAsync(AssinaturaEmpresa assinatura);
         Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default);
         Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default);
+        Task<IEnumerable<AssinaturaEmpresa>> GetSuspensasAntigasAsync(int diasMinimos, CancellationToken ct = default);
     }
 }

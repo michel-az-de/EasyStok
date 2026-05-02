@@ -202,6 +202,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GerenciarCategoriaUseCase>();
         services.AddScoped<ListarPlanosUseCase>();
         services.AddScoped<DeleteUserAuditDataUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ListarFaturas.ListarFaturasUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.CancelarAssinatura.CancelarAssinaturaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.AlterarPlano.AlterarPlanoUseCase>();
 
         return services;
     }

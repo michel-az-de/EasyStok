@@ -50,5 +50,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                      (a.DataFim != null && a.DataFim < now)))
                 .ToListAsync(ct);
         }
+
+        public async Task<IEnumerable<AssinaturaEmpresa>> GetSuspensasAntigasAsync(int diasMinimos, CancellationToken ct = default)
+        {
+            var limite = DateTime.UtcNow.AddDays(-diasMinimos);
+            return await dbContext.AssinaturasEmpresa
+                .Where(a => a.Status == StatusAssinatura.Suspensa
+                         && ((a.SuspensaEm != null && a.SuspensaEm < limite)
+                          || (a.SuspensaEm == null && a.AlteradoEm < limite)))
+                .ToListAsync(ct);
+        }
     }
 }

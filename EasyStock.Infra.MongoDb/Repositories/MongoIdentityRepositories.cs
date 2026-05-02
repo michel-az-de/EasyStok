@@ -504,6 +504,17 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
             .ToListAsync(ct);
         return assinaturas;
     }
+
+    public async Task<IEnumerable<AssinaturaEmpresa>> GetSuspensasAntigasAsync(int diasMinimos, CancellationToken ct = default)
+    {
+        var limite = DateTime.UtcNow.AddDays(-diasMinimos);
+        var assinaturas = await Collection.Find(a =>
+            a.Status == StatusAssinatura.Suspensa &&
+            ((a.SuspensaEm != null && a.SuspensaEm < limite) ||
+             (a.SuspensaEm == null && a.AlteradoEm < limite)))
+            .ToListAsync(ct);
+        return assinaturas;
+    }
 }
 
 public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
