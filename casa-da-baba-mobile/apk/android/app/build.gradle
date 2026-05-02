@@ -1,16 +1,25 @@
 apply plugin: 'com.android.application'
 
-// versionCode dinâmico:
-//  - Em CI (GitHub Actions): usa github.run_number (sempre crescente).
-//  - Local: cai no timestamp em minutos desde epoch (também crescente).
-//  - Isso garante que cada APK nova tem versionCode > anterior, permitindo
-//    ao Android aceitar a atualização sem precisar desinstalar (preservando
-//    localStorage e dados do usuário).
+// versionCode dinâmico — garante crescimento MONOTONICO entre builds locais
+// e do CI. Usa o MAIOR valor entre run_number e timestamp:
+//  - Build local: usa timestamp em minutos desde 21/12/2025 (cresce 1440/dia,
+//    cabe em int 32-bit por 1500+ anos).
+//  - Build CI: github.run_number e pequeno (dezenas), entao Math.max(run,
+//    timestamp) sempre cai no timestamp — crescente independente da ordem
+//    em que builds rodam.
+//
+// IMPORTANTE: se em algum momento alguem buildou local primeiro (versionCode
+// virou um numero alto tipo 186000+) e DEPOIS o CI buildou com BUILD_VERSION_CODE
+// pequeno (run_number<100), Android bloqueia o update in-place com mensagem
+// "pacote parece ser invalido" — porque entende como downgrade. Esse Math.max
+// resolve definitivamente.
 def dynamicVersionCode = {
+    def base = ((System.currentTimeMillis() / 60000) - 29437920).toInteger()
     def envRun = System.getenv("BUILD_VERSION_CODE")
-    if (envRun != null && envRun.toString().isInteger()) return envRun.toInteger()
-    // Fallback: minutos desde 2026-01-01 (cabe em int, cresce ~525k/ano)
-    return ((System.currentTimeMillis() / 60000) - 29437920).toInteger()
+    if (envRun != null && envRun.toString().isInteger()) {
+        return Math.max(envRun.toInteger(), base)
+    }
+    return base
 }()
 
 android {

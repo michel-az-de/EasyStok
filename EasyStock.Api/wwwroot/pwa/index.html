@@ -8165,21 +8165,69 @@ function exportBackup() {
       if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
     } catch (e) {}
 
-    // Web Share API com File: melhor caminho no Android (deixa o usuário
-    // escolher onde salvar — Drive, e-mail, Files, WhatsApp).
+    // CAMINHO 1 (PRIORITARIO): plugin nativo Capacitor — escreve o arquivo
+    // via Filesystem em Cache e abre o share sheet apontando pra URI nativa.
+    // No WebView Capacitor, navigator.share({files}) e <a download> NAO
+    // funcionam confiavelmente (Web Share retorna canShare:true mas falha
+    // silenciosamente; <a download> ignora o atributo). Plugin nativo SEMPRE
+    // funciona porque vai pelo intent ACTION_SEND nativo do Android.
     const blob = new Blob([json], { type: 'application/json' });
-    if (navigator.canShare && typeof File !== 'undefined') {
+    (async function () {
       try {
-        const file = new File([blob], filename, { type: 'application/json' });
-        if (navigator.canShare({ files: [file] })) {
-          navigator.share({ files: [file], title: filename })
-            .then(() => showToast('Backup exportado'))
-            .catch(() => fallbackBackupDownload(blob, filename, json));
+        const Cap = window.Capacitor;
+        const FS    = Cap && Cap.Plugins && Cap.Plugins.Filesystem;
+        const Share = Cap && Cap.Plugins && Cap.Plugins.Share;
+        if (FS && Share) {
+          // Documents = sobrevive (mesmo quando o app fecha) e fica visivel
+          // pelo Files do Android; cliente pode abrir, copiar pra Drive, etc.
+          // Se o operador apenas quer compartilhar, o Share.share faz isso.
+          const writeRes = await FS.writeFile({
+            path: filename,
+            data: json,
+            directory: 'DOCUMENTS',
+            encoding: 'utf8',
+            recursive: true
+          });
+          showToast('Backup salvo · abrindo compartilhar...');
+          try {
+            await Share.share({
+              title: 'Backup Casa da Baba',
+              text: filename,
+              url: writeRes.uri,
+              dialogTitle: 'Onde quer enviar o backup?'
+            });
+          } catch (shareErr) {
+            // Cliente pode ter cancelado — arquivo ja esta salvo em Documents,
+            // entao mostra toast informativo com o caminho exato.
+            showToast('Backup salvo em Documentos: ' + filename);
+          }
           return;
         }
-      } catch (e) {}
-    }
-    fallbackBackupDownload(blob, filename, json);
+      } catch (eNative) {
+        console.warn('[backup] caminho nativo falhou:', eNative);
+      }
+
+      // CAMINHO 2 (fallback browser): Web Share API. Funciona em PWA real
+      // (Chrome desktop/mobile) mas e instavel em WebView Capacitor.
+      try {
+        if (navigator.canShare && typeof File !== 'undefined') {
+          const file = new File([blob], filename, { type: 'application/json' });
+          if (navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: filename });
+              showToast('Backup exportado');
+              return;
+            } catch (e) { /* cai pro fallback */ }
+          }
+        }
+      } catch (eShare) {}
+
+      // CAMINHO 3 (sempre funciona — overlay de copy/paste): mostra textarea
+      // fullscreen com o JSON. Cliente segura e cola onde quiser. Garantia
+      // de ultimo recurso — funciona em qualquer WebView, sem permissao,
+      // sem plugin. Lentamente, mas funciona SEMPRE.
+      showBackupTextForCopy(json, filename);
+    })();
   } catch (e) {
     console.error('Backup falhou:', e);
     showToast('Erro ao gerar backup');
