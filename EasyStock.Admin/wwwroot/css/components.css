@@ -102,6 +102,27 @@
   .alert .cta { grid-column: 1 / -1; }
 }
 
+/* ---------- Table wrapper (overflow-x em mobile) ---------- */
+.tbl-wrap, .table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+@media (max-width: 760px) {
+  .tbl, .tbl-full, .table-admin {
+    min-width: 640px;
+  }
+}
+
+/* ---------- Skip-link (a11y) ---------- */
+.skip-link {
+  position: absolute; left: -9999px; top: 8px;
+  background: var(--navy-700); color: #fff; padding: 8px 14px;
+  border-radius: 8px; font-weight: 600; z-index: 99999;
+}
+.skip-link:focus { left: 12px; }
+
 /* ---------- Focus ring (a11y) ---------- */
 :focus-visible {
   outline: 2px solid var(--navy-500);
