@@ -19,10 +19,7 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <!-- tailwind: build local em ~/css/tailwind.dist.css -->
-    <script>
-        tailwind.config = { darkMode: 'class' };
-    </script>
+    <!-- tailwind: build local em ~/css/tailwind.dist.css (config em tailwind.config.js) -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />

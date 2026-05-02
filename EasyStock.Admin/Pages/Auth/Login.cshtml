@@ -12,41 +12,24 @@
     <title>@ViewData["Title"]</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'es-bg':       '#111827',
-                        'es-surface':  '#172033',
-                        'es-card':     '#151f31',
-                        'es-accent':   '#f47920',
-                        'es-accent-h': '#d96610',
-                        'es-ink':      '#f7f2e8',
-                        'es-ink-dim':  '#c8c1b4',
-                        'es-ink-mute': '#8793a7',
-                    },
-                    fontFamily: { sans: ['Manrope', '-apple-system', 'sans-serif'] }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
-<body class="min-h-screen bg-es-bg font-sans flex items-center justify-center">
+<body class="min-h-screen font-sans flex items-center justify-center" data-theme="dark" style="background:var(--bg-app);color:var(--text-primary);">
 <div class="w-full max-w-sm mx-auto px-4">
 
     <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center mb-4">
-            <svg width="56" height="56" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="50,4 96,28 50,52 4,28" fill="#f47920"/>
-                <polygon points="4,28 4,72 50,96 50,52" fill="#1d3461"/>
-                <polygon points="96,28 96,72 50,96 50,52" fill="#253a6e"/>
+            <svg width="56" height="56" viewBox="0 0 64 64" fill="none" aria-label="EasyStock">
+                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
             </svg>
         </div>
-        <h1 class="text-es-ink text-2xl font-bold">
-            <span>Easy</span><span style="color:#f47920">Stok</span> Admin
+        <h1 class="text-es-ink text-2xl font-bold" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
+            <span>Easy</span><span style="color:#F26B25">Stok</span> Admin
         </h1>
         <p class="text-es-ink-dim text-sm mt-1">Painel restrito a Super Administradores</p>
     </div>
