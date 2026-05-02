@@ -1,0 +1,54 @@
+@*
+    Pagination (T2.9). Recebe: Page (int), TotalPages (int), QueryParam (default 'page').
+    Mantém demais querystrings.
+*@
+@model dynamic
+@{
+    int page = 1; try { page = (int)Model.Page; } catch { }
+    int total = 1; try { total = (int)Model.TotalPages; } catch { }
+    string param = "page"; try { param = (Model.QueryParam as string) ?? "page"; } catch { }
+    if (total < 1) total = 1;
+    if (page < 1) page = 1;
+    if (page > total) page = total;
+
+    string buildHref(int p)
+    {
+        var qs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in Context.Request.Query) qs[kv.Key] = kv.Value.ToString();
+        qs[param] = p.ToString();
+        return Context.Request.Path + "?" + string.Join("&", qs.Select(x => Uri.EscapeDataString(x.Key) + "=" + Uri.EscapeDataString(x.Value ?? "")));
+    }
+
+    int from = Math.Max(1, page - 2);
+    int to = Math.Min(total, page + 2);
+    if (page <= 3) to = Math.Min(total, 5);
+    if (page >= total - 2) from = Math.Max(1, total - 4);
+}
+@if (total > 1)
+{
+    <nav class="pagination" aria-label="Paginação">
+        <a href="@buildHref(page - 1)" class="@(page == 1 ? "pg-disabled" : "")" aria-label="Anterior">‹</a>
+        @if (from > 1)
+        {
+            <a href="@buildHref(1)">1</a>
+            @if (from > 2) { <span class="pg-disabled">…</span> }
+        }
+        @for (var p = from; p <= to; p++)
+        {
+            if (p == page)
+            {
+                <span class="pg-active" aria-current="page">@p</span>
+            }
+            else
+            {
+                <a href="@buildHref(p)">@p</a>
+            }
+        }
+        @if (to < total)
+        {
+            @if (to < total - 1) { <span class="pg-disabled">…</span> }
+            <a href="@buildHref(total)">@total</a>
+        }
+        <a href="@buildHref(page + 1)" class="@(page == total ? "pg-disabled" : "")" aria-label="Próxima">›</a>
+    </nav>
+}

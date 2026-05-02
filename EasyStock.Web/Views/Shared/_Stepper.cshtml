@@ -1,0 +1,22 @@
+@*
+    Stepper / Wizard (T2.8). Steps: List<string> labels.
+*@
+@model dynamic
+@{
+    var steps = Model.Steps as System.Collections.Generic.IList<string>;
+    int current = 0; try { current = (int)Model.Current; } catch { }
+}
+@if (steps != null && steps.Count > 0)
+{
+    <ol class="stepper" aria-label="Etapas">
+        @for (var i = 0; i < steps.Count; i++)
+        {
+            var active = i == current;
+            var done = i < current;
+            <li class="stepper-step" data-active="@(active.ToString().ToLower())" data-done="@(done.ToString().ToLower())" aria-current="@(active ? "step" : null)">
+                <span class="stepper-bullet">@(done ? "✓" : (i + 1).ToString())</span>
+                <span class="stepper-label">@steps[i]</span>
+            </li>
+        }
+    </ol>
+}

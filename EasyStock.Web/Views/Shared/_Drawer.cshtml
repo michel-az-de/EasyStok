@@ -1,0 +1,28 @@
+@*
+    Drawer slide-right (T2.6). Uso:
+        <div x-data="{ open: false }">
+          <button @click="open = true" class="btn btn-primary">Abrir</button>
+          <partial name="_Drawer" model='new { Title = "Editar item", BodyHtml = "..." }' />
+        </div>
+*@
+@model dynamic
+@{
+    string title = null; try { title = Model.Title as string; } catch { }
+    string bodyHtml = null; try { bodyHtml = Model.BodyHtml as string; } catch { }
+    string footerHtml = null; try { footerHtml = Model.FooterHtml as string; } catch { }
+}
+<div x-show="open" x-cloak>
+    <div class="drawer-backdrop" @@click="open=false" x-transition.opacity></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" :aria-labelledby="$id('drawer-title')"
+           @@keydown.escape.window="open=false">
+        <div class="drawer-header">
+            <h3 :id="$id('drawer-title')" class="text-base font-semibold m-0">@title</h3>
+            <button type="button" class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="open=false">✕</button>
+        </div>
+        <div class="drawer-body">@Html.Raw(bodyHtml)</div>
+        @if (!string.IsNullOrEmpty(footerHtml))
+        {
+            <div class="drawer-footer">@Html.Raw(footerHtml)</div>
+        }
+    </aside>
+</div>

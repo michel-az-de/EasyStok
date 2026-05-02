@@ -1,0 +1,27 @@
+@*
+    Tabs com ARIA (T2.5). Recebe Items: List<(string Id, string Label, string ContentHtml)>.
+*@
+@model dynamic
+@{
+    var items = Model.Items as System.Collections.Generic.IList<System.ValueTuple<string,string,string>>;
+    string defaultId = null;
+    try { defaultId = Model.Default as string; } catch { }
+    if (string.IsNullOrEmpty(defaultId) && items != null && items.Count > 0) defaultId = items[0].Item1;
+}
+@if (items != null && items.Count > 0)
+{
+    <div x-data='{ active: "@defaultId" }'>
+        <div class="tabs" role="tablist">
+            @foreach (var (id, label, _) in items)
+            {
+                <button type="button" role="tab" :aria-selected="active === '@id'"
+                        :tabindex="active === '@id' ? 0 : -1"
+                        @@click="active = '@id'">@label</button>
+            }
+        </div>
+        @foreach (var (id, _, html) in items)
+        {
+            <div role="tabpanel" x-show="active === '@id'" x-cloak class="anim-fadeInUp">@Html.Raw(html)</div>
+        }
+    </div>
+}

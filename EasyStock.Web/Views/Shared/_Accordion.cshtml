@@ -1,0 +1,31 @@
+@*
+    Accordion com ARIA disclosure (T2.5). Items: List<(string Title, string ContentHtml)>.
+*@
+@model dynamic
+@{
+    var items = Model.Items as System.Collections.Generic.IList<System.ValueTuple<string,string>>;
+    bool multiple = false; try { multiple = (bool)Model.Multiple; } catch { }
+}
+@if (items != null && items.Count > 0)
+{
+    <div x-data='{ open: @(multiple ? "[]" : "null") }'>
+        @for (var i = 0; i < items.Count; i++)
+        {
+            var (title, html) = items[i];
+            var idx = i;
+            <div class="accordion-item">
+                <button type="button" class="accordion-trigger"
+                        :aria-expanded="@(multiple ? $"open.includes({idx})" : $"open === {idx}")"
+                        @@click="@(multiple ? $"open.includes({idx}) ? open = open.filter(x => x !== {idx}) : open.push({idx})" : $"open = (open === {idx}) ? null : {idx}")">
+                    <span>@title</span>
+                    <svg class="accordion-chevron w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <div class="accordion-panel" x-show="@(multiple ? $"open.includes({idx})" : $"open === {idx}")" x-cloak x-transition.duration.180ms>
+                    @Html.Raw(html)
+                </div>
+            </div>
+        }
+    </div>
+}

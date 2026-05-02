@@ -1,0 +1,28 @@
+@*
+    Datepicker (T2.2). Wrapper sobre <input type="date"> com estilo do DS + suporte a range.
+    Uso single: <partial name="_Datepicker" model='new { Name = "data", Value = (string)null }' />
+    Uso range:  <partial name="_Datepicker" model='new { Range = true, NameStart="de", NameEnd="ate" }' />
+*@
+@model dynamic
+@{
+    bool range = false; try { range = (bool)Model.Range; } catch { }
+    string name = null, value = null, nameStart = null, nameEnd = null, valueStart = null, valueEnd = null;
+    try { name = Model.Name as string; } catch { }
+    try { value = Model.Value as string; } catch { }
+    try { nameStart = Model.NameStart as string; } catch { }
+    try { nameEnd = Model.NameEnd as string; } catch { }
+    try { valueStart = Model.ValueStart as string; } catch { }
+    try { valueEnd = Model.ValueEnd as string; } catch { }
+}
+@if (range)
+{
+    <div class="inline-flex items-center gap-2">
+        <input type="date" class="combobox-input" name="@nameStart" value="@valueStart" aria-label="Data inicial" />
+        <span class="text-[color:var(--text-muted)]">→</span>
+        <input type="date" class="combobox-input" name="@nameEnd" value="@valueEnd" aria-label="Data final" />
+    </div>
+}
+else
+{
+    <input type="date" class="combobox-input" name="@name" value="@value" />
+}

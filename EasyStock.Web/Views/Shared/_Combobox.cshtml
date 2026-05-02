@@ -1,0 +1,41 @@
+@*
+    Combobox/searchable select (T2.1).
+    Uso:
+        <partial name="_Combobox" model='new {
+            Name = "categoriaId",
+            Items = new[] { new { value = 1, label = "Bebidas" }, new { value = 2, label = "Limpeza" } },
+            Value = (object)null,
+            Placeholder = "Selecionar categoria"
+        }' />
+*@
+@model dynamic
+@{
+    string name = Model.Name as string ?? "combobox";
+    object value = null; try { value = Model.Value; } catch { }
+    string placeholder = null; try { placeholder = Model.Placeholder as string; } catch { }
+    var itemsJson = System.Text.Json.JsonSerializer.Serialize(Model.Items);
+    var valueJson = System.Text.Json.JsonSerializer.Serialize(value);
+    var phEsc = (placeholder ?? "Selecionar...").Replace("\"", "&quot;");
+}
+<div class="combobox" x-data='combobox({ items: @Html.Raw(itemsJson), value: @Html.Raw(valueJson), name: "@name", placeholder: "@phEsc" })'>
+    <input type="text" class="combobox-input"
+           role="combobox" aria-autocomplete="list" :aria-expanded="open"
+           :aria-controls="$id('cbx-list')"
+           x-model="query"
+           @@input="onInput()" @@focus="onFocus()" @@blur="onBlur()"
+           @@keydown="onKey($event)"
+           placeholder="@placeholder" />
+    <span class="combobox-caret" aria-hidden="true">▾</span>
+    <input type="hidden" name="@name" :value="selected ?? ''" />
+    <div class="combobox-listbox" role="listbox" :id="$id('cbx-list')" x-show="open" x-cloak>
+        <template x-for="(item, idx) in filtered" :key="item.value">
+            <div class="combobox-option"
+                 role="option"
+                 :aria-selected="String(item.value) === String(selected)"
+                 :data-active="idx === activeIdx"
+                 @@mousedown.prevent="pick(item)"
+                 x-text="item.label"></div>
+        </template>
+        <div class="combobox-empty" x-show="filtered.length === 0">Nenhum resultado</div>
+    </div>
+</div>

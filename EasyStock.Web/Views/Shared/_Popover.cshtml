@@ -1,0 +1,28 @@
+@*
+    Popover/menu de ações (T2.4). Usar ao redor de um trigger Alpine `x-data="{ open: false }"`.
+    Items: List<(string Label, string Href, string Icon, string Variant)>
+    Variant: null | "danger".
+*@
+@model dynamic
+@{
+    var items = Model.Items as System.Collections.Generic.IList<System.ValueTuple<string,string,string,string>>;
+}
+@if (items != null && items.Count > 0)
+{
+    <div class="popover-panel" x-show="open" x-cloak @@click.outside="open = false" style="right:0;top:calc(100% + 4px)" role="menu">
+        @foreach (var (label, href, icon, variant) in items)
+        {
+            if (string.IsNullOrEmpty(label))
+            {
+                <div class="popover-divider"></div>
+            }
+            else
+            {
+                <a href="@(href ?? "#")" class="popover-item @(variant == "danger" ? "danger" : "")" role="menuitem">
+                    @if (!string.IsNullOrEmpty(icon)) { <span aria-hidden="true">@Html.Raw(icon)</span> }
+                    <span>@label</span>
+                </a>
+            }
+        }
+    </div>
+}
