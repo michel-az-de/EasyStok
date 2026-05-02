@@ -1,9 +1,10 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 
 namespace EasyStock.Infra.MongoDb.Data;
 
-public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
+public sealed class MongoUnitOfWork(IMongoClient mongoClient, ILogger<MongoUnitOfWork> logger) : IUnitOfWork
 {
     private readonly List<Func<IClientSessionHandle?, CancellationToken, Task>> _operations = [];
 
@@ -31,8 +32,9 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
 
                 await session.CommitTransactionAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                logger.LogError(ex, "MongoUnitOfWork: erro durante CommitTransactionAsync, abortando ({Count} operacoes pendentes).", pending.Length);
                 await session.AbortTransactionAsync();
                 throw;
             }
@@ -42,6 +44,10 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient) : IUnitOfWork
         }
         catch (Exception ex) when (SupportsFallback(ex))
         {
+            // Mongo standalone (sem replica set) não suporta transações. Cai em modo
+            // best-effort sem rollback — operador deve estar ciente.
+            logger.LogWarning(ex, "MongoUnitOfWork: transacoes nao suportadas pelo cluster; aplicando {Count} operacoes em modo nao-transacional.", pending.Length);
+
             foreach (var operation in pending)
                 await operation(null, CancellationToken.None);
 
