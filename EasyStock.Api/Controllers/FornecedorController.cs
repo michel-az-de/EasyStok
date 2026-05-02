@@ -34,6 +34,7 @@ public class FornecedorController(
     CriarPedidoFornecedorUseCase criarPedidoUseCase,
     ReceberPedidoFornecedorUseCase receberPedidoUseCase,
     CancelarPedidoFornecedorUseCase cancelarPedidoUseCase,
+    ProcessarRecebimentoPedidoFornecedorUseCase processarRecebimentoUseCase,
     ObterHistoricoAlteracoesFornecedorUseCase obterAlteracoesUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
@@ -101,6 +102,32 @@ public class FornecedorController(
         if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var empresaId, out var err)) return err!;
         await cancelarPedidoUseCase.ExecuteAsync(new CancelarPedidoFornecedorCommand(id, empresaId));
         return DataOk(true);
+    }
+
+    [SwaggerOperation(Summary = "Receive a purchase order with inventory integration (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("pedidos/{id}/receber-com-itens")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> ReceberPedidoComEstoque(
+        Guid id,
+        [FromBody] ReceberPedidoComEstoqueBody body,
+        CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var empresaId, out var err)) return err!;
+
+        var ItensRecebidos = body.Itens?.ToDictionary(x => x.ItemId, x => x.QuantidadeRecebida)
+            ?? new Dictionary<Guid, decimal>();
+
+        var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
+            id,
+            empresaId,
+            body.DataRecebimento,
+            ItensRecebidos);
+
+        var resultado = await processarRecebimentoUseCase.ExecuteAsync(comando, ct);
+        return DataOk(resultado);
     }
 
     [SwaggerOperation(Summary = "Get supplier details (Operador only)")]
@@ -219,3 +246,5 @@ public class FornecedorController(
 
 public sealed record ReceberPedidoBody(Guid? EmpresaId, DateTime? DataRecebimento, string? Tracking);
 public sealed record CancelarPedidoBody(Guid? EmpresaId);
+public sealed record ReceberPedidoComEstoqueBody(Guid? EmpresaId, DateTime? DataRecebimento, List<ItemRecebidoDto>? Itens);
+public sealed record ItemRecebidoDto(Guid ItemId, decimal QuantidadeRecebida);

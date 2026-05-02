@@ -21,8 +21,5 @@ public class PedidoFornecedor
 
     public Fornecedor? Fornecedor { get; set; }
 
-    // TODO(deploy seguinte): adicionar migration "AddPedidoFornecedorItem" e
-    // remover [NotMapped] para persistir itens no banco.
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public ICollection<PedidoFornecedorItem> Itens { get; set; } = new List<PedidoFornecedorItem>();
 }
