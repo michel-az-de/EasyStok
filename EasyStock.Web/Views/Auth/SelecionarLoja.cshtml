@@ -17,12 +17,15 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- tailwind: build local em ~/css/tailwind.dist.css -->
     <script>
         tailwind.config = { darkMode: 'class' };
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="~/css/app.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
 </head>
 <body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
     <div class="w-full max-w-lg mx-auto px-4">
