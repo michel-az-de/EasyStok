@@ -1,0 +1,114 @@
+/* EasyStok — Components extraídos do design-system.html / dashboard.html / critico.html.
+   Carregado APÓS tokens.css e app-shell.css. */
+
+/* ---------- Status pills (pedidos / validade) ---------- */
+.status-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.stp {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; letter-spacing: -0.005em;
+  border: 1px solid;
+}
+.stp .ind { width: 8px; height: 8px; border-radius: 50%; }
+.stp.aguardando { background: var(--ink-50);   border-color: var(--ink-200);  color: var(--ink-700); }
+.stp.aguardando .ind { background: var(--ink-500); }
+.stp.preparando { background: var(--navy-50);  border-color: var(--navy-200); color: var(--navy-700); }
+.stp.preparando .ind { background: var(--navy-600); }
+.stp.pronto     { background: var(--ok-50);    border-color: #BFE0CC;         color: var(--ok-700); }
+.stp.pronto .ind { background: var(--ok-600); }
+.stp.entregue   { background: var(--ink-100);  border-color: var(--ink-200);  color: var(--ink-600); }
+.stp.entregue .ind { background: var(--ink-400); }
+.stp.vencendo   { background: var(--warn-50);  border-color: #F0DC9A;         color: var(--warn-700); }
+.stp.vencendo .ind { background: var(--warn-600); }
+.stp.critico    { background: var(--crit-50);  border-color: #EFB7AD;         color: var(--crit-700); }
+.stp.critico .ind { background: var(--crit-600); }
+
+/* ---------- Alerts (4px left border, 44px icon slot) ---------- */
+.alerts { display: flex; flex-direction: column; gap: 12px; }
+.alert {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 16px; align-items: center;
+  border-left-width: 4px;
+}
+.alert.ok   { border-left-color: var(--ok-600);     background: var(--ok-50); }
+.alert.warn { border-left-color: var(--warn-600);   background: var(--warn-50); }
+.alert.crit { border-left-color: var(--crit-600);   background: var(--crit-50); }
+.alert.info { border-left-color: var(--orange-600); background: var(--orange-50); }
+.alert .ic {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: grid; place-items: center; font-weight: 700; font-size: 22px; color: #fff;
+}
+.alert.ok   .ic { background: var(--ok-600); }
+.alert.warn .ic { background: var(--warn-600); }
+.alert.crit .ic { background: var(--crit-600); }
+.alert.info .ic { background: var(--orange-600); }
+.alert .body .ttl  { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.005em; margin-bottom: 2px; }
+.alert .body .desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; }
+.alert .cta {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--orange-500); text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+/* ---------- Validade rows (lista crítica) ---------- */
+.vrow {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 10px 12px; border-radius: 10px; border-left: 3px solid transparent;
+}
+.vrow.warn { border-left: 3px solid var(--warn-600); background: var(--warn-50); }
+.vrow.crit { border-left: 3px solid var(--crit-600); background: var(--crit-50); }
+.vrow .nm   { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.vrow .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.vdays {
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+  padding: 3px 8px; border-radius: 999px; letter-spacing: 0.04em;
+  background: var(--ink-100); color: var(--ink-700);
+}
+.vrow.warn .vdays { background: var(--warn-100); color: var(--warn-700); }
+.vrow.crit .vdays { background: var(--crit-100); color: var(--crit-700); }
+
+/* ---------- Operational cards (estoque crítico/warn/ok) ---------- */
+.op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.op-card {
+  background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: 14px;
+  padding: 22px; display: flex; flex-direction: column; gap: 14px;
+  border-top: 3px solid transparent;
+}
+.op-card.crit { border-top-color: var(--crit-600); }
+.op-card.warn { border-top-color: var(--warn-600); }
+.op-card.ok   { border-top-color: var(--ok-600); }
+.op-card .ic-box {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: grid; place-items: center; font-size: 20px; color: #fff;
+}
+.op-card.crit .ic-box { background: var(--crit-600); }
+.op-card.warn .ic-box { background: var(--warn-600); }
+.op-card.ok   .ic-box { background: var(--ok-600); }
+.op-card .meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.op-card .qty  { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; }
+.op-card .nm   { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.op-card .desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; }
+.op-card .actions { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-soft); margin-top: auto; }
+
+@media (max-width: 980px) {
+  .op-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 760px) {
+  .op-grid { grid-template-columns: 1fr; }
+  .vrow { grid-template-columns: 1fr; gap: 6px; }
+  .alert { grid-template-columns: 44px 1fr; }
+  .alert .cta { grid-column: 1 / -1; }
+}
+
+/* ---------- Focus ring (a11y) ---------- */
+:focus-visible {
+  outline: 2px solid var(--navy-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.btn:focus-visible,
+button:focus-visible {
+  outline-color: var(--orange-500);
+}
