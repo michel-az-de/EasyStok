@@ -10,5 +10,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateAsync(RefreshToken refreshToken);
         Task DeleteAsync(Guid id);
         Task DeleteExpiredAsync();
+        Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId);
     }
 }

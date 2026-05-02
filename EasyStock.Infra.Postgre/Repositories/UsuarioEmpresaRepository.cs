@@ -10,6 +10,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.UsuariosEmpresas.AddAsync(usuarioEmpresa).AsTask();
         public Task<UsuarioEmpresa?> GetByUsuarioEEmpresaAsync(Guid usuarioId, Guid empresaId) =>
             dbContext.UsuariosEmpresas.FirstOrDefaultAsync(x => x.UsuarioId == usuarioId && x.EmpresaId == empresaId);
+        public async Task<IReadOnlyList<UsuarioEmpresa>> GetByUsuarioIdAsync(Guid usuarioId) =>
+            await dbContext.UsuariosEmpresas
+                .AsNoTracking()
+                .Include(ue => ue.Empresa)
+                .Where(ue => ue.UsuarioId == usuarioId)
+                .ToListAsync();
         public Task UpdateAsync(UsuarioEmpresa usuarioEmpresa)
         {
             dbContext.UsuariosEmpresas.Update(usuarioEmpresa);

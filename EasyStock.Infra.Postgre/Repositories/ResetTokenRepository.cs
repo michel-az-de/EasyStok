@@ -41,4 +41,7 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
             .ToListAsync();
         _context.ResetTokens.RemoveRange(expiredTokens);
     }
+
+    public Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId) =>
+        _context.ResetTokens.Where(rt => rt.UsuarioId == usuarioId).ExecuteDeleteAsync();
 }

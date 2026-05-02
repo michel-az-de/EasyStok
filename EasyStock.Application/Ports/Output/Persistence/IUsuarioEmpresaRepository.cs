@@ -6,6 +6,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task AddAsync(UsuarioEmpresa usuarioEmpresa);
         Task<UsuarioEmpresa?> GetByUsuarioEEmpresaAsync(Guid usuarioId, Guid empresaId);
+        Task<IReadOnlyList<UsuarioEmpresa>> GetByUsuarioIdAsync(Guid usuarioId);
         Task UpdateAsync(UsuarioEmpresa usuarioEmpresa);
     }
 }

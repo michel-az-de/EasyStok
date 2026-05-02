@@ -2,12 +2,14 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
+using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
+using EasyStock.Application.UseCases.ExportarMeusDados;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
@@ -43,7 +45,9 @@ public class AuthController(
     ConfirmEmailUseCase confirmEmailUseCase,
     ObterUsuarioAtualUseCase obterUsuarioAtualUseCase,
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
-    AlterarSenhaUseCase alterarSenhaUseCase) : EasyStockControllerBase
+    AlterarSenhaUseCase alterarSenhaUseCase,
+    ExportarMeusDadosUseCase exportarMeusDadosUseCase,
+    AnonimizarMeusDadosUseCase anonimizarMeusDadosUseCase) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited by IP.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -169,6 +173,25 @@ public class AuthController(
     [HttpPatch("me/password")]
     public async Task<IActionResult> ChangePassword([FromBody] AlterarSenhaCommand command)
         => DataOk(await alterarSenhaUseCase.ExecuteAsync(command));
+
+    [Authorize]
+    [SwaggerOperation(
+        Summary = "LGPD Art.18 — exportar dados pessoais do usuario",
+        Description = "Devolve um snapshot estruturado dos dados pessoais do usuario autenticado: perfil, empresas vinculadas e refresh tokens ativos.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet("me/export")]
+    public async Task<IActionResult> ExportMyData()
+        => DataOk(await exportarMeusDadosUseCase.ExecuteAsync());
+
+    [Authorize]
+    [SwaggerOperation(
+        Summary = "LGPD Art.18 — anonimizar (direito ao esquecimento)",
+        Description = "Pseudonimiza campos PII do usuario autenticado, zera senha, desativa conta e remove credenciais (refresh/reset/confirm-email tokens). AuditLogs e movimentacoes historicas sao preservadas com UsuarioId. Operacao irreversivel — exige body { confirmacaoTexto: 'ANONIMIZAR' }.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("me/anonimizar")]
+    public async Task<IActionResult> AnonimizarMeusDados([FromBody] AnonimizarMeusDadosCommand command)
+        => DataOk(await anonimizarMeusDadosUseCase.ExecuteAsync(command));
 
     [SwaggerOperation(Summary = "Confirm email address", Description = "Validates and marks an email address as confirmed using a token. Allows login access.")]
     [ProducesResponseType(StatusCodes.Status200OK)]

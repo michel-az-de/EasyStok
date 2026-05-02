@@ -72,6 +72,12 @@ public class AuthControllerTests
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
         var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
 
+        var exportarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>>();
+        var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();
+        var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
+        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, currentUser, exportarLogger);
+        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, currentUser, unitOfWork2, anonimizarLogger);
+
         _controller = new AuthController(
             _autenticarUseCase,
             _mockJwtService,
@@ -86,7 +92,9 @@ public class AuthControllerTests
             confirmEmailUseCase,
             obterUsuarioAtualUseCase,
             atualizarUsuarioAtualUseCase,
-            alterarSenhaUseCase);
+            alterarSenhaUseCase,
+            exportarUseCase,
+            anonimizarUseCase);
     }
 
     [Fact]

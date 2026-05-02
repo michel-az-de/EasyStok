@@ -98,6 +98,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ObterUsuarioAtualUseCase>();
         services.AddScoped<AtualizarUsuarioAtualUseCase>();
         services.AddScoped<AlterarSenhaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>();
         services.AddScoped<RegistrarEmpresaUseCase>();
         services.AddScoped<CriarUsuarioUseCase>();
         services.AddScoped<AtualizarUsuarioUseCase>();

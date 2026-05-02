@@ -42,4 +42,7 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
             .ToListAsync();
         _context.RefreshTokens.RemoveRange(expiredTokens);
     }
+
+    public Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId) =>
+        _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId).ExecuteDeleteAsync();
 }

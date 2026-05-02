@@ -520,6 +520,9 @@ public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, Mong
     public async Task<UsuarioEmpresa?> GetByUsuarioEEmpresaAsync(Guid usuarioId, Guid empresaId) =>
         await UsuariosEmpresas.Find(x => x.UsuarioId == usuarioId && x.EmpresaId == empresaId).FirstOrDefaultAsync();
 
+    public async Task<IReadOnlyList<UsuarioEmpresa>> GetByUsuarioIdAsync(Guid usuarioId) =>
+        await UsuariosEmpresas.Find(x => x.UsuarioId == usuarioId).ToListAsync();
+
     public Task UpdateAsync(UsuarioEmpresa usuarioEmpresa)
     {
         EnqueueReplaceScoped(UsuariosEmpresas, usuarioEmpresa.Id, usuarioEmpresa.EmpresaId, usuarioEmpresa);
@@ -585,6 +588,12 @@ public sealed class RefreshTokenRepository(MongoEasyStockContext context, MongoU
         var filter = Builders<RefreshToken>.Filter.Lt(x => x.ExpiraEm, DateTime.UtcNow);
         await Collection.DeleteManyAsync(filter);
     }
+
+    public async Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId)
+    {
+        var result = await Collection.DeleteManyAsync(x => x.UsuarioId == usuarioId);
+        return (int)result.DeletedCount;
+    }
 }
 
 public sealed class ResetTokenRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)
@@ -620,6 +629,12 @@ public sealed class ResetTokenRepository(MongoEasyStockContext context, MongoUni
     {
         var filter = Builders<ResetToken>.Filter.Lt(x => x.ExpiraEm, DateTime.UtcNow);
         await Collection.DeleteManyAsync(filter);
+    }
+
+    public async Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId)
+    {
+        var result = await Collection.DeleteManyAsync(x => x.UsuarioId == usuarioId);
+        return (int)result.DeletedCount;
     }
 }
 

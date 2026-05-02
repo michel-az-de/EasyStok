@@ -69,5 +69,25 @@ namespace EasyStock.Domain.Entities
         {
             return LockoutEnd.HasValue && LockoutEnd > DateTime.UtcNow;
         }
+
+        /// <summary>
+        /// LGPD Art. 18 — direito ao esquecimento. Substitui campos PII por valores
+        /// pseudonimizados deterministicos baseados no Id (preserva FKs em audit logs,
+        /// movimentacoes e demais entidades com valor historico/forense).
+        /// Login fica impossivel (SenhaHash=null + Ativo=false). Operacao irreversivel.
+        /// </summary>
+        public void Anonimizar()
+        {
+            var pseudoId = Id.ToString("N").Substring(0, 12);
+            Nome = "[Anonimizado]";
+            Email = $"anonimizado-{pseudoId}@anonimizado.local";
+            AvatarUrl = null;
+            SenhaHash = string.Empty;
+            Ativo = false;
+            EmailConfirmado = false;
+            FailedLoginAttempts = 0;
+            LockoutEnd = null;
+            AlteradoEm = DateTime.UtcNow;
+        }
     }
 }
