@@ -7998,6 +7998,14 @@ function incrementActionCounter() {
   try { localStorage.setItem('cdb-action-count', String(count)); } catch (e) {}
   // Defer pra nao bloquear o fluxo da acao em andamento (ex: criar pedido)
   setTimeout(maybeTriggerAutoBackup, 800);
+  // Offline-first: agenda backup local em arquivo (silencioso, throttle 60s).
+  // Sobrevive sem rede, sem servidor, sem subscription Azure ativa. Se o
+  // operador desinstalar e reinstalar, no boot a gente detecta e restaura.
+  try {
+    if (window.cdbSync && typeof window.cdbSync.scheduleLocalBackup === 'function') {
+      window.cdbSync.scheduleLocalBackup('action');
+    }
+  } catch (e) {}
 }
 
 function maybeTriggerAutoBackup() {
@@ -8032,6 +8040,81 @@ function autoBackupAction(choice) {
     setTimeout(exportBackup, 200);
   }
 }
+
+// =========================
+// AUTO-RESTORE NO BOOT (offline-first)
+// =========================
+// Quando o app abre e detecta que NAO TEM dados locais (localStorage virgem
+// — primeira instalacao OU reinstalacao), procura em /Documents/casa-da-baba/
+// um backup-latest.json deixado pela sessao anterior. Se achar, oferece
+// restaurar automaticamente. Resolve o caso do cliente que desinstala+reinstala
+// e perde tudo, sem depender de servidor.
+async function maybeOfferLocalRestore() {
+  try {
+    // Se ja tem dados, nao oferece restore (nao sobrescreve trabalho atual)
+    var hasData = false;
+    try {
+      var keys = ['cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-batches'];
+      for (var i = 0; i < keys.length; i++) {
+        var raw = localStorage.getItem(keys[i]);
+        if (raw && raw.length > 5 && raw !== '[]' && raw !== '{}') { hasData = true; break; }
+      }
+    } catch (e) {}
+    if (hasData) return;
+
+    // Sem cdbSync ou plugin Filesystem (browser): nada a fazer
+    if (!window.cdbSync || typeof window.cdbSync.readLocalBackup !== 'function') return;
+    var backup = await window.cdbSync.readLocalBackup();
+    if (!backup || !backup.data) return;
+
+    var capturedAt = backup.capturedAt ? new Date(backup.capturedAt).toLocaleString('pt-BR') : '?';
+    var snap = backup.data;
+    var counts = {
+      pedidos: 0, produtos: 0, clientes: 0, lotes: 0, caixa: 0
+    };
+    try {
+      var arr;
+      if (snap['cdb-orders'])   { arr = JSON.parse(snap['cdb-orders']);   counts.pedidos  = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-products']) { arr = JSON.parse(snap['cdb-products']); counts.produtos = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-clients'])  { arr = JSON.parse(snap['cdb-clients']);  counts.clientes = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-batches'])  { arr = JSON.parse(snap['cdb-batches']);  counts.lotes    = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-cash'])     { arr = JSON.parse(snap['cdb-cash']);     counts.caixa    = Array.isArray(arr) ? arr.length : 0; }
+    } catch (e) {}
+    var total = counts.pedidos + counts.produtos + counts.clientes + counts.lotes + counts.caixa;
+    if (total === 0) return; // backup vazio, nada a oferecer
+
+    var msg = 'Achei um backup automatico do app (' + capturedAt + ') com:\n\n'
+            + '  ' + counts.pedidos  + ' pedidos\n'
+            + '  ' + counts.produtos + ' produtos\n'
+            + '  ' + counts.clientes + ' clientes\n'
+            + '  ' + counts.lotes    + ' lotes\n'
+            + '  ' + counts.caixa    + ' lancamentos de caixa\n\n'
+            + 'Deseja RESTAURAR esses dados? (Recomendado se voce reinstalou o app)';
+    if (!confirm(msg)) return;
+
+    // Aplica: escreve cada chave snap no localStorage e recarrega
+    Object.keys(snap).forEach(function (k) {
+      // Mantem device-id atual (se ja foi gerado neste install) pra nao
+      // confundir o servidor com "mesmo device" em duas instalacoes
+      if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
+      try { localStorage.setItem(k, snap[k]); } catch (e) {}
+    });
+    try {
+      localStorage.setItem('cdb-restore-source', 'local-file');
+      localStorage.setItem('cdb-restore-at', String(Date.now()));
+    } catch (e) {}
+    alert('Dados restaurados! Recarregando o app...');
+    setTimeout(function () { location.reload(); }, 600);
+  } catch (e) {
+    console.warn('[autoRestore] falhou:', e);
+  }
+}
+
+// Dispara a oferta de restore logo apos o app montar — espera 1.5s pra UI
+// estabilizar e o cdbSync (que carrega Filesystem plugin) ficar pronto.
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(maybeOfferLocalRestore, 1500);
+});
 
 // =========================
 // BACKUP / RESTAURAÇÃO

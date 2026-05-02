@@ -422,6 +422,99 @@
     }
   }
 
+  // ---- Backup local em arquivo (offline-first) ----
+  // Escreve snapshot JSON em pasta Documents do dispositivo, NAO depende de
+  // servidor nem de rede. Sobrevive ao app crashar ou WebView limpar cache.
+  // Em Android com Capacitor Filesystem v6, Directory.Documents usa scoped
+  // storage e nao requer permissao runtime. Em Android 11+ o arquivo eh
+  // criado em /storage/emulated/0/Documents/casa-da-baba/, visivel ao usuario
+  // pelo gerenciador de arquivos e (na maioria dos OEMs) preservado mesmo
+  // apos uninstall do app.
+  //
+  // Retorna { ok: bool, uri?: string, reason?: string }. Falha silenciosa
+  // — nunca interrompe trabalho do operador.
+  const LOCAL_BACKUP_DIR = 'casa-da-baba';
+  const LOCAL_BACKUP_FILE = LOCAL_BACKUP_DIR + '/backup-latest.json';
+  const LAST_LOCAL_BACKUP_KEY = 'cdb-last-local-backup-at';
+
+  function _getFilesystemPlugin() {
+    try {
+      var Cap = window.Capacitor;
+      if (!Cap || !Cap.Plugins) return null;
+      return Cap.Plugins.Filesystem || null;
+    } catch (e) { return null; }
+  }
+
+  async function localBackupToFile(note) {
+    var FS = _getFilesystemPlugin();
+    if (!FS) return { ok: false, reason: 'filesystem-unavailable' };
+    try {
+      var snap = _collectSnapshot();
+      var payload = {
+        schema: 'cdb-backup-v1',
+        capturedAt: Date.now(),
+        capturedAtIso: new Date().toISOString(),
+        deviceId: deviceId,
+        bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
+        operatorName: (window.cdbApp && window.cdbApp.getOperator)
+          ? window.cdbApp.getOperator()
+          : null,
+        note: note || 'auto',
+        data: snap
+      };
+      var json = JSON.stringify(payload);
+      var res = await FS.writeFile({
+        path: LOCAL_BACKUP_FILE,
+        data: json,
+        directory: 'DOCUMENTS',
+        encoding: 'utf8',
+        recursive: true
+      });
+      try { localStorage.setItem(LAST_LOCAL_BACKUP_KEY, String(Date.now())); } catch (e) {}
+      console.log('[localBackup] gravou em', res && res.uri);
+      return { ok: true, uri: res && res.uri };
+    } catch (e) {
+      console.warn('[localBackup] falhou:', e && e.message);
+      return { ok: false, reason: (e && e.message) || 'erro' };
+    }
+  }
+
+  // Le backup local existente. Retorna o JSON parseado ou null.
+  // Usado no boot pra detectar reinstalacao + oferecer restore.
+  async function readLocalBackup() {
+    var FS = _getFilesystemPlugin();
+    if (!FS) return null;
+    try {
+      var res = await FS.readFile({
+        path: LOCAL_BACKUP_FILE,
+        directory: 'DOCUMENTS',
+        encoding: 'utf8'
+      });
+      if (!res || !res.data) return null;
+      var parsed = JSON.parse(res.data);
+      if (!parsed || parsed.schema !== 'cdb-backup-v1' || !parsed.data) return null;
+      return parsed;
+    } catch (e) {
+      // Arquivo nao existe ou ilegivel — silencioso.
+      return null;
+    }
+  }
+
+  // Throttled: chamado apos mutacoes (criar pedido, fechar caixa, etc).
+  // Min 60s entre escritas pra nao martelar IO em rajadas de operacao.
+  var _localBackupTimer = null;
+  var LOCAL_BACKUP_MIN_INTERVAL = 60 * 1000;
+  function scheduleLocalBackup(reason) {
+    if (_localBackupTimer) return;
+    _localBackupTimer = setTimeout(function () {
+      _localBackupTimer = null;
+      var last = 0;
+      try { last = parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0; } catch (e) {}
+      if (Date.now() - last < LOCAL_BACKUP_MIN_INTERVAL) return;
+      localBackupToFile(reason || 'mutation').catch(function () {});
+    }, 5000);
+  }
+
   // ---- Multi-loja (Onda 6) ----
   // App pareado pode trocar de loja sem re-parear. Empresa fixa (vem
   // do pareamento original); só lojaId muda. Após trocar, força flush
@@ -712,6 +805,8 @@
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     listLojasDisponiveis, switchLoja,
     uploadBackup, maybeAutoBackup,
+    localBackupToFile, readLocalBackup, scheduleLocalBackup,
+    lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
