@@ -5,10 +5,41 @@
     var ctaText = ViewData["EmptyCta"] as string;
     var ctaHref = ViewData["EmptyCtaHref"] as string;
     var ctaModal = ViewData["EmptyCtaModal"] as string;
+    var illustration = ViewData["EmptyIllustration"] as string; // box | search | inbox | chart
 }
 
-<div class="text-center py-12 text-slate-400">
-    <div class="text-5xl mb-3">@icon</div>
+<div class="text-center py-12 text-slate-400 anim-fadeInUp">
+    @if (!string.IsNullOrEmpty(illustration))
+    {
+        <svg class="w-32 h-32 mx-auto mb-4 opacity-70" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            @switch (illustration)
+            {
+                case "search":
+                    <circle cx="52" cy="52" r="26" />
+                    <path d="M72 72l20 20" />
+                    <path d="M52 40v12M52 56h.01" />
+                    break;
+                case "inbox":
+                    <path d="M20 50l10-26h60l10 26v40H20V50z" />
+                    <path d="M20 50h22l6 10h24l6-10h22" />
+                    break;
+                case "chart":
+                    <path d="M16 96V24M16 96h88" />
+                    <path d="M32 80l16-20 14 8 22-30" />
+                    <circle cx="32" cy="80" r="2" /><circle cx="48" cy="60" r="2" />
+                    <circle cx="62" cy="68" r="2" /><circle cx="84" cy="38" r="2" />
+                    break;
+                default: /* box */
+                    <path d="M20 36l40-18 40 18v48L60 102 20 84V36z" />
+                    <path d="M20 36l40 18 40-18M60 54v48" />
+                    break;
+            }
+        </svg>
+    }
+    else
+    {
+        <div class="text-5xl mb-3">@icon</div>
+    }
     <p class="font-semibold text-slate-600">@title</p>
     @if (!string.IsNullOrEmpty(description))
     {

@@ -517,3 +517,31 @@ button:focus-visible {
 .popover-item.danger { color: var(--crit-600); }
 .popover-item.danger:hover { background: var(--crit-50); }
 .popover-divider { height: 1px; background: var(--border-soft); margin: 4px 0; }
+
+/* =========================================================================
+   TIER 3 — Microinterações
+   ========================================================================= */
+
+/* ---------- Bulk action bar (T3.6) ---------- */
+.bulk-bar {
+  position: sticky; bottom: 16px; z-index: 50;
+  display: inline-flex; align-items: center; gap: 12px;
+  background: var(--navy-800, #0a1f54); color: #fff;
+  padding: 10px 14px; border-radius: 14px;
+  box-shadow: 0 12px 32px -8px rgba(8,15,40,0.5);
+  animation: anim-fadeInUp 200ms var(--ease, cubic-bezier(.4,0,.2,1)) both;
+}
+.bulk-bar .bulk-count { font-weight: 700; font-size: 13.5px; }
+.bulk-bar .bulk-actions { display: inline-flex; gap: 6px; margin-left: 6px; }
+.bulk-bar .btn-ghost { color: #fff; }
+.bulk-bar .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+/* ---------- Page transitions (T3.5) ---------- */
+@supports (view-transition-name: a) {
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(.4,0,.2,1);
+  }
+}
+/* Fallback CSS-only para main content */
+.app-main > * { animation: anim-fadeInUp 240ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
