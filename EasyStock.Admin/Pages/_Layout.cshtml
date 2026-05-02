@@ -17,49 +17,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: ['class', '[data-theme="dark"]'],
-            theme: {
-                extend: {
-                    colors: {
-                        // Tokens DS (preferidos)
-                        navy:   { 900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E', 600: '#15388A', 500: '#1E48A8', 200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9' },
-                        orange: { 700: '#BF4307', 600: '#E85814', 500: '#F26B25', 400: '#F8884A', 200: '#FAC8AB', 100: '#FCDCC8', 50: '#FEEFE3' },
-                        // Aliases legacy (mantidos para não quebrar templates atuais)
-                        'es-bg':        '#111827',
-                        'es-surface':   '#172033',
-                        'es-surface-2': '#202b42',
-                        'es-card':      '#151f31',
-                        'es-accent':    '#F26B25',
-                        'es-accent-h':  '#E85814',
-                        'es-basil':     '#4fbf9f',
-                        'es-gold':      '#f0b84a',
-                        'es-cream':     '#f1dcc0',
-                        'es-ink':       '#f7f2e8',
-                        'es-ink-dim':   '#c8c1b4',
-                        'es-ink-mute':  '#8793a7',
-                    },
-                    fontFamily: {
-                        sans:    ['Inter', '-apple-system', 'sans-serif'],
-                        display: ['Fraunces', 'serif'],
-                        serif:   ['Fraunces', 'serif'],
-                        mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
     <style>
         [x-cloak] { display: none !important; }
         .sidebar-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; border-radius: 0.5rem; color: var(--es-ink-mute); transition: all 0.15s; }
         .sidebar-link:hover { color: var(--es-ink); background: var(--es-surface-2); }
         .sidebar-link.active { background: var(--es-accent); color: var(--es-ink); }
     </style>
-    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
 <body class="h-full bg-es-bg text-es-ink font-sans" x-data="adminApp()" x-init="init()">
 

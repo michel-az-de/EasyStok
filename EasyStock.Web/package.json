@@ -1,0 +1,14 @@
+{
+  "name": "easystock.web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EasyStock.Web — Tailwind build pipeline",
+  "scripts": {
+    "css:build": "tailwindcss -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.dist.css --minify",
+    "css:watch": "tailwindcss -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.dist.css --watch"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

@@ -1,12 +1,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
+# Node 20 LTS para gerar tailwind.dist.css.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY EasyStock.Admin/EasyStock.Admin.csproj EasyStock.Admin/
+COPY EasyStock.Admin/package.json EasyStock.Admin/
 RUN dotnet restore EasyStock.Admin/EasyStock.Admin.csproj
+RUN cd EasyStock.Admin && npm install --no-audit --no-fund
 
 COPY . .
 WORKDIR /src/EasyStock.Admin
-RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
+RUN npm run css:build
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false /p:SkipTailwind=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app

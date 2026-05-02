@@ -19,31 +19,12 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#6366F1',
-                        'primary-hover': '#4F46E5',
-                        'primary-light': '#EEF2FF',
-                        sidebar: '#0F172A',
-                        'sidebar-text': '#94A3B8',
-                        'sidebar-active': '#818CF8',
-                        surface: '#FFFFFF',
-                        border: '#E2E8F0'
-                    }
-                }
-            }
-        }
-    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
     <style>

@@ -11,4 +11,22 @@
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
   </ItemGroup>
 
+  <!-- Tailwind: gera wwwroot/css/tailwind.dist.css antes do build.
+       Inputs disparam rebuild quando config/CSS-fonte/views mudam.
+       Pula em CI quando SkipTailwind=true (Docker já compila no stage Node). -->
+  <ItemGroup>
+    <TailwindInputs Include="tailwind.config.js" />
+    <TailwindInputs Include="wwwroot/css/tailwind.src.css" />
+    <TailwindInputs Include="Views/**/*.cshtml" />
+    <TailwindInputs Include="wwwroot/js/**/*.js" />
+  </ItemGroup>
+  <Target Name="TailwindInstall" BeforeTargets="TailwindBuild" Condition="!Exists('node_modules') AND '$(SkipTailwind)' != 'true'">
+    <Message Text="Installing npm dependencies for Tailwind..." Importance="high" />
+    <Exec Command="npm install --no-audit --no-fund" />
+  </Target>
+  <Target Name="TailwindBuild" BeforeTargets="BeforeBuild" Inputs="@(TailwindInputs)" Outputs="wwwroot/css/tailwind.dist.css" Condition="'$(SkipTailwind)' != 'true'">
+    <Message Text="Building Tailwind CSS..." Importance="high" />
+    <Exec Command="npm run css:build" />
+  </Target>
+
 </Project>

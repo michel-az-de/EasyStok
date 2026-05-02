@@ -12,6 +12,11 @@ appsettings.*.local.json
 .env.*
 !.env.example
 
+# Node / Tailwind build artifacts (gerados em build, não versionados)
+node_modules/
+**/wwwroot/css/tailwind.dist.css
+package-lock.json
+
 # User-specific files
 *.rsuser
 *.suo
