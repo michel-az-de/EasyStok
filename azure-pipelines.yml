@@ -156,8 +156,35 @@ stages:
     dependsOn: Build
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
+      - job: MigrateDatabase
+        displayName: "EF Core: aplicar migrations antes do deploy"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs:
+              packageType: sdk
+              version: $(dotnetVersion)
+          - script: |
+              set -euo pipefail
+              dotnet tool install --global dotnet-ef --version 9.*
+              echo "##vso[task.prependpath]$HOME/.dotnet/tools"
+            displayName: "Instalar dotnet-ef"
+          - script: |
+              set -euo pipefail
+              export ConnectionStrings__DefaultConnection="$(azurePgConnectionString)"
+              dotnet ef database update \
+                --project EasyStock.Infra.Postgre/EasyStock.Infra.Postgre.csproj \
+                --startup-project EasyStock.Api/EasyStock.Api.csproj \
+                --configuration $(buildConfiguration)
+            displayName: "Aplicar migrations no Azure PostgreSQL"
+            env:
+              ASPNETCORE_ENVIRONMENT: Production
+
       - deployment: DeployToAKS
         displayName: "Deploy EasyStock API no AKS"
+        dependsOn: MigrateDatabase
         environment: "production"
         pool:
           vmImage: "ubuntu-latest"
