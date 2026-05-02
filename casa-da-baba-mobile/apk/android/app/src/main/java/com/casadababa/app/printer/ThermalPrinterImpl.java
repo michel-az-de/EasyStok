@@ -26,7 +26,8 @@ public class ThermalPrinterImpl {
 
     public boolean isConnected() {
         BluetoothSocket s = socket;
-        return s != null && s.isConnected();
+        OutputStream o = out;
+        return s != null && o != null && s.isConnected();
     }
 
     public void connect(final BluetoothDevice device, final UUID sppUuid, final ResultCallback cb) {
@@ -90,6 +91,12 @@ public class ThermalPrinterImpl {
                     o.flush();
                     cb.onSuccess();
                 } catch (IOException ex) {
+                    // Socket morto (broken pipe / EPIPE acontece quando a impressora
+                    // saiu de alcance, entrou em idle ou foi desligada). Fecha o
+                    // socket zumbi pra forçar reconnect na próxima chamada — sem
+                    // isso, isConnected() continua mentindo "true" e todo write
+                    // falha igual ate o app ser reaberto.
+                    closeQuietly();
                     cb.onError("Falha ao enviar: " + ex.getMessage());
                 }
             }

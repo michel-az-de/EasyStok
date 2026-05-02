@@ -14567,12 +14567,61 @@ function printViaBluetooth(bytes, onFallback) {
       // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
       try { bs.disconnect(function () {}, function () {}); } catch (_) {}
     }, 15000);
-    const send = () => {
-      btStep('print:send-write');
+    // Erros de socket morto (printer saiu de range, entrou em idle, foi
+    // desligada): broken pipe, EPIPE, "not connected", "closed". Nesses
+    // casos a unica saida e fechar o socket e refazer o pareamento SPP.
+    const isStaleSocketErr = (msg) => {
+      const m = String(msg || '').toLowerCase();
+      return m.includes('broken pipe') || m.includes('epipe')
+          || m.includes('not connected') || m.includes('closed')
+          || m.includes('socket') || m.includes('connection reset');
+    };
+    const reconnectAndRetry = () => {
+      btStep('print:reconnect-retry');
+      try {
+        bs.disconnect(
+          () => {
+            bs.connect(printer.address,
+              () => { btStep('print:reconnected'); rawWrite(false); },
+              (err) => {
+                btStep('print:reconnect-err ' + (err && err.message || err));
+                showToast('Não reconectou: ' + (err && err.message || err));
+                releasePrinting();
+              }
+            );
+          },
+          () => {
+            bs.connect(printer.address,
+              () => { btStep('print:reconnected-nodc'); rawWrite(false); },
+              (err) => {
+                btStep('print:reconnect-err2 ' + (err && err.message || err));
+                showToast('Não reconectou: ' + (err && err.message || err));
+                releasePrinting();
+              }
+            );
+          }
+        );
+      } catch (ex) {
+        btStep('print:reconnect-throw ' + (ex.message || ex));
+        showToast('Erro reconectar: ' + (ex.message || ex));
+        releasePrinting();
+      }
+    };
+    const rawWrite = (canRetry) => {
+      btStep('print:send-write retry=' + !canRetry);
       try {
         bs.write(bytes,
           () => { btStep('print:write-ok'); showToast('Enviado pra impressora'); releasePrinting(); },
-          (err) => { btStep('print:write-err ' + (err && err.message || err)); showToast('Erro imprimir: ' + (err && err.message || err)); releasePrinting(); }
+          (err) => {
+            const msg = (err && err.message) || err;
+            btStep('print:write-err ' + msg);
+            if (canRetry && isStaleSocketErr(msg)) {
+              reconnectAndRetry();
+              return;
+            }
+            showToast('Erro imprimir: ' + msg);
+            releasePrinting();
+          }
         );
       } catch (ex) {
         btStep('print:write-throw ' + (ex.message || ex));
@@ -14581,6 +14630,7 @@ function printViaBluetooth(bytes, onFallback) {
         if (typeof onFallback === 'function') onFallback();
       }
     };
+    const send = () => rawWrite(true);
     btStep('print:isConnected-call addr=' + printer.address);
     try {
       bs.isConnected(
