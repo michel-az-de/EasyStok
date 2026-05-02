@@ -9,6 +9,7 @@ using EasyStock.Application.UseCases.ReativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Application.UseCases.Pedido;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -42,10 +43,23 @@ public class FornecedorControllerTests
         var criarPedido = new CriarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _fornecedorRepository, _unitOfWork, Substitute.For<ILogger<CriarPedidoFornecedorUseCase>>());
         var receberPedido = new ReceberPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<ReceberPedidoFornecedorUseCase>>());
         var cancelarPedido = new CancelarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CancelarPedidoFornecedorUseCase>>());
+        var entradaUseCase = new RegistrarEntradaEstoqueUseCase(
+            Substitute.For<IProdutoRepository>(),
+            Substitute.For<IProdutoVariacaoRepository>(),
+            Substitute.For<IItemEstoqueRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(),
+            _unitOfWork,
+            Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>());
+        var processarRecebimento = new ProcessarRecebimentoPedidoFornecedorUseCase(
+            _pedidoFornecedorRepository,
+            Substitute.For<IPedidoFornecedorItemRepository>(),
+            entradaUseCase,
+            _unitOfWork,
+            Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>());
         var alteracoes = new EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor.ObterHistoricoAlteracoesFornecedorUseCase(_fornecedorRepository);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new FornecedorController(criar, atualizar, desativar, reativar, listar, detalhe, historico, estatisticas, pedidosAbertos, criarPedido, receberPedido, cancelarPedido, alteracoes, _currentUser);
+        _controller = new FornecedorController(criar, atualizar, desativar, reativar, listar, detalhe, historico, estatisticas, pedidosAbertos, criarPedido, receberPedido, cancelarPedido, processarRecebimento, alteracoes, _currentUser);
     }
 
     [Fact]
