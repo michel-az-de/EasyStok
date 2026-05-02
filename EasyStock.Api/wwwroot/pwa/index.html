@@ -4088,22 +4088,41 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 [data-screen="producao"] .prod-screen-summary .ps-items {
   max-width: min(58vw, 260px);
 }
+/*
+ * BUG FIX 02/05/2026 (segunda iteracao): position:sticky NAO funcionava porque
+ * o .content (scroll container) tem padding-bottom:140px, entao "bottom:76px"
+ * grudava 76px acima do FUNDO DO CONTENT-BOX, que ja estava 140px acima do
+ * final visivel da tela. Resultado: cta-row aparecia a ~216px do bottom = MEIO
+ * da tela, sobreposta a cards no meio da lista (screenshots do Felipe).
+ *
+ * Solucao definitiva: position:fixed (relativo ao viewport, sempre 76px do
+ * fundo REAL da tela, em cima do tab bar). Como o pai data-screen="producao"
+ * fica display:none quando inativo, a cta-row fixed tambem some — isso
+ * funciona porque display:none cascateia para filhos fixed.
+ */
 [data-screen="producao"] .cta-row {
-  position: sticky;
+  position: fixed;
+  left: 22px;
+  right: 22px;
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   z-index: 8;
-  margin: 14px -2px 0;
-  padding: 10px 2px;
-  /* Background OPACO — antes era gradiente translucido que deixava cards
-     passarem por tras (bug visual: ver screenshot do Felipe em 02/05/2026
-     onde 'Lasanha Bolonhesa' aparecia atras dos botoes Limpar/Registrar). */
+  margin: 0;
+  padding: 10px 0;
   background: var(--bg);
   border-top: 1px solid var(--border, rgba(0,0,0,0.06));
+  /* Sombra superior sutil pra criar separacao visual entre lista e action bar
+     mesmo quando o usuario rola — assim fica claro que e uma area sticky. */
+  box-shadow: 0 -8px 16px -8px rgba(0,0,0,0.18);
 }
-/* Garante que os ultimos cards do grid nao fiquem atras da cta-row sticky.
-   Soma altura da cta-row (~64px) + offset bottom dela (76 + safe-area). */
-[data-screen="producao"] .producao-tab-section[data-ptab="catalogo"] .product-grid {
-  padding-bottom: calc(64px + 76px + env(safe-area-inset-bottom, 0px));
+/* Garante respiro pros ultimos cards: tab bar (76) + cta-row (~64) +
+   safe-area + folga (24). Sem isso o ultimo card fica COBERTO pela
+   action bar fixed, impossivel de tocar/editar. */
+[data-screen="producao"] .producao-tab-section[data-ptab="catalogo"] {
+  padding-bottom: calc(76px + 64px + 24px + env(safe-area-inset-bottom, 0px));
+}
+/* Aba "Lotes" nao tem cta-row — sem padding extra. */
+[data-screen="producao"] .producao-tab-section[data-ptab="lotes"] .cta-row {
+  display: none;
 }
 .batch-tools {
   display: grid;
