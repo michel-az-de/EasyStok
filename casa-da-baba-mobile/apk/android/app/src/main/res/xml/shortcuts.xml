@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App Shortcuts (Android 7.1+ / API 25+).
+    Long-press no icone do app no launcher mostra estes 3 atalhos
+    diretos pra acoes mais usadas na cozinha. Cada atalho dispara um
+    deep link cdb://* que e tratado pelo listener appUrlOpen no JS
+    (ver pwa/index.html — bloco "Deep linking handler").
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="new_order"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_order_short"
+        android:shortcutLongLabel="@string/shortcut_new_order_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.casadababa.app"
+            android:targetClass="com.casadababa.app.MainActivity"
+            android:data="cdb://orders/new" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="cash"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_cash_short"
+        android:shortcutLongLabel="@string/shortcut_cash_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.casadababa.app"
+            android:targetClass="com.casadababa.app.MainActivity"
+            android:data="cdb://cash" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scan_short"
+        android:shortcutLongLabel="@string/shortcut_scan_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.casadababa.app"
+            android:targetClass="com.casadababa.app.MainActivity"
+            android:data="cdb://scan" />
+    </shortcut>
+
+</shortcuts>

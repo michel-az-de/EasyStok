@@ -22,6 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep linking: cdb://orders/new, cdb://cash, cdb://scan, etc.
+                 Usado pelos App Shortcuts (long-press no icone) e por
+                 chamadas externas (adb am start, links no WhatsApp, etc). -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cdb" />
+            </intent-filter>
+
+            <!-- App Shortcuts (Android 7.1+): long-press no icone do app
+                 mostra atalhos diretos. Os 3 atalhos mais usados na cozinha. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <provider

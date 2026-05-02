@@ -10,7 +10,9 @@
     "sync": "cap sync android",
     "build-debug": "cd android && gradlew.bat assembleDebug && cd ..",
     "build-release": "cd android && gradlew.bat assembleRelease && cd ..",
-    "full": "npm run copy-web && npm run sync && npm run build-debug"
+    "full": "npm run copy-web && npm run sync && npm run build-debug",
+    "test": "node tests/run.js",
+    "pretest": "npm run copy-web"
   },
   "dependencies": {
     "@capacitor-community/file-opener": "^6.0.0",

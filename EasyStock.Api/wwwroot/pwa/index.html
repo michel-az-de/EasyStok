@@ -4093,8 +4093,17 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   z-index: 8;
   margin: 14px -2px 0;
-  padding: 8px 2px 2px;
-  background: linear-gradient(180deg, transparent, var(--bg) 28%);
+  padding: 10px 2px;
+  /* Background OPACO — antes era gradiente translucido que deixava cards
+     passarem por tras (bug visual: ver screenshot do Felipe em 02/05/2026
+     onde 'Lasanha Bolonhesa' aparecia atras dos botoes Limpar/Registrar). */
+  background: var(--bg);
+  border-top: 1px solid var(--border, rgba(0,0,0,0.06));
+}
+/* Garante que os ultimos cards do grid nao fiquem atras da cta-row sticky.
+   Soma altura da cta-row (~64px) + offset bottom dela (76 + safe-area). */
+[data-screen="producao"] .producao-tab-section[data-ptab="catalogo"] .product-grid {
+  padding-bottom: calc(64px + 76px + env(safe-area-inset-bottom, 0px));
 }
 .batch-tools {
   display: grid;
@@ -5782,14 +5791,8 @@ select:focus-visible {
   border-radius: 14px;
   box-shadow: none;
 }
-[data-screen="producao"] .cta-row {
-  position: sticky;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  z-index: 8;
-  margin: 14px -2px 0;
-  padding: 8px 2px 2px;
-  background: linear-gradient(180deg, transparent, var(--bg) 28%);
-}
+/* Regra original duplicada removida — ver bloco consolidado em ~L4091
+   (background opaco + padding-bottom no product-grid). */
 .batch-card-head .bc-lote .u-status {
   font-family: inherit;
   letter-spacing: 0.04em;
@@ -6150,6 +6153,20 @@ body.ux-calm [data-screen="producao"] .section-label {
   .shop-add-row,
   .shop-toolbar {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Acessibilidade: respeita preferencia do sistema pra reduzir animacoes
+   (Android > Configuracoes > Acessibilidade > Remover animacoes; iOS >
+   Acessibilidade > Movimento > Reduzir movimento). Usuarios com sensibilidade
+   vestibular ou processamento sensorial recebem o app sem motion. Usa
+   !important pra sobrescrever transicoes inline e de classes especificas. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 </style>
@@ -6708,20 +6725,20 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
       <label class="modal-label">Medida</label>
       <div class="input-box"><input id="newProdUnit" placeholder="ex: 300g, 250ml, unidade"></div>
-      <label class="modal-label">Ícone</label>
-      <div class="emoji-grid" id="emojiGrid">
-        <button class="emoji-pick active">🍝</button>
-        <button class="emoji-pick">🥟</button>
-        <button class="emoji-pick">🍲</button>
-        <button class="emoji-pick">🥔</button>
-        <button class="emoji-pick">🌿</button>
-        <button class="emoji-pick">🧄</button>
-        <button class="emoji-pick">🧀</button>
-        <button class="emoji-pick">🍋</button>
-        <button class="emoji-pick">🍅</button>
-        <button class="emoji-pick">🥛</button>
-        <button class="emoji-pick">🥩</button>
-        <button class="emoji-pick">🍄</button>
+      <label class="modal-label" id="emojiGridLabel">Ícone</label>
+      <div class="emoji-grid" id="emojiGrid" role="radiogroup" aria-labelledby="emojiGridLabel">
+        <button class="emoji-pick active" role="radio" aria-checked="true" aria-label="Massa">🍝</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Recheado">🥟</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Caldo ou sopa">🍲</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Tubérculo">🥔</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Erva fresca">🌿</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Alho ou tempero">🧄</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Queijo">🧀</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Limão ou cítrico">🍋</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Tomate ou molho">🍅</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Bebida">🥛</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Carne">🥩</button>
+        <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Cogumelo">🍄</button>
       </div>
       <label class="modal-label">Preço</label>
       <div class="price-row">
@@ -7001,6 +7018,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="ajustes-actions-stack">
           <button class="btn-ajustes-printer" onclick="exportBackup()">Exportar backup (JSON)</button>
           <button class="btn-ajustes-printer" onclick="document.getElementById('backupFileInput').click()">Restaurar de arquivo</button>
+          <button class="btn-ajustes-printer" onclick="restoreFromPublicStorage()" id="restorePublicBtn" style="display:none">Restaurar do celular (auto)</button>
           <input type="file" id="backupFileInput" accept="application/json,.json" style="display:none" onchange="importBackup(event)" />
         </div>
       </div>
@@ -8062,9 +8080,38 @@ async function maybeOfferLocalRestore() {
     } catch (e) {}
     if (hasData) return;
 
-    // Sem cdbSync ou plugin Filesystem (browser): nada a fazer
+    // Sem cdbSync (browser puro fora do APK): nada a fazer
     if (!window.cdbSync || typeof window.cdbSync.readLocalBackup !== 'function') return;
     var backup = await window.cdbSync.readLocalBackup();
+
+    // Auto-read falhou (Android 11+ pos-reinstall, app perdeu ownership do
+    // MediaStore). Oferece SAF picker pro user selecionar o arquivo.
+    if ((!backup || !backup.data) && typeof window.cdbSync.pickBackupViaSAF === 'function'
+        && window.cdbSync.hasPublicBackupPlugin && window.cdbSync.hasPublicBackupPlugin()) {
+      var ofereceuSAF = confirm(
+        'Bem-vindo de volta!\n\n'
+        + 'Parece que voce reinstalou o app. Tem um arquivo de backup salvo no '
+        + 'celular (em Documentos/casa-da-baba ou Downloads).\n\n'
+        + 'Quer selecionar o arquivo backup-latest.json pra restaurar seus dados?'
+      );
+      if (!ofereceuSAF) return;
+      var picked = await window.cdbSync.pickBackupViaSAF();
+      if (!picked) return;
+      if (picked.kind === 'export' && picked.payload && typeof applyBackupPayload === 'function') {
+        // Formato do exportBackup manual: tem .state estruturado.
+        applyBackupPayload(picked.payload);
+        try {
+          localStorage.setItem('cdb-restore-source', 'saf-export-' + (picked.filename || ''));
+          localStorage.setItem('cdb-restore-at', String(Date.now()));
+        } catch (e) {}
+        alert('Dados restaurados de ' + (picked.filename || 'arquivo') + ' · recarregando...');
+        setTimeout(function () { location.reload(); }, 600);
+        return;
+      }
+      // kind === 'snapshot' (auto-backup-v1): cai no fluxo normal abaixo
+      backup = picked.payload;
+    }
+
     if (!backup || !backup.data) return;
 
     var capturedAt = backup.capturedAt ? new Date(backup.capturedAt).toLocaleString('pt-BR') : '?';
@@ -8114,7 +8161,65 @@ async function maybeOfferLocalRestore() {
 // estabilizar e o cdbSync (que carrega Filesystem plugin) ficar pronto.
 document.addEventListener('DOMContentLoaded', function () {
   setTimeout(maybeOfferLocalRestore, 1500);
+  // Mostra o botao "Restaurar do celular (auto)" em Ajustes apenas se o
+  // plugin custom PublicBackup estiver presente (APK Capacitor moderno).
+  // Em browser ou APK antigo, o botao fica escondido pra nao confundir.
+  setTimeout(function () {
+    try {
+      var btn = document.getElementById('restorePublicBtn');
+      if (btn && window.cdbSync && window.cdbSync.hasPublicBackupPlugin && window.cdbSync.hasPublicBackupPlugin()) {
+        btn.style.display = '';
+      }
+    } catch (e) {}
+  }, 2000);
 });
+
+// Restauracao manual via Ajustes: usa SAF picker pra user selecionar
+// o backup-latest.json em Documentos/casa-da-baba ou Downloads. Usa
+// applyBackupPayload (export manual) ou aplica snapshot direto (auto).
+async function restoreFromPublicStorage() {
+  try {
+    if (!window.cdbSync || typeof window.cdbSync.pickBackupViaSAF !== 'function') {
+      alert('Recurso indisponivel nesta versao do app.');
+      return;
+    }
+    var picked = await window.cdbSync.pickBackupViaSAF();
+    if (!picked) {
+      showToast && showToast('Nenhum arquivo selecionado');
+      return;
+    }
+    if (picked.kind === 'export' && typeof applyBackupPayload === 'function') {
+      if (!confirm('Restaurar dados do arquivo "' + (picked.filename || 'backup') + '"?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
+      applyBackupPayload(picked.payload);
+      try {
+        localStorage.setItem('cdb-restore-source', 'manual-saf-export');
+        localStorage.setItem('cdb-restore-at', String(Date.now()));
+      } catch (e) {}
+      alert('Backup restaurado · recarregando...');
+      setTimeout(function () { location.reload(); }, 600);
+      return;
+    }
+    if (picked.kind === 'snapshot' && picked.payload && picked.payload.data) {
+      if (!confirm('Restaurar snapshot automatico de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
+      var snap = picked.payload.data;
+      Object.keys(snap).forEach(function (k) {
+        if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
+        try { localStorage.setItem(k, snap[k]); } catch (e) {}
+      });
+      try {
+        localStorage.setItem('cdb-restore-source', 'manual-saf-snapshot');
+        localStorage.setItem('cdb-restore-at', String(Date.now()));
+      } catch (e) {}
+      alert('Snapshot restaurado · recarregando...');
+      setTimeout(function () { location.reload(); }, 600);
+      return;
+    }
+    alert('Arquivo nao reconhecido como backup do app.');
+  } catch (e) {
+    console.error('[restoreFromPublicStorage]', e);
+    alert('Erro ao restaurar: ' + (e && e.message || e));
+  }
+}
 
 // =========================
 // BACKUP / RESTAURAÇÃO
@@ -10905,8 +11010,8 @@ function renderCashDetails() {
       const color = e.type === 'expense' ? 'var(--accent)' : 'var(--basil)';
       const time = new Date(e.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
       const acoes = closed ? ''
-        : `<button class="fin-action" onclick="openCashModal('${e.id}')">✏️</button>
-           <button class="fin-action danger" onclick="deleteCashEntry('${e.id}')">🗑️</button>`;
+        : `<button class="fin-action" onclick="openCashModal('${e.id}')" aria-label="Editar lançamento" title="Editar">✏️</button>
+           <button class="fin-action danger" onclick="deleteCashEntry('${e.id}')" aria-label="Excluir lançamento" title="Excluir">🗑️</button>`;
       return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700">${escapeHtml(e.description)}</div>
@@ -12016,8 +12121,8 @@ function renderCatalogList() {
     ].filter(Boolean).join(' · ');
     const archivedTag = p.archived ? ' <span style="color:#e87a7a">(arquivado)</span>' : '';
     const archiveBtn = p.archived
-      ? `<button class="cat-btn" title="Restaurar" onclick="restoreProduct('${p.id}')">↺</button>`
-      : `<button class="cat-btn danger" title="Arquivar" onclick="archiveProduct('${p.id}')">🗑️</button>`;
+      ? `<button class="cat-btn" title="Restaurar" aria-label="Restaurar produto ${escapeHtml(p.name)}" onclick="restoreProduct('${p.id}')">↺</button>`
+      : `<button class="cat-btn danger" title="Arquivar" aria-label="Arquivar produto ${escapeHtml(p.name)}" onclick="archiveProduct('${p.id}')">🗑️</button>`;
     return `
       <div class="cat-row">
         <div class="cat-emoji">${p.emoji || '📦'}</div>
@@ -12026,7 +12131,7 @@ function renderCatalogList() {
           <div class="cat-meta">${escapeHtml(meta)}</div>
         </div>
         <div class="cat-actions">
-          <button class="cat-btn" title="Editar" onclick="closeAjustes(); openProductModalForEdit('${p.id}')">✏️</button>
+          <button class="cat-btn" title="Editar" aria-label="Editar produto ${escapeHtml(p.name)}" onclick="closeAjustes(); openProductModalForEdit('${p.id}')">✏️</button>
           ${archiveBtn}
         </div>
       </div>
@@ -16339,10 +16444,10 @@ function renderOrderItems() {
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
       </div>
-      <div class="qty-stepper">
-        <button onclick="changeItemQty(${idx}, -1)">−</button>
-        <div class="q">${it.qty}</div>
-        <button onclick="changeItemQty(${idx}, 1)">+</button>
+      <div class="qty-stepper" role="group" aria-label="Ajustar quantidade de ${escapeHtml(it.name)}">
+        <button onclick="changeItemQty(${idx}, -1)" aria-label="Diminuir quantidade">−</button>
+        <div class="q" aria-live="polite">${it.qty}</div>
+        <button onclick="changeItemQty(${idx}, 1)" aria-label="Aumentar quantidade">+</button>
       </div>
       <button class="remove" onclick="removeItem(${idx})" aria-label="Remover">&times;</button>
     `;
@@ -17171,6 +17276,90 @@ window.cdbApp = {
       console.log('[LiveUpdater] noNeedUpdate (ja na versao mais nova)');
     });
   } catch (e) { /* nao-Capacitor — ignora */ }
+})();
+
+// ================================================================
+// DEEP LINKING — handler de cdb://*
+// Disparado pelos App Shortcuts (long-press no icone) e por chamadas
+// externas (adb am start, links em apps de mensagem). Mapeamento:
+//   cdb://orders/new   → tela Pedidos, aba Novo
+//   cdb://orders/<id>  → tela Pedidos, aba Andamento (foco no pedido)
+//   cdb://cash         → tela Caixa
+//   cdb://scan         → tela Conferencia (scanner ativo)
+//   cdb://producao     → tela Producao
+//   cdb://home         → tela Home (default)
+// ================================================================
+(function setupDeepLinking() {
+  function route(url) {
+    if (!url) return;
+    try {
+      // Aceita "cdb://orders/new" e tambem "cdb:orders/new" (variantes
+      // que alguns launchers/apps geram). Normaliza removendo o esquema.
+      var path = String(url).replace(/^cdb:(\/\/)?/, '');
+      var parts = path.split('?')[0].split('/').filter(Boolean);
+      var head = (parts[0] || 'home').toLowerCase();
+
+      console.log('[deeplink]', url, '→', head, parts.slice(1));
+
+      switch (head) {
+        case 'orders':
+        case 'pedidos':
+          if (typeof go === 'function') go('pedidos');
+          if (parts[1] === 'new' || parts[1] === 'novo') {
+            if (typeof goPedidosTab === 'function') setTimeout(function () { goPedidosTab('novo'); }, 100);
+          }
+          break;
+        case 'cash':
+        case 'caixa':
+          if (typeof go === 'function') go('caixa');
+          break;
+        case 'scan':
+        case 'conferencia':
+        case 'conferir':
+          if (typeof go === 'function') go('conferencia');
+          break;
+        case 'producao':
+        case 'production':
+          if (typeof go === 'function') go('producao');
+          break;
+        case 'home':
+        default:
+          if (typeof go === 'function') go('home');
+      }
+    } catch (e) {
+      console.warn('[deeplink] erro:', e);
+    }
+  }
+
+  // Capacitor App plugin emite 'appUrlOpen' quando o app eh aberto via
+  // intent VIEW (cdb://...). Em browser puro, nao acontece — sem efeito.
+  function attachListener() {
+    try {
+      var App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+      if (!App || typeof App.addListener !== 'function') return false;
+      App.addListener('appUrlOpen', function (event) {
+        if (event && event.url) route(event.url);
+      });
+      // Tambem checa launch URL (caso o app tenha sido ABERTO por deep link
+      // do estado morto — appUrlOpen so dispara em re-abertura).
+      if (typeof App.getLaunchUrl === 'function') {
+        App.getLaunchUrl().then(function (res) {
+          if (res && res.url) route(res.url);
+        }).catch(function () {});
+      }
+      console.log('[deeplink] listener instalado');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  if (!attachListener()) {
+    document.addEventListener('deviceready', attachListener, false);
+    document.addEventListener('DOMContentLoaded', attachListener, false);
+    setTimeout(attachListener, 800);
+    setTimeout(attachListener, 2500);
+  }
 })();
 
 // Forca checagem manual de update (botao Ajustes > Verificar atualizacoes).

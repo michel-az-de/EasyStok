@@ -4,4 +4,12 @@
     <string name="title_activity_main">Casa da Baba</string>
     <string name="package_name">com.casadababa.app</string>
     <string name="custom_url_scheme">com.casadababa.app</string>
+
+    <!-- App Shortcuts (long-press no icone) -->
+    <string name="shortcut_new_order_short">Pedido</string>
+    <string name="shortcut_new_order_long">Novo pedido</string>
+    <string name="shortcut_cash_short">Caixa</string>
+    <string name="shortcut_cash_long">Abrir caixa</string>
+    <string name="shortcut_scan_short">Scanner</string>
+    <string name="shortcut_scan_long">Conferir codigo de barras</string>
 </resources>

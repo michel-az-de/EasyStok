@@ -445,57 +445,164 @@
     } catch (e) { return null; }
   }
 
-  async function localBackupToFile(note) {
-    var FS = _getFilesystemPlugin();
-    if (!FS) return { ok: false, reason: 'filesystem-unavailable' };
+  // Plugin custom (Java) que escreve em MediaStore Documents/Downloads
+  // PUBLICOS — sobrevive uninstall do app. Em ultima instancia, oferece
+  // SAF picker pro user selecionar arquivo manualmente.
+  function _getPublicBackupPlugin() {
     try {
-      var snap = _collectSnapshot();
-      var payload = {
-        schema: 'cdb-backup-v1',
-        capturedAt: Date.now(),
-        capturedAtIso: new Date().toISOString(),
-        deviceId: deviceId,
-        bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
-        operatorName: (window.cdbApp && window.cdbApp.getOperator)
-          ? window.cdbApp.getOperator()
-          : null,
-        note: note || 'auto',
-        data: snap
-      };
-      var json = JSON.stringify(payload);
-      var res = await FS.writeFile({
-        path: LOCAL_BACKUP_FILE,
-        data: json,
-        directory: 'DOCUMENTS',
-        encoding: 'utf8',
-        recursive: true
-      });
-      try { localStorage.setItem(LAST_LOCAL_BACKUP_KEY, String(Date.now())); } catch (e) {}
-      console.log('[localBackup] gravou em', res && res.uri);
-      return { ok: true, uri: res && res.uri };
-    } catch (e) {
-      console.warn('[localBackup] falhou:', e && e.message);
-      return { ok: false, reason: (e && e.message) || 'erro' };
+      var Cap = window.Capacitor;
+      if (!Cap || !Cap.Plugins) return null;
+      return Cap.Plugins.PublicBackup || null;
+    } catch (e) { return null; }
+  }
+
+  function _buildBackupPayload(note) {
+    return {
+      schema: 'cdb-backup-v1',
+      capturedAt: Date.now(),
+      capturedAtIso: new Date().toISOString(),
+      deviceId: deviceId,
+      bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
+      operatorName: (window.cdbApp && window.cdbApp.getOperator)
+        ? window.cdbApp.getOperator()
+        : null,
+      note: note || 'auto',
+      data: _collectSnapshot()
+    };
+  }
+
+  async function localBackupToFile(note) {
+    var json = JSON.stringify(_buildBackupPayload(note));
+    var anyOk = false;
+    var details = { publicUris: null, scopedUri: null };
+
+    // CAMINHO 1 (PRIORITARIO): MediaStore publico via plugin custom.
+    // Sobrevive uninstall — esse e o ponto crucial.
+    var PB = _getPublicBackupPlugin();
+    if (PB) {
+      try {
+        var pubRes = await PB.writePublicBackup({
+          filename: 'backup-latest.json',
+          json: json
+        });
+        details.publicUris = {
+          documents: pubRes && pubRes.documentsUri,
+          downloads: pubRes && pubRes.downloadsUri
+        };
+        anyOk = true;
+        console.log('[localBackup] publico OK', details.publicUris);
+      } catch (e) {
+        console.warn('[localBackup] publico falhou:', e && e.message);
+      }
     }
+
+    // CAMINHO 2 (defensa em profundidade): Filesystem scoped do app.
+    // NAO sobrevive uninstall, mas protege contra crash do WebView, limpeza
+    // de cache, etc. Roda mesmo se o plugin custom estiver fora do APK
+    // (compatibilidade com versoes antigas).
+    var FS = _getFilesystemPlugin();
+    if (FS) {
+      try {
+        var res = await FS.writeFile({
+          path: LOCAL_BACKUP_FILE,
+          data: json,
+          directory: 'DOCUMENTS',
+          encoding: 'utf8',
+          recursive: true
+        });
+        details.scopedUri = res && res.uri;
+        anyOk = true;
+      } catch (e) {
+        console.warn('[localBackup] scoped falhou:', e && e.message);
+      }
+    }
+
+    if (anyOk) {
+      try { localStorage.setItem(LAST_LOCAL_BACKUP_KEY, String(Date.now())); } catch (e) {}
+      return { ok: true, details: details };
+    }
+    return { ok: false, reason: 'no-storage-available' };
   }
 
   // Le backup local existente. Retorna o JSON parseado ou null.
   // Usado no boot pra detectar reinstalacao + oferecer restore.
+  // Tenta MediaStore publico primeiro (sobrevive uninstall), fallback Filesystem.
   async function readLocalBackup() {
+    // CAMINHO 1: MediaStore publico — funciona se mesmo install, e em alguns
+    // OEMs Android tambem apos reinstall (depende do MediaStore preservar
+    // entries do uninstall).
+    var PB = _getPublicBackupPlugin();
+    if (PB) {
+      try {
+        var res = await PB.readPublicBackup({ filename: 'backup-latest.json' });
+        if (res && res.found && res.content) {
+          var parsed = JSON.parse(res.content);
+          if (parsed && parsed.schema === 'cdb-backup-v1' && parsed.data) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('[readLocalBackup] publico falhou:', e && e.message);
+      }
+    }
+
+    // CAMINHO 2: scoped storage — pode nao existir apos reinstall em Android 11+,
+    // mas funciona pra recovery de crash do WebView no mesmo install.
     var FS = _getFilesystemPlugin();
-    if (!FS) return null;
+    if (FS) {
+      try {
+        var res2 = await FS.readFile({
+          path: LOCAL_BACKUP_FILE,
+          directory: 'DOCUMENTS',
+          encoding: 'utf8'
+        });
+        if (res2 && res2.data) {
+          var parsed2 = JSON.parse(res2.data);
+          if (parsed2 && parsed2.schema === 'cdb-backup-v1' && parsed2.data) {
+            return parsed2;
+          }
+        }
+      } catch (e) {
+        // Silencioso — arquivo nao existe.
+      }
+    }
+    return null;
+  }
+
+  // ULTIMA LINHA DE DEFESA: SAF picker. Em Android 11+ apos reinstall, o
+  // app perde ownership dos arquivos publicos que ele criou. SAF deixa o
+  // user selecionar manualmente o arquivo (`backup-latest.json` ou backup
+  // exportado mais antigo) e o sistema concede acesso temporario.
+  async function pickBackupViaSAF() {
+    var PB = _getPublicBackupPlugin();
+    if (!PB) return null;
     try {
-      var res = await FS.readFile({
-        path: LOCAL_BACKUP_FILE,
-        directory: 'DOCUMENTS',
-        encoding: 'utf8'
-      });
-      if (!res || !res.data) return null;
-      var parsed = JSON.parse(res.data);
-      if (!parsed || parsed.schema !== 'cdb-backup-v1' || !parsed.data) return null;
-      return parsed;
+      var res = await PB.pickBackupFile();
+      if (!res || res.cancelled || !res.content) return null;
+      var parsed = JSON.parse(res.content);
+      // Aceita 2 formatos: cdb-backup-v1 (auto) e o do exportBackup manual
+      // (que tem .state e .localStorage). Devolve normalizado pra
+      // applySnapshot saber o que fazer.
+      if (parsed && parsed.schema === 'cdb-backup-v1' && parsed.data) {
+        return { kind: 'snapshot', filename: res.filename, payload: parsed };
+      }
+      if (parsed && parsed.appId === 'casa-da-baba' && parsed.state) {
+        return { kind: 'export', filename: res.filename, payload: parsed };
+      }
+      // Fallback: aceita objeto plano de chaves cdb-* (snapshot direto)
+      if (parsed && typeof parsed === 'object') {
+        var keys = Object.keys(parsed);
+        if (keys.some(function (k) { return k.indexOf('cdb-') === 0; })) {
+          return {
+            kind: 'snapshot',
+            filename: res.filename,
+            payload: { schema: 'cdb-backup-v1', data: parsed, capturedAt: Date.now() }
+          };
+        }
+      }
+      return null;
     } catch (e) {
-      // Arquivo nao existe ou ilegivel — silencioso.
+      console.warn('[pickBackupViaSAF]', e);
       return null;
     }
   }
@@ -806,6 +913,8 @@
     listLojasDisponiveis, switchLoja,
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
+    pickBackupViaSAF,
+    hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
