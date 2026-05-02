@@ -1,0 +1,21 @@
+@*
+    Validation summary acessível.
+    Uso: <partial name="_ValidationSummary" />  (dentro de um <form>)
+*@
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert crit anim-fadeInUp" role="alert" aria-live="polite" style="margin-bottom:12px">
+        <div class="ic" aria-hidden="true">!</div>
+        <div class="body">
+            <div class="ttl">Verifique os campos abaixo</div>
+            <div class="desc">
+                <ul class="list-disc pl-5 m-0">
+                    @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@err.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}

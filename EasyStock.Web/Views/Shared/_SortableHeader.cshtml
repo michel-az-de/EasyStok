@@ -1,0 +1,43 @@
+@*
+    Sortable column header. Recebe um objeto dinâmico com:
+      Label, Column, CurrentSort, CurrentDir, BaseUrl (opc), HeaderClass (opc).
+
+    Uso (dentro de <thead><tr>):
+        @await Html.PartialAsync("_SortableHeader", new {
+            Label = "Nome", Column = "nome",
+            CurrentSort = (string)ViewBag.Sort, CurrentDir = (string)ViewBag.Dir
+        })
+*@
+@model dynamic
+@{
+    string label = Model.Label as string ?? string.Empty;
+    string column = Model.Column as string ?? string.Empty;
+    string currentSort = (Model.CurrentSort as string) ?? string.Empty;
+    string currentDir = (Model.CurrentDir as string) ?? string.Empty;
+    string baseUrl = null;
+    try { baseUrl = Model.BaseUrl as string; } catch { }
+    string headerClass = null;
+    try { headerClass = Model.HeaderClass as string; } catch { }
+
+    var isActive = string.Equals(currentSort, column, StringComparison.OrdinalIgnoreCase);
+    var nextDir = isActive && string.Equals(currentDir, "asc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+    var ariaSort = !isActive ? "none" : (string.Equals(currentDir, "desc", StringComparison.OrdinalIgnoreCase) ? "descending" : "ascending");
+
+    var qs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var kv in Context.Request.Query)
+    {
+        qs[kv.Key] = kv.Value.ToString();
+    }
+    qs["sort"] = column;
+    qs["dir"] = nextDir;
+    var path = string.IsNullOrEmpty(baseUrl) ? Context.Request.Path.ToString() : baseUrl;
+    var href = path + "?" + string.Join("&", qs.Select(p => Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value ?? string.Empty)));
+}
+<th scope="col" aria-sort="@ariaSort" class="@headerClass">
+    <a href="@href" class="th-sort" rel="nofollow">
+        <span>@label</span>
+        <svg class="th-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M3 7l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    </a>
+</th>

@@ -1,0 +1,36 @@
+@*
+    Breadcrumb partial — lê ViewBag.Breadcrumb (List<(string Label, string Url)>).
+    A última entrada é renderizada como texto inerte (página atual).
+    Inclua em _Topbar ou no topo da view com:
+        <partial name="_Breadcrumb" />
+    No controller:
+        ViewBag.Breadcrumb = new List<(string,string)> {
+            ("Início","/"), ("Produtos","/produtos"), ("Editar", null)
+        };
+*@
+@{
+    var crumbs = ViewBag.Breadcrumb as System.Collections.Generic.IList<System.ValueTuple<string, string>>;
+}
+@if (crumbs != null && crumbs.Count > 0)
+{
+    <nav aria-label="Trilha de navegação" class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5 anim-fadeInUp">
+        <ol class="flex items-center gap-1.5 m-0 p-0 list-none flex-wrap">
+            @for (var i = 0; i < crumbs.Count; i++)
+            {
+                var c = crumbs[i];
+                var isLast = i == crumbs.Count - 1;
+                <li class="flex items-center gap-1.5">
+                    @if (!isLast && !string.IsNullOrEmpty(c.Item2))
+                    {
+                        <a href="@c.Item2" class="hover:text-[color:var(--orange-500)] transition-colors">@c.Item1</a>
+                        <span aria-hidden="true" class="opacity-60">/</span>
+                    }
+                    else
+                    {
+                        <span aria-current="page" class="font-medium text-[color:var(--text-secondary)]">@c.Item1</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}

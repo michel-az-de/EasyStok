@@ -115,7 +115,7 @@
                     <button @@click="selectedPhotoIdx = idx"
                             class="produto-thumb w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden border-2 transition-all"
                             :class="selectedPhotoIdx === idx ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'">
-                        <img :src="foto.url" class="w-full h-full object-cover object-top"
+                        <img :src="foto.url" loading="lazy" decoding="async" class="w-full h-full object-cover object-top"
                              onload="if(this.naturalWidth===0){this.onerror&&this.onerror();}"
                              onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
                         <span class="produto-thumb__placeholder hidden">

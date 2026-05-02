@@ -133,3 +133,82 @@
 button:focus-visible {
   outline-color: var(--orange-500);
 }
+
+/* ---------- Skeleton loader (T1.2) ---------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-elev-1, var(--ink-100));
+  border-radius: var(--r-md, 8px);
+  color: transparent !important;
+  user-select: none;
+  pointer-events: none;
+}
+.skeleton::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.55) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+[data-theme="dark"] .skeleton { background: rgba(255,255,255,0.06); }
+[data-theme="dark"] .skeleton::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+}
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton-text  { height: 0.9em; width: 100%; margin: 0.25em 0; border-radius: 4px; }
+.skeleton-title { height: 1.4em; width: 60%; margin: 0.4em 0; border-radius: 6px; }
+.skeleton-line  { height: 0.8em; width: 80%; margin: 0.3em 0; border-radius: 4px; }
+.skeleton-circle{ width: 40px; height: 40px; border-radius: 50%; }
+.skeleton-card  { height: 120px; border-radius: 14px; }
+.skeleton-row   { height: 48px; border-radius: 8px; margin-bottom: 8px; }
+
+/* ---------- Entry animations (T1.9) ---------- */
+@keyframes anim-fadeInUp {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes anim-slideDown {
+  from { opacity: 0; transform: translate3d(0, -8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes anim-scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.anim-fadeInUp  { animation: anim-fadeInUp  220ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
+.anim-slideDown { animation: anim-slideDown 180ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
+.anim-scaleIn   { animation: anim-scaleIn   180ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
+
+/* ---------- Sortable table headers (T1.8) ---------- */
+.th-sort {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+  color: inherit; text-decoration: none;
+  font: inherit;
+}
+.th-sort:hover { color: var(--orange-500); }
+.th-sort .th-arrow {
+  width: 12px; height: 12px; opacity: 0.35; transition: opacity 120ms;
+  flex: none;
+}
+.th-sort[aria-sort="ascending"] .th-arrow,
+.th-sort[aria-sort="descending"] .th-arrow { opacity: 1; color: var(--orange-500); }
+.th-sort[aria-sort="descending"] .th-arrow { transform: rotate(180deg); }
+
+/* ---------- Card hover lift (T3.4 — incluído pra reuso desde Tier 1) ---------- */
+.card-hover {
+  transition: transform 180ms var(--ease, cubic-bezier(.4,0,.2,1)),
+              box-shadow 180ms var(--ease, cubic-bezier(.4,0,.2,1));
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(14,42,110,0.18);
+}

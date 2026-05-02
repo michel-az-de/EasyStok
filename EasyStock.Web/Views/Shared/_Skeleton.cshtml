@@ -1,0 +1,36 @@
+@*
+    Skeleton loader partial.
+    Uso:
+        @await Html.PartialAsync("_Skeleton", ("table-row", 5))
+        @await Html.PartialAsync("_Skeleton", ("card", 3))
+        @await Html.PartialAsync("_Skeleton", ("text", 1))
+*@
+@model ValueTuple<string, int>
+@{
+    var type = Model.Item1 ?? "text";
+    var count = Model.Item2 > 0 ? Model.Item2 : 1;
+}
+<div class="skeleton-group anim-fadeInUp" aria-busy="true" aria-live="polite" role="status">
+    <span class="sr-only">Carregando…</span>
+    @for (var i = 0; i < count; i++)
+    {
+        switch (type)
+        {
+            case "table-row":
+                <div class="skeleton skeleton-row" aria-hidden="true"></div>
+                break;
+            case "card":
+                <div class="skeleton skeleton-card" aria-hidden="true" style="margin-bottom:12px"></div>
+                break;
+            case "title":
+                <div class="skeleton skeleton-title" aria-hidden="true"></div>
+                break;
+            case "circle":
+                <div class="skeleton skeleton-circle" aria-hidden="true"></div>
+                break;
+            default:
+                <div class="skeleton skeleton-text" aria-hidden="true"></div>
+                break;
+        }
+    }
+</div>

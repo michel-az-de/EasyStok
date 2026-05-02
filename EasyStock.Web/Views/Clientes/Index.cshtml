@@ -133,7 +133,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input type="text" x-model="form.telefone" class="ui-field w-full text-sm" />
+                <input type="text" x-model="form.telefone" x-mask:phone class="ui-field w-full text-sm" inputmode="numeric" autocomplete="tel" />
             </div>
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
@@ -145,7 +145,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
-                <input type="text" x-model="form.documento" class="ui-field w-full text-sm" />
+                <input type="text" x-model="form.documento" x-mask:doc class="ui-field w-full text-sm" inputmode="numeric" />
             </div>
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>

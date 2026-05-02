@@ -68,9 +68,9 @@
                     <div><label class="block text-xs text-slate-500 mb-1">Nome *</label><input type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label class="block text-xs text-slate-500 mb-1">Apt</label><input type="text" name="apt" value="@c.Apt" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label class="block text-xs text-slate-500 mb-1">Endereço</label><input type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label class="block text-xs text-slate-500 mb-1">E-mail</label><input type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label class="block text-xs text-slate-500 mb-1">Observações</label><textarea name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
                     <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar</button>
                 </div>

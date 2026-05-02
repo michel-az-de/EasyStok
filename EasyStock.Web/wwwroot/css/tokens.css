@@ -345,3 +345,31 @@ html, body {
   pointer-events: none;
   opacity: 0.55;
 }
+
+/* ----- Dark mode overrides for legacy hardcoded Tailwind classes -----
+   Many Razor views still ship `text-slate-900`, `text-gray-900`, `bg-white`, etc.
+   Until each view is migrated to tokens, these rules ensure dark mode stays legible. */
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-800 { color: var(--text-primary) !important; }
+[data-theme="dark"] .text-slate-700,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-600 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-slate-500,
+[data-theme="dark"] .text-slate-400,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-400 { color: var(--text-muted) !important; }
+
+/* ----- Accessibility: respect prefers-reduced-motion ----- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -35,7 +35,7 @@
     </style>
     @RenderSection("Styles", required: false)
 </head>
-<body class="app-body h-full font-[Inter] text-slate-900 antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
+<body class="app-body h-full font-[Inter] antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);color:var(--text-primary);">
     <a href="#app-main" class="skip-link">Pular para o conteúdo</a>
     <div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden">
         <div x-show="sidebarOpen" x-cloak
@@ -64,6 +64,7 @@
     <script src="~/js/toast.js" asp-append-version="true"></script>
     <script src="~/js/api.js" asp-append-version="true"></script>
     <script src="~/js/locale.js" asp-append-version="true"></script>
+    <script src="~/js/masks.js" asp-append-version="true"></script>
     <script src="~/js/notifications.js" asp-append-version="true"></script>
     <script>
         // Topbar scroll state binding (depende de .app-main e .app-topbar no DOM).
