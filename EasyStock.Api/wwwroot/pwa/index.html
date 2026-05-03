@@ -6321,6 +6321,62 @@ body.ux-calm [data-screen="producao"] .section-label {
 }
 /* prefers-reduced-motion ja desativa as animacoes acima por causa
    da regra global *, *::before, *::after — splash some quase instant. */
+
+/* ===========================================================
+   HEALTH BANNER — warning nao-bloqueante no topo
+   Aparece quando runHealthCheck() detecta problema (BT off,
+   printer fora de alcance, backup desatualizado, etc). Click no
+   "Resolver" abre Diagnostico unificado. NAO bloqueia o app.
+   =========================================================== */
+.health-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-top, 0px)) 12px;
+  background: #d97757;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  animation: hb-slide-down 0.3s ease both;
+}
+.health-banner[hidden] { display: none; }
+.health-banner.warn  { background: #d4a23a; color: #1a1410; }
+.health-banner.error { background: #c44d3a; color: #fff; }
+.health-banner.info  { background: #4a8aa3; color: #fff; }
+.health-banner .hb-icon { font-size: 18px; line-height: 1; }
+.health-banner .hb-msg { flex: 1; min-width: 0; line-height: 1.3; }
+.health-banner .hb-action {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.35);
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.health-banner.warn .hb-action {
+  background: rgba(0,0,0,0.12);
+  border-color: rgba(0,0,0,0.18);
+}
+.health-banner .hb-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.75;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+@keyframes hb-slide-down {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
 </style>
 </head>
 <body>
@@ -7034,6 +7090,17 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cta-btn primary" onclick="saveCashEntry()">Lançar</button>
       </div>
     </div>
+  </div>
+
+  <!-- Health Banner: warning nao-bloqueante no topo quando algo esta errado
+       (impressora desconectada, BT desligado, sem backup ha muito tempo, etc).
+       Inserido pelo runHealthCheck() no boot e em visibilitychange. Click
+       abre Diagnostico. -->
+  <div id="healthBanner" class="health-banner" role="status" aria-live="polite" hidden>
+    <span class="hb-icon" id="hbIcon">⚠️</span>
+    <span class="hb-msg" id="hbMsg"></span>
+    <button class="hb-action" id="hbAction" onclick="openDiagnostics()">Resolver</button>
+    <button class="hb-close" id="hbClose" onclick="dismissHealthBanner()" aria-label="Fechar aviso">×</button>
   </div>
 
   <!-- Toast -->
@@ -8339,6 +8406,204 @@ async function maybeOfferLocalRestore() {
     setTimeout(function () { location.reload(); }, 600);
   } catch (e) {
     console.warn('[autoRestore] falhou:', e);
+  }
+}
+
+// ============================================================
+// HEALTH CHECK — diagnostico defensivo no boot
+// ============================================================
+// Felipe pediu (Semana 2 do roadmap, 03/05/2026): "verificar BT e
+// imprimora antes do 1o pedido — descobrir tarde no meio do servico
+// e horrivel". Roda no DOMContentLoaded + cada visibilitychange (app
+// vira visivel = pode ter ficado horas em background sem checar).
+//
+// Detecta:
+//  - Bluetooth desligado (mas tem impressora salva)
+//  - Impressora pareada mas nao detectada (saiu de range / desligada)
+//  - Backup local nunca feito (dados em risco se fechar app)
+//  - Backup local muito velho (>7 dias)
+//
+// Mostra banner unico no topo (se algo errado). Click abre Diagnostico.
+
+var _healthBannerDismissedAt = 0;
+var HEALTH_DISMISS_TTL = 60 * 60 * 1000; // 1h: depois desse tempo o banner reaparece
+
+function showHealthBanner(level, msg, actionLabel) {
+  var el = document.getElementById('healthBanner');
+  if (!el) return;
+  // Se foi descartado recentemente, respeita o silencio temporario
+  if (Date.now() - _healthBannerDismissedAt < HEALTH_DISMISS_TTL) return;
+  el.classList.remove('warn','error','info');
+  el.classList.add(level || 'warn');
+  document.getElementById('hbIcon').textContent =
+    level === 'error' ? '🔴' : level === 'info' ? 'ℹ️' : '⚠️';
+  document.getElementById('hbMsg').textContent = msg;
+  var actBtn = document.getElementById('hbAction');
+  actBtn.textContent = actionLabel || 'Resolver';
+  el.hidden = false;
+}
+function dismissHealthBanner() {
+  var el = document.getElementById('healthBanner');
+  if (el) el.hidden = true;
+  _healthBannerDismissedAt = Date.now();
+}
+function hideHealthBanner() {
+  var el = document.getElementById('healthBanner');
+  if (el) el.hidden = true;
+}
+
+async function runHealthCheck() {
+  try {
+    var saved = (typeof getSavedPrinter === 'function') ? getSavedPrinter() : null;
+    var bs    = window.bluetoothSerial;
+
+    // 1. Tem impressora salva? Checa se ainda da pra usar
+    if (saved && saved.address && bs && bs.list) {
+      // Tenta ver se Bluetooth esta ligado
+      if (bs.isEnabled) {
+        var btEnabled = await new Promise(function (resolve) {
+          var done = false;
+          bs.isEnabled(
+            function () { if (!done) { done = true; resolve(true); } },
+            function () { if (!done) { done = true; resolve(false); } }
+          );
+          // Timeout: se nao responder em 3s, assume desligado
+          setTimeout(function () { if (!done) { done = true; resolve(false); } }, 3000);
+        });
+        if (!btEnabled) {
+          showHealthBanner('warn',
+            'Bluetooth desligado. Ative pra usar a impressora.',
+            'Resolver');
+          return;
+        }
+      }
+      // BT ligado — checa se a impressora salva ainda esta na lista de pareadas
+      var found = await new Promise(function (resolve) {
+        var done = false;
+        bs.list(
+          function (devs) {
+            if (done) return; done = true;
+            var match = (devs || []).some(function (d) {
+              return d && (d.address === saved.address || d.id === saved.address);
+            });
+            resolve(match);
+          },
+          function () { if (!done) { done = true; resolve(true); /* nao bloqueia se list falhou */ } }
+        );
+        setTimeout(function () { if (!done) { done = true; resolve(true); } }, 4000);
+      });
+      if (!found) {
+        showHealthBanner('warn',
+          'Impressora "' + (saved.name || saved.address) + '" não está disponível agora. Religue ela ou re-emparelhe.',
+          'Diagnóstico');
+        return;
+      }
+    }
+
+    // 2. Backup local — quanto tempo desde ultimo?
+    var lastBackup = 0;
+    try {
+      lastBackup = parseInt(localStorage.getItem('cdb-last-local-backup-at') || '0', 10) || 0;
+    } catch (e) {}
+    var hasData = false;
+    try {
+      var pCount = JSON.parse(localStorage.getItem('cdb-products') || '[]').length;
+      var oCount = JSON.parse(localStorage.getItem('cdb-orders')   || '[]').length;
+      hasData = pCount > 0 || oCount > 0;
+    } catch (e) {}
+    if (hasData && lastBackup === 0) {
+      showHealthBanner('info',
+        'Recomendo fazer um backup. Em Ajustes > Backup, toque em "Exportar".',
+        'Backup');
+      return;
+    }
+    var ageDays = lastBackup ? (Date.now() - lastBackup) / (1000 * 60 * 60 * 24) : 999;
+    if (hasData && ageDays > 7) {
+      showHealthBanner('info',
+        'Seu último backup foi há ' + Math.round(ageDays) + ' dias. Vale fazer um novo.',
+        'Backup');
+      return;
+    }
+
+    // Tudo OK: garante banner escondido
+    hideHealthBanner();
+  } catch (e) {
+    console.warn('[healthcheck] falhou:', e);
+  }
+}
+
+// Boot e cada vez que o app vira visivel (vindo de background)
+document.addEventListener('DOMContentLoaded', function () {
+  // Espera 2.5s pra garantir que cdbSync e plugins de BT estao prontos
+  setTimeout(runHealthCheck, 2500);
+  // Auto-share semanal: 4s pra nao competir com health-check + restore
+  setTimeout(maybePromptWeeklyShare, 4000);
+});
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) {
+    setTimeout(runHealthCheck, 600);
+  }
+});
+
+// ============================================================
+// AUTO-SHARE SEMANAL — defesa #3 contra perda total
+// ============================================================
+// Felipe pediu (Semana 2 do roadmap, 03/05/2026): "uma vez por semana
+// pode lembrar de mandar backup pro meu WhatsApp". Estrategia:
+//
+// - Detecta dias desde ultimo SHARE (nao desde ultimo backup local — esse
+//   ja roda automatico). Share = quando o user efetivamente exportou +
+//   compartilhou pra fora do celular.
+// - A cada 7 dias, mostra confirm() amigavel oferecendo abrir o share.
+// - "Pular dessa vez" reseta o timer pra +3 dias (evita spam mas nao
+//   esquece pra sempre).
+// - "Salvar agora" chama exportBackup() (que com fix do v5 abre share
+//   sheet nativo via plugin Capacitor — usuario escolhe Drive/WhatsApp).
+//
+// Chave de timer: cdb-last-share-prompt (ms epoch).
+
+var WEEKLY_SHARE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;  // 7 dias
+var WEEKLY_SHARE_SKIP_PENALTY = 3 * 24 * 60 * 60 * 1000; // pular = volta em 3d
+
+function maybePromptWeeklyShare() {
+  try {
+    // So roda em APK Capacitor (browser PWA usa share desktop, menos util)
+    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+
+    // So oferece se ja tem dados — app virgem nao precisa
+    var hasData = false;
+    try {
+      var oCount = JSON.parse(localStorage.getItem('cdb-orders') || '[]').length;
+      var pCount = JSON.parse(localStorage.getItem('cdb-products') || '[]').length;
+      hasData = oCount > 0 && pCount > 0;
+    } catch (e) {}
+    if (!hasData) return;
+
+    var last = 0;
+    try { last = parseInt(localStorage.getItem('cdb-last-share-prompt') || '0', 10) || 0; } catch (e) {}
+    if (Date.now() - last < WEEKLY_SHARE_INTERVAL_MS) return;
+
+    // Pergunta: oferece abrir share. Mensagem amigavel — Felipe disse que
+    // "feedback positivo importa", entao usa tom encorajador, nao alarmista.
+    var ok = confirm(
+      'Já faz uma semana. Quer mandar uma cópia do backup pro seu WhatsApp '
+      + '(ou Drive/email) agora?\n\n'
+      + 'É só um arquivo JSON pequeno — nada quebra se você só fechar.'
+    );
+    if (ok) {
+      // Marca o prompt como satisfeito (volta em 7 dias)
+      try { localStorage.setItem('cdb-last-share-prompt', String(Date.now())); } catch (e) {}
+      // Dispara exportBackup com pequeno delay pra UI fechar o confirm
+      setTimeout(function () { try { exportBackup(); } catch (e) {} }, 200);
+    } else {
+      // Pulou: penaliza pra volta em 3 dias (em vez de 7)
+      try {
+        var skipUntil = Date.now() - WEEKLY_SHARE_INTERVAL_MS + WEEKLY_SHARE_SKIP_PENALTY;
+        localStorage.setItem('cdb-last-share-prompt', String(skipUntil));
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('[weekly share] falhou:', e);
   }
 }
 
@@ -12837,6 +13102,10 @@ function collectDiagnostics() {
     });
   } catch (e) {}
 
+  // Backup local: ultimo timestamp + plugin publico disponivel
+  const lastLocalBackup = Number(localStorage.getItem('cdb-last-local-backup-at')) || 0;
+  const hasPublicBackup = !!(cs.hasPublicBackupPlugin && cs.hasPublicBackupPlugin());
+
   return {
     app: { ver, platform, theme, operator: operatorName || '(sem operador)', deviceId },
     sync: { queueSize, lastSync, apiBase, online },
@@ -12849,6 +13118,11 @@ function collectDiagnostics() {
       cashEntries: (cashEntries || []).length,
       auditLog: loadAuditLog().length,
       auditMax: AUDIT_LOG_MAX
+    },
+    backup: {
+      lastLocalAt: lastLocalBackup,
+      hasPublicPlugin: hasPublicBackup,
+      surviveUninstall: hasPublicBackup
     },
     integrity: { issues, cashTodayCount, cashTodayBalance },
     printer: { plugin: !!TP, shim: !!bs, native: !!(bs && bs.__cdbNative),
@@ -13057,6 +13331,20 @@ async function switchLojaPrompt() {
   }
 }
 
+// Calcula severidade da secao Backup do diagnostico:
+//  - sem plugin publico: warn (pode perder dados em uninstall)
+//  - sem auto-backup: warn (nunca rodou)
+//  - mais de 7 dias: warn
+//  - tudo ok: ok
+function _backupLevel(b) {
+  if (!b) return 'warn';
+  if (!b.hasPublicPlugin) return 'warn';
+  if (!b.lastLocalAt) return 'warn';
+  var ageDays = (Date.now() - b.lastLocalAt) / (1000 * 60 * 60 * 24);
+  if (ageDays > 7) return 'warn';
+  return 'ok';
+}
+
 function _diagBadge(level) {
   if (level === 'err') return '<span class="diag-status err">erro</span>';
   if (level === 'warn') return '<span class="diag-status warn">atenção</span>';
@@ -13149,6 +13437,22 @@ function openDiagnostics() {
       , ''
         + '<button class="diag-action" onclick="diagCompactAuditLog()">Compactar audit</button>'
         + '<button class="diag-action" onclick="closeDiagnostics(); exportBackup()">Exportar backup</button>'
+      , '')
+    + section('Backup', _backupLevel(d.backup), ''
+        + _diagRow('Último auto-backup',
+            d.backup.lastLocalAt ? _fmtRelTime(d.backup.lastLocalAt) : 'nunca',
+            d.backup.lastLocalAt ? '' : 'warn')
+        + _diagRow('Sobrevive desinstalação',
+            d.backup.surviveUninstall ? 'SIM ✓' : 'NÃO',
+            d.backup.surviveUninstall ? '' : 'warn')
+        + _diagRow('Plugin público',
+            d.backup.hasPublicPlugin ? 'OK' : 'ausente (atualize o APK)',
+            d.backup.hasPublicPlugin ? '' : 'warn')
+      , ''
+        + '<button class="diag-action" onclick="closeDiagnostics(); window.cdbSync && window.cdbSync.localBackupToFile && window.cdbSync.localBackupToFile(\'manual\').then(r => showToast(r.ok ? \'Backup salvo no celular\' : \'Falha: \' + r.reason))">Salvar agora</button>'
+        + (d.backup.hasPublicPlugin
+            ? '<button class="diag-action" onclick="restoreFromPublicStorage()">Restaurar de arquivo</button>'
+            : '')
       , '')
     + section('Integridade', integrityLevel, ''
         + _diagRow('Caixa de hoje', d.integrity.cashTodayCount + ' lançamentos · ' + money(d.integrity.cashTodayBalance))
