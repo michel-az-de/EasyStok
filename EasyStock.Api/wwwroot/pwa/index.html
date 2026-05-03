@@ -2861,6 +2861,55 @@ button:disabled {
 [data-theme="light"] .doc-hint.valid { color: var(--basil); }
 [data-theme="light"] .doc-hint.invalid { color: var(--accent); }
 
+/* Preview de margem no modal de produto — aparece quando preço E custo
+   estao preenchidos. Cor muda conforme saude da margem (verde >50%,
+   ambar 25-50%, vermelho <25% ou negativa). */
+.margin-preview {
+  margin: 14px 0 4px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border: 1px solid rgba(240,184,74,0.22);
+  border-left: 3px solid var(--gold, #f0b84a);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.margin-preview .mp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.margin-preview .mp-label {
+  color: var(--ink-mute);
+  font-weight: 600;
+}
+.margin-preview strong {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+}
+.margin-preview.healthy { border-left-color: var(--basil, #6db474); }
+.margin-preview.healthy strong { color: var(--basil, #6db474); }
+.margin-preview.warn { border-left-color: #d4a23a; }
+.margin-preview.warn strong { color: #d4a23a; }
+.margin-preview.bad { border-left-color: var(--accent, #d97757); }
+.margin-preview.bad strong { color: var(--accent, #d97757); }
+.margin-preview .mp-hint {
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-top: 2px;
+  font-style: italic;
+}
+.modal-label .ml-hint {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
 .modal-ctas {
   display: flex;
   gap: 10px;
@@ -6188,9 +6237,106 @@ body.ux-calm [data-screen="producao"] .section-label {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===========================================================
+   SPLASH SCREEN — animacao de boot (Felipe pediu 02/05/2026:
+   "todo app tem uma animação quando abre, parece tendência").
+   Removido pelo JS no DOMContentLoaded + 600ms de fade pra
+   transicao suave pra UI do app.
+   =========================================================== */
+#cdbSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1a1410 0%, #2d1f17 60%, #1a1410 100%);
+  /* Light theme override */
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+  pointer-events: auto;
+}
+[data-theme="light"] #cdbSplash {
+  background: linear-gradient(160deg, #fef9f3 0%, #f5e8d8 60%, #fef9f3 100%);
+}
+#cdbSplash.cdb-splash-fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.cdb-splash-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: cdb-splash-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.cdb-splash-emoji {
+  font-size: 64px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(240, 184, 74, 0.4));
+  animation: cdb-splash-float 2.4s ease-in-out infinite;
+}
+.cdb-splash-name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #f0b84a;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+}
+[data-theme="light"] .cdb-splash-name { color: #b8862a; }
+.cdb-splash-tagline {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(240, 184, 74, 0.55);
+  margin-top: -4px;
+}
+[data-theme="light"] .cdb-splash-tagline { color: rgba(184, 134, 42, 0.7); }
+.cdb-splash-spinner {
+  margin-top: 24px;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(240, 184, 74, 0.18);
+  border-top-color: #f0b84a;
+  border-radius: 50%;
+  animation: cdb-splash-spin 0.9s linear infinite;
+}
+[data-theme="light"] .cdb-splash-spinner {
+  border-color: rgba(184, 134, 42, 0.18);
+  border-top-color: #b8862a;
+}
+@keyframes cdb-splash-pop {
+  0%   { opacity: 0; transform: scale(0.85) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes cdb-splash-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+@keyframes cdb-splash-spin {
+  to { transform: rotate(360deg); }
+}
+/* prefers-reduced-motion ja desativa as animacoes acima por causa
+   da regra global *, *::before, *::after — splash some quase instant. */
 </style>
 </head>
 <body>
+
+<!-- Splash animation: visivel ate o JS rodar e remover a classe no DOMContentLoaded
+     + ~600ms de animacao suave. Logo Casa da Baba (gold) num fundo gradiente
+     escuro/claro que alinha com o tema. NAO depende de plugin nativo nem de
+     carregar imagens externas — desenhado em CSS puro. -->
+<div id="cdbSplash" aria-hidden="true">
+  <div class="cdb-splash-mark">
+    <div class="cdb-splash-emoji">🍝</div>
+    <div class="cdb-splash-name">Casa da Baba</div>
+    <div class="cdb-splash-tagline">Massas frescas</div>
+    <div class="cdb-splash-spinner" role="status" aria-label="Carregando"></div>
+  </div>
+</div>
 
 <!-- Boas-vindas / login com nome do operador -->
 <div class="welcome hidden" id="welcomeScreen">
@@ -6759,10 +6905,30 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Carne">🥩</button>
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Cogumelo">🍄</button>
       </div>
-      <label class="modal-label">Preço</label>
+      <label class="modal-label">Preço de venda</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="newProdPrice" type="text" inputmode="decimal" placeholder="25,00" autocomplete="off"></div>
+        <div class="input-box"><input id="newProdPrice" type="text" inputmode="decimal" placeholder="25,00" autocomplete="off" oninput="updateMarginPreview()"></div>
+      </div>
+      <label class="modal-label">Custo (ingredientes + embalagem)
+        <span class="ml-hint">opcional, ajuda a calcular margem</span>
+      </label>
+      <div class="price-row">
+        <span class="currency">R$</span>
+        <div class="input-box"><input id="newProdCost" type="text" inputmode="decimal" placeholder="9,50" autocomplete="off" oninput="updateMarginPreview()"></div>
+      </div>
+      <!-- Preview de margem: mostra lucro absoluto e % quando os 2 campos
+           tem valor. Esconde por default. -->
+      <div id="marginPreview" class="margin-preview" style="display:none">
+        <div class="mp-row">
+          <span class="mp-label">Lucro por unidade</span>
+          <strong id="mpProfit">—</strong>
+        </div>
+        <div class="mp-row">
+          <span class="mp-label">Margem</span>
+          <strong id="mpMargin">—</strong>
+        </div>
+        <div class="mp-hint" id="mpHint"></div>
       </div>
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductModal()">Cancelar</button>
@@ -8175,6 +8341,22 @@ async function maybeOfferLocalRestore() {
     console.warn('[autoRestore] falhou:', e);
   }
 }
+
+// Splash: remove apos UI montar. Mantem visivel ate ter algo concreto pra
+// mostrar (DOMContentLoaded + ~700ms = init do app rodou). Se algo demorar
+// MUITO (ex: 5s), forca remocao mesmo assim pra nao prender o usuario.
+function _cdbHideSplash() {
+  var el = document.getElementById('cdbSplash');
+  if (!el || el.classList.contains('cdb-splash-fade-out')) return;
+  el.classList.add('cdb-splash-fade-out');
+  setTimeout(function () { try { el.parentNode && el.parentNode.removeChild(el); } catch (e) {} }, 500);
+}
+document.addEventListener('DOMContentLoaded', function () {
+  // Tempo minimo de 600ms pra animacao "respirar" + splash nao piscar.
+  setTimeout(_cdbHideSplash, 700);
+});
+// Hard-fallback: se algo bloqueou o boot, sumir o splash em 5s no maximo.
+setTimeout(_cdbHideSplash, 5000);
 
 // Dispara a oferta de restore logo apos o app montar — espera 1.5s pra UI
 // estabilizar e o cdbSync (que carrega Filesystem plugin) ficar pronto.
@@ -14840,7 +15022,7 @@ function printViaBluetooth(bytes, onFallback) {
               () => { btStep('print:reconnected'); rawWrite(false); },
               (err) => {
                 btStep('print:reconnect-err ' + (err && err.message || err));
-                showToast('Não reconectou: ' + (err && err.message || err));
+                showError(err, 'print');
                 releasePrinting();
               }
             );
@@ -14850,7 +15032,7 @@ function printViaBluetooth(bytes, onFallback) {
               () => { btStep('print:reconnected-nodc'); rawWrite(false); },
               (err) => {
                 btStep('print:reconnect-err2 ' + (err && err.message || err));
-                showToast('Não reconectou: ' + (err && err.message || err));
+                showError(err, 'print');
                 releasePrinting();
               }
             );
@@ -14858,7 +15040,7 @@ function printViaBluetooth(bytes, onFallback) {
         );
       } catch (ex) {
         btStep('print:reconnect-throw ' + (ex.message || ex));
-        showToast('Erro reconectar: ' + (ex.message || ex));
+        showError(ex, 'print');
         releasePrinting();
       }
     };
@@ -14874,13 +15056,13 @@ function printViaBluetooth(bytes, onFallback) {
               reconnectAndRetry();
               return;
             }
-            showToast('Erro imprimir: ' + msg);
+            showError(err, 'print');
             releasePrinting();
           }
         );
       } catch (ex) {
         btStep('print:write-throw ' + (ex.message || ex));
-        showToast('Erro nativo: ' + (ex.message || ex));
+        showError(ex, 'print');
         releasePrinting();
         if (typeof onFallback === 'function') onFallback();
       }
@@ -14897,14 +15079,14 @@ function printViaBluetooth(bytes, onFallback) {
               () => { btStep('print:connected'); send(); },
               (err) => {
                 btStep('print:connect-err ' + (err && err.message || err));
-                showToast('Não conectou: ' + (err && err.message || err));
+                showError(err, 'print');
                 releasePrinting();
                 if (typeof onFallback === 'function') onFallback();
               }
             );
           } catch (ex) {
             btStep('print:connect-throw ' + (ex.message || ex));
-            showToast('Erro conectar: ' + (ex.message || ex));
+            showError(ex, 'print');
             releasePrinting();
             if (typeof onFallback === 'function') onFallback();
           }
@@ -14912,7 +15094,7 @@ function printViaBluetooth(bytes, onFallback) {
       );
     } catch (ex) {
       btStep('print:isConnected-throw ' + (ex.message || ex));
-      showToast('Erro Bluetooth: ' + (ex.message || ex));
+      showError(ex, 'bluetooth');
       releasePrinting();
       if (typeof onFallback === 'function') onFallback();
     }
@@ -16634,6 +16816,8 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   document.getElementById('newProdName').value = prefillName;
   document.getElementById('newProdUnit').value = '';
   document.getElementById('newProdPrice').value = '';
+  const costEl = document.getElementById('newProdCost');
+  if (costEl) costEl.value = '';
   selectedCat = cat;
   selectedEmoji = '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
@@ -16641,6 +16825,7 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   productModalCallback = fromOrder;
   document.getElementById('newProductModal').classList.add('show');
   setTimeout(() => document.getElementById(prefillName ? 'newProdUnit' : 'newProdName').focus(), 300);
+  updateMarginPreview();
 }
 function closeProductModal() {
   document.getElementById('newProductModal').classList.remove('show');
@@ -16650,6 +16835,51 @@ function closeProductModal() {
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Novo <span class="accent">produto</span>';
 }
+
+// Calcula e exibe lucro absoluto + margem % entre os campos preço e custo
+// no modal de produto. Felipe pediu (02/05/2026): "calculadora de
+// precificação". Helper: chamado em todo onInput de preço e custo, e em
+// open()/openEdit(). Color-coded (verde / ambar / vermelho) pra dar
+// feedback visual rapido sobre saude da margem.
+function updateMarginPreview() {
+  const previewEl = document.getElementById('marginPreview');
+  if (!previewEl) return;
+  const priceStr = document.getElementById('newProdPrice')?.value?.trim() || '';
+  const costStr  = document.getElementById('newProdCost')?.value?.trim() || '';
+  const price = priceStr ? parseMoneyInput(priceStr) : NaN;
+  const cost  = costStr  ? parseMoneyInput(costStr)  : NaN;
+  // Sem ambos os valores => esconde
+  if (isNaN(price) || isNaN(cost) || price <= 0) {
+    previewEl.style.display = 'none';
+    return;
+  }
+  const profit = price - cost;
+  const marginPct = (profit / price) * 100;
+  document.getElementById('mpProfit').textContent = money(profit);
+  document.getElementById('mpMargin').textContent = (marginPct >= 0 ? '+' : '') + marginPct.toFixed(1) + '%';
+
+  // Classifica saude. Foodservice tipico tem margem 50-65% saudavel.
+  previewEl.classList.remove('healthy','warn','bad');
+  let hint = '';
+  if (marginPct < 0) {
+    previewEl.classList.add('bad');
+    hint = 'Está vendendo abaixo do custo — você perde dinheiro a cada unidade.';
+  } else if (marginPct < 25) {
+    previewEl.classList.add('bad');
+    hint = 'Margem baixa pra foodservice. Mira em pelo menos 50%.';
+  } else if (marginPct < 50) {
+    previewEl.classList.add('warn');
+    hint = 'Margem ok mas apertada. Foodservice saudável fica 50-65%.';
+  } else if (marginPct < 75) {
+    previewEl.classList.add('healthy');
+    hint = 'Margem saudável.';
+  } else {
+    previewEl.classList.add('healthy');
+    hint = 'Margem excelente — confira se o custo está real (incluindo embalagem, gás).';
+  }
+  document.getElementById('mpHint').textContent = hint;
+  previewEl.style.display = '';
+}
 function saveNewProduct() {
   const name = document.getElementById('newProdName').value.trim();
   if (!name) { document.getElementById('newProdName').focus(); return; }
@@ -16657,6 +16887,9 @@ function saveNewProduct() {
   const priceStr = document.getElementById('newProdPrice').value.trim();
   const priceParsed = priceStr ? parseMoneyInput(priceStr) : NaN;
   const price = isNaN(priceParsed) ? null : priceParsed;
+  const costStr = (document.getElementById('newProdCost')?.value || '').trim();
+  const costParsed = costStr ? parseMoneyInput(costStr) : NaN;
+  const cost = isNaN(costParsed) ? null : costParsed;
 
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
@@ -16666,9 +16899,9 @@ function saveNewProduct() {
     products[idx] = {
       ...products[idx],
       name, emoji: selectedEmoji, category: selectedCat,
-      unit: unit || '', price
+      unit: unit || '', price, cost
     };
-    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price']);
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost']);
     persistAll();
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
@@ -16689,7 +16922,7 @@ function saveNewProduct() {
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
-    unit: unit || '', price, count: 0, photo: null, stock: 0, custom: true
+    unit: unit || '', price, cost, count: 0, photo: null, stock: 0, custom: true
   };
   products.push(product);
   persistAll();
@@ -16725,6 +16958,8 @@ function openProductModalForEdit(productId) {
   document.getElementById('newProdName').value = p.name || '';
   document.getElementById('newProdUnit').value = p.unit || '';
   document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
+  const costEl = document.getElementById('newProdCost');
+  if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');
   selectedCat = p.category || 'massa';
   selectedEmoji = p.emoji || '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(x => {
@@ -16737,6 +16972,7 @@ function openProductModalForEdit(productId) {
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
   document.getElementById('newProductModal').classList.add('show');
+  updateMarginPreview();
 }
 
 // Long-press num tile de produto (tela de Producao) abre esse menu pra
@@ -17105,6 +17341,126 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
+
+// ============================================================
+// MENSAGENS DE ERRO HUMANIZADAS
+// ============================================================
+// Felipe reportou que erros do app vinham crípticos ("Broken pipe",
+// "EPIPE", "Connection reset"). humanizeError mapeia o raw da exception
+// pra { titulo, dica } em portugues, com ação sugerida quando tem
+// procedimento conhecido. Use no lugar de showToast('Erro: ' + e.message).
+//
+// Padrões cobertos:
+//  - Bluetooth/impressora (broken pipe, EPIPE, not connected)
+//  - Rede (timeout, fetch failed, ERR_NETWORK)
+//  - Backup/Filesystem
+//  - Permissão (denied, not granted)
+//  - Servidor (401, 403, 404, 500, 503)
+function humanizeError(raw, context) {
+  var msg = String(raw && (raw.message || raw) || '').toLowerCase();
+  var ctx = (context || '').toLowerCase();
+
+  // === Impressora Bluetooth ===
+  if (msg.includes('broken pipe') || msg.includes('epipe')) {
+    return {
+      title: 'Impressora travou',
+      hint: 'A impressora pode ter saído de alcance ou entrado em modo de economia. ' +
+            'Religue ela e tente imprimir de novo — o app reconecta sozinho.'
+    };
+  }
+  if (msg.includes('not connected') && (ctx.includes('print') || ctx.includes('bluetooth'))) {
+    return {
+      title: 'Impressora desconectada',
+      hint: 'Toque em Imprimir de novo. Se persistir, vá em Ajustes > Impressora e reconecte.'
+    };
+  }
+  if (msg.includes('bluetooth') && msg.includes('disabled')) {
+    return {
+      title: 'Bluetooth desligado',
+      hint: 'Ative o Bluetooth nas Configurações do celular pra usar a impressora.'
+    };
+  }
+  if (msg.includes('permiss') || msg.includes('not granted') || msg.includes('denied')) {
+    return {
+      title: 'Permissão negada',
+      hint: 'Vá em Configurações > Apps > Casa da Baba > Permissões e libere o que está bloqueado.'
+    };
+  }
+  if (msg.includes('falha ao conectar') || msg.includes('failed to connect')) {
+    return {
+      title: 'Não conectou na impressora',
+      hint: 'Confira se ela está ligada e perto do celular. Tente desemparelhar e parear de novo nas Configurações de Bluetooth.'
+    };
+  }
+
+  // === Rede / Servidor ===
+  if (msg.includes('timeout') || msg.includes('aborted')) {
+    return {
+      title: 'Servidor demorou demais',
+      hint: 'Sua internet pode estar lenta. O app continua funcionando offline — ele sincroniza quando voltar.'
+    };
+  }
+  if (msg.includes('failed to fetch') || msg.includes('err_network')
+      || msg.includes('network request') || msg.includes('sem rede')) {
+    return {
+      title: 'Sem internet',
+      hint: 'Tudo bem, o app funciona offline. Suas ações ficam salvas e sincronizam quando a internet voltar.'
+    };
+  }
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('pareamento invalido')) {
+    return {
+      title: 'Pareamento expirou',
+      hint: 'Vá em Ajustes > Diagnóstico e refaça o pareamento com o servidor.'
+    };
+  }
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('servidor recusou')) {
+    return {
+      title: 'Servidor com problema',
+      hint: 'Tenta de novo em alguns minutos. Suas ações continuam salvas no celular.'
+    };
+  }
+
+  // === Backup / Storage ===
+  if (msg.includes('snapshot muito grande')) {
+    return {
+      title: 'Backup grande demais',
+      hint: 'Tem muitos dados acumulados. Vá em Ajustes > Backup e exporte um JSON pra arquivar.'
+    };
+  }
+  if (msg.includes('arquivo invalido') || msg.includes('schema')) {
+    return {
+      title: 'Arquivo de backup inválido',
+      hint: 'O arquivo selecionado não é um backup do Casa da Baba. Confira se você selecionou o JSON certo.'
+    };
+  }
+  if (msg.includes('storage') || msg.includes('quota')) {
+    return {
+      title: 'Sem espaço',
+      hint: 'O celular está com pouca memória. Libere algum espaço e tente de novo.'
+    };
+  }
+
+  // === Genérico — fallback que não expõe stack trace ===
+  // Retorna a mensagem original mas EM CIMA de um título amigavel,
+  // pra ainda dar pista pro Felipe debugar se precisar.
+  var raw_clean = String(raw && (raw.message || raw) || 'Erro desconhecido').slice(0, 140);
+  return {
+    title: 'Algo deu errado',
+    hint: raw_clean
+  };
+}
+
+// Atalho que chama humanizeError + showToast no formato consistente.
+// Usa "·" pra separar titulo da dica (compacto).
+function showError(raw, context) {
+  var h = humanizeError(raw, context);
+  // Toast curto = titulo. Hint vai junto se couber, senao só titulo.
+  var msg = h.hint && h.hint.length < 120
+    ? h.title + ' · ' + h.hint
+    : h.title;
+  showToast(msg);
+  return h; // retorna pra quem quiser usar (ex: alert detalhado)
+}
 function undoLast() {
   document.getElementById('toast').classList.remove('show');
   showToast('Ação desfeita');
@@ -17379,6 +17735,145 @@ window.cdbApp = {
     setTimeout(attachListener, 800);
     setTimeout(attachListener, 2500);
   }
+})();
+
+// ================================================================
+// HARDWARE BACK BUTTON — handler inteligente
+// Sem isso, o Capacitor por padrao chama App.exitApp() e o app SAI no
+// primeiro toque do back. Felipe reportou que durante impressao apertar
+// back fechava o app inteiro — perdia contexto da tela.
+//
+// Prioridades (do mais especifico pro mais geral):
+//  1. Imprimindo agora       → IGNORA back (proteção critica do fluxo)
+//  2. Modal aberto           → fecha modal (incluindo Ajustes, Etiquetas,
+//                              Cardapio, Diagnostico, etc)
+//  3. Mais menu / busca      → fecha o overlay
+//  4. Tela != home           → goBack() (volta tela anterior do historico)
+//  5. Em home no top         → minimiza app (NAO fecha — preserva estado)
+// ================================================================
+(function setupBackButton() {
+  // Lista de IDs de modais conhecidos do app. Quando qualquer um esta com
+  // .show ou .open, o back fecha ele em vez de navegar/minimizar.
+  var MODAL_IDS = [
+    'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
+    'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
+    'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
+    'productModal','clientModal','batchModal','novoProdutoModal',
+    'globalSearchModal','diagnosticsModal','supportModal'
+  ];
+
+  function findOpenModal() {
+    for (var i = 0; i < MODAL_IDS.length; i++) {
+      var el = document.getElementById(MODAL_IDS[i]);
+      if (el && (el.classList.contains('show') || el.classList.contains('open') || el.classList.contains('active'))) {
+        return el;
+      }
+    }
+    // Fallback: procura qualquer overlay generico .np-overlay aberto
+    var overlays = document.querySelectorAll('.np-overlay.show, .modal.show, .overlay.show');
+    for (var j = 0; j < overlays.length; j++) {
+      if (overlays[j].offsetParent !== null) return overlays[j]; // visible check
+    }
+    return null;
+  }
+
+  function tryCloseModal(el) {
+    if (!el) return false;
+    var id = el.id || '';
+    // Mapeia IDs pra fechadores especificos quando existem (evita só remover
+    // a classe e deixar listeners ativos / estado inconsistente).
+    var closers = {
+      ajustesModal: 'closeAjustes',
+      etiquetasPreview: 'closeEtiquetasPreview',
+      noPrinterModal: 'closeNoPrinterModal',
+      updateModal: 'closeUpdateModal',
+      autoBackupModal: function () { autoBackupAction && autoBackupAction('skip'); },
+      cashEntryModal: 'closeCashModal',
+      cashCloseModal: 'closeCashCloseModal',
+      productModal: 'closeProductModal',
+      novoProdutoModal: 'closeProductModal',
+      clientModal: 'closeClientModal',
+      diagnosticsModal: 'closeDiagnostics',
+      globalSearchModal: 'closeGlobalSearch',
+      supportModal: 'closeSupport'
+    };
+    var closer = closers[id];
+    try {
+      if (typeof closer === 'function') { closer(); return true; }
+      if (typeof closer === 'string' && typeof window[closer] === 'function') {
+        window[closer](); return true;
+      }
+    } catch (e) { console.warn('[backbutton] closer falhou:', e); }
+    // Fallback genérico: tira as classes de visibilidade
+    el.classList.remove('show'); el.classList.remove('open'); el.classList.remove('active');
+    return true;
+  }
+
+  function isMoreMenuOpen() {
+    var el = document.getElementById('moreMenu');
+    return el && (el.classList.contains('show') || el.classList.contains('open'));
+  }
+
+  function handleBack(event) {
+    try {
+      // 1. Imprimindo: protege o fluxo
+      if (window.isPrinting === true) {
+        try { showToast && showToast('Aguarde a impressão terminar'); } catch (_) {}
+        return; // intercept silencioso
+      }
+      // 2. Modal aberto
+      var modal = findOpenModal();
+      if (modal) {
+        tryCloseModal(modal);
+        return;
+      }
+      // 3. Mais menu aberto
+      if (isMoreMenuOpen() && typeof closeMoreMenu === 'function') {
+        closeMoreMenu();
+        return;
+      }
+      // 4. Não estamos em home — volta na história
+      if (typeof currentScreen !== 'undefined' && currentScreen !== 'home'
+          && typeof goBack === 'function') {
+        goBack();
+        return;
+      }
+      // 5. Em home, sem modais — minimiza ao invés de fechar (preserva estado)
+      try {
+        var App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+        if (App && typeof App.minimizeApp === 'function') {
+          App.minimizeApp();
+        }
+      } catch (e) { /* noop */ }
+    } catch (e) {
+      console.warn('[backbutton] handler erro:', e);
+    }
+  }
+
+  function attach() {
+    try {
+      var App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+      if (!App || typeof App.addListener !== 'function') return false;
+      App.addListener('backButton', handleBack);
+      console.log('[backbutton] listener instalado');
+      return true;
+    } catch (e) { return false; }
+  }
+
+  if (!attach()) {
+    document.addEventListener('deviceready', attach, false);
+    document.addEventListener('DOMContentLoaded', attach, false);
+    setTimeout(attach, 800);
+    setTimeout(attach, 2500);
+  }
+
+  // Browser/PWA: também tratar popstate pra manter consistência ao testar fora do APK
+  window.addEventListener('popstate', function () {
+    handleBack();
+    // Adiciona uma entrada de novo pra evitar sair do app no proximo back
+    try { history.pushState({ cdb: true }, '', location.href); } catch (_) {}
+  });
+  try { history.pushState({ cdb: true }, '', location.href); } catch (_) {}
 })();
 
 // Forca checagem manual de update (botao Ajustes > Verificar atualizacoes).
