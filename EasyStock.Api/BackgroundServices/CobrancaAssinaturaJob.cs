@@ -16,7 +16,24 @@ public sealed class CobrancaAssinaturaJob(
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
-        if (db is null) { await action(ct); return; }
+        if (db is null)
+        {
+            // Sem DbContext: só ocorre em DEV com provider não-relacional ou DI mal configurada.
+            // Roda sem lock — aceitável em dev (réplica única), MAS em multi-pod prod isso causa
+            // cobrança duplicada. Log em Warning para alertar caso isso vaze pra prod.
+            logger.LogWarning("CobrancaAssinaturaJob: DbContext indisponível — executando SEM advisory lock. NÃO usar em multi-pod.");
+            await action(ct);
+            return;
+        }
+
+        // pg_try_advisory_lock é exclusivo do PostgreSQL. Se outro provider (SQLite em dev),
+        // pulamos com warning para deixar explícito o risco em ambientes não-PG.
+        if (!db.Database.IsNpgsql())
+        {
+            logger.LogWarning("CobrancaAssinaturaJob: provider {Provider} não suporta advisory lock — executando SEM lock.", db.Database.ProviderName);
+            await action(ct);
+            return;
+        }
 
         // Tenta adquirir lock — se outra réplica já tem, sai sem rodar.
         await db.Database.OpenConnectionAsync(ct);

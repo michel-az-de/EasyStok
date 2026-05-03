@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -9,7 +10,7 @@ namespace EasyStock.Infra.Postgre.Repositories
     public sealed class ItemEstoqueRepository(EasyStockDbContext dbContext)
         : IItemEstoqueRepository
     {
-        private const decimal FallbackMargemPrecoSugerido = 1.3m;
+        private const decimal FallbackMargemPrecoSugerido = OperacionalDefaults.FallbackMargemPrecoSugerido;
         public Task<ItemEstoque?> GetByIdAsync(Guid id) =>
             dbContext.ItensEstoque.FirstOrDefaultAsync(i => i.Id == id);
 

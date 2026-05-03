@@ -93,7 +93,13 @@ public sealed class DiagnosticoController(
                         foreach (var file in logFiles)
                         {
                             allEntries.AddRange(DiagnosticoLogAnalyzer.ParseEnhancedLogFile(file.FullName, cutoff));
-                            if (allEntries.Count > 5000) { allEntries = allEntries.TakeLast(5000).ToList(); break; }
+                            // Evita realocacao de lista inteira ao truncar — modifica a lista existente
+                            // removendo entries do inicio, que e ~O(n) mas sem alocar uma 2a list grande.
+                            if (allEntries.Count > 5000)
+                            {
+                                allEntries.RemoveRange(0, allEntries.Count - 5000);
+                                break;
+                            }
                         }
 
                         enhancedLogs = new EnhancedLogsResult

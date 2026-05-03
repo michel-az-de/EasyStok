@@ -233,10 +233,9 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-                await regDb.Database.ExecuteSqlRawAsync(
-                    "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") " +
-                    "VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
-                    migrationId, "9.0.0");
+                const string productVersion = "9.0.0";
+                await regDb.Database.ExecuteSqlInterpolatedAsync(
+                    $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
             }
         }
 

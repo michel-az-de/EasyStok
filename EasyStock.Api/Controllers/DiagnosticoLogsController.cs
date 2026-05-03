@@ -238,7 +238,8 @@ public sealed class DiagnosticoLogsController(
             catch (Exception ex)
             {
                 logger.LogDebug(ex, "SSE logs/live: erro ao ler logs.");
-                try { await Response.WriteAsync($": error {ex.GetType().Name}\n\n", ct); await Response.Body.FlushAsync(ct); } catch { }
+                try { await Response.WriteAsync($": error {ex.GetType().Name}\n\n", ct); await Response.Body.FlushAsync(ct); }
+                catch (Exception writeEx) { logger.LogTrace(writeEx, "SSE logs/live: cliente desconectou durante escrita do erro."); }
             }
         }
     }
@@ -579,7 +580,8 @@ public sealed class DiagnosticoLogsController(
             }
             finally
             {
-                try { System.IO.File.Delete(tmpPath); } catch { }
+                try { System.IO.File.Delete(tmpPath); }
+                catch (Exception delEx) { logger.LogDebug(delEx, "Falha ao remover arquivo temporario {Path}", tmpPath); }
             }
         }
         catch (Exception ex)

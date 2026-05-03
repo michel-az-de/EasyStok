@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         {
             Quantidade = (int)i.QuantidadeAtual,
             ValorCusto = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
-            ValorVenda = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * 1.3m) * (int)i.QuantidadeAtual,
+            ValorVenda = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual,
             EstaAbaixoMinimo = (int)i.QuantidadeAtual < i.QuantidadeMinima
         }).ToListAsync();
 
@@ -111,7 +112,9 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             ValorTotalEstoque: Math.Round(valorVenda, 2),
             ValorCustoEstoque: Math.Round(valorCusto, 2),
             MediaVendasDiaria: Math.Round(mediaVendasDiaria, 2),
-            ProjecaoVendasPeriodo: Math.Round(mediaVendasDiaria * periodoDias, 0),
+            // Arredondamento explicito AwayFromZero — default ToEven (banker's) seria
+            // contraintuitivo num KPI de projeção de vendas para o usuário final.
+            ProjecaoVendasPeriodo: Math.Round(mediaVendasDiaria * periodoDias, 0, MidpointRounding.AwayFromZero),
             ReceitaEstimadaPeriodo: Math.Round(receitaEstimada, 2),
             AlertasEstoqueBaixo: alertasBaixo,
             AlertasVencimento: alertasValidade,

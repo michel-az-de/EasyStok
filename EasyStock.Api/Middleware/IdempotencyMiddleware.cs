@@ -18,7 +18,7 @@ namespace EasyStock.Api.Middleware;
 ///
 /// TTL: 24h. Cleanup periodico via <see cref="IIdempotencyKeyRepository.CleanupExpiredAsync"/>.
 /// </summary>
-public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptions options)
+public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptions options, ILogger<IdempotencyMiddleware> logger)
 {
     private const string HeaderName = "Idempotency-Key";
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
@@ -111,10 +111,12 @@ public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptio
             {
                 await repo.SaveAsync(entry, context.RequestAborted);
             }
-            catch
+            catch (Exception ex)
             {
                 // Falha ao persistir cache nao deve invalidar a operacao
                 // ja completada — seguinte request fara o mesmo trabalho.
+                // Logar como warning porque pode mascarar duplicacoes futuras.
+                logger.LogWarning(ex, "Falha ao persistir idempotency key. Retry pode reaplicar efeitos.");
             }
         }
     }

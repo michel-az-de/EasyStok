@@ -143,10 +143,11 @@ public class AdminAdminsController(
     private static string GerarSenhaAleatoria(int length)
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
-        var bytes = RandomNumberGenerator.GetBytes(length);
+        // RandomNumberGenerator.GetInt32 elimina modulo bias automaticamente
+        // (256 % 65 != 0 → bytes brutos enviesariam chars iniciais).
         var sb = new StringBuilder(length);
-        foreach (var b in bytes)
-            sb.Append(chars[b % chars.Length]);
+        for (var i = 0; i < length; i++)
+            sb.Append(chars[RandomNumberGenerator.GetInt32(chars.Length)]);
         return sb.ToString();
     }
 }

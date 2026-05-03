@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -120,7 +121,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     LojaId = g.Key,
                     TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
                     QuantidadeTotal = g.Sum(i => (int)i.QuantidadeAtual),
-                    ValorEstoque = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * 1.3m) * (int)i.QuantidadeAtual),
+                    ValorEstoque = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual),
                     AlertasCriticos = g.Count(i => (int)i.QuantidadeAtual <= 2),
                     ItensAbaixoMinimo = g.Count(i => (int)i.QuantidadeAtual < i.QuantidadeMinima),
                     AlertasVencimento = g.Count(i => i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade),

@@ -133,10 +133,15 @@ public class AdminTenantsController(
             new("impersonated_by", currentUser.UsuarioId.ToString())
         };
 
+        var agora = DateTime.UtcNow;
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddSeconds(900),
+            // NotBefore + IssuedAt explicitos para que validacao do JWT rejeite tokens com
+            // timestamps inconsistentes ou clones gerados fora desta sessao.
+            NotBefore = agora,
+            IssuedAt = agora,
+            Expires = agora.AddSeconds(900),
             Issuer = configuration["Jwt:Issuer"],
             Audience = configuration["Jwt:Audience"],
             SigningCredentials = credentials

@@ -35,7 +35,11 @@ public class WebhookPixController(
 
         JsonElement payload;
         try { payload = JsonDocument.Parse(rawBody).RootElement; }
-        catch { return BadRequest(); }
+        catch (JsonException jx)
+        {
+            logger.LogWarning(jx, "Webhook Pix: payload JSON invalido. Recusando.");
+            return BadRequest(new { error = "INVALID_JSON" });
+        }
 
         try
         {

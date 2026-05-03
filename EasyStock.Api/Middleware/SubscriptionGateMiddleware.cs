@@ -93,8 +93,7 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
             blockCode = "SUBSCRIPTION_EXPIRED";
             blockMsg = "Assinatura expirada.";
         }
-        else if (assinatura.TrialFim.HasValue && assinatura.TrialFim.Value < now &&
-                 (!assinatura.DataFim.HasValue || assinatura.DataFim.Value < now))
+        else if (TrialExpiradoSemPlanoAtivo(assinatura, now))
         {
             blockCode = "TRIAL_EXPIRED";
             blockMsg = "Período de teste expirado. Faça upgrade para continuar.";
@@ -120,5 +119,15 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
             }
         });
         await context.Response.WriteAsync(body);
+    }
+
+    // Trial expirou E não há plano pago vigente (DataFim null = nunca pagou; DataFim < now = plano expirado).
+    // Usuário com plano pago vigente passa mesmo se TrialFim < now.
+    private static bool TrialExpiradoSemPlanoAtivo(EasyStock.Domain.Entities.AssinaturaEmpresa assinatura, DateTime now)
+    {
+        if (!assinatura.TrialFim.HasValue) return false;
+        if (assinatura.TrialFim.Value >= now) return false;
+        var planoPagoVigente = assinatura.DataFim.HasValue && assinatura.DataFim.Value >= now;
+        return !planoPagoVigente;
     }
 }
