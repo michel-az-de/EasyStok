@@ -480,6 +480,25 @@
 
   async function localBackupToFile(note) {
     var json = JSON.stringify(_buildBackupPayload(note));
+
+    // Sanity-check de espaco antes de tentar escrever. StorageEstimate
+    // reporta quota da origin (IndexedDB/localStorage) — nao reflete
+    // exatamente o filesystem do device, mas se quota esta cheia
+    // tipicamente indica pouco espaco geral. Aborta cedo em vez de
+    // explodir no Filesystem.writeFile silenciosamente.
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        var est = await navigator.storage.estimate();
+        if (est && typeof est.quota === 'number' && typeof est.usage === 'number') {
+          var livre = est.quota - est.usage;
+          if (livre < Math.max(json.length * 4, 1024 * 1024)) {
+            console.warn('[localBackup] espaco insuficiente (livre=' + livre + 'B). Abortando.');
+            return { ok: false, reason: 'insufficient-storage' };
+          }
+        }
+      }
+    } catch (_) { /* nao bloqueia se API indisponivel */ }
+
     var anyOk = false;
     var details = { publicUris: null, scopedUri: null };
 

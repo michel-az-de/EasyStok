@@ -7783,7 +7783,13 @@ let operatorName = (() => {
 })();
 
 function saveOperatorName(name) {
-  const clean = (name || '').trim().slice(0, 32);
+  // Sanitiza: remove control chars, < > " \ pra evitar que nome corrompa
+  // log do servidor ou seja usado em payload de injection. Mantem letras
+  // (incl. acentos PT-BR), digitos, espaco, hifen, ponto e apostrofo.
+  const clean = String(name || '')
+    .replace(/[\x00-\x1F\x7F<>"\\]/g, '')
+    .trim()
+    .slice(0, 32);
   operatorName = clean;
   try { localStorage.setItem('cdb-operator-name', clean); } catch (e) {}
   renderOperatorBadge();
@@ -17972,10 +17978,18 @@ window.cdbApp = {
 (function setupDeepLinking() {
   function route(url) {
     if (!url) return;
+    var rawUrl = String(url);
+    // Rejeita tentativa de path traversal — switch ja restringe a whitelist,
+    // mas defesa em profundidade contra "cdb://orders/../../admin" ou variantes
+    // url-encoded. Cobre %2e%2e (..) e %2f (/).
+    if (/\.\.|%2e%2e|%2f/i.test(rawUrl)) {
+      try { console.warn('[deeplink] rejeitado por path traversal:', rawUrl); } catch (_) {}
+      return;
+    }
     try {
       // Aceita "cdb://orders/new" e tambem "cdb:orders/new" (variantes
       // que alguns launchers/apps geram). Normaliza removendo o esquema.
-      var path = String(url).replace(/^cdb:(\/\/)?/, '');
+      var path = rawUrl.replace(/^cdb:(\/\/)?/, '');
       var parts = path.split('?')[0].split('/').filter(Boolean);
       var head = (parts[0] || 'home').toLowerCase();
 
