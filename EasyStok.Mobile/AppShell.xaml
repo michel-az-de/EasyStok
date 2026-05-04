@@ -5,15 +5,30 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:views="clr-namespace:EasyStok.Mobile.Views"
     Title="EasyStok Mobile"
-    FlyoutBehavior="Disabled">
+    FlyoutBehavior="Disabled"
+    Shell.TabBarIsVisible="False">
 
     <!--
-    HomePage e a rota inicial. Demais rotas registradas em
-    AppShell.xaml.cs para navegacao via Shell.Current.GoToAsync("rota").
+    Rotas declaradas como ShellContent para suportar navegacao absoluta
+    (Shell.Current.GoToAsync("//rota")). LoginPage e a primeira para ser
+    o landing default antes de OnNavigated redirecionar conforme sessao.
+    Agrupado em <TabBar> com TabBarIsVisible=False para esconder a tab bar.
     -->
-    <ShellContent
-        Title="Inicio"
-        Route="home"
-        ContentTemplate="{DataTemplate views:HomePage}" />
+    <TabBar>
+        <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" />
+        <ShellContent Route="tenant-picker" ContentTemplate="{DataTemplate views:TenantPickerPage}" />
+        <ShellContent Route="loja-picker" ContentTemplate="{DataTemplate views:LojaPickerPage}" />
+        <ShellContent Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
+        <ShellContent Route="producao" ContentTemplate="{DataTemplate views:ProducaoPage}" />
+        <ShellContent Route="pedidos" ContentTemplate="{DataTemplate views:PedidosPage}" />
+        <ShellContent Route="caixa" ContentTemplate="{DataTemplate views:CaixaPage}" />
+        <ShellContent Route="finalizados" ContentTemplate="{DataTemplate views:FinalizadosPage}" />
+        <ShellContent Route="clientes" ContentTemplate="{DataTemplate views:ClientesPage}" />
+        <ShellContent Route="suporte" ContentTemplate="{DataTemplate views:SuportePage}" />
+        <ShellContent Route="conferencia" ContentTemplate="{DataTemplate views:ConferenciaPage}" />
+        <ShellContent Route="compras" ContentTemplate="{DataTemplate views:ComprasPage}" />
+        <ShellContent Route="historico" ContentTemplate="{DataTemplate views:HistoricoPage}" />
+        <ShellContent Route="estoque" ContentTemplate="{DataTemplate views:EstoquePage}" />
+    </TabBar>
 
 </Shell>
