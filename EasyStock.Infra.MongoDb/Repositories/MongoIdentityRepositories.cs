@@ -458,6 +458,24 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
         return assinatura;
     }
 
+    public async Task<AssinaturaEmpresa?> GetMaisRecenteAsync(Guid empresaId)
+    {
+        return await Collection.Find(x => x.EmpresaId == empresaId)
+            .Sort(Builders<AssinaturaEmpresa>.Sort.Descending(a => a.DataInicio))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<AssinaturaEmpresa?> GetAtivaMaisRecenteAsync(Guid empresaId)
+    {
+        var assinatura = await Collection.Find(x => x.EmpresaId == empresaId && x.Status == StatusAssinatura.Ativa)
+            .Sort(Builders<AssinaturaEmpresa>.Sort.Descending(a => a.DataInicio))
+            .FirstOrDefaultAsync();
+        if (assinatura is null) return null;
+
+        assinatura.Plano = await Planos.Find(x => x.Id == assinatura.PlanoId).FirstOrDefaultAsync();
+        return assinatura;
+    }
+
     public Task AddAsync(AssinaturaEmpresa assinatura)
     {
         EnqueueInsert(Collection, assinatura);

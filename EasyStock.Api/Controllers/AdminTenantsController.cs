@@ -22,6 +22,11 @@ namespace EasyStock.Api.Controllers;
 public class AdminTenantsController(
     EasyStockDbContext db,
     IAdminTenantsQueries tenantsQueries,
+    IAssinaturaEmpresaRepository assinaturaRepo,
+    IPlanoRepository planoRepo,
+    ICupomRepository cupomRepo,
+    IAuditLogRepository auditLogRepo,
+    IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser,
     IConfiguration configuration,
     AdminAuditService audit) : EasyStockControllerBase
@@ -51,20 +56,19 @@ public class AdminTenantsController(
         return DataOk(detalhe);
     }
 
-    // TODO B4 follow-up: extrair os 6 endpoints de mutação abaixo para UseCases dedicados
-    // (PatchStatus, Impersonate, PatchPlano, GetAudit, GrantTrial, AplicarCupom). Hoje
-    // ainda dependem de db.AssinaturasEmpresa / db.AdminImpersonationLogs / db.Cupons /
-    // db.AuditLogs direto — violação leve, gated por SuperAdmin policy. As leituras
-    // complexas (GetTenants/GetTenant) já foram migradas para IAdminTenantsQueries.
+    // TODO B4 follow-up: extrair os endpoints de mutação para UseCases dedicados.
+    // Hoje: PatchStatus, PatchPlano, GrantTrial, AplicarCupom já usam ports (IAssinatura/
+    // IPlano/ICupom/IAuditLog Repository). Restam Impersonate e GetAudit que ainda
+    // tocam db.UsuariosEmpresas / db.UsuariosPerfis / db.AdminImpersonationLogs /
+    // db.AuditLogs direto — JWT generation + queries complexas, requer refactor maior
+    // (criar IAdminImpersonationLogRepository + IUsuarioPerfilRepository.GetByUsuarioE...).
+    // Acoplamento atual gated por SuperAdmin policy. Leituras complexas já foram
+    // migradas para IAdminTenantsQueries.
 
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> PatchStatus(Guid id, [FromBody] PatchTenantStatusRequest req)
     {
-        var assinatura = await db.AssinaturasEmpresa
-            .Where(a => a.EmpresaId == id)
-            .OrderByDescending(a => a.DataInicio)
-            .FirstOrDefaultAsync();
-
+        var assinatura = await assinaturaRepo.GetMaisRecenteAsync(id);
         if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
 
         if (!Enum.TryParse<StatusAssinatura>(req.Status, out var novoStatus))
@@ -78,7 +82,8 @@ public class AdminTenantsController(
             default: return DataBadRequest("Status não suportado.");
         }
 
-        db.AuditLogs.Add(AuditLog.Criar(
+        await assinaturaRepo.UpdateAsync(assinatura);
+        await auditLogRepo.AddAsync(AuditLog.Criar(
             currentUser.UsuarioId,
             $"AdminAlterarStatusTenant:{novoStatus}",
             true,
@@ -86,7 +91,7 @@ public class AdminTenantsController(
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             null));
 
-        await db.CommitAsync();
+        await unitOfWork.CommitAsync();
         await audit.LogAsync("TenantStatusAlterado", $"Status={novoStatus}, Motivo={req.Motivo}", id);
         return DataOk(new { status = novoStatus.ToString() });
     }
@@ -163,19 +168,16 @@ public class AdminTenantsController(
     [HttpPatch("{id:guid}/plano")]
     public async Task<IActionResult> PatchPlano(Guid id, [FromBody] PatchTenantPlanoRequest req)
     {
-        var assinatura = await db.AssinaturasEmpresa
-            .Where(a => a.EmpresaId == id && a.Status == StatusAssinatura.Ativa)
-            .OrderByDescending(a => a.DataInicio)
-            .FirstOrDefaultAsync();
-
+        var assinatura = await assinaturaRepo.GetAtivaMaisRecenteAsync(id);
         if (assinatura is null) return DataNotFound("Assinatura ativa não encontrada.");
 
-        var plano = await db.Planos.FindAsync(req.PlanoId);
+        var plano = await planoRepo.GetByIdAsync(req.PlanoId);
         if (plano is null) return DataNotFound("Plano não encontrado.");
 
         assinatura.PlanoId = req.PlanoId;
         assinatura.AlteradoEm = DateTime.UtcNow;
-        await db.CommitAsync();
+        await assinaturaRepo.UpdateAsync(assinatura);
+        await unitOfWork.CommitAsync();
         await audit.LogAsync("TenantPlanoAlterado", $"PlanoId={req.PlanoId}, PlanoNome={plano.Nome}", id);
 
         return DataOk(new { planoId = req.PlanoId, planoNome = plano.Nome });
@@ -210,15 +212,12 @@ public class AdminTenantsController(
         if (req.DiasTrial < 1 || req.DiasTrial > 90)
             return DataBadRequest("DiasTrial deve estar entre 1 e 90.");
 
-        var assinatura = await db.AssinaturasEmpresa
-            .Where(a => a.EmpresaId == id)
-            .OrderByDescending(a => a.DataInicio)
-            .FirstOrDefaultAsync();
-
+        var assinatura = await assinaturaRepo.GetMaisRecenteAsync(id);
         if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
 
         assinatura.AtivarTrial(req.DiasTrial);
-        await db.CommitAsync();
+        await assinaturaRepo.UpdateAsync(assinatura);
+        await unitOfWork.CommitAsync();
         await audit.LogAsync("TrialConcedido", $"Dias={req.DiasTrial}, TrialFim={assinatura.TrialFim:O}", id);
 
         return DataOk(new { trialFim = assinatura.TrialFim });
@@ -227,21 +226,18 @@ public class AdminTenantsController(
     [HttpPost("{id:guid}/aplicar-cupom")]
     public async Task<IActionResult> AplicarCupom(Guid id, [FromBody] AplicarCupomRequest req)
     {
-        var assinatura = await db.AssinaturasEmpresa
-            .Where(a => a.EmpresaId == id)
-            .OrderByDescending(a => a.DataInicio)
-            .FirstOrDefaultAsync();
-
+        var assinatura = await assinaturaRepo.GetMaisRecenteAsync(id);
         if (assinatura is null) return DataNotFound("Assinatura não encontrada.");
 
-        var cupom = await db.Cupons.FirstOrDefaultAsync(c => c.Codigo == req.Codigo.ToUpperInvariant());
+        var cupom = await cupomRepo.GetByCodigoAsync(req.Codigo);
         if (cupom is null) return DataNotFound("Cupom não encontrado.");
 
         if (!cupom.PodeUsarEm(DateTime.UtcNow))
             return Conflict(new { error = new { code = "CUPOM_INVALIDO", message = "Cupom inválido, expirado ou esgotado." } });
 
         assinatura.AplicarCupom(cupom);
-        await db.CommitAsync();
+        await assinaturaRepo.UpdateAsync(assinatura);
+        await unitOfWork.CommitAsync();
         await audit.LogAsync("CupomAplicado", $"Codigo={cupom.Codigo}, Desconto={cupom.Valor}", id);
 
         return DataOk(new { cupomCodigo = cupom.Codigo, descontoAplicado = cupom.Valor });

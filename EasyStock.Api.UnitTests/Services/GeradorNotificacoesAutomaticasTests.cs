@@ -11,6 +11,12 @@ namespace EasyStock.Api.UnitTests.Services;
 
 public class GeradorNotificacoesAutomaticasTests
 {
+    private static async IAsyncEnumerable<Empresa> Stream(params Empresa[] empresas)
+    {
+        foreach (var e in empresas) yield return e;
+        await Task.CompletedTask;
+    }
+
     [Fact]
     public async Task Deve_gerar_notificacoes_sem_duplicar_no_mesmo_dia()
     {
@@ -26,7 +32,8 @@ public class GeradorNotificacoesAutomaticasTests
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        empresaRepository.GetAllAsync().Returns(new[] { new Empresa { Id = empresaId, Nome = "Empresa" } });
+        empresaRepository.StreamAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Stream(new Empresa { Id = empresaId, Nome = "Empresa" }));
         lojaRepository.GetByEmpresaAsync(empresaId).Returns(new[] { new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja", Ativa = true } });
         configuracaoLojaRepository.GetOrDefaultAsync(lojaId).Returns(ConfiguracaoLoja.CriarPadrao(lojaId));
         estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId)
@@ -85,7 +92,8 @@ public class GeradorNotificacoesAutomaticasTests
         var lojaId = Guid.NewGuid();
         var pedidoAtrasadoId = Guid.NewGuid();
         var pedidoRecebidoId = Guid.NewGuid();
-        empresaRepository.GetAllAsync().Returns(new[] { new Empresa { Id = empresaId, Nome = "Empresa" } });
+        empresaRepository.StreamAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Stream(new Empresa { Id = empresaId, Nome = "Empresa" }));
         lojaRepository.GetByEmpresaAsync(empresaId).Returns(new[] { new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja", Ativa = true } });
         configuracaoLojaRepository.GetOrDefaultAsync(lojaId).Returns(ConfiguracaoLoja.CriarPadrao(lojaId));
         estoqueRepository.GetEstoqueBaixoAsync(empresaId, Arg.Any<int>(), 1, 100, lojaId).Returns((Array.Empty<ItemEstoque>(), 0));

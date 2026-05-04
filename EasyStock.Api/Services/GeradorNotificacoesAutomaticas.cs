@@ -16,17 +16,20 @@ public sealed class GeradorNotificacoesAutomaticas(
 {
     public async Task ExecutarAsync(CancellationToken ct = default)
     {
-        var empresas = await empresaRepository.GetAllAsync();
-        foreach (var empresa in empresas)
+        var total = 0;
+        // Stream evita carregar todas as empresas em memoria — em prod multi-tenant
+        // a tabela cresce indefinidamente e GetAllAsync seria O(n) memoria.
+        await foreach (var empresa in empresaRepository.StreamAllAsync(ct))
         {
             if (ct.IsCancellationRequested)
                 break;
 
             await ProcessarEmpresaAsync(empresa, ct);
             await unitOfWork.CommitAsync();
+            total++;
         }
 
-        logger.LogInformation("Geração automática de notificações concluída para {TotalEmpresas} empresa(s).", empresas.Count());
+        logger.LogInformation("Geração automática de notificações concluída para {TotalEmpresas} empresa(s).", total);
     }
 
     private async Task ProcessarEmpresaAsync(Empresa empresa, CancellationToken ct)

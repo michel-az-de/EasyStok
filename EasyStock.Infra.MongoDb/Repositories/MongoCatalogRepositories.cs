@@ -76,6 +76,20 @@ public sealed class EmpresaRepository(MongoEasyStockContext context, MongoUnitOf
     public async Task<IEnumerable<Empresa>> GetAllAsync() =>
         await Collection.Find(FilterDefinition<Empresa>.Empty).ToListAsync();
 
+    public async IAsyncEnumerable<Empresa> StreamAllAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var cursor = await Collection.Find(FilterDefinition<Empresa>.Empty).ToCursorAsync(ct);
+        while (await cursor.MoveNextAsync(ct))
+        {
+            foreach (var empresa in cursor.Current)
+            {
+                ct.ThrowIfCancellationRequested();
+                yield return empresa;
+            }
+        }
+    }
+
     public Task AddAsync(Empresa empresa)
     {
         EnqueueInsert(Collection, empresa);

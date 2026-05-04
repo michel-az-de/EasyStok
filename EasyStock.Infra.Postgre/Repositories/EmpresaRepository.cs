@@ -20,6 +20,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IEnumerable<Empresa>> GetAllAsync() =>
             await dbContext.Empresas.AsNoTracking().ToListAsync();
 
+        public IAsyncEnumerable<Empresa> StreamAllAsync(CancellationToken ct = default) =>
+            dbContext.Empresas.AsNoTracking().AsAsyncEnumerable();
+
         public Task AddAsync(Empresa empresa) =>
             dbContext.Empresas.AddAsync(empresa).AsTask();
     }

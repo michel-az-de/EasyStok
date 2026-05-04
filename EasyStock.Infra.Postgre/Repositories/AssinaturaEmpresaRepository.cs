@@ -20,6 +20,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(a => a.Plano)
                 .FirstOrDefaultAsync(a => a.EmpresaId == empresaId && a.Status == StatusAssinatura.Ativa);
 
+        public Task<AssinaturaEmpresa?> GetMaisRecenteAsync(Guid empresaId) =>
+            dbContext.AssinaturasEmpresa
+                .Where(a => a.EmpresaId == empresaId)
+                .OrderByDescending(a => a.DataInicio)
+                .FirstOrDefaultAsync();
+
+        public Task<AssinaturaEmpresa?> GetAtivaMaisRecenteAsync(Guid empresaId) =>
+            dbContext.AssinaturasEmpresa
+                .Include(a => a.Plano)
+                .Where(a => a.EmpresaId == empresaId && a.Status == StatusAssinatura.Ativa)
+                .OrderByDescending(a => a.DataInicio)
+                .FirstOrDefaultAsync();
+
         public Task AddAsync(AssinaturaEmpresa assinatura) =>
             dbContext.AssinaturasEmpresa.AddAsync(assinatura).AsTask();
 
