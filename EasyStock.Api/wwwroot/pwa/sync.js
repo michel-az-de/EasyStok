@@ -306,17 +306,24 @@
   };
 
   // ---- Eventos de conectividade ----
-  window.addEventListener('online', () => {
+  function handleOnline() {
     console.log('Voltei online, sincronizando...');
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
-  });
-  window.addEventListener('offline', stopRealtime);
-  window.addEventListener('offline', () => console.log('Offline, tudo vai pra fila.'));
+  }
+  function handleOffline() {
+    stopRealtime();
+    console.log('Offline, tudo vai pra fila.');
+  }
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
 
   // ---- Inicialização ----
   let flushIntervalId = null;
   function stop() {
     if (flushIntervalId) { clearInterval(flushIntervalId); flushIntervalId = null; }
+    stopRealtime();
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
   }
   // Cleanup no unload — em Capacitor o pagehide dispara antes de descarregar
   // a webview; no browser puro tambem cobre fechamento de aba.

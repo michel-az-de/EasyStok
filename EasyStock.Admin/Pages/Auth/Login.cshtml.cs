@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Auth;
 
-public class LoginModel(AdminApiClient api, AdminSessionService session) : PageModel
+public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger<LoginModel> logger) : PageModel
 {
     [BindProperty] public string Email { get; set; } = "";
     [BindProperty] public string Senha { get; set; } = "";
@@ -55,7 +55,8 @@ public class LoginModel(AdminApiClient api, AdminSessionService session) : PageM
         }
         catch (Exception ex)
         {
-            Erro = $"Erro ao conectar à API: {ex.Message}";
+            logger.LogError(ex, "Falha ao conectar na API durante login admin (email={Email})", Email);
+            Erro = "Não foi possível concluir o login. Tente novamente em instantes.";
             return Page();
         }
     }

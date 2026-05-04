@@ -34,10 +34,13 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         foreach (var permissao in resultado.Permissoes.Distinct())
             claims.Add(new Claim("permissao", permissao.ToString()));
 
+        var agora = DateTime.UtcNow;
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddSeconds(ExpiresInSeconds),
+            NotBefore = agora,
+            IssuedAt = agora,
+            Expires = agora.AddSeconds(ExpiresInSeconds),
             Issuer = configuration["Jwt:Issuer"],
             Audience = configuration["Jwt:Audience"],
             SigningCredentials = credentials
