@@ -63,8 +63,7 @@
 
 ## Diretórios notáveis
 
-- `casa-da-baba-mobile/pwa/` — PWA white-label vanilla JS
-- `EasyStock.Api/wwwroot/pwa/` — versão servida pela API
+- `EasyStock.Api/wwwroot/pwa/` — PWA white-label vanilla JS, fonte da verdade. Servida pela API e empacotada no APK pelo `casa-da-baba-mobile/apk/scripts/copy-web.js`.
 - `scripts/` — deploy GCP, seed, utilitários
 - `docs/reports/` — relatórios de análise (ANALISE-CONCORRENTES, Visão de Valor)
 - `.knowledge/` — esta knowledge base (gitignored)

@@ -30,8 +30,8 @@
 
 ## P2 — Qualidade
 
-7. **PWA mobile tem 12,876 linhas de JS monolítico** (`casa-da-baba-mobile/pwa/sync.js`)
-   - Sem testes. Sync offline complexo.
+7. **PWA mobile com sync.js monolítico** (`EasyStock.Api/wwwroot/pwa/sync.js`)
+   - Sem testes. Sync offline complexo (~1000 linhas hoje).
    - Não migrar agora, mas isolar mudanças.
 
 8. **Falta migration formalizada para `xmin` em entidades novas**

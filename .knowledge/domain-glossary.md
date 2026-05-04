@@ -46,5 +46,5 @@
 - Limite mensal vem do plano. Reset 1º do mês.
 
 ## PWA Mobile (Casa da Babá)
-- White-label fixado. Config por empresa (`MobileTenantConfig`). PWA vanilla JS em `casa-da-baba-mobile/pwa/`.
+- White-label fixado. Config por empresa (`MobileTenantConfig`). PWA vanilla JS em `EasyStock.Api/wwwroot/pwa/`.
 - Sync offline via IndexedDB + service worker. Mantida como referência — não migrar pra framework agora.

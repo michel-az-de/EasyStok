@@ -91,11 +91,13 @@ app.Run();
 
 Se o `Program.cs` já tem `AddControllers()`, `UseCors(...)` e `MapControllers()`, **não duplique**. Em vez disso, só copie a parte de static files do `UseMobileModule` manualmente.
 
-## Passo 6 — Copiar o PWA pra wwwroot
+## Passo 6 — PWA já está em wwwroot
+
+A fonte da verdade do PWA é `EasyStock.Api/wwwroot/pwa/` — já vem versionada no repo. Não há mais cópia separada em `casa-da-baba-mobile/pwa/` (era a fonte original; foi consolidada). Se você está integrando num projeto novo, copie de `EasyStock.Api/wwwroot/pwa/`:
 
 ```bash
 mkdir -p SeuProjetoApi/wwwroot/pwa
-cp -r casa-da-baba-mobile/pwa/* SeuProjetoApi/wwwroot/pwa/
+cp -r EasyStock.Api/wwwroot/pwa/* SeuProjetoApi/wwwroot/pwa/
 ```
 
 Confere que ficou:

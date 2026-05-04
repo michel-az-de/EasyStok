@@ -133,11 +133,13 @@ dotnet ef database update
 
 O SQL já traz um `INSERT ... ON CONFLICT DO NOTHING` com o catálogo inicial (7 produtos do cardápio). Se escolher EF Core, o seed pode ser adicionado com `HasData` no `OnModelCreating` ou simplesmente rodando o trecho de INSERT separadamente.
 
-### Passo 6 — Copiar o PWA pra wwwroot
+### Passo 6 — PWA ja esta em wwwroot
+
+A fonte da verdade do PWA e `EasyStock.Api/wwwroot/pwa/` (versionada no repo). A pasta original `casa-da-baba-mobile/pwa/` foi removida — drift entre as duas copias estava causando bugs (fix aplicado num lado nao chegava no outro). Se voce precisa replicar o PWA pra outro projeto, copie de `EasyStock.Api/wwwroot/pwa/`:
 
 ```bash
 mkdir -p [ProjetoApi]/wwwroot/pwa
-cp -r casa-da-baba-mobile/pwa/* [ProjetoApi]/wwwroot/pwa/
+cp -r EasyStock.Api/wwwroot/pwa/* [ProjetoApi]/wwwroot/pwa/
 ```
 
 O `UseMobileModule` já configura o `UseStaticFiles` apontando pra essa pasta.
