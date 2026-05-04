@@ -1,7 +1,7 @@
 ﻿using Android.App;
 using Android.Runtime;
 
-namespace EasyStock.Mobile.Maui;
+namespace EasyStok.Mobile;
 
 [Application]
 public class MainApplication : MauiApplication

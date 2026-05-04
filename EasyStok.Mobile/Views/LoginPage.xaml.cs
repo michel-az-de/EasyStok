@@ -1,9 +1,20 @@
+using EasyStok.Mobile.ViewModels;
+
 namespace EasyStok.Mobile.Views;
 
 public partial class LoginPage : ContentPage
 {
-	public LoginPage()
+	private readonly LoginViewModel _vm;
+
+	public LoginPage(LoginViewModel vm)
 	{
 		InitializeComponent();
+		BindingContext = _vm = vm;
+	}
+
+	protected override async void OnAppearing()
+	{
+		base.OnAppearing();
+		await _vm.InitializeAsync();
 	}
 }

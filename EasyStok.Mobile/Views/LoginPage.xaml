@@ -1,12 +1,68 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.LoginPage"
-             Title="Login">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Login" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F2)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
-        </VerticalStackLayout>
+             x:DataType="vm:LoginViewModel"
+             Title="Login"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="22,32">
+        <ScrollView>
+            <VerticalStackLayout Spacing="14" VerticalOptions="Center" HorizontalOptions="Fill">
+
+                <!-- Brand header -->
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center" Margin="0,0,0,16">
+                    <Label Text="EasyStok" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
+                    <Label Text="Mobile" Style="{StaticResource LabelHeroAccent}" HorizontalOptions="Center" />
+                    <Label Text="Sua operacao no bolso"
+                           Style="{StaticResource LabelGreeting}"
+                           HorizontalOptions="Center" />
+                </VerticalStackLayout>
+
+                <!-- Email -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="EMAIL" Style="{StaticResource LabelSuffix}" />
+                        <Entry Text="{Binding Email}"
+                               Keyboard="Email"
+                               Placeholder="voce@empresa.com"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Senha -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="SENHA" Style="{StaticResource LabelSuffix}" />
+                        <Entry Text="{Binding Senha}"
+                               IsPassword="True"
+                               Placeholder="********"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Erro inline -->
+                <Label Text="{Binding ErrorMessage}"
+                       TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}"
+                       FontSize="12"
+                       IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+
+                <!-- Login button -->
+                <Button Text="Entrar"
+                        Command="{Binding LoginCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+
+                <!-- Biometric shortcut (visivel se disponivel + habilitado em sessao previa) -->
+                <Button Text="Entrar com biometria"
+                        Style="{StaticResource ButtonGhost}"
+                        Command="{Binding BiometricLoginCommand}"
+                        IsVisible="{Binding BiometricsEnabled}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+
+                <!-- Loading -->
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="24" />
+
+            </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>

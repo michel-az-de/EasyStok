@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Shell
-    x:Class="EasyStock.Mobile.Maui.AppShell"
+    x:Class="EasyStok.Mobile.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:EasyStock.Mobile.Maui"
-    Title="EasyStock.Mobile.Maui">
+    xmlns:views="clr-namespace:EasyStok.Mobile.Views"
+    Title="EasyStok Mobile"
+    FlyoutBehavior="Disabled">
 
+    <!--
+    HomePage e a rota inicial. Demais rotas registradas em
+    AppShell.xaml.cs para navegacao via Shell.Current.GoToAsync("rota").
+    -->
     <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+        Title="Inicio"
+        Route="home"
+        ContentTemplate="{DataTemplate views:HomePage}" />
 
 </Shell>

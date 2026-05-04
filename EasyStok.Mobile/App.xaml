@@ -1,14 +1,19 @@
-﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:local="clr-namespace:EasyStock.Mobile.Maui"
-             x:Class="EasyStock.Mobile.Maui.App">
+             xmlns:local="clr-namespace:EasyStok.Mobile"
+             xmlns:converters="clr-namespace:EasyStok.Mobile.Converters"
+             x:Class="EasyStok.Mobile.App"
+             UserAppTheme="Dark">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <converters:StringNotNullOrEmptyConverter x:Key="StringNotNullOrEmptyConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
