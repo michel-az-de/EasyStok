@@ -21,9 +21,6 @@ public static class MauiProgram
 		}
 		catch (Exception ex)
 		{
-			// Crash bem cedo (antes mesmo de App ser instanciado): grava em
-			// um caminho conhecido SEM passar por FileSystem.AppDataDirectory
-			// (que pode nao estar disponivel ainda).
 			BootCrashLog.Write("MauiProgram.CreateMauiApp", ex);
 			throw;
 		}
@@ -31,8 +28,6 @@ public static class MauiProgram
 
 	private static MauiApp BuildApp()
 	{
-		// SQLite — algumas combinacoes de SDK Android exigem init explicito
-		// do bundle antes do primeiro uso. Idempotente.
 		SQLitePCL.Batteries_V2.Init();
 
 		var builder = MauiApp.CreateBuilder();
@@ -41,7 +36,10 @@ public static class MauiProgram
 			.UseMauiCommunityToolkit()
 			.ConfigureFonts(fonts =>
 			{
-				fonts.AddFont("Manrope.ttf", "Manrope");
+				// Tipografia oficial EasyStok:
+				//   Inter (variable) -> body/labels/botoes
+				//   Fraunces / FrauncesItalic (variable) -> display/accent
+				fonts.AddFont("Inter.ttf", "Inter");
 				fonts.AddFont("Fraunces.ttf", "Fraunces");
 				fonts.AddFont("FrauncesItalic.ttf", "FrauncesItalic");
 			});
@@ -52,7 +50,6 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IEstoqueCache, EstoqueCache>();
 		builder.Services.AddSingleton<IOutboxRepository, OutboxRepository>();
 
-		// HTTP clients:
 		builder.Services.AddTransient<AuthHandler>();
 
 		builder.Services.AddHttpClient(NoAuthClientName, http =>
@@ -67,25 +64,22 @@ public static class MauiProgram
 			http.Timeout = TimeSpan.FromSeconds(15);
 		}).AddHttpMessageHandler<AuthHandler>();
 
-		// Servicos de dominio
 		builder.Services.AddSingleton<IAuthService, AuthService>();
 		builder.Services.AddSingleton<ICompanyService, CompanyService>();
 		builder.Services.AddSingleton<IPermissionService, PermissionService>();
 		builder.Services.AddSingleton<IEstoqueService, EstoqueService>();
 		builder.Services.AddSingleton<IOutboxFlushService, OutboxFlushService>();
 		builder.Services.AddSingleton<IEstoqueMutationService, EstoqueMutationService>();
+		builder.Services.AddSingleton<IDemoSeedService, DemoSeedService>();
 		builder.Services.AddSingleton<SyncEngine>();
 
-		// Shell (singleton — uma instancia por app)
 		builder.Services.AddSingleton<AppShell>();
 
-		// ViewModels (transient)
 		builder.Services.AddTransient<LoginViewModel>();
 		builder.Services.AddTransient<TenantPickerViewModel>();
 		builder.Services.AddTransient<LojaPickerViewModel>();
 		builder.Services.AddTransient<ProducaoViewModel>();
 
-		// Views (transient)
 		builder.Services.AddTransient<LoginPage>();
 		builder.Services.AddTransient<TenantPickerPage>();
 		builder.Services.AddTransient<LojaPickerPage>();

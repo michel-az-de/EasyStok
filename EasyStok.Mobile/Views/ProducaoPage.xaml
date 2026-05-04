@@ -5,29 +5,38 @@
              xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.ProducaoPage"
              x:DataType="vm:ProducaoViewModel"
-             Title="Producao"
+             Title="Produção"
              Shell.NavBarIsVisible="False">
-    <Grid Padding="22,16" RowDefinitions="Auto,Auto,Auto,*">
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
 
-        <VerticalStackLayout Grid.Row="0" Spacing="2" Margin="0,0,0,12">
-            <Label Text="Producao" Style="{StaticResource LabelHero}" />
-            <Label Text="estoque ativo" Style="{StaticResource LabelGreeting}" />
-        </VerticalStackLayout>
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label Text="Produção" Style="{StaticResource LabelH1}" />
+                <Label Text="estoque ativo da loja" Style="{StaticResource LabelSmall}" />
+            </VerticalStackLayout>
+            <Border Grid.Column="1"
+                    BackgroundColor="{StaticResource Orange600}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="0"
+                    Padding="10,6"
+                    VerticalOptions="Center"
+                    IsVisible="{Binding PendingMutations, Converter={StaticResource IntGreaterThanZeroConverter}}">
+                <Label Text="{Binding PendingMutations, StringFormat='{0} pendentes'}"
+                       FontFamily="Inter"
+                       FontSize="11"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource White}" />
+            </Border>
+        </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
+        <!-- Status + Atualizar -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <Label Grid.Column="0"
                    Text="{Binding StatusLine}"
-                   Style="{StaticResource LabelCaption}"
+                   Style="{StaticResource LabelSmall}"
                    VerticalOptions="Center" />
-            <Border Grid.Column="1"
-                    Style="{StaticResource CardElev}"
-                    Padding="8,4"
-                    IsVisible="{Binding PendingMutations, Converter={StaticResource IntGreaterThanZeroConverter}}">
-                <Label Text="{Binding PendingMutations, StringFormat='{0} pendente(s)'}"
-                       Style="{StaticResource LabelCaption}"
-                       TextColor="{AppThemeBinding Dark={StaticResource GoldDark}, Light={StaticResource GoldLight}}" />
-            </Border>
-            <Button Grid.Column="2"
+            <Button Grid.Column="1"
                     Text="Atualizar"
                     Style="{StaticResource ButtonGhost}"
                     Command="{Binding RefreshCommand}"
@@ -37,16 +46,18 @@
         <VerticalStackLayout Grid.Row="2" Spacing="6">
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
             <Label Text="{Binding ErrorMessage}"
-                   TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}"
-                   FontSize="12"
+                   TextColor="{StaticResource Crit600}"
+                   FontFamily="Inter"
+                   FontSize="13"
                    IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
-            <Label Text="Nenhum item de estoque para a empresa atual."
-                   Style="{StaticResource LabelSubtitle}"
+            <Label Text="Nenhum item de estoque por aqui ainda."
+                   Style="{StaticResource LabelSmall}"
                    IsVisible="{Binding SemDados}"
                    HorizontalOptions="Center"
                    Margin="0,12,0,0" />
         </VerticalStackLayout>
 
+        <!-- Grid 2 colunas -->
         <CollectionView Grid.Row="3"
                         x:Name="ProducaoList"
                         ItemsSource="{Binding Itens}"
@@ -64,7 +75,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <Label Grid.Column="0"
                                        Text="{Binding ProdutoNome}"
-                                       Style="{StaticResource LabelTitle}"
+                                       Style="{StaticResource LabelH3}"
                                        LineBreakMode="TailTruncation"
                                        MaxLines="2" />
                                 <Label Grid.Column="1"
@@ -73,17 +84,17 @@
                                        VerticalOptions="Start" />
                             </Grid>
                             <Label Text="{Binding Sku, StringFormat='SKU {0}'}"
-                                   Style="{StaticResource LabelCaption}" />
+                                   Style="{StaticResource LabelEyebrow}" />
                             <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
                                 <Label Grid.Column="0"
                                        Text="{Binding Qty, StringFormat='{0} un'}"
-                                       FontFamily="Manrope"
+                                       FontFamily="Inter"
                                        FontSize="22"
                                        FontAttributes="Bold"
-                                       TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}" />
+                                       TextColor="{StaticResource Orange500}" />
                                 <Label Grid.Column="1"
                                        Text="{Binding Status}"
-                                       Style="{StaticResource LabelSuffix}"
+                                       Style="{StaticResource LabelEyebrow}"
                                        VerticalOptions="End" />
                             </Grid>
 

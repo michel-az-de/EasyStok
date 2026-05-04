@@ -9,6 +9,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 {
 	private readonly IAuthService _auth;
 	private readonly ISecureStore _store;
+	private readonly IDemoSeedService _demoSeed;
 
 	[ObservableProperty]
 	private string _email = string.Empty;
@@ -16,19 +17,11 @@ public sealed partial class LoginViewModel : BaseViewModel
 	[ObservableProperty]
 	private string _senha = string.Empty;
 
-	// Biometria temporariamente desativada — Plugin.Fingerprint 3.0.0-beta.1
-	// causou crash de startup em alguns devices. Volta na F5 com BiometricPrompt
-	// nativo. Mantemos as properties pra UI continuar com bind valido.
-	[ObservableProperty]
-	private bool _biometricsAvailable;
-
-	[ObservableProperty]
-	private bool _biometricsEnabled;
-
-	public LoginViewModel(IAuthService auth, ISecureStore store)
+	public LoginViewModel(IAuthService auth, ISecureStore store, IDemoSeedService demoSeed)
 	{
 		_auth = auth;
 		_store = store;
+		_demoSeed = demoSeed;
 	}
 
 	public async Task InitializeAsync()
@@ -36,8 +29,6 @@ public sealed partial class LoginViewModel : BaseViewModel
 		try
 		{
 			Email = await _store.GetEmailLastLoginAsync() ?? string.Empty;
-			BiometricsEnabled = false;
-			BiometricsAvailable = false;
 		}
 		catch (Exception ex)
 		{
@@ -61,27 +52,25 @@ public sealed partial class LoginViewModel : BaseViewModel
 			return;
 		}
 
-		await NavigateAfterLoginAsync(result.Data!.Usuario.Nivel);
-	});
-
-	[RelayCommand]
-	private Task BiometricLoginAsync() => RunAsync(async () =>
-	{
-		// Stub ate F5 reintroduzir biometria nativa.
-		ErrorMessage = "Biometria ainda nao habilitada nesta versao.";
-		await Task.CompletedTask;
-	});
-
-	private async Task NavigateAfterLoginAsync(string _nivel)
-	{
 		var empresaId = await _auth.GetEmpresaIdFromTokenAsync();
 		if (empresaId is null)
 		{
 			await Shell.Current.GoToAsync("//tenant-picker");
 			return;
 		}
-
 		await _store.SetEmpresaIdAsync(empresaId.Value);
 		await Shell.Current.GoToAsync("//loja-picker");
-	}
+	});
+
+	/// <summary>
+	/// Bypass do backend: cria sessao demo local + popula cache com produtos
+	/// seed. Permite usar o app 100% offline pra teste/demo de UI.
+	/// </summary>
+	[RelayCommand]
+	private Task ContinuarOfflineAsync() => RunAsync(async () =>
+	{
+		await _auth.LoginOfflineDemoAsync();
+		await _demoSeed.SeedIfEmptyAsync();
+		await Shell.Current.GoToAsync("//home");
+	});
 }

@@ -5,51 +5,62 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!--
-    Paleta espelha exatamente as CSS variables do PWA Casa da Baba
-    (wwwroot/pwa/index.html lines 17-72). Cada cor tem variante Dark
-    (default) e Light, consumidas via AppThemeBinding nos estilos.
-    Alphas (rgba) convertidos para hex8 (#AARRGGBB).
+    Paleta oficial EasyStok (espelha EasyStock.Web/wwwroot/css/tokens.css).
+    Identidade: navy profundo (#06143A/#0E2A6E) + orange vibrante (#E85814).
     -->
 
-    <!-- Dark theme (default) -->
-    <Color x:Key="BgDark">#111827</Color>
-    <Color x:Key="BgElevDark">#172033</Color>
-    <Color x:Key="BgElev2Dark">#202B42</Color>
-    <Color x:Key="BgCardDark">#151F31</Color>
-    <Color x:Key="InkDark">#F7F2E8</Color>
-    <Color x:Key="InkDimDark">#C8C1B4</Color>
-    <Color x:Key="InkMuteDark">#8793A7</Color>
-    <Color x:Key="AccentDark">#E76845</Color>
-    <Color x:Key="AccentSoftDark">#29E76845</Color>
-    <Color x:Key="BasilDark">#4FBF9F</Color>
-    <Color x:Key="BasilSoftDark">#264FBF9F</Color>
-    <Color x:Key="GoldDark">#F0B84A</Color>
-    <Color x:Key="GoldSoftDark">#24F0B84A</Color>
-    <Color x:Key="CreamDark">#F1DCC0</Color>
-    <Color x:Key="BorderDark">#1AF7F2E8</Color>
-    <Color x:Key="BorderStrongDark">#2EF7F2E8</Color>
-    <Color x:Key="PageBgDark">#0B0908</Color>
+    <!-- Brand: Navy -->
+    <Color x:Key="Navy900">#06143A</Color>
+    <Color x:Key="Navy800">#0A1F52</Color>
+    <Color x:Key="Navy700">#0E2A6E</Color>
+    <Color x:Key="Navy600">#15388A</Color>
+    <Color x:Key="Navy500">#1E48A8</Color>
+    <Color x:Key="Navy200">#BCC8E5</Color>
+    <Color x:Key="Navy100">#DDE4F2</Color>
+    <Color x:Key="Navy50">#EDF1F9</Color>
 
-    <!-- Light theme -->
-    <Color x:Key="BgLight">#F5F7FB</Color>
-    <Color x:Key="BgElevLight">#FFFFFF</Color>
-    <Color x:Key="BgElev2Light">#EDF1F7</Color>
-    <Color x:Key="BgCardLight">#FFFFFF</Color>
-    <Color x:Key="InkLight">#172033</Color>
-    <Color x:Key="InkDimLight">#526071</Color>
-    <Color x:Key="InkMuteLight">#8693A4</Color>
-    <Color x:Key="AccentLight">#CF5738</Color>
-    <Color x:Key="AccentSoftLight">#1CCF5738</Color>
-    <Color x:Key="BasilLight">#168F7A</Color>
-    <Color x:Key="BasilSoftLight">#1C168F7A</Color>
-    <Color x:Key="GoldLight">#B78122</Color>
-    <Color x:Key="GoldSoftLight">#21B78122</Color>
-    <Color x:Key="CreamLight">#BD8F5C</Color>
-    <Color x:Key="BorderLight">#17172033</Color>
-    <Color x:Key="BorderStrongLight">#2E172033</Color>
-    <Color x:Key="PageBgLight">#EBE6DC</Color>
+    <!-- Brand: Orange -->
+    <Color x:Key="Orange900">#7A2A05</Color>
+    <Color x:Key="Orange700">#BF4307</Color>
+    <Color x:Key="Orange600">#E85814</Color>
+    <Color x:Key="Orange500">#F26B25</Color>
+    <Color x:Key="Orange400">#F8884A</Color>
+    <Color x:Key="Orange200">#FAC8AB</Color>
+    <Color x:Key="Orange100">#FCDCC8</Color>
+    <Color x:Key="Orange50">#FEEFE3</Color>
 
-    <!-- Aliases neutros (independem de tema) -->
+    <!-- Status -->
+    <Color x:Key="Ok700">#0E6B3D</Color>
+    <Color x:Key="Ok600">#18874E</Color>
+    <Color x:Key="Ok100">#D6EFDF</Color>
+    <Color x:Key="Warn700">#8A5A00</Color>
+    <Color x:Key="Warn600">#B57A00</Color>
+    <Color x:Key="Warn100">#FBEBC4</Color>
+    <Color x:Key="Crit700">#8E2A1E</Color>
+    <Color x:Key="Crit600">#C03B2A</Color>
+    <Color x:Key="Crit100">#F8D8D2</Color>
+
+    <!-- Surfaces dark (default) -->
+    <Color x:Key="BgAppDark">#06143A</Color>
+    <Color x:Key="BgSurfaceDark">#0A1F52</Color>
+    <Color x:Key="BgElevatedDark">#122042</Color>
+    <Color x:Key="TextPrimaryDark">#F2F4F9</Color>
+    <Color x:Key="TextSecondaryDark">#BCC8E5</Color>
+    <Color x:Key="TextMutedDark">#8A95B0</Color>
+    <Color x:Key="BorderSoftDark">#1FFFFFFF</Color>
+    <Color x:Key="BorderStrongDark">#2EFFFFFF</Color>
+
+    <!-- Surfaces light -->
+    <Color x:Key="BgAppLight">#F8FAFD</Color>
+    <Color x:Key="BgSurfaceLight">#FFFFFF</Color>
+    <Color x:Key="BgElevatedLight">#FFFFFF</Color>
+    <Color x:Key="TextPrimaryLight">#0A1530</Color>
+    <Color x:Key="TextSecondaryLight">#2A3556</Color>
+    <Color x:Key="TextMutedLight">#707892</Color>
+    <Color x:Key="BorderSoftLight">#DEE2EB</Color>
+    <Color x:Key="BorderStrongLight">#C2C8D6</Color>
+
+    <!-- Neutros -->
     <Color x:Key="Black">#000000</Color>
     <Color x:Key="White">#FFFFFF</Color>
     <Color x:Key="Transparent">#00000000</Color>

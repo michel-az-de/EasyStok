@@ -2,12 +2,143 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="EasyStok.Mobile.Views.HomePage"
-             Title="Inicio">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="EasyStok" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Mobile" Style="{StaticResource LabelHeroAccent}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
-        </VerticalStackLayout>
-    </Grid>
+             Title="Início"
+             Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <Grid Padding="20,24" RowSpacing="20" RowDefinitions="Auto,Auto,Auto,Auto">
+
+            <!-- Brand -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Border Grid.Column="0"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        BackgroundColor="{StaticResource White}"
+                        StrokeShape="RoundRectangle 12"
+                        StrokeThickness="0"
+                        Padding="6">
+                    <Image Source="easystok_logo.svg" Aspect="AspectFit" />
+                </Border>
+                <HorizontalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
+                    <Label Text="Easy"
+                           FontFamily="Fraunces"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           CharacterSpacing="-0.4"
+                           TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
+                    <Label Text="Stok"
+                           FontFamily="Fraunces"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           CharacterSpacing="-0.4"
+                           TextColor="{StaticResource Orange600}" />
+                </HorizontalStackLayout>
+                <Border Grid.Column="2"
+                        BackgroundColor="{StaticResource Navy700}"
+                        StrokeShape="RoundRectangle 999"
+                        StrokeThickness="0"
+                        Padding="10,5"
+                        VerticalOptions="Center">
+                    <Label Text="DEMO"
+                           FontFamily="Inter"
+                           FontSize="10"
+                           FontAttributes="Bold"
+                           CharacterSpacing="2"
+                           TextColor="{StaticResource White}" />
+                </Border>
+            </Grid>
+
+            <!-- Saudação -->
+            <VerticalStackLayout Grid.Row="1" Spacing="4">
+                <Label Text="OPERAÇÃO DO DIA" Style="{StaticResource LabelEyebrow}" />
+                <Label Text="Bem-vindo de volta" Style="{StaticResource LabelH1}" />
+                <Label Text="Loja Demo · Modo offline"
+                       Style="{StaticResource LabelLead}" />
+            </VerticalStackLayout>
+
+            <!-- KPIs grid 2x2 -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,*" RowDefinitions="*,*"
+                  ColumnSpacing="10" RowSpacing="10">
+
+                <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="ITENS EM ESTOQUE" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="—" FontFamily="Inter" FontSize="28" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
+                        <Label Text="produtos cadastrados" Style="{StaticResource LabelSmall}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Column="1" Grid.Row="0" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="ALERTAS" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="—" FontFamily="Inter" FontSize="28" FontAttributes="Bold"
+                               TextColor="{StaticResource Crit600}" />
+                        <Label Text="críticos / vencidos" Style="{StaticResource LabelSmall}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Column="0" Grid.Row="1" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="VENDAS HOJE" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="R$ 0" FontFamily="Inter" FontSize="22" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
+                        <Label Text="movimento bruto" Style="{StaticResource LabelSmall}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="PEDIDOS ABERTOS" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="0" FontFamily="Inter" FontSize="22" FontAttributes="Bold"
+                               TextColor="{StaticResource Orange600}" />
+                        <Label Text="aguardando preparo" Style="{StaticResource LabelSmall}" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- Atalhos -->
+            <VerticalStackLayout Grid.Row="3" Spacing="10">
+                <Label Text="ATALHOS RÁPIDOS" Style="{StaticResource LabelEyebrow}" Margin="0,8,0,4" />
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnIrParaProducao" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Produção" Style="{StaticResource LabelH3}" />
+                            <Label Text="Contar entradas e saídas do estoque" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSair" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Sair" Style="{StaticResource LabelH3}" />
+                            <Label Text="Encerrar sessão demo e voltar ao login" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+        </Grid>
+    </ScrollView>
 </ContentPage>

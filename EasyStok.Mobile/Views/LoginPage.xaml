@@ -4,65 +4,157 @@
              xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.LoginPage"
              x:DataType="vm:LoginViewModel"
-             Title="Login"
-             Shell.NavBarIsVisible="False">
-    <Grid Padding="22,32">
-        <ScrollView>
-            <VerticalStackLayout Spacing="14" VerticalOptions="Center" HorizontalOptions="Fill">
+             Title="Entrar"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{AppThemeBinding Dark={StaticResource Navy900}, Light={StaticResource BgAppLight}}">
 
-                <!-- Brand header -->
-                <VerticalStackLayout Spacing="2" HorizontalOptions="Center" Margin="0,0,0,16">
-                    <Label Text="EasyStok" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-                    <Label Text="Mobile" Style="{StaticResource LabelHeroAccent}" HorizontalOptions="Center" />
-                    <Label Text="Sua operacao no bolso"
-                           Style="{StaticResource LabelGreeting}"
-                           HorizontalOptions="Center" />
-                </VerticalStackLayout>
+    <ScrollView>
+        <Grid Padding="24,40,24,32" RowSpacing="0">
 
-                <!-- Email -->
-                <Border Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="EMAIL" Style="{StaticResource LabelSuffix}" />
-                        <Entry Text="{Binding Email}"
-                               Keyboard="Email"
-                               Placeholder="voce@empresa.com"
-                               IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+            <VerticalStackLayout Spacing="0" VerticalOptions="Fill">
+
+                <!-- Brand: cubo + wordmark -->
+                <Grid ColumnDefinitions="Auto,*"
+                      ColumnSpacing="14"
+                      VerticalOptions="Center"
+                      HorizontalOptions="Start"
+                      Margin="0,8,0,28">
+                    <Border Grid.Column="0"
+                            WidthRequest="56"
+                            HeightRequest="56"
+                            BackgroundColor="{StaticResource White}"
+                            StrokeShape="RoundRectangle 14"
+                            StrokeThickness="0"
+                            Padding="10">
+                        <Image Source="easystok_logo.svg"
+                               Aspect="AspectFit"
+                               HeightRequest="36"
+                               WidthRequest="36" />
+                    </Border>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
+                        <Label Text="Easy"
+                               FontFamily="Fraunces"
+                               FontSize="32"
+                               FontAttributes="Bold"
+                               CharacterSpacing="-0.6"
+                               TextColor="{StaticResource White}" />
+                        <Label Text="Stok"
+                               FontFamily="Fraunces"
+                               FontSize="32"
+                               FontAttributes="Bold"
+                               CharacterSpacing="-0.6"
+                               TextColor="{StaticResource Orange500}" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Eyebrow + headline -->
+                <Label Text="OPERAÇÃO EM TEMPO REAL"
+                       FontFamily="Inter"
+                       FontSize="11"
+                       FontAttributes="Bold"
+                       CharacterSpacing="3"
+                       TextColor="#A6B6E0"
+                       Margin="0,0,0,10" />
+
+                <Label Text="Controle estoque, validade e saída em um fluxo mais claro."
+                       Style="{StaticResource LabelH1}"
+                       TextColor="{StaticResource White}"
+                       Margin="0,0,0,28" />
+
+                <!-- Auth card -->
+                <Border BackgroundColor="{StaticResource Navy800}"
+                        Stroke="{StaticResource BorderStrongDark}"
+                        StrokeShape="RoundRectangle 20"
+                        StrokeThickness="1"
+                        Padding="22,22,22,24">
+                    <VerticalStackLayout Spacing="16">
+
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="Entrar"
+                                   Style="{StaticResource LabelH2}"
+                                   TextColor="{StaticResource White}" />
+                            <Label Text="Acesse sua conta para continuar"
+                                   Style="{StaticResource LabelSmall}"
+                                   TextColor="#A6B6E0" />
+                        </VerticalStackLayout>
+
+                        <!-- Email -->
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="E-MAIL" Style="{StaticResource LabelEyebrow}" TextColor="#A6B6E0" />
+                            <Border Style="{StaticResource FieldBox}"
+                                    BackgroundColor="#0A1F52"
+                                    Stroke="{StaticResource BorderSoftDark}">
+                                <Entry Text="{Binding Email}"
+                                       Keyboard="Email"
+                                       Placeholder="voce@empresa.com"
+                                       TextColor="{StaticResource White}"
+                                       PlaceholderColor="#5C6B92"
+                                       IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <!-- Senha -->
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="SENHA" Style="{StaticResource LabelEyebrow}" TextColor="#A6B6E0" />
+                            <Border Style="{StaticResource FieldBox}"
+                                    BackgroundColor="#0A1F52"
+                                    Stroke="{StaticResource BorderSoftDark}">
+                                <Entry Text="{Binding Senha}"
+                                       IsPassword="True"
+                                       Placeholder="••••••••"
+                                       TextColor="{StaticResource White}"
+                                       PlaceholderColor="#5C6B92"
+                                       IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <!-- Erro inline -->
+                        <Border BackgroundColor="#3A1E18"
+                                Stroke="#5A2920"
+                                StrokeShape="RoundRectangle 8"
+                                StrokeThickness="1"
+                                Padding="12,10"
+                                IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}">
+                            <Label Text="{Binding ErrorMessage}"
+                                   TextColor="#F8884A"
+                                   FontFamily="Inter"
+                                   FontSize="13" />
+                        </Border>
+
+                        <!-- CTA principal -->
+                        <Button Text="Entrar"
+                                Command="{Binding LoginCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+
+                        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                           IsVisible="{Binding IsBusy}"
+                                           HeightRequest="22" />
+
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Senha -->
-                <Border Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="SENHA" Style="{StaticResource LabelSuffix}" />
-                        <Entry Text="{Binding Senha}"
-                               IsPassword="True"
-                               Placeholder="********"
-                               IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
-                    </VerticalStackLayout>
-                </Border>
+                <!-- Divisor + modo demo offline -->
+                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="10" Margin="0,24,0,16">
+                    <BoxView Grid.Column="0" HeightRequest="1" Color="{StaticResource BorderSoftDark}" VerticalOptions="Center" />
+                    <Label Grid.Column="1" Text="OU" Style="{StaticResource LabelEyebrow}" TextColor="#A6B6E0" />
+                    <BoxView Grid.Column="2" HeightRequest="1" Color="{StaticResource BorderSoftDark}" VerticalOptions="Center" />
+                </Grid>
 
-                <!-- Erro inline -->
-                <Label Text="{Binding ErrorMessage}"
-                       TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}"
-                       FontSize="12"
-                       IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
-
-                <!-- Login button -->
-                <Button Text="Entrar"
-                        Command="{Binding LoginCommand}"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
-
-                <!-- Biometric shortcut (visivel se disponivel + habilitado em sessao previa) -->
-                <Button Text="Entrar com biometria"
+                <Button Text="Continuar em modo demo (offline)"
                         Style="{StaticResource ButtonGhost}"
-                        Command="{Binding BiometricLoginCommand}"
-                        IsVisible="{Binding BiometricsEnabled}"
+                        TextColor="{StaticResource White}"
+                        BorderColor="{StaticResource BorderStrongDark}"
+                        Command="{Binding ContinuarOfflineCommand}"
                         IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
 
-                <!-- Loading -->
-                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="24" />
+                <Label Text="Use modo demo para explorar o app sem conexão. Dados ficam só no aparelho."
+                       Style="{StaticResource LabelSmall}"
+                       TextColor="#7B8AB0"
+                       HorizontalTextAlignment="Center"
+                       Margin="8,12,8,0" />
 
             </VerticalStackLayout>
-        </ScrollView>
-    </Grid>
+        </Grid>
+    </ScrollView>
+
 </ContentPage>

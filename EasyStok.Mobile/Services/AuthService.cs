@@ -106,10 +106,27 @@ public sealed class AuthService : IAuthService
 
 	public async Task<bool> IsAuthenticatedAsync()
 	{
+		// Modo demo: ha empresa+loja salvas mesmo sem JWT real.
+		if (await IsDemoAsync()) return true;
 		// Token valido OU refresh existe (ainda da pra renovar)
 		if (await _store.IsAccessTokenValidAsync()) return true;
 		var refresh = await _store.GetRefreshTokenAsync();
 		return !string.IsNullOrEmpty(refresh);
+	}
+
+	public async Task<bool> IsDemoAsync()
+	{
+		var empresa = await _store.GetEmpresaIdAsync();
+		return empresa == DemoSeedService.DemoEmpresaId;
+	}
+
+	public async Task LoginOfflineDemoAsync()
+	{
+		// Sessao local fake — nao bate em rede, nao gera JWT real.
+		await _store.SetEmpresaIdAsync(DemoSeedService.DemoEmpresaId);
+		await _store.SetLojaIdAsync(DemoSeedService.DemoLojaId);
+		// O ClearSession e o SaveSession do SecureStore lidam com tokens reais;
+		// no modo demo nao temos JWT — IsAuthenticatedAsync detecta via IsDemoAsync.
 	}
 
 	public async Task<Guid?> GetEmpresaIdFromTokenAsync()
@@ -164,6 +181,11 @@ public interface IAuthService
 	Task<bool> RefreshAsync(CancellationToken ct = default);
 	Task LogoutAsync(CancellationToken ct = default);
 	Task<bool> IsAuthenticatedAsync();
+	Task<bool> IsDemoAsync();
+
+	/// <summary>Modo demo offline: cria sessao local fake (sem chamada de rede) com empresa/loja
+	/// fixas conhecidas. Usada quando o backend nao esta disponivel.</summary>
+	Task LoginOfflineDemoAsync();
 
 	/// <summary>Decodifica o access token corrente e retorna o claim empresaId, se houver.</summary>
 	Task<Guid?> GetEmpresaIdFromTokenAsync();
