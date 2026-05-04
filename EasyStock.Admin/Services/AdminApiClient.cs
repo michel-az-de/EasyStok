@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -6,19 +5,21 @@ namespace EasyStock.Admin.Services;
 
 public sealed class SessionExpiredException() : Exception("Sessão expirada. Faça login novamente.");
 
-public class AdminApiClient(HttpClient httpClient, AdminSessionService session)
+/// <summary>
+/// Cliente HTTP para a API do EasyStock. O Bearer token e o retry com refresh
+/// sao injetados pelo <see cref="AdminTokenRefreshHandler"/> no pipeline do
+/// HttpClient — esta classe so monta a request e desserializa a resposta.
+/// </summary>
+public class AdminApiClient(HttpClient httpClient)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private HttpRequestMessage BuildRequest(HttpMethod method, string path, object? body = null)
+    private static HttpRequestMessage BuildRequest(HttpMethod method, string path, object? body = null)
     {
         var request = new HttpRequestMessage(method, path);
-        var token = session.GetToken();
-        if (!string.IsNullOrEmpty(token))
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         if (body is not null)
             request.Content = new StringContent(
                 JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");

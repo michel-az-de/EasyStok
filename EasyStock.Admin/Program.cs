@@ -33,11 +33,12 @@ builder.Services.AddSession(options =>
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
     ?? throw new InvalidOperationException("ApiBaseUrl não configurado.");
 
+builder.Services.AddTransient<AdminTokenRefreshHandler>();
 builder.Services.AddHttpClient<AdminApiClient>(c =>
 {
     c.BaseAddress = new Uri(apiBaseUrl);
     c.Timeout = TimeSpan.FromSeconds(15);
-});
+}).AddHttpMessageHandler<AdminTokenRefreshHandler>();
 
 // Session e API services
 builder.Services.AddScoped<AdminSessionService>();

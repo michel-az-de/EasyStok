@@ -32,11 +32,12 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
             }
 
             var token = data.TryGetProperty("token", out var t) ? t.GetString() : null;
+            var refreshToken = data.TryGetProperty("refreshToken", out var rt) ? rt.GetString() : null;
             var usuario = data.TryGetProperty("usuario", out var u) ? u : default;
             var nivel = usuario.ValueKind != JsonValueKind.Undefined && usuario.TryGetProperty("nivel", out var n)
                 ? n.GetString() : null;
 
-            if (string.IsNullOrEmpty(token))
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(refreshToken))
             {
                 Erro = "Token não recebido.";
                 return Page();
@@ -49,7 +50,7 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
             }
 
             var nome = usuario.TryGetProperty("nome", out var nomeProp) ? nomeProp.GetString() ?? Email : Email;
-            session.SetSession(token, nome, Email);
+            session.SetSession(token, refreshToken, nome, Email);
 
             return RedirectToPage("/Index");
         }
