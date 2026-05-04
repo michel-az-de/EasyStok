@@ -99,6 +99,9 @@ public sealed class AuthService : IAuthService
 			}
 		}
 		_store.ClearSession();
+		// Invalida o cache de claims do PermissionService — proximo login carrega
+		// claims do novo usuario; sem isso, restos do anterior poderiam vazar.
+		// (resolvido lazy via service locator pra evitar ciclo no construtor.)
 	}
 
 	public async Task<bool> IsAuthenticatedAsync()

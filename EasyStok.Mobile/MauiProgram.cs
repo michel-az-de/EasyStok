@@ -56,6 +56,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IEstoqueService, EstoqueService>();
 		builder.Services.AddSingleton<IOutboxFlushService, OutboxFlushService>();
 		builder.Services.AddSingleton<IEstoqueMutationService, EstoqueMutationService>();
+		builder.Services.AddSingleton<SyncEngine>();
 
 		// Shell (singleton — uma instancia por app)
 		builder.Services.AddSingleton<AppShell>();

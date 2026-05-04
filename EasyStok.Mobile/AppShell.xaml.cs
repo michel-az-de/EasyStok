@@ -8,13 +8,15 @@ public partial class AppShell : Shell
 {
 	private readonly IAuthService _auth;
 	private readonly ISecureStore _store;
+	private readonly SyncEngine _sync;
 	private bool _initialized;
 
-	public AppShell(IAuthService auth, ISecureStore store)
+	public AppShell(IAuthService auth, ISecureStore store, SyncEngine sync)
 	{
 		InitializeComponent();
 		_auth = auth;
 		_store = store;
+		_sync = sync;
 		RegisterRoutes();
 	}
 
@@ -51,6 +53,8 @@ public partial class AppShell : Shell
 				return;
 			}
 			// Tudo certo — segue na home (rota default do ShellContent inicial).
+			// Liga o SyncEngine pra manter outbox + cache em dia.
+			_sync.Start();
 		});
 	}
 
