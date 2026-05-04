@@ -1,6 +1,7 @@
 using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Storage;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace EasyStok.Mobile.Services;
 
@@ -31,22 +32,36 @@ public sealed class EstoqueMutationService : IEstoqueMutationService
 		_logger = logger;
 	}
 
-	public async Task IncrementAsync(CachedItemEstoque item, int quantidade = 1)
+	public Task IncrementAsync(CachedItemEstoque item, int quantidade = 1) =>
+		IncrementAsync(item, new CapturaProducaoResult(quantidade, null, null, null));
+
+	public async Task IncrementAsync(CachedItemEstoque item, CapturaProducaoResult capture)
 	{
 		var empresaId = await _store.GetEmpresaIdAsync()
 			?? throw new InvalidOperationException("Empresa nao definida.");
 		var lojaId = await _store.GetLojaIdAsync();
+
+		// DimensoesInput exige todos os 4 valores (Peso, Largura, Altura, Comprimento).
+		// Quando peso e informado, mandamos com largura/altura/comprimento=0 para que
+		// o backend grave so o peso. Quando nao informado, deixamos null (default).
+		object? dims = capture.PesoG.HasValue
+			? new { peso = capture.PesoG.Value, largura = 0m, altura = 0m, comprimento = 0m }
+			: null;
+
+		var observacoes = "Entrada via mobile";
+		if (!string.IsNullOrEmpty(capture.FotoPath))
+			observacoes += $" | foto: {Path.GetFileName(capture.FotoPath)}";
 
 		var produtoId = Guid.Parse(item.ProdutoId);
 		var cmd = new RegistrarEntradaCommand(
 			EmpresaId: empresaId,
 			ProdutoId: produtoId,
 			ProdutoVariacaoId: null,
-			Quantidade: quantidade,
+			Quantidade: capture.Quantidade,
 			CustoUnitario: item.CustoUnitario,
 			PrecoVendaSugerido: item.PrecoVendaSugerido,
 			DataEntrada: DateTime.UtcNow,
-			Natureza: "Compra", // mais conservador — backend aceita; producao via Compra
+			Natureza: "Compra",
 			CodigoInterno: null,
 			CodigoLote: item.Lote,
 			CodigoMarketplace: null,
@@ -54,16 +69,16 @@ public sealed class EstoqueMutationService : IEstoqueMutationService
 			Cor: null,
 			Tamanho: null,
 			FornecedorNome: null,
-			Validade: item.ValidadeUtc,
-			Observacoes: "Entrada via mobile",
+			Validade: capture.Validade ?? item.ValidadeUtc,
+			Observacoes: observacoes,
 			DescricaoAnuncio: null,
 			DocumentoReferencia: null,
-			DimensoesReais: null,
+			DimensoesReais: dims,
 			InstrucoesGeracaoDescricao: null,
 			LojaId: lojaId);
 
 		await _outbox.EnqueueAsync(OutboxTypes.EstoqueEntrada, cmd);
-		await OptimisticUpdateAsync(item.Id, +quantidade);
+		await OptimisticUpdateAsync(item.Id, +capture.Quantidade);
 		_ = Task.Run(async () => await _flush.FlushAsync());
 	}
 
@@ -113,5 +128,6 @@ public sealed class EstoqueMutationService : IEstoqueMutationService
 public interface IEstoqueMutationService
 {
 	Task IncrementAsync(CachedItemEstoque item, int quantidade = 1);
+	Task IncrementAsync(CachedItemEstoque item, CapturaProducaoResult capture);
 	Task DecrementAsync(CachedItemEstoque item, int quantidade = 1);
 }

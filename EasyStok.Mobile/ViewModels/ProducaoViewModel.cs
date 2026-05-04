@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 using System.Collections.ObjectModel;
@@ -70,13 +71,13 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 		await UpdatePendingAsync();
 	});
 
-	[RelayCommand]
-	private async Task IncrementAsync(CachedItemEstoque item)
+	// Chamados pelo code-behind apos confirmar o popup de captura.
+	public async Task HandleIncrementAsync(CachedItemEstoque item, CapturaProducaoResult capture)
 	{
 		if (item is null) return;
 		try
 		{
-			await _mutations.IncrementAsync(item);
+			await _mutations.IncrementAsync(item, capture);
 			ReplaceInCollection(item.Id);
 			await UpdatePendingAsync();
 		}
@@ -86,8 +87,7 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 		}
 	}
 
-	[RelayCommand]
-	private async Task DecrementAsync(CachedItemEstoque item)
+	public async Task HandleDecrementAsync(CachedItemEstoque item)
 	{
 		if (item is null || item.Qty <= 0) return;
 		try

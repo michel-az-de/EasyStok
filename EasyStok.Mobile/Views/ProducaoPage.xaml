@@ -9,13 +9,11 @@
              Shell.NavBarIsVisible="False">
     <Grid Padding="22,16" RowDefinitions="Auto,Auto,Auto,*">
 
-        <!-- Header brand -->
         <VerticalStackLayout Grid.Row="0" Spacing="2" Margin="0,0,0,12">
             <Label Text="Producao" Style="{StaticResource LabelHero}" />
             <Label Text="estoque ativo" Style="{StaticResource LabelGreeting}" />
         </VerticalStackLayout>
 
-        <!-- Status / refresh / pending count -->
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
             <Label Grid.Column="0"
                    Text="{Binding StatusLine}"
@@ -49,7 +47,6 @@
                    Margin="0,12,0,0" />
         </VerticalStackLayout>
 
-        <!-- Grid 2 colunas com botoes +/- -->
         <CollectionView Grid.Row="3"
                         x:Name="ProducaoList"
                         ItemsSource="{Binding Itens}"
@@ -90,7 +87,6 @@
                                        VerticalOptions="End" />
                             </Grid>
 
-                            <!-- Botoes +/-  -->
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,8,0,0">
                                 <Button Grid.Column="0"
                                         Text="−"
@@ -98,14 +94,14 @@
                                         FontAttributes="Bold"
                                         Style="{StaticResource ButtonGhost}"
                                         HeightRequest="40"
-                                        Command="{Binding Path=BindingContext.DecrementCommand, Source={x:Reference ProducaoList}}"
+                                        Clicked="OnDecrementClicked"
                                         CommandParameter="{Binding .}" />
                                 <Button Grid.Column="1"
                                         Text="+"
                                         FontSize="20"
                                         FontAttributes="Bold"
                                         HeightRequest="40"
-                                        Command="{Binding Path=BindingContext.IncrementCommand, Source={x:Reference ProducaoList}}"
+                                        Clicked="OnIncrementClicked"
                                         CommandParameter="{Binding .}" />
                             </Grid>
                         </VerticalStackLayout>
