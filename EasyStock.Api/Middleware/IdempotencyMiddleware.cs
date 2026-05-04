@@ -21,6 +21,8 @@ namespace EasyStock.Api.Middleware;
 public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptions options, ILogger<IdempotencyMiddleware> logger)
 {
     private const string HeaderName = "Idempotency-Key";
+    private const int MaxBufferBytes = 1 * 1024 * 1024; // 1MB hard cap por request — evita OOM em response excepcionalmente grande.
+    private const int CacheMaxBytes = 64 * 1024;        // 64KB cacheado em DB.
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
 
     public async Task InvokeAsync(HttpContext context)
@@ -80,10 +82,14 @@ public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptio
             return;
         }
 
-        // Captura body da resposta para serializar no cache.
+        // Captura body da resposta para serializar no cache. Usa stream-mirror
+        // que escreve no body original imediatamente E espelha em buffer ate
+        // MaxBufferBytes; acima disso, descarta o mirror e segue so para o body.
+        // Isso evita OOM caso resposta cresca muito (defesa em profundidade —
+        // rotas whitelisted sao POSTs simples, mas ainda assim).
         var originalBody = context.Response.Body;
-        await using var buffer = new MemoryStream();
-        context.Response.Body = buffer;
+        await using var mirror = new MirroringStream(originalBody, MaxBufferBytes);
+        context.Response.Body = mirror;
 
         try
         {
@@ -91,19 +97,17 @@ public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptio
         }
         finally
         {
-            buffer.Seek(0, SeekOrigin.Begin);
-            await buffer.CopyToAsync(originalBody);
             context.Response.Body = originalBody;
         }
 
-        // Cacheia somente respostas bem-sucedidas (2xx).
-        if (context.Response.StatusCode is >= 200 and < 300)
+        // Cacheia somente respostas bem-sucedidas (2xx) que couberam no mirror.
+        if (context.Response.StatusCode is >= 200 and < 300 && mirror.MirrorComplete)
         {
-            buffer.Seek(0, SeekOrigin.Begin);
             string? respostaJson = null;
-            if (buffer.Length > 0 && buffer.Length <= 64 * 1024) // limite 64KB
+            var bytes = mirror.GetMirroredBytes();
+            if (bytes is not null && bytes.Length > 0 && bytes.Length <= CacheMaxBytes)
             {
-                respostaJson = Encoding.UTF8.GetString(buffer.ToArray());
+                respostaJson = Encoding.UTF8.GetString(bytes);
             }
 
             var entry = IdempotencyKey.Criar(key, empresaId, metodoRecurso, context.Response.StatusCode, respostaJson, Ttl);
@@ -129,6 +133,82 @@ public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptio
         // (Conservador: por agora retornamos path original; refinar quando
         // necessario.)
         return path;
+    }
+
+    // Stream que escreve direto no body original e espelha em memoria ate o
+    // limite. Acima do limite, descarta o mirror (cache fica disabled pra
+    // essa request) mas segue escrevendo no body — request nao quebra.
+    private sealed class MirroringStream : Stream
+    {
+        private readonly Stream _primary;
+        private readonly int _maxMirror;
+        private MemoryStream? _mirror = new();
+
+        public MirroringStream(Stream primary, int maxMirror)
+        {
+            _primary = primary;
+            _maxMirror = maxMirror;
+        }
+
+        public bool MirrorComplete => _mirror is not null;
+        public byte[]? GetMirroredBytes() => _mirror?.ToArray();
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _primary.Length;
+        public override long Position
+        {
+            get => _primary.Position;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => _primary.Flush();
+        public override Task FlushAsync(CancellationToken cancellationToken) => _primary.FlushAsync(cancellationToken);
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            _primary.Write(buffer, offset, count);
+            MirrorWrite(buffer.AsSpan(offset, count));
+        }
+
+        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            await _primary.WriteAsync(buffer.AsMemory(offset, count), cancellationToken);
+            MirrorWrite(buffer.AsSpan(offset, count));
+        }
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await _primary.WriteAsync(buffer, cancellationToken);
+            MirrorWrite(buffer.Span);
+        }
+
+        private void MirrorWrite(ReadOnlySpan<byte> span)
+        {
+            if (_mirror is null) return;
+            if (_mirror.Length + span.Length > _maxMirror)
+            {
+                _mirror.Dispose();
+                _mirror = null;
+                return;
+            }
+            _mirror.Write(span);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _mirror?.Dispose();
+                _mirror = null;
+            }
+            base.Dispose(disposing);
+        }
     }
 }
 

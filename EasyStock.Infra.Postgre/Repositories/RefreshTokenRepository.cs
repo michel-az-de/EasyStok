@@ -45,4 +45,11 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
 
     public Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId) =>
         _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId).ExecuteDeleteAsync();
+
+    public Task<int> RevogarSessoesAtivasAsync(Guid usuarioId, DateTime agora) =>
+        _context.RefreshTokens
+            .Where(rt => rt.UsuarioId == usuarioId && !rt.Revogado && rt.ExpiraEm > agora)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(rt => rt.Revogado, true)
+                .SetProperty(rt => rt.RevogadoEm, agora));
 }

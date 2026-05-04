@@ -623,6 +623,19 @@ public sealed class RefreshTokenRepository(MongoEasyStockContext context, MongoU
         var result = await Collection.DeleteManyAsync(x => x.UsuarioId == usuarioId);
         return (int)result.DeletedCount;
     }
+
+    public async Task<int> RevogarSessoesAtivasAsync(Guid usuarioId, DateTime agora)
+    {
+        var filter = Builders<RefreshToken>.Filter.And(
+            Builders<RefreshToken>.Filter.Eq(x => x.UsuarioId, usuarioId),
+            Builders<RefreshToken>.Filter.Eq(x => x.Revogado, false),
+            Builders<RefreshToken>.Filter.Gt(x => x.ExpiraEm, agora));
+        var update = Builders<RefreshToken>.Update
+            .Set(x => x.Revogado, true)
+            .Set(x => x.RevogadoEm, agora);
+        var result = await Collection.UpdateManyAsync(filter, update);
+        return (int)result.ModifiedCount;
+    }
 }
 
 public sealed class ResetTokenRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

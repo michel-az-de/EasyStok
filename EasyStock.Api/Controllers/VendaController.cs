@@ -52,6 +52,18 @@ public class VendaController(
         return venda is null ? DataNotFound() : DataOk(venda);
     }
 
+    public sealed record ItemVendaDto(
+        Guid Id,
+        Guid ItemEstoqueId,
+        Guid ProdutoId,
+        Guid? ProdutoVariacaoId,
+        string? DescricaoSnapshot,
+        string? VariacaoSnapshot,
+        int Quantidade,
+        decimal PrecoUnitario,
+        decimal PrecoTotal,
+        DateTime CriadoEm);
+
     [SwaggerOperation(Summary = "Get sale items", Description = "Returns the list of items that compose a sale.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -66,7 +78,19 @@ public class VendaController(
         if (venda is null)
             return DataNotFound();
 
-        var itens = venda.ItensVenda ?? Enumerable.Empty<Domain.Entities.ItemVenda>();
+        var itens = (venda.ItensVenda ?? Enumerable.Empty<Domain.Entities.ItemVenda>())
+            .Select(i => new ItemVendaDto(
+                i.Id,
+                i.ItemEstoqueId,
+                i.ProdutoId,
+                i.ProdutoVariacaoId,
+                i.DescricaoSnapshot,
+                i.VariacaoSnapshot,
+                i.Quantidade.Value,
+                i.PrecoUnitario.Valor,
+                i.PrecoTotal.Valor,
+                i.CriadoEm))
+            .ToList();
         return DataOk(itens);
     }
 

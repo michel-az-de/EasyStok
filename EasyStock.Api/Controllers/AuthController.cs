@@ -65,14 +65,10 @@ public class AuthController(
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
 
-        // Revogar sessões anteriores (login em novo dispositivo força logout nos outros)
-        var sessoesAnteriores = await refreshTokenRepository.GetByUsuarioIdAsync(resultado.UsuarioId);
-        var sessoesAtivas = sessoesAnteriores.Where(t => t.EstaValido()).ToList();
-        foreach (var sessaoAtiva in sessoesAtivas)
-        {
-            sessaoAtiva.Revogar();
-            await refreshTokenRepository.UpdateAsync(sessaoAtiva);
-        }
+        // Revogar sessões anteriores (login em novo dispositivo força logout nos outros).
+        // Um único UPDATE em batch — antes era N updates via change tracker.
+        var sessoesRevogadas = await refreshTokenRepository.RevogarSessoesAtivasAsync(
+            resultado.UsuarioId, DateTime.UtcNow);
 
         var token = jwtService.GerarToken(resultado);
         var refreshTokenValue = jwtService.GerarRefreshToken();
@@ -97,13 +93,13 @@ public class AuthController(
             userAgent);
         await auditLogRepository.AddAsync(auditLog);
 
-        if (sessoesAtivas.Count > 0)
+        if (sessoesRevogadas > 0)
         {
             var auditNovoDispositivo = AuditLogEntity.Criar(
                 resultado.UsuarioId,
                 "login_novo_dispositivo",
                 true,
-                $"Login detectado em novo dispositivo. {sessoesAtivas.Count} sessão(ões) anterior(es) encerrada(s).",
+                $"Login detectado em novo dispositivo. {sessoesRevogadas} sessão(ões) anterior(es) encerrada(s).",
                 ip,
                 userAgent);
             await auditLogRepository.AddAsync(auditNovoDispositivo);

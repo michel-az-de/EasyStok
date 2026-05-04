@@ -102,24 +102,26 @@ public class AdminTenantsController(
         var empresa = await db.Empresas.FindAsync(id);
         if (empresa is null) return DataNotFound("Tenant não encontrado.");
 
-        // Busca o usuário com perfil Admin na empresa (ou o primeiro usuário ativo)
-        var ue = await db.UsuariosEmpresas
-            .Include(x => x.Usuario)
+        // Busca usuário ativo + perfil/nivel nesta empresa em uma única query.
+        // EF traduz a subquery em Select pra LEFT JOIN; antes era 2 round-trips.
+        var dados = await db.UsuariosEmpresas
             .Where(x => x.EmpresaId == id && x.Usuario!.Ativo)
             .OrderBy(x => x.CriadoEm)
+            .Select(x => new
+            {
+                Usuario = x.Usuario!,
+                Nivel = db.UsuariosPerfis
+                    .Where(up => up.UsuarioId == x.UsuarioId && up.EmpresaId == id)
+                    .Select(up => (NivelAcesso?)up.Perfil!.Nivel)
+                    .FirstOrDefault()
+            })
             .FirstOrDefaultAsync();
 
-        if (ue?.Usuario is null)
+        if (dados?.Usuario is null)
             return DataNotFound("Nenhum usuário ativo encontrado nesta empresa.");
 
-        // Busca o perfil/nivel do usuário nesta empresa
-        var perfil = await db.UsuariosPerfis
-            .Include(up => up.Perfil)
-            .Where(up => up.UsuarioId == ue.UsuarioId && up.EmpresaId == id)
-            .FirstOrDefaultAsync();
-
         // Cap at Admin — impersonation must never produce a SuperAdmin token
-        var rawNivel = perfil?.Perfil?.Nivel ?? NivelAcesso.Admin;
+        var rawNivel = dados.Nivel ?? NivelAcesso.Admin;
         var nivel = rawNivel == NivelAcesso.SuperAdmin ? NivelAcesso.Admin : rawNivel;
 
         var secretKey = configuration["Jwt:SecretKey"];
@@ -130,9 +132,9 @@ public class AdminTenantsController(
 
         var claims = new List<Claim>
         {
-            new("sub", ue.Usuario.Id.ToString()),
-            new("email", ue.Usuario.Email),
-            new("nome", ue.Usuario.Nome),
+            new("sub", dados.Usuario.Id.ToString()),
+            new("email", dados.Usuario.Email),
+            new("nome", dados.Usuario.Nome),
             new("nivel", nivel.ToString()),
             new("empresaId", id.ToString()),
             new("impersonated_by", currentUser.UsuarioId.ToString())
