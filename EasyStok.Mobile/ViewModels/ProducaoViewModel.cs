@@ -9,7 +9,9 @@ namespace EasyStok.Mobile.ViewModels;
 public sealed partial class ProducaoViewModel : BaseViewModel
 {
 	private readonly IEstoqueService _estoque;
-	private readonly EasyStok.Mobile.Storage.ISecureStore _store;
+	private readonly IEstoqueMutationService _mutations;
+	private readonly IOutboxRepository _outbox;
+	private readonly ISecureStore _store;
 
 	public ObservableCollection<CachedItemEstoque> Itens { get; } = new();
 
@@ -19,9 +21,18 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 	[ObservableProperty]
 	private string? _statusLine;
 
-	public ProducaoViewModel(IEstoqueService estoque, EasyStok.Mobile.Storage.ISecureStore store)
+	[ObservableProperty]
+	private int _pendingMutations;
+
+	public ProducaoViewModel(
+		IEstoqueService estoque,
+		IEstoqueMutationService mutations,
+		IOutboxRepository outbox,
+		ISecureStore store)
 	{
 		_estoque = estoque;
+		_mutations = mutations;
+		_outbox = outbox;
 		_store = store;
 	}
 
@@ -34,19 +45,13 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 			return;
 		}
 
-		// Cache primeiro (renderiza imediato, mesmo offline).
 		await LoadFromCacheAsync(empresaId.Value);
+		await UpdatePendingAsync();
 
-		// Pull em background atualiza com a API.
 		var refresh = await _estoque.RefreshAsync(empresaId.Value);
-		if (!refresh.Success)
-		{
-			StatusLine = refresh.Error;
-		}
-		else
-		{
-			StatusLine = $"{refresh.Imported} itens atualizados";
-		}
+		StatusLine = refresh.Success
+			? $"{refresh.Imported} itens atualizados"
+			: refresh.Error;
 
 		await LoadFromCacheAsync(empresaId.Value);
 	});
@@ -62,7 +67,40 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 			? $"{refresh.Imported} itens atualizados"
 			: refresh.Error;
 		await LoadFromCacheAsync(empresaId.Value);
+		await UpdatePendingAsync();
 	});
+
+	[RelayCommand]
+	private async Task IncrementAsync(CachedItemEstoque item)
+	{
+		if (item is null) return;
+		try
+		{
+			await _mutations.IncrementAsync(item);
+			ReplaceInCollection(item.Id);
+			await UpdatePendingAsync();
+		}
+		catch (Exception ex)
+		{
+			ErrorMessage = ex.Message;
+		}
+	}
+
+	[RelayCommand]
+	private async Task DecrementAsync(CachedItemEstoque item)
+	{
+		if (item is null || item.Qty <= 0) return;
+		try
+		{
+			await _mutations.DecrementAsync(item);
+			ReplaceInCollection(item.Id);
+			await UpdatePendingAsync();
+		}
+		catch (Exception ex)
+		{
+			ErrorMessage = ex.Message;
+		}
+	}
 
 	private async Task LoadFromCacheAsync(Guid empresaId)
 	{
@@ -71,5 +109,22 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 		foreach (var item in cached)
 			Itens.Add(item);
 		SemDados = Itens.Count == 0;
+	}
+
+	private async Task UpdatePendingAsync()
+	{
+		PendingMutations = await _outbox.CountAsync();
+	}
+
+	private async void ReplaceInCollection(string itemId)
+	{
+		// Pos optimistic update no SQLite, recarrega so o item afetado.
+		var empresaId = await _store.GetEmpresaIdAsync();
+		if (empresaId is null) return;
+		var cached = await _estoque.GetCachedAsync(empresaId.Value);
+		var fresh = cached.FirstOrDefault(x => x.Id == itemId);
+		if (fresh is null) return;
+		var idx = Itens.ToList().FindIndex(x => x.Id == itemId);
+		if (idx >= 0) Itens[idx] = fresh;
 	}
 }

@@ -26,10 +26,11 @@ public static class MauiProgram
 				fonts.AddFont("FrauncesItalic.ttf", "FrauncesItalic");
 			});
 
-		// Storage seguro + DB local + caches
+		// Storage seguro + DB local + caches + outbox
 		builder.Services.AddSingleton<ISecureStore, SecureStore>();
 		builder.Services.AddSingleton<AppDatabase>();
 		builder.Services.AddSingleton<IEstoqueCache, EstoqueCache>();
+		builder.Services.AddSingleton<IOutboxRepository, OutboxRepository>();
 
 		// HTTP clients:
 		// - "easystok-api-noauth" para login/refresh (nao injeta Authorization)
@@ -53,6 +54,8 @@ public static class MauiProgram
 		builder.Services.AddSingleton<ICompanyService, CompanyService>();
 		builder.Services.AddSingleton<IPermissionService, PermissionService>();
 		builder.Services.AddSingleton<IEstoqueService, EstoqueService>();
+		builder.Services.AddSingleton<IOutboxFlushService, OutboxFlushService>();
+		builder.Services.AddSingleton<IEstoqueMutationService, EstoqueMutationService>();
 
 		// Shell (singleton — uma instancia por app)
 		builder.Services.AddSingleton<AppShell>();

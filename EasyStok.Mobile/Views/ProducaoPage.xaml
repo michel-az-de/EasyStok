@@ -15,20 +15,27 @@
             <Label Text="estoque ativo" Style="{StaticResource LabelGreeting}" />
         </VerticalStackLayout>
 
-        <!-- Status / refresh -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+        <!-- Status / refresh / pending count -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
             <Label Grid.Column="0"
                    Text="{Binding StatusLine}"
                    Style="{StaticResource LabelCaption}"
                    VerticalOptions="Center" />
-            <Button Grid.Column="1"
+            <Border Grid.Column="1"
+                    Style="{StaticResource CardElev}"
+                    Padding="8,4"
+                    IsVisible="{Binding PendingMutations, Converter={StaticResource IntGreaterThanZeroConverter}}">
+                <Label Text="{Binding PendingMutations, StringFormat='{0} pendente(s)'}"
+                       Style="{StaticResource LabelCaption}"
+                       TextColor="{AppThemeBinding Dark={StaticResource GoldDark}, Light={StaticResource GoldLight}}" />
+            </Border>
+            <Button Grid.Column="2"
                     Text="Atualizar"
                     Style="{StaticResource ButtonGhost}"
                     Command="{Binding RefreshCommand}"
                     IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
         </Grid>
 
-        <!-- Loading + estado vazio + erro -->
         <VerticalStackLayout Grid.Row="2" Spacing="6">
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
             <Label Text="{Binding ErrorMessage}"
@@ -42,8 +49,9 @@
                    Margin="0,12,0,0" />
         </VerticalStackLayout>
 
-        <!-- Grid 2 colunas (espelha o catalogo do PWA Casa da Baba) -->
+        <!-- Grid 2 colunas com botoes +/- -->
         <CollectionView Grid.Row="3"
+                        x:Name="ProducaoList"
                         ItemsSource="{Binding Itens}"
                         SelectionMode="None">
             <CollectionView.ItemsLayout>
@@ -80,6 +88,25 @@
                                        Text="{Binding Status}"
                                        Style="{StaticResource LabelSuffix}"
                                        VerticalOptions="End" />
+                            </Grid>
+
+                            <!-- Botoes +/-  -->
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,8,0,0">
+                                <Button Grid.Column="0"
+                                        Text="−"
+                                        FontSize="20"
+                                        FontAttributes="Bold"
+                                        Style="{StaticResource ButtonGhost}"
+                                        HeightRequest="40"
+                                        Command="{Binding Path=BindingContext.DecrementCommand, Source={x:Reference ProducaoList}}"
+                                        CommandParameter="{Binding .}" />
+                                <Button Grid.Column="1"
+                                        Text="+"
+                                        FontSize="20"
+                                        FontAttributes="Bold"
+                                        HeightRequest="40"
+                                        Command="{Binding Path=BindingContext.IncrementCommand, Source={x:Reference ProducaoList}}"
+                                        CommandParameter="{Binding .}" />
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
