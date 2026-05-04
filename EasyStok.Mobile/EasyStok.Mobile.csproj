@@ -63,8 +63,11 @@
 		<!-- QR scanner (tela conferencia) -->
 		<PackageReference Include="ZXing.Net.Maui.Controls" Version="0.4.0" />
 
-		<!-- Biometria (BiometricPrompt no Android) para login subsequente -->
-		<PackageReference Include="Plugin.Fingerprint" Version="3.0.0-beta.1" />
+		<!-- Biometria removida temporariamente (Plugin.Fingerprint 3.0.0-beta.1
+		     suspeita de crash no startup em alguns devices). F5/polish vai
+		     trazer de volta usando BiometricPrompt nativo via binding Android
+		     ou versao estavel do plugin quando sair da fase beta. -->
+		<!-- <PackageReference Include="Plugin.Fingerprint" Version="3.0.0-beta.1" /> -->
 	</ItemGroup>
 
 </Project>

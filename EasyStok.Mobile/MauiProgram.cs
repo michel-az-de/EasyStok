@@ -15,6 +15,26 @@ public static class MauiProgram
 
 	public static MauiApp CreateMauiApp()
 	{
+		try
+		{
+			return BuildApp();
+		}
+		catch (Exception ex)
+		{
+			// Crash bem cedo (antes mesmo de App ser instanciado): grava em
+			// um caminho conhecido SEM passar por FileSystem.AppDataDirectory
+			// (que pode nao estar disponivel ainda).
+			BootCrashLog.Write("MauiProgram.CreateMauiApp", ex);
+			throw;
+		}
+	}
+
+	private static MauiApp BuildApp()
+	{
+		// SQLite — algumas combinacoes de SDK Android exigem init explicito
+		// do bundle antes do primeiro uso. Idempotente.
+		SQLitePCL.Batteries_V2.Init();
+
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
@@ -33,8 +53,6 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IOutboxRepository, OutboxRepository>();
 
 		// HTTP clients:
-		// - "easystok-api-noauth" para login/refresh (nao injeta Authorization)
-		// - "easystok-api"        para chamadas autenticadas (com AuthHandler)
 		builder.Services.AddTransient<AuthHandler>();
 
 		builder.Services.AddHttpClient(NoAuthClientName, http =>
@@ -61,7 +79,7 @@ public static class MauiProgram
 		// Shell (singleton — uma instancia por app)
 		builder.Services.AddSingleton<AppShell>();
 
-		// ViewModels (transient — nova instancia por Page)
+		// ViewModels (transient)
 		builder.Services.AddTransient<LoginViewModel>();
 		builder.Services.AddTransient<TenantPickerViewModel>();
 		builder.Services.AddTransient<LojaPickerViewModel>();

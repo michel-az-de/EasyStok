@@ -2,8 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
-using Plugin.Fingerprint;
-using Plugin.Fingerprint.Abstractions;
 
 namespace EasyStok.Mobile.ViewModels;
 
@@ -18,6 +16,9 @@ public sealed partial class LoginViewModel : BaseViewModel
 	[ObservableProperty]
 	private string _senha = string.Empty;
 
+	// Biometria temporariamente desativada — Plugin.Fingerprint 3.0.0-beta.1
+	// causou crash de startup em alguns devices. Volta na F5 com BiometricPrompt
+	// nativo. Mantemos as properties pra UI continuar com bind valido.
 	[ObservableProperty]
 	private bool _biometricsAvailable;
 
@@ -32,16 +33,15 @@ public sealed partial class LoginViewModel : BaseViewModel
 
 	public async Task InitializeAsync()
 	{
-		Email = await _store.GetEmailLastLoginAsync() ?? string.Empty;
-		BiometricsEnabled = await _store.GetBiometricsEnabledAsync();
-		BiometricsAvailable = await CrossFingerprint.Current.IsAvailableAsync(allowAlternativeAuthentication: false);
-
-		// Se biometria ja esta autorizada e o ultimo refresh ainda eh valido,
-		// oferece login automatico sem digitar senha.
-		var refreshToken = await _store.GetRefreshTokenAsync();
-		if (BiometricsEnabled && BiometricsAvailable && !string.IsNullOrEmpty(refreshToken))
+		try
 		{
-			await TryBiometricLoginAsync();
+			Email = await _store.GetEmailLastLoginAsync() ?? string.Empty;
+			BiometricsEnabled = false;
+			BiometricsAvailable = false;
+		}
+		catch (Exception ex)
+		{
+			CrashLog.Write("LoginViewModel.InitializeAsync", ex);
 		}
 	}
 
@@ -61,58 +61,19 @@ public sealed partial class LoginViewModel : BaseViewModel
 			return;
 		}
 
-		// Oferece habilitar biometria no primeiro login bem-sucedido em device
-		// que tem hardware. (Application.MainPage foi deprecated em MAUI 9 —
-		// usamos Windows[0].Page agora.)
-		if (BiometricsAvailable && !BiometricsEnabled)
-		{
-			var page = Application.Current?.Windows?.FirstOrDefault()?.Page;
-			var ok = page is not null && await page.DisplayAlert(
-				"Biometria",
-				"Quer entrar com digital nas proximas vezes?",
-				"Sim", "Agora nao");
-			if (ok)
-			{
-				await _store.SetBiometricsEnabledAsync(true);
-				BiometricsEnabled = true;
-			}
-		}
-
 		await NavigateAfterLoginAsync(result.Data!.Usuario.Nivel);
 	});
 
 	[RelayCommand]
-	private Task BiometricLoginAsync() => RunAsync(TryBiometricLoginAsync);
-
-	private async Task TryBiometricLoginAsync()
+	private Task BiometricLoginAsync() => RunAsync(async () =>
 	{
-		var req = new AuthenticationRequestConfiguration("Entrar no EasyStok",
-			"Confirme sua identidade para usar a sessao salva.");
-		var auth = await CrossFingerprint.Current.AuthenticateAsync(req);
-		if (!auth.Authenticated)
-		{
-			ErrorMessage = auth.ErrorMessage ?? "Autenticacao biometrica cancelada.";
-			return;
-		}
-
-		var refreshed = await _auth.RefreshAsync();
-		if (!refreshed)
-		{
-			ErrorMessage = "Sessao expirou. Faca login com email e senha.";
-			await _store.SetBiometricsEnabledAsync(false);
-			BiometricsEnabled = false;
-			return;
-		}
-
-		var usuario = await _store.GetUsuarioAsync();
-		await NavigateAfterLoginAsync(usuario?.Nivel ?? "Operador");
-	}
+		// Stub ate F5 reintroduzir biometria nativa.
+		ErrorMessage = "Biometria ainda nao habilitada nesta versao.";
+		await Task.CompletedTask;
+	});
 
 	private async Task NavigateAfterLoginAsync(string _nivel)
 	{
-		// Multi-tenant flow:
-		// - Se JWT tem empresaId: salva e vai pra LojaPicker (que auto-escolhe se loja unica)
-		// - Se JWT NAO tem empresaId (multi-empresa): vai pra TenantPicker
 		var empresaId = await _auth.GetEmpresaIdFromTokenAsync();
 		if (empresaId is null)
 		{
