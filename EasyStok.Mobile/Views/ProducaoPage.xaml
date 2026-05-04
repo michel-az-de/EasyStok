@@ -1,12 +1,91 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.ProducaoPage"
-             Title="Producao">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Producao" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F3 - marco go/no-go)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:ProducaoViewModel"
+             Title="Producao"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="22,16" RowDefinitions="Auto,Auto,Auto,*">
+
+        <!-- Header brand -->
+        <VerticalStackLayout Grid.Row="0" Spacing="2" Margin="0,0,0,12">
+            <Label Text="Producao" Style="{StaticResource LabelHero}" />
+            <Label Text="estoque ativo" Style="{StaticResource LabelGreeting}" />
         </VerticalStackLayout>
+
+        <!-- Status / refresh -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <Label Grid.Column="0"
+                   Text="{Binding StatusLine}"
+                   Style="{StaticResource LabelCaption}"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Atualizar"
+                    Style="{StaticResource ButtonGhost}"
+                    Command="{Binding RefreshCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
+        </Grid>
+
+        <!-- Loading + estado vazio + erro -->
+        <VerticalStackLayout Grid.Row="2" Spacing="6">
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
+            <Label Text="{Binding ErrorMessage}"
+                   TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}"
+                   FontSize="12"
+                   IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+            <Label Text="Nenhum item de estoque para a empresa atual."
+                   Style="{StaticResource LabelSubtitle}"
+                   IsVisible="{Binding SemDados}"
+                   HorizontalOptions="Center"
+                   Margin="0,12,0,0" />
+        </VerticalStackLayout>
+
+        <!-- Grid 2 colunas (espelha o catalogo do PWA Casa da Baba) -->
+        <CollectionView Grid.Row="3"
+                        ItemsSource="{Binding Itens}"
+                        SelectionMode="None">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical"
+                                 Span="2"
+                                 HorizontalItemSpacing="8"
+                                 VerticalItemSpacing="8" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:CachedItemEstoque">
+                    <Border Style="{StaticResource Card}">
+                        <VerticalStackLayout Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0"
+                                       Text="{Binding ProdutoNome}"
+                                       Style="{StaticResource LabelTitle}"
+                                       LineBreakMode="TailTruncation"
+                                       MaxLines="2" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding Emoji}"
+                                       FontSize="22"
+                                       VerticalOptions="Start" />
+                            </Grid>
+                            <Label Text="{Binding Sku, StringFormat='SKU {0}'}"
+                                   Style="{StaticResource LabelCaption}" />
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                <Label Grid.Column="0"
+                                       Text="{Binding Qty, StringFormat='{0} un'}"
+                                       FontFamily="Manrope"
+                                       FontSize="22"
+                                       FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Dark={StaticResource AccentDark}, Light={StaticResource AccentLight}}" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding Status}"
+                                       Style="{StaticResource LabelSuffix}"
+                                       VerticalOptions="End" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
     </Grid>
 </ContentPage>
