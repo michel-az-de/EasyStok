@@ -1,4 +1,5 @@
 using EasyStok.Mobile.Services;
+using EasyStok.Mobile.Storage;
 using EasyStok.Mobile.Views;
 
 namespace EasyStok.Mobile;
@@ -6,12 +7,14 @@ namespace EasyStok.Mobile;
 public partial class AppShell : Shell
 {
 	private readonly IAuthService _auth;
+	private readonly ISecureStore _store;
 	private bool _initialized;
 
-	public AppShell(IAuthService auth)
+	public AppShell(IAuthService auth, ISecureStore store)
 	{
 		InitializeComponent();
 		_auth = auth;
+		_store = store;
 		RegisterRoutes();
 	}
 
@@ -21,11 +24,33 @@ public partial class AppShell : Shell
 		if (_initialized) return;
 		_initialized = true;
 
-		// Roteia para login se nao houver sessao valida.
+		// Decide a rota inicial baseado no estado da sessao:
+		//   - sem token e sem refresh    -> //login
+		//   - autenticado mas sem empresa -> //tenant-picker
+		//   - empresa OK mas sem loja     -> //loja-picker
+		//   - tudo OK                    -> //home (default ja esta na rota inicial)
 		Dispatcher.Dispatch(async () =>
 		{
 			if (!await _auth.IsAuthenticatedAsync())
+			{
 				await GoToAsync("//login");
+				return;
+			}
+
+			var empresaId = await _store.GetEmpresaIdAsync()
+				?? await _auth.GetEmpresaIdFromTokenAsync();
+			if (empresaId is null)
+			{
+				await GoToAsync("//tenant-picker");
+				return;
+			}
+
+			if (await _store.GetLojaIdAsync() is null)
+			{
+				await GoToAsync("//loja-picker");
+				return;
+			}
+			// Tudo certo — segue na home (rota default do ShellContent inicial).
 		});
 	}
 

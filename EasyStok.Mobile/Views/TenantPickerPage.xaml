@@ -1,12 +1,37 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.TenantPickerPage"
-             Title="Selecionar empresa">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Empresa" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F2b)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
-        </VerticalStackLayout>
+             x:DataType="vm:TenantPickerViewModel"
+             Title="Selecionar empresa"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="22,32">
+        <ScrollView>
+            <VerticalStackLayout Spacing="14" VerticalOptions="Center">
+
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center" Margin="0,0,0,12">
+                    <Label Text="Selecione a empresa" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
+                    <Label Text="Sua conta esta vinculada a mais de uma empresa"
+                           Style="{StaticResource LabelGreeting}"
+                           HorizontalOptions="Center"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Funcionalidade em construcao"
+                               Style="{StaticResource LabelTitle}" />
+                        <Label Text="Para usar o app com multiplas empresas, contate o suporte para configurar a empresa principal. A listagem direta sera liberada em breve."
+                               Style="{StaticResource LabelSubtitle}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Button Text="Sair e tentar com outra conta"
+                        Style="{StaticResource ButtonGhost}"
+                        Command="{Binding LogoutCommand}" />
+
+            </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>

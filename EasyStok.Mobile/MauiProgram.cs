@@ -48,12 +48,16 @@ public static class MauiProgram
 
 		// Servicos de dominio
 		builder.Services.AddSingleton<IAuthService, AuthService>();
+		builder.Services.AddSingleton<ICompanyService, CompanyService>();
+		builder.Services.AddSingleton<IPermissionService, PermissionService>();
 
 		// Shell (singleton — uma instancia por app)
 		builder.Services.AddSingleton<AppShell>();
 
 		// ViewModels (transient — nova instancia por Page)
 		builder.Services.AddTransient<LoginViewModel>();
+		builder.Services.AddTransient<TenantPickerViewModel>();
+		builder.Services.AddTransient<LojaPickerViewModel>();
 
 		// Views (transient)
 		builder.Services.AddTransient<LoginPage>();

@@ -108,10 +108,19 @@ public sealed partial class LoginViewModel : BaseViewModel
 		await NavigateAfterLoginAsync(usuario?.Nivel ?? "Operador");
 	}
 
-	private static async Task NavigateAfterLoginAsync(string _nivel)
+	private async Task NavigateAfterLoginAsync(string _nivel)
 	{
-		// Multi-tenant flow (F2b) decide se pede TenantPicker / LojaPicker.
-		// Por enquanto vai direto pra home — F2b vai checar /api/auth/me + lojas.
-		await Shell.Current.GoToAsync("//home");
+		// Multi-tenant flow:
+		// - Se JWT tem empresaId: salva e vai pra LojaPicker (que auto-escolhe se loja unica)
+		// - Se JWT NAO tem empresaId (multi-empresa): vai pra TenantPicker
+		var empresaId = await _auth.GetEmpresaIdFromTokenAsync();
+		if (empresaId is null)
+		{
+			await Shell.Current.GoToAsync("//tenant-picker");
+			return;
+		}
+
+		await _store.SetEmpresaIdAsync(empresaId.Value);
+		await Shell.Current.GoToAsync("//loja-picker");
 	}
 }

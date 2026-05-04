@@ -109,6 +109,31 @@ public sealed class AuthService : IAuthService
 		return !string.IsNullOrEmpty(refresh);
 	}
 
+	public async Task<Guid?> GetEmpresaIdFromTokenAsync()
+	{
+		var token = await _store.GetAccessTokenAsync();
+		if (string.IsNullOrEmpty(token)) return null;
+		var claims = JwtParser.Decode(token);
+		var raw = JwtParser.GetString(claims, "empresaId");
+		return Guid.TryParse(raw, out var g) ? g : null;
+	}
+
+	public async Task<string?> GetNivelFromTokenAsync()
+	{
+		var token = await _store.GetAccessTokenAsync();
+		if (string.IsNullOrEmpty(token)) return null;
+		var claims = JwtParser.Decode(token);
+		return JwtParser.GetString(claims, "nivel");
+	}
+
+	public async Task<IReadOnlyList<string>> GetPermissoesFromTokenAsync()
+	{
+		var token = await _store.GetAccessTokenAsync();
+		if (string.IsNullOrEmpty(token)) return Array.Empty<string>();
+		var claims = JwtParser.Decode(token);
+		return JwtParser.GetStringArray(claims, "permissao");
+	}
+
 	private static async Task<string> ExtractErrorMessageAsync(HttpResponseMessage resp, CancellationToken ct)
 	{
 		try
@@ -136,6 +161,15 @@ public interface IAuthService
 	Task<bool> RefreshAsync(CancellationToken ct = default);
 	Task LogoutAsync(CancellationToken ct = default);
 	Task<bool> IsAuthenticatedAsync();
+
+	/// <summary>Decodifica o access token corrente e retorna o claim empresaId, se houver.</summary>
+	Task<Guid?> GetEmpresaIdFromTokenAsync();
+
+	/// <summary>Decodifica o access token corrente e retorna o claim nivel (Admin/Gerente/Operador/Visualizador).</summary>
+	Task<string?> GetNivelFromTokenAsync();
+
+	/// <summary>Decodifica o access token corrente e retorna a lista de claims permissao.</summary>
+	Task<IReadOnlyList<string>> GetPermissoesFromTokenAsync();
 }
 
 public sealed record AuthResult(bool Success, LoginResponse? Data, string? Error)
