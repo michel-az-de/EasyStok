@@ -694,8 +694,15 @@
   //
   // FAIL-SAFE: se servidor offline / pairing inválido / browser sem
   // EventSource, app continua funcionando com polling 30s normal.
-  // Reconnect automatico do EventSource em caso de drop.
+  // Reconnect com backoff exponencial em caso de drop. O reconnect nativo
+  // do EventSource é ~1s — em servidor down isso vira 3600 reconnects/h por
+  // device. Aqui fechamos no onerror e religamos com 2s → 30s, e ainda
+  // abortamos depois de 8 falhas consecutivas (polling 30s segue como
+  // fallback até o usuário voltar pro app).
   let _sseSource = null;
+  let _sseRetryCount = 0;
+  let _sseRetryTimer = null;
+  const SSE_MAX_RETRIES = 8;
   function startRealtime() {
     if (_sseSource) return; // já conectado
     if (!navigator.onLine) return;
@@ -705,6 +712,7 @@
     try {
       const url = API_BASE_URL + API_PREFIX + '/operation/stream?apiKey=' + encodeURIComponent(apiKey);
       _sseSource = new EventSource(url);
+      _sseSource.onopen = function () { _sseRetryCount = 0; };
       _sseSource.onmessage = function (ev) {
         try {
           const data = JSON.parse(ev.data);
@@ -719,8 +727,19 @@
         } catch (e) {}
       };
       _sseSource.onerror = function () {
-        // EventSource reconecta sozinho. Só loga; polling 30s segue como fallback.
-        try { console.warn('[realtime] erro SSE — fallback pra polling'); } catch (_) {}
+        try { _sseSource.close(); } catch (_) {}
+        _sseSource = null;
+        if (_sseRetryCount >= SSE_MAX_RETRIES) {
+          try { console.warn('[realtime] SSE desligado apos', SSE_MAX_RETRIES, 'tentativas — polling segue'); } catch (_) {}
+          return;
+        }
+        const delay = Math.min(2000 * Math.pow(2, _sseRetryCount), 30000);
+        _sseRetryCount++;
+        if (_sseRetryTimer) clearTimeout(_sseRetryTimer);
+        _sseRetryTimer = setTimeout(function () {
+          _sseRetryTimer = null;
+          startRealtime();
+        }, delay);
       };
     } catch (e) {
       try { console.warn('[realtime] startRealtime falhou:', e && e.message); } catch (_) {}
@@ -728,6 +747,8 @@
     }
   }
   function stopRealtime() {
+    if (_sseRetryTimer) { clearTimeout(_sseRetryTimer); _sseRetryTimer = null; }
+    _sseRetryCount = 0;
     if (_sseSource) {
       try { _sseSource.close(); } catch (e) {}
       _sseSource = null;

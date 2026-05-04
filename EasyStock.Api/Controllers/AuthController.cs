@@ -2,6 +2,7 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
+using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -24,7 +25,10 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
-public sealed record LoginRequest(string Email, string Senha, Guid? EmpresaId);
+public sealed record LoginRequest(
+    [Required, EmailAddress] string Email,
+    [Required] string Senha,
+    Guid? EmpresaId);
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
 

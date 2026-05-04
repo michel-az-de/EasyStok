@@ -13,7 +13,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/status")]
 [Authorize(Policy = "SuperAdmin")]
 [ResponseCache(Duration = 30)]
-public class AdminStatusController(EasyStockDbContext db) : EasyStockControllerBase
+public class AdminStatusController(EasyStockDbContext db, ILogger<AdminStatusController> logger) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetStatus()
@@ -29,10 +29,11 @@ public class AdminStatusController(EasyStockDbContext db) : EasyStockControllerB
             await db.Database.ExecuteSqlRawAsync("SELECT 1");
             sw.Stop();
             dbLatencyMs = sw.ElapsedMilliseconds;
-            dbStatus = dbLatencyMs < 200 ? "ok" : dbLatencyMs < 1000 ? "degraded" : "degraded";
+            dbStatus = dbLatencyMs < 200 ? "ok" : "degraded";
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Health-check do banco falhou no AdminStatus");
             dbStatus = "down";
         }
 

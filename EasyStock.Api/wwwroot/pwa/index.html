@@ -12221,7 +12221,8 @@ window.cdbSetPix = function (key, holder, type, empresa) {
   if (holder)  localStorage.setItem('cdb-pix-holder',   String(holder));
   if (type)    localStorage.setItem('cdb-pix-type',     String(type));
   if (empresa) localStorage.setItem('cdb-empresa-name', String(empresa));
-  console.log('[PIX]', getPixType(), '·', getPixKey(), '·', getPixHolder(), '·', getEmpresaName());
+  // Não logar chave/holder — confirmação sem expor dado sensível.
+  console.log('[PIX] configurado:', getPixType() || '(sem tipo)', '·', getEmpresaName() || '(sem empresa)');
 };
 
 /**
