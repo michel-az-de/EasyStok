@@ -1,4 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Ports.Output;
@@ -9,6 +11,7 @@ using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace EasyStock.Api.Mobile.Controllers;
 
@@ -29,12 +32,17 @@ public class OperationController(
     EasyStockDbContext db,
     MobileEventBroker eventBroker,
     ICurrentUserAccessor currentUser,
+    IConfiguration configuration,
     ILogger<OperationController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileEventBroker _eventBroker = eventBroker;
     private readonly ICurrentUserAccessor _currentUser = currentUser;
+    private readonly IConfiguration _configuration = configuration;
     private readonly ILogger<OperationController> _log = log;
+
+    private const string SseTokenType = "mobile-sse";
+    private const int SseTokenExpiresInSeconds = 300; // 5 min
 
     /// <summary>
     /// Dashboard ao vivo da loja — KPIs agregados em tempo de request.
@@ -295,9 +303,55 @@ public class OperationController(
     }
 
     /// <summary>
+    /// Emite token efemero (JWT 5min) para o device usar como query param ?token=
+    /// no /operation/stream — assim a apiKey nao vai mais pra URL, log de proxy,
+    /// historico de browser etc. Endpoint exige apiKey via header [MobileApiKey],
+    /// que nao deixa rasto em logs HTTP.
+    /// </summary>
+    [HttpPost("sse-token")]
+    [MobileApiKey]
+    public IActionResult IssueSseToken()
+    {
+        var device = HttpContext.GetMobileDevice();
+        if (device == null) return Unauthorized();
+
+        var secretKey = _configuration["Jwt:SecretKey"];
+        if (string.IsNullOrEmpty(secretKey))
+        {
+            _log.LogError("Jwt:SecretKey ausente — nao consigo emitir SSE token.");
+            return StatusCode(500, new { error = "Configuracao JWT ausente." });
+        }
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var agora = DateTime.UtcNow;
+
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim("typ", SseTokenType),
+                new Claim("deviceId", device.Id),
+            }),
+            NotBefore = agora,
+            IssuedAt = agora,
+            Expires = agora.AddSeconds(SseTokenExpiresInSeconds),
+            Issuer = _configuration["Jwt:Issuer"],
+            Audience = _configuration["Jwt:Audience"],
+            SigningCredentials = credentials,
+        };
+
+        var handler = new JwtSecurityTokenHandler();
+        var token = handler.WriteToken(handler.CreateToken(descriptor));
+        return Ok(new { token, expiresIn = SseTokenExpiresInSeconds });
+    }
+
+    /// <summary>
     /// Onda 5 — Server-Sent Events stream pro PWA receber notificações de
-    /// outros devices em tempo real. Auth: <c>?apiKey=mk_xxx</c> na query
-    /// (EventSource não suporta headers customizados).
+    /// outros devices em tempo real. Auth: <c>?token=jwt</c> emitido por
+    /// <see cref="IssueSseToken"/>. Aceita tambem <c>?apiKey=mk_xxx</c> como
+    /// fallback legado (APKs antigos antes do token efêmero) — remover
+    /// depois que toda frota atualizar.
     ///
     /// Eventos emitidos:
     ///   - mutations-applied: outro device da mesma loja sincronizou →
@@ -311,18 +365,33 @@ public class OperationController(
     /// </summary>
     [HttpGet("stream")]
     [AllowAnonymous]
-    public async Task Stream([FromQuery] string? apiKey, CancellationToken ct)
+    public async Task Stream([FromQuery] string? token, [FromQuery] string? apiKey, CancellationToken ct)
     {
-        // Mantém apiKey opcional pra que ASP.NET não dispare 400 antes
-        // do nosso check — preferimos 401 explícito pra clareza no PWA.
-        if (string.IsNullOrWhiteSpace(apiKey))
+        MobileDevice? device = null;
+
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            var deviceId = TryReadSseTokenDeviceId(token);
+            if (deviceId == null)
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+            device = await _db.Set<MobileDevice>().AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        }
+        else if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            // Caminho legado — APKs antigos ainda mandam apiKey na URL.
+            device = await _db.Set<MobileDevice>().AsNoTracking()
+                .FirstOrDefaultAsync(d => d.ApiKey == apiKey, ct);
+        }
+        else
         {
             Response.StatusCode = 401;
             return;
         }
 
-        var device = await _db.Set<MobileDevice>().AsNoTracking()
-            .FirstOrDefaultAsync(d => d.ApiKey == apiKey, ct);
         if (device == null || device.Revoked)
         {
             Response.StatusCode = 401;
@@ -384,6 +453,42 @@ public class OperationController(
         var sub = User.FindFirstValue("sub")
                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(sub, out var g) ? g : null;
+    }
+
+    /// <summary>
+    /// Valida JWT efemero de SSE e devolve deviceId. Retorna null se token
+    /// invalido, expirado, ou de tipo errado.
+    /// </summary>
+    private string? TryReadSseTokenDeviceId(string token)
+    {
+        var secretKey = _configuration["Jwt:SecretKey"];
+        if (string.IsNullOrEmpty(secretKey)) return null;
+
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var parameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = _configuration["Jwt:Issuer"],
+                ValidateAudience = true,
+                ValidAudience = _configuration["Jwt:Audience"],
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                ClockSkew = TimeSpan.FromSeconds(30),
+            };
+
+            var principal = handler.ValidateToken(token, parameters, out _);
+            if (principal.FindFirstValue("typ") != SseTokenType) return null;
+
+            var deviceId = principal.FindFirstValue("deviceId");
+            return string.IsNullOrEmpty(deviceId) ? null : deviceId;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 

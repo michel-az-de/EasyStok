@@ -699,18 +699,55 @@
   // device. Aqui fechamos no onerror e religamos com 2s → 30s, e ainda
   // abortamos depois de 8 falhas consecutivas (polling 30s segue como
   // fallback até o usuário voltar pro app).
+  //
+  // Auth: pedimos um token JWT efemero (5min) via POST /operation/sse-token
+  // com header X-Mobile-Api-Key, e usamos esse token na URL do EventSource.
+  // Antes a apiKey ia direto na URL — ficava em log de proxy, historico de
+  // browser, telemetria. Servidor velho sem o endpoint cai no fallback de
+  // ?apiKey= legado.
   let _sseSource = null;
   let _sseRetryCount = 0;
   let _sseRetryTimer = null;
   const SSE_MAX_RETRIES = 8;
-  function startRealtime() {
+
+  async function fetchSseToken() {
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
+    try {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+      let resp;
+      try {
+        resp = await fetch(API_BASE_URL + API_PREFIX + '/operation/sse-token', {
+          method: 'POST',
+          headers: baseHeaders({ 'Content-Type': 'application/json' }),
+          body: '{}',
+          signal: ctrl.signal,
+        });
+      } finally { clearTimeout(timeoutId); }
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return (data && typeof data.token === 'string' && data.token) ? data.token : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function startRealtime() {
     if (_sseSource) return; // já conectado
     if (!navigator.onLine) return;
     if (typeof EventSource === 'undefined') return; // browser sem suporte
     const apiKey = getApiKey();
     if (!apiKey) return; // só pareados
+
+    // Tenta token efemero. Se servidor antigo (404) ou rede falha, cai no
+    // fallback ?apiKey= pra nao perder realtime durante a transicao.
+    const token = await fetchSseToken();
+    const queryParam = token ? ('token=' + encodeURIComponent(token))
+                              : ('apiKey=' + encodeURIComponent(apiKey));
+
     try {
-      const url = API_BASE_URL + API_PREFIX + '/operation/stream?apiKey=' + encodeURIComponent(apiKey);
+      const url = API_BASE_URL + API_PREFIX + '/operation/stream?' + queryParam;
       _sseSource = new EventSource(url);
       _sseSource.onopen = function () { _sseRetryCount = 0; };
       _sseSource.onmessage = function (ev) {

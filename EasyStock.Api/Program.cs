@@ -505,6 +505,19 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 
+// Aviso de seguranca em Production: se Mobile:RequireApiKey ainda esta false,
+// /api/mobile/sync aceita request anonimo. Configurar a env var
+// Mobile__RequireApiKey=true no App Service quando todos os APKs estiverem
+// pareados (ver Mobile/DEPLOY-RUNBOOK.md, Passo 6).
+if (app.Environment.IsProduction()
+    && !app.Configuration.GetValue<bool>("Mobile:RequireApiKey"))
+{
+    app.Logger.LogWarning(
+        "Mobile:RequireApiKey={Value} em Production — /api/mobile/sync aceita request anonimo. " +
+        "Recomendado virar true via env var Mobile__RequireApiKey=true.",
+        false);
+}
+
 app.Run();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
