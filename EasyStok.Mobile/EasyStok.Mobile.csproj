@@ -26,20 +26,10 @@
 
 		<SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
 
-		<!-- ===== Standalone deployment (sideload-friendly) =====
-		     Por padrao o MAUI Android Debug usa "fast deployment": assemblies
-		     ficam fora do APK e precisam do Mono runtime compartilhado (que so
-		     existe quando o Visual Studio / Android Studio prepara o device).
-		     Em sideload no celular do usuario isso causa crash imediato antes
-		     do MainActivity.OnCreate. As tres flags abaixo forcam o deployment
-		     "embedded" mesmo em Debug — APK fica maior porem auto-suficiente. -->
-		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-		<AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
-		<UseInterpreter>false</UseInterpreter>
-
-		<!-- Multi-arch: cobre devices arm 32-bit (alguns Galaxy A entry-level)
-		     e 64-bit (maioria dos Galaxy S, A50+, todos novos). -->
-		<RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+		<!-- Build com `dotnet publish -c Release` para gerar APK auto-suficiente
+		     (assemblies + Mono runtime nativo embarcados). `dotnet build` em
+		     Debug usa fast deployment que assume runtime compartilhado pre-
+		     instalado por VS/Android Studio — falha em sideload manual. -->
 	</PropertyGroup>
 
 	<ItemGroup>
