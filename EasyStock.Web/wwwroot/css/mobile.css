@@ -224,7 +224,7 @@
     }
 
     .search-results-list {
-        max-height: calc(100dvh - 84px);
+        max-height: calc(100dvh - 140px);
         padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
     }
 

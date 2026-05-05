@@ -11,27 +11,37 @@
        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
 
     <!-- Logo -->
-    <div class="px-5 py-4 flex items-center gap-2.5 border-b border-white/5">
-        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock" class="flex-shrink-0">
-            <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
-            <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
-            <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
-        </svg>
-        <span class="brand-name font-bold text-base tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
-            <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stok</span>
-        </span>
+    <div class="px-5 py-4 flex items-center gap-2.5 border-b border-white/5 justify-between">
+        <div class="flex items-center gap-2.5">
+            <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock" class="flex-shrink-0">
+                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
+            </svg>
+            <span class="brand-name font-bold text-base tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
+                <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stok</span>
+            </span>
+        </div>
+        <!-- Close button (mobile only) -->
+        <button @@click="sidebarOpen = false"
+                aria-label="Fechar menu"
+                class="lg:hidden p-2 text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-navy-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
     </div>
 
     <!-- Seletor de Loja -->
     <div class="px-3 py-2.5 border-b border-white/5" x-data="{ open: false }">
         <button @@click="open = !open"
-                class="app-store-trigger w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left">
+                class="app-store-trigger w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500">
             <span class="text-lg leading-none">@lojaEmoji</span>
             <div class="flex-1 min-w-0">
-                <div class="text-white text-xs font-semibold truncate">@lojaNome</div>
-                <div class="text-slate-500 text-[11px]">Loja ativa</div>
+                <div class="text-white font-semibold truncate" style="font-size: 0.875rem;">@lojaNome</div>
+                <div style="color: var(--text-muted); font-size: 0.6875rem;">Loja ativa</div>
             </div>
-            <svg class="w-3.5 h-3.5 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
         </button>

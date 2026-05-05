@@ -8,7 +8,8 @@
     <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
             aria-label="Abrir menu"
-            class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
+            class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+            style="color: var(--text-secondary);">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
@@ -16,7 +17,7 @@
 
     <!-- Page title (mobile only) -->
     <div class="flex-1 lg:hidden min-w-0">
-        <span class="page-title text-sm font-semibold text-slate-800 block">@(ViewBag.Title as string ?? "EasyStock")</span>
+        <span class="page-title font-semibold block" style="font-size: 0.875rem; color: var(--text-primary);">@(ViewBag.Title as string ?? "EasyStock")</span>
     </div>
 
     <!-- Busca global -->
@@ -28,19 +29,22 @@
         <!-- Desktop: full search bar -->
         <div class="hidden lg:block flex-1">
             <button @@click="abrir()"
-                    class="app-search-trigger flex items-center gap-3 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-md">
+                    class="app-search-trigger flex items-center gap-3 px-4 py-2.5 border rounded-lg text-sm transition-colors w-full max-w-md focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    style="background: var(--bg-surface); border-color: var(--border-soft); color: var(--text-muted);">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
                 </svg>
                 <span class="flex-1 text-left truncate">Buscar produto, SKU ou fornecedor</span>
-                <kbd class="inline-flex items-center gap-1 px-2 py-1 text-[11px] bg-slate-100 border border-slate-200 rounded-md text-slate-400">Ctrl K</kbd>
+                <kbd class="inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px]"
+                     style="background: var(--ink-100); border-color: var(--border-soft); color: var(--text-muted);">Ctrl K</kbd>
             </button>
         </div>
 
         <!-- Mobile: icon-only search -->
         <button @@click="abrir()"
                 aria-label="Buscar"
-                class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0">
+                class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                style="color: var(--text-secondary);">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
             </svg>

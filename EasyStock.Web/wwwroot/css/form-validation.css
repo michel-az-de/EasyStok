@@ -1,0 +1,178 @@
+/* Form validation styles
+   Visual feedback for form inputs: error, success, loading states
+*/
+
+/* ───── Input States ───── */
+input:invalid:not(:placeholder-shown),
+textarea:invalid:not(:placeholder-shown),
+select:invalid:not(:placeholder-shown) {
+  border-color: var(--crit-600);
+  background-image:
+    linear-gradient(to right, transparent 0%, transparent calc(100% - 32px), var(--crit-600) calc(100% - 32px));
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: bottom;
+}
+
+input:invalid:focus,
+textarea:invalid:focus,
+select:invalid:focus {
+  box-shadow: 0 0 0 3px rgba(192, 59, 42, 0.15);
+  border-color: var(--crit-600);
+  outline: none;
+}
+
+/* Error message styling */
+.form-error,
+[role="alert"].error,
+.invalid-feedback {
+  display: block;
+  color: var(--crit-600);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+  animation: slideInDown 0.2s ease-out;
+}
+
+.form-error-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+/* Success state */
+input:valid:not(:placeholder-shown),
+textarea:valid:not(:placeholder-shown),
+select:valid:not(:placeholder-shown) {
+  border-color: var(--ok-600);
+}
+
+input:valid:focus,
+textarea:valid:focus,
+select:valid:focus {
+  box-shadow: 0 0 0 3px rgba(24, 135, 78, 0.15);
+  border-color: var(--ok-600);
+  outline: none;
+}
+
+.form-success,
+[role="alert"].success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ok-700);
+  background: var(--ok-50);
+  border: 1px solid var(--ok-200);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideInDown 0.2s ease-out;
+}
+
+/* Loading state */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--ink-100);
+}
+
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] textarea:disabled,
+[data-theme="dark"] select:disabled {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Validation summary container */
+.validation-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--crit-50);
+  border: 1px solid var(--crit-200);
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
+}
+
+.validation-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.validation-summary li {
+  color: var(--crit-700);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.validation-summary li::before {
+  content: "⚠";
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] input:invalid:not(:placeholder-shown),
+[data-theme="dark"] textarea:invalid:not(:placeholder-shown),
+[data-theme="dark"] select:invalid:not(:placeholder-shown) {
+  border-color: var(--crit-600);
+}
+
+[data-theme="dark"] .validation-summary {
+  background: rgba(192, 59, 42, 0.15);
+  border-color: var(--crit-600);
+}
+
+[data-theme="dark"] .validation-summary li {
+  color: var(--crit-600);
+}
+
+[data-theme="dark"] .form-error {
+  color: var(--crit-500);
+}
+
+[data-theme="dark"] .form-success {
+  background: rgba(24, 135, 78, 0.15);
+  border-color: var(--ok-600);
+  color: var(--ok-500);
+}
+
+/* Animations */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Spinner animation for loading inputs */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.form-loading::after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(30, 72, 168, 0.3);
+  border-top-color: var(--navy-600);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 4px;
+}

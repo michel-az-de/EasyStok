@@ -99,8 +99,9 @@ html[data-theme="dark"] {
 .auth-input:focus {
     box-shadow: var(--indigo-glow);
     border-color: #15388A;
+    outline: none;
 }
-.auth-input::placeholder { color: #9CA3AF; }
+.auth-input::placeholder { color: #6B7280; /* Increased contrast from #9CA3AF */ }
 
 .auth-alert-warn {
     background: #FFFBEB;
@@ -143,9 +144,10 @@ html.theme-dark .auth-input {
     border-color: rgba(71, 85, 105, 0.7) !important;
     color: #E2E8F0 !important;
 }
-html.theme-dark .auth-input::placeholder { color: #475569 !important; }
+html.theme-dark .auth-input::placeholder { color: #9CA3AF !important; /* Increased contrast */ }
 html.theme-dark .auth-input:focus {
     border-color: #1E48A8 !important;
+    outline: none;
 }
 
 html.theme-dark .auth-alert-warn {
