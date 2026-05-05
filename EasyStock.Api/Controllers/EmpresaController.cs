@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
+using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
 
 namespace EasyStock.Api.Controllers;
 
