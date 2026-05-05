@@ -6,11 +6,8 @@ public partial class App : Application
 {
 	private readonly IServiceProvider _services;
 
-	public App(IServiceProvider services)
+	public App(IServiceProvider services, ThemeService theme)
 	{
-		// Handlers globais antes do InitializeComponent — pega tudo que vier
-		// dali pra frente. AppDomain captura crashes hard (UI thread, ANR);
-		// TaskScheduler captura excecoes em Tasks descartadas (fire-and-forget).
 		AppDomain.CurrentDomain.UnhandledException += (s, e) =>
 			CrashLog.Write("AppDomain.UnhandledException", e.ExceptionObject as Exception ?? new Exception("unknown"));
 		TaskScheduler.UnobservedTaskException += (s, e) =>
@@ -21,6 +18,9 @@ public partial class App : Application
 
 		InitializeComponent();
 		_services = services;
+
+		// Aplica tema persistido antes do Shell renderizar (sem flash).
+		theme.Initialize();
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)

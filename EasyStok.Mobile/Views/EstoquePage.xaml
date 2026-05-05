@@ -1,12 +1,63 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.EstoquePage"
-             Title="Estoque">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Estoque" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:EstoqueViewModel"
+             Title="Estoque"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Estoque" Style="{StaticResource LabelH1}" />
+            <Label Text="todos os itens da loja" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1" Orientation="Horizontal">
+            <HorizontalStackLayout Spacing="6">
+                <Button Text="Todos" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                        Command="{Binding SetFiltroCommand}" CommandParameter="todos" />
+                <Button Text="OK" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                        Command="{Binding SetFiltroCommand}" CommandParameter="ok" />
+                <Button Text="Atenção" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                        Command="{Binding SetFiltroCommand}" CommandParameter="atencao" />
+                <Button Text="Crítico" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                        Command="{Binding SetFiltroCommand}" CommandParameter="critico" />
+                <Button Text="Vencido" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                        Command="{Binding SetFiltroCommand}" CommandParameter="vencido" />
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <CollectionView Grid.Row="2"
+                        ItemsSource="{Binding Itens}"
+                        SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="Nenhum item neste filtro."
+                       Style="{StaticResource LabelSmall}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:CachedItemEstoque">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Grid.Column="0" Text="{Binding Emoji}" FontSize="28" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding ProdutoNome}" Style="{StaticResource LabelH3}" />
+                                <Label Text="{Binding Sku, StringFormat='SKU {0}'}" Style="{StaticResource LabelEyebrow}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center">
+                                <Label Text="{Binding Qty, StringFormat='{0} un'}"
+                                       FontFamily="Inter" FontSize="18" FontAttributes="Bold"
+                                       TextColor="{StaticResource Orange500}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Text="{Binding Status}" Style="{StaticResource LabelEyebrow}" HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
     </Grid>
 </ContentPage>

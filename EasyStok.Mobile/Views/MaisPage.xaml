@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EasyStok.Mobile.Views.MaisPage"
+             Title="Mais"
+             Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,24" Spacing="22">
+
+            <!-- Header -->
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Mais" Style="{StaticResource LabelH1}" />
+                <Label Text="ferramentas e ajustes" Style="{StaticResource LabelSmall}" />
+            </VerticalStackLayout>
+
+            <!-- OPERAÇÃO -->
+            <VerticalStackLayout Spacing="10">
+                <Label Text="OPERAÇÃO" Style="{StaticResource LabelEyebrow}" />
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapCaixa" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Caixa" Style="{StaticResource LabelH3}" />
+                            <Label Text="Saldo do dia, entradas e saídas" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapConferencia" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Conferência" Style="{StaticResource LabelH3}" />
+                            <Label Text="Buscar pedido por código curto ou QR" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapCompras" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Compras" Style="{StaticResource LabelH3}" />
+                            <Label Text="Itens em falta ou vencidos" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- RELATÓRIOS -->
+            <VerticalStackLayout Spacing="10">
+                <Label Text="RELATÓRIOS" Style="{StaticResource LabelEyebrow}" />
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapFinalizados" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Finalizados" Style="{StaticResource LabelH3}" />
+                            <Label Text="Pedidos entregues filtrados por data" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapClientes" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Clientes" Style="{StaticResource LabelH3}" />
+                            <Label Text="Lista, busca e histórico" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapHistorico" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Histórico" Style="{StaticResource LabelH3}" />
+                            <Label Text="Auditoria local de eventos" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- SISTEMA -->
+            <VerticalStackLayout Spacing="10">
+                <Label Text="SISTEMA" Style="{StaticResource LabelEyebrow}" />
+
+                <Border Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTapSuporte" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Suporte e Ajustes" Style="{StaticResource LabelH3}" />
+                            <Label Text="Tema, conta, diagnóstico e logs" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1"
+                               Text="›"
+                               FontFamily="Inter"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource Orange600}" />
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

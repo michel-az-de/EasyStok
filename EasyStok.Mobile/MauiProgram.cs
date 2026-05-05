@@ -72,6 +72,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IEstoqueMutationService, EstoqueMutationService>();
 		builder.Services.AddSingleton<IDemoSeedService, DemoSeedService>();
 		builder.Services.AddSingleton<SyncEngine>();
+		builder.Services.AddSingleton<ThemeService>();
 
 		builder.Services.AddSingleton<AppShell>();
 
@@ -79,6 +80,15 @@ public static class MauiProgram
 		builder.Services.AddTransient<TenantPickerViewModel>();
 		builder.Services.AddTransient<LojaPickerViewModel>();
 		builder.Services.AddTransient<ProducaoViewModel>();
+		builder.Services.AddTransient<SuporteViewModel>();
+		builder.Services.AddTransient<EstoqueViewModel>();
+		builder.Services.AddTransient<ComprasViewModel>();
+		builder.Services.AddTransient<HistoricoViewModel>();
+		builder.Services.AddTransient<PedidosViewModel>();
+		builder.Services.AddTransient<ClientesViewModel>();
+		builder.Services.AddTransient<CaixaViewModel>();
+		builder.Services.AddTransient<FinalizadosViewModel>();
+		builder.Services.AddTransient<ConferenciaViewModel>();
 
 		builder.Services.AddTransient<LoginPage>();
 		builder.Services.AddTransient<TenantPickerPage>();
@@ -94,6 +104,9 @@ public static class MauiProgram
 		builder.Services.AddTransient<ComprasPage>();
 		builder.Services.AddTransient<HistoricoPage>();
 		builder.Services.AddTransient<EstoquePage>();
+		builder.Services.AddTransient<MaisPage>();
+		// ProducaoCapturaPage e instanciado direto via `new` (recebe parametro
+		// CachedItemEstoque), nao registrado no DI.
 
 #if DEBUG
 		builder.Logging.AddDebug();

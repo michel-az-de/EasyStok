@@ -1,12 +1,39 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.HistoricoPage"
-             Title="Historico">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Historico" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:HistoricoViewModel"
+             Title="Histórico"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16" RowDefinitions="Auto,*" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Histórico" Style="{StaticResource LabelH1}" />
+            <Label Text="auditoria local · até 1000 eventos" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Entries}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="Nenhum evento registrado." Style="{StaticResource LabelSmall}"
+                       HorizontalOptions="Center" VerticalOptions="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:AuditLogEntry">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <VerticalStackLayout Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" Text="{Binding Description}" Style="{StaticResource LabelH3}" />
+                                <Label Grid.Column="1" Text="{Binding Type}" Style="{StaticResource LabelEyebrow}" VerticalOptions="Center" />
+                            </Grid>
+                            <Label Text="{Binding AtUtc, StringFormat='{0:dd/MM HH:mm}'}" Style="{StaticResource LabelSmall}" />
+                            <Label Text="{Binding Operator, StringFormat='operador: {0}'}" Style="{StaticResource LabelEyebrow}"
+                                   IsVisible="{Binding Operator, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
     </Grid>
 </ContentPage>

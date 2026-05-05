@@ -28,6 +28,9 @@ public sealed class AppDatabase
 				SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
 
 			await conn.CreateTableAsync<CachedItemEstoque>();
+			await conn.CreateTableAsync<CachedPedido>();
+			await conn.CreateTableAsync<CachedCliente>();
+			await conn.CreateTableAsync<CachedCaixaEntry>();
 			await conn.CreateTableAsync<OutboxItem>();
 			await conn.CreateTableAsync<AuditLogEntry>();
 			await conn.CreateTableAsync<KvMeta>();
@@ -64,6 +67,72 @@ public sealed class CachedItemEstoque
 	public string? Lote { get; set; }
 	public decimal CustoUnitario { get; set; }
 	public decimal? PrecoVendaSugerido { get; set; }
+
+	[Indexed]
+	public Guid EmpresaId { get; set; }
+
+	public DateTime CachedAtUtc { get; set; }
+}
+
+// =============================================================================
+// Cache local de pedidos (kanban + finalizados + conferencia).
+// =============================================================================
+public sealed class CachedPedido
+{
+	[PrimaryKey]
+	public string Id { get; set; } = string.Empty;
+
+	public string? ClienteId { get; set; }
+	public string ClienteNome { get; set; } = string.Empty;
+
+	[Indexed]
+	public string Status { get; set; } = "aguardando"; // aguardando | preparando | pronto | entregue | cancelado
+
+	public decimal Total { get; set; }
+	public DateTime CriadoUtc { get; set; }
+	public DateTime AtualizadoUtc { get; set; }
+	public string? ShortCode { get; set; }
+	public string? ItensJson { get; set; }
+
+	[Indexed]
+	public Guid EmpresaId { get; set; }
+
+	public DateTime CachedAtUtc { get; set; }
+}
+
+// =============================================================================
+// Cache local de clientes.
+// =============================================================================
+public sealed class CachedCliente
+{
+	[PrimaryKey]
+	public string Id { get; set; } = string.Empty;
+
+	public string Nome { get; set; } = string.Empty;
+	public string? Telefone { get; set; }
+	public DateTime? UltimoPedidoUtc { get; set; }
+	public int TotalPedidos { get; set; }
+
+	[Indexed]
+	public Guid EmpresaId { get; set; }
+
+	public DateTime CachedAtUtc { get; set; }
+}
+
+// =============================================================================
+// Caixa do dia — entradas e saidas.
+// =============================================================================
+public sealed class CachedCaixaEntry
+{
+	[PrimaryKey]
+	public string Id { get; set; } = string.Empty;
+
+	public string Tipo { get; set; } = "entrada"; // entrada | saida
+	public decimal Valor { get; set; }
+	public string Descricao { get; set; } = string.Empty;
+
+	[Indexed]
+	public DateTime AtUtc { get; set; }
 
 	[Indexed]
 	public Guid EmpresaId { get; set; }

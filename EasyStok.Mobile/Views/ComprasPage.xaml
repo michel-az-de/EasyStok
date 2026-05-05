@@ -1,12 +1,51 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.ComprasPage"
-             Title="Compras">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Compras" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:ComprasViewModel"
+             Title="Compras"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Compras" Style="{StaticResource LabelH1}" />
+            <Label Text="itens em falta, vencidos ou críticos" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1"
+                        ItemsSource="{Binding Itens}"
+                        SelectionMode="None">
+            <CollectionView.EmptyView>
+                <VerticalStackLayout VerticalOptions="Center" Spacing="6">
+                    <Label Text="Tudo em ordem 🎉" Style="{StaticResource LabelH3}" HorizontalOptions="Center" />
+                    <Label Text="Nenhum item precisa de reposição agora." Style="{StaticResource LabelSmall}" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:CachedItemEstoque">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Grid.Column="0" Text="{Binding Emoji}" FontSize="24" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="{Binding ProdutoNome}" Style="{StaticResource LabelH3}" />
+                                <Label Text="{Binding Sku, StringFormat='SKU {0}'}" Style="{StaticResource LabelEyebrow}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2"
+                                   Text="{Binding Status}"
+                                   Style="{StaticResource LabelEyebrow}"
+                                   TextColor="{StaticResource Crit600}"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button Grid.Row="2"
+                Text="Compartilhar lista"
+                Command="{Binding CompartilharCommand}"
+                IsEnabled="{Binding SemDados, Converter={StaticResource InvertedBoolConverter}}" />
     </Grid>
 </ContentPage>

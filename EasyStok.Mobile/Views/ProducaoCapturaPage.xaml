@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EasyStok.Mobile.Views.ProducaoCapturaPage"
+             Title="Registrar produção"
+             Shell.NavBarIsVisible="False">
+
+    <ScrollView>
+        <Grid Padding="20,40,20,32">
+            <Border Style="{StaticResource CardElev}" Padding="22">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Registrar produção" Style="{StaticResource LabelH2}" />
+                        <Label x:Name="ProdutoLabel" Text="" Style="{StaticResource LabelSmall}" />
+                    </VerticalStackLayout>
+
+                    <!-- Quantidade -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="QUANTIDADE" Style="{StaticResource LabelEyebrow}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry x:Name="QuantidadeEntry"
+                                   Text="1"
+                                   Keyboard="Numeric" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Peso -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="PESO (G) — OPCIONAL" Style="{StaticResource LabelEyebrow}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry x:Name="PesoEntry"
+                                   Placeholder="ex. 250"
+                                   Keyboard="Numeric" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Validade -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="VALIDADE — OPCIONAL" Style="{StaticResource LabelEyebrow}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <Border Grid.Column="0" Style="{StaticResource FieldBox}">
+                                <DatePicker x:Name="ValidadePicker" />
+                            </Border>
+                            <Button Grid.Column="1"
+                                    Text="Limpar"
+                                    Style="{StaticResource ButtonGhost}"
+                                    FontSize="12"
+                                    Padding="10,4"
+                                    Clicked="OnLimparValidade" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <!-- Foto -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="FOTO — OPCIONAL" Style="{StaticResource LabelEyebrow}" />
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Border Grid.Column="0"
+                                    WidthRequest="60"
+                                    HeightRequest="60"
+                                    Stroke="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderStrongLight}}"
+                                    StrokeShape="RoundRectangle 10"
+                                    BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}">
+                                <Image x:Name="FotoPreview" Aspect="AspectFill" />
+                            </Border>
+                            <Button Grid.Column="1"
+                                    Text="Capturar foto"
+                                    Style="{StaticResource ButtonGhost}"
+                                    Clicked="OnCapturarFoto" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <!-- Erro inline -->
+                    <Border BackgroundColor="#3A1E18"
+                            Stroke="#5A2920"
+                            StrokeShape="RoundRectangle 8"
+                            StrokeThickness="1"
+                            Padding="12,10"
+                            IsVisible="False"
+                            x:Name="ErroBorder">
+                        <Label x:Name="ErroLabel"
+                               Text=""
+                               TextColor="#F8884A"
+                               FontFamily="Inter"
+                               FontSize="13" />
+                    </Border>
+
+                    <!-- Acoes -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                        <Button Grid.Column="0"
+                                Text="Cancelar"
+                                Style="{StaticResource ButtonGhost}"
+                                Clicked="OnCancelar" />
+                        <Button Grid.Column="1"
+                                Text="Confirmar"
+                                Clicked="OnConfirmar" />
+                    </Grid>
+
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </ScrollView>
+
+</ContentPage>

@@ -15,14 +15,13 @@ public partial class HomePage : ContentPage
 		_store = store;
 	}
 
-	private async void OnIrParaProducao(object? sender, TappedEventArgs e)
-	{
-		await Shell.Current.GoToAsync("//producao");
-	}
+	private void OnIrParaProducao(object? sender, TappedEventArgs e) =>
+		UiSafe.Fire(() => Shell.Current.GoToAsync("//producao"));
 
-	private async void OnSair(object? sender, TappedEventArgs e)
-	{
-		await _auth.LogoutAsync();
-		await Shell.Current.GoToAsync("//login");
-	}
+	private void OnSair(object? sender, TappedEventArgs e) =>
+		UiSafe.Fire(async () =>
+		{
+			await _auth.LogoutAsync();
+			await Shell.Current.GoToAsync("//login");
+		});
 }

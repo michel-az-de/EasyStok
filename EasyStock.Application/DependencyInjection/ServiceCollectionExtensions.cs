@@ -1,255 +1,36 @@
-using EasyStock.Application.UseCases.AlterarSenha;
-using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
-using EasyStock.Application.UseCases.CadastrarUsuario;
-using EasyStock.Application.UseCases.ConfirmEmail;
-using EasyStock.Application.UseCases.GerenciarUsuario;
-using EasyStock.Application.UseCases.EsqueciSenha;
-using EasyStock.Application.UseCases.EstornarSaida;
-using EasyStock.Application.UseCases.Logout;
-using EasyStock.Application.UseCases.ObterUsuarioAtual;
-using EasyStock.Application.UseCases.RefreshToken;
-using EasyStock.Application.UseCases.ResetarSenha;
-using EasyStock.Application.UseCases.AlterarSenhaUsuario;
-using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
-using EasyStock.Application.UseCases.AtualizarFornecedor;
-using EasyStock.Application.UseCases.AtualizarLoja;
-using EasyStock.Application.UseCases.AtualizarUsuario;
-using EasyStock.Application.UseCases.AutenticarUsuario;
-using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
-using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Application.UseCases.AdicionarClienteDocumento;
-using EasyStock.Application.UseCases.AdicionarClienteEndereco;
-using EasyStock.Application.UseCases.AdicionarClienteTelefone;
-using EasyStock.Application.UseCases.AtualizarCliente;
-using EasyStock.Application.UseCases.BuscarCliente;
-using EasyStock.Application.UseCases.CriarCliente;
-using EasyStock.Application.UseCases.CriarPedido;
-using EasyStock.Application.UseCases.AtualizarStatusPedido;
-using EasyStock.Application.UseCases.CancelarPedido;
-using EasyStock.Application.UseCases.ListarPedidosCliente;
-using EasyStock.Application.UseCases.ObterPedidoDetalhes;
-using EasyStock.Application.UseCases.AdicionarItemPedido;
-using EasyStock.Application.UseCases.RemoverItemPedido;
-using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
-using EasyStock.Application.UseCases.RemoverPagamentoPedido;
-using EasyStock.Application.UseCases.AbrirCaixa;
-using EasyStock.Application.UseCases.FecharCaixa;
-using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
-using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
-using EasyStock.Application.UseCases.ListarMovimentosCaixa;
-using EasyStock.Application.UseCases.ObterCaixaDia;
-using EasyStock.Application.UseCases.ListarFechamentosCaixa;
-using EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor;
-using EasyStock.Application.UseCases.CriarLote;
-using EasyStock.Application.UseCases.AdicionarItemLote;
-using EasyStock.Application.UseCases.RemoverItemLote;
-using EasyStock.Application.UseCases.FinalizarLote;
-using EasyStock.Application.UseCases.ListarLotes;
-using EasyStock.Application.UseCases.ObterLoteDetalhes;
-using EasyStock.Application.UseCases.ConferirEtiqueta;
-using EasyStock.Application.UseCases.ListasCompras;
-using EasyStock.Application.UseCases.CriarFornecedor;
-using EasyStock.Application.UseCases.DesativarCliente;
-using EasyStock.Application.UseCases.ListarClientes;
-using EasyStock.Application.UseCases.ObterClienteDetalhes;
-using EasyStock.Application.UseCases.ReativarCliente;
-using EasyStock.Application.UseCases.RemoverClienteDocumento;
-using EasyStock.Application.UseCases.RemoverClienteEndereco;
-using EasyStock.Application.UseCases.RemoverClienteTelefone;
-using EasyStock.Application.UseCases.CriarLoja;
-using EasyStock.Application.UseCases.CriarUsuario;
-using EasyStock.Application.UseCases.DesativarFornecedor;
-using EasyStock.Application.UseCases.DesativarLoja;
-using EasyStock.Application.UseCases.DesativarUsuario;
-using EasyStock.Application.UseCases.ConfiguracoesLoja;
-using EasyStock.Application.UseCases.GerenciarCategoria;
-using EasyStock.Application.UseCases.GerenciarProduto;
-using EasyStock.Application.UseCases.GerenciarUploads;
-using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
-using EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio;
-using EasyStock.Application.UseCases.AnuncioIa;
-using EasyStock.Application.UseCases.Fornecedor;
-using EasyStock.Application.UseCases.ListarFornecedores;
-using EasyStock.Application.UseCases.ListarLojas;
-using EasyStock.Application.UseCases.ListarPlanos;
-using EasyStock.Application.UseCases.ListarUsuarios;
-using EasyStock.Application.UseCases.RegistrarEmpresa;
-using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
-using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
-using EasyStock.Application.UseCases.Pedido;
-using EasyStock.Application.UseCases.ReativarFornecedor;
-using EasyStock.Application.UseCases.ReativarLoja;
-using EasyStock.Application.UseCases.ReporEstoque;
-using EasyStock.Application.UseCases.Analytics.Dashboard;
-using EasyStock.Application.UseCases.Analytics.Projecoes;
-using EasyStock.Application.UseCases.Analytics.Reposicao;
-using EasyStock.Application.UseCases.Analytics.Sazonalidade;
-using EasyStock.Application.UseCases.Analytics.Alertas;
-using EasyStock.Application.UseCases.Analytics.AlertasDias;
-using EasyStock.Application.UseCases.Analytics.Receita;
-using EasyStock.Application.UseCases.Analytics.Margem;
-using EasyStock.Application.UseCases.Analytics.Movimentacoes;
-using EasyStock.Application.UseCases.Analytics.Validade;
-using EasyStock.Application.UseCases.Analytics.Parados;
-using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
-using EasyStock.Application.UseCases.Inteligencia.Board;
-using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
-using EasyStock.Application.UseCases.Inteligencia.Rotatividade;
-using EasyStock.Application.UseCases.Inteligencia.Sazonalidade;
-using EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
-using EasyStock.Application.UseCases.Inteligencia.ProximoVencimento;
-using EasyStock.Application.UseCases.Inteligencia.ItensParados;
-using EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
 
-public static class ServiceCollectionExtensions
+/// <summary>
+/// Extensão de ServiceCollection para registrar todos os UseCases da aplicação.
+///
+/// Este arquivo é o orquestrador central que chama os métodos parciais definidos em:
+/// - ServiceCollectionExtensions.Auth.cs (Autenticação)
+/// - ServiceCollectionExtensions.Users.cs (Usuários e Lojas)
+/// - ServiceCollectionExtensions.Fornecedores.cs (Fornecedores)
+/// - ServiceCollectionExtensions.Clientes.cs (Clientes)
+/// - ServiceCollectionExtensions.Core.cs (Pedidos, Caixa, Estoque, etc)
+/// - ServiceCollectionExtensions.Analytics.cs (Analytics e Inteligência)
+///
+/// A divisão melhora legibilidade e reduz usings desnecessários de ~103 para ~10 por arquivo.
+/// </summary>
+public static partial class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registra todos os UseCases da camada Application.
+    /// Chama os métodos de registro específicos por domínio.
+    /// </summary>
     public static IServiceCollection AddEasyStockApplication(this IServiceCollection services)
     {
-        services.AddScoped<AutenticarUsuarioUseCase>();
-        services.AddScoped<CadastrarUsuarioUseCase>();
-        services.AddScoped<RefreshTokenUseCase>();
-        services.AddScoped<LogoutUseCase>();
-        services.AddScoped<EsqueciSenhaUseCase>();
-        services.AddScoped<ResetarSenhaUseCase>();
-        services.AddScoped<ConfirmEmailUseCase>();
-        services.AddScoped<ObterUsuarioAtualUseCase>();
-        services.AddScoped<AtualizarUsuarioAtualUseCase>();
-        services.AddScoped<AlterarSenhaUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>();
-        services.AddScoped<RegistrarEmpresaUseCase>();
-        services.AddScoped<CriarUsuarioUseCase>();
-        services.AddScoped<AtualizarUsuarioUseCase>();
-        services.AddScoped<AlterarSenhaUsuarioUseCase>();
-        services.AddScoped<DesativarUsuarioUseCase>();
-        services.AddScoped<ListarUsuariosUseCase>();
-        services.AddScoped<AtribuirPerfilUsuarioUseCase>();
-        services.AddScoped<CriarLojaUseCase>();
-        services.AddScoped<AtualizarLojaUseCase>();
-        services.AddScoped<DesativarLojaUseCase>();
-        services.AddScoped<ReativarLojaUseCase>();
-        services.AddScoped<ListarLojasUseCase>();
-        services.AddScoped<CriarFornecedorUseCase>();
-        services.AddScoped<AtualizarFornecedorUseCase>();
-        services.AddScoped<DesativarFornecedorUseCase>();
-        services.AddScoped<ReativarFornecedorUseCase>();
-        services.AddScoped<ListarFornecedoresUseCase>();
-        services.AddScoped<ObterFornecedorDetalheUseCase>();
-        services.AddScoped<ObterHistoricoFornecedorUseCase>();
-        services.AddScoped<ObterEstatisticasFornecedorUseCase>();
-        services.AddScoped<ListarPedidosAbertosUseCase>();
-        services.AddScoped<CriarPedidoFornecedorUseCase>();
-        services.AddScoped<ReceberPedidoFornecedorUseCase>();
-        services.AddScoped<CancelarPedidoFornecedorUseCase>();
-        services.AddScoped<CriarClienteUseCase>();
-        services.AddScoped<AtualizarClienteUseCase>();
-        services.AddScoped<ListarClientesUseCase>();
-        services.AddScoped<BuscarClienteUseCase>();
-        services.AddScoped<ObterClienteDetalhesUseCase>();
-        services.AddScoped<DesativarClienteUseCase>();
-        services.AddScoped<ReativarClienteUseCase>();
-        services.AddScoped<AdicionarClienteEnderecoUseCase>();
-        services.AddScoped<RemoverClienteEnderecoUseCase>();
-        services.AddScoped<AdicionarClienteTelefoneUseCase>();
-        services.AddScoped<RemoverClienteTelefoneUseCase>();
-        services.AddScoped<AdicionarClienteDocumentoUseCase>();
-        services.AddScoped<RemoverClienteDocumentoUseCase>();
-
-        // Onda P2 — Pedidos
-        services.AddOptions<EasyStock.Application.Services.PedidoEstoqueOptions>();
-        services.AddScoped<EasyStock.Application.Services.PedidoEstoqueIntegrationService>();
-        services.AddScoped<CriarPedidoUseCase>();
-        services.AddScoped<AtualizarStatusPedidoUseCase>();
-        services.AddScoped<CancelarPedidoUseCase>();
-        services.AddScoped<ListarPedidosUseCase>();
-        services.AddScoped<ObterPedidoDetalhesUseCase>();
-        services.AddScoped<AdicionarItemPedidoUseCase>();
-        services.AddScoped<RemoverItemPedidoUseCase>();
-        services.AddScoped<RegistrarPagamentoPedidoUseCase>();
-        services.AddScoped<RemoverPagamentoPedidoUseCase>();
-
-        // Onda P3 — Caixa
-        services.AddScoped<AbrirCaixaUseCase>();
-        services.AddScoped<FecharCaixaUseCase>();
-        services.AddScoped<RegistrarMovimentoCaixaUseCase>();
-        services.AddScoped<EstornarMovimentoCaixaUseCase>();
-        services.AddScoped<ListarMovimentosCaixaUseCase>();
-        services.AddScoped<ObterCaixaDiaUseCase>();
-        services.AddScoped<ListarFechamentosCaixaUseCase>();
-
-        // Onda P4 — Audit expandido
-        services.AddScoped<ObterHistoricoAlteracoesFornecedorUseCase>();
-
-        // Onda P5.A — Lotes
-        services.AddScoped<CriarLoteUseCase>();
-        services.AddScoped<AdicionarItemLoteUseCase>();
-        services.AddScoped<RemoverItemLoteUseCase>();
-        services.AddScoped<FinalizarLoteUseCase>();
-        services.AddScoped<ListarLotesUseCase>();
-        services.AddScoped<ObterLoteDetalhesUseCase>();
-        services.AddScoped<ConferirEtiquetaUseCase>();
-
-        // Onda P5.B — Listas de compras
-        services.AddScoped<ListarListasComprasUseCase>();
-        services.AddScoped<ObterListaComprasUseCase>();
-        services.AddScoped<CriarListaComprasUseCase>();
-        services.AddScoped<ArquivarListaComprasUseCase>();
-        services.AddScoped<ReabrirListaComprasUseCase>();
-        services.AddScoped<AdicionarItemListaComprasUseCase>();
-        services.AddScoped<ToggleItemListaComprasUseCase>();
-        services.AddScoped<RemoverItemListaComprasUseCase>();
-        services.AddScoped<ObterConfiguracaoLojaUseCase>();
-        services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
-        services.AddScoped<ResetarConfiguracaoLojaUseCase>();
-        services.AddScoped<CadastrarProdutoUseCase>();
-        services.AddScoped<GerenciarProdutoUseCase>();
-        services.AddScoped<GerenciarVariacaoProdutoUseCase>();
-        services.AddScoped<GerenciarUploadsUseCase>();
-        services.AddScoped<RegistrarEntradaEstoqueUseCase>();
-        services.AddScoped<RegistrarSaidaEstoqueUseCase>();
-        services.AddScoped<EstornarSaidaUseCase>();
-        services.AddScoped<ReporEstoqueUseCase>();
-        services.AddScoped<BuscarEstoqueInteligenteUseCase>();
-        services.AddScoped<GerarSugestaoDescricaoAnuncioUseCase>();
-        services.AddScoped<GerarAnuncioStreamingUseCase>();
-        services.AddScoped<SalvarRascunhoAnuncioUseCase>();
-        services.AddScoped<ListarAnunciosUseCase>();
-        services.AddScoped<ExcluirAnuncioUseCase>();
-        services.AddScoped<ObterUsoIaUseCase>();
-        services.AddScoped<GerenciarCategoriaUseCase>();
-        services.AddScoped<ListarPlanosUseCase>();
-        services.AddScoped<DeleteUserAuditDataUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.ListarFaturas.ListarFaturasUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.CancelarAssinatura.CancelarAssinaturaUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.AlterarPlano.AlterarPlanoUseCase>();
-
-        // Analytics Use Cases
-        services.AddScoped<GetDashboardUseCase>();
-        services.AddScoped<CalcularProjecoesUseCase>();
-        services.AddScoped<CalcularReposicaoUseCase>();
-        services.AddScoped<CalcularSazonalidadeUseCase>();
-        services.AddScoped<ObterAlertasUseCase>();
-        services.AddScoped<ObterDiasAlertaValidadeUseCase>();
-        services.AddScoped<CalcularReceitaUseCase>();
-        services.AddScoped<CalcularMargemUseCase>();
-        services.AddScoped<ObterMovimentacoesUseCase>();
-        services.AddScoped<ObterValidadeUseCase>();
-        services.AddScoped<ObterParadosUseCase>();
-        services.AddScoped<ObterDiasAlertaParadoUseCase>();
-        services.AddScoped<ObterVendasPorCanalUseCase>();
-
-        // Inteligencia Use Cases
-        services.AddScoped<GetBoardUseCase>();
-        services.AddScoped<CalcularProjecaoRupturaUseCase>();
-        services.AddScoped<CalcularRotatividadeUseCase>();
-        services.AddScoped<CalcularSazonalidadeInteligenciaUseCase>();
-        services.AddScoped<ObterEstoqueBaixoUseCase>();
-        services.AddScoped<ObterProximoVencimentoUseCase>();
-        services.AddScoped<ObterItensParadosUseCase>();
-        services.AddScoped<ObterSugestaoReposicaoUseCase>();
+        // Registra UseCases em ordem de domínio para melhor organização
+        services
+            .AddEasyStockAuthenticationUseCases()
+            .AddEasyStockUserManagementUseCases()
+            .AddEasyStockClienteUseCases()
+            .AddEasyStockFornecedorUseCases()
+            .AddEasyStockCoreUseCases()
+            .AddEasyStockAnalyticsUseCases();
 
         return services;
     }

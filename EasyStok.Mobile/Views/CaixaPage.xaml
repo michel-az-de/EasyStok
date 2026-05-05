@@ -1,12 +1,62 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.CaixaPage"
-             Title="Caixa">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Caixa" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:CaixaViewModel"
+             Title="Caixa"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Caixa" Style="{StaticResource LabelH1}" />
+            <Label Text="movimento do dia" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <Border Grid.Row="1" Style="{StaticResource CardElev}">
+            <VerticalStackLayout Spacing="6">
+                <Label Text="SALDO HOJE" Style="{StaticResource LabelEyebrow}" />
+                <Label Text="{Binding SaldoDoDia, StringFormat='R$ {0:N2}'}"
+                       FontFamily="Inter" FontSize="32" FontAttributes="Bold"
+                       TextColor="{StaticResource Orange500}" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="ENTRADAS" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="{Binding EntradasDoDia, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelH3}" TextColor="{StaticResource Ok600}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="SAÍDAS" Style="{StaticResource LabelEyebrow}" />
+                        <Label Text="{Binding SaidasDoDia, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelH3}" TextColor="{StaticResource Crit600}" />
+                    </VerticalStackLayout>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Entries}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="Nenhum lançamento ainda." Style="{StaticResource LabelSmall}" HorizontalOptions="Center" VerticalOptions="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:CachedCaixaEntry">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding Descricao}" Style="{StaticResource LabelH3}" />
+                                <Label Text="{Binding AtUtc, StringFormat='{0:dd/MM HH:mm}'}" Style="{StaticResource LabelEyebrow}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" HorizontalOptions="End">
+                                <Label Text="{Binding Valor, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelH3}" HorizontalTextAlignment="End" />
+                                <Label Text="{Binding Tipo}" Style="{StaticResource LabelEyebrow}" HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button Grid.Row="3"
+                Text="+ Novo lançamento"
+                Command="{Binding NovaEntradaCommand}" />
     </Grid>
 </ContentPage>

@@ -1,12 +1,51 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.ClientesPage"
-             Title="Clientes">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Clientes" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:ClientesViewModel"
+             Title="Clientes"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Clientes" Style="{StaticResource LabelH1}" />
+            <Label Text="lista da loja" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <Border Grid.Row="1" Style="{StaticResource FieldBox}">
+            <Entry Text="{Binding Busca}" Placeholder="Buscar por nome ou telefone…" />
+        </Border>
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Itens}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="Nenhum cliente." Style="{StaticResource LabelSmall}" HorizontalOptions="Center" VerticalOptions="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="storage:CachedCliente">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Border Grid.Column="0" WidthRequest="40" HeightRequest="40"
+                                    BackgroundColor="{StaticResource Navy700}"
+                                    StrokeShape="RoundRectangle 999" StrokeThickness="0">
+                                <Label Text="{Binding Nome, StringFormat='{0}', Converter={StaticResource StringNotNullOrEmptyConverter}}"
+                                       FontFamily="Inter" FontSize="16" FontAttributes="Bold"
+                                       TextColor="{StaticResource White}"
+                                       HorizontalOptions="Center" VerticalOptions="Center" />
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding Nome}" Style="{StaticResource LabelH3}" />
+                                <Label Text="{Binding Telefone}" Style="{StaticResource LabelSmall}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center">
+                                <Label Text="{Binding TotalPedidos, StringFormat='{0} pedidos'}" Style="{StaticResource LabelEyebrow}" HorizontalTextAlignment="End" />
+                                <Label Text="{Binding UltimoPedidoUtc, StringFormat='último: {0:dd/MM}'}" Style="{StaticResource LabelEyebrow}" HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
     </Grid>
 </ContentPage>

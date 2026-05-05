@@ -1,12 +1,115 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.SuportePage"
-             Title="Suporte">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Suporte" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:SuporteViewModel"
+             Title="Suporte e Ajustes"
+             Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,24" Spacing="18">
+
+            <!-- Header -->
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Suporte e Ajustes" Style="{StaticResource LabelH1}" />
+                <Label Text="conta · aparência · diagnóstico" Style="{StaticResource LabelSmall}" />
+            </VerticalStackLayout>
+
+            <!-- Sessão -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="SESSÃO" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="{Binding SessaoLabel}" Style="{StaticResource LabelH3}" />
+                    <Label Text="{Binding EmpresaLabel}" Style="{StaticResource LabelSmall}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Aparência -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="APARÊNCIA" Style="{StaticResource LabelEyebrow}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Tema escuro" Style="{StaticResource LabelH3}" />
+                            <Label Text="Reduz cansaço visual em ambientes com pouca luz" Style="{StaticResource LabelSmall}" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding IsDarkTheme}"
+                                OnColor="{StaticResource Orange600}"
+                                ThumbColor="{StaticResource White}"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Backend -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="BACKEND" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="URL da API EasyStok que o app consome." Style="{StaticResource LabelSmall}" />
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry Text="{Binding BaseUrl}" Keyboard="Url" />
+                    </Border>
+                    <Button Text="Salvar URL"
+                            Style="{StaticResource ButtonNavy}"
+                            Command="{Binding SalvarBaseUrlCommand}" />
+                    <Label Text="{Binding StatusBackend}"
+                           Style="{StaticResource LabelSmall}"
+                           IsVisible="{Binding StatusBackend, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Diagnóstico -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="DIAGNÓSTICO" Style="{StaticResource LabelEyebrow}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Versão do app" Style="{StaticResource LabelSmall}" />
+                            <Label Text="{Binding AppVersion}" Style="{StaticResource LabelH3}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Dispositivo" Style="{StaticResource LabelSmall}" />
+                            <Label Text="{Binding DeviceLabel}" Style="{StaticResource LabelH3}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0"
+                                Text="Ver crash log"
+                                Style="{StaticResource ButtonGhost}"
+                                Command="{Binding VerCrashLogCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Limpar logs"
+                                Style="{StaticResource ButtonGhost}"
+                                Command="{Binding LimparCrashLogCommand}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Sobre -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="SOBRE" Style="{StaticResource LabelEyebrow}" />
+                    <Button Text="Abrir EasyStok Web"
+                            Style="{StaticResource ButtonGhost}"
+                            Command="{Binding AbrirWebCommand}" />
+                    <Label Text="© EasyStok · controle operacional para pequenos negócios" Style="{StaticResource LabelSmall}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Sair -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="ENCERRAR SESSÃO" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="Sai da sessão atual e volta para a tela de login. Em modo demo, os dados locais permanecem para a próxima entrada." Style="{StaticResource LabelSmall}" />
+                    <Button Text="Sair"
+                            BackgroundColor="{StaticResource Crit600}"
+                            Command="{Binding SairCommand}" />
+                </VerticalStackLayout>
+            </Border>
+
         </VerticalStackLayout>
-    </Grid>
+    </ScrollView>
 </ContentPage>

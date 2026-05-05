@@ -1,12 +1,109 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
+             xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
              x:Class="EasyStok.Mobile.Views.PedidosPage"
-             Title="Pedidos">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Pedidos" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:PedidosViewModel"
+             Title="Pedidos"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="20,16,0,16" RowDefinitions="Auto,*" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Pedidos" Style="{StaticResource LabelH1}" />
+            <Label Text="{Binding TotalAbertos, StringFormat='{0} em aberto'}" Style="{StaticResource LabelSmall}" />
         </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1" Orientation="Horizontal">
+            <HorizontalStackLayout Spacing="10" Padding="0,0,20,0">
+
+                <!-- Aguardando -->
+                <Border Style="{StaticResource Card}" WidthRequest="280" Padding="14">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="AGUARDANDO" Style="{StaticResource LabelEyebrow}" />
+                            <Label Grid.Column="1" Text="{Binding Aguardando.Count}" Style="{StaticResource LabelEyebrow}" TextColor="{StaticResource Orange600}" />
+                        </Grid>
+                        <CollectionView ItemsSource="{Binding Aguardando}" SelectionMode="None" HeightRequest="500">
+                            <CollectionView.EmptyView>
+                                <Label Text="Vazio" Style="{StaticResource LabelSmall}" HorizontalOptions="Center" Margin="0,20" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="storage:CachedPedido">
+                                    <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}"
+                                            Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                                            StrokeShape="RoundRectangle 10"
+                                            StrokeThickness="1"
+                                            Padding="12" Margin="0,4">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="{Binding ClienteNome}" Style="{StaticResource LabelH3}" />
+                                            <Label Text="{Binding Total, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelSmall}" TextColor="{StaticResource Orange500}" />
+                                            <Label Text="{Binding ShortCode, StringFormat='cód: {0}'}" Style="{StaticResource LabelEyebrow}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Preparando -->
+                <Border Style="{StaticResource Card}" WidthRequest="280" Padding="14">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="PREPARANDO" Style="{StaticResource LabelEyebrow}" />
+                            <Label Grid.Column="1" Text="{Binding Preparando.Count}" Style="{StaticResource LabelEyebrow}" TextColor="{StaticResource Warn600}" />
+                        </Grid>
+                        <CollectionView ItemsSource="{Binding Preparando}" SelectionMode="None" HeightRequest="500">
+                            <CollectionView.EmptyView>
+                                <Label Text="Vazio" Style="{StaticResource LabelSmall}" HorizontalOptions="Center" Margin="0,20" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="storage:CachedPedido">
+                                    <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}"
+                                            Stroke="{StaticResource Warn600}" StrokeShape="RoundRectangle 10" StrokeThickness="1"
+                                            Padding="12" Margin="0,4">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="{Binding ClienteNome}" Style="{StaticResource LabelH3}" />
+                                            <Label Text="{Binding Total, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelSmall}" TextColor="{StaticResource Orange500}" />
+                                            <Label Text="{Binding ShortCode, StringFormat='cód: {0}'}" Style="{StaticResource LabelEyebrow}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Pronto -->
+                <Border Style="{StaticResource Card}" WidthRequest="280" Padding="14">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="PRONTO" Style="{StaticResource LabelEyebrow}" />
+                            <Label Grid.Column="1" Text="{Binding Pronto.Count}" Style="{StaticResource LabelEyebrow}" TextColor="{StaticResource Ok600}" />
+                        </Grid>
+                        <CollectionView ItemsSource="{Binding Pronto}" SelectionMode="None" HeightRequest="500">
+                            <CollectionView.EmptyView>
+                                <Label Text="Vazio" Style="{StaticResource LabelSmall}" HorizontalOptions="Center" Margin="0,20" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="storage:CachedPedido">
+                                    <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}"
+                                            Stroke="{StaticResource Ok600}" StrokeShape="RoundRectangle 10" StrokeThickness="1"
+                                            Padding="12" Margin="0,4">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="{Binding ClienteNome}" Style="{StaticResource LabelH3}" />
+                                            <Label Text="{Binding Total, StringFormat='R$ {0:N2}'}" Style="{StaticResource LabelSmall}" TextColor="{StaticResource Orange500}" />
+                                            <Label Text="{Binding ShortCode, StringFormat='cód: {0}'}" Style="{StaticResource LabelEyebrow}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+            </HorizontalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>

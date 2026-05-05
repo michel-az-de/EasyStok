@@ -1,3 +1,4 @@
+using EasyStok.Mobile.Services;
 using EasyStok.Mobile.ViewModels;
 
 namespace EasyStok.Mobile.Views;
@@ -13,9 +14,9 @@ public partial class LojaPickerPage : ContentPage
 		LojaPickerRoot.BindingContext = vm;
 	}
 
-	protected override async void OnAppearing()
+	protected override void OnAppearing()
 	{
 		base.OnAppearing();
-		await _vm.InitializeAsync();
+		UiSafe.Fire(() => _vm.InitializeAsync());
 	}
 }

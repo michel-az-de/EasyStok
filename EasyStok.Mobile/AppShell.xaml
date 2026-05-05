@@ -5,30 +5,45 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:views="clr-namespace:EasyStok.Mobile.Views"
     Title="EasyStok Mobile"
-    FlyoutBehavior="Disabled"
-    Shell.TabBarIsVisible="False">
+    FlyoutBehavior="Disabled">
 
-    <!--
-    Rotas declaradas como ShellContent para suportar navegacao absoluta
-    (Shell.Current.GoToAsync("//rota")). LoginPage e a primeira para ser
-    o landing default antes de OnNavigated redirecionar conforme sessao.
-    Agrupado em <TabBar> com TabBarIsVisible=False para esconder a tab bar.
-    -->
-    <TabBar>
+    <Shell.Resources>
+        <ResourceDictionary>
+            <Style TargetType="Tab">
+                <Setter Property="Shell.TabBarBackgroundColor"
+                        Value="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}" />
+                <Setter Property="Shell.TabBarForegroundColor" Value="{StaticResource Orange600}" />
+                <Setter Property="Shell.TabBarTitleColor" Value="{StaticResource Orange600}" />
+                <Setter Property="Shell.TabBarUnselectedColor"
+                        Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
+            </Style>
+        </ResourceDictionary>
+    </Shell.Resources>
+
+    <!-- Pre-login: TabBar oculta. -->
+    <TabBar Shell.TabBarIsVisible="False">
         <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" />
         <ShellContent Route="tenant-picker" ContentTemplate="{DataTemplate views:TenantPickerPage}" />
         <ShellContent Route="loja-picker" ContentTemplate="{DataTemplate views:LojaPickerPage}" />
-        <ShellContent Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
-        <ShellContent Route="producao" ContentTemplate="{DataTemplate views:ProducaoPage}" />
-        <ShellContent Route="pedidos" ContentTemplate="{DataTemplate views:PedidosPage}" />
-        <ShellContent Route="caixa" ContentTemplate="{DataTemplate views:CaixaPage}" />
-        <ShellContent Route="finalizados" ContentTemplate="{DataTemplate views:FinalizadosPage}" />
-        <ShellContent Route="clientes" ContentTemplate="{DataTemplate views:ClientesPage}" />
-        <ShellContent Route="suporte" ContentTemplate="{DataTemplate views:SuportePage}" />
-        <ShellContent Route="conferencia" ContentTemplate="{DataTemplate views:ConferenciaPage}" />
-        <ShellContent Route="compras" ContentTemplate="{DataTemplate views:ComprasPage}" />
-        <ShellContent Route="historico" ContentTemplate="{DataTemplate views:HistoricoPage}" />
-        <ShellContent Route="estoque" ContentTemplate="{DataTemplate views:EstoquePage}" />
+    </TabBar>
+
+    <!-- App principal: 5 abas fixas. -->
+    <TabBar>
+        <Tab Title="Início">
+            <ShellContent Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
+        </Tab>
+        <Tab Title="Produção">
+            <ShellContent Route="producao" ContentTemplate="{DataTemplate views:ProducaoPage}" />
+        </Tab>
+        <Tab Title="Pedidos">
+            <ShellContent Route="pedidos" ContentTemplate="{DataTemplate views:PedidosPage}" />
+        </Tab>
+        <Tab Title="Estoque">
+            <ShellContent Route="estoque" ContentTemplate="{DataTemplate views:EstoquePage}" />
+        </Tab>
+        <Tab Title="Mais">
+            <ShellContent Route="mais" ContentTemplate="{DataTemplate views:MaisPage}" />
+        </Tab>
     </TabBar>
 
 </Shell>

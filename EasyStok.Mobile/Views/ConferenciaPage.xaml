@@ -1,12 +1,53 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.ConferenciaPage"
-             Title="Conferencia">
-    <Grid Padding="22,16">
-        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Conferencia" Style="{StaticResource LabelHero}" HorizontalOptions="Center" />
-            <Label Text="Em construcao (F5)" Style="{StaticResource LabelGreeting}" HorizontalOptions="Center" />
+             x:DataType="vm:ConferenciaViewModel"
+             Title="Conferência"
+             Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,16" Spacing="14">
+
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Conferência" Style="{StaticResource LabelH1}" />
+                <Label Text="busca rápida por código" Style="{StaticResource LabelSmall}" />
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="CÓDIGO CURTO" Style="{StaticResource LabelEyebrow}" />
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry Text="{Binding Codigo}" Placeholder="ex. EW001" />
+                    </Border>
+                    <Button Text="Buscar" Command="{Binding BuscarCommand}" />
+                    <Label Text="Scanner QR disponível em breve."
+                           Style="{StaticResource LabelEyebrow}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource CardElev}" IsVisible="{Binding Resultado, Converter={StaticResource StringNotNullOrEmptyConverter}}">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="ENCONTRADO" Style="{StaticResource LabelEyebrow}" TextColor="{StaticResource Ok600}" />
+                    <Label Text="{Binding Resultado.ClienteNome}" Style="{StaticResource LabelH2}" />
+                    <Label Text="{Binding Resultado.ShortCode, StringFormat='código {0}'}" Style="{StaticResource LabelSmall}" />
+                    <Label Text="{Binding Resultado.Status, StringFormat='status: {0}'}" Style="{StaticResource LabelSmall}" />
+                    <Label Text="{Binding Resultado.Total, StringFormat='R$ {0:N2}'}"
+                           FontFamily="Inter" FontSize="22" FontAttributes="Bold"
+                           TextColor="{StaticResource Orange500}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border BackgroundColor="#3A1E18"
+                    Stroke="#5A2920"
+                    StrokeShape="RoundRectangle 8"
+                    StrokeThickness="1"
+                    Padding="12,10"
+                    IsVisible="{Binding AvisoNaoEncontrado, Converter={StaticResource StringNotNullOrEmptyConverter}}">
+                <Label Text="{Binding AvisoNaoEncontrado}" TextColor="#F8884A" FontFamily="Inter" FontSize="13" />
+            </Border>
+
         </VerticalStackLayout>
-    </Grid>
+    </ScrollView>
 </ContentPage>

@@ -1,3 +1,4 @@
+using EasyStok.Mobile.Services;
 using EasyStok.Mobile.ViewModels;
 
 namespace EasyStok.Mobile.Views;
@@ -12,9 +13,9 @@ public partial class LoginPage : ContentPage
 		BindingContext = _vm = vm;
 	}
 
-	protected override async void OnAppearing()
+	protected override void OnAppearing()
 	{
 		base.OnAppearing();
-		await _vm.InitializeAsync();
+		UiSafe.Fire(() => _vm.InitializeAsync());
 	}
 }
