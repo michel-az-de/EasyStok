@@ -7,43 +7,22 @@
     Title="EasyStok Mobile"
     FlyoutBehavior="Disabled">
 
-    <Shell.Resources>
-        <ResourceDictionary>
-            <Style TargetType="Tab">
-                <Setter Property="Shell.TabBarBackgroundColor"
-                        Value="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}" />
-                <Setter Property="Shell.TabBarForegroundColor" Value="{StaticResource Orange600}" />
-                <Setter Property="Shell.TabBarTitleColor" Value="{StaticResource Orange600}" />
-                <Setter Property="Shell.TabBarUnselectedColor"
-                        Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
-            </Style>
-        </ResourceDictionary>
-    </Shell.Resources>
+    <!--
+    Arquitetura hibrida v1.3:
+    - Pre-login (Login/Tenant/Loja) e Suporte: telas MAUI nativas, TabBar oculta.
+    - Pos-login: WebOpsPage (HybridWebView) carregando o PWA empacotado em
+      Resources/Raw/pwa. PWA tem sua propria nav inferior, entao TabBar
+      nativa fica oculta tambem. Bridge JS->Native: PWA chama
+      window.HybridWebView.SendRawMessage('logout'|'ajustes') para acoes
+      que precisam saltar pra MAUI.
+    -->
 
-    <!-- Pre-login: TabBar oculta. -->
     <TabBar Shell.TabBarIsVisible="False">
         <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" />
         <ShellContent Route="tenant-picker" ContentTemplate="{DataTemplate views:TenantPickerPage}" />
         <ShellContent Route="loja-picker" ContentTemplate="{DataTemplate views:LojaPickerPage}" />
-    </TabBar>
-
-    <!-- App principal: 5 abas fixas. -->
-    <TabBar>
-        <Tab Title="Início">
-            <ShellContent Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
-        </Tab>
-        <Tab Title="Produção">
-            <ShellContent Route="producao" ContentTemplate="{DataTemplate views:ProducaoPage}" />
-        </Tab>
-        <Tab Title="Pedidos">
-            <ShellContent Route="pedidos" ContentTemplate="{DataTemplate views:PedidosPage}" />
-        </Tab>
-        <Tab Title="Estoque">
-            <ShellContent Route="estoque" ContentTemplate="{DataTemplate views:EstoquePage}" />
-        </Tab>
-        <Tab Title="Mais">
-            <ShellContent Route="mais" ContentTemplate="{DataTemplate views:MaisPage}" />
-        </Tab>
+        <ShellContent Route="web-ops" ContentTemplate="{DataTemplate views:WebOpsPage}" />
+        <ShellContent Route="suporte" ContentTemplate="{DataTemplate views:SuportePage}" />
     </TabBar>
 
 </Shell>

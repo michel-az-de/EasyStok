@@ -1,0 +1,31 @@
+{
+  "routes": [
+    {
+      "route": "/api/updates",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/bundle-*.zip",
+      "headers": {
+        "Content-Type": "application/zip",
+        "Cache-Control": "public, max-age=3600"
+      }
+    },
+    {
+      "route": "/updates.json",
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache"
+      }
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/bundle-*.zip", "/*.{js,json,zip,png,svg,ico,webmanifest,css,html}"]
+  },
+  "mimeTypes": {
+    ".zip": "application/zip",
+    ".json": "application/json"
+  }
+}

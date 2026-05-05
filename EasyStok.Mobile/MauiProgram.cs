@@ -106,6 +106,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<HistoricoPage>();
 		builder.Services.AddTransient<EstoquePage>();
 		builder.Services.AddTransient<MaisPage>();
+		builder.Services.AddTransient<WebOpsPage>();
 		// ProducaoCapturaPage e instanciado direto via `new` (recebe parametro
 		// CachedItemEstoque), nao registrado no DI.
 

@@ -64,7 +64,7 @@ public sealed partial class LojaPickerViewModel : BaseViewModel
 	private Task SelectAsync(Loja loja) => RunAsync(async () =>
 	{
 		await _store.SetLojaIdAsync(loja.Id);
-		await Shell.Current.GoToAsync("//home");
+		await Shell.Current.GoToAsync("//web-ops");
 	});
 
 	[RelayCommand]

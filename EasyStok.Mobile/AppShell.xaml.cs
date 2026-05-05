@@ -24,15 +24,19 @@ public partial class AppShell : Shell
 
 	private static void RegisterRoutes()
 	{
-		// Rotas das telas acessadas via "Mais" — push relativo (sem //) sobre
-		// a Tab corrente. Voltar com back retorna pra Tab Mais.
+		// V1.3 hibrido: rotas nativas residuais (uteis pra debug, mas
+		// telas operacionais agora vivem dentro do PWA via WebOpsPage).
 		Routing.RegisterRoute("caixa", typeof(CaixaPage));
 		Routing.RegisterRoute("finalizados", typeof(FinalizadosPage));
 		Routing.RegisterRoute("clientes", typeof(ClientesPage));
-		Routing.RegisterRoute("suporte", typeof(SuportePage));
 		Routing.RegisterRoute("conferencia", typeof(ConferenciaPage));
 		Routing.RegisterRoute("compras", typeof(ComprasPage));
 		Routing.RegisterRoute("historico", typeof(HistoricoPage));
+		Routing.RegisterRoute("estoque", typeof(EstoquePage));
+		Routing.RegisterRoute("producao", typeof(ProducaoPage));
+		Routing.RegisterRoute("pedidos", typeof(PedidosPage));
+		Routing.RegisterRoute("home", typeof(HomePage));
+		Routing.RegisterRoute("mais", typeof(MaisPage));
 	}
 
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
@@ -71,7 +75,8 @@ public partial class AppShell : Shell
 		if (await _auth.IsDemoAsync())
 			await _demoSeed.SeedIfEmptyAsync();
 
-		await GoToAsync("//home");
+		// V1.3 hibrido: pos-login vai pra WebOpsPage (PWA dentro do app).
+		await GoToAsync("//web-ops");
 		_sync.Start();
 	}
 }

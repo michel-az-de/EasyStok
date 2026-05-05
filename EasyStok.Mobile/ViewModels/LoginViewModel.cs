@@ -71,6 +71,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 	{
 		await _auth.EntrarOfflineDemoAsync();
 		await _demoSeed.SeedIfEmptyAsync();
-		await Shell.Current.GoToAsync("//home");
+		// V1.3 hibrido: WebOpsPage hospeda o PWA com sua propria UI completa.
+		await Shell.Current.GoToAsync("//web-ops");
 	});
 }
