@@ -7,6 +7,7 @@ COPY EasyStock.Domain/EasyStock.Domain.csproj                 EasyStock.Domain/
 COPY EasyStock.Application/EasyStock.Application.csproj       EasyStock.Application/
 COPY EasyStock.Infra.Postgre/EasyStock.Infra.Postgre.csproj   EasyStock.Infra.Postgre/
 COPY EasyStock.Infra.MongoDb/EasyStock.Infra.MongoDb.csproj   EasyStock.Infra.MongoDb/
+COPY EasyStock.Infra.Sqlite/EasyStock.Infra.Sqlite.csproj     EasyStock.Infra.Sqlite/
 COPY EasyStock.Infra.Async/EasyStock.Infra.Async.csproj       EasyStock.Infra.Async/
 COPY EasyStock.Api/EasyStock.Api.csproj                       EasyStock.Api/
 
