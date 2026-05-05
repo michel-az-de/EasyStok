@@ -5,13 +5,14 @@
              Title="EasyStok"
              Shell.NavBarIsVisible="False"
              Shell.TabBarIsVisible="False"
-             BackgroundColor="{AppThemeBinding Dark={StaticResource Navy900}, Light={StaticResource BgAppLight}}">
+             Padding="0"
+             BackgroundColor="#111827">
 
-    <Grid>
-        <WebView x:Name="WebOps"
-                 Source="file:///android_asset/pwa/index.html"
-                 VerticalOptions="Fill"
-                 HorizontalOptions="Fill" />
-    </Grid>
+    <WebView x:Name="WebOps"
+             Source="file:///android_asset/pwa/index.html"
+             BackgroundColor="Transparent"
+             VerticalOptions="Fill"
+             HorizontalOptions="Fill"
+             Margin="0" />
 
 </ContentPage>

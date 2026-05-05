@@ -37,7 +37,10 @@ public sealed class ThemeService
 			var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
 			if (activity?.Window is null) return;
 
-			var hex = theme == AppTheme.Dark ? "#06143A" : "#F5F0E8";
+			// PWA tem fundo navy fixo (#111827), entao status bar combina com
+			// ele independente do tema MAUI (que so afeta as telas nativas
+			// LoginPage / SuportePage).
+			var hex = "#111827";
 			var color = Android.Graphics.Color.ParseColor(hex);
 			activity.Window.SetStatusBarColor(color);
 			activity.Window.SetNavigationBarColor(color);

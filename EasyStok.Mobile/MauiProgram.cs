@@ -44,6 +44,39 @@ public static class MauiProgram
 				fonts.AddFont("FrauncesItalic.ttf", "FrauncesItalic");
 			});
 
+		// WebView platform-specific config: PWA usa localStorage + Service Worker
+		// + fetch de assets locais — sem essas configuracoes o PWA roda quebrado
+		// dentro de file:///android_asset/.
+		Microsoft.Maui.Handlers.WebViewHandler.Mapper.AppendToMapping("EasyStokWebViewSettings", (handler, view) =>
+		{
+#if ANDROID
+			try
+			{
+				var nativeWebView = handler.PlatformView;
+				var settings = nativeWebView.Settings;
+				settings.JavaScriptEnabled = true;
+				settings.DomStorageEnabled = true;          // localStorage / sessionStorage
+				settings.DatabaseEnabled = true;
+				settings.AllowFileAccess = true;
+				settings.AllowContentAccess = true;
+#pragma warning disable CA1422 // deprecated em API 30+ mas ainda funciona
+				settings.AllowFileAccessFromFileURLs = true;
+				settings.AllowUniversalAccessFromFileURLs = true;
+#pragma warning restore CA1422
+				settings.MixedContentMode = Android.Webkit.MixedContentHandling.AlwaysAllow;
+				settings.LoadWithOverviewMode = false;
+				settings.UseWideViewPort = false;
+				settings.JavaScriptCanOpenWindowsAutomatically = true;
+				settings.SetSupportZoom(false);
+				settings.BuiltInZoomControls = false;
+				settings.DisplayZoomControls = false;
+				nativeWebView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+				nativeWebView.OverScrollMode = Android.Views.OverScrollMode.Never;
+			}
+			catch (Exception ex) { CrashLog.Write("WebViewHandler.Mapper", ex); }
+#endif
+		});
+
 		// Storage seguro + DB local + caches + outbox
 		builder.Services.AddSingleton<ISecureStore, SecureStore>();
 		builder.Services.AddSingleton<AppDatabase>();
