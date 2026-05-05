@@ -26,6 +26,31 @@ public sealed class ThemeService
 			Application.Current.UserAppTheme = theme;
 		if (persist)
 			Preferences.Default.Set(PreferenceKey, theme == AppTheme.Light ? "light" : "dark");
+		AtualizarStatusBar(theme);
+	}
+
+	private static void AtualizarStatusBar(AppTheme theme)
+	{
+#if ANDROID
+		try
+		{
+			var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+			if (activity?.Window is null) return;
+
+			var hex = theme == AppTheme.Dark ? "#06143A" : "#F5F0E8";
+			var color = Android.Graphics.Color.ParseColor(hex);
+			activity.Window.SetStatusBarColor(color);
+			activity.Window.SetNavigationBarColor(color);
+
+			if (OperatingSystem.IsAndroidVersionAtLeast(30))
+			{
+				var lightIcons = theme == AppTheme.Light;
+				var mask = (int)Android.Views.WindowInsetsControllerAppearance.LightStatusBars;
+				activity.Window.InsetsController?.SetSystemBarsAppearance(lightIcons ? mask : 0, mask);
+			}
+		}
+		catch { /* status bar e cosmetico — nao quebra app */ }
+#endif
 	}
 
 	public void Toggle() =>

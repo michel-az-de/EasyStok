@@ -12,94 +12,217 @@
 
             <ctrls:DemoBanner x:Name="DemoBannerCtrl" />
 
-            <!-- Esteira de pedidos resumo -->
-            <VerticalStackLayout Spacing="10">
-                <Grid ColumnDefinitions="*,Auto">
-                    <Label Grid.Column="0" Text="ESTEIRA DE PEDIDOS" Style="{StaticResource LabelEyebrow}" />
-                    <Border Grid.Column="1"
-                            BackgroundColor="{StaticResource Orange500}"
+            <!-- Banner: caixa anterior em aberto -->
+            <Border BackgroundColor="{AppThemeBinding Dark={StaticResource Gold800}, Light={StaticResource Gold50}}"
+                    Stroke="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold400}}"
+                    StrokeShape="RoundRectangle 18"
+                    StrokeThickness="1"
+                    Padding="16"
+                    Shadow="{StaticResource ShadowCard}">
+                <Grid ColumnDefinitions="4,*" ColumnSpacing="14">
+                    <BoxView Grid.Column="0"
+                             Color="{StaticResource Gold600}"
+                             CornerRadius="999"
+                             VerticalOptions="Fill" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="10">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="⚠️" FontSize="18" VerticalOptions="Center" />
+                            <Label Text="Caixa de dia(s) anterior(es) ainda em aberto"
+                                   FontFamily="Fraunces" FontSize="17" FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Dark={StaticResource Gold100}, Light={StaticResource Gold700}}"
+                                   LineBreakMode="WordWrap"
+                                   MaxLines="2" />
+                        </HorizontalStackLayout>
+                        <Label Text="Sem fechamento, esses dias ficam sem snapshot. Recomendado fechar."
+                               Style="{StaticResource LabelLead}"
+                               TextColor="{AppThemeBinding Dark={StaticResource Gold200}, Light={StaticResource Gold700}}" />
+                        <!-- Card 03/05 -->
+                        <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource White}}"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 12"
+                                Padding="14,12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="03/05" FontFamily="Fraunces" FontSize="17" FontAttributes="Bold"
+                                           TextColor="{StaticResource Gold600}" />
+                                    <Label Text="5 movimento(s) · saldo R$ 236,00" Style="{StaticResource LabelSmall}" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="Fechar" Padding="18,10" FontSize="14" CornerRadius="12" />
+                            </Grid>
+                        </Border>
+                        <!-- Card 02/05 -->
+                        <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource White}}"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 12"
+                                Padding="14,12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="02/05" FontFamily="Fraunces" FontSize="17" FontAttributes="Bold"
+                                           TextColor="{StaticResource Gold600}" />
+                                    <Label Text="1 movimento(s) · saldo R$ 30,00" Style="{StaticResource LabelSmall}" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="Fechar" Padding="18,10" FontSize="14" CornerRadius="12" />
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <!-- Esteira de pedidos -->
+            <Grid ColumnDefinitions="*,Auto">
+                <HorizontalStackLayout Grid.Column="0" Spacing="10" VerticalOptions="Center">
+                    <Label Text="ESTEIRA DE PEDIDOS" Style="{StaticResource LabelEyebrow}" VerticalOptions="Center" />
+                    <Border BackgroundColor="{StaticResource Orange500}"
                             StrokeShape="RoundRectangle 999"
                             StrokeThickness="0"
-                            Padding="9,2"
-                            VerticalOptions="Center">
-                        <Label Text="3"
-                               FontFamily="Fraunces" FontSize="13" FontAttributes="Bold"
+                            Padding="9,2">
+                        <Label Text="3" FontFamily="Fraunces" FontSize="13" FontAttributes="Bold"
                                TextColor="{StaticResource White}" />
+                    </Border>
+                </HorizontalStackLayout>
+                <Border Grid.Column="1"
+                        BackgroundColor="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold100}}"
+                        Stroke="{StaticResource Gold500}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 999"
+                        Padding="14,6">
+                    <Label Text="Abrir kanban →" FontFamily="Fraunces" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Dark={StaticResource Gold100}, Light={StaticResource Gold700}}" />
+                </Border>
+            </Grid>
+
+            <!-- Aguardando: header + cards -->
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" Padding="4,0">
+                    <Label Grid.Column="0" Text="AGUARDANDO" Style="{StaticResource LabelEyebrow}"
+                           TextColor="{StaticResource Gold600}" VerticalOptions="Center" />
+                    <Border Grid.Column="1"
+                            BackgroundColor="{StaticResource Transparent}"
+                            Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                            StrokeShape="RoundRectangle 999"
+                            StrokeThickness="1"
+                            Padding="10,2">
+                        <Label Text="2" Style="{StaticResource LabelEyebrow}" />
                     </Border>
                 </Grid>
 
-                <Border Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="12">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="AGUARDANDO" Style="{StaticResource LabelEyebrow}" TextColor="{StaticResource Gold600}" />
-                            <Label Grid.Column="1" Text="2" Style="{StaticResource LabelEyebrow}" />
-                        </Grid>
-                        <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}"
-                                Stroke="{StaticResource Gold500}"
-                                StrokeShape="RoundRectangle 12"
-                                StrokeThickness="1"
-                                Padding="14">
-                            <VerticalStackLayout Spacing="6">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Grid.Column="0" Text="Luiz Fernando" Style="{StaticResource LabelH3}" />
-                                    <Label Grid.Column="1" Text="R$ 58,00"
-                                           FontFamily="Fraunces" FontSize="18" FontAttributes="Bold"
-                                           TextColor="{StaticResource Gold600}" />
-                                </Grid>
-                                <Label Text="Apto 54 - Torre 2" Style="{StaticResource LabelSmall}" />
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,6,0,0">
-                                    <Button Grid.Column="0" Text="▶  Iniciar preparo" Style="{StaticResource ButtonCoral}" />
-                                    <Button Grid.Column="1" Text="Abrir" Style="{StaticResource ButtonGhost}" />
-                                </Grid>
-                            </VerticalStackLayout>
-                        </Border>
-                    </VerticalStackLayout>
+                <!-- Card pedido com border lateral gold -->
+                <Border Style="{StaticResource Card}" Padding="0">
+                    <Grid ColumnDefinitions="4,*">
+                        <BoxView Grid.Column="0" Color="{StaticResource Gold500}" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="10" Padding="18,16">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="Luiz Fernando" FontFamily="Fraunces" FontSize="20" FontAttributes="Bold" />
+                                    <Label Text="Apto 54 - Torre 2" Style="{StaticResource LabelSmall}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1" Text="R$ 58,00"
+                                       FontFamily="Fraunces" FontSize="20" FontAttributes="Bold"
+                                       TextColor="{StaticResource Gold600}" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Border Grid.Column="0"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 14"
+                                        Padding="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                            <GradientStop Color="{StaticResource Orange500}" Offset="0" />
+                                            <GradientStop Color="{StaticResource Orange600}" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Label Text="▶  Iniciar preparo"
+                                           FontFamily="Fraunces" FontSize="15" FontAttributes="Bold"
+                                           TextColor="{StaticResource White}"
+                                           HorizontalOptions="Center" VerticalOptions="Center"
+                                           Padding="0,12" />
+                                </Border>
+                                <Button Grid.Column="1" Text="Abrir" Style="{StaticResource ButtonGhost}" Padding="18,10" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Grid>
                 </Border>
 
-                <Label Text="Os pedidos acima são de demonstração. Use a aba Pedidos para o kanban completo."
-                       Style="{StaticResource LabelSmall}"
-                       HorizontalTextAlignment="Center" />
+                <!-- +1 no kanban (dashed) -->
+                <Border BackgroundColor="{StaticResource Transparent}"
+                        Stroke="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderSoftLight}}"
+                        StrokeShape="RoundRectangle 14"
+                        StrokeThickness="1"
+                        StrokeDashArray="4,4"
+                        Padding="14,12">
+                    <Label Text="+1 no kanban"
+                           FontFamily="Fraunces" FontSize="14" FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
+                </Border>
             </VerticalStackLayout>
 
-            <!-- KPIs do dia -->
-            <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" ColumnSpacing="10" RowSpacing="10">
-                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="ITENS EM ESTOQUE" Style="{StaticResource LabelEyebrow}" />
-                        <Label x:Name="KpiItens" Text="—"
-                               FontFamily="Fraunces" FontSize="32" FontAttributes="Bold"
-                               TextColor="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}" />
-                        <Label Text="produtos cadastrados" Style="{StaticResource LabelSmall}" />
-                    </VerticalStackLayout>
+            <!-- Preparando -->
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" Padding="4,0">
+                    <Label Grid.Column="0" Text="PREPARANDO" Style="{StaticResource LabelEyebrow}"
+                           TextColor="{StaticResource Info600}" VerticalOptions="Center" />
+                    <Border Grid.Column="1"
+                            BackgroundColor="{StaticResource Transparent}"
+                            Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                            StrokeShape="RoundRectangle 999"
+                            StrokeThickness="1"
+                            Padding="10,2">
+                        <Label Text="1" Style="{StaticResource LabelEyebrow}" />
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource Card}" Padding="0">
+                    <Grid ColumnDefinitions="4,*">
+                        <BoxView Grid.Column="0" Color="{StaticResource Info600}" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="10" Padding="18,16">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="Bistro Santa Massa" FontFamily="Fraunces" FontSize="20" FontAttributes="Bold" />
+                                    <Label Text="Rua das Cantinas, 120" Style="{StaticResource LabelSmall}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1" Text="R$ 154,00"
+                                       FontFamily="Fraunces" FontSize="20" FontAttributes="Bold"
+                                       TextColor="{StaticResource Gold600}" VerticalOptions="Center" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Border Grid.Column="0" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                            <GradientStop Color="{StaticResource Orange500}" Offset="0" />
+                                            <GradientStop Color="{StaticResource Orange600}" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Label Text="✓  Marcar pronto"
+                                           FontFamily="Fraunces" FontSize="15" FontAttributes="Bold"
+                                           TextColor="{StaticResource White}"
+                                           HorizontalOptions="Center" VerticalOptions="Center"
+                                           Padding="0,12" />
+                                </Border>
+                                <Button Grid.Column="1" Text="Abrir" Style="{StaticResource ButtonGhost}" Padding="18,10" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Grid>
                 </Border>
-                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="ALERTAS" Style="{StaticResource LabelEyebrow}" />
-                        <Label x:Name="KpiAlertas" Text="—"
-                               FontFamily="Fraunces" FontSize="32" FontAttributes="Bold"
-                               TextColor="{StaticResource Crit600}" />
-                        <Label Text="críticos / vencidos" Style="{StaticResource LabelSmall}" />
-                    </VerticalStackLayout>
-                </Border>
-                <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="VENDAS HOJE" Style="{StaticResource LabelEyebrow}" />
-                        <Label x:Name="KpiVendas" Text="R$ 0"
-                               FontFamily="Fraunces" FontSize="22" FontAttributes="Bold"
-                               TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
-                        <Label Text="movimento bruto" Style="{StaticResource LabelSmall}" />
-                    </VerticalStackLayout>
-                </Border>
-                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="PEDIDOS ABERTOS" Style="{StaticResource LabelEyebrow}" />
-                        <Label x:Name="KpiPedidos" Text="0"
-                               FontFamily="Fraunces" FontSize="22" FontAttributes="Bold"
-                               TextColor="{StaticResource Orange500}" />
-                        <Label Text="aguardando preparo" Style="{StaticResource LabelSmall}" />
-                    </VerticalStackLayout>
-                </Border>
-            </Grid>
+            </VerticalStackLayout>
+
+            <!-- Operação do dia -->
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" Text="Operação do dia" Style="{StaticResource LabelH3}" VerticalOptions="Center" />
+                    <Border Grid.Column="1"
+                            BackgroundColor="{AppThemeBinding Dark={StaticResource Ok100}, Light={StaticResource Ok50}}"
+                            Stroke="{StaticResource Ok600}"
+                            StrokeShape="RoundRectangle 999"
+                            StrokeThickness="1"
+                            Padding="12,4">
+                        <Label Text="PENDENTE"
+                               FontFamily="Inter" FontSize="10" FontAttributes="Bold"
+                               CharacterSpacing="2"
+                               TextColor="{StaticResource Ok700}" />
+                    </Border>
+                </Grid>
+            </Border>
 
         </VerticalStackLayout>
     </ScrollView>
