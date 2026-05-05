@@ -30,6 +30,8 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<EasyStockD
 
         var optionsBuilder = new DbContextOptionsBuilder<EasyStockDbContext>();
         optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.ConfigureWarnings(w =>
+            w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         return new EasyStockDbContext(optionsBuilder.Options);
     }
