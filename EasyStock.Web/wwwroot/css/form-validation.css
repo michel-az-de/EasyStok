@@ -7,11 +7,6 @@ input:invalid:not(:placeholder-shown),
 textarea:invalid:not(:placeholder-shown),
 select:invalid:not(:placeholder-shown) {
   border-color: var(--crit-600);
-  background-image:
-    linear-gradient(to right, transparent 0%, transparent calc(100% - 32px), var(--crit-600) calc(100% - 32px));
-  background-size: 100% 1px;
-  background-repeat: no-repeat;
-  background-position: bottom;
 }
 
 input:invalid:focus,
@@ -137,13 +132,13 @@ select:disabled {
 }
 
 [data-theme="dark"] .form-error {
-  color: var(--crit-500);
+  color: var(--crit-600);
 }
 
 [data-theme="dark"] .form-success {
   background: rgba(24, 135, 78, 0.15);
   border-color: var(--ok-600);
-  color: var(--ok-500);
+  color: var(--ok-600);
 }
 
 /* Animations */
