@@ -3,54 +3,55 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
+             xmlns:ctrls="clr-namespace:EasyStok.Mobile.Controls"
              x:Class="EasyStok.Mobile.Views.EstoquePage"
              x:DataType="vm:EstoqueViewModel"
              Title="Estoque"
              Shell.NavBarIsVisible="False">
-    <Grid Padding="20,16" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+    <Grid Padding="20,16" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="14">
 
-        <VerticalStackLayout Grid.Row="0" Spacing="2">
-            <Label Text="Estoque" Style="{StaticResource LabelH1}" />
-            <Label Text="todos os itens da loja" Style="{StaticResource LabelSmall}" />
+        <ctrls:BrandHeader Grid.Row="0" x:Name="Header" />
+
+        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,4,0,4">
+            <Label Text="Estoque" Style="{StaticResource LabelDisplay}" />
+            <Label Text="todos os itens da loja" Style="{StaticResource LabelLead}" />
         </VerticalStackLayout>
 
-        <ScrollView Grid.Row="1" Orientation="Horizontal">
-            <HorizontalStackLayout Spacing="6">
-                <Button Text="Todos" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+        <ScrollView Grid.Row="2" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout Spacing="8" Padding="2,4">
+                <Button Text="Todos" Style="{StaticResource ChipFiltroAtivo}"
                         Command="{Binding SetFiltroCommand}" CommandParameter="todos" />
-                <Button Text="OK" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                <Button Text="OK" Style="{StaticResource ChipFiltroInativo}"
                         Command="{Binding SetFiltroCommand}" CommandParameter="ok" />
-                <Button Text="Atenção" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                <Button Text="Atenção" Style="{StaticResource ChipFiltroInativo}"
                         Command="{Binding SetFiltroCommand}" CommandParameter="atencao" />
-                <Button Text="Crítico" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                <Button Text="Crítico" Style="{StaticResource ChipFiltroInativo}"
                         Command="{Binding SetFiltroCommand}" CommandParameter="critico" />
-                <Button Text="Vencido" Style="{StaticResource ButtonGhost}" FontSize="12" Padding="12,6"
+                <Button Text="Vencido" Style="{StaticResource ChipFiltroInativo}"
                         Command="{Binding SetFiltroCommand}" CommandParameter="vencido" />
             </HorizontalStackLayout>
         </ScrollView>
 
-        <CollectionView Grid.Row="2"
+        <CollectionView Grid.Row="3"
                         ItemsSource="{Binding Itens}"
                         SelectionMode="None">
             <CollectionView.EmptyView>
-                <Label Text="Nenhum item neste filtro."
-                       Style="{StaticResource LabelSmall}"
-                       HorizontalOptions="Center"
-                       VerticalOptions="Center" />
+                <Label Text="Nenhum item neste filtro." Style="{StaticResource LabelLead}"
+                       HorizontalOptions="Center" VerticalOptions="Center" />
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="storage:CachedItemEstoque">
-                    <Border Style="{StaticResource Card}" Margin="0,4">
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Grid.Column="0" Text="{Binding Emoji}" FontSize="28" VerticalOptions="Center" />
-                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="{Binding ProdutoNome}" Style="{StaticResource LabelH3}" />
+                    <Border Style="{StaticResource Card}" Margin="0,5">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <Label Grid.Column="0" Text="{Binding Emoji}" FontSize="32" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                                <Label Text="{Binding ProdutoNome}" Style="{StaticResource LabelH3}" LineBreakMode="TailTruncation" MaxLines="1" />
                                 <Label Text="{Binding Sku, StringFormat='SKU {0}'}" Style="{StaticResource LabelEyebrow}" />
                             </VerticalStackLayout>
-                            <VerticalStackLayout Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center">
+                            <VerticalStackLayout Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center" Spacing="4">
                                 <Label Text="{Binding Qty, StringFormat='{0} un'}"
-                                       FontFamily="Inter" FontSize="18" FontAttributes="Bold"
-                                       TextColor="{StaticResource Orange500}"
+                                       FontFamily="Fraunces" FontSize="20" FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}"
                                        HorizontalTextAlignment="End" />
                                 <Label Text="{Binding Status}" Style="{StaticResource LabelEyebrow}" HorizontalTextAlignment="End" />
                             </VerticalStackLayout>

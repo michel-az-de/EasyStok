@@ -7,10 +7,11 @@ public partial class EstoquePage : ContentPage
 {
 	private readonly EstoqueViewModel _vm;
 
-	public EstoquePage(EstoqueViewModel vm)
+	public EstoquePage(EstoqueViewModel vm, AppIdentity identity)
 	{
 		InitializeComponent();
 		BindingContext = _vm = vm;
+		Header.Bind(identity);
 	}
 
 	protected override void OnAppearing()

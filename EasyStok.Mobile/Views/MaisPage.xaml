@@ -6,7 +6,7 @@
              Title="Mais"
              Shell.NavBarIsVisible="False">
     <ScrollView>
-        <VerticalStackLayout Padding="20,16,20,32" Spacing="16">
+        <VerticalStackLayout Padding="20,16,20,32" Spacing="18">
 
             <ctrls:BrandHeader x:Name="Header" />
 
@@ -16,7 +16,7 @@
                 <Label Grid.Column="0" Text="MAIS FERRAMENTAS" Style="{StaticResource LabelEyebrow}" VerticalOptions="Center" />
                 <Border Grid.Column="1"
                         BackgroundColor="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold100}}"
-                        Stroke="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold500}}"
+                        Stroke="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold400}}"
                         StrokeShape="RoundRectangle 999"
                         StrokeThickness="1"
                         Padding="14,4">
@@ -26,43 +26,43 @@
                 </Border>
             </Grid>
 
-            <!-- Grid 3x3 ferramentas -->
+            <!-- Grid 3x3 — fonte menor + lineheight curto + permitir 2 linhas centralizadas -->
             <Grid ColumnDefinitions="*,*,*" RowDefinitions="*,*,*" ColumnSpacing="10" RowSpacing="10">
-                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapHistorico" /></Border.GestureRecognizers>
-                    <Label Text="Histórico" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Histórico" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapEstoque" /></Border.GestureRecognizers>
-                    <Label Text="Estoque" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Estoque" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapClientes" /></Border.GestureRecognizers>
-                    <Label Text="Clientes" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Clientes" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapCompras" /></Border.GestureRecognizers>
-                    <Label Text="Compras" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Compras" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapCaixa" /></Border.GestureRecognizers>
-                    <Label Text="Caixa" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Caixa" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapFinalizados" /></Border.GestureRecognizers>
-                    <Label Text="Finalizados" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Finalizados" FontFamily="Fraunces" FontSize="13" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapSuporte" /></Border.GestureRecognizers>
-                    <Label Text="Suporte" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Suporte" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapSuporte" /></Border.GestureRecognizers>
-                    <Label Text="Ajustes" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Ajustes" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
-                <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}" Padding="14">
+                <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}" Padding="10" HeightRequest="92">
                     <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTapConferencia" /></Border.GestureRecognizers>
-                    <Label Text="Busca" Style="{StaticResource LabelH3}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Busca" FontFamily="Fraunces" FontSize="15" FontAttributes="Bold" LineHeight="1" HorizontalTextAlignment="Center" HorizontalOptions="Center" VerticalOptions="Center" />
                 </Border>
             </Grid>
 

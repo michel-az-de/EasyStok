@@ -5,8 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!--
-    Tipografia v1.2 — Fraunces serif dominante (espelha PWA produção).
-    Inter só pra eyebrow/labels técnicos. Botões em Fraunces Bold.
+    Tipografia v1.2.1 — Fraunces serif dominante + sombras suaves PWA-style.
     -->
 
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
@@ -32,7 +31,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
-    <!-- Hero — Fraunces Bold gigante (Registrar lote, Ajustes hero) -->
     <Style x:Key="LabelDisplay" TargetType="Label">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="36" />
@@ -43,7 +41,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
-    <!-- H1 = Fraunces Bold (titulo de tela) -->
     <Style x:Key="LabelH1" TargetType="Label">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="28" />
@@ -54,7 +51,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
-    <!-- H2 — section title em Fraunces -->
     <Style x:Key="LabelH2" TargetType="Label">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="22" />
@@ -64,7 +60,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
-    <!-- H3 — card title em Fraunces (nome de produto/cliente) -->
     <Style x:Key="LabelH3" TargetType="Label">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="17" />
@@ -74,7 +69,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
-    <!-- Saudação italic (Boa noite, ...) -->
     <Style x:Key="LabelGreeting" TargetType="Label">
         <Setter Property="FontFamily" Value="FrauncesItalic" />
         <Setter Property="FontSize" Value="18" />
@@ -83,7 +77,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource TextSecondaryLight}}" />
     </Style>
 
-    <!-- Subtítulo lead (Inter regular) -->
     <Style x:Key="LabelLead" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="15" />
@@ -92,7 +85,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource TextSecondaryLight}}" />
     </Style>
 
-    <!-- Body small / caption -->
     <Style x:Key="LabelSmall" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="13" />
@@ -101,7 +93,6 @@
                 Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
     </Style>
 
-    <!-- Eyebrow uppercase (CATÁLOGO DE PRODUÇÃO, MASSAS, OPERADOR) -->
     <Style x:Key="LabelEyebrow" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="11" />
@@ -111,7 +102,7 @@
                 Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
     </Style>
 
-    <!-- ===== Aliases legados (compat) ===== -->
+    <!-- Aliases legados -->
     <Style x:Key="LabelHero" TargetType="Label" BasedOn="{StaticResource LabelH1}" />
     <Style x:Key="LabelHeroAccent" TargetType="Label">
         <Setter Property="FontFamily" Value="FrauncesItalic" />
@@ -124,21 +115,38 @@
     <Style x:Key="LabelCaption" TargetType="Label" BasedOn="{StaticResource LabelSmall}" />
     <Style x:Key="LabelSuffix" TargetType="Label" BasedOn="{StaticResource LabelEyebrow}" />
 
-    <!-- ===== Botões ===== -->
+    <!-- ===== Sombras reutilizaveis ===== -->
+    <Shadow x:Key="ShadowCard"
+            Brush="#0A1530"
+            Offset="0,2"
+            Radius="8"
+            Opacity="0.08" />
 
-    <!-- Primary = Gold (CTA padrão do PWA) -->
+    <Shadow x:Key="ShadowCardElev"
+            Brush="#0A1530"
+            Offset="0,6"
+            Radius="18"
+            Opacity="0.12" />
+
+    <Shadow x:Key="ShadowHero"
+            Brush="#5C3A00"
+            Offset="0,8"
+            Radius="22"
+            Opacity="0.18" />
+
+    <!-- ===== Botões ===== -->
     <Style TargetType="Button">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="TextColor"
-                Value="{AppThemeBinding Dark={StaticResource Navy900}, Light={StaticResource Navy900}}" />
+        <Setter Property="TextColor" Value="{StaticResource Navy900}" />
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="20,14" />
-        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="22,14" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
         <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
     <Style x:Key="ButtonNavy" TargetType="Button">
@@ -147,10 +155,11 @@
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Navy700}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="20,14" />
-        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="22,14" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
         <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
     <Style x:Key="ButtonGhost" TargetType="Button">
@@ -159,12 +168,13 @@
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource Transparent}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Transparent}, Light={StaticResource White}}" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="16,10" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="BorderColor"
-                Value="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderStrongLight}}" />
+                Value="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderSoftLight}}" />
         <Setter Property="MinimumHeightRequest" Value="44" />
     </Style>
 
@@ -173,9 +183,10 @@
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Ok600}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,12" />
         <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
     <Style x:Key="ButtonCoral" TargetType="Button">
@@ -183,53 +194,56 @@
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Orange500}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,12" />
         <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
-    <!-- ===== Cards ===== -->
+    <!-- ===== Cards (com sombra agora) ===== -->
 
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}" />
         <Setter Property="Stroke"
                 Value="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 16" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 18" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="Padding" Value="20" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
     <Style x:Key="CardElev" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}" />
         <Setter Property="Stroke"
-                Value="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderStrongLight}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 20" />
+                Value="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderSoftLight}}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 22" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="Padding" Value="24" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCardElev}" />
     </Style>
 
-    <!-- Card hero — fundo gold soft com Fraunces gigante (Registrar lote) -->
     <Style x:Key="CardHero" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold200}}" />
         <Setter Property="Stroke"
                 Value="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold500}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 18" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 22" />
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="Padding" Value="22" />
+        <Setter Property="Padding" Value="24" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowHero}" />
     </Style>
 
-    <!-- Banner amarelo persistente "MODO APRESENTAÇÃO ATIVO" -->
     <Style x:Key="BannerDemo" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource Gold800}, Light={StaticResource Gold100}}" />
         <Setter Property="Stroke"
                 Value="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold400}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 16" />
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
     </Style>
 
     <Style x:Key="FieldBox" TargetType="Border">
@@ -240,6 +254,66 @@
         <Setter Property="StrokeShape" Value="RoundRectangle 12" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="Padding" Value="14,10" />
+    </Style>
+
+    <!-- ===== Filter chip (ativo / inativo) ===== -->
+    <Style x:Key="ChipFiltroAtivo" TargetType="Button">
+        <Setter Property="FontFamily" Value="Fraunces" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource Navy900}" />
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}" />
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="MinimumHeightRequest" Value="36" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="Shadow" Value="{StaticResource ShadowCard}" />
+    </Style>
+
+    <Style x:Key="ChipFiltroInativo" TargetType="Button">
+        <Setter Property="FontFamily" Value="Fraunces" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor"
+                Value="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource Navy700}}" />
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Transparent}, Light={StaticResource White}}" />
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="MinimumHeightRequest" Value="36" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="BorderColor"
+                Value="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderSoftLight}}" />
+    </Style>
+
+    <!-- ===== Status pills (Ok/Atencao/Critico/Vencido) ===== -->
+    <Style x:Key="StatusPillOk" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Ok100}, Light={StaticResource Ok50}}" />
+        <Setter Property="Stroke" Value="{StaticResource Ok600}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="10,3" />
+        <Setter Property="HorizontalOptions" Value="Start" />
+    </Style>
+    <Style x:Key="StatusPillWarn" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Warn100}, Light={StaticResource Warn50}}" />
+        <Setter Property="Stroke" Value="{StaticResource Warn600}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="10,3" />
+        <Setter Property="HorizontalOptions" Value="Start" />
+    </Style>
+    <Style x:Key="StatusPillCrit" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Crit100}, Light={StaticResource Crit50}}" />
+        <Setter Property="Stroke" Value="{StaticResource Crit600}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 999" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="10,3" />
+        <Setter Property="HorizontalOptions" Value="Start" />
     </Style>
 
     <!-- ===== Inputs ===== -->
