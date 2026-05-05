@@ -4,111 +4,130 @@
              xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              x:Class="EasyStok.Mobile.Views.SuportePage"
              x:DataType="vm:SuporteViewModel"
-             Title="Suporte e Ajustes"
+             Title="Ajustes"
              Shell.NavBarIsVisible="False">
     <ScrollView>
-        <VerticalStackLayout Padding="20,24" Spacing="18">
+        <VerticalStackLayout Padding="20,16,20,32" Spacing="16">
 
-            <!-- Header -->
-            <VerticalStackLayout Spacing="2">
-                <Label Text="Suporte e Ajustes" Style="{StaticResource LabelH1}" />
-                <Label Text="conta · aparência · diagnóstico" Style="{StaticResource LabelSmall}" />
-            </VerticalStackLayout>
+            <!-- Header simples (modal-like) -->
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                    <Label Text="Ajustes" Style="{StaticResource LabelDisplay}" />
+                    <Label Text="Identidade, aparência, conta e diagnóstico." Style="{StaticResource LabelLead}" />
+                </VerticalStackLayout>
+                <Button Grid.Column="1"
+                        Text="✕"
+                        BackgroundColor="{StaticResource Transparent}"
+                        TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}"
+                        FontSize="20" Padding="12,8"
+                        BorderWidth="0"
+                        Clicked="OnFecharClicked" />
+            </Grid>
 
-            <!-- Sessão -->
-            <Border Style="{StaticResource Card}">
+            <!-- Card hero white label -->
+            <Border Style="{StaticResource CardHero}">
                 <VerticalStackLayout Spacing="8">
-                    <Label Text="SESSÃO" Style="{StaticResource LabelEyebrow}" />
-                    <Label Text="{Binding SessaoLabel}" Style="{StaticResource LabelH3}" />
-                    <Label Text="{Binding EmpresaLabel}" Style="{StaticResource LabelSmall}" />
+                    <Label Text="WHITE LABEL" Style="{StaticResource LabelEyebrow}" TextColor="{AppThemeBinding Dark={StaticResource Gold200}, Light={StaticResource Gold700}}" />
+                    <Label Text="Deixe a operação com a cara da loja"
+                           FontFamily="Fraunces" FontSize="26" FontAttributes="Bold"
+                           CharacterSpacing="-0.4" LineHeight="1.1"
+                           TextColor="{AppThemeBinding Dark={StaticResource Gold100}, Light={StaticResource Navy900}}" />
+                    <Label Text="O nome da empresa, o operador e o código da loja aparecem no app inteiro. Ajustes bem organizados ajudam a parecer produto, não improviso."
+                           Style="{StaticResource LabelLead}"
+                           TextColor="{AppThemeBinding Dark={StaticResource Gold100}, Light={StaticResource Navy900}}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Identidade (Loja) -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="🏬  LOJA" Style="{StaticResource LabelEyebrow}" />
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Nome da empresa" Style="{StaticResource LabelH3}" />
+                        <Label Text="Aparece no header em todas as telas." Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry Text="{Binding EmpresaNome}" Placeholder="Minha empresa" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Código da loja" Style="{StaticResource LabelH3}" />
+                        <Label Text="Identifica a unidade. Ex.: T1, MTZ, 24H." Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry Text="{Binding LojaCodigo}" Placeholder="T1" MaxLength="8" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Operador" Style="{StaticResource LabelH3}" />
+                        <Label Text="Nome usado em pedidos, histórico e rastreabilidade." Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry Text="{Binding OperadorNome}" Placeholder="Seu nome" MaxLength="40" />
+                        </Border>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 
             <!-- Aparência -->
             <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="8">
-                    <Label Text="APARÊNCIA" Style="{StaticResource LabelEyebrow}" />
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="✨  APARÊNCIA" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="Tema visual" Style="{StaticResource LabelH3}" />
+                    <Label Text="Aplicado imediatamente. Persiste entre aberturas." Style="{StaticResource LabelSmall}" />
                     <Grid ColumnDefinitions="*,Auto">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Tema escuro" Style="{StaticResource LabelH3}" />
-                            <Label Text="Reduz cansaço visual em ambientes com pouca luz" Style="{StaticResource LabelSmall}" />
-                        </VerticalStackLayout>
+                        <Label Grid.Column="0" Text="Modo escuro" Style="{StaticResource LabelLead}" VerticalOptions="Center" />
                         <Switch Grid.Column="1"
                                 IsToggled="{Binding IsDarkTheme}"
-                                OnColor="{StaticResource Orange600}"
+                                OnColor="{StaticResource Gold500}"
                                 ThumbColor="{StaticResource White}"
                                 VerticalOptions="Center" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Backend -->
+            <!-- Backend (Manut) -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="BACKEND" Style="{StaticResource LabelEyebrow}" />
-                    <Label Text="URL da API EasyStok que o app consome." Style="{StaticResource LabelSmall}" />
+                    <Label Text="🛠  MANUTENÇÃO" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="URL do backend" Style="{StaticResource LabelH3}" />
                     <Border Style="{StaticResource FieldBox}">
                         <Entry Text="{Binding BaseUrl}" Keyboard="Url" />
                     </Border>
-                    <Button Text="Salvar URL"
-                            Style="{StaticResource ButtonNavy}"
-                            Command="{Binding SalvarBaseUrlCommand}" />
+                    <Button Text="Salvar URL" Style="{StaticResource ButtonNavy}" Command="{Binding SalvarBaseUrlCommand}" />
                     <Label Text="{Binding StatusBackend}"
                            Style="{StaticResource LabelSmall}"
                            IsVisible="{Binding StatusBackend, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+
+                    <BoxView HeightRequest="1"
+                             Color="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                             Margin="0,8" />
+
+                    <Label Text="Diagnóstico" Style="{StaticResource LabelH3}" />
+                    <Label Text="{Binding AppVersion, StringFormat='Versão {0}'}" Style="{StaticResource LabelSmall}" />
+                    <Label Text="{Binding DeviceLabel}" Style="{StaticResource LabelSmall}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,4,0,0">
+                        <Button Grid.Column="0" Text="Ver crash log" Style="{StaticResource ButtonGhost}" Command="{Binding VerCrashLogCommand}" />
+                        <Button Grid.Column="1" Text="Limpar logs" Style="{StaticResource ButtonGhost}" Command="{Binding LimparCrashLogCommand}" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Diagnóstico -->
+            <!-- Sessão / Sair -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="DIAGNÓSTICO" Style="{StaticResource LabelEyebrow}" />
-                    <Grid ColumnDefinitions="*,Auto">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Versão do app" Style="{StaticResource LabelSmall}" />
-                            <Label Text="{Binding AppVersion}" Style="{StaticResource LabelH3}" />
-                        </VerticalStackLayout>
-                    </Grid>
-                    <Grid ColumnDefinitions="*,Auto">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Dispositivo" Style="{StaticResource LabelSmall}" />
-                            <Label Text="{Binding DeviceLabel}" Style="{StaticResource LabelH3}" />
-                        </VerticalStackLayout>
-                    </Grid>
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <Button Grid.Column="0"
-                                Text="Ver crash log"
-                                Style="{StaticResource ButtonGhost}"
-                                Command="{Binding VerCrashLogCommand}" />
-                        <Button Grid.Column="1"
-                                Text="Limpar logs"
-                                Style="{StaticResource ButtonGhost}"
-                                Command="{Binding LimparCrashLogCommand}" />
-                    </Grid>
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- Sobre -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="8">
-                    <Label Text="SOBRE" Style="{StaticResource LabelEyebrow}" />
-                    <Button Text="Abrir EasyStok Web"
-                            Style="{StaticResource ButtonGhost}"
-                            Command="{Binding AbrirWebCommand}" />
-                    <Label Text="© EasyStok · controle operacional para pequenos negócios" Style="{StaticResource LabelSmall}" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- Sair -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="ENCERRAR SESSÃO" Style="{StaticResource LabelEyebrow}" />
-                    <Label Text="Sai da sessão atual e volta para a tela de login. Em modo demo, os dados locais permanecem para a próxima entrada." Style="{StaticResource LabelSmall}" />
-                    <Button Text="Sair"
+                    <Label Text="SESSÃO" Style="{StaticResource LabelEyebrow}" />
+                    <Label Text="{Binding SessaoLabel}" Style="{StaticResource LabelH3}" />
+                    <Label Text="{Binding EmpresaLabel}" Style="{StaticResource LabelSmall}" />
+                    <Button Text="Sair / Trocar conta"
                             BackgroundColor="{StaticResource Crit600}"
-                            Command="{Binding SairCommand}" />
+                            TextColor="{StaticResource White}"
+                            Command="{Binding SairCommand}"
+                            Margin="0,6,0,0" />
                 </VerticalStackLayout>
             </Border>
+
+            <Button Text="Abrir EasyStok Web" Style="{StaticResource ButtonGhost}" Command="{Binding AbrirWebCommand}" />
 
         </VerticalStackLayout>
     </ScrollView>

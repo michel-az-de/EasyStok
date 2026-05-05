@@ -18,4 +18,7 @@ public partial class SuportePage : ContentPage
 		base.OnAppearing();
 		UiSafe.Fire(() => _vm.InitializeAsync());
 	}
+
+	private void OnFecharClicked(object? sender, EventArgs e) =>
+		UiSafe.Fire(() => Shell.Current.GoToAsync(".."));
 }

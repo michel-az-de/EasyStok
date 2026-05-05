@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Storage;
+﻿using EasyStok.Mobile.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStok.Mobile.Services;
@@ -9,7 +9,7 @@ namespace EasyStok.Mobile.Services;
 ///     /api/estoque para a empresa ativa.
 ///   - Reage a <see cref="Connectivity.ConnectivityChanged"/> — quando
 ///     a rede volta, dispara flush+pull imediato sem esperar o tick.
-///   - Invalida o PermissionService apos cada refresh para que claims
+///   - Invalida o PermissaoService apos cada refresh para que claims
 ///     atualizadas (apos refresh do JWT) sejam relidas.
 ///
 /// Espelha o ciclo do sync.js do PWA (flush + pull a cada 30s + flush
@@ -22,7 +22,7 @@ public sealed class SyncEngine : IDisposable
 	private readonly IOutboxFlushService _flush;
 	private readonly IEstoqueService _estoque;
 	private readonly ISecureStore _store;
-	private readonly IPermissionService _permissions;
+	private readonly IPermissaoService _permissions;
 	private readonly ILogger<SyncEngine> _logger;
 
 	private CancellationTokenSource? _cts;
@@ -32,7 +32,7 @@ public sealed class SyncEngine : IDisposable
 		IOutboxFlushService flush,
 		IEstoqueService estoque,
 		ISecureStore store,
-		IPermissionService permissions,
+		IPermissaoService permissions,
 		ILogger<SyncEngine> logger)
 	{
 		_flush = flush;
@@ -83,7 +83,7 @@ public sealed class SyncEngine : IDisposable
 		if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
 		if (!await _store.IsAccessTokenValidAsync())
 		{
-			// Sem sessao valida: AuthHandler tentaria refresh em request real,
+			// Sem sessao valida: AutenticacaoHandler tentaria refresh em request real,
 			// mas nao queremos disparar flush/pull as cegas.
 			return;
 		}
@@ -92,7 +92,7 @@ public sealed class SyncEngine : IDisposable
 
 		var empresaId = await _store.GetEmpresaIdAsync();
 		if (empresaId is not null)
-			await _estoque.RefreshAsync(empresaId.Value, ct);
+			await _estoque.RenovarAsync(empresaId.Value, ct);
 
 		_permissions.Invalidate();
 	}

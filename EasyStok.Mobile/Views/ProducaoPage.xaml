@@ -3,123 +3,121 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:EasyStok.Mobile.ViewModels"
              xmlns:storage="clr-namespace:EasyStok.Mobile.Storage"
+             xmlns:ctrls="clr-namespace:EasyStok.Mobile.Controls"
              x:Class="EasyStok.Mobile.Views.ProducaoPage"
              x:DataType="vm:ProducaoViewModel"
              Title="Produção"
              Shell.NavBarIsVisible="False">
-    <Grid Padding="20,16" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,16,20,32" Spacing="14">
 
-        <!-- Header -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-            <VerticalStackLayout Grid.Column="0" Spacing="2">
-                <Label Text="Produção" Style="{StaticResource LabelH1}" />
-                <Label Text="estoque ativo da loja" Style="{StaticResource LabelSmall}" />
-            </VerticalStackLayout>
-            <Border Grid.Column="1"
-                    BackgroundColor="{StaticResource Orange600}"
-                    StrokeShape="RoundRectangle 10"
-                    StrokeThickness="0"
-                    Padding="10,6"
-                    VerticalOptions="Center"
-                    IsVisible="{Binding PendingMutations, Converter={StaticResource IntGreaterThanZeroConverter}}">
-                <Label Text="{Binding PendingMutations, StringFormat='{0} pendentes'}"
-                       FontFamily="Inter"
-                       FontSize="11"
-                       FontAttributes="Bold"
-                       TextColor="{StaticResource White}" />
+            <ctrls:BrandHeader x:Name="Header" />
+
+            <ctrls:DemoBanner />
+
+            <!-- Card hero "Registrar lote" -->
+            <Border Style="{StaticResource CardHero}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Registrar lote"
+                           FontFamily="Fraunces"
+                           FontSize="32"
+                           FontAttributes="Bold"
+                           CharacterSpacing="-0.5"
+                           TextColor="{AppThemeBinding Dark={StaticResource Gold100}, Light={StaticResource Navy900}}" />
+                    <Button Text="Cadastrar produto"
+                            HorizontalOptions="Start"
+                            BackgroundColor="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}"
+                            TextColor="{StaticResource Navy900}" />
+                </VerticalStackLayout>
             </Border>
-        </Grid>
 
-        <!-- Status + Atualizar -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <Label Grid.Column="0"
-                   Text="{Binding StatusLine}"
-                   Style="{StaticResource LabelSmall}"
-                   VerticalOptions="Center" />
-            <Button Grid.Column="1"
-                    Text="Atualizar"
-                    Style="{StaticResource ButtonGhost}"
-                    Command="{Binding RefreshCommand}"
-                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
-        </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="CATÁLOGO DE PRODUÇÃO" Style="{StaticResource LabelEyebrow}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding StatusLine}" Style="{StaticResource LabelSmall}" VerticalOptions="Center" />
+            </Grid>
 
-        <VerticalStackLayout Grid.Row="2" Spacing="6">
+            <!-- Tabs Catálogo / Lotes (placeholder visual; Lotes vai vir em v1.3) -->
+            <Border BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}"
+                    Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                    StrokeShape="RoundRectangle 14"
+                    StrokeThickness="1"
+                    Padding="4">
+                <Grid ColumnDefinitions="*,*">
+                    <Border Grid.Column="0"
+                            BackgroundColor="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold500}}"
+                            StrokeShape="RoundRectangle 12"
+                            StrokeThickness="0"
+                            Padding="14,10">
+                        <Label Text="Catálogo"
+                               FontFamily="Fraunces" FontSize="15" FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource Navy900}" />
+                    </Border>
+                    <Label Grid.Column="1" Text="Lotes (em breve)"
+                           FontFamily="Fraunces" FontSize="15" FontAttributes="Bold"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
+                </Grid>
+            </Border>
+
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
-            <Label Text="{Binding ErrorMessage}"
-                   TextColor="{StaticResource Crit600}"
-                   FontFamily="Inter"
-                   FontSize="13"
-                   IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotNullOrEmptyConverter}}" />
+
             <Label Text="Nenhum item de estoque por aqui ainda."
                    Style="{StaticResource LabelSmall}"
                    IsVisible="{Binding SemDados}"
                    HorizontalOptions="Center"
                    Margin="0,12,0,0" />
+
+            <!-- Lista de produtos com stepper inline (não modal) -->
+            <CollectionView x:Name="ProducaoList"
+                            ItemsSource="{Binding Itens}"
+                            SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="storage:CachedItemEstoque">
+                        <Border Style="{StaticResource Card}" Margin="0,4">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                <Label Grid.Column="0" Text="{Binding Emoji}" FontSize="28" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="{Binding ProdutoNome}" Style="{StaticResource LabelH3}" LineBreakMode="TailTruncation" MaxLines="1" />
+                                    <Label Text="{Binding Sku}" Style="{StaticResource LabelEyebrow}" />
+                                    <Label Text="{Binding Status, StringFormat='{0}'}" Style="{StaticResource LabelEyebrow}" />
+
+                                </VerticalStackLayout>
+                                <!-- Stepper inline -->
+                                <Border Grid.Column="2"
+                                        BackgroundColor="{AppThemeBinding Dark={StaticResource BgElevatedDark}, Light={StaticResource BgElevatedLight}}"
+                                        Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                                        StrokeShape="RoundRectangle 12"
+                                        StrokeThickness="1"
+                                        Padding="2"
+                                        VerticalOptions="Center">
+                                    <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="0">
+                                        <Button Grid.Column="0" Text="−"
+                                                BackgroundColor="{StaticResource Transparent}"
+                                                TextColor="{StaticResource Crit600}"
+                                                FontSize="20" FontAttributes="Bold"
+                                                Padding="10,4" MinimumHeightRequest="36" CornerRadius="8"
+                                                Clicked="OnDecrementClicked"
+                                                CommandParameter="{Binding .}" />
+                                        <Label Grid.Column="1" Text="{Binding Qty}"
+                                               FontFamily="Fraunces" FontSize="20" FontAttributes="Bold"
+                                               VerticalOptions="Center" Margin="6,0"
+                                               TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
+                                        <Button Grid.Column="2" Text="+"
+                                                BackgroundColor="{StaticResource Transparent}"
+                                                TextColor="{StaticResource Gold600}"
+                                                FontSize="20" FontAttributes="Bold"
+                                                Padding="10,4" MinimumHeightRequest="36" CornerRadius="8"
+                                                Clicked="OnIncrementClicked"
+                                                CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
         </VerticalStackLayout>
-
-        <!-- Grid 2 colunas -->
-        <CollectionView Grid.Row="3"
-                        x:Name="ProducaoList"
-                        ItemsSource="{Binding Itens}"
-                        SelectionMode="None">
-            <CollectionView.ItemsLayout>
-                <GridItemsLayout Orientation="Vertical"
-                                 Span="2"
-                                 HorizontalItemSpacing="8"
-                                 VerticalItemSpacing="8" />
-            </CollectionView.ItemsLayout>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="storage:CachedItemEstoque">
-                    <Border Style="{StaticResource Card}">
-                        <VerticalStackLayout Spacing="6">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <Label Grid.Column="0"
-                                       Text="{Binding ProdutoNome}"
-                                       Style="{StaticResource LabelH3}"
-                                       LineBreakMode="TailTruncation"
-                                       MaxLines="2" />
-                                <Label Grid.Column="1"
-                                       Text="{Binding Emoji}"
-                                       FontSize="22"
-                                       VerticalOptions="Start" />
-                            </Grid>
-                            <Label Text="{Binding Sku, StringFormat='SKU {0}'}"
-                                   Style="{StaticResource LabelEyebrow}" />
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                                <Label Grid.Column="0"
-                                       Text="{Binding Qty, StringFormat='{0} un'}"
-                                       FontFamily="Inter"
-                                       FontSize="22"
-                                       FontAttributes="Bold"
-                                       TextColor="{StaticResource Orange500}" />
-                                <Label Grid.Column="1"
-                                       Text="{Binding Status}"
-                                       Style="{StaticResource LabelEyebrow}"
-                                       VerticalOptions="End" />
-                            </Grid>
-
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,8,0,0">
-                                <Button Grid.Column="0"
-                                        Text="−"
-                                        FontSize="20"
-                                        FontAttributes="Bold"
-                                        Style="{StaticResource ButtonGhost}"
-                                        HeightRequest="40"
-                                        Clicked="OnDecrementClicked"
-                                        CommandParameter="{Binding .}" />
-                                <Button Grid.Column="1"
-                                        Text="+"
-                                        FontSize="20"
-                                        FontAttributes="Bold"
-                                        HeightRequest="40"
-                                        Clicked="OnIncrementClicked"
-                                        CommandParameter="{Binding .}" />
-                            </Grid>
-                        </VerticalStackLayout>
-                    </Border>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
-
-    </Grid>
+    </ScrollView>
 </ContentPage>

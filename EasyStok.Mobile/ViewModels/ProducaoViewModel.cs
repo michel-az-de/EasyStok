@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Services;
@@ -49,7 +49,7 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 		await LoadFromCacheAsync(empresaId.Value);
 		await UpdatePendingAsync();
 
-		var refresh = await _estoque.RefreshAsync(empresaId.Value);
+		var refresh = await _estoque.RenovarAsync(empresaId.Value);
 		StatusLine = refresh.Success
 			? $"{refresh.Imported} itens atualizados"
 			: refresh.Error;
@@ -58,12 +58,12 @@ public sealed partial class ProducaoViewModel : BaseViewModel
 	});
 
 	[RelayCommand]
-	private Task RefreshAsync() => RunAsync(async () =>
+	private Task RenovarAsync() => RunAsync(async () =>
 	{
 		var empresaId = await _store.GetEmpresaIdAsync();
 		if (empresaId is null) return;
 
-		var refresh = await _estoque.RefreshAsync(empresaId.Value);
+		var refresh = await _estoque.RenovarAsync(empresaId.Value);
 		StatusLine = refresh.Success
 			? $"{refresh.Imported} itens atualizados"
 			: refresh.Error;

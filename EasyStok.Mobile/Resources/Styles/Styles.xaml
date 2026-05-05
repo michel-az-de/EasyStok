@@ -5,9 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!--
-    Tipografia oficial EasyStok:
-      Inter (variable)        -> body / labels / botoes
-      Fraunces (variable)     -> display / headings serif
+    Tipografia v1.2 — Fraunces serif dominante (espelha PWA produção).
+    Inter só pra eyebrow/labels técnicos. Botões em Fraunces Bold.
     -->
 
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
@@ -28,55 +27,72 @@
     <Style TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="LineHeight" Value="1.5" />
+        <Setter Property="LineHeight" Value="1.45" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
+    <!-- Hero — Fraunces Bold gigante (Registrar lote, Ajustes hero) -->
     <Style x:Key="LabelDisplay" TargetType="Label">
         <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="36" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="LineHeight" Value="1.05" />
         <Setter Property="CharacterSpacing" Value="-0.5" />
+        <Setter Property="TextColor"
+                Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
+    <!-- H1 = Fraunces Bold (titulo de tela) -->
     <Style x:Key="LabelH1" TargetType="Label">
-        <Setter Property="FontFamily" Value="Inter" />
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontFamily" Value="Fraunces" />
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.18" />
+        <Setter Property="LineHeight" Value="1.12" />
         <Setter Property="CharacterSpacing" Value="-0.4" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
+    <!-- H2 — section title em Fraunces -->
     <Style x:Key="LabelH2" TargetType="Label">
-        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="22" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.2" />
+        <Setter Property="LineHeight" Value="1.18" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
+    <!-- H3 — card title em Fraunces (nome de produto/cliente) -->
     <Style x:Key="LabelH3" TargetType="Label">
-        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.3" />
+        <Setter Property="LineHeight" Value="1.25" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
     </Style>
 
+    <!-- Saudação italic (Boa noite, ...) -->
+    <Style x:Key="LabelGreeting" TargetType="Label">
+        <Setter Property="FontFamily" Value="FrauncesItalic" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontAttributes" Value="Italic" />
+        <Setter Property="TextColor"
+                Value="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource TextSecondaryLight}}" />
+    </Style>
+
+    <!-- Subtítulo lead (Inter regular) -->
     <Style x:Key="LabelLead" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontSize" Value="15" />
         <Setter Property="LineHeight" Value="1.5" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource TextSecondaryLight}}" />
     </Style>
 
+    <!-- Body small / caption -->
     <Style x:Key="LabelSmall" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="13" />
@@ -85,49 +101,66 @@
                 Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
     </Style>
 
+    <!-- Eyebrow uppercase (CATÁLOGO DE PRODUÇÃO, MASSAS, OPERADOR) -->
     <Style x:Key="LabelEyebrow" TargetType="Label">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="CharacterSpacing" Value="2" />
+        <Setter Property="CharacterSpacing" Value="2.5" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
     </Style>
 
-    <!-- Botoes -->
+    <!-- ===== Aliases legados (compat) ===== -->
+    <Style x:Key="LabelHero" TargetType="Label" BasedOn="{StaticResource LabelH1}" />
+    <Style x:Key="LabelHeroAccent" TargetType="Label">
+        <Setter Property="FontFamily" Value="FrauncesItalic" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontAttributes" Value="Italic" />
+        <Setter Property="TextColor" Value="{StaticResource Gold500}" />
+    </Style>
+    <Style x:Key="LabelTitle" TargetType="Label" BasedOn="{StaticResource LabelH3}" />
+    <Style x:Key="LabelSubtitle" TargetType="Label" BasedOn="{StaticResource LabelLead}" />
+    <Style x:Key="LabelCaption" TargetType="Label" BasedOn="{StaticResource LabelSmall}" />
+    <Style x:Key="LabelSuffix" TargetType="Label" BasedOn="{StaticResource LabelEyebrow}" />
 
+    <!-- ===== Botões ===== -->
+
+    <!-- Primary = Gold (CTA padrão do PWA) -->
     <Style TargetType="Button">
-        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="TextColor" Value="{StaticResource White}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource Orange600}" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="18,14" />
+        <Setter Property="TextColor"
+                Value="{AppThemeBinding Dark={StaticResource Navy900}, Light={StaticResource Navy900}}" />
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,14" />
         <Setter Property="MinimumHeightRequest" Value="48" />
         <Setter Property="BorderWidth" Value="0" />
     </Style>
 
     <Style x:Key="ButtonNavy" TargetType="Button">
-        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Navy700}" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="18,14" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,14" />
         <Setter Property="MinimumHeightRequest" Value="48" />
         <Setter Property="BorderWidth" Value="0" />
     </Style>
 
     <Style x:Key="ButtonGhost" TargetType="Button">
-        <Setter Property="FontFamily" Value="Inter" />
+        <Setter Property="FontFamily" Value="Fraunces" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="TextColor"
                 Value="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource Navy700}}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Transparent}" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="14,10" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="BorderColor"
@@ -135,14 +168,34 @@
         <Setter Property="MinimumHeightRequest" Value="44" />
     </Style>
 
-    <!-- Cards -->
+    <Style x:Key="ButtonOk" TargetType="Button">
+        <Setter Property="FontFamily" Value="Fraunces" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource White}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Ok600}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="BorderWidth" Value="0" />
+    </Style>
+
+    <Style x:Key="ButtonCoral" TargetType="Button">
+        <Setter Property="FontFamily" Value="Fraunces" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource White}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Orange500}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="BorderWidth" Value="0" />
+    </Style>
+
+    <!-- ===== Cards ===== -->
 
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}" />
         <Setter Property="Stroke"
                 Value="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 16" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="Padding" Value="20" />
     </Style>
@@ -157,16 +210,39 @@
         <Setter Property="Padding" Value="24" />
     </Style>
 
+    <!-- Card hero — fundo gold soft com Fraunces gigante (Registrar lote) -->
+    <Style x:Key="CardHero" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold200}}" />
+        <Setter Property="Stroke"
+                Value="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold500}}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 18" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="22" />
+    </Style>
+
+    <!-- Banner amarelo persistente "MODO APRESENTAÇÃO ATIVO" -->
+    <Style x:Key="BannerDemo" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Dark={StaticResource Gold800}, Light={StaticResource Gold100}}" />
+        <Setter Property="Stroke"
+                Value="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold400}}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="14,10" />
+    </Style>
+
     <Style x:Key="FieldBox" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}" />
         <Setter Property="Stroke"
                 Value="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Padding" Value="14,10" />
     </Style>
 
+    <!-- ===== Inputs ===== -->
     <Style TargetType="Entry">
         <Setter Property="FontFamily" Value="Inter" />
         <Setter Property="FontSize" Value="15" />
@@ -179,7 +255,8 @@
     </Style>
 
     <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{StaticResource Orange600}" />
+        <Setter Property="Color"
+                Value="{AppThemeBinding Dark={StaticResource Gold500}, Light={StaticResource Gold600}}" />
     </Style>
 
 </ResourceDictionary>

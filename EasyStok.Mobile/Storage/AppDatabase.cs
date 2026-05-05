@@ -1,4 +1,4 @@
-using SQLite;
+﻿using SQLite;
 
 namespace EasyStok.Mobile.Storage;
 
@@ -46,7 +46,7 @@ public sealed class AppDatabase
 }
 
 // =============================================================================
-// Cache local — espelha o ItemEstoqueDto da API. Reescrito a cada Pull.
+// Cache local — espelha o ItemEstoqueRemoto da API. Reescrito a cada Pull.
 // =============================================================================
 public sealed class CachedItemEstoque
 {

@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Models;
+﻿using EasyStok.Mobile.Models;
 
 namespace EasyStok.Mobile.Storage;
 
@@ -24,7 +24,7 @@ public sealed class EstoqueCache : IEstoqueCache
 			.ToListAsync();
 	}
 
-	public async Task UpsertManyAsync(IEnumerable<ItemEstoqueDto> items, Guid empresaId)
+	public async Task UpsertManyAsync(IEnumerable<ItemEstoqueRemoto> items, Guid empresaId)
 	{
 		var conn = await _db.GetConnectionAsync();
 		var now = DateTime.UtcNow;
@@ -67,6 +67,6 @@ public sealed class EstoqueCache : IEstoqueCache
 public interface IEstoqueCache
 {
 	Task<IReadOnlyList<CachedItemEstoque>> GetAllAsync(Guid empresaId);
-	Task UpsertManyAsync(IEnumerable<ItemEstoqueDto> items, Guid empresaId);
+	Task UpsertManyAsync(IEnumerable<ItemEstoqueRemoto> items, Guid empresaId);
 	Task<int> CountAsync(Guid empresaId);
 }

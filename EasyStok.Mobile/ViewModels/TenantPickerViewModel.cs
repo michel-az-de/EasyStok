@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
 using EasyStok.Mobile.Services;
 
 namespace EasyStok.Mobile.ViewModels;
@@ -10,21 +10,21 @@ namespace EasyStok.Mobile.ViewModels;
 /// raro hoje. Esta tela orienta o user a contatar o suporte para reduzir
 /// o vinculo a uma empresa unica, ate o backend ganhar /api/empresas/minhas.
 /// Quando o endpoint chegar, este VM lista as empresas e re-loga via
-/// AuthService.LoginAsync com EmpresaId selecionada.
+/// AutenticacaoService.EntrarAsync com EmpresaId selecionada.
 /// </summary>
 public sealed partial class TenantPickerViewModel : BaseViewModel
 {
-	private readonly IAuthService _auth;
+	private readonly IAutenticacaoService _auth;
 
-	public TenantPickerViewModel(IAuthService auth)
+	public TenantPickerViewModel(IAutenticacaoService auth)
 	{
 		_auth = auth;
 	}
 
 	[RelayCommand]
-	private Task LogoutAsync() => RunAsync(async () =>
+	private Task SairAsync() => RunAsync(async () =>
 	{
-		await _auth.LogoutAsync();
+		await _auth.SairAsync();
 		await Shell.Current.GoToAsync("//login");
 	});
 }

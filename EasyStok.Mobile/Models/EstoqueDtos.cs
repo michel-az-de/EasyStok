@@ -1,15 +1,15 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace EasyStok.Mobile.Models;
 
 /// <summary>
 /// Resposta paginada padrao da API: <c>{ data: [...], meta: { total, pages, page, limit } }</c>.
 /// </summary>
-public sealed record PagedEnvelope<T>(
+public sealed record EnvelopePaginado<T>(
 	[property: JsonPropertyName("data")] List<T> Data,
-	[property: JsonPropertyName("meta")] PagedMetaDto Meta);
+	[property: JsonPropertyName("meta")] MetaPaginacao Meta);
 
-public sealed record PagedMetaDto(
+public sealed record MetaPaginacao(
 	[property: JsonPropertyName("total")] int Total,
 	[property: JsonPropertyName("pages")] int Pages,
 	[property: JsonPropertyName("page")] int Page,
@@ -20,7 +20,7 @@ public sealed record PagedMetaDto(
 /// Strings em vez de Guid em <c>id</c>/<c>produtoId</c>/<c>varId</c> para
 /// bater com a serializacao do backend (i.Id.ToString()).
 /// </summary>
-public sealed record ItemEstoqueDto(
+public sealed record ItemEstoqueRemoto(
 	[property: JsonPropertyName("id")] string Id,
 	[property: JsonPropertyName("produtoId")] string ProdutoId,
 	[property: JsonPropertyName("varId")] string? VarId,
@@ -35,10 +35,10 @@ public sealed record ItemEstoqueDto(
 	[property: JsonPropertyName("status")] string Status,
 	[property: JsonPropertyName("custoUnitario")] decimal CustoUnitario,
 	[property: JsonPropertyName("precoVendaSugerido")] decimal? PrecoVendaSugerido,
-	[property: JsonPropertyName("produto")] ItemEstoqueProdutoLeveDto? Produto,
-	[property: JsonPropertyName("variacao")] ItemEstoqueVariacaoLeveDto? Variacao);
+	[property: JsonPropertyName("produto")] ProdutoLeve? Produto,
+	[property: JsonPropertyName("variacao")] VariacaoLeve? Variacao);
 
-public sealed record ItemEstoqueProdutoLeveDto(
+public sealed record ProdutoLeve(
 	[property: JsonPropertyName("id")] string Id,
 	[property: JsonPropertyName("sku")] string Sku,
 	[property: JsonPropertyName("nome")] string Nome,
@@ -46,7 +46,7 @@ public sealed record ItemEstoqueProdutoLeveDto(
 	[property: JsonPropertyName("categoria")] string? Categoria,
 	[property: JsonPropertyName("status")] string Status);
 
-public sealed record ItemEstoqueVariacaoLeveDto(
+public sealed record VariacaoLeve(
 	[property: JsonPropertyName("id")] string Id,
 	[property: JsonPropertyName("produtoId")] string ProdutoId,
 	[property: JsonPropertyName("nome")] string Nome);

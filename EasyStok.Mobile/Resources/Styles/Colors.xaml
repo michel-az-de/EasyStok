@@ -5,11 +5,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!--
-    Paleta oficial EasyStok (espelha EasyStock.Web/wwwroot/css/tokens.css).
-    Identidade: navy profundo (#06143A/#0E2A6E) + orange vibrante (#E85814).
+    Paleta v1.2 — espelha o PWA EasyStok em produção.
+    Identidade: navy + GOLD (não orange) + cream/papel no light + Fraunces.
+    Status badges multicor: green/yellow/red/blue.
     -->
 
-    <!-- Brand: Navy -->
+    <!-- Brand Navy (mantém) -->
     <Color x:Key="Navy900">#06143A</Color>
     <Color x:Key="Navy800">#0A1F52</Color>
     <Color x:Key="Navy700">#0E2A6E</Color>
@@ -19,28 +20,43 @@
     <Color x:Key="Navy100">#DDE4F2</Color>
     <Color x:Key="Navy50">#EDF1F9</Color>
 
-    <!-- Brand: Orange -->
-    <Color x:Key="Orange900">#7A2A05</Color>
+    <!-- Gold (accent primário no light/dark) — substitui Orange como CTA padrão -->
+    <Color x:Key="Gold900">#5C3A00</Color>
+    <Color x:Key="Gold800">#7A5500</Color>
+    <Color x:Key="Gold700">#B57A00</Color>
+    <Color x:Key="Gold600">#D49118</Color>
+    <Color x:Key="Gold500">#F0B84A</Color>
+    <Color x:Key="Gold400">#F5C875</Color>
+    <Color x:Key="Gold200">#FBE2A8</Color>
+    <Color x:Key="Gold100">#FCEEC8</Color>
+    <Color x:Key="Gold50">#FDF7E6</Color>
+
+    <!-- Orange (mantida pra coral "Iniciar preparo" e alertas quentes) -->
     <Color x:Key="Orange700">#BF4307</Color>
     <Color x:Key="Orange600">#E85814</Color>
     <Color x:Key="Orange500">#F26B25</Color>
     <Color x:Key="Orange400">#F8884A</Color>
-    <Color x:Key="Orange200">#FAC8AB</Color>
     <Color x:Key="Orange100">#FCDCC8</Color>
     <Color x:Key="Orange50">#FEEFE3</Color>
 
-    <!-- Status -->
+    <!-- Status (mais ricas pra badges) -->
     <Color x:Key="Ok700">#0E6B3D</Color>
     <Color x:Key="Ok600">#18874E</Color>
     <Color x:Key="Ok100">#D6EFDF</Color>
+    <Color x:Key="Ok50">#ECF7F0</Color>
     <Color x:Key="Warn700">#8A5A00</Color>
     <Color x:Key="Warn600">#B57A00</Color>
     <Color x:Key="Warn100">#FBEBC4</Color>
+    <Color x:Key="Warn50">#FCF5E0</Color>
     <Color x:Key="Crit700">#8E2A1E</Color>
     <Color x:Key="Crit600">#C03B2A</Color>
     <Color x:Key="Crit100">#F8D8D2</Color>
+    <Color x:Key="Crit50">#FBEAE6</Color>
+    <Color x:Key="Info700">#0E2A6E</Color>
+    <Color x:Key="Info600">#1E48A8</Color>
+    <Color x:Key="Info100">#DDE4F2</Color>
 
-    <!-- Surfaces dark (default) -->
+    <!-- Surfaces dark theme — navy escuro de fundo -->
     <Color x:Key="BgAppDark">#06143A</Color>
     <Color x:Key="BgSurfaceDark">#0A1F52</Color>
     <Color x:Key="BgElevatedDark">#122042</Color>
@@ -50,15 +66,24 @@
     <Color x:Key="BorderSoftDark">#1FFFFFFF</Color>
     <Color x:Key="BorderStrongDark">#2EFFFFFF</Color>
 
-    <!-- Surfaces light -->
-    <Color x:Key="BgAppLight">#F8FAFD</Color>
+    <!-- Surfaces light theme — cream/papel (espelha PWA light) -->
+    <Color x:Key="BgAppLight">#F5F0E8</Color>
     <Color x:Key="BgSurfaceLight">#FFFFFF</Color>
     <Color x:Key="BgElevatedLight">#FFFFFF</Color>
     <Color x:Key="TextPrimaryLight">#0A1530</Color>
     <Color x:Key="TextSecondaryLight">#2A3556</Color>
     <Color x:Key="TextMutedLight">#707892</Color>
-    <Color x:Key="BorderSoftLight">#DEE2EB</Color>
-    <Color x:Key="BorderStrongLight">#C2C8D6</Color>
+    <Color x:Key="BorderSoftLight">#E8DFC8</Color>
+    <Color x:Key="BorderStrongLight">#D4C7A8</Color>
+
+    <!-- Aliases legados (compat com telas que ainda usam nomes antigos —
+         LojaPickerPage etc; serão substituídos ao migrar cada page). -->
+    <Color x:Key="AccentDark">#F0B84A</Color>
+    <Color x:Key="AccentLight">#B57A00</Color>
+    <Color x:Key="BgDark">#06143A</Color>
+    <Color x:Key="BgLight">#F5F0E8</Color>
+    <Color x:Key="BgElevDark">#0A1F52</Color>
+    <Color x:Key="BgElevLight">#FFFFFF</Color>
 
     <!-- Neutros -->
     <Color x:Key="Black">#000000</Color>

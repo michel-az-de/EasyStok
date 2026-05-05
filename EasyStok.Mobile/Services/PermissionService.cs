@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Models;
+﻿using EasyStok.Mobile.Models;
 
 namespace EasyStok.Mobile.Services;
 
@@ -8,14 +8,14 @@ namespace EasyStok.Mobile.Services;
 /// login ou refresh. ViewModels e Converters consultam aqui pra
 /// decidir visibilidade/habilitacao de UI.
 /// </summary>
-public sealed class PermissionService : IPermissionService
+public sealed class PermissaoService : IPermissaoService
 {
-	private readonly IAuthService _auth;
+	private readonly IAutenticacaoService _auth;
 	private NivelAcesso? _nivelCache;
 	private HashSet<string>? _permissoesCache;
 	private string? _tokenSnapshot;
 
-	public PermissionService(IAuthService auth)
+	public PermissaoService(IAutenticacaoService auth)
 	{
 		_auth = auth;
 	}
@@ -59,7 +59,7 @@ public sealed class PermissionService : IPermissionService
 	}
 }
 
-public interface IPermissionService
+public interface IPermissaoService
 {
 	Task<NivelAcesso> GetNivelAsync();
 	Task<bool> HasPermissionAsync(string permissao);

@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Services;
@@ -9,11 +9,11 @@ namespace EasyStok.Mobile.ViewModels;
 
 public sealed partial class LojaPickerViewModel : BaseViewModel
 {
-	private readonly IAuthService _auth;
-	private readonly ICompanyService _company;
+	private readonly IAutenticacaoService _auth;
+	private readonly IEmpresaService _company;
 	private readonly ISecureStore _store;
 
-	public ObservableCollection<LojaDto> Lojas { get; } = new();
+	public ObservableCollection<Loja> Lojas { get; } = new();
 
 	[ObservableProperty]
 	private bool _semLojas;
@@ -21,7 +21,7 @@ public sealed partial class LojaPickerViewModel : BaseViewModel
 	[ObservableProperty]
 	private string _empresaLabel = string.Empty;
 
-	public LojaPickerViewModel(IAuthService auth, ICompanyService company, ISecureStore store)
+	public LojaPickerViewModel(IAutenticacaoService auth, IEmpresaService company, ISecureStore store)
 	{
 		_auth = auth;
 		_company = company;
@@ -61,16 +61,16 @@ public sealed partial class LojaPickerViewModel : BaseViewModel
 	}
 
 	[RelayCommand]
-	private Task SelectAsync(LojaDto loja) => RunAsync(async () =>
+	private Task SelectAsync(Loja loja) => RunAsync(async () =>
 	{
 		await _store.SetLojaIdAsync(loja.Id);
 		await Shell.Current.GoToAsync("//home");
 	});
 
 	[RelayCommand]
-	private Task LogoutAsync() => RunAsync(async () =>
+	private Task SairAsync() => RunAsync(async () =>
 	{
-		await _auth.LogoutAsync();
+		await _auth.SairAsync();
 		await Shell.Current.GoToAsync("//login");
 	});
 }

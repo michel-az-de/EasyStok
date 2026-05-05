@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Models;
+﻿using EasyStok.Mobile.Models;
 using System.Text.Json;
 
 namespace EasyStok.Mobile.Storage;
@@ -21,7 +21,7 @@ public sealed class SecureStore : ISecureStore
 	public Task<string?> GetAccessTokenAsync() => SecureStorage.Default.GetAsync(KeyAccessToken);
 	public Task<string?> GetRefreshTokenAsync() => SecureStorage.Default.GetAsync(KeyRefreshToken);
 
-	public async Task SaveSessionAsync(LoginResponse login)
+	public async Task SaveSessionAsync(RespostaLogin login)
 	{
 		var expiresAt = DateTimeOffset.UtcNow.AddSeconds(login.ExpiresIn).ToUnixTimeSeconds();
 		await SecureStorage.Default.SetAsync(KeyAccessToken, login.Token);
@@ -106,7 +106,7 @@ public interface ISecureStore
 {
 	Task<string?> GetAccessTokenAsync();
 	Task<string?> GetRefreshTokenAsync();
-	Task SaveSessionAsync(LoginResponse login);
+	Task SaveSessionAsync(RespostaLogin login);
 	Task UpdateAccessTokenAsync(string accessToken, string refreshToken, int expiresInSeconds);
 	Task<UsuarioInfo?> GetUsuarioAsync();
 	Task<DateTimeOffset?> GetAccessTokenExpiresAtAsync();

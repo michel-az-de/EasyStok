@@ -1,4 +1,4 @@
-using CommunityToolkit.Maui;
+﻿using CommunityToolkit.Maui;
 using EasyStok.Mobile.Network;
 using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
@@ -50,7 +50,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IEstoqueCache, EstoqueCache>();
 		builder.Services.AddSingleton<IOutboxRepository, OutboxRepository>();
 
-		builder.Services.AddTransient<AuthHandler>();
+		builder.Services.AddTransient<AutenticacaoHandler>();
 
 		builder.Services.AddHttpClient(NoAuthClientName, http =>
 		{
@@ -62,17 +62,18 @@ public static class MauiProgram
 		{
 			http.BaseAddress = new Uri(AppConfig.GetBaseUrl());
 			http.Timeout = TimeSpan.FromSeconds(15);
-		}).AddHttpMessageHandler<AuthHandler>();
+		}).AddHttpMessageHandler<AutenticacaoHandler>();
 
-		builder.Services.AddSingleton<IAuthService, AuthService>();
-		builder.Services.AddSingleton<ICompanyService, CompanyService>();
-		builder.Services.AddSingleton<IPermissionService, PermissionService>();
+		builder.Services.AddSingleton<IAutenticacaoService, AutenticacaoService>();
+		builder.Services.AddSingleton<IEmpresaService, EmpresaService>();
+		builder.Services.AddSingleton<IPermissaoService, PermissaoService>();
 		builder.Services.AddSingleton<IEstoqueService, EstoqueService>();
 		builder.Services.AddSingleton<IOutboxFlushService, OutboxFlushService>();
 		builder.Services.AddSingleton<IEstoqueMutationService, EstoqueMutationService>();
 		builder.Services.AddSingleton<IDemoSeedService, DemoSeedService>();
 		builder.Services.AddSingleton<SyncEngine>();
 		builder.Services.AddSingleton<ThemeService>();
+		builder.Services.AddSingleton<AppIdentity>();
 
 		builder.Services.AddSingleton<AppShell>();
 

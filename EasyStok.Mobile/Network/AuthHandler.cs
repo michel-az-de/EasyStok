@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Services;
+﻿using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 using System.Net;
 using System.Net.Http.Headers;
@@ -11,13 +11,13 @@ namespace EasyStok.Mobile.Network;
 /// falhar, limpa a sessao e propaga 401 — quem chamou decide redirecionar
 /// pra LoginPage.
 /// </summary>
-public sealed class AuthHandler : DelegatingHandler
+public sealed class AutenticacaoHandler : DelegatingHandler
 {
 	private readonly ISecureStore _store;
 	private readonly IServiceProvider _services;
 	private static readonly SemaphoreSlim _refreshLock = new(1, 1);
 
-	public AuthHandler(ISecureStore store, IServiceProvider services)
+	public AutenticacaoHandler(ISecureStore store, IServiceProvider services)
 	{
 		_store = store;
 		_services = services;
@@ -62,10 +62,10 @@ public sealed class AuthHandler : DelegatingHandler
 			// Outra thread pode ter renovado enquanto esperavamos o lock.
 			if (await _store.IsAccessTokenValidAsync()) return true;
 
-			// Resolve AuthService sob demanda para evitar ciclo de DI
-			// (AuthService depende de IHttpClientFactory que depende deste handler).
-			var auth = (IAuthService)_services.GetService(typeof(IAuthService))!;
-			return await auth.RefreshAsync(ct);
+			// Resolve AutenticacaoService sob demanda para evitar ciclo de DI
+			// (AutenticacaoService depende de IHttpClientFactory que depende deste handler).
+			var auth = (IAutenticacaoService)_services.GetService(typeof(IAutenticacaoService))!;
+			return await auth.RenovarAsync(ct);
 		}
 		finally
 		{

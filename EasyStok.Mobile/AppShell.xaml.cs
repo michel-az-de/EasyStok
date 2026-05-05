@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Services;
+﻿using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 using EasyStok.Mobile.Views;
 
@@ -6,13 +6,13 @@ namespace EasyStok.Mobile;
 
 public partial class AppShell : Shell
 {
-	private readonly IAuthService _auth;
+	private readonly IAutenticacaoService _auth;
 	private readonly ISecureStore _store;
 	private readonly SyncEngine _sync;
 	private readonly IDemoSeedService _demoSeed;
 	private bool _initialized;
 
-	public AppShell(IAuthService auth, ISecureStore store, SyncEngine sync, IDemoSeedService demoSeed)
+	public AppShell(IAutenticacaoService auth, ISecureStore store, SyncEngine sync, IDemoSeedService demoSeed)
 	{
 		InitializeComponent();
 		_auth = auth;
@@ -46,7 +46,7 @@ public partial class AppShell : Shell
 
 	private async Task InitializeSessionAsync()
 	{
-		if (!await _auth.IsAuthenticatedAsync())
+		if (!await _auth.EstaAutenticadoAsync())
 		{
 			await GoToAsync("//login");
 			return;

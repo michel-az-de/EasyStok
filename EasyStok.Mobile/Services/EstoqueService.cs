@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Models;
+﻿using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Storage;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
@@ -29,7 +29,7 @@ public sealed class EstoqueService : IEstoqueService
 	public Task<IReadOnlyList<CachedItemEstoque>> GetCachedAsync(Guid empresaId) =>
 		_cache.GetAllAsync(empresaId);
 
-	public async Task<RefreshResult> RefreshAsync(Guid empresaId, CancellationToken ct = default)
+	public async Task<RefreshResult> RenovarAsync(Guid empresaId, CancellationToken ct = default)
 	{
 		var http = _httpFactory.CreateClient(ClientName);
 		var page = 1;
@@ -41,7 +41,7 @@ public sealed class EstoqueService : IEstoqueService
 			{
 				ct.ThrowIfCancellationRequested();
 				var url = $"/api/estoque?empresaId={empresaId}&page={page}&pageSize={PageSize}";
-				var env = await http.GetFromJsonAsync<PagedEnvelope<ItemEstoqueDto>>(url, ct);
+				var env = await http.GetFromJsonAsync<EnvelopePaginado<ItemEstoqueRemoto>>(url, ct);
 				if (env is null || env.Data is null || env.Data.Count == 0)
 					break;
 
@@ -76,7 +76,7 @@ public sealed class EstoqueService : IEstoqueService
 public interface IEstoqueService
 {
 	Task<IReadOnlyList<CachedItemEstoque>> GetCachedAsync(Guid empresaId);
-	Task<RefreshResult> RefreshAsync(Guid empresaId, CancellationToken ct = default);
+	Task<RefreshResult> RenovarAsync(Guid empresaId, CancellationToken ct = default);
 }
 
 public sealed record RefreshResult(bool Success, int Imported, string? Error)

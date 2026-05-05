@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
@@ -7,7 +7,7 @@ namespace EasyStok.Mobile.ViewModels;
 
 public sealed partial class LoginViewModel : BaseViewModel
 {
-	private readonly IAuthService _auth;
+	private readonly IAutenticacaoService _auth;
 	private readonly ISecureStore _store;
 	private readonly IDemoSeedService _demoSeed;
 
@@ -17,7 +17,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 	[ObservableProperty]
 	private string _senha = string.Empty;
 
-	public LoginViewModel(IAuthService auth, ISecureStore store, IDemoSeedService demoSeed)
+	public LoginViewModel(IAutenticacaoService auth, ISecureStore store, IDemoSeedService demoSeed)
 	{
 		_auth = auth;
 		_store = store;
@@ -37,7 +37,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 	}
 
 	[RelayCommand]
-	private Task LoginAsync() => RunAsync(async () =>
+	private Task EntrarAsync() => RunAsync(async () =>
 	{
 		if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Senha))
 		{
@@ -45,7 +45,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 			return;
 		}
 
-		var result = await _auth.LoginAsync(Email.Trim(), Senha, empresaId: null);
+		var result = await _auth.EntrarAsync(Email.Trim(), Senha, empresaId: null);
 		if (!result.Success)
 		{
 			ErrorMessage = result.Error ?? "Falha no login.";
@@ -69,7 +69,7 @@ public sealed partial class LoginViewModel : BaseViewModel
 	[RelayCommand]
 	private Task ContinuarOfflineAsync() => RunAsync(async () =>
 	{
-		await _auth.LoginOfflineDemoAsync();
+		await _auth.EntrarOfflineDemoAsync();
 		await _demoSeed.SeedIfEmptyAsync();
 		await Shell.Current.GoToAsync("//home");
 	});

@@ -1,10 +1,10 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace EasyStok.Mobile.Models;
 
 // GET /api/lojas?empresaId={guid} — espelha LojaResult em
 // EasyStock.Application.UseCases.Loja: (Id, EmpresaId, Nome, Ativa).
-public sealed record LojaDto(
+public sealed record Loja(
 	[property: JsonPropertyName("id")] Guid Id,
 	[property: JsonPropertyName("empresaId")] Guid EmpresaId,
 	[property: JsonPropertyName("nome")] string Nome,

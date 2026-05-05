@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EasyStok.Mobile.Controls.BrandHeader"
+             x:Name="HeaderRoot">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="6" Padding="0,8,0,12">
+
+        <!-- Logo cubo -->
+        <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                WidthRequest="56" HeightRequest="56"
+                BackgroundColor="{StaticResource White}"
+                StrokeShape="RoundRectangle 14"
+                StrokeThickness="0"
+                Padding="8"
+                VerticalOptions="Start">
+            <Image Source="easystok_logo.svg" Aspect="AspectFit" />
+        </Border>
+
+        <!-- Nome empresa + MOBILE chip -->
+        <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2" VerticalOptions="Start">
+            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=EmpresaNome}"
+                   FontFamily="Fraunces"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   LineBreakMode="TailTruncation"
+                   MaxLines="2"
+                   CharacterSpacing="-0.4"
+                   TextColor="{AppThemeBinding Dark={StaticResource TextPrimaryDark}, Light={StaticResource TextPrimaryLight}}" />
+            <Border BackgroundColor="{StaticResource Transparent}"
+                    Stroke="{AppThemeBinding Dark={StaticResource BorderStrongDark}, Light={StaticResource BorderStrongLight}}"
+                    StrokeShape="RoundRectangle 999"
+                    StrokeThickness="1"
+                    Padding="8,2"
+                    HorizontalOptions="Start">
+                <Label Text="MOBILE"
+                       FontFamily="Inter"
+                       FontSize="9"
+                       FontAttributes="Bold"
+                       CharacterSpacing="2.5"
+                       TextColor="{AppThemeBinding Dark={StaticResource TextMutedDark}, Light={StaticResource TextMutedLight}}" />
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Loja chip -->
+        <Border Grid.Row="0" Grid.Column="2"
+                BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}"
+                Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                StrokeShape="RoundRectangle 999"
+                StrokeThickness="1"
+                Padding="10,5"
+                VerticalOptions="Start">
+            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=LojaCodigo}"
+                   FontFamily="Inter"
+                   FontSize="11"
+                   FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Dark={StaticResource TextSecondaryDark}, Light={StaticResource TextSecondaryLight}}" />
+        </Border>
+
+        <!-- Saudação + nome operador editável (placeholder) + ações busca/ajustes -->
+        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=Saudacao}"
+                       Style="{StaticResource LabelGreeting}"
+                       VerticalOptions="Center" />
+                <Border BackgroundColor="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold100}}"
+                        Stroke="{AppThemeBinding Dark={StaticResource Gold600}, Light={StaticResource Gold400}}"
+                        StrokeShape="RoundRectangle 999"
+                        StrokeThickness="1"
+                        Padding="10,4"
+                        VerticalOptions="Center">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnEditarOperadorTapped" />
+                    </Border.GestureRecognizers>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=OperadorNome}"
+                               FontFamily="Inter" FontSize="13" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Dark={StaticResource Gold200}, Light={StaticResource Gold700}}" />
+                        <Label Text="✏️" FontSize="11" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </Border>
+            </HorizontalStackLayout>
+
+            <Border Grid.Column="1"
+                    WidthRequest="40" HeightRequest="40"
+                    BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}"
+                    Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                    StrokeShape="RoundRectangle 12"
+                    StrokeThickness="1">
+                <Label Text="🔍" FontSize="16" HorizontalOptions="Center" VerticalOptions="Center" />
+            </Border>
+
+            <Border Grid.Column="2"
+                    WidthRequest="40" HeightRequest="40"
+                    BackgroundColor="{AppThemeBinding Dark={StaticResource BgSurfaceDark}, Light={StaticResource BgSurfaceLight}}"
+                    Stroke="{AppThemeBinding Dark={StaticResource BorderSoftDark}, Light={StaticResource BorderSoftLight}}"
+                    StrokeShape="RoundRectangle 12"
+                    StrokeThickness="1">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnAjustesTapped" />
+                </Border.GestureRecognizers>
+                <Label Text="⚙" FontSize="18" HorizontalOptions="Center" VerticalOptions="Center" />
+            </Border>
+        </Grid>
+
+    </Grid>
+</ContentView>
