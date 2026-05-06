@@ -84,6 +84,11 @@ public static class ApiServiceCollectionExtensions
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Desabilita o remap legacy de claims do JWT (sub -> nameidentifier, etc).
+                // Sem isso, CurrentUserAccessor.FindFirstValue("sub") retorna null porque
+                // o handler renomeia "sub" para ClaimTypes.NameIdentifier por default.
+                options.MapInboundClaims = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer           = true,
@@ -92,7 +97,9 @@ public static class ApiServiceCollectionExtensions
                     ValidateIssuerSigningKey  = true,
                     ValidIssuer              = jwtIssuer,
                     ValidAudience            = jwtAudience,
-                    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+                    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                    NameClaimType            = "sub",
+                    RoleClaimType            = "nivel"
                 };
             });
 
