@@ -253,6 +253,21 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         app.Logger.LogError(ex, "Erro durante migrations. A aplicacao continuara mas pode estar incompleta.");
     }
 
+    // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
+    // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
+    // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
+    // SQL idempotente — no-op se schema já está correto.
+    try
+    {
+        using var bootstrapScope = app.Services.CreateScope();
+        var bootstrapDb = bootstrapScope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        await EasyStock.Api.Data.SeedSchemaBootstrap.EnsureAsync(bootstrapDb, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "[SeedSchema] Bootstrap falhou no startup — seed via UI vai tentar de novo no próprio run.");
+    }
+
     try
     {
         using var seedScope = app.Services.CreateScope();

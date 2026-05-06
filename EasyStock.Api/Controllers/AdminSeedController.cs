@@ -362,6 +362,15 @@ public class AdminSeedController(
         {
             ct.ThrowIfCancellationRequested();
 
+            // ── Schema bootstrap defensivo ───────────────────────────────────────
+            // Não depende de migrations EF terem rodado certinho — garante
+            // IsSeedData + SeedRunLogs via SQL idempotente. Se ambiente já tem,
+            // é no-op. Se faltava algo (deploy parcial, migration vazia, etc),
+            // agora está lá. Sem isso, seed quebra com "column does not exist".
+            seedProgress.Report(runId, 1, "Verificando schema do banco…");
+            await Data.SeedSchemaBootstrap.EnsureAsync(ctx, logger, ct);
+            seedProgress.Report(runId, 3, "Schema OK — iniciando seed.");
+
             var agora = new DateTime(
                 DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
                 DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, 0, DateTimeKind.Utc);
@@ -377,28 +386,22 @@ public class AdminSeedController(
 
                 case "demo":
                     {
+                        // SeedData.ExecutarAsync gerencia sua PRÓPRIA tx + ExecutionStrategy
+                        // internamente (SeedData.cs:39,45). Aninhar 2 ExecutionStrategy quebra
+                        // com "does not support user-initiated transactions". Aqui só configura
+                        // env vars + chama, transação é responsabilidade do SeedData.
                         var originalVolume = Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME");
                         var originalDemo = Environment.GetEnvironmentVariable("SEED_DEMO_DATA");
+                        transactionActive = true; // SeedData abre tx interna
                         try
                         {
-                            // EnableRetryOnFailure (NpgsqlRetryingExecutionStrategy) NÃO suporta
-                            // BeginTransactionAsync direto — TUDO precisa ir dentro de
-                            // ExecutionStrategy.ExecuteAsync pra ser uma "unit retriable".
-                            var strategy = ctx.Database.CreateExecutionStrategy();
-                            await strategy.ExecuteAsync(async () =>
-                            {
-                                await using var demoTx = await ctx.Database.BeginTransactionAsync(ct);
-                                transactionActive = true;
-                                seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
-                                if (!string.IsNullOrWhiteSpace(volume))
-                                    Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
-                                Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
-                                seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
-                                await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
-                                seedProgress.Report(runId, 95, "Confirmando transação no banco…");
-                                await demoTx.CommitAsync(ct);
-                                transactionActive = false;
-                            });
+                            seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
+                            if (!string.IsNullOrWhiteSpace(volume))
+                                Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
+                            Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
+                            seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
+                            await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
+                            transactionActive = false; // SeedData committed sua tx com sucesso
                             await seedProgress.SuccessAsync(runId,
                                 $"Seed demo (volume={volume ?? "large"}) concluído em {sw.ElapsedMilliseconds}ms.");
                         }
@@ -412,17 +415,11 @@ public class AdminSeedController(
 
                 case "minimal":
                     {
-                        var strategy = ctx.Database.CreateExecutionStrategy();
-                        await strategy.ExecuteAsync(async () =>
-                        {
-                            await using var minTx = await ctx.Database.BeginTransactionAsync(ct);
-                            transactionActive = true;
-                            seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
-                            await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
-                            seedProgress.Report(runId, 95, "Confirmando transação no banco…");
-                            await minTx.CommitAsync(ct);
-                            transactionActive = false;
-                        });
+                        // Idem demo — SeedData.ExecutarMinimalAsync já é transacional (SeedData.cs:87,93).
+                        transactionActive = true;
+                        seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
+                        await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
+                        transactionActive = false;
                         await seedProgress.SuccessAsync(runId,
                             $"Seed mínimo concluído em {sw.ElapsedMilliseconds}ms.");
                     }
