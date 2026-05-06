@@ -410,6 +410,58 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         return RedirectToPage(new { Id, tab = "lojas" });
     }
 
+    // ─────────────────── Atividade unificada (P1 slice 1) ───────────────────
+
+    public async Task<IActionResult> OnGetAtividadeAsync(
+        int page = 1,
+        string? tipo = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        Guid? usuarioId = null,
+        string? search = null)
+    {
+        try
+        {
+            var qs = $"api/admin/clientes/{Id}/atividade?page={page}&pageSize=20";
+            if (!string.IsNullOrWhiteSpace(tipo)) qs += $"&tipo={Uri.EscapeDataString(tipo)}";
+            if (from.HasValue) qs += $"&from={Uri.EscapeDataString(from.Value.ToString("o"))}";
+            if (to.HasValue) qs += $"&to={Uri.EscapeDataString(to.Value.ToString("o"))}";
+            if (usuarioId.HasValue && usuarioId.Value != Guid.Empty) qs += $"&usuarioId={usuarioId.Value}";
+            if (!string.IsNullOrWhiteSpace(search)) qs += $"&search={Uri.EscapeDataString(search)}";
+
+            var data = await api.GetRawAsync(qs);
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao listar atividade do tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
+    // ─────────────────── PII unmask just-in-time (P1 slice 1) ───────────────────
+
+    public async Task<IActionResult> OnGetPiiUsuarioAsync(Guid userId, string campo, string motivo)
+    {
+        if (userId == Guid.Empty) return new JsonResult(new { error = "userId inválido" }) { StatusCode = 400 };
+        if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 10)
+            return new JsonResult(new { error = "Motivo obrigatório (≥10 chars)" }) { StatusCode = 400 };
+
+        try
+        {
+            var data = await api.GetAsync<JsonElement>(
+                $"api/admin/clientes/{Id}/usuario-pii/{userId}?campo={Uri.EscapeDataString(campo ?? "email")}&motivo={Uri.EscapeDataString(motivo)}");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao desmascarar PII {Campo} do usuário {UserId}", campo, userId);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
     public async Task<IActionResult> OnPostToggleLojaAsync(Guid lojaId, string motivo, bool ativa)
     {
         if (lojaId == Guid.Empty) { SetErro("Loja inválida."); return RedirectToPage(new { Id, tab = "lojas" }); }

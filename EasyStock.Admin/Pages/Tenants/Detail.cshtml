@@ -122,7 +122,7 @@
         }
      }" class="space-y-4">
     <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
-        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log"), ("features","Features") })
+        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("features","Features") })
         {
             <button type="button"
                     @@click="switchTab('@t')"
@@ -261,9 +261,19 @@
                         // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
                         var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
                         var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
-                        <tr x-data="{ open: false }">
+                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@uemail'))">
                             <td class="text-es-ink font-medium">@unome</td>
-                            <td class="text-es-ink-dim font-mono text-xs">@uemail</td>
+                            <td class="text-es-ink-dim font-mono text-xs">
+                                <span x-text="piiVisivel ? piiValor : '@uemail'"></span>
+                                <button type="button" :title="piiVisivel ? 'Re-mascarar' : 'Ver completo (auditado)'"
+                                        @@click="piiVisivel ? remascarar() : abrirRevealModal()"
+                                        class="ml-1 text-es-ink-mute hover:text-es-accent text-xs">
+                                    <span x-text="piiVisivel ? '🙈' : '👁'"></span>
+                                </button>
+                                <span x-show="piiVisivel && piiTtl > 0" x-cloak class="text-[10px] text-es-ink-mute ml-1">
+                                    (<span x-text="Math.ceil(piiTtl/60)"></span> min)
+                                </span>
+                            </td>
                             <td class="text-es-ink-dim">@nivel</td>
                             <td class="text-es-ink-dim">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
                             <td><span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span></td>
@@ -457,15 +467,129 @@
                 get podeEnviar() {
                     if (this.motivo.trim().length < 10) return false;
                     if (!this.ctx.userId) return false;
-                    // Pelo menos um campo precisa estar diferente do original.
                     const trocouNome = this.nome.trim() && this.nome.trim() !== this.ctx.nome;
                     const trocouEmail = this.email.trim() && this.email.trim() !== this.ctx.email;
                     return trocouNome || trocouEmail;
                 },
-                close() {
-                    if (this.submitting) return;
-                    this.open = false;
+                close() { if (!this.submitting) this.open = false; }
+            };
+        }
+
+        // PII reveal — mostra valor por janela curta após auditoria.
+        // tenantId é capturado de window.__tenantId definido logo abaixo.
+        function piiReveal(userId, campo, valorMascarado) {
+            return {
+                piiVisivel: false,
+                piiValor: valorMascarado,
+                piiTtl: 0,
+                _tickHandle: null,
+                abrirRevealModal() {
+                    window.dispatchEvent(new CustomEvent('open-pii-reveal', {
+                        detail: { userId, campo, callback: (valor, expiraEm) => {
+                            this.piiValor = valor;
+                            this.piiVisivel = true;
+                            const expiresAt = new Date(expiraEm).getTime();
+                            const tick = () => {
+                                this.piiTtl = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+                                if (this.piiTtl <= 0) { this.remascarar(); }
+                            };
+                            tick();
+                            clearInterval(this._tickHandle);
+                            this._tickHandle = setInterval(tick, 1000);
+                        }}
+                    }));
+                },
+                remascarar() {
+                    this.piiVisivel = false;
+                    this.piiValor = valorMascarado;
+                    this.piiTtl = 0;
+                    clearInterval(this._tickHandle);
                 }
+            };
+        }
+        window.__tenantId = '@Model.Id';
+        </script>
+
+        <!-- Modal global PII reveal — escuta `open-pii-reveal` -->
+        <div x-data="piiRevealModal()" x-init="init()" x-show="open" x-cloak
+             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()">
+            <div class="modal-box max-w-md" @@click.stop>
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="text-2xl">👁</div>
+                    <div class="flex-1">
+                        <h3 class="text-es-ink font-semibold">Visualizar dado pessoal</h3>
+                        <p class="text-es-ink-dim text-xs mt-1">
+                            Você está prestes a visualizar <b x-text="cfg.campo"></b> em texto-claro.
+                            Esta visualização será registrada no log LGPD com seu nome.
+                            O valor ficará visível por 5 minutos e depois será re-mascarado automaticamente.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                    <textarea x-model="motivo" rows="2" minlength="10" maxlength="1000"
+                              placeholder="Ex.: cliente confirmou identidade no chamado #1234"
+                              class="form-input w-full text-sm font-mono"></textarea>
+                    <p class="text-xs mt-1" :class="motivo.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                        <span x-text="motivo.trim().length"></span> / 10 mínimo
+                    </p>
+                </div>
+                <div x-show="erro" x-cloak class="text-xs text-red-400 mb-3" x-text="erro"></div>
+
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @@click="close()" :disabled="submitting" class="btn-secondary text-sm">Cancelar</button>
+                    <button type="button" @@click="confirmar()" :disabled="motivo.trim().length < 10 || submitting" class="btn-primary text-sm">
+                        <span x-show="!submitting">Mostrar (auditado)</span>
+                        <span x-show="submitting" x-cloak>Buscando…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function piiRevealModal() {
+            return {
+                open: false,
+                submitting: false,
+                erro: '',
+                motivo: '',
+                cfg: { userId: '', campo: '', callback: null },
+                init() {
+                    window.addEventListener('open-pii-reveal', (e) => {
+                        this.cfg = Object.assign({ userId: '', campo: '', callback: null }, e.detail || {});
+                        this.motivo = '';
+                        this.erro = '';
+                        this.submitting = false;
+                        this.open = true;
+                    });
+                },
+                async confirmar() {
+                    if (this.motivo.trim().length < 10) return;
+                    this.submitting = true; this.erro = '';
+                    try {
+                        const url = '/Tenants/Detail/' + window.__tenantId
+                            + '?handler=PiiUsuario'
+                            + '&userId=' + encodeURIComponent(this.cfg.userId)
+                            + '&campo=' + encodeURIComponent(this.cfg.campo)
+                            + '&motivo=' + encodeURIComponent(this.motivo.trim());
+                        const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+                        const d = await r.json();
+                        if (!r.ok) {
+                            this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                            this.submitting = false;
+                            return;
+                        }
+                        const data = d.data || d;
+                        if (this.cfg.callback) this.cfg.callback(data.valor, data.expiraEm);
+                        this.open = false;
+                    } catch (e) {
+                        this.erro = 'Falha de rede: ' + (e.message || e);
+                    } finally {
+                        this.submitting = false;
+                    }
+                },
+                close() { if (!this.submitting) this.open = false; }
             };
         }
         </script>
@@ -642,35 +766,168 @@
         </div>
     </div>
 
-    <!-- Audit Log -->
-    <div x-show="tab === 'audit'" x-cloak>
-        <div class="card p-0 overflow-hidden">
-            <table class="table-admin">
-                <thead><tr><th>Ação</th><th>Sucesso</th><th>Detalhes</th><th>IP</th><th>Data/Hora</th></tr></thead>
-                <tbody>
-                    @foreach (var a in Model.AuditLogs)
-                    {
-                        var acao = a.TryGetProperty("acao", out var aap) ? aap.GetString() : "";
-                        var sucesso = a.TryGetProperty("sucesso", out var asp2) && asp2.GetBoolean();
-                        var detalhes = a.TryGetProperty("detalhes", out var adp) && adp.ValueKind != System.Text.Json.JsonValueKind.Null ? adp.GetString() : "—";
-                        var ip = a.TryGetProperty("ip", out var aip) ? aip.GetString() : "—";
-                        var dh = a.TryGetProperty("dataHora", out var adhp) ? adhp.GetString() : null;
-                        DateTime.TryParse(dh, out var dhDt);
-                        <tr>
-                            <td class="font-mono text-xs text-es-ink-dim">@acao</td>
-                            <td><span class="status-badge @(sucesso ? "badge-ativa" : "badge-cancelada")">@(sucesso ? "Sim" : "Não")</span></td>
-                            <td class="text-es-ink-dim text-xs max-w-xs truncate">@detalhes</td>
-                            <td class="text-es-ink-dim text-xs">@ip</td>
-                            <td class="text-es-ink-dim text-xs">@dhDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
-                        </tr>
-                    }
-                    @if (!Model.AuditLogs.Any())
-                    {
-                        <tr><td colspan="5" class="text-center text-es-ink-mute py-6">Nenhuma ação auditada.</td></tr>
-                    }
-                </tbody>
-            </table>
+    <!-- Atividade unificada (P1) — timeline com filtros -->
+    <div x-show="tab === 'atividade'" x-cloak x-data="atividadeTimeline('@Model.Id')" x-init="$watch('tab', t => { if (t === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); } })">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
+            <!-- Timeline -->
+            <div class="card p-0 overflow-hidden">
+                <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.08)">
+                    <h3 class="text-es-ink font-semibold text-sm">Atividade do cliente</h3>
+                    <div class="flex items-center gap-2 text-xs text-es-ink-mute">
+                        <span x-show="loading" x-cloak>Carregando…</span>
+                        <span x-show="!loading && total !== null" x-cloak><b class="text-es-ink" x-text="total"></b> evento(s)</span>
+                        <button type="button" @@click="recarregar()" class="text-es-ink hover:text-es-accent ml-2">↻</button>
+                    </div>
+                </div>
+                <div x-show="erro" x-cloak class="bg-red-500/10 border-b border-red-500/30 text-red-400 text-xs px-4 py-2" x-text="erro"></div>
+
+                <div class="divide-y" style="--tw-divide-opacity:0.05">
+                    <template x-if="!loading && itens.length === 0">
+                        <div class="text-es-ink-mute text-sm text-center py-10">
+                            Sem atividade no período. Tente ampliar os filtros.
+                        </div>
+                    </template>
+                    <template x-for="ev in itens" :key="ev.id">
+                        <div class="px-4 py-3 flex items-start gap-3 hover:bg-es-surface-2/30 transition-colors" style="border-top:1px solid rgba(247,242,232,0.05)">
+                            <div class="text-xl leading-none mt-0.5" x-text="iconePorAcao(ev.acao, ev.tipo)"></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <span class="font-mono text-xs px-1.5 py-0.5 rounded" :style="ev.tipo === 'admin' ? 'background:rgba(244,121,32,.15);color:#f47920' : 'background:rgba(120,160,200,.12);color:#a8c5e2'" x-text="ev.acao"></span>
+                                    <span x-show="ev.sucesso === false" x-cloak class="status-badge badge-cancelada">falhou</span>
+                                </div>
+                                <div class="text-es-ink-dim text-xs mt-0.5">
+                                    <span x-text="ev.atorNome || 'Sistema'"></span>
+                                    <span x-show="ev.atorEmail" x-cloak class="font-mono text-es-ink-mute">· <span x-text="ev.atorEmail"></span></span>
+                                </div>
+                                <div x-show="ev.detalhes" x-cloak class="text-es-ink-mute text-xs mt-1 break-all" x-text="ev.detalhes"></div>
+                                <div x-show="ev.motivo" x-cloak class="text-amber-300/80 text-xs mt-1 italic">
+                                    Justificativa: <span x-text="ev.motivo"></span>
+                                </div>
+                                <div class="text-es-ink-mute text-xs mt-1 flex items-center gap-3">
+                                    <span :title="new Date(ev.dataHora).toLocaleString('pt-BR')" x-text="formatRelativo(ev.dataHora)"></span>
+                                    <span x-show="ev.ip" x-cloak class="font-mono">IP <span x-text="ev.ip"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div x-show="!loading && temMais" x-cloak class="text-center py-3" style="border-top:1px solid rgba(247,242,232,0.08)">
+                    <button type="button" @@click="carregarMais()" class="btn-secondary text-xs">Carregar mais</button>
+                </div>
+            </div>
+
+            <!-- Filtros sticky -->
+            <div class="card p-4 self-start lg:sticky lg:top-20 space-y-3">
+                <h4 class="text-es-ink font-semibold text-xs uppercase tracking-wide">Filtros</h4>
+                <div>
+                    <label class="form-label">Tipo</label>
+                    <select x-model="filtros.tipo" @@change="recarregar()" class="form-input w-full text-sm">
+                        <option value="">Todos</option>
+                        <option value="tenant">Atividade do cliente</option>
+                        <option value="admin">Ações do operador</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Período</label>
+                    <select x-model="filtros.periodo" @@change="aplicarPeriodo(); recarregar()" class="form-input w-full text-sm">
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                        <option value="">Tudo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Busca livre</label>
+                    <input type="text" x-model="filtros.search" @@keyup.enter="recarregar()"
+                           placeholder="Ex: login, suspendido…"
+                           class="form-input w-full text-sm" />
+                </div>
+                <button type="button" @@click="recarregar()" class="btn-primary text-xs w-full">Aplicar</button>
+                <button type="button" @@click="limparFiltros()" class="text-xs text-es-ink-mute hover:text-es-ink w-full">Limpar filtros</button>
+            </div>
         </div>
+
+        <script>
+        function atividadeTimeline(tenantId) {
+            return {
+                tenantId,
+                carregouUmaVez: false,
+                loading: false,
+                erro: '',
+                itens: [],
+                total: null,
+                pagina: 1,
+                temMais: false,
+                filtros: { tipo: '', periodo: '30', search: '', from: null, to: null },
+
+                aplicarPeriodo() {
+                    if (!this.filtros.periodo) { this.filtros.from = null; return; }
+                    const d = new Date();
+                    d.setDate(d.getDate() - parseInt(this.filtros.periodo, 10));
+                    this.filtros.from = d.toISOString();
+                },
+                async recarregar() {
+                    this.aplicarPeriodo();
+                    this.pagina = 1;
+                    this.itens = [];
+                    await this._fetch();
+                },
+                async carregarMais() {
+                    this.pagina += 1;
+                    await this._fetch(true);
+                },
+                limparFiltros() {
+                    this.filtros = { tipo: '', periodo: '30', search: '', from: null, to: null };
+                    this.recarregar();
+                },
+                async _fetch(append = false) {
+                    this.loading = true; this.erro = '';
+                    try {
+                        const qs = new URLSearchParams({ page: this.pagina });
+                        if (this.filtros.tipo) qs.set('tipo', this.filtros.tipo);
+                        if (this.filtros.from) qs.set('from', this.filtros.from);
+                        if (this.filtros.search) qs.set('search', this.filtros.search);
+                        const url = '/Tenants/Detail/' + this.tenantId + '?handler=Atividade&' + qs.toString();
+                        const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+                        if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        const d = await r.json();
+                        const items = (d.data || []);
+                        this.itens = append ? this.itens.concat(items) : items;
+                        const meta = d.meta || {};
+                        this.total = meta.total ?? this.itens.length;
+                        this.temMais = meta.pages != null && this.pagina < meta.pages;
+                    } catch (e) {
+                        this.erro = 'Falha ao carregar atividade: ' + (e.message || e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                iconePorAcao(acao, tipo) {
+                    const a = (acao || '').toLowerCase();
+                    if (tipo === 'admin') return '🛡️';
+                    if (a.includes('login')) return '🔑';
+                    if (a.includes('logout')) return '🚪';
+                    if (a.includes('venda')) return '💰';
+                    if (a.includes('estoque') || a.includes('produto')) return '📦';
+                    if (a.includes('senha') || a.includes('reset')) return '🔒';
+                    if (a.includes('cadastr') || a.includes('criar')) return '➕';
+                    if (a.includes('alter') || a.includes('atualiz') || a.includes('edit')) return '✏️';
+                    return '•';
+                },
+                formatRelativo(iso) {
+                    if (!iso) return '';
+                    const d = new Date(iso);
+                    const diff = (Date.now() - d.getTime()) / 1000;
+                    if (diff < 60) return 'agora há pouco';
+                    if (diff < 3600) return Math.floor(diff/60) + ' min atrás';
+                    if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';
+                    if (diff < 86400*7) return Math.floor(diff/86400) + ' dia(s) atrás';
+                    return d.toLocaleDateString('pt-BR');
+                }
+            };
+        }
+        </script>
     </div>
 </div>
 
