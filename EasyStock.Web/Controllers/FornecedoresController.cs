@@ -20,7 +20,7 @@ public class CriarFornecedorRequest
     public string? Observacoes { get; set; }
 }
 
-public class FornecedoresController(FornecedoresService svc, SessionService session) : BaseController(session)
+public class FornecedoresController(FornecedoresService svc, SessionService session, ILogger<FornecedoresController> logger) : BaseController(session)
 {
     [HttpGet("/fornecedores")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
@@ -103,8 +103,14 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
 
     [HttpPost("/fornecedores/json")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CriarJson([FromBody] CriarFornecedorRequest req)
+    public async Task<IActionResult> CriarJson([FromBody] CriarFornecedorRequest? req)
     {
+        if (req is null)
+        {
+            logger.LogWarning("CriarJson: corpo nulo ou inválido (modelbinder retornou null)");
+            return BadRequest(new { success = false, errorMessage = "Corpo da requisição inválido." });
+        }
+
         if (string.IsNullOrWhiteSpace(req.Nome))
             return BadRequest(new { success = false, errorMessage = "Nome é obrigatório." });
 
@@ -114,7 +120,10 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
             req.PedidoMinimo, req.FretePadrao, req.Observacoes);
 
         if (!result.Success)
+        {
+            logger.LogWarning("CriarJson falhou: {Code} — {Msg}", result.ErrorCode, result.ErrorMessage);
             return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar fornecedor." });
+        }
 
         return Ok(new { success = true, id = result.Data?.Id });
     }

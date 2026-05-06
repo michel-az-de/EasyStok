@@ -209,11 +209,23 @@ function criarFornecedorModal() {
                     headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                     body: JSON.stringify(this.form)
                 });
-                const data = await res.json();
-                if (res.ok && data.success) {
+                // Lê o corpo como texto pra tolerar respostas vazias ou HTML (ex: página
+                // de erro do StatusCodePages quando antiforgery/auth falha).
+                const raw = await res.text();
+                let data = null;
+                try { data = raw ? JSON.parse(raw) : null; } catch { /* ignora — resposta não-JSON */ }
+                if (res.ok && data && data.success) {
                     window.location.href = '/fornecedores/' + data.id;
+                    return;
+                }
+                if (data && data.errorMessage) {
+                    this.erroMsg = data.errorMessage;
+                } else if (res.status === 400 || res.status === 403) {
+                    this.erroMsg = 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.';
+                } else if (res.status === 401) {
+                    this.erroMsg = 'Sessão expirada. Faça login novamente.';
                 } else {
-                    this.erroMsg = data.errorMessage || 'Erro ao criar fornecedor. Tente novamente.';
+                    this.erroMsg = `Erro ao criar fornecedor (HTTP ${res.status}). Tente novamente.`;
                 }
             } catch {
                 this.erroMsg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
