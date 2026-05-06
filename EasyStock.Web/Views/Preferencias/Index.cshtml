@@ -1,0 +1,110 @@
+@model EasyStock.Web.Models.ViewModels.Preferencias.PreferenciasViewModel
+@{
+    ViewBag.Title = "Preferências de Notificação";
+    Layout = "_Layout";
+
+    string CanalLabel(string c) => c switch {
+        "Email" => "E-mail",
+        "Sms" => "SMS",
+        "WhatsApp" => "WhatsApp",
+        "InApp" => "In-App",
+        _ => c
+    };
+
+    string CategoriaLabel(string c) => c switch {
+        "Transacional" => "Transacional",
+        "Operacional" => "Operacional",
+        "Marketing" => "Marketing",
+        _ => c
+    };
+
+    string CategoriaDesc(string c) => c switch {
+        "Transacional" => "Senhas, cobranças, confirmações — obrigatório por interesse legítimo",
+        "Operacional" => "Alertas de estoque, tarefas, prazos",
+        "Marketing" => "Promoções, novidades e comunicados",
+        _ => ""
+    };
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Preferências de Notificação</h1>
+        <p>Controle como e quando deseja receber notificações (LGPD)</p>
+    </div>
+</div>
+
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-800">
+    <strong>Informação LGPD:</strong> Notificações <em>Transacionais</em> são enviadas com base em
+    interesse legítimo e não podem ser desativadas. As demais respeitam sua escolha abaixo.
+</div>
+
+<form asp-action="Salvar" asp-controller="Preferencias" method="post" x-data="{ loading: false }" @@submit="loading = true">
+    @Html.AntiForgeryToken()
+
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-white shadow-sm rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 w-32">Canal</th>
+                    @foreach (var cat in EasyStock.Web.Models.ViewModels.Preferencias.PreferenciasViewModel.Categorias)
+                    {
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-slate-700">
+                            <div>@CategoriaLabel(cat)</div>
+                            <div class="text-xs font-normal text-slate-400 mt-0.5">@CategoriaDesc(cat)</div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var canal in EasyStock.Web.Models.ViewModels.Preferencias.PreferenciasViewModel.Canais)
+                {
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-4 py-3">
+                            <span class="font-medium text-slate-800 text-sm">@CanalLabel(canal)</span>
+                        </td>
+                        @foreach (var cat in EasyStock.Web.Models.ViewModels.Preferencias.PreferenciasViewModel.Categorias)
+                        {
+                            var key = $"{canal}_{cat}";
+                            var isOptIn = Model.IsOptIn(canal, cat);
+                            var isTransacional = cat == "Transacional";
+                            <td class="px-4 py-3 text-center">
+                                @if (isTransacional)
+                                {
+                                    <span class="inline-flex items-center gap-1 text-xs text-slate-400" title="Obrigatório">
+                                        <svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Sempre
+                                    </span>
+                                }
+                                else
+                                {
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox"
+                                               name="toggle_@(canal)_@(cat)"
+                                               @(isOptIn ? "checked" : "")
+                                               class="sr-only peer" />
+                                        <div class="w-10 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer
+                                                    peer-checked:after:translate-x-full peer-checked:after:border-white
+                                                    after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                                                    after:bg-white after:border-gray-300 after:border after:rounded-full
+                                                    after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+        <button type="submit" :disabled="loading"
+                class="btn-primary flex items-center gap-2">
+            <span x-show="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span x-text="loading ? 'Salvando...' : 'Salvar preferências'">Salvar preferências</span>
+        </button>
+        <a href="/" class="btn-ghost px-4 py-2">Cancelar</a>
+    </div>
+</form>

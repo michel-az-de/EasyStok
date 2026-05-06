@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Notifications;
@@ -12,12 +14,19 @@ namespace EasyStock.Worker.BackgroundServices;
 /// <summary>
 /// Dispatcher do Outbox — lê lotes de OutboxMensagemNotificacao e envia via ICanalNotificacao.
 /// Usa advisory lock por shard para safe multi-réplica (4 shards × 4 réplicas = sem sobreposição).
+/// Expõe métricas via System.Diagnostics.Metrics (OTel-compatível).
 /// </summary>
 public sealed class DispatcherOutboxService(
     IServiceProvider serviceProvider,
     IOptions<WorkerOptions> options,
     ILogger<DispatcherOutboxService> logger) : BackgroundService
 {
+    private static readonly Meter NotifMeter = new("EasyStock.Notifications", "1.0");
+    private static readonly Counter<long> SentCounter = NotifMeter.CreateCounter<long>("notifications.sent", "notifications", "Total de notificações enviadas com sucesso");
+    private static readonly Counter<long> FailedCounter = NotifMeter.CreateCounter<long>("notifications.failed", "notifications", "Total de notificações com falha");
+    private static readonly Histogram<long> BatchSizeHistogram = NotifMeter.CreateHistogram<long>("dispatcher.batch.size", "notifications", "Tamanho do batch processado por rodada");
+    private static readonly Histogram<double> OutboxLagHistogram = NotifMeter.CreateHistogram<double>("outbox.lag.seconds", "s", "Atraso entre criação e envio da mensagem outbox");
+
     // Base de lock: 0x4E4F5449 = "NOTI" em ASCII
     private const long LockBase = 0x4E4F_5449_0000_0000L;
 
@@ -74,8 +83,11 @@ public sealed class DispatcherOutboxService(
             }
 
             if (mensagens.Count > 0)
+            {
                 logger.LogInformation(
                     "Shard {Shard}: processadas {Count} mensagens.", shardKey, mensagens.Count);
+                BatchSizeHistogram.Record(mensagens.Count, new TagList { { "shard", shardKey.ToString() } });
+            }
 
         }, ct);
     }
@@ -115,6 +127,10 @@ public sealed class DispatcherOutboxService(
         if (resultado.Sucesso)
         {
             mensagem.MarcarEnviado(resultado.ProviderUsado ?? mensagem.Canal.ToString());
+            var lag = (DateTime.UtcNow - mensagem.CriadoEm).TotalSeconds;
+            OutboxLagHistogram.Record(lag, new TagList { { "canal", mensagem.Canal.ToString() } });
+            SentCounter.Add(1, new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } });
+
             var logSucesso = LogEnvioNotificacao.RegistrarSucesso(
                 mensagem.Id, mensagem.Tentativas + 1, mensagem.Canal,
                 resultado.ProviderUsado ?? mensagem.Canal.ToString(),
@@ -135,6 +151,7 @@ public sealed class DispatcherOutboxService(
             };
 
             mensagem.MarcarFalhaTentativa(resultado.ErroDetalhado ?? "Erro desconhecido", backoff);
+            FailedCounter.Add(1, new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } });
 
             var logFalha = LogEnvioNotificacao.RegistrarFalha(
                 mensagem.Id, mensagem.Tentativas, mensagem.Canal,
