@@ -526,6 +526,84 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         }
     }
 
+    // ─────────────────── Notas internas (P3) ───────────────────
+
+    public async Task<IActionResult> OnGetNotasAsync()
+    {
+        try
+        {
+            var data = await api.GetRawAsync($"api/admin/clientes/{Id}/notas");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao listar notas do tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
+    public async Task<IActionResult> OnPostCriarNotaAsync(string texto, string tipo)
+    {
+        var textoT = (texto ?? "").Trim();
+        if (textoT.Length is < 3 or > 2000)
+            return new JsonResult(new { error = "Texto entre 3 e 2000 caracteres." }) { StatusCode = 400 };
+        var tipoT = (tipo ?? "Info").Trim();
+        if (tipoT is not ("Info" or "Alerta" or "Escalonamento"))
+            return new JsonResult(new { error = "Tipo inválido." }) { StatusCode = 400 };
+
+        try
+        {
+            var data = await api.PostAsync<JsonElement>($"api/admin/clientes/{Id}/notas",
+                new { texto = textoT, tipo = tipoT });
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao criar nota no tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
+    public async Task<IActionResult> OnPostAtualizarNotaAsync(Guid notaId, string texto, string tipo)
+    {
+        if (notaId == Guid.Empty) return new JsonResult(new { error = "Nota inválida." }) { StatusCode = 400 };
+        var textoT = (texto ?? "").Trim();
+        if (textoT.Length is < 3 or > 2000)
+            return new JsonResult(new { error = "Texto entre 3 e 2000 caracteres." }) { StatusCode = 400 };
+        var tipoT = (tipo ?? "Info").Trim();
+
+        try
+        {
+            var data = await api.PatchAsync<JsonElement>($"api/admin/clientes/{Id}/notas/{notaId}",
+                new { texto = textoT, tipo = tipoT });
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao atualizar nota {NotaId}", notaId);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
+    public async Task<IActionResult> OnPostExcluirNotaAsync(Guid notaId)
+    {
+        if (notaId == Guid.Empty) return new JsonResult(new { error = "Nota inválida." }) { StatusCode = 400 };
+        try
+        {
+            await api.DeleteAsync($"api/admin/clientes/{Id}/notas/{notaId}");
+            return new JsonResult(new { ok = true });
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao excluir nota {NotaId}", notaId);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
     public async Task<IActionResult> OnPostToggleLojaAsync(Guid lojaId, string motivo, bool ativa)
     {
         if (lojaId == Guid.Empty) { SetErro("Loja inválida."); return RedirectToPage(new { Id, tab = "lojas" }); }

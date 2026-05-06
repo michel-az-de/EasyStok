@@ -22,6 +22,38 @@
     <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
 }
 
+<!-- Banner de alerta — populado por fetch ao carregar notas. -->
+<div x-data="alertaBanner('@Model.Id')" x-init="carregar()"
+     x-show="alertasAtivos > 0" x-cloak
+     class="mb-3 px-4 py-2.5 rounded-lg flex items-start gap-3"
+     style="background:rgba(248,113,113,0.10);border:1px solid rgba(248,113,113,0.35)">
+    <div class="text-xl leading-none">⚠️</div>
+    <div class="flex-1 text-sm">
+        <span class="text-red-300 font-semibold">
+            <span x-text="alertasAtivos"></span> alerta(s) ativo(s) neste cliente.
+        </span>
+        <span class="text-es-ink-dim">Veja na aba <strong>Notas</strong> antes de agir.</span>
+    </div>
+    <a href="?tab=notas" class="text-xs text-red-300 hover:text-red-200 underline">Ver notas</a>
+</div>
+
+<script>
+function alertaBanner(tenantId) {
+    return {
+        alertasAtivos: 0,
+        async carregar() {
+            try {
+                const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=Notas', { credentials: 'same-origin', cache: 'no-store' });
+                if (!r.ok) return;
+                const d = await r.json();
+                const data = d.data || d;
+                this.alertasAtivos = data.alertasAtivos ?? 0;
+            } catch {}
+        }
+    };
+}
+</script>
+
 <!-- Header -->
 <div class="card mb-6" x-data="{ modal: null }">
     <div class="flex items-start justify-between flex-wrap gap-4">
@@ -122,7 +154,7 @@
         }
      }" class="space-y-4">
     <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
-        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("features","Features"), ("lgpd","LGPD") })
+        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("notas","Notas"), ("features","Features"), ("lgpd","LGPD") })
         {
             <button type="button"
                     @@click="switchTab('@t')"
@@ -1009,6 +1041,209 @@
                     if (!iso) return '';
                     const d = new Date(iso);
                     const diff = (Date.now() - d.getTime()) / 1000;
+                    if (diff < 60) return 'agora há pouco';
+                    if (diff < 3600) return Math.floor(diff/60) + ' min atrás';
+                    if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';
+                    if (diff < 86400*7) return Math.floor(diff/86400) + ' dia(s) atrás';
+                    return d.toLocaleDateString('pt-BR');
+                }
+            };
+        }
+        </script>
+    </div>
+
+    <!-- Tab Notas internas (P3) — handoff entre operadores -->
+    <div x-show="tab === 'notas'" x-cloak x-data="notasPanel('@Model.Id')"
+         x-init="$watch('tab', t => { if (t === 'notas' && !carregouUmaVez) { carregouUmaVez = true; carregar(); } })">
+        <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+            <!-- Lista -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-es-ink font-semibold text-sm">Notas internas</h3>
+                        <p class="text-es-ink-mute text-xs">Visíveis só para o time de back-office. Use pra handoff entre operadores.</p>
+                    </div>
+                    <div class="text-xs text-es-ink-mute">
+                        <span x-show="loading" x-cloak>Carregando…</span>
+                        <span x-show="!loading"><b class="text-es-ink" x-text="notas.length"></b> nota(s)</span>
+                    </div>
+                </div>
+                <div x-show="erro" x-cloak class="text-xs text-red-400 mb-2" x-text="erro"></div>
+
+                <template x-if="!loading && notas.length === 0">
+                    <div class="card text-center text-es-ink-mute text-sm py-8">
+                        Sem notas ainda. Use o formulário ao lado pra deixar contexto pra próximo operador.
+                    </div>
+                </template>
+
+                <div class="space-y-3">
+                    <template x-for="n in notas" :key="n.id">
+                        <div class="card p-3"
+                             :style="n.tipoInt === 1 ? 'background:rgba(248,113,113,0.06);border-color:rgba(248,113,113,0.3)' : (n.tipoInt === 2 ? 'background:rgba(247,144,9,0.06);border-color:rgba(247,144,9,0.3)' : '')">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                                     :style="'background:rgba(244,121,32,0.2);color:#f47920'"
+                                     x-text="(n.autorEmail || '?').substring(0, 1).toUpperCase()"></div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                        <span class="text-es-ink text-xs font-semibold" x-text="n.autorEmail"></span>
+                                        <span class="status-badge"
+                                              :class="n.tipoInt === 1 ? 'badge-cancelada' : (n.tipoInt === 2 ? 'badge-suspensa' : 'badge-ativa')"
+                                              x-text="n.tipoInt === 1 ? '⚠ Alerta' : (n.tipoInt === 2 ? '↑ Escalonamento' : 'Info')"></span>
+                                        <span class="text-es-ink-mute text-[10px]" x-text="formatRelativo(n.criadoEm)" :title="new Date(n.criadoEm).toLocaleString('pt-BR')"></span>
+                                        <span x-show="n.editado" x-cloak class="text-es-ink-mute text-[10px] italic">(editada)</span>
+                                    </div>
+                                    <template x-if="editandoId !== n.id">
+                                        <div class="text-es-ink-dim text-sm whitespace-pre-wrap break-words" x-text="n.texto"></div>
+                                    </template>
+                                    <template x-if="editandoId === n.id">
+                                        <div class="space-y-2 mt-1">
+                                            <textarea x-model="editandoTexto" rows="3" minlength="3" maxlength="2000"
+                                                      class="form-input w-full text-sm font-mono"></textarea>
+                                            <select x-model="editandoTipo" class="form-input text-sm">
+                                                <option value="Info">Info</option>
+                                                <option value="Alerta">⚠ Alerta</option>
+                                                <option value="Escalonamento">↑ Escalonamento</option>
+                                            </select>
+                                            <div class="flex gap-2">
+                                                <button type="button" @@click="salvarEdicao(n.id)" :disabled="editandoTexto.trim().length < 3" class="btn-primary text-xs">Salvar</button>
+                                                <button type="button" @@click="editandoId = null" class="btn-secondary text-xs">Cancelar</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button type="button" @@click="iniciarEdicao(n)" class="text-es-ink-mute hover:text-es-ink text-xs" title="Editar (só autor)">✏️</button>
+                                    <button type="button" @@click="excluir(n.id)" class="text-es-ink-mute hover:text-red-400 text-xs" title="Excluir">🗑</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Editor -->
+            @{ var afNotas = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+            <div class="card p-4 self-start lg:sticky lg:top-20 space-y-3">
+                <h4 class="text-es-ink font-semibold text-xs uppercase tracking-wide">Adicionar nota</h4>
+                <div>
+                    <label class="form-label">Tipo</label>
+                    <select x-model="novoTipo" class="form-input w-full text-sm">
+                        <option value="Info">Info — observação geral</option>
+                        <option value="Alerta">⚠ Alerta — aparece em banner no header</option>
+                        <option value="Escalonamento">↑ Escalonamento — passa pra outro operador</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Texto <span class="text-es-ink-mute">(3..2000 chars)</span></label>
+                    <textarea x-model="novoTexto" rows="5" minlength="3" maxlength="2000"
+                              placeholder="Ex.: cliente prefere ser atendido por email; confirmar com Maria antes de qualquer cobrança."
+                              class="form-input w-full text-sm font-mono"></textarea>
+                    <p class="text-xs text-es-ink-mute mt-1">
+                        <span x-text="novoTexto.length"></span> / 2000
+                    </p>
+                </div>
+                <button type="button" @@click="criar()" :disabled="novoTexto.trim().length < 3 || enviando"
+                        class="btn-primary text-sm w-full">
+                    <span x-show="!enviando">Adicionar nota</span>
+                    <span x-show="enviando" x-cloak>Enviando…</span>
+                </button>
+            </div>
+        </div>
+
+        <script>
+        function notasPanel(tenantId) {
+            return {
+                tenantId,
+                carregouUmaVez: false,
+                loading: false,
+                enviando: false,
+                erro: '',
+                notas: [],
+                novoTexto: '',
+                novoTipo: 'Info',
+                editandoId: null,
+                editandoTexto: '',
+                editandoTipo: 'Info',
+                async carregar() {
+                    this.loading = true; this.erro = '';
+                    try {
+                        const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=Notas', { credentials: 'same-origin', cache: 'no-store' });
+                        if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        const d = await r.json();
+                        const data = d.data || d;
+                        this.notas = data.itens || [];
+                    } catch (e) { this.erro = 'Falha: ' + (e.message || e); }
+                    finally { this.loading = false; }
+                },
+                async criar() {
+                    if (this.novoTexto.trim().length < 3) return;
+                    this.enviando = true;
+                    try {
+                        const fd = new FormData();
+                        fd.append('texto', this.novoTexto.trim());
+                        fd.append('tipo', this.novoTipo);
+                        fd.append('__RequestVerificationToken', '@afNotas');
+                        const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=CriarNota', {
+                            method: 'POST', credentials: 'same-origin', body: fd
+                        });
+                        if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        if (!r.ok) {
+                            const d = await r.json();
+                            this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                            return;
+                        }
+                        this.novoTexto = '';
+                        this.novoTipo = 'Info';
+                        await this.carregar();
+                    } catch (e) { this.erro = 'Falha: ' + (e.message || e); }
+                    finally { this.enviando = false; }
+                },
+                iniciarEdicao(n) {
+                    this.editandoId = n.id;
+                    this.editandoTexto = n.texto;
+                    this.editandoTipo = n.tipo;
+                },
+                async salvarEdicao(notaId) {
+                    if (this.editandoTexto.trim().length < 3) return;
+                    try {
+                        const fd = new FormData();
+                        fd.append('notaId', notaId);
+                        fd.append('texto', this.editandoTexto.trim());
+                        fd.append('tipo', this.editandoTipo);
+                        fd.append('__RequestVerificationToken', '@afNotas');
+                        const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=AtualizarNota', {
+                            method: 'POST', credentials: 'same-origin', body: fd
+                        });
+                        if (!r.ok) {
+                            const d = await r.json();
+                            this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                            return;
+                        }
+                        this.editandoId = null;
+                        await this.carregar();
+                    } catch (e) { this.erro = 'Falha: ' + (e.message || e); }
+                },
+                async excluir(notaId) {
+                    if (!confirm('Excluir esta nota? Esta ação fica auditada.')) return;
+                    try {
+                        const fd = new FormData();
+                        fd.append('notaId', notaId);
+                        fd.append('__RequestVerificationToken', '@afNotas');
+                        const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=ExcluirNota', {
+                            method: 'POST', credentials: 'same-origin', body: fd
+                        });
+                        if (!r.ok) {
+                            const d = await r.json();
+                            this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                            return;
+                        }
+                        await this.carregar();
+                    } catch (e) { this.erro = 'Falha: ' + (e.message || e); }
+                },
+                formatRelativo(iso) {
+                    if (!iso) return '';
+                    const d = new Date(iso); const diff = (Date.now() - d.getTime()) / 1000;
                     if (diff < 60) return 'agora há pouco';
                     if (diff < 3600) return Math.floor(diff/60) + ' min atrás';
                     if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';

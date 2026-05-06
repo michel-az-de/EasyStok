@@ -540,6 +540,137 @@ public class AdminClientesController(
         }.itens, total, page, pageSize);
     }
 
+    // ─────────────────── #14: Notas internas (handoff entre operadores) ───────────────────
+
+    [HttpGet("{tenantId:guid}/notas")]
+    public async Task<IActionResult> ListarNotas(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+
+        var notas = await db.AdminNotasTenant.AsNoTracking()
+            .Where(n => n.TenantId == tenantId && n.ExcluidoEm == null)
+            .OrderByDescending(n => n.CriadoEm)
+            .Select(n => new
+            {
+                id = n.Id,
+                texto = n.Texto,
+                tipo = n.Tipo.ToString(),
+                tipoInt = (int)n.Tipo,
+                autorAdminId = n.AutorAdminId,
+                autorEmail = n.AutorEmail,
+                criadoEm = n.CriadoEm,
+                alteradoEm = n.AlteradoEm,
+                editado = n.AlteradoEm > n.CriadoEm.AddSeconds(2)
+            })
+            .ToListAsync();
+
+        // Conta alertas pra usar no banner do header (UI faz outro GET /alertas-count
+        // se quiser; aqui já vai inline pra economizar 1 round-trip).
+        var alertasAtivos = notas.Count(n => n.tipoInt == (int)Domain.Entities.TipoNotaTenant.Alerta);
+
+        return DataOk(new { itens = notas, total = notas.Count, alertasAtivos });
+    }
+
+    [HttpPost("{tenantId:guid}/notas")]
+    public async Task<IActionResult> CriarNota(Guid tenantId, [FromBody] NotaTenantRequest req)
+    {
+        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!ValidarTextoNota(req?.Texto, out var textoT, out var erro)) return DataBadRequest(erro!);
+        if (!Enum.TryParse<Domain.Entities.TipoNotaTenant>(req!.Tipo, out var tipo))
+            return DataBadRequest("Tipo inválido. Use Info, Alerta ou Escalonamento.");
+
+        var (autorId, autorEmail) = ResolverAutor();
+        var nota = Domain.Entities.AdminNotaTenant.Criar(tenantId, autorId, autorEmail, textoT, tipo);
+        db.AdminNotasTenant.Add(nota);
+        await db.CommitAsync();
+
+        await audit.LogAsync(
+            "NotaInternaCriada",
+            $"NotaId={nota.Id}, Tipo={tipo}, Tamanho={textoT.Length}",
+            tenantId: tenantId,
+            entidadeAfetadaId: nota.Id);
+
+        return DataCreated($"/api/admin/clientes/{tenantId}/notas/{nota.Id}", new
+        {
+            id = nota.Id, criadoEm = nota.CriadoEm, autorEmail = nota.AutorEmail
+        });
+    }
+
+    [HttpPatch("{tenantId:guid}/notas/{notaId:guid}")]
+    public async Task<IActionResult> AtualizarNota(Guid tenantId, Guid notaId, [FromBody] NotaTenantRequest req)
+    {
+        if (tenantId == Guid.Empty || notaId == Guid.Empty) return DataBadRequest("Identificadores inválidos.");
+        if (!ValidarTextoNota(req?.Texto, out var textoT, out var erro)) return DataBadRequest(erro!);
+        if (!Enum.TryParse<Domain.Entities.TipoNotaTenant>(req!.Tipo, out var tipo))
+            return DataBadRequest("Tipo inválido.");
+
+        var nota = await db.AdminNotasTenant.FirstOrDefaultAsync(n => n.Id == notaId && n.TenantId == tenantId && n.ExcluidoEm == null);
+        if (nota is null) return DataNotFound("Nota não encontrada.");
+
+        var (autorId, _) = ResolverAutor();
+        // Só o autor pode editar (regra de domínio simples — SuperAdmin pode excluir
+        // qualquer, mas editar de outro autor mudaria a autoria do registro).
+        if (nota.AutorAdminId != autorId)
+            return DataBadRequest("Apenas o autor pode editar esta nota. Use exclusão se precisar substituir.");
+
+        nota.Atualizar(textoT, tipo);
+        await db.CommitAsync();
+
+        await audit.LogAsync(
+            "NotaInternaAtualizada",
+            $"NotaId={notaId}, Tipo={tipo}",
+            tenantId: tenantId,
+            entidadeAfetadaId: notaId);
+
+        return DataOk(new { id = nota.Id, alteradoEm = nota.AlteradoEm });
+    }
+
+    [HttpDelete("{tenantId:guid}/notas/{notaId:guid}")]
+    public async Task<IActionResult> ExcluirNota(Guid tenantId, Guid notaId)
+    {
+        if (tenantId == Guid.Empty || notaId == Guid.Empty) return DataBadRequest("Identificadores inválidos.");
+
+        var nota = await db.AdminNotasTenant.FirstOrDefaultAsync(n => n.Id == notaId && n.TenantId == tenantId && n.ExcluidoEm == null);
+        if (nota is null) return DataNotFound("Nota não encontrada.");
+
+        // SuperAdmin pode excluir qualquer nota — política mais flexível pra moderação.
+        // Soft-delete preserva histórico LGPD do que foi escrito por quem.
+        nota.Excluir();
+        await db.CommitAsync();
+
+        await audit.LogAsync(
+            "NotaInternaExcluida",
+            $"NotaId={notaId}, AutorOriginal={nota.AutorEmail}",
+            tenantId: tenantId,
+            entidadeAfetadaId: notaId);
+
+        return DataOk(new { id = notaId, excluido = true });
+    }
+
+    private (Guid AutorId, string AutorEmail) ResolverAutor()
+    {
+        var ctx = http.HttpContext;
+        var email = ctx?.User?.FindFirstValue(ClaimTypes.Email)
+                    ?? ctx?.User?.FindFirstValue("email")
+                    ?? "anonymous";
+        var subClaim = ctx?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                       ?? ctx?.User?.FindFirstValue("sub");
+        Guid.TryParse(subClaim, out var autorId);
+        return (autorId, email);
+    }
+
+    private static bool ValidarTextoNota(string? texto, out string textoNormalizado, out string? erro)
+    {
+        textoNormalizado = (texto ?? string.Empty).Trim();
+        if (textoNormalizado.Length is < 3 or > 2000)
+        {
+            erro = "Texto da nota deve ter entre 3 e 2000 caracteres.";
+            return false;
+        }
+        erro = null;
+        return true;
+    }
+
     // ─────────────────── helpers de mascaramento ───────────────────
 
     private static string? MascararDetalhes(string? texto)
@@ -591,3 +722,4 @@ public record CriarLojaAdminRequest(string Motivo, string Nome, string? Descrica
 public record AtualizarLojaAdminRequest(string Motivo, string Nome, string? Descricao, string? Documento, string? Endereco, string? Telefone);
 public record ToggleLojaRequest(string Motivo, bool Ativa);
 public record AnonimizarUsuarioRequest(string Motivo, string ConfirmacaoEmail);
+public record NotaTenantRequest(string Texto, string Tipo);

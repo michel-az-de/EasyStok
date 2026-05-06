@@ -58,6 +58,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;
+        public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
 
         // Identity / SaaS DbSets
