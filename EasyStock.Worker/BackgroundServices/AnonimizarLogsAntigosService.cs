@@ -58,8 +58,7 @@ public sealed class AnonimizarLogsAntigosService(
                          && m.Destinatario != "[anonimizado]")
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.Destinatario, "[anonimizado]")
-                    .SetProperty(m => m.CorpoRenderizado, "[anonimizado]")
-                    .SetProperty(m => m.AssuntoRenderizado, m => m.AssuntoRenderizado), // mantém assunto (não PII)
+                    .SetProperty(m => m.CorpoRenderizado, "[anonimizado]"),
                     ct);
 
             logger.LogInformation(

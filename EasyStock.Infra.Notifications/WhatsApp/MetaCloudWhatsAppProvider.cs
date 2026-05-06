@@ -34,7 +34,7 @@ public sealed class MetaCloudWhatsAppProvider(
 
         try
         {
-            await Pipeline.ExecuteAsync(async token =>
+            await Pipeline.ExecuteAsync(async pollyToken =>
             {
                 using var client = httpClientFactory.CreateClient("MetaWhatsApp");
                 client.DefaultRequestHeaders.Authorization =
@@ -50,7 +50,7 @@ public sealed class MetaCloudWhatsAppProvider(
                 });
 
                 var content = new StringContent(body, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync(url, content, token);
+                var response = await client.PostAsync(url, content, pollyToken);
                 response.EnsureSuccessStatusCode();
             }, ct);
 

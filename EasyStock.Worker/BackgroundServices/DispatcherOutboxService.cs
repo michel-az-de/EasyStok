@@ -117,7 +117,7 @@ public sealed class DispatcherOutboxService(
         }
 
         var mensagemPronta = new MensagemPronta(
-            mensagem.Id, mensagem.Destinatario, mensagem.AssuntoRenderizado,
+            mensagem.Id, mensagem.EmpresaId, mensagem.Destinatario, mensagem.AssuntoRenderizado,
             mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();

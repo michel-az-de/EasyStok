@@ -81,6 +81,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
+            // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
+            services.AddEasyStockNotificationsRepositories();
+
             // AI: OpenAI tem prioridade; Anthropic como fallback; stub se nenhum habilitado
             var openAiEnabled = configuration.GetValue<bool>("OpenAI:Enabled");
             var anthropicEnabled = configuration.GetValue<bool>("Anthropic:Enabled");

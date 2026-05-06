@@ -4,6 +4,7 @@ namespace EasyStock.Application.Ports.Output.Notifications;
 
 public sealed record MensagemPronta(
     Guid OutboxId,
+    Guid EmpresaId,
     string Destinatario,
     string Assunto,
     string Corpo,

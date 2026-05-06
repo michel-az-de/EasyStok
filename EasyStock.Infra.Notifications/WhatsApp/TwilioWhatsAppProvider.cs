@@ -33,7 +33,7 @@ public sealed class TwilioWhatsAppProvider(
 
         try
         {
-            await Pipeline.ExecuteAsync(async token =>
+            await Pipeline.ExecuteAsync(async pollyToken =>
             {
                 using var client = httpClientFactory.CreateClient("TwilioWhatsApp");
 
@@ -49,7 +49,7 @@ public sealed class TwilioWhatsAppProvider(
                     new("Body", mensagem.Corpo)
                 ]);
 
-                var response = await client.PostAsync(url, content, token);
+                var response = await client.PostAsync(url, content, pollyToken);
                 response.EnsureSuccessStatusCode();
             }, ct);
 

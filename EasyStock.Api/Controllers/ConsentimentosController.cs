@@ -69,6 +69,10 @@ public sealed class ConsentimentosController(
         if (parts.Length != 2)
             return BadRequest("Token inválido.");
 
+        Guid usuarioId;
+        CanalNotificacao canal;
+        CategoriaConteudoNotificacao categoria;
+
         try
         {
             var payload = Encoding.UTF8.GetString(Base64UrlDecode(parts[0]));
@@ -86,23 +90,23 @@ public sealed class ConsentimentosController(
 
             var fields = payload.Split(':');
             if (fields.Length != 3 ||
-                !Guid.TryParse(fields[0], out var usuarioId) ||
-                !Enum.TryParse<CanalNotificacao>(fields[1], out var canal) ||
-                !Enum.TryParse<CategoriaConteudoNotificacao>(fields[2], out var categoria))
+                !Guid.TryParse(fields[0], out usuarioId) ||
+                !Enum.TryParse<CanalNotificacao>(fields[1], out canal) ||
+                !Enum.TryParse<CategoriaConteudoNotificacao>(fields[2], out categoria))
             {
                 return BadRequest("Token inválido.");
             }
-
-            await optOutUseCase.ExecuteAsync(new RegistrarOptOutCommand(
-                usuarioId, canal, categoria,
-                "unsubscribe-link", "Descadastro via link no email"));
-
-            return Ok(new { mensagem = "Você foi descadastrado com sucesso. Suas preferências foram atualizadas." });
         }
         catch
         {
             return BadRequest("Token inválido.");
         }
+
+        await optOutUseCase.ExecuteAsync(new RegistrarOptOutCommand(
+            usuarioId, canal, categoria,
+            "unsubscribe-link", "Descadastro via link no email"));
+
+        return Ok(new { mensagem = "Você foi descadastrado com sucesso. Suas preferências foram atualizadas." });
     }
 
     /// <summary>

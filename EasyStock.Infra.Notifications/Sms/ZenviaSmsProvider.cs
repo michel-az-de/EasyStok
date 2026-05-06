@@ -34,7 +34,7 @@ public sealed class ZenviaSmsProvider(
 
         try
         {
-            await Pipeline.ExecuteAsync(async token =>
+            await Pipeline.ExecuteAsync(async pollyToken =>
             {
                 using var client = httpClientFactory.CreateClient("ZenviaSms");
                 client.DefaultRequestHeaders.Add("X-API-TOKEN", opts.ApiToken);
@@ -48,7 +48,7 @@ public sealed class ZenviaSmsProvider(
 
                 var content = new StringContent(body, Encoding.UTF8, "application/json");
                 var response = await client.PostAsync(
-                    $"{opts.BaseUrl}/channels/sms/messages", content, token);
+                    $"{opts.BaseUrl}/channels/sms/messages", content, pollyToken);
                 response.EnsureSuccessStatusCode();
             }, ct);
 

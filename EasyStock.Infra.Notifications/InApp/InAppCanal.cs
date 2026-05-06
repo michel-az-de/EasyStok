@@ -26,12 +26,8 @@ public sealed class InAppCanal(
                     ErroDetalhado: "Destinatario InApp deve ser um UsuarioId (GUID).");
             }
 
-            // Precisamos do EmpresaId — extraído do OutboxId via comentário de design:
-            // Para InApp, o "Destinatario" é o UsuarioId e o EmpresaId vem do contexto.
-            // Como não temos EmpresaId direto aqui, usamos Guid.Empty como placeholder
-            // — o Worker resolverá via OutboxMensagem.EmpresaId em PR4.
             var notificacao = Notificacao.Criar(
-                empresaId: Guid.Empty,
+                empresaId: mensagem.EmpresaId,
                 tipo: MapearTipo(mensagem.Categoria),
                 mensagem: mensagem.Corpo,
                 referenciaId: mensagem.OutboxId);
