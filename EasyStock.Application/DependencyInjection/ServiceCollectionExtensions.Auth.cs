@@ -46,6 +46,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>();
 
+        // LGPD operacional (admin dispara em nome do cliente)
+        services.AddScoped<EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin.AnonimizarUsuarioPorAdminUseCase>();
+
         return services;
     }
 }

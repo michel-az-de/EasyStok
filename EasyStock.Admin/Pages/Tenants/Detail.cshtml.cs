@@ -462,6 +462,70 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         }
     }
 
+    // ─────────────────── LGPD (P1 slice 2) ───────────────────
+
+    public async Task<IActionResult> OnPostAnonimizarUsuarioAsync(Guid userId, string motivo, string confirmacaoEmail)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 20) { SetErro("Justificativa obrigatória (≥20 caracteres) — anonimização é irreversível."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        if (string.IsNullOrWhiteSpace(confirmacaoEmail)) { SetErro("Confirmação de email é obrigatória."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>(
+                $"api/admin/clientes/{Id}/usuarios/{userId}/anonimizar",
+                new { motivo = motivoT, confirmacaoEmail = confirmacaoEmail.Trim() });
+            var msg = resp.TryGetProperty("mensagem", out var mp) ? mp.GetString() : "Usuário anonimizado.";
+            SetSucesso(msg ?? "Usuário anonimizado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao anonimizar usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao anonimizar: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "lgpd" });
+    }
+
+    public async Task<IActionResult> OnGetExportarDadosAsync(string motivo)
+    {
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) return BadRequest(new { error = "Motivo obrigatório (≥10 caracteres)." });
+
+        try
+        {
+            // O endpoint da API devolve File JSON. ApiClient.GetBytesAsync busca como bytes
+            // sem tentar deserializar — caminho ideal pra download cru.
+            var (bytes, ct) = await api.GetBytesAsync(
+                $"api/admin/clientes/{Id}/exportar?motivo={Uri.EscapeDataString(motivoT)}");
+            var fileName = $"easystock-export-tenant-{Id:N}-{DateTime.UtcNow:yyyyMMddHHmmss}.json";
+            return File(bytes, ct, fileName);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao exportar dados do tenant {TenantId}", Id);
+            SetErro($"Falha ao exportar: {ex.Message}");
+            return RedirectToPage(new { Id, tab = "lgpd" });
+        }
+    }
+
+    public async Task<IActionResult> OnGetHistoricoLgpdAsync(int page = 1)
+    {
+        try
+        {
+            var data = await api.GetRawAsync($"api/admin/clientes/{Id}/lgpd/historico?page={page}&pageSize=20");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao listar histórico LGPD do tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
+
     public async Task<IActionResult> OnPostToggleLojaAsync(Guid lojaId, string motivo, bool ativa)
     {
         if (lojaId == Guid.Empty) { SetErro("Loja inválida."); return RedirectToPage(new { Id, tab = "lojas" }); }

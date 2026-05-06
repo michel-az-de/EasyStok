@@ -122,7 +122,7 @@
         }
      }" class="space-y-4">
     <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
-        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("features","Features") })
+        @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("features","Features"), ("lgpd","LGPD") })
         {
             <button type="button"
                     @@click="switchTab('@t')"
@@ -338,6 +338,11 @@
                                             ✓ Reativar conta
                                         </button>
                                     }
+                                    <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10"
+                                            @@click="open=false; $dispatch('open-anonimizar', { userId: '@uid', nome: @Html.Raw(unomeJs), email: @Html.Raw(uemailJs) })">
+                                        ⚠️ Anonimizar (LGPD)
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -588,6 +593,91 @@
                     } finally {
                         this.submitting = false;
                     }
+                },
+                close() { if (!this.submitting) this.open = false; }
+            };
+        }
+        </script>
+
+        <!-- Modal Anonimizar (LGPD double-confirm) -->
+        @{ var afLgpd = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+        <div x-data="anonimizarModal()" x-init="init()" x-show="open" x-cloak
+             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()">
+            <div class="modal-box max-w-lg" @@click.stop>
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="text-2xl">⚠️</div>
+                    <div class="flex-1">
+                        <h3 class="text-red-400 font-bold">Anonimizar usuário</h3>
+                        <p class="text-es-ink-dim text-xs mt-1">
+                            <strong class="text-red-400">Operação irreversível.</strong> Os dados pessoais
+                            (nome, email, avatar) serão pseudonimizados; senha será apagada; sessões e
+                            tokens de credencial removidos. AuditLog/movimentações ficam preservados
+                            (UsuarioId mantido) — orientação ANPD.
+                        </p>
+                    </div>
+                </div>
+
+                <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AnonimizarUsuario&userId=' + ctx.userId" @@submit="submitting = true">
+                    <input type="hidden" name="__RequestVerificationToken" value="@afLgpd" />
+
+                    <div class="mb-4 p-3 rounded-lg" style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2)">
+                        <p class="text-xs text-red-300 mb-2">
+                            Para confirmar, digite o <strong>email exato</strong> do usuário-alvo:
+                        </p>
+                        <div class="text-es-ink-mute text-xs mb-2">Email do usuário: <span class="font-mono text-es-ink" x-text="ctx.email"></span></div>
+                        <input type="email" name="confirmacaoEmail" x-model="confirmacaoEmail"
+                               placeholder="email@dominio.com"
+                               class="form-input w-full text-sm font-mono"
+                               :class="emailMatch ? 'border-es-basil/50' : (confirmacaoEmail.length > 0 ? 'border-red-500/50' : '')" />
+                        <p x-show="confirmacaoEmail.length > 0 && !emailMatch" x-cloak class="text-xs text-red-400 mt-1">
+                            Email digitado não bate com o do usuário-alvo.
+                        </p>
+                        <p x-show="emailMatch" x-cloak class="text-xs text-es-basil mt-1">✓ Email confere.</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Justificativa <span class="text-es-ink-mute">(≥20 chars, audit log LGPD)</span></label>
+                        <textarea name="motivo" x-model="motivo" rows="3" minlength="20" maxlength="1000" required
+                                  placeholder="Ex.: cliente solicitou exclusão de conta via canal de suporte conforme chamado #1234"
+                                  class="form-input w-full text-sm font-mono"></textarea>
+                        <p class="text-xs mt-1" :class="motivo.trim().length >= 20 ? 'text-es-basil' : 'text-es-ink-mute'">
+                            <span x-text="motivo.trim().length"></span> / 20 mínimo
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" @@click="close()" :disabled="submitting" class="btn-secondary text-sm">Cancelar</button>
+                        <button type="submit" :disabled="!podeEnviar || submitting" class="btn-danger text-sm">
+                            <span x-show="!submitting">Anonimizar definitivamente</span>
+                            <span x-show="submitting" x-cloak>Anonimizando…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+        function anonimizarModal() {
+            return {
+                open: false,
+                submitting: false,
+                ctx: { userId: '', nome: '', email: '' },
+                confirmacaoEmail: '',
+                motivo: '',
+                init() {
+                    window.addEventListener('open-anonimizar', (e) => {
+                        this.ctx = Object.assign({ userId: '', nome: '', email: '' }, e.detail || {});
+                        this.confirmacaoEmail = '';
+                        this.motivo = '';
+                        this.submitting = false;
+                        this.open = true;
+                    });
+                },
+                get emailMatch() {
+                    return this.confirmacaoEmail.trim().toLowerCase() === (this.ctx.email || '').trim().toLowerCase();
+                },
+                get podeEnviar() {
+                    return this.emailMatch && this.motivo.trim().length >= 20;
                 },
                 close() { if (!this.submitting) this.open = false; }
             };
@@ -924,6 +1014,152 @@
                     if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';
                     if (diff < 86400*7) return Math.floor(diff/86400) + ' dia(s) atrás';
                     return d.toLocaleDateString('pt-BR');
+                }
+            };
+        }
+        </script>
+    </div>
+
+    <!-- Tab LGPD (P1 slice 2) — Exportar / Anonimizar / Histórico -->
+    <div x-show="tab === 'lgpd'" x-cloak x-data="lgpdPanel('@Model.Id')" x-init="$watch('tab', t => { if (t === 'lgpd' && !carregouHistorico) { carregouHistorico = true; carregarHistorico(); } })">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+            <!-- Card Exportar -->
+            <div class="card">
+                <div class="flex items-start gap-2 mb-2">
+                    <div class="text-2xl">📤</div>
+                    <div>
+                        <h4 class="text-es-ink font-semibold text-sm">Exportar dados</h4>
+                        <p class="text-es-ink-mute text-xs mt-0.5">LGPD Art. 18 — direito de portabilidade</p>
+                    </div>
+                </div>
+                <p class="text-es-ink-dim text-xs mb-3">
+                    Gera snapshot JSON com empresa, lojas, usuários (mascarados), contagens.
+                    Operação é auditada. PII desmascarada via endpoint individual.
+                </p>
+                <div class="space-y-2">
+                    <input type="text" x-model="exportarMotivo" placeholder="Justificativa (≥10 chars)"
+                           class="form-input w-full text-xs font-mono" />
+                    <a :href="exportarUrl"
+                       :class="exportarMotivo.trim().length >= 10 ? 'btn-primary' : 'btn-secondary opacity-50 pointer-events-none'"
+                       class="text-xs w-full block text-center">
+                        Baixar JSON
+                    </a>
+                </div>
+            </div>
+
+            <!-- Card Anonimizar -->
+            <div class="card">
+                <div class="flex items-start gap-2 mb-2">
+                    <div class="text-2xl">⚠️</div>
+                    <div>
+                        <h4 class="text-es-ink font-semibold text-sm">Anonimizar usuário</h4>
+                        <p class="text-es-ink-mute text-xs mt-0.5">LGPD Art. 18 — direito ao esquecimento</p>
+                    </div>
+                </div>
+                <p class="text-es-ink-dim text-xs mb-3">
+                    Para anonimizar um usuário deste cliente, abra a aba <button type="button" @@click="$root.tab='usuarios'; window.history.replaceState({}, '', new URL(window.location).toString().replace(/tab=\w+/, 'tab=usuarios'))" class="text-es-accent hover:underline">Usuários</button>,
+                    clique em <strong class="text-es-ink">Ações ▾ → Anonimizar (LGPD)</strong>.
+                    Operação irreversível com double-confirm por email.
+                </p>
+                <div class="text-xs text-es-ink-mute" x-show="estatisticas.totalAcoesLgpd != null" x-cloak>
+                    <span x-text="estatisticas.totalAcoesLgpd ?? 0"></span> ação(ões) LGPD registrada(s) neste cliente
+                    · <span x-text="estatisticas.totalUnmasks ?? 0"></span> unmask(s) de PII
+                </div>
+            </div>
+
+            <!-- Card Histórico -->
+            <div class="card">
+                <div class="flex items-start gap-2 mb-2">
+                    <div class="text-2xl">📋</div>
+                    <div>
+                        <h4 class="text-es-ink font-semibold text-sm">Histórico LGPD</h4>
+                        <p class="text-es-ink-mute text-xs mt-0.5">Comprovação ANPD em segundos</p>
+                    </div>
+                </div>
+                <p class="text-es-ink-dim text-xs mb-3">
+                    Anonimizações, exports e desmascaramentos de PII realizados neste cliente,
+                    com operador e justificativa. Veja a tabela abaixo.
+                </p>
+                <button type="button" @@click="carregarHistorico()"
+                        class="btn-secondary text-xs w-full">↻ Atualizar histórico</button>
+            </div>
+        </div>
+
+        <!-- Tabela histórico -->
+        <div class="card p-0 overflow-hidden">
+            <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.08)">
+                <h3 class="text-es-ink font-semibold text-sm">Ações LGPD registradas</h3>
+                <span class="text-es-ink-mute text-xs"><b class="text-es-ink" x-text="totalHist"></b> registro(s)</span>
+            </div>
+            <div x-show="loadingHist" x-cloak class="text-es-ink-mute text-sm py-6 text-center">Carregando…</div>
+            <div x-show="erroHist" x-cloak class="bg-red-500/10 text-red-400 text-xs px-4 py-2 border-b border-red-500/30" x-text="erroHist"></div>
+            <table class="table-admin">
+                <thead><tr><th>Ação</th><th>Operador</th><th>Detalhes</th><th>Justificativa</th><th>Quando</th></tr></thead>
+                <tbody>
+                    <template x-if="!loadingHist && historico.length === 0">
+                        <tr><td colspan="5" class="text-es-ink-mute text-center py-6">Sem registros LGPD para este cliente.</td></tr>
+                    </template>
+                    <template x-for="r in historico" :key="r.id">
+                        <tr>
+                            <td class="font-mono text-xs">
+                                <span class="status-badge"
+                                      :class="r.acao === 'UsuarioTenantAnonimizado' ? 'badge-cancelada' : (r.acao === 'TenantDadosExportados' ? 'badge-ativa' : 'badge-suspensa')"
+                                      x-text="iconePorAcao(r.acao) + ' ' + labelAcao(r.acao)"></span>
+                            </td>
+                            <td class="text-es-ink-dim text-xs font-mono" x-text="r.adminEmail"></td>
+                            <td class="text-es-ink-dim text-xs max-w-xs truncate" :title="r.detalhes" x-text="r.detalhes ?? '—'"></td>
+                            <td class="text-amber-300/80 text-xs max-w-xs truncate italic" :title="r.motivo" x-text="r.motivo ?? '—'"></td>
+                            <td class="text-es-ink-dim text-xs" x-text="new Date(r.criadoEm).toLocaleString('pt-BR')"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+        function lgpdPanel(tenantId) {
+            return {
+                tenantId,
+                carregouHistorico: false,
+                loadingHist: false,
+                erroHist: '',
+                historico: [],
+                totalHist: 0,
+                estatisticas: { totalAcoesLgpd: null, totalUnmasks: null },
+                exportarMotivo: '',
+                get exportarUrl() {
+                    if (this.exportarMotivo.trim().length < 10) return '#';
+                    return '/Tenants/Detail/' + this.tenantId + '?handler=ExportarDados&motivo=' + encodeURIComponent(this.exportarMotivo.trim());
+                },
+                async carregarHistorico() {
+                    this.loadingHist = true; this.erroHist = '';
+                    try {
+                        const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=HistoricoLgpd', {
+                            credentials: 'same-origin', cache: 'no-store'
+                        });
+                        if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        const d = await r.json();
+                        const items = (d.data || []);
+                        this.historico = items;
+                        this.totalHist = (d.meta && d.meta.total) ?? items.length;
+                    } catch (e) {
+                        this.erroHist = 'Falha ao carregar: ' + (e.message || e);
+                    } finally {
+                        this.loadingHist = false;
+                    }
+                },
+                iconePorAcao(acao) {
+                    if (acao === 'UsuarioTenantAnonimizado') return '🗑';
+                    if (acao === 'TenantDadosExportados') return '📤';
+                    if (acao === 'PiiVisualizado') return '👁';
+                    return '🛡';
+                },
+                labelAcao(acao) {
+                    if (acao === 'UsuarioTenantAnonimizado') return 'Anonimizado';
+                    if (acao === 'TenantDadosExportados') return 'Export gerado';
+                    if (acao === 'PiiVisualizado') return 'PII desmascarada';
+                    return acao;
                 }
             };
         }

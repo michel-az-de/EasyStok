@@ -1,6 +1,7 @@
 using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin;
 using EasyStock.Application.UseCases.AtualizarLoja;
 using EasyStock.Application.UseCases.CriarLoja;
 using EasyStock.Application.UseCases.DesativarLoja;
@@ -32,6 +33,7 @@ public class AdminClientesController(
     AtualizarLojaUseCase atualizarLojaUseCase,
     DesativarLojaUseCase desativarLojaUseCase,
     ReativarLojaUseCase reativarLojaUseCase,
+    AnonimizarUsuarioPorAdminUseCase anonimizarUseCase,
     AdminAuditService audit,
     IHttpContextAccessor http,
     ILogger<AdminClientesController> logger) : EasyStockControllerBase
@@ -360,6 +362,184 @@ public class AdminClientesController(
         });
     }
 
+    // ─────────────────── #8: Anonimizar usuário pelo admin (LGPD) ───────────────────
+
+    [HttpPost("{tenantId:guid}/usuarios/{userId:guid}/anonimizar")]
+    public async Task<IActionResult> AnonimizarUsuario(Guid tenantId, Guid userId, [FromBody] AnonimizarUsuarioRequest req)
+    {
+        if (tenantId == Guid.Empty || userId == Guid.Empty) return DataBadRequest("Cliente ou usuário inválidos.");
+        if (string.IsNullOrWhiteSpace(req?.Motivo) || req.Motivo.Trim().Length < 20)
+            return DataBadRequest("Justificativa obrigatória (≥20 caracteres) — anonimização é irreversível.");
+        if (string.IsNullOrWhiteSpace(req.ConfirmacaoEmail))
+            return DataBadRequest("Confirmação de email obrigatória.");
+
+        // Valida pertencimento ao tenant.
+        var pertence = await db.UsuariosEmpresas.AnyAsync(ue => ue.UsuarioId == userId && ue.EmpresaId == tenantId);
+        if (!pertence) return DataNotFound("Usuário não pertence a este cliente.");
+
+        try
+        {
+            var resultado = await anonimizarUseCase.ExecuteAsync(new AnonimizarUsuarioPorAdminCommand(
+                UsuarioId: userId,
+                ConfirmacaoEmail: req.ConfirmacaoEmail,
+                Motivo: req.Motivo));
+
+            await audit.LogAsync(
+                "UsuarioTenantAnonimizado",
+                $"UserId={userId}; tokens removidos refresh:{resultado.RefreshTokensRemovidos} reset:{resultado.ResetTokensRemovidos} confirm:{resultado.EmailConfirmationTokensRemovidos}",
+                tenantId: tenantId,
+                motivo: req.Motivo,
+                entidadeAfetadaId: userId);
+
+            return DataOk(new
+            {
+                usuarioId = resultado.UsuarioId,
+                anonimizadoEm = resultado.AnonimizadoEm,
+                tokensRemovidos = new
+                {
+                    refresh = resultado.RefreshTokensRemovidos,
+                    reset = resultado.ResetTokensRemovidos,
+                    confirmacaoEmail = resultado.EmailConfirmationTokensRemovidos
+                },
+                mensagem = "Usuário anonimizado. Operação irreversível registrada no audit LGPD."
+            });
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao anonimizar usuário {UserId} do tenant {TenantId}", userId, tenantId);
+            return Problem(detail: ex.Message, statusCode: 500, title: "Erro ao anonimizar.");
+        }
+    }
+
+    // ─────────────────── Exportar dados do tenant (LGPD) ───────────────────
+
+    /// <summary>
+    /// LGPD Art. 18 — direito de portabilidade. Snapshot estruturado dos dados do
+    /// tenant: empresa, lojas, usuários (mascarados), assinatura, contagens. Download
+    /// como JSON estruturado. ZIP fica como evolução futura (incluir movimentações).
+    /// </summary>
+    [HttpGet("{tenantId:guid}/exportar")]
+    public async Task<IActionResult> ExportarDados(Guid tenantId, [FromQuery] string motivo)
+    {
+        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!ValidarMotivo(motivo, out var motivoT, out var erro)) return DataBadRequest(erro!);
+
+        var empresa = await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == tenantId);
+        if (empresa is null) return DataNotFound("Cliente não encontrado.");
+
+        var lojas = await db.Lojas.AsNoTracking()
+            .Where(l => l.EmpresaId == tenantId)
+            .Select(l => new { l.Id, l.Nome, l.Descricao, l.Documento, l.Endereco, l.Telefone, l.Ativa, l.CriadoEm, l.AlteradoEm })
+            .ToListAsync();
+
+        var usuariosIds = await db.UsuariosEmpresas
+            .Where(ue => ue.EmpresaId == tenantId)
+            .Select(ue => ue.UsuarioId)
+            .ToListAsync();
+
+        var usuarios = await db.Usuarios.AsNoTracking()
+            .Where(u => usuariosIds.Contains(u.Id))
+            .Select(u => new
+            {
+                u.Id,
+                u.Nome,
+                emailMascarado = MascararEmail(u.Email),
+                u.Ativo,
+                u.EmailConfirmado,
+                u.UltimoAcessoEm,
+                u.CriadoEm,
+                u.AlteradoEm
+            })
+            .ToListAsync();
+
+        var snapshot = new
+        {
+            geradoEm = DateTime.UtcNow,
+            geradoPor = http.HttpContext?.User?.FindFirstValue(ClaimTypes.Email) ?? "anonymous",
+            motivo = motivoT,
+            tenantId,
+            lgpdNote = "Snapshot LGPD Art. 18 — emails mascarados. Use endpoint /usuario-pii/{id} pra desmascarar individualmente (auditado).",
+            empresa = new { empresa.Id, empresa.Nome, empresa.Documento, empresa.CriadoEm, empresa.AlteradoEm },
+            contagens = new
+            {
+                lojas = lojas.Count,
+                lojasAtivas = lojas.Count(l => l.Ativa),
+                usuarios = usuarios.Count,
+                usuariosAtivos = usuarios.Count(u => u.Ativo)
+            },
+            lojas,
+            usuarios
+        };
+
+        await audit.LogAsync(
+            "TenantDadosExportados",
+            $"Empresa={empresa.Nome}, Lojas={lojas.Count}, Usuarios={usuarios.Count}",
+            tenantId: tenantId,
+            motivo: motivoT,
+            entidadeAfetadaId: tenantId);
+
+        // JSON download — Content-Disposition força attachment.
+        var fileName = $"easystock-export-tenant-{tenantId:N}-{DateTime.UtcNow:yyyyMMddHHmmss}.json";
+        var json = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", fileName);
+    }
+
+    // ─────────────────── Histórico LGPD do tenant ───────────────────
+
+    /// <summary>
+    /// Lista ações LGPD-relevantes feitas neste tenant pelo admin (anonimização,
+    /// export, PII unmask). Mostra quem fez, quando, motivo. Fonte para tab
+    /// "Histórico LGPD" — comprovação à ANPD em disputas ou auditorias.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/lgpd/historico")]
+    public async Task<IActionResult> HistoricoLgpd(
+        Guid tenantId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 30)
+    {
+        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        (page, pageSize) = NormalisePage(page, pageSize, maxPageSize: 100);
+
+        // Ações LGPD-relevantes que aparecem na timeline geral, mas precisam de
+        // visualização dedicada pra relatório. Whitelist mantém o filtro estrito.
+        var acoesLgpd = new[] { "UsuarioTenantAnonimizado", "PiiVisualizado", "TenantDadosExportados" };
+
+        var query = db.AdminAuditLogs.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && acoesLgpd.Contains(a.Acao));
+        var total = await query.CountAsync();
+        var itens = await query
+            .OrderByDescending(a => a.CriadoEm)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new
+            {
+                a.Id,
+                a.Acao,
+                a.AdminEmail,
+                a.Detalhes,
+                a.Motivo,
+                a.EntidadeAfetadaId,
+                criadoEm = a.CriadoEm
+            })
+            .ToListAsync();
+
+        // Estatísticas rápidas pra mostrar no card.
+        var totalUnmasks = await db.AdminAcessosPiiLogs.AsNoTracking()
+            .Where(p => p.TenantId == tenantId)
+            .CountAsync();
+
+        return DataPaged(new
+        {
+            itens,
+            estatisticas = new
+            {
+                totalAcoesLgpd = total,
+                totalUnmasks
+            }
+        }.itens, total, page, pageSize);
+    }
+
     // ─────────────────── helpers de mascaramento ───────────────────
 
     private static string? MascararDetalhes(string? texto)
@@ -410,3 +590,4 @@ public class AdminClientesController(
 public record CriarLojaAdminRequest(string Motivo, string Nome, string? Descricao, string? Documento, string? Endereco, string? Telefone);
 public record AtualizarLojaAdminRequest(string Motivo, string Nome, string? Descricao, string? Documento, string? Endereco, string? Telefone);
 public record ToggleLojaRequest(string Motivo, bool Ativa);
+public record AnonimizarUsuarioRequest(string Motivo, string ConfirmacaoEmail);
