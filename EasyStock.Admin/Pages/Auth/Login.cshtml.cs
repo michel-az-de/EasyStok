@@ -20,13 +20,16 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
     public string Senha { get; set; } = "";
 
     public string? Erro { get; set; }
+    /// <summary>True quando o usuário caiu aqui por sessão expirada (cookie _se_admin).
+    /// UI distingue visualmente desse caso (banner amarelo) vs erro de credencial (vermelho).</summary>
+    public bool SessaoExpirada { get; private set; }
 
     public void OnGet()
     {
         // Se o handler de refresh marcou sessão expirada via cookie, mostra mensagem.
         if (Request.Cookies.ContainsKey("_se_admin"))
         {
-            Erro = "Sua sessão expirou. Faça login novamente.";
+            SessaoExpirada = true;
             Response.Cookies.Delete("_se_admin");
         }
     }
