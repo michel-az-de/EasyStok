@@ -217,6 +217,14 @@
                 this.loadRecent();
                 this.bindShortcuts();
                 this.trackTenantViewed();
+                // Seed do dashboard via window.__initialDash (definido inline em /Index.cshtml).
+                // Acontece ANTES da fetch pra UI mostrar valores server-side imediatamente,
+                // sem o "flash de zeros" enquanto a fetch não retorna. fetchDashBadges()
+                // depois sobrescreve com valores frescos da API.
+                if (typeof window.__initialDash === 'object' && window.__initialDash !== null) {
+                    Object.assign(this.dash, window.__initialDash);
+                    this.dash.ticketsBadge = (this.dash.ticketsComNovaMensagem ?? 0) + (this.dash.ticketsCriticos ?? 0);
+                }
                 await this.fetchDashBadges();
                 setInterval(() => this.fetchDashBadges(), 60000);
                 setInterval(() => { if (this._lastFetch) this.dashSecsAgo = Math.floor((Date.now() - this._lastFetch) / 1000); }, 5000);

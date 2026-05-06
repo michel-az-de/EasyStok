@@ -43,6 +43,33 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
             session.ClearSession();
             context.Result = new RedirectToPageResult("/Auth/Login");
         }
+        catch (Exception ex)
+        {
+            // Last-resort: qualquer exception não capturada por handlers individuais
+            // vira página de erro amigável em vez de "HTTP 500". Logamos pra forensics.
+            // Sem isso, exceções de rede (API down) ou bugs novos viram 500 cru no
+            // browser do operador — UX terrível, especialmente em prod.
+            try
+            {
+                var logger = context.HttpContext.RequestServices.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+                logger?.CreateLogger("AdminPageBase").LogError(ex,
+                    "Exceção não tratada no handler {Handler} da página {Page}",
+                    context.HandlerMethod?.MethodInfo.Name ?? "(?)",
+                    context.ActionDescriptor.ViewEnginePath);
+            }
+            catch { /* logging falhou — sem fallback */ }
+
+            // TempData["Erro"] vai ser exibido como toast no _Layout. RedirectToPage
+            // pra mesma rota mantém o usuário no contexto e mostra a mensagem amigável.
+            try { context.HttpContext.Items["__handler_error"] = ex.Message; } catch { }
+            try
+            {
+                ((Microsoft.AspNetCore.Mvc.RazorPages.PageModel)context.HandlerInstance).TempData["Erro"]
+                    = "Operação falhou: " + (ex.Message?.Length > 200 ? ex.Message.Substring(0, 200) + "…" : ex.Message);
+            }
+            catch { /* TempData não disponível em contextos especiais — ignora */ }
+            context.Result = new RedirectToPageResult(context.ActionDescriptor.ViewEnginePath);
+        }
     }
 
     /// <summary>
