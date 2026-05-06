@@ -13,8 +13,11 @@ public class AdminAuditLogConfiguration : IEntityTypeConfiguration<AdminAuditLog
         b.Property(x => x.AdminEmail).HasMaxLength(256).IsRequired();
         b.Property(x => x.Acao).HasMaxLength(100).IsRequired();
         b.Property(x => x.Detalhes).HasMaxLength(2000);
+        b.Property(x => x.Motivo).HasMaxLength(1000);
         b.Property(x => x.Ip).HasMaxLength(64);
         b.HasIndex(x => x.CriadoEm);
         b.HasIndex(x => x.TenantId);
+        // Filtro "tudo sobre esta entidade" — composto com TenantId pra ser seletivo.
+        b.HasIndex(x => new { x.TenantId, x.EntidadeAfetadaId });
     }
 }

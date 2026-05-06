@@ -1,0 +1,97 @@
+@*
+    Modal global de justificativa — usado por toda ação destrutiva auditada.
+    Padrão: o caller dispara o evento `open-justificar` com payload, este modal
+    renderiza form, valida motivo (>=10 chars) e POSTa no endpoint.
+
+    Uso (em qualquer página que inclua este partial):
+
+      <button type="button"
+              @@click="$dispatch('open-justificar', {
+                  endpoint: '/Tenants/Detail?handler=ForcarLogoutUsuario&id=@Model.Id&userId=' + uid,
+                  acao: 'Forçar logout',
+                  resumo: 'Todas as sessões ativas de ' + nome + ' serão revogadas.',
+                  variant: 'danger'
+              })">
+          Forçar logout
+      </button>
+
+    O endpoint POST recebe um campo "motivo" + antiforgery token automático.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery _antiforgery
+@{
+    var _af = _antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+<div x-data="modalJustificativa()" x-init="init()" x-show="open" x-cloak
+     class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()">
+    <div class="modal-box max-w-md" @@click.stop>
+        <div class="flex items-start gap-3 mb-4">
+            <div class="text-2xl" x-text="cfg.variant === 'danger' ? '⚠️' : 'ℹ️'"></div>
+            <div class="flex-1">
+                <h3 class="text-es-ink font-semibold" x-text="cfg.acao || 'Confirmar ação'"></h3>
+                <p class="text-es-ink-dim text-sm mt-1" x-text="cfg.resumo"></p>
+            </div>
+        </div>
+
+        <form method="post" :action="cfg.endpoint" @@submit="submitting = true">
+            <input type="hidden" name="__RequestVerificationToken" value="@_af" />
+            <div class="mb-4">
+                <label class="form-label">Justificativa <span class="text-es-ink-mute">(será gravada no audit log)</span></label>
+                <textarea name="motivo" x-model="motivo" rows="3"
+                          minlength="10" maxlength="1000" required
+                          placeholder="Ex.: cliente abriu chamado #1234 solicitando reset de senha"
+                          class="form-input w-full font-mono text-sm"
+                          :class="motivoErro && 'border-red-500'"></textarea>
+                <p class="text-xs mt-1" :class="motivo.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                    <span x-text="motivo.trim().length"></span> / 10 mínimo
+                </p>
+                <p x-show="motivoErro" x-cloak class="text-xs text-red-400 mt-1" x-text="motivoErro"></p>
+            </div>
+
+            <template x-if="cfg.extraFields">
+                <div class="mb-4 space-y-3" x-html="cfg.extraFields"></div>
+            </template>
+
+            <div class="flex gap-3 justify-end">
+                <button type="button" @@click="close()" :disabled="submitting"
+                        class="btn-secondary text-sm">Cancelar</button>
+                <button type="submit" :disabled="!podeEnviar || submitting"
+                        :class="cfg.variant === 'danger' ? 'btn-danger' : 'btn-primary'"
+                        class="text-sm">
+                    <span x-show="!submitting" x-text="cfg.confirmLabel || 'Confirmar (auditado)'"></span>
+                    <span x-show="submitting" x-cloak>Enviando…</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function modalJustificativa() {
+    return {
+        open: false,
+        submitting: false,
+        motivo: '',
+        motivoErro: '',
+        cfg: { endpoint: '', acao: '', resumo: '', variant: 'primary', confirmLabel: '', extraFields: '' },
+        init() {
+            window.addEventListener('open-justificar', (e) => {
+                this.cfg = Object.assign(
+                    { endpoint: '', acao: '', resumo: '', variant: 'primary', confirmLabel: '', extraFields: '' },
+                    e.detail || {}
+                );
+                this.motivo = '';
+                this.motivoErro = '';
+                this.submitting = false;
+                this.open = true;
+            });
+        },
+        get podeEnviar() {
+            return this.motivo.trim().length >= 10 && !!this.cfg.endpoint;
+        },
+        close() {
+            if (this.submitting) return;
+            this.open = false;
+        }
+    };
+}
+</script>

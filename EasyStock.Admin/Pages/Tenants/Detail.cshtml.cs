@@ -219,4 +219,75 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         }
         return RedirectToPage(new { Id });
     }
+
+    // ─────────────────────── Ações sobre usuário do tenant (P0) ───────────────────────
+    // Endpoints que cobrem 80% dos chamados de suporte: reset senha, forçar logout, ver sessões.
+    // Todos exigem `motivo` (≥10 chars) auditado no AdminAuditLog.
+
+    public async Task<IActionResult> OnPostResetSenhaUsuarioAsync(Guid userId, string motivo)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>(
+                $"api/admin/usuarios-tenant/{userId}/reset-senha",
+                new { motivo = motivoT, enviarPorEmail = true });
+            var emailEnviado = resp.TryGetProperty("emailEnviado", out var eep) && eep.GetBoolean();
+            var sessoesRevogadas = resp.TryGetProperty("sessoesRevogadas", out var srp) && srp.TryGetInt32(out var sr) ? sr : 0;
+            SetSucesso(emailEnviado
+                ? $"Senha resetada — email enviado ao usuário ({sessoesRevogadas} sessão(ões) revogada(s))."
+                : $"Senha resetada, mas o email NÃO foi enviado. Informe o usuário pelo canal oficial. ({sessoesRevogadas} sessão(ões) revogada(s)).");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao resetar senha do usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao resetar senha: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
+
+    public async Task<IActionResult> OnPostForcarLogoutUsuarioAsync(Guid userId, string motivo)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>(
+                $"api/admin/usuarios-tenant/{userId}/forcar-logout",
+                new { motivo = motivoT });
+            var revogadas = resp.TryGetProperty("sessoesRevogadas", out var srp) && srp.TryGetInt32(out var sr) ? sr : 0;
+            SetSucesso(revogadas > 0
+                ? $"{revogadas} sessão(ões) ativa(s) revogada(s)."
+                : "Usuário não tinha sessões ativas — nenhuma alteração.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao forçar logout do usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao forçar logout: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
+
+    public async Task<IActionResult> OnGetSessoesUsuarioAsync(Guid userId)
+    {
+        if (userId == Guid.Empty) return BadRequest(new { error = "userId inválido" });
+        try
+        {
+            var data = await api.GetAsync<JsonElement>($"api/admin/usuarios-tenant/{userId}/sessoes");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao listar sessões do usuário {UserId}", userId);
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
 }

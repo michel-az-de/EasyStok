@@ -110,12 +110,21 @@
 </div>
 
 <!-- Tabs -->
-<div x-data="{ tab: 'visao' }" class="space-y-4">
+<div x-data="{
+        tab: (new URLSearchParams(window.location.search).get('tab')) || 'visao',
+        switchTab(t) {
+            this.tab = t;
+            // Atualiza URL sem recarregar — permite voltar pra mesma tab no F5/Back.
+            const u = new URL(window.location);
+            u.searchParams.set('tab', t);
+            window.history.replaceState({}, '', u);
+        }
+     }" class="space-y-4">
     <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
         @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("audit","Audit Log"), ("features","Features") })
         {
             <button type="button"
-                    @@click="tab = '@t'"
+                    @@click="switchTab('@t')"
                     x-bind:style="tab === '@t' ? 'background:#f47920;color:#f7f2e8' : 'color:#8793a7'"
                     class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">@l</button>
         }
@@ -230,29 +239,108 @@
     </div>
 
     <!-- Usuários -->
-    <div x-show="tab === 'usuarios'" x-cloak>
+    <div x-show="tab === 'usuarios'" x-cloak x-data="{ sessoesUserId: null, sessoesData: null, sessoesLoading: false, sessoesErro: '' }">
         <div class="card p-0 overflow-hidden">
             <table class="table-admin">
-                <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th></tr></thead>
+                <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
                 <tbody>
+                    @if (!Model.Usuarios.Any())
+                    {
+                        <tr><td colspan="6" class="text-es-ink-mute text-center py-8 text-sm">Cliente sem usuários cadastrados.</td></tr>
+                    }
                     @foreach (var u in Model.Usuarios)
                     {
+                        var uid = u.TryGetProperty("id", out var uidp) ? uidp.GetString() : "";
                         var unome = u.TryGetProperty("nome", out var unp) ? unp.GetString() : "";
                         var uemail = u.TryGetProperty("email", out var uep) ? uep.GetString() : "";
                         var nivel = u.TryGetProperty("nivelAcesso", out var univelP) && univelP.ValueKind != System.Text.Json.JsonValueKind.Null ? univelP.GetString() : "—";
                         var ativo = u.TryGetProperty("ativo", out var uap) && uap.GetBoolean();
                         var ultimo = u.TryGetProperty("ultimoAcessoEm", out var uup) && uup.ValueKind != System.Text.Json.JsonValueKind.Null ? uup.GetString() : null;
                         DateTime.TryParse(ultimo, out var ultimoDt);
-                        <tr>
+                        // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
+                        var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
+                        var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
+                        <tr x-data="{ open: false }">
                             <td class="text-es-ink font-medium">@unome</td>
-                            <td class="text-es-ink-dim">@uemail</td>
+                            <td class="text-es-ink-dim font-mono text-xs">@uemail</td>
                             <td class="text-es-ink-dim">@nivel</td>
                             <td class="text-es-ink-dim">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
                             <td><span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span></td>
+                            <td class="text-right relative">
+                                <button type="button" @@click="open = !open" @@click.outside="open = false"
+                                        class="btn-secondary text-xs px-3 py-1">Ações ▾</button>
+                                <div x-show="open" x-cloak
+                                     class="absolute right-0 mt-1 w-56 z-30 rounded-lg shadow-2xl py-1"
+                                     style="background:#1a2540;border:1px solid rgba(247,242,232,0.12)">
+                                    <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
+                                            @@click="open=false; $dispatch('open-justificar', {
+                                                endpoint: '/Tenants/Detail/@Model.Id?handler=ResetSenhaUsuario&userId=@uid',
+                                                acao: 'Resetar senha de @unome',
+                                                resumo: 'Uma nova senha temporária será gerada e enviada por email para @uemail. Todas as sessões ativas serão revogadas.',
+                                                variant: 'danger',
+                                                confirmLabel: 'Resetar senha (auditado)'
+                                            })">
+                                        🔑 Resetar senha
+                                    </button>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
+                                            @@click="open=false; $dispatch('open-justificar', {
+                                                endpoint: '/Tenants/Detail/@Model.Id?handler=ForcarLogoutUsuario&userId=@uid',
+                                                acao: 'Forçar logout de @unome',
+                                                resumo: 'Todas as sessões ativas (refresh tokens) deste usuário serão revogadas. Ele precisará logar novamente em todos os dispositivos.',
+                                                variant: 'danger',
+                                                confirmLabel: 'Forçar logout (auditado)'
+                                            })">
+                                        🚪 Forçar logout
+                                    </button>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
+                                            @@click="open=false; sessoesUserId='@uid'; sessoesData=null; sessoesErro=''; sessoesLoading=true; fetch('/Tenants/Detail/@Model.Id?handler=SessoesUsuario&userId=@uid', { credentials: 'same-origin' }).then(r => r.json()).then(d => { sessoesData = d.data || d; sessoesLoading = false; }).catch(e => { sessoesErro = e.message; sessoesLoading = false; })">
+                                        👁 Ver sessões
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
+        </div>
+
+        <!-- Modal Sessões -->
+        <div x-show="sessoesUserId" x-cloak class="modal-overlay" @@click.self="sessoesUserId = null" @@keydown.escape.window="sessoesUserId = null">
+            <div class="modal-box max-w-2xl" @@click.stop>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-es-ink font-semibold">Sessões ativas</h3>
+                    <button type="button" @@click="sessoesUserId = null" class="text-es-ink-mute hover:text-es-ink">✕</button>
+                </div>
+                <div x-show="sessoesLoading" x-cloak class="text-es-ink-mute text-sm py-6 text-center">Carregando sessões…</div>
+                <div x-show="sessoesErro" x-cloak class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm" x-text="sessoesErro"></div>
+                <template x-if="sessoesData && !sessoesLoading">
+                    <div>
+                        <div class="text-es-ink-dim text-xs mb-3">
+                            <span x-text="sessoesData.usuarioNome"></span> ·
+                            <span x-text="sessoesData.usuarioEmail" class="font-mono"></span> ·
+                            <span class="font-bold text-es-ink" x-text="sessoesData.ativas + ' ativa(s) de ' + sessoesData.total"></span>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto space-y-2">
+                            <template x-for="s in (sessoesData.sessoes || [])" :key="s.id">
+                                <div class="rounded-lg p-3 text-xs" :style="s.ativa ? 'background:rgba(79,191,159,.08);border:1px solid rgba(79,191,159,.2)' : 'background:rgba(120,120,120,.06);border:1px solid rgba(120,120,120,.15)'">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="font-mono text-es-ink" x-text="s.ip || '(sem ip)'"></span>
+                                        <span class="status-badge" :class="s.ativa ? 'badge-ativa' : 'badge-expirada'" x-text="s.ativa ? 'Ativa' : (s.revogado ? 'Revogada' : 'Expirada')"></span>
+                                    </div>
+                                    <div class="text-es-ink-mute truncate" x-text="s.userAgent || '(sem user-agent)'"></div>
+                                    <div class="text-es-ink-mute mt-1">
+                                        Criada: <span x-text="new Date(s.criadoEm).toLocaleString('pt-BR')"></span>
+                                        · Expira: <span x-text="new Date(s.expiraEm).toLocaleString('pt-BR')"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="(sessoesData.sessoes || []).length === 0">
+                                <div class="text-es-ink-mute text-sm text-center py-6">Sem sessões registradas para este usuário.</div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 
@@ -339,3 +427,5 @@
         </div>
     </div>
 </div>
+
+<partial name="_ModalJustificativa" />

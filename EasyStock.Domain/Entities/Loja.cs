@@ -34,5 +34,20 @@ namespace EasyStock.Domain.Entities
                 AlteradoEm = agora
             };
         }
+
+        /// <summary>Soft-delete. Mantém histórico de vendas/itens; loja não aparece em listagens ativas.</summary>
+        public void Desativar()
+        {
+            if (!Ativa) return;
+            Ativa = false;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void Reativar()
+        {
+            if (Ativa) return;
+            Ativa = true;
+            AlteradoEm = DateTime.UtcNow;
+        }
     }
 }
