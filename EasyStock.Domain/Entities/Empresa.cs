@@ -10,6 +10,11 @@ namespace EasyStock.Domain.Entities
         public string? Documento { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
+        /// <summary>
+        /// Marcador de dados de seed/demo. Quando true, o seed inteligente pode
+        /// deletar este registro antes de recriar a carga — nunca toca empresas reais.
+        /// </summary>
+        public bool IsSeedData { get; set; }
 
         public static Empresa Criar(string nome, string? documento)
         {

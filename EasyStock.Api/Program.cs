@@ -184,6 +184,10 @@ builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>(
 // Em multi-instance, evoluir pra Redis pubsub.
 builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>();
 
+// SeedProgressService: Singleton pra compartilhar estado de runs entre requests.
+// O background job e o polling endpoint falam com a mesma instância.
+builder.Services.AddSingleton<EasyStock.Api.Services.SeedProgressService>();
+
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 

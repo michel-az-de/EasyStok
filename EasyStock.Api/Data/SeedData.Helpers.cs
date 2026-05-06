@@ -33,7 +33,13 @@ public static partial class SeedData
         return plano;
     }
 
-    internal static async Task<Empresa> UpsertEmpresaAsync(EasyStockDbContext context, string nome, string documento, DateTime agora, DateTime? criadoEmOverride = null)
+    internal static async Task<Empresa> UpsertEmpresaAsync(
+        EasyStockDbContext context,
+        string nome,
+        string documento,
+        DateTime agora,
+        DateTime? criadoEmOverride = null,
+        bool isSeedData = false)
     {
         var empresa = await context.Empresas.FirstOrDefaultAsync(e => e.Documento == documento)
                      ?? await context.Empresas.FirstOrDefaultAsync(e => e.Nome == nome);
@@ -52,6 +58,7 @@ public static partial class SeedData
         empresa.Nome = nome;
         empresa.Documento = documento;
         empresa.AlteradoEm = agora;
+        if (isSeedData) empresa.IsSeedData = true;
 
         return empresa;
     }

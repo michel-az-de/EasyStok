@@ -262,6 +262,76 @@ app.MapGet("/api-proxy/diag/search", async (
     }
 });
 
+// ── Seed async (progresso em tempo real) ──────────────────────────────────────
+
+// Inicia run em background e retorna runId imediatamente.
+app.MapPost("/api-proxy/seed/run-async", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.PostAsync<System.Text.Json.JsonElement>($"api/admin/seed/run-async?{qs}", new { });
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy seed/run-async falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Polling de status de um run específico.
+app.MapGet("/api-proxy/seed/run/{runId:guid}", async (
+    Guid runId,
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/seed/run/{runId}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy seed/run/{RunId} falhou", runId);
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Histórico de runs (auditoria).
+app.MapGet("/api-proxy/seed/runs", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/seed/runs?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy seed/runs falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 // Export JSON (binário passthrough) — alimenta o botão "Exportar JSON".
 // Não consegue usar GetAsync<JsonElement> porque o endpoint devolve File(); usa GetBytesAsync.
 app.MapGet("/api-proxy/diag/export", async (

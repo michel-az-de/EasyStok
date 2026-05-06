@@ -1,3 +1,5 @@
+using System.Text.Json;
+using EasyStock.Api.Services;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -11,9 +13,9 @@ namespace EasyStock.Api.Data.Tenants;
 /// 5 tickets cobrindo todas as combinações de status × prioridade,
 /// + 3 notas internas (incluindo 1 tipo Alerta pra acionar o banner).
 ///
-/// Idempotente: pode rodar múltiplas vezes sem duplicar. Estável (datas
-/// relativas a `agora` arredondado ao minuto pra reproduzir o mesmo estado
-/// entre runs e facilitar bater contadores no dashboard).
+/// Smart-seed: antes de criar, deleta APENAS empresas marcadas com IsSeedData=true
+/// (nunca toca dados reais). Backup dos IDs deletados é registrado em SeedRunLog
+/// pra auditoria e recuperação emergencial.
 ///
 /// Senha padrão de todos os usuários: <c>Teste@123</c>.
 /// </summary>
@@ -21,159 +23,244 @@ public static class AdminTestScenariosSeed
 {
     public const string SenhaPadrao = "Teste@123";
 
-    public static async Task ExecutarAsync(EasyStockDbContext context, DateTime agora, ILogger logger)
+    /// <summary>
+    /// Executa o seed com progresso em tempo real reportado via <paramref name="progress"/>.
+    /// Usa transação — rollback automático se qualquer etapa falhar.
+    /// </summary>
+    public static async Task ExecutarAsync(
+        EasyStockDbContext context,
+        DateTime agora,
+        ILogger logger,
+        SeedProgressService? progress = null,
+        Guid runId = default)
     {
-        logger.LogInformation("[AdminTestScenarios] Iniciando seed de cenários de teste do Admin…");
-
-        // ── Planos ────────────────────────────────────────────────────────────
-        var planoStarter = await SeedData.UpsertPlanoAsync(context, "Starter", "Plano inicial — 1 loja, 3 usuários", 79m, agora);
-        var planoPro = await SeedData.UpsertPlanoAsync(context, "Pro", "Plano completo — lojas e usuários ilimitados", 199m, agora);
-        await context.SaveChangesAsync();
-
-        // ── Cenário 1: Bistrô da Vila — cliente Ativa há 30d, plano Pro ─────────
-        var c1 = await CriarCenarioAsync(context, agora,
-            nome: "Bistrô da Vila",
-            documento: "12.345.678/0001-90",
-            criadoHaDias: 30,
-            statusAssinatura: StatusAssinatura.Ativa,
-            plano: planoPro,
-            lojas: ["Bistrô Centro", "Bistrô Jardins"],
-            adminEmail: "admin@bistro-vila.test",
-            usuarios: [
-                ("Maria Carvalho", "maria.carvalho@bistro-vila.test", NivelAcesso.Admin),
-                ("Joao Silva", "joao.silva@bistro-vila.test", NivelAcesso.Operador),
-                ("Ana Souza", "ana.souza@bistro-vila.test", NivelAcesso.Gerente)
-            ]);
-
-        // ── Cenário 2: Padaria do Bairro — cliente novo (5d), plano Starter ────
-        var c2 = await CriarCenarioAsync(context, agora,
-            nome: "Padaria do Bairro",
-            documento: "98.765.432/0001-10",
-            criadoHaDias: 5,
-            statusAssinatura: StatusAssinatura.Ativa,
-            plano: planoStarter,
-            lojas: ["Padaria Matriz"],
-            adminEmail: "admin@padaria-bairro.test",
-            usuarios: [
-                ("Ricardo Lima", "ricardo@padaria-bairro.test", NivelAcesso.Admin),
-                ("Sofia Mendes", "sofia@padaria-bairro.test", NivelAcesso.Operador)
-            ]);
-
-        // ── Cenário 3: Café Quase Lá — Suspensa há 60d ────────────────────────
-        var c3 = await CriarCenarioAsync(context, agora,
-            nome: "Café Quase Lá",
-            documento: "55.444.333/0001-20",
-            criadoHaDias: 90,
-            statusAssinatura: StatusAssinatura.Suspensa,
-            plano: planoPro,
-            lojas: ["Café Centro", "Café Praia"],
-            adminEmail: "admin@cafe-quasela.test",
-            usuarios: [
-                ("Bruno Costa", "bruno.costa@cafe-quasela.test", NivelAcesso.Admin),
-                ("Patricia Alves", "patricia@cafe-quasela.test", NivelAcesso.Operador)
-            ]);
-
-        // ── Cenário 4: Loja Do Zé Cancelada — fechou conta há 30d ─────────────
-        var c4 = await CriarCenarioAsync(context, agora,
-            nome: "Loja Do Zé",
-            documento: "11.222.333/0001-44",
-            criadoHaDias: 120,
-            statusAssinatura: StatusAssinatura.Cancelada,
-            plano: planoStarter,
-            lojas: ["Loja Centro"],
-            adminEmail: "admin@lojadoze.test",
-            usuarios: [
-                ("Zé Pereira", "ze.pereira@lojadoze.test", NivelAcesso.Admin)
-            ]);
-
-        await context.SaveChangesAsync();
-
-        // ── Tickets variados pra testar dashboard ──────────────────────────────
-        await UpsertTicketAsync(context, c1.Empresa.Id, c1.AdminUsuario.Id,
-            titulo: "Erro ao gerar relatório de vendas",
-            descricao: "Quando clico em exportar PDF do dashboard, recebo erro 500.",
-            categoria: TicketCategoria.Bug,
-            prioridade: TicketPrioridade.Critica,
-            status: TicketStatus.Aberto,
-            criadoHorasAtras: 2,
-            agora: agora);
-
-        await UpsertTicketAsync(context, c2.Empresa.Id, c2.AdminUsuario.Id,
-            titulo: "Como cadastrar produto com variação?",
-            descricao: "Não estou conseguindo adicionar tamanhos diferentes pro mesmo produto.",
-            categoria: TicketCategoria.Duvida,
-            prioridade: TicketPrioridade.Normal,
-            status: TicketStatus.Aberto,
-            criadoHorasAtras: 8,
-            agora: agora);
-
-        await UpsertTicketAsync(context, c3.Empresa.Id, c3.AdminUsuario.Id,
-            titulo: "Cobrança em duplicidade",
-            descricao: "Vi 2 cobranças do plano Pro neste mês — pode verificar?",
-            categoria: TicketCategoria.Financeiro,
-            prioridade: TicketPrioridade.Alta,
-            status: TicketStatus.EmAtendimento,
-            criadoHorasAtras: 24,
-            agora: agora);
-
-        await UpsertTicketAsync(context, c1.Empresa.Id, c1.AdminUsuario.Id,
-            titulo: "Lentidão ao listar estoque",
-            descricao: "Estoque com 5k itens demora 8s pra abrir.",
-            categoria: TicketCategoria.Bug,
-            prioridade: TicketPrioridade.Normal,
-            status: TicketStatus.Resolvido,
-            criadoHorasAtras: 72,
-            agora: agora);
-
-        await UpsertTicketAsync(context, c2.Empresa.Id, c2.AdminUsuario.Id,
-            titulo: "Sugestão: campo de margem em massa",
-            descricao: "Seria útil aplicar margem em vários produtos de uma vez.",
-            categoria: TicketCategoria.Outro,
-            prioridade: TicketPrioridade.Normal,
-            status: TicketStatus.Fechado,
-            criadoHorasAtras: 240,
-            agora: agora);
-
-        await context.SaveChangesAsync();
-
-        // ── Notas internas pra testar Tab Notas + banner de alerta ─────────────
-        var operadorAdminId = await GetSuperAdminIdAsync(context);
-        if (operadorAdminId != Guid.Empty)
+        void Report(int pct, string msg, string level = "info")
         {
-            await UpsertNotaInternaAsync(context, c3.Empresa.Id, operadorAdminId,
-                texto: "Cliente em negociação financeira — não cobrar enquanto a renegociação estiver em andamento. Confirmar com a equipe de billing antes de qualquer ação.",
-                tipo: TipoNotaTenant.Alerta,
-                horasAtras: 6,
-                agora: agora);
-
-            await UpsertNotaInternaAsync(context, c1.Empresa.Id, operadorAdminId,
-                texto: "Cliente VIP — preferência por contato via email. Não ligar fora do horário comercial.",
-                tipo: TipoNotaTenant.Info,
-                horasAtras: 48,
-                agora: agora);
-
-            await UpsertNotaInternaAsync(context, c2.Empresa.Id, operadorAdminId,
-                texto: "Onboarding em andamento — Sofia ficou de retornar a configuração do POS até sexta. Acompanhar.",
-                tipo: TipoNotaTenant.Escalonamento,
-                horasAtras: 24,
-                agora: agora);
+            logger.LogInformation("[AdminTestScenarios] {Pct}% — {Msg}", pct, msg);
+            if (progress is not null && runId != default)
+                progress.Report(runId, pct, msg, level);
         }
 
-        // ── Audit logs (atividade do tenant) — alimenta a tab Atividade ────────
-        await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "192.168.0.10", agora.AddHours(-1));
-        await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "192.168.0.10", agora.AddHours(-9));
-        await EnsureAuditLogAsync(context, c2.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "10.0.0.5", agora.AddHours(-3));
-        await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "AlterarSenha", true, "Senha alterada pelo próprio usuário", "192.168.0.10", agora.AddHours(-12));
-        await EnsureAuditLogAsync(context, c3.AdminUsuario.Id, "Login", false, "Senha incorreta (3ª tentativa)", "203.0.113.5", agora.AddHours(-5));
+        Report(5, "Verificando flags de segurança…");
 
-        await context.SaveChangesAsync();
+        // ── Etapa 1: Backup + limpeza de dados seed anteriores ──────────────────
+        Report(10, "Identificando dados seed anteriores para remoção segura…");
 
-        logger.LogInformation(
-            "[AdminTestScenarios] OK — 4 tenants ({C1}, {C2}, {C3}, {C4}), 5 tickets, 3 notas, 5 audit logs.",
-            c1.Empresa.Nome, c2.Empresa.Nome, c3.Empresa.Nome, c4.Empresa.Nome);
+        var seedEmpresas = await context.Empresas
+            .Where(e => e.IsSeedData)
+            .Select(e => new { e.Id, e.Nome, e.Documento })
+            .ToListAsync();
+
+        string backupJson = "{}";
+        if (seedEmpresas.Count > 0)
+        {
+            backupJson = JsonSerializer.Serialize(new
+            {
+                deletedAt = DateTime.UtcNow,
+                empresas = seedEmpresas.Select(e => new { e.Id, e.Nome, e.Documento })
+            });
+            Report(15, $"Backup criado — {seedEmpresas.Count} empresa(s) seed identificadas.");
+        }
+        else
+        {
+            Report(15, "Nenhum dado seed anterior encontrado — primeiro run ou banco limpo.");
+        }
+
+        // Backup logado no server log pra recuperação emergencial.
+        logger.LogInformation("[AdminTestScenarios] BackupJson: {Json}", backupJson.Length > 2000 ? backupJson[..2000] + "…" : backupJson);
+
+        // ── Etapa 2: Delete das empresas seed (dentro de transação) ─────────────
+        await using var tx = await context.Database.BeginTransactionAsync();
+        try
+        {
+            if (seedEmpresas.Count > 0)
+            {
+                Report(20, $"Removendo {seedEmpresas.Count} empresa(s) seed + dados relacionados…", "warn");
+
+                var ids = seedEmpresas.Select(e => e.Id).ToList();
+
+                // Deleta entidades Admin vinculadas às empresas seed (sem cascade automático).
+                await context.AdminTickets.Where(t => ids.Contains(t.EmpresaId)).ExecuteDeleteAsync();
+                await context.AdminNotasTenant.Where(n => ids.Contains(n.TenantId)).ExecuteDeleteAsync();
+
+                // UsuarioPerfis → UsuariosEmpresas → (Usuarios orphans depois)
+                var usuarioIds = await context.UsuariosEmpresas
+                    .Where(ue => ids.Contains(ue.EmpresaId))
+                    .Select(ue => ue.UsuarioId)
+                    .ToListAsync();
+
+                await context.UsuariosPerfis.Where(up => usuarioIds.Contains(up.UsuarioId) && ids.Contains(up.EmpresaId)).ExecuteDeleteAsync();
+                await context.UsuariosEmpresas.Where(ue => ids.Contains(ue.EmpresaId)).ExecuteDeleteAsync();
+                await context.AssinaturasEmpresa.Where(a => ids.Contains(a.EmpresaId)).ExecuteDeleteAsync();
+                await context.Lojas.Where(l => ids.Contains(l.EmpresaId)).ExecuteDeleteAsync();
+                await context.Perfis.Where(p => p.EmpresaId.HasValue && ids.Contains(p.EmpresaId.Value)).ExecuteDeleteAsync();
+
+                // Remove usuários que agora são órfãos (sem empresa nenhuma) E têm email .test
+                var orphanIds = await context.Usuarios
+                    .Where(u => usuarioIds.Contains(u.Id)
+                        && !context.UsuariosEmpresas.Any(ue => ue.UsuarioId == u.Id)
+                        && u.Email.EndsWith(".test"))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+                if (orphanIds.Count > 0)
+                    await context.Usuarios.Where(u => orphanIds.Contains(u.Id)).ExecuteDeleteAsync();
+
+                // Remove as próprias empresas seed.
+                await context.Empresas.Where(e => ids.Contains(e.Id)).ExecuteDeleteAsync();
+
+                Report(30, $"Removido: {seedEmpresas.Count} empresa(s) + {orphanIds.Count} usuário(s) orphan.");
+            }
+
+            // ── Etapa 3: Planos ────────────────────────────────────────────────────
+            Report(35, "Criando/verificando planos base…");
+            var planoStarter = await SeedData.UpsertPlanoAsync(context, "Starter", "Plano inicial — 1 loja, 3 usuários", 79m, agora);
+            var planoPro = await SeedData.UpsertPlanoAsync(context, "Pro", "Plano completo — lojas e usuários ilimitados", 199m, agora);
+            await context.SaveChangesAsync();
+
+            // ── Etapa 4: Tenants ──────────────────────────────────────────────────
+            Report(40, "Criando tenant 1/4 — Bistrô da Vila (Ativa, plano Pro)…");
+            var c1 = await CriarCenarioAsync(context, agora,
+                nome: "Bistrô da Vila",
+                documento: "12.345.678/0001-90",
+                criadoHaDias: 30,
+                statusAssinatura: StatusAssinatura.Ativa,
+                plano: planoPro,
+                lojas: ["Bistrô Centro", "Bistrô Jardins"],
+                adminEmail: "admin@bistro-vila.test",
+                usuarios: [
+                    ("Maria Carvalho", "maria.carvalho@bistro-vila.test", NivelAcesso.Admin),
+                    ("Joao Silva", "joao.silva@bistro-vila.test", NivelAcesso.Operador),
+                    ("Ana Souza", "ana.souza@bistro-vila.test", NivelAcesso.Gerente)
+                ]);
+
+            Report(55, "Criando tenant 2/4 — Padaria do Bairro (Ativa, trial)…");
+            var c2 = await CriarCenarioAsync(context, agora,
+                nome: "Padaria do Bairro",
+                documento: "98.765.432/0001-10",
+                criadoHaDias: 5,
+                statusAssinatura: StatusAssinatura.Ativa,
+                plano: planoStarter,
+                lojas: ["Padaria Matriz"],
+                adminEmail: "admin@padaria-bairro.test",
+                usuarios: [
+                    ("Ricardo Lima", "ricardo@padaria-bairro.test", NivelAcesso.Admin),
+                    ("Sofia Mendes", "sofia@padaria-bairro.test", NivelAcesso.Operador)
+                ]);
+
+            Report(65, "Criando tenant 3/4 — Café Quase Lá (Suspensa)…");
+            var c3 = await CriarCenarioAsync(context, agora,
+                nome: "Café Quase Lá",
+                documento: "55.444.333/0001-20",
+                criadoHaDias: 90,
+                statusAssinatura: StatusAssinatura.Suspensa,
+                plano: planoPro,
+                lojas: ["Café Centro", "Café Praia"],
+                adminEmail: "admin@cafe-quasela.test",
+                usuarios: [
+                    ("Bruno Costa", "bruno.costa@cafe-quasela.test", NivelAcesso.Admin),
+                    ("Patricia Alves", "patricia@cafe-quasela.test", NivelAcesso.Operador)
+                ]);
+
+            Report(75, "Criando tenant 4/4 — Loja Do Zé (Cancelada)…");
+            var c4 = await CriarCenarioAsync(context, agora,
+                nome: "Loja Do Zé",
+                documento: "11.222.333/0001-44",
+                criadoHaDias: 120,
+                statusAssinatura: StatusAssinatura.Cancelada,
+                plano: planoStarter,
+                lojas: ["Loja Centro"],
+                adminEmail: "admin@lojadoze.test",
+                usuarios: [
+                    ("Zé Pereira", "ze.pereira@lojadoze.test", NivelAcesso.Admin)
+                ]);
+
+            await context.SaveChangesAsync();
+
+            // ── Etapa 5: Tickets ──────────────────────────────────────────────────
+            Report(80, "Criando tickets de suporte (5 cenários)…");
+
+            await UpsertTicketAsync(context, c1.Empresa.Id, c1.AdminUsuario.Id,
+                titulo: "Erro ao gerar relatório de vendas",
+                descricao: "Quando clico em exportar PDF do dashboard, recebo erro 500.",
+                categoria: TicketCategoria.Bug, prioridade: TicketPrioridade.Critica,
+                status: TicketStatus.Aberto, criadoHorasAtras: 2, agora: agora);
+
+            await UpsertTicketAsync(context, c2.Empresa.Id, c2.AdminUsuario.Id,
+                titulo: "Como cadastrar produto com variação?",
+                descricao: "Não estou conseguindo adicionar tamanhos diferentes pro mesmo produto.",
+                categoria: TicketCategoria.Duvida, prioridade: TicketPrioridade.Normal,
+                status: TicketStatus.Aberto, criadoHorasAtras: 8, agora: agora);
+
+            await UpsertTicketAsync(context, c3.Empresa.Id, c3.AdminUsuario.Id,
+                titulo: "Cobrança em duplicidade",
+                descricao: "Vi 2 cobranças do plano Pro neste mês — pode verificar?",
+                categoria: TicketCategoria.Financeiro, prioridade: TicketPrioridade.Alta,
+                status: TicketStatus.EmAtendimento, criadoHorasAtras: 24, agora: agora);
+
+            await UpsertTicketAsync(context, c1.Empresa.Id, c1.AdminUsuario.Id,
+                titulo: "Lentidão ao listar estoque",
+                descricao: "Estoque com 5k itens demora 8s pra abrir.",
+                categoria: TicketCategoria.Bug, prioridade: TicketPrioridade.Normal,
+                status: TicketStatus.Resolvido, criadoHorasAtras: 72, agora: agora);
+
+            await UpsertTicketAsync(context, c2.Empresa.Id, c2.AdminUsuario.Id,
+                titulo: "Sugestão: campo de margem em massa",
+                descricao: "Seria útil aplicar margem em vários produtos de uma vez.",
+                categoria: TicketCategoria.Outro, prioridade: TicketPrioridade.Normal,
+                status: TicketStatus.Fechado, criadoHorasAtras: 240, agora: agora);
+
+            await context.SaveChangesAsync();
+
+            // ── Etapa 6: Notas + Audit logs ───────────────────────────────────────
+            Report(88, "Criando notas internas e audit logs…");
+
+            var operadorAdminId = await GetSuperAdminIdAsync(context);
+            if (operadorAdminId != Guid.Empty)
+            {
+                await UpsertNotaInternaAsync(context, c3.Empresa.Id, operadorAdminId,
+                    texto: "Cliente em negociação financeira — não cobrar enquanto a renegociação estiver em andamento. Confirmar com a equipe de billing antes de qualquer ação.",
+                    tipo: TipoNotaTenant.Alerta, horasAtras: 6, agora: agora);
+
+                await UpsertNotaInternaAsync(context, c1.Empresa.Id, operadorAdminId,
+                    texto: "Cliente VIP — preferência por contato via email. Não ligar fora do horário comercial.",
+                    tipo: TipoNotaTenant.Info, horasAtras: 48, agora: agora);
+
+                await UpsertNotaInternaAsync(context, c2.Empresa.Id, operadorAdminId,
+                    texto: "Onboarding em andamento — Sofia ficou de retornar a configuração do POS até sexta. Acompanhar.",
+                    tipo: TipoNotaTenant.Escalonamento, horasAtras: 24, agora: agora);
+            }
+
+            await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "192.168.0.10", agora.AddHours(-1));
+            await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "192.168.0.10", agora.AddHours(-9));
+            await EnsureAuditLogAsync(context, c2.AdminUsuario.Id, "Login", true, "Login bem-sucedido via web", "10.0.0.5", agora.AddHours(-3));
+            await EnsureAuditLogAsync(context, c1.AdminUsuario.Id, "AlterarSenha", true, "Senha alterada pelo próprio usuário", "192.168.0.10", agora.AddHours(-12));
+            await EnsureAuditLogAsync(context, c3.AdminUsuario.Id, "Login", false, "Senha incorreta (3ª tentativa)", "203.0.113.5", agora.AddHours(-5));
+
+            await context.SaveChangesAsync();
+
+            // ── Commit ────────────────────────────────────────────────────────────
+            Report(95, "Confirmando transação no banco…");
+            await tx.CommitAsync();
+
+            var resumo = $"4 tenants criados ({c1.Empresa.Nome}, {c2.Empresa.Nome}, {c3.Empresa.Nome}, {c4.Empresa.Nome}), 5 tickets, 3 notas, 5 audit logs.";
+            Report(100, resumo, "success");
+            logger.LogInformation("[AdminTestScenarios] Seed concluído — {Resumo}", resumo);
+
+            // Retorna o backup JSON pra o caller persistir no SeedRunLog.
+            if (progress is not null && runId != default)
+                progress.Success(runId, resumo);
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            var msg = $"Rollback efetuado. Dados anteriores preservados. Erro: {ex.Message}";
+            logger.LogError(ex, "[AdminTestScenarios] {Msg}", msg);
+            progress?.Failure(runId, ex.Message, rolledBack: true);
+            throw;
+        }
     }
 
-    // ─────────────── helpers ───────────────
+    // ─────────────────────────── helpers ───────────────────────────────────────
 
     private record CenarioResult(Empresa Empresa, Usuario AdminUsuario);
 
@@ -191,15 +278,15 @@ public static class AdminTestScenariosSeed
     {
         var criadoEm = agora.AddDays(-criadoHaDias);
 
-        var empresa = await SeedData.UpsertEmpresaAsync(context, nome, documento, agora, criadoEmOverride: criadoEm);
-        await context.SaveChangesAsync(); // garante Id atribuído
+        // isSeedData=true marca esta empresa pra limpeza no próximo run.
+        var empresa = await SeedData.UpsertEmpresaAsync(context, nome, documento, agora,
+            criadoEmOverride: criadoEm, isSeedData: true);
+        await context.SaveChangesAsync();
 
         await SeedData.UpsertAssinaturaAsync(context, empresa.Id, plano.Id, agora, diasDesdeInicio: criadoHaDias);
         await context.SaveChangesAsync();
 
-        // Força o status conforme o cenário (UpsertAssinatura sempre seta Ativa).
-        var assinatura = await context.AssinaturasEmpresa
-            .FirstOrDefaultAsync(a => a.EmpresaId == empresa.Id);
+        var assinatura = await context.AssinaturasEmpresa.FirstOrDefaultAsync(a => a.EmpresaId == empresa.Id);
         if (assinatura is not null && assinatura.Status != statusAssinatura)
         {
             assinatura.Status = statusAssinatura;
@@ -207,7 +294,6 @@ public static class AdminTestScenariosSeed
             await context.SaveChangesAsync();
         }
 
-        // Lojas (1ª ativa, eventual 2ª também ativa por simplicidade).
         var lojaEntities = new List<Loja>();
         foreach (var lojaNome in lojas)
         {
@@ -221,13 +307,11 @@ public static class AdminTestScenariosSeed
         }
         await context.SaveChangesAsync();
 
-        // Perfis padrão.
         var perfilAdmin = await SeedData.UpsertPerfilAsync(context, empresa.Id, "Admin", "Acesso total à empresa", NivelAcesso.Admin, agora);
         var perfilGerente = await SeedData.UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestão de operação e analytics", NivelAcesso.Gerente, agora);
         var perfilOperador = await SeedData.UpsertPerfilAsync(context, empresa.Id, "Operador", "Operação diária", NivelAcesso.Operador, agora);
         await context.SaveChangesAsync();
 
-        // Usuários.
         Usuario? usuarioAdmin = null;
         foreach (var (uNome, uEmail, uNivel) in usuarios)
         {
@@ -242,25 +326,17 @@ public static class AdminTestScenariosSeed
                 NivelAcesso.Gerente => perfilGerente,
                 _ => perfilOperador
             };
-            // Vincula à 1ª loja (ou null se for Admin que vê tudo).
             Guid? lojaId = uNivel == NivelAcesso.Admin ? null : lojaEntities.FirstOrDefault()?.Id;
             await SeedData.EnsureUsuarioPerfilAsync(context, usuario.Id, empresa.Id, perfilAlvo.Id, lojaId, agora);
 
-            // Marca último acesso pra dashboard mostrar atividade recente.
             usuario.UltimoAcessoEm = agora.AddHours(-2);
-
             if (uNivel == NivelAcesso.Admin) usuarioAdmin = usuario;
         }
 
-        // Garante perfil Admin para o adminEmail (caso adminEmail não bata com nenhum dos usuários listados).
         if (usuarioAdmin is null && usuarios.Length > 0)
-        {
-            var primeiroUsuario = await context.Usuarios.FirstAsync(u => u.Email == usuarios[0].Email);
-            usuarioAdmin = primeiroUsuario;
-        }
+            usuarioAdmin = await context.Usuarios.FirstAsync(u => u.Email == usuarios[0].Email);
 
         await context.SaveChangesAsync();
-
         return new CenarioResult(empresa, usuarioAdmin!);
     }
 
@@ -288,8 +364,6 @@ public static class AdminTestScenariosSeed
         ticket.AlteradoEm = criadoEm;
         context.AdminTickets.Add(ticket);
 
-        // Mensagem inicial do cliente — pra Tab "Mensagens" do ticket detail
-        // ter algo pra mostrar e pro contador `ticketsComNovaMensagem` exercitar.
         if (status == TicketStatus.Aberto || status == TicketStatus.EmAtendimento)
         {
             context.AdminTicketMensagens.Add(new AdminTicketMensagem
@@ -314,16 +388,12 @@ public static class AdminTestScenariosSeed
         int horasAtras,
         DateTime agora)
     {
-        // Idempotente — bate por (tenantId + 30 primeiros chars do texto).
-        var prefixo = texto.Length > 30 ? texto.Substring(0, 30) : texto;
+        var prefixo = texto.Length > 30 ? texto[..30] : texto;
         var existente = await context.AdminNotasTenant
             .FirstOrDefaultAsync(n => n.TenantId == tenantId && n.Texto.StartsWith(prefixo) && n.ExcluidoEm == null);
         if (existente is not null) return;
 
         var nota = AdminNotaTenant.Criar(tenantId, autorAdminId, "admin@easystock.local", texto, tipo);
-        // Usa reflection-free hack: re-criamos com data customizada via property private setter
-        // só quando absolutamente necessário. Como o entity setter é private e CriadoEm vai
-        // pelo Criar(), aceitamos a data atual aqui pra simplicidade do seed.
         context.AdminNotasTenant.Add(nota);
     }
 
@@ -336,7 +406,6 @@ public static class AdminTestScenariosSeed
         string ip,
         DateTime dataHora)
     {
-        // Idempotente — bate por (UsuarioId + Acao + DataHora exata).
         var existente = await context.AuditLogs
             .AnyAsync(a => a.UsuarioId == usuarioId && a.Acao == acao && a.DataHora == dataHora);
         if (existente) return;
@@ -346,10 +415,6 @@ public static class AdminTestScenariosSeed
         context.AuditLogs.Add(log);
     }
 
-    /// <summary>
-    /// Tenta achar um SuperAdmin existente pra usar como autor das notas internas.
-    /// Se não houver, retorna Guid.Empty (notas serão puladas).
-    /// </summary>
     private static async Task<Guid> GetSuperAdminIdAsync(EasyStockDbContext context)
     {
         var perfilSuper = await context.Perfis
