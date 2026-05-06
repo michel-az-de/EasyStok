@@ -176,4 +176,30 @@ app.MapGet("/api-proxy/audit-logs-csv", async (
     }
 });
 
+// Proxy busca global (Cmd+K). Debounce client-side de 200ms; clamp limit no backend.
+app.MapGet("/api-proxy/buscar-global", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/buscar-global?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException)
+    {
+        return Results.Unauthorized();
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Proxy buscar-global: falha");
+        return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.Run();

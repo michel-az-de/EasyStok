@@ -54,6 +54,29 @@
 
         <!-- Nav -->
         <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+
+            <!-- Cmd+K trigger -->
+            <button type="button" @@click="$dispatch('open-cmdk')"
+                    class="sidebar-link w-full text-left mb-2"
+                    style="background:rgba(247,242,232,0.04);border:1px dashed rgba(247,242,232,0.12)">
+                <span class="text-base">🔍</span>
+                <span class="text-sm font-medium flex-1 text-es-ink-mute">Buscar…</span>
+                <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute font-mono">Ctrl K</kbd>
+            </button>
+
+            <!-- Recently viewed clientes (localStorage) -->
+            <template x-if="recentTenants.length > 0">
+                <div class="mb-2 pb-2" style="border-bottom:1px solid rgba(247,242,232,0.05)">
+                    <div class="px-3 pt-1 pb-1 text-[10px] font-semibold tracking-widest text-es-ink-mute">RECENTES</div>
+                    <template x-for="t in recentTenants" :key="t.id">
+                        <a :href="'/Tenants/Detail/' + t.id" class="sidebar-link" style="padding-top:.4rem;padding-bottom:.4rem">
+                            <span class="text-xs">🏢</span>
+                            <span class="text-xs truncate flex-1" x-text="t.nome"></span>
+                        </a>
+                    </template>
+                </div>
+            </template>
+
             <a href="/" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/Index" ? "active" : "")">
                 <span class="text-base">📊</span>
                 <span class="text-sm font-medium">Dashboard</span>
@@ -174,6 +197,8 @@
 }
 
 <script>
+    const RECENT_TENANTS_KEY = 'easystok-admin-recent-tenants';
+
     function adminApp() {
         return {
             dash: {
@@ -184,7 +209,14 @@
             },
             dashSecsAgo: 0,
             _lastFetch: 0,
+            recentTenants: [],
+            cheatOpen: false,
+            _gPressed: false,
+            _gTimer: null,
             async init() {
+                this.loadRecent();
+                this.bindShortcuts();
+                this.trackTenantViewed();
                 await this.fetchDashBadges();
                 setInterval(() => this.fetchDashBadges(), 60000);
                 setInterval(() => { if (this._lastFetch) this.dashSecsAgo = Math.floor((Date.now() - this._lastFetch) / 1000); }, 5000);
@@ -204,10 +236,281 @@
                 } catch (e) {
                     console.error('[admin] fetchDashBadges falhou:', e);
                 }
+            },
+
+            // ── Recently viewed (localStorage) ──
+            loadRecent() {
+                try {
+                    const raw = localStorage.getItem(RECENT_TENANTS_KEY);
+                    this.recentTenants = raw ? JSON.parse(raw).slice(0, 5) : [];
+                } catch { this.recentTenants = []; }
+            },
+            pushRecent(id, nome) {
+                if (!id) return;
+                let list = this.recentTenants.filter(t => t.id !== id);
+                list.unshift({ id, nome: (nome || '').slice(0, 60) || 'Cliente', at: Date.now() });
+                list = list.slice(0, 5);
+                this.recentTenants = list;
+                try { localStorage.setItem(RECENT_TENANTS_KEY, JSON.stringify(list)); } catch {}
+            },
+            trackTenantViewed() {
+                // Detecta /Tenants/Detail/{guid} — adiciona à lista de recentes.
+                const m = window.location.pathname.match(/^\/Tenants\/Detail\/([0-9a-f-]{36})/i);
+                if (!m) return;
+                const id = m[1];
+                // Pega o nome do <h2> do header se existir.
+                const titulo = document.querySelector('h2.text-es-ink')?.textContent?.trim() || document.title;
+                this.pushRecent(id, titulo);
+            },
+
+            // ── Atalhos teclado ──
+            bindShortcuts() {
+                window.addEventListener('keydown', (e) => {
+                    // Cmd+K / Ctrl+K — sempre abre busca, ignora foco.
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+                        e.preventDefault();
+                        window.dispatchEvent(new CustomEvent('open-cmdk'));
+                        return;
+                    }
+                    // Atalhos de letra só fora de input/textarea/select.
+                    const tag = (e.target.tagName || '').toLowerCase();
+                    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+
+                    // ? — abre cheatsheet (precisa Shift+/ no teclado padrão BR/US).
+                    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        this.cheatOpen = true;
+                        return;
+                    }
+
+                    // g + letra — atalhos "vai para".
+                    if (e.key === 'g' && !this._gPressed) {
+                        this._gPressed = true;
+                        clearTimeout(this._gTimer);
+                        this._gTimer = setTimeout(() => { this._gPressed = false; }, 1200);
+                        return;
+                    }
+                    if (this._gPressed) {
+                        this._gPressed = false; clearTimeout(this._gTimer);
+                        const dest = {
+                            'd': '/',
+                            'c': '/Tenants',
+                            't': '/Tickets',
+                            'p': '/Planos',
+                            'a': '/Admins',
+                            's': '/Status'
+                        }[e.key.toLowerCase()];
+                        if (dest) {
+                            e.preventDefault();
+                            window.location.href = dest;
+                        }
+                    }
+                }, true);
             }
         }
     }
+
+    // ── Cmd+K modal Alpine factory ──
+    function cmdkModal() {
+        return {
+            open: false,
+            q: '',
+            loading: false,
+            erro: '',
+            sel: 0,
+            results: { clientes: [], lojas: [], usuarios: [] },
+            _debounceHandle: null,
+            recentes: [],
+            init() {
+                window.addEventListener('open-cmdk', () => this.show());
+                try {
+                    this.recentes = JSON.parse(localStorage.getItem(RECENT_TENANTS_KEY) || '[]').slice(0, 5);
+                } catch {}
+            },
+            show() {
+                this.open = true;
+                this.q = '';
+                this.results = { clientes: [], lojas: [], usuarios: [] };
+                this.sel = 0;
+                this.erro = '';
+                this.$nextTick && this.$nextTick(() => {
+                    document.getElementById('cmdk-input')?.focus();
+                });
+                setTimeout(() => document.getElementById('cmdk-input')?.focus(), 50);
+            },
+            close() { this.open = false; },
+            onInput() {
+                clearTimeout(this._debounceHandle);
+                this._debounceHandle = setTimeout(() => this.search(), 200);
+            },
+            async search() {
+                const termo = this.q.trim();
+                if (termo.length < 2) {
+                    this.results = { clientes: [], lojas: [], usuarios: [] };
+                    return;
+                }
+                this.loading = true; this.erro = ''; this.sel = 0;
+                try {
+                    const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(termo) + '&limit=8', {
+                        credentials: 'same-origin', cache: 'no-store'
+                    });
+                    if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                    const d = await r.json();
+                    const data = d.data || d;
+                    this.results = {
+                        clientes: data.clientes || [],
+                        lojas: data.lojas || [],
+                        usuarios: data.usuarios || []
+                    };
+                } catch (e) {
+                    this.erro = 'Falha de rede: ' + (e.message || e);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            get flatList() {
+                return [
+                    ...this.results.clientes.map(x => ({ ...x, _section: 'Cliente' })),
+                    ...this.results.lojas.map(x => ({ ...x, _section: 'Loja' })),
+                    ...this.results.usuarios.map(x => ({ ...x, _section: 'Usuário' }))
+                ];
+            },
+            move(delta) {
+                const n = this.flatList.length;
+                if (n === 0) return;
+                this.sel = (this.sel + delta + n) % n;
+            },
+            choose() {
+                const item = this.flatList[this.sel];
+                if (item && item.url && item.url !== '#') {
+                    window.location.href = item.url;
+                }
+            }
+        };
+    }
 </script>
+
+<!-- Modal Cmd+K global -->
+<div x-data="cmdkModal()" x-init="init()" x-show="open" x-cloak
+     class="fixed inset-0 z-[300] flex items-start justify-center bg-black/60 backdrop-blur-sm"
+     style="padding-top:10vh"
+     @@click.self="close()"
+     @@keydown.escape.window="if (open) close()"
+     @@keydown.arrow-down.window.prevent="if (open) move(1)"
+     @@keydown.arrow-up.window.prevent="if (open) move(-1)"
+     @@keydown.enter.window.prevent="if (open) choose()">
+    <div class="w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden"
+         style="background:#0b1530;border:1px solid rgba(247,242,232,.12)">
+        <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid rgba(247,242,232,.08)">
+            <span class="text-2xl">🔍</span>
+            <input id="cmdk-input" type="text" x-model="q" @@input="onInput()"
+                   placeholder="Buscar cliente, usuário, loja, email ou CNPJ…"
+                   class="flex-1 bg-transparent text-es-ink text-lg outline-none placeholder:text-es-ink-mute" />
+            <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute font-mono">Esc</kbd>
+        </div>
+
+        <div class="max-h-[60vh] overflow-y-auto py-2">
+            <div x-show="loading" x-cloak class="text-es-ink-mute text-sm text-center py-6">Buscando…</div>
+            <div x-show="erro" x-cloak class="text-red-400 text-sm text-center py-3" x-text="erro"></div>
+
+            <!-- Estado vazio com recentes -->
+            <template x-if="!loading && q.trim().length < 2">
+                <div>
+                    <template x-if="recentes.length > 0">
+                        <div>
+                            <div class="px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-es-ink-mute">Vistos recentemente</div>
+                            <template x-for="t in recentes" :key="t.id">
+                                <a :href="'/Tenants/Detail/' + t.id" class="flex items-center gap-3 px-5 py-2 hover:bg-es-surface-2/50 transition-colors">
+                                    <span class="text-base">🏢</span>
+                                    <span class="text-es-ink text-sm flex-1" x-text="t.nome"></span>
+                                    <span class="text-[10px] text-es-ink-mute">↵</span>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="recentes.length === 0">
+                        <div class="text-es-ink-mute text-sm text-center py-8">
+                            Digite ao menos 2 caracteres pra buscar.<br/>
+                            <span class="text-xs">Pressione <kbd class="px-1 py-0.5 bg-es-surface-2 rounded">?</kbd> pra ver atalhos.</span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Resultados -->
+            <template x-for="(grupo, gi) in [
+                { titulo: 'Clientes', items: results.clientes },
+                { titulo: 'Lojas', items: results.lojas },
+                { titulo: 'Usuários', items: results.usuarios }
+            ]" :key="gi">
+                <div x-show="grupo.items.length > 0">
+                    <div class="px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-es-ink-mute" x-text="grupo.titulo"></div>
+                    <template x-for="(item, idx) in grupo.items" :key="(grupo.titulo + ':' + item.id)">
+                        <a :href="item.url"
+                           @@mouseenter="sel = flatList.findIndex(x => x.id === item.id && x._section.startsWith(grupo.titulo.slice(0, -1)))"
+                           class="flex items-center gap-3 px-5 py-2.5 transition-colors"
+                           :class="flatList[sel] && flatList[sel].id === item.id ? 'bg-es-accent/15 border-l-2 border-es-accent' : 'hover:bg-es-surface-2/50 border-l-2 border-transparent'">
+                            <span class="text-base" x-text="grupo.titulo === 'Clientes' ? '🏢' : (grupo.titulo === 'Lojas' ? '🛒' : '👤')"></span>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-es-ink text-sm truncate" x-text="item.nome"></div>
+                                <div class="text-es-ink-mute text-[11px] truncate font-mono">
+                                    <template x-if="grupo.titulo === 'Clientes'">
+                                        <span x-text="item.documento || item.id.slice(0, 8)"></span>
+                                    </template>
+                                    <template x-if="grupo.titulo === 'Lojas'">
+                                        <span x-text="item.empresaNome + (item.ativa ? '' : ' · inativa')"></span>
+                                    </template>
+                                    <template x-if="grupo.titulo === 'Usuários'">
+                                        <span x-text="item.emailMascarado + ' · ' + item.empresaNome + (item.ativo ? '' : ' · inativo')"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </a>
+                    </template>
+                </div>
+            </template>
+
+            <template x-if="!loading && q.trim().length >= 2 && flatList.length === 0">
+                <div class="text-es-ink-mute text-sm text-center py-8">
+                    Sem resultados para "<span class="text-es-ink" x-text="q"></span>".<br/>
+                    <span class="text-xs">Tente CNPJ sem pontuação ou parte do email/nome.</span>
+                </div>
+            </template>
+        </div>
+
+        <div class="px-5 py-2 text-[10px] text-es-ink-mute flex items-center justify-between" style="background:rgba(0,0,0,.2);border-top:1px solid rgba(247,242,232,.05)">
+            <span>↑↓ navegar · ↵ abrir · Esc fechar</span>
+            <span x-show="flatList.length > 0" x-cloak><b class="text-es-ink" x-text="flatList.length"></b> resultado(s)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Cheatsheet de atalhos -->
+<div x-show="cheatOpen" x-cloak
+     class="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+     @@click.self="cheatOpen = false" @@keydown.escape.window="cheatOpen = false">
+    <div class="w-full max-w-md rounded-xl shadow-2xl p-5"
+         style="background:#0b1530;border:1px solid rgba(247,242,232,.12)">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-es-ink font-semibold">Atalhos do teclado</h3>
+            <button @@click="cheatOpen = false" class="text-es-ink-mute hover:text-es-ink">✕</button>
+        </div>
+        <dl class="space-y-2 text-sm">
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Buscar (Cmd+K)</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">Ctrl K</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pro Dashboard</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g d</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Clientes</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g c</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Tickets</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g t</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Planos</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g p</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Admins</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g a</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Status</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g s</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Esta tela</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">?</kbd></dd></div>
+            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Fechar modais</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">Esc</kbd></dd></div>
+        </dl>
+        <p class="text-es-ink-mute text-xs mt-4">
+            Atalhos só funcionam fora de campos de texto. Dentro de inputs, atalhos do navegador prevalecem.
+        </p>
+    </div>
+</div>
 
 </body>
 </html>
