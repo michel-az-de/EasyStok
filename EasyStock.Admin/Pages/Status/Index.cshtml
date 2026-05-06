@@ -112,7 +112,20 @@
         <button type="button" @@click="carregarStatus()" class="btn-secondary text-xs">↻</button>
     </div>
 
-    <div x-show="loadingStatus" x-cloak class="text-es-ink-mute text-sm py-3">Consultando status…</div>
+    <div x-show="loadingStatus" x-cloak class="text-es-ink-mute text-sm py-3 flex items-center gap-2">
+        <span class="inline-block w-3 h-3 rounded-full bg-es-accent animate-pulse"></span>
+        Consultando status do seed na API…
+    </div>
+
+    <!-- Banner de falha ao carregar status (API dormindo / down) — distinto dos erros de execução -->
+    <div x-show="statusErro" x-cloak class="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-3 py-2 text-sm mb-3 flex items-start gap-2">
+        <span>⚠</span>
+        <div class="flex-1">
+            <div class="font-semibold">Não consegui consultar a API</div>
+            <div class="text-xs mt-1" x-text="statusErro"></div>
+        </div>
+        <button type="button" @@click="carregarStatus()" class="text-xs underline hover:text-amber-200">↻ Tentar novamente</button>
+    </div>
 
     <template x-if="!loadingStatus && counts">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -139,19 +152,20 @@
     <div x-show="sucesso" x-cloak class="bg-es-basil/10 border border-es-basil/30 text-es-basil rounded-lg px-3 py-2 text-sm mb-3" x-text="sucesso"></div>
 
     <div class="flex flex-wrap gap-2 items-center">
-        <select x-model="volume" :disabled="!enabled || executando" class="form-input text-sm max-w-[200px]">
+        <select x-model="volume" :disabled="executando" class="form-input text-sm max-w-[200px]">
             <option value="small">Small (2 tenants)</option>
             <option value="medium">Medium (3 tenants)</option>
             <option value="large">Large (4 tenants — default)</option>
         </select>
-        <button type="button" @@click="executarDemo()" :disabled="!enabled || executando" class="btn-primary text-sm">
+        <button type="button" @@click="executarDemo()" :disabled="executando" class="btn-primary text-sm">
             <span x-show="!executando">🚀 Rodar seed demo</span>
             <span x-show="executando" x-cloak>Executando…</span>
         </button>
-        <button type="button" @@click="executarAdminScenarios()" :disabled="!enabled || executando" class="btn-secondary text-sm" title="Carga focada pra testar Admin: 4 tenants variados, 5 tickets, 3 notas. Sem produtos/movimentações.">
-            🧪 Cenários do Admin
+        <button type="button" @@click="executarAdminScenarios()" :disabled="executando" class="btn-secondary text-sm" title="Carga focada pra testar Admin: 4 tenants variados, 5 tickets, 3 notas. Sem produtos/movimentações.">
+            <span x-show="!executando">🧪 Cenários do Admin</span>
+            <span x-show="executando" x-cloak>Executando…</span>
         </button>
-        <button type="button" @@click="executarMinimal()" :disabled="!enabled || executando" class="btn-secondary text-sm">
+        <button type="button" @@click="executarMinimal()" :disabled="executando" class="btn-secondary text-sm">
             ⚡ Seed mínimo (1 admin)
         </button>
         <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs ml-auto">→ Ver clientes</a>
@@ -240,27 +254,38 @@ function seedPanel() {
         volume: 'large',
         erro: '',
         sucesso: '',
+        statusErro: '', // erro específico de carregar status — mostrado em banner separado
         async carregarStatus() {
-            this.loadingStatus = true; this.erro = ''; this.sucesso = '';
+            this.loadingStatus = true; this.statusErro = '';
             try {
                 const r = await fetch('/Status?handler=SeedStatus', { credentials: 'same-origin', cache: 'no-store' });
                 if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
                 const d = await r.json();
                 if (!r.ok) {
-                    this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                    this.statusErro = 'Não foi possível consultar status do seed (HTTP ' + r.status + '). API pode estar dormindo (Render free tier) — tente recarregar em 30s.';
                     return;
                 }
                 const data = d.data || d;
                 this.enabled = !!data.enabled;
                 this.counts = data.counts || null;
             } catch (e) {
-                this.erro = 'Falha de rede ao consultar seed: ' + (e.message || e);
+                this.statusErro = 'Falha de rede ao consultar API: ' + (e.message || e) + '. Se a API está em sleep (Render), pode levar 30-60s pra acordar.';
             } finally {
                 this.loadingStatus = false;
             }
         },
         async _post(url) {
-            if (!this.enabled || this.executando) return;
+            // Bloqueio explícito em vez de silêncio — caso enabled seja null (status ainda não
+            // carregou) ou false (flag desabilitada), mostra mensagem em vez de no-op.
+            if (this.enabled === null) {
+                this.erro = 'Aguarde — status do seed ainda não carregou. Clique no ↻ acima.';
+                return;
+            }
+            if (this.enabled === false) {
+                this.erro = 'Seed via API está desabilitado neste ambiente. Defina SEED_API_ENABLED=true (env var no Render) ou Seed:ApiEnabled=true em appsettings, e reinicie a API.';
+                return;
+            }
+            if (this.executando) return;
             this.executando = true; this.erro = ''; this.sucesso = '';
             try {
                 const fd = new FormData();
