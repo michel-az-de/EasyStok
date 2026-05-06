@@ -272,7 +272,30 @@ function alertaBanner(tenantId) {
     </div>
 
     <!-- Usuários -->
-    <div x-show="tab === 'usuarios'" x-cloak x-data="{ sessoesUserId: null, sessoesData: null, sessoesLoading: false, sessoesErro: '' }">
+    <div x-show="tab === 'usuarios'" x-cloak x-data="{
+            sessoesUserId: null, sessoesData: null, sessoesLoading: false, sessoesErro: '',
+            async carregarSessoes(uid) {
+                this.sessoesUserId = uid;
+                this.sessoesData = null;
+                this.sessoesErro = '';
+                this.sessoesLoading = true;
+                try {
+                    const r = await fetch('/Tenants/Detail/@Model.Id?handler=SessoesUsuario&userId=' + uid,
+                        { credentials: 'same-origin', cache: 'no-store' });
+                    if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                    const d = await r.json();
+                    if (!r.ok) {
+                        this.sessoesErro = (d && d.error) || ('Falha HTTP ' + r.status);
+                        return;
+                    }
+                    this.sessoesData = d.data || d;
+                } catch (e) {
+                    this.sessoesErro = 'Falha de rede: ' + (e.message || e);
+                } finally {
+                    this.sessoesLoading = false;
+                }
+            }
+         }">
         <div class="card p-0 overflow-hidden">
             <table class="table-admin">
                 <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
@@ -293,10 +316,10 @@ function alertaBanner(tenantId) {
                         // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
                         var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
                         var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
-                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@uemail'))">
+                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', @Html.Raw(uemailJs)))">
                             <td class="text-es-ink font-medium">@unome</td>
                             <td class="text-es-ink-dim font-mono text-xs">
-                                <span x-text="piiVisivel ? piiValor : '@uemail'"></span>
+                                <span x-text="piiVisivel ? piiValor : @Html.Raw(uemailJs)"></span>
                                 <button type="button" :title="piiVisivel ? 'Re-mascarar' : 'Ver completo (auditado)'"
                                         @@click="piiVisivel ? remascarar() : abrirRevealModal()"
                                         class="ml-1 text-es-ink-mute hover:text-es-accent text-xs">
@@ -318,8 +341,8 @@ function alertaBanner(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ResetSenhaUsuario&userId=@uid',
-                                                acao: 'Resetar senha de @unome',
-                                                resumo: 'Uma nova senha temporária será gerada e enviada por email para @uemail. Todas as sessões ativas serão revogadas.',
+                                                acao: 'Resetar senha de ' + @Html.Raw(unomeJs),
+                                                resumo: 'Uma nova senha temporária será gerada e enviada por email para ' + @Html.Raw(uemailJs) + '. Todas as sessões ativas serão revogadas.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Resetar senha (auditado)'
                                             })">
@@ -328,7 +351,7 @@ function alertaBanner(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ForcarLogoutUsuario&userId=@uid',
-                                                acao: 'Forçar logout de @unome',
+                                                acao: 'Forçar logout de ' + @Html.Raw(unomeJs),
                                                 resumo: 'Todas as sessões ativas (refresh tokens) deste usuário serão revogadas. Ele precisará logar novamente em todos os dispositivos.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Forçar logout (auditado)'
@@ -336,7 +359,7 @@ function alertaBanner(tenantId) {
                                         🚪 Forçar logout
                                     </button>
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
-                                            @@click="open=false; sessoesUserId='@uid'; sessoesData=null; sessoesErro=''; sessoesLoading=true; fetch('/Tenants/Detail/@Model.Id?handler=SessoesUsuario&userId=@uid', { credentials: 'same-origin' }).then(r => r.json()).then(d => { sessoesData = d.data || d; sessoesLoading = false; }).catch(e => { sessoesErro = e.message; sessoesLoading = false; })">
+                                            @@click="open=false; carregarSessoes('@uid')">
                                         👁 Ver sessões
                                     </button>
                                     <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
@@ -349,7 +372,7 @@ function alertaBanner(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-amber-300 hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=DesativarUsuario&userId=@uid',
-                                                    acao: 'Desativar @unome',
+                                                    acao: 'Desativar ' + @Html.Raw(unomeJs),
                                                     resumo: 'O usuário não conseguirá mais fazer login. Sessões ativas serão encerradas. Pode ser reativado depois.',
                                                     variant: 'danger',
                                                     confirmLabel: 'Desativar (auditado)'
@@ -362,7 +385,7 @@ function alertaBanner(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-basil hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=ReativarUsuario&userId=@uid',
-                                                    acao: 'Reativar @unome',
+                                                    acao: 'Reativar ' + @Html.Raw(unomeJs),
                                                     resumo: 'O usuário voltará a conseguir fazer login. Tentativas de bloqueio serão zeradas.',
                                                     variant: 'primary',
                                                     confirmLabel: 'Reativar (auditado)'
@@ -743,6 +766,8 @@ function alertaBanner(tenantId) {
                     var lativa = l.TryGetProperty("ativa", out var lap) && lap.GetBoolean();
                     // Serializa JSON pra passar como contexto pro modal de edição (escape correto).
                     var lojaJson = System.Text.Json.JsonSerializer.Serialize(new { id = lid, nome = lnome, descricao = ldesc, documento = ldoc, endereco = lend, telefone = ltel });
+                    // Nome serializado pra string JS literal — evita quebra com aspas no nome da loja.
+                    var lnomeJs = System.Text.Json.JsonSerializer.Serialize(lnome);
                     <div class="card flex flex-col">
                         <div class="flex items-start justify-between mb-2">
                             <h4 class="text-es-ink font-semibold flex-1 truncate">@lnome</h4>
@@ -764,7 +789,7 @@ function alertaBanner(tenantId) {
                                 <button type="button"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Desativar loja @lnome',
+                                            acao: 'Desativar loja ' + @Html.Raw(lnomeJs),
                                             resumo: 'A loja não aparecerá mais para o cliente. Histórico (vendas, estoque) é preservado. Pode ser reativada.',
                                             variant: 'danger',
                                             confirmLabel: 'Desativar (auditado)',
@@ -777,7 +802,7 @@ function alertaBanner(tenantId) {
                                 <button type="button"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Reativar loja @lnome',
+                                            acao: 'Reativar loja ' + @Html.Raw(lnomeJs),
                                             resumo: 'A loja voltará a aparecer para o cliente.',
                                             variant: 'primary',
                                             confirmLabel: 'Reativar (auditado)',
@@ -1378,6 +1403,10 @@ function alertaBanner(tenantId) {
                         const items = (d.data || []);
                         this.historico = items;
                         this.totalHist = (d.meta && d.meta.total) ?? items.length;
+                        // Estatísticas vêm fora do envelope `data`/`meta` (DataPaged padrão).
+                        if (d.estatisticas) {
+                            this.estatisticas = d.estatisticas;
+                        }
                     } catch (e) {
                         this.erroHist = 'Falha ao carregar: ' + (e.message || e);
                     } finally {

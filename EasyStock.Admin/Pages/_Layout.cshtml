@@ -396,9 +396,9 @@
      style="padding-top:10vh"
      @@click.self="close()"
      @@keydown.escape.window="if (open) close()"
-     @@keydown.arrow-down.window.prevent="if (open) move(1)"
-     @@keydown.arrow-up.window.prevent="if (open) move(-1)"
-     @@keydown.enter.window.prevent="if (open) choose()">
+     @@keydown.arrow-down.window="if (open) { move(1); $event.preventDefault(); }"
+     @@keydown.arrow-up.window="if (open) { move(-1); $event.preventDefault(); }"
+     @@keydown.enter.window="if (open) { choose(); $event.preventDefault(); }">
     <div class="w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden"
          style="background:#0b1530;border:1px solid rgba(247,242,232,.12)">
         <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid rgba(247,242,232,.08)">

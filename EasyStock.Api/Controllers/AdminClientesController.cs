@@ -529,15 +529,19 @@ public class AdminClientesController(
             .Where(p => p.TenantId == tenantId)
             .CountAsync();
 
-        return DataPaged(new
+        // Envelope custom (não usa DataPaged) pra preservar `estatisticas` na resposta.
+        // DataPaged só aceita IEnumerable<T> + meta — perderia o objeto extra.
+        var pages = pageSize > 0 ? (int)Math.Ceiling((double)total / pageSize) : 0;
+        return Ok(new
         {
-            itens,
+            data = itens,
+            meta = new { total, pages, page, limit = pageSize },
             estatisticas = new
             {
                 totalAcoesLgpd = total,
                 totalUnmasks
             }
-        }.itens, total, page, pageSize);
+        });
     }
 
     // ─────────────────── #14: Notas internas (handoff entre operadores) ───────────────────

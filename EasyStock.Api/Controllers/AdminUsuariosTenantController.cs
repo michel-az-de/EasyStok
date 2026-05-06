@@ -209,6 +209,7 @@ public class AdminUsuariosTenantController(
             usuario.Nome = nomeNovo;
         }
 
+        var emailTrocado = false;
         if (!string.IsNullOrWhiteSpace(emailNovo) && !string.Equals(emailNovo, emailAntigo, StringComparison.OrdinalIgnoreCase))
         {
             // Conflito: outro usuário já usa esse email.
@@ -218,6 +219,7 @@ public class AdminUsuariosTenantController(
             alteracoes.Add($"email: '{MascararEmail(emailAntigo)}' → '{MascararEmail(emailNovo)}'");
             usuario.Email = emailNovo;
             usuario.EmailConfirmado = false; // Forçar reconfirmação na próxima ação que exigir.
+            emailTrocado = true;
         }
 
         if (alteracoes.Count == 0)
@@ -226,9 +228,17 @@ public class AdminUsuariosTenantController(
         usuario.AlteradoEm = DateTime.UtcNow;
         await db.CommitAsync();
 
+        // Email troca → revoga refresh tokens. Defesa contra atacante que captura sessão
+        // e troca o email de identidade. Padrão Auth0: "credential change → invalidate sessions".
+        var sessoesRevogadas = 0;
+        if (emailTrocado)
+        {
+            sessoesRevogadas = await refreshTokens.RevogarSessoesAtivasAsync(userId, DateTime.UtcNow);
+        }
+
         await audit.LogAsync(
             "UsuarioTenantAtualizado",
-            $"UserId={userId}; {string.Join("; ", alteracoes)}",
+            $"UserId={userId}; {string.Join("; ", alteracoes)}{(emailTrocado ? $"; SessoesRevogadas={sessoesRevogadas}" : "")}",
             tenantId: await ResolverTenantIdAsync(userId),
             motivo: motivo,
             entidadeAfetadaId: userId);
@@ -242,7 +252,9 @@ public class AdminUsuariosTenantController(
             usuarioId = userId,
             alterado = true,
             alteracoes,
+            sessoesRevogadas = emailTrocado ? (int?)sessoesRevogadas : null,
             mensagem = $"{alteracoes.Count} campo(s) atualizado(s)."
+                + (emailTrocado ? $" Email trocado → {sessoesRevogadas} sessão(ões) revogada(s)." : "")
         });
     }
 
@@ -308,21 +320,29 @@ public class AdminUsuariosTenantController(
     // ─────────────────────────── helpers ───────────────────────────
 
     /// <summary>
-    /// True se o usuário é o último Admin/SuperAdmin ATIVO de algum tenant ao qual pertence.
-    /// Evita deixar cliente sem dono. Usa join via UsuarioPerfil + Perfil pra checar nivel.
+    /// True se o usuário-alvo é admin (Admin ou SuperAdmin) de algum tenant E é o
+    /// único admin ativo desse tenant. Evita deixar cliente sem dono. Bug histórico:
+    /// versão anterior bloqueava desativar QUALQUER usuário (mesmo não-admin) sempre
+    /// que o tenant tinha 1 só admin — agora valida especificamente que o alvo é admin.
     /// </summary>
     private async Task<bool> EhUltimoAdminAtivoAsync(Guid usuarioId)
     {
-        var empresaIds = await db.UsuariosEmpresas
-            .Where(ue => ue.UsuarioId == usuarioId)
-            .Select(ue => ue.EmpresaId)
+        // 1. Empresas onde o usuário-alvo é admin ATIVO.
+        var empresasOndeEhAdmin = await db.UsuariosPerfis
+            .Where(up => up.UsuarioId == usuarioId)
+            .Join(db.Perfis, up => up.PerfilId, p => p.Id, (up, p) => new { up.EmpresaId, p.Nivel })
+            .Where(x => x.Nivel == Domain.Enums.NivelAcesso.Admin || x.Nivel == Domain.Enums.NivelAcesso.SuperAdmin)
+            .Select(x => x.EmpresaId)
+            .Distinct()
             .ToListAsync();
-        if (empresaIds.Count == 0) return false;
 
-        foreach (var empresaId in empresaIds)
+        if (empresasOndeEhAdmin.Count == 0) return false; // alvo não é admin em lugar nenhum.
+
+        foreach (var empresaId in empresasOndeEhAdmin)
         {
-            var totalAdmins = await db.UsuariosPerfis
-                .Where(up => up.EmpresaId == empresaId)
+            // 2. Conta admins ativos DIFERENTES do alvo nessa empresa.
+            var outrosAdminsAtivos = await db.UsuariosPerfis
+                .Where(up => up.EmpresaId == empresaId && up.UsuarioId != usuarioId)
                 .Join(db.Perfis, up => up.PerfilId, p => p.Id, (up, p) => new { up.UsuarioId, p.Nivel })
                 .Where(x => x.Nivel == Domain.Enums.NivelAcesso.Admin || x.Nivel == Domain.Enums.NivelAcesso.SuperAdmin)
                 .Join(db.Usuarios, x => x.UsuarioId, u => u.Id, (x, u) => new { x.UsuarioId, u.Ativo })
@@ -331,8 +351,8 @@ public class AdminUsuariosTenantController(
                 .Distinct()
                 .CountAsync();
 
-            // Se o próprio usuário é o único admin ativo → bloqueia.
-            if (totalAdmins == 1) return true;
+            // Se não sobra nenhum outro admin ativo, o alvo é o último — bloqueia.
+            if (outrosAdminsAtivos == 0) return true;
         }
         return false;
     }

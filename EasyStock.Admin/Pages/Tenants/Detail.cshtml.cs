@@ -277,7 +277,8 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
 
     public async Task<IActionResult> OnGetSessoesUsuarioAsync(Guid userId)
     {
-        if (userId == Guid.Empty) return BadRequest(new { error = "userId inválido" });
+        if (userId == Guid.Empty)
+            return new JsonResult(new { error = "userId inválido" }) { StatusCode = 400 };
         try
         {
             var data = await api.GetAsync<JsonElement>($"api/admin/usuarios-tenant/{userId}/sessoes");
