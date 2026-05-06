@@ -35,12 +35,13 @@ jobs:
           package: ./publish-api
 
   # ── 2. Run DB migrations ─────────────────────────────────────────────────────
+  # NOTA: GitHub Actions bloqueia `secrets.X` em condicional `if:` (security
+  # feature — evita timing leak). Em vez de skip via `if`, deixamos o job
+  # sempre rodar e o step verifica a env var localmente.
   migrate:
     name: DB migrations
     runs-on: ubuntu-latest
     needs: deploy-api
-    # Only runs if DB_CONNECTION_STRING secret is configured
-    if: ${{ secrets.DB_CONNECTION_STRING != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,11 +53,15 @@ jobs:
       - name: Install EF Core tools
         run: dotnet tool install --global dotnet-ef
 
-      - name: Run migrations
+      - name: Run migrations (skip if DB_CONNECTION_STRING ausente)
         env:
           ConnectionStrings__DefaultConnection: ${{ secrets.DB_CONNECTION_STRING }}
           Database__Provider: PostgreSql
         run: |
+          if [ -z "$ConnectionStrings__DefaultConnection" ]; then
+            echo "::notice::DB_CONNECTION_STRING não configurado — pulando migrations."
+            exit 0
+          fi
           dotnet ef database update \
             --project EasyStock.Infra.Postgre \
             --startup-project EasyStock.Api \
