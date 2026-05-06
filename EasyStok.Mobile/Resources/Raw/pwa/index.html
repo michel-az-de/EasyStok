@@ -15173,7 +15173,14 @@ function escPosTextLines(title, lines) {
 /**
  * Comandos GS ( k pra QR code em ESC/POS (suportado pela Hipertech WTP05).
  * Sequencia: setModelo -> setSize -> setErrorCorrection -> store -> print.
- * Usado pra confer\u00eancia: QR pequeno (\u224820mm) com c\u00f3digo curto (orderRef).
+ *
+ * Modulo default = 8 dots (em 203 DPI ~ 1mm/modulo). Em modulos menores
+ * (4-5) a tinta termica borra e leitor de smartphone nao decodifica.
+ * 8 dots com ECL=M aguenta o bleed natural da WTP05 e mantem QR ~25-30mm
+ * \u2014 confortavel pra leitura por camera, ainda cabe em 58mm (384 dots uteis).
+ *
+ * ECL=M (~15%) e o ponto doce em termica: L (~7%) e fragil demais com
+ * bleed; Q/H aumentam o numero de modulos demais e podem apertar a etiqueta.
  */
 function escPosQrCommands(data, moduleSize) {
   const enc = PRINT_ENCODER.encode(data || '');
@@ -15183,10 +15190,10 @@ function escPosQrCommands(data, moduleSize) {
   const out = [];
   // Modelo 2 (mais comum)
   out.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
-  // Tamanho do m\u00f3dulo (5 = ~20mm)
-  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize || 0x05);
-  // Error correction L (48)
-  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30);
+  // Tamanho do modulo em dots (1-16). Default 8 = ~25-30mm em QR tipico.
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize || 0x08);
+  // Error correction M (49) \u2014 robusto contra bleed termico
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31);
   // Store data
   out.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
   enc.forEach(byte => out.push(byte));
@@ -15264,10 +15271,12 @@ function escPosOrderLabel(o) {
     if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
   }
   b.line(divider());
-  // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo
+  // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo.
+  // moduleSize=8 dots (~25mm em v1) garante leitura por camera apesar do
+  // bleed termico. 2 LFs criam quiet zone inferior antes do texto.
   b.center();
-  b.push(...escPosQrCommands(orderRef, 0x05));
-  b.push(0x0A);
+  b.push(...escPosQrCommands(orderRef, 0x08));
+  b.push(0x0A, 0x0A);
   b.bold().line('Codigo: ' + orderRef).boldOff();
   b.line('Confira no app pelo codigo ou QR');
   b.left();
@@ -15591,8 +15600,10 @@ function escPosLabelProducao(et) {
   const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
   if (showQr) {
     // QR: mais robusto no scanner do app e mais legivel em termica.
-    b.push(...escPosQrCommands(et.codigoBarras, 0x04));
-    b.push(0x0A);
+    // moduleSize=8 dots + ECL=M (no escPosQrCommands) compensam o bleed
+    // termico da WTP05; 2 LFs garantem quiet zone inferior.
+    b.push(...escPosQrCommands(et.codigoBarras, 0x08));
+    b.push(0x0A, 0x0A);
   }
   b.bold().line(et.codigoBarras).boldOff();
   b.line('Escaneie no app para conferir');
