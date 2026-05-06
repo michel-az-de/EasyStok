@@ -28,6 +28,7 @@ public class AdminSeedController(
     public async Task<IActionResult> Status()
     {
         var enabled = SeedApiEnabled();
+        var (envSet, configSet) = SeedApiEnabledSources();
         var counts = new
         {
             empresas = await db.Empresas.AsNoTracking().CountAsync(),
@@ -35,7 +36,25 @@ public class AdminSeedController(
             lojas = await db.Lojas.AsNoTracking().CountAsync(),
             planos = await db.Planos.AsNoTracking().CountAsync()
         };
-        return DataOk(new { enabled, counts });
+        // Log de cada consulta — fica no Render/Azure logs pra rastreabilidade.
+        logger.LogInformation(
+            "[Seed] Status consultado — enabled={Enabled} (envSet={EnvSet}, configSet={ConfigSet}); counts={@Counts}",
+            enabled, envSet, configSet, counts);
+        return DataOk(new
+        {
+            enabled,
+            counts,
+            // Diagnóstico — admin enxerga de onde a flag vem (env var vs appsettings).
+            // Útil quando "habilitei mas não funciona": indica qual fonte está winning.
+            diagnostico = new
+            {
+                fonteEnv = envSet,
+                fonteConfig = configSet,
+                hint = enabled
+                    ? "OK — seed liberado."
+                    : "Pra liberar: defina SEED_API_ENABLED=true (env var no host) OU \"Seed:ApiEnabled\": true em appsettings, e reinicie a API."
+            }
+        });
     }
 
     /// <summary>
@@ -102,8 +121,17 @@ public class AdminSeedController(
     [HttpPost("admin-test-scenarios")]
     public async Task<IActionResult> ExecutarAdminTestScenarios()
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        logger.LogInformation("[Seed] admin-test-scenarios — iniciando…");
+
         if (!SeedApiEnabled())
-            return DataBadRequest("Seed via API não está habilitado. Defina SEED_API_ENABLED=true ou Seed:ApiEnabled=true.");
+        {
+            var (envSet, cfgSet) = SeedApiEnabledSources();
+            logger.LogWarning("[Seed] admin-test-scenarios BLOQUEADO — flag desabilitada (envSet={EnvSet}, configSet={CfgSet})", envSet, cfgSet);
+            return DataBadRequest(
+                "Seed via API está desabilitado. Defina SEED_API_ENABLED=true (env var) ou \"Seed:ApiEnabled\": true em appsettings, e reinicie a API. " +
+                $"Estado atual: env={envSet}, config={cfgSet}.");
+        }
 
         try
         {
@@ -126,10 +154,16 @@ public class AdminSeedController(
                 tickets = await db.AdminTickets.AsNoTracking().CountAsync()
             };
 
+            sw.Stop();
+            logger.LogInformation(
+                "[Seed] admin-test-scenarios — OK em {Ms}ms. counts={@Counts}",
+                sw.ElapsedMilliseconds, counts);
+
             return DataOk(new
             {
                 ok = true,
                 cenario = "admin-test-scenarios",
+                tempoMs = sw.ElapsedMilliseconds,
                 counts,
                 credenciais = new
                 {
@@ -142,13 +176,15 @@ public class AdminSeedController(
                         "ze.pereira@lojadoze.test (Loja Do Zé — Cancelada)"
                     }
                 },
-                mensagem = "Cenários de teste do Admin criados. Atualize Clientes/Dashboard/Tickets pra ver."
+                mensagem = $"Cenários criados em {sw.ElapsedMilliseconds}ms. Atualize Clientes/Dashboard/Tickets pra ver."
             });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Falha ao executar seed admin-test-scenarios");
-            return Problem(detail: ex.Message, statusCode: 500, title: "Erro ao executar seed.");
+            sw.Stop();
+            logger.LogError(ex, "[Seed] admin-test-scenarios FALHOU em {Ms}ms — {Msg}", sw.ElapsedMilliseconds, ex.Message);
+            return Problem(detail: ex.Message + (ex.InnerException is { } inner ? " | inner: " + inner.Message : ""),
+                statusCode: 500, title: "Erro ao executar seed (admin-test-scenarios).");
         }
     }
 
@@ -183,5 +219,19 @@ public class AdminSeedController(
             return string.Equals(fromEnv, "true", StringComparison.OrdinalIgnoreCase);
         var fromConfig = config.GetValue<bool?>("Seed:ApiEnabled");
         return fromConfig ?? false;
+    }
+
+    /// <summary>
+    /// Diagnóstico — retorna o estado das duas fontes (env var + appsettings) pro
+    /// status mostrar pra o usuário "qual flag tá vencendo". Útil quando "habilitei
+    /// mas não funciona" — ajuda a ver qual fonte tem precedência.
+    /// </summary>
+    private (string Env, string Config) SeedApiEnabledSources()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("SEED_API_ENABLED");
+        var envState = string.IsNullOrWhiteSpace(fromEnv) ? "(vazio)" : fromEnv;
+        var fromConfig = config.GetValue<bool?>("Seed:ApiEnabled");
+        var cfgState = fromConfig.HasValue ? fromConfig.Value.ToString().ToLowerInvariant() : "(vazio)";
+        return (envState, cfgState);
     }
 }

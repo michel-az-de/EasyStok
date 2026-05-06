@@ -127,6 +127,25 @@
         <button type="button" @@click="carregarStatus()" class="text-xs underline hover:text-amber-200">↻ Tentar novamente</button>
     </div>
 
+    <!-- Diagnóstico de flags — sempre visível quando status carregou. -->
+    <template x-if="!loadingStatus && diagnostico">
+        <div class="rounded-lg p-3 mb-4 text-xs"
+             :style="enabled ? 'background:rgba(79,191,159,.06);border:1px solid rgba(79,191,159,.2)' : 'background:rgba(247,144,9,.06);border:1px solid rgba(247,144,9,.25)'">
+            <div class="flex items-center gap-2 mb-1">
+                <span x-show="enabled" x-cloak class="text-es-basil">●</span>
+                <span x-show="!enabled" x-cloak class="text-amber-400">●</span>
+                <span class="font-semibold text-es-ink" x-text="enabled ? 'Seed liberado' : 'Seed bloqueado'"></span>
+            </div>
+            <div class="font-mono text-es-ink-mute mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+                <span>SEED_API_ENABLED (env):</span>
+                <span class="text-es-ink" x-text="diagnostico.fonteEnv"></span>
+                <span>Seed:ApiEnabled (config):</span>
+                <span class="text-es-ink" x-text="diagnostico.fonteConfig"></span>
+            </div>
+            <div class="text-es-ink-dim mt-2" x-text="diagnostico.hint"></div>
+        </div>
+    </template>
+
     <template x-if="!loadingStatus && counts">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div class="rounded-lg p-3 text-center" style="background:rgba(247,242,232,0.04)">
@@ -183,6 +202,54 @@
             Carga maior, útil pra testar EasyStock.Web também.
         </p>
         <p>Todos os seeds são <strong>idempotentes</strong> — rodar múltiplas vezes não duplica dados.</p>
+    </div>
+
+    <!-- ── Console de debug — mostra request/response/timing/status pra rastreabilidade -->
+    <div class="mt-4" style="border-top:1px solid rgba(247,242,232,0.06); padding-top:12px;">
+        <div class="flex items-center justify-between">
+            <button type="button" @@click="debugAberto = !debugAberto"
+                    class="text-xs flex items-center gap-2 text-es-ink-mute hover:text-es-ink">
+                <span x-text="debugAberto ? '▼' : '▶'"></span>
+                <span class="font-mono uppercase tracking-wide">Detalhes do request</span>
+                <span class="text-es-ink-mute" x-show="debugLog.length > 0" x-cloak>(<span x-text="debugLog.length"></span> entrada<span x-show="debugLog.length !== 1" x-cloak>s</span>)</span>
+            </button>
+            <button type="button" @@click="copiarLog()" x-show="debugLog.length > 0" x-cloak
+                    class="text-[10px] text-es-ink-mute hover:text-es-accent">
+                📋 Copiar log
+            </button>
+        </div>
+
+        <div x-show="debugAberto" x-cloak class="mt-3 rounded-lg overflow-hidden"
+             style="background:rgba(0,0,0,.3); border:1px solid rgba(247,242,232,0.08); font-family:'JetBrains Mono',monospace;">
+            <template x-if="debugLog.length === 0">
+                <div class="text-es-ink-mute text-xs p-3 text-center">Nenhum request feito ainda. Clique em ↻ ou em um botão de seed pra começar.</div>
+            </template>
+            <template x-for="(e, i) in debugLog" :key="i">
+                <div class="text-[11px] px-3 py-2"
+                     :style="i % 2 === 0 ? 'background:rgba(247,242,232,.02)' : ''"
+                     style="border-top:1px solid rgba(247,242,232,.04)">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-es-ink-mute" x-text="e.ts"></span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                              :style="e.error ? 'background:rgba(248,113,113,.2);color:#fca5a5' : (e.status >= 200 && e.status < 300 ? 'background:rgba(79,191,159,.2);color:#5eead4' : (e.status >= 400 ? 'background:rgba(248,113,113,.2);color:#fca5a5' : 'background:rgba(247,144,9,.2);color:#fbbf24'))"
+                              x-text="e.error ? 'NET-ERR' : e.status"></span>
+                        <span class="font-bold" :class="e.method === 'POST' ? 'text-es-accent' : 'text-es-basil'" x-text="e.method"></span>
+                        <span class="text-es-ink-dim flex-1 truncate" x-text="e.url"></span>
+                        <span class="text-es-ink-mute" x-text="e.ms + 'ms'"></span>
+                    </div>
+                    <div x-show="e.error" x-cloak class="mt-1 text-red-300" x-text="'⚠ ' + e.error"></div>
+                    <details x-show="e.sample" x-cloak class="mt-1">
+                        <summary class="text-es-ink-mute cursor-pointer hover:text-es-ink">Body</summary>
+                        <pre class="mt-1 text-es-ink-dim text-[10px] whitespace-pre-wrap break-all" x-text="e.sample"></pre>
+                    </details>
+                </div>
+            </template>
+        </div>
+
+        <p class="text-[10px] text-es-ink-mute mt-2">
+            <strong class="text-es-ink">Dica:</strong> abra também o <kbd class="px-1 py-0.5 bg-es-surface-2 rounded">DevTools (F12) → Console</kbd>
+            — todos os requests são logados lá com prefixo <code class="text-es-accent">[seed]</code>.
+        </p>
     </div>
 </div>
 
@@ -254,60 +321,122 @@ function seedPanel() {
         volume: 'large',
         erro: '',
         sucesso: '',
-        statusErro: '', // erro específico de carregar status — mostrado em banner separado
+        statusErro: '',
+        // ── Console de debug — toda chamada gera entry visível na UI pra o
+        //    usuário ter rastreabilidade do que aconteceu (status, timing, body)
+        debugAberto: false,
+        debugLog: [],   // [{ts, method, url, status, ms, sample, error}]
+
+        _logEntry(entry) {
+            entry.ts = new Date().toLocaleTimeString('pt-BR') + '.' +
+                String(new Date().getMilliseconds()).padStart(3, '0');
+            // Mantém só as últimas 20 entradas pra não estourar UI.
+            this.debugLog.unshift(entry);
+            if (this.debugLog.length > 20) this.debugLog.pop();
+            // Console também pra DevTools.
+            const tag = entry.error ? '❌' : (entry.status >= 200 && entry.status < 300 ? '✓' : '⚠');
+            console.log('[seed]', tag, entry.method, entry.url, entry.status, entry.ms + 'ms', entry.sample || '');
+        },
+
+        async _doFetch(url, options) {
+            const t0 = performance.now();
+            const method = (options && options.method) || 'GET';
+            const entry = { method, url, status: 0, ms: 0, sample: '', error: '' };
+            try {
+                const r = await fetch(url, options);
+                const ms = Math.round(performance.now() - t0);
+                entry.status = r.status;
+                entry.ms = ms;
+                let bodyText = '';
+                try { bodyText = await r.clone().text(); } catch {}
+                entry.sample = bodyText.length > 500 ? bodyText.slice(0, 500) + '…' : bodyText;
+                this._logEntry(entry);
+                return { ok: r.ok, status: r.status, body: bodyText, response: r };
+            } catch (e) {
+                entry.ms = Math.round(performance.now() - t0);
+                entry.error = e.message || String(e);
+                this._logEntry(entry);
+                throw e;
+            }
+        },
+
+        _parseBody(bodyText) {
+            try { return JSON.parse(bodyText); } catch { return null; }
+        },
+
+        diagnostico: null, // { fonteEnv, fonteConfig, hint } da resposta do GET /seed/status
+
         async carregarStatus() {
             this.loadingStatus = true; this.statusErro = '';
             try {
-                const r = await fetch('/Status?handler=SeedStatus', { credentials: 'same-origin', cache: 'no-store' });
-                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
-                const d = await r.json();
-                if (!r.ok) {
-                    this.statusErro = 'Não foi possível consultar status do seed (HTTP ' + r.status + '). API pode estar dormindo (Render free tier) — tente recarregar em 30s.';
+                const result = await this._doFetch('/Status?handler=SeedStatus',
+                    { credentials: 'same-origin', cache: 'no-store' });
+                if (result.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const d = this._parseBody(result.body);
+                if (!result.ok) {
+                    this.statusErro = (d && (d.error || (d.error?.message)))
+                        || ('HTTP ' + result.status + ' ao consultar status. Se a API está em sleep (Render), pode levar 30-60s pra acordar.');
                     return;
                 }
-                const data = d.data || d;
+                const data = (d && (d.data || d)) || {};
                 this.enabled = !!data.enabled;
                 this.counts = data.counts || null;
+                this.diagnostico = data.diagnostico || null;
             } catch (e) {
-                this.statusErro = 'Falha de rede ao consultar API: ' + (e.message || e) + '. Se a API está em sleep (Render), pode levar 30-60s pra acordar.';
+                this.statusErro = 'Falha de rede ao consultar API: ' + (e.message || e)
+                    + '. Possíveis causas: (1) API hibernando no Render free tier; (2) ApiBaseUrl errado no Admin; (3) CORS.';
             } finally {
                 this.loadingStatus = false;
             }
         },
+
         async _post(url) {
-            // Bloqueio explícito em vez de silêncio — caso enabled seja null (status ainda não
-            // carregou) ou false (flag desabilitada), mostra mensagem em vez de no-op.
+            // Bloqueio explícito em vez de silêncio — caso enabled seja null/false,
+            // mostra mensagem com instrução clara.
             if (this.enabled === null) {
-                this.erro = 'Aguarde — status do seed ainda não carregou. Clique no ↻ acima.';
+                this.erro = 'Status ainda não carregou. Clique no ↻ acima e aguarde a API responder.';
                 return;
             }
             if (this.enabled === false) {
-                this.erro = 'Seed via API está desabilitado neste ambiente. Defina SEED_API_ENABLED=true (env var no Render) ou Seed:ApiEnabled=true em appsettings, e reinicie a API.';
+                this.erro = 'Seed via API está desabilitado. Defina SEED_API_ENABLED=true (env var no Render) ou Seed:ApiEnabled=true em appsettings, depois reinicie a API.';
                 return;
             }
             if (this.executando) return;
             this.executando = true; this.erro = ''; this.sucesso = '';
+            // Abre debug automaticamente em chamada destrutiva — usuário vê o que rola.
+            this.debugAberto = true;
             try {
                 const fd = new FormData();
                 fd.append('__RequestVerificationToken', '@afStatus');
                 if (url.includes('handler=SeedDemo')) fd.append('volume', this.volume);
-                const r = await fetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
-                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
-                const d = await r.json();
-                if (!r.ok) {
-                    this.erro = (d && (d.error || (d.error?.message))) || ('Falha HTTP ' + r.status);
+                const result = await this._doFetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
+                if (result.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const d = this._parseBody(result.body);
+                if (!result.ok) {
+                    // Tenta extrair mensagem amigável do body, senão monta uma com status.
+                    const fromError = d && (
+                        (d.error && d.error.message) ||
+                        (typeof d.error === 'string' ? d.error : null) ||
+                        d.message ||
+                        d.title
+                    );
+                    this.erro = fromError
+                        ? `[HTTP ${result.status}] ${fromError}`
+                        : `HTTP ${result.status} sem mensagem da API. Veja "Detalhes do request" abaixo pro corpo da resposta.`;
                     return;
                 }
-                const data = d.data || d;
-                this.sucesso = data.mensagem || 'Seed executado com sucesso.';
+                const data = (d && (d.data || d)) || {};
+                this.sucesso = data.mensagem || 'Seed executado com sucesso. Atualize as telas pra ver os novos dados.';
                 if (data.counts) this.counts = data.counts;
                 else await this.carregarStatus();
             } catch (e) {
-                this.erro = 'Falha de rede ao executar seed: ' + (e.message || e);
+                this.erro = 'Falha de rede: ' + (e.message || e)
+                    + '. Veja "Detalhes do request" abaixo — exception capturada antes da resposta chegar.';
             } finally {
                 this.executando = false;
             }
         },
+
         async executarDemo() {
             await this._post('/Status?handler=SeedDemo&volume=' + encodeURIComponent(this.volume));
         },
@@ -317,6 +446,18 @@ function seedPanel() {
         async executarMinimal() {
             if (!confirm('Executar seed mínimo? Cria apenas 1 admin + 1 empresa + 1 loja.')) return;
             await this._post('/Status?handler=SeedMinimal');
+        },
+
+        copiarLog() {
+            const txt = this.debugLog.map(e =>
+                `[${e.ts}] ${e.method} ${e.url} → ${e.status || 'ERR'} (${e.ms}ms)\n  ${e.error || e.sample || ''}`
+            ).join('\n\n');
+            try {
+                navigator.clipboard.writeText(txt);
+                this.sucesso = 'Log copiado pra área de transferência.';
+            } catch {
+                this.erro = 'Não foi possível copiar — selecione manualmente abaixo.';
+            }
         }
     };
 }
