@@ -24,6 +24,8 @@
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
     <div class="w-full max-w-lg mx-auto px-4">
@@ -64,27 +66,90 @@
         }
         else if (podeCriarLoja)
         {
-            <div class="auth-card rounded-xl p-6">
+            <div class="auth-card rounded-xl p-6"
+                 x-data="{
+                     emoji: '🏪',
+                     nome: '',
+                     cidade: '',
+                     telefone: '',
+                     emojis: ['🏪','🛒','🏬','🛍️','🏭','📦','🍔','☕','🍕','💊','💄','📚','🔧','🐾','🌱','💼','🚗','⚽'],
+                     get nomeOk() { return this.nome.trim().length >= 2 && this.nome.trim().length <= 80; },
+                     get telefoneOk() { return !this.telefone || /^[0-9()+\-\s]{8,20}$/.test(this.telefone); },
+                     get podeEnviar() { return this.nomeOk && this.telefoneOk; }
+                 }">
                 <div class="flex items-start gap-3 mb-4 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);">
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:#3b82f6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <p class="text-xs auth-card-subtitle leading-relaxed">
-                        Sua conta de administrador ainda não tem nenhuma loja vinculada. Crie a primeira loja abaixo — você poderá adicionar mais depois em <strong>Configurações → Lojas</strong>.
+                        Para começar, configure sua primeira loja. Esta etapa é obrigatória — você poderá editar depois ou cadastrar mais lojas em <strong>Configurações → Lojas</strong>.
                     </p>
                 </div>
-                <form asp-action="Criar" asp-controller="Lojas" method="post" class="space-y-3">
+
+                <form asp-action="Criar" asp-controller="Lojas" method="post" class="space-y-4"
+                      @@submit="if (!podeEnviar) { $event.preventDefault(); }">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" name="emoji" :value="emoji" />
+
+                    <!-- Emoji picker -->
                     <div>
-                        <label for="nome" class="block text-sm font-semibold auth-card-title mb-1">Nome da loja</label>
+                        <label class="block text-sm font-semibold auth-card-title mb-1.5">Identidade visual</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <template x-for="e in emojis" :key="e">
+                                <button type="button" @@click="emoji = e"
+                                        :class="emoji === e ? 'bg-indigo-100 ring-2 ring-indigo-400' : 'bg-slate-50 hover:bg-slate-100'"
+                                        class="w-9 h-9 rounded-lg text-lg leading-none flex items-center justify-center transition">
+                                    <span x-text="e"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Nome -->
+                    <div>
+                        <label for="nome" class="block text-sm font-semibold auth-card-title mb-1">
+                            Nome da loja <span class="text-red-500">*</span>
+                        </label>
                         <input id="nome" name="nome" type="text" required maxlength="80" autofocus
+                               x-model="nome"
                                placeholder="Ex.: Matriz Centro"
+                               class="w-full px-3 py-2.5 rounded-lg border focus:ring-2 focus:ring-indigo-200 outline-none transition"
+                               :class="(nome.length > 0 && !nomeOk) ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'" />
+                        <p x-show="nome.length > 0 && !nomeOk" x-cloak class="text-xs text-red-600 mt-1">
+                            O nome deve ter entre 2 e 80 caracteres.
+                        </p>
+                    </div>
+
+                    <!-- Cidade -->
+                    <div>
+                        <label for="cidade" class="block text-sm font-semibold auth-card-title mb-1">Cidade <span class="text-slate-400 font-normal">(opcional)</span></label>
+                        <input id="cidade" name="cidade" type="text" maxlength="120"
+                               x-model="cidade"
+                               placeholder="Ex.: São Paulo, SP"
                                class="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" />
                     </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors">
+
+                    <!-- Telefone -->
+                    <div>
+                        <label for="telefone" class="block text-sm font-semibold auth-card-title mb-1">Telefone de contato <span class="text-slate-400 font-normal">(opcional)</span></label>
+                        <input id="telefone" name="telefone" type="tel" maxlength="20"
+                               x-model="telefone"
+                               placeholder="(11) 90000-0000"
+                               class="w-full px-3 py-2.5 rounded-lg border focus:ring-2 focus:ring-indigo-200 outline-none transition"
+                               :class="(telefone.length > 0 && !telefoneOk) ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'" />
+                        <p x-show="telefone.length > 0 && !telefoneOk" x-cloak class="text-xs text-red-600 mt-1">
+                            Telefone inválido — use apenas dígitos, espaços e ( ) + -.
+                        </p>
+                    </div>
+
+                    <button type="submit"
+                            :disabled="!podeEnviar"
+                            :class="podeEnviar ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'"
+                            class="w-full font-semibold py-2.5 rounded-lg transition-colors">
                         Criar loja e continuar
                     </button>
                 </form>
+
                 <form asp-action="Logout" asp-controller="Auth" method="post" class="mt-3 text-center">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="text-xs auth-card-subtitle hover:underline">Sair desta conta</button>

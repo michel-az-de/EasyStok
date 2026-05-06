@@ -22,9 +22,13 @@
                       || string.Equals(Model.ErrorCode, "LOJA_NAO_SELECIONADA", StringComparison.OrdinalIgnoreCase)
                       || string.IsNullOrEmpty(ViewBag.LojaAtualId as string);
     var isAuthIssue = string.Equals(Model.ErrorCode, "UNAUTHORIZED", StringComparison.OrdinalIgnoreCase)
-                      || string.Equals(Model.ErrorCode, "TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase);
+                      || string.Equals(Model.ErrorCode, "TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase)
+                      || string.Equals(Model.ErrorCode, "AUTH_TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase);
+    // Auto-retry só pra falha transitória (rede/timeout/5xx). Loja/auth precisam de ação humana.
+    var canAutoRetry = !isLojaIssue && !isAuthIssue;
 
-    <div class="ws bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+    <div class="ws bg-red-50 border border-red-200 rounded-xl p-8 text-center"
+         x-data="caixaAutoRetry(@(canAutoRetry ? "true" : "false"))" x-init="start()">
         <svg class="w-12 h-12 mx-auto text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -50,19 +54,37 @@
         else
         {
             <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
-                Verifique sua conexão e tente novamente. Se o problema persistir, contate o suporte.
+                Tentaremos automaticamente novamente. Se o problema persistir, contate o suporte.
+            </p>
+            <p x-show="enabled && !exhausted" x-cloak
+               class="text-xs text-slate-500 mt-2">
+                <span x-show="retrying">Tentando novamente…</span>
+                <span x-show="!retrying">
+                    Tentativa <span x-text="attempts + 1"></span> de <span x-text="maxAttempts"></span>
+                    em <span x-text="countdown" class="font-semibold"></span>s
+                </span>
+            </p>
+            <p x-show="exhausted" x-cloak class="text-xs text-amber-600 mt-2 font-medium">
+                Tentativas automáticas esgotadas. Use o botão abaixo para tentar manualmente.
             </p>
         }
 
         <div class="flex justify-center gap-3 mt-5 flex-wrap">
-            <button type="button" onclick="location.reload()"
+            <button type="button" @@click="retryNow()"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4" :class="retrying && 'animate-spin'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Tentar novamente
+                Tentar agora
             </button>
+            @if (canAutoRetry)
+            {
+                <button type="button" x-show="enabled && !exhausted" @@click="cancel()"
+                        class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                    Cancelar tentativas automáticas
+                </button>
+            }
             @if (isAuthIssue)
             {
                 <a href="/auth/login" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
@@ -105,10 +127,12 @@ else
         <div class="flex flex-wrap gap-3 items-center">
             @if (!d.Aberto && !d.Fechado)
             {
-                <form asp-action="Abrir" asp-controller="Caixa" method="post" class="flex gap-2 items-center" x-data>
+                <form asp-action="Abrir" asp-controller="Caixa" method="post" data-validate class="flex gap-2 items-center" x-data>
                     @Html.AntiForgeryToken()
-                    <input type="number" step="0.01" min="0" name="saldoInicial" placeholder="Saldo inicial" required class="ui-field text-sm" />
-                    <input type="text" name="observacoes" placeholder="Obs (opcional)" class="ui-field text-sm" />
+                    <input type="number" step="0.01" min="0" name="saldoInicial" placeholder="Saldo inicial" required
+                           data-error-message="Informe um saldo inicial válido (use 0 se não houver caixa físico)."
+                           class="ui-field text-sm" />
+                    <input type="text" name="observacoes" placeholder="Obs (opcional)" maxlength="200" class="ui-field text-sm" />
                     <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                         🔓 Abrir caixa
                     </button>
@@ -196,7 +220,7 @@ else
          @@click.self="open = false" @@keydown.escape.window="open = false">
         <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-xl p-6">
             <h2 class="text-lg font-semibold text-slate-900 mb-4">Lançar entrada/saída</h2>
-            <form asp-action="RegistrarMovimento" asp-controller="Caixa" method="post" class="space-y-3">
+            <form asp-action="RegistrarMovimento" asp-controller="Caixa" method="post" data-validate class="space-y-3">
                 @Html.AntiForgeryToken()
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -208,7 +232,9 @@ else
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Valor *</label>
-                        <input type="number" name="valor" step="0.01" min="0.01" required class="ui-field w-full text-sm" />
+                        <input type="number" name="valor" step="0.01" min="0.01" required
+                               data-error-message="Informe um valor maior que zero."
+                               class="ui-field w-full text-sm" />
                     </div>
                     <div class="col-span-2">
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -247,5 +273,71 @@ else
 @section Scripts {
 <script>
 function lancamentoCaixaModal() { return { open: false }; }
+
+// Auto-retry exponencial pra falhas transitórias na carga do Caixa.
+// 3 tentativas com backoff (5s, 10s, 20s); usuário pode cancelar ou disparar agora.
+function caixaAutoRetry(enabled) {
+    return {
+        enabled: enabled,
+        attempts: 0,
+        maxAttempts: 3,
+        delays: [5, 10, 20],
+        countdown: 0,
+        retrying: false,
+        exhausted: false,
+        _tickHandle: null,
+
+        start() {
+            if (!this.enabled) return;
+            this.scheduleNext();
+        },
+        scheduleNext() {
+            if (this.attempts >= this.maxAttempts) {
+                this.exhausted = true;
+                return;
+            }
+            this.countdown = this.delays[this.attempts] || 30;
+            clearInterval(this._tickHandle);
+            this._tickHandle = setInterval(() => {
+                this.countdown -= 1;
+                if (this.countdown <= 0) {
+                    clearInterval(this._tickHandle);
+                    this.retryNow();
+                }
+            }, 1000);
+        },
+        async retryNow() {
+            if (this.retrying) return;
+            clearInterval(this._tickHandle);
+            this.retrying = true;
+            this.attempts += 1;
+            try {
+                // HEAD na própria URL — se o servidor responder OK, recarrega de vez.
+                // Se ainda falhar, agenda próxima tentativa.
+                const r = await fetch(window.location.pathname + window.location.search, {
+                    method: 'GET',
+                    headers: { 'X-Probe': '1' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                if (r.ok) {
+                    window.location.reload();
+                    return;
+                }
+                // não-OK do servidor → conta como falha, segue tentando
+                this.retrying = false;
+                this.scheduleNext();
+            } catch (e) {
+                this.retrying = false;
+                this.scheduleNext();
+            }
+        },
+        cancel() {
+            clearInterval(this._tickHandle);
+            this.enabled = false;
+            this.exhausted = true;
+        }
+    };
+}
 </script>
 }

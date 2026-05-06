@@ -277,19 +277,16 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
         session.SetTemaPreferido("light");
 
-        // Após signup: usuário ainda não tem lojas. Cria uma loja default para que
-        // o dashboard e demais controllers que dependem de LojaAtual não quebrem.
+        // Após signup: se a empresa já tiver lojas (ex: signup repetido pelo mesmo
+        // admin), usa a primeira. Senão, NÃO cria loja silenciosamente — o usuário
+        // passa pelo wizard de onboarding obrigatório em /auth/selecionar-loja para
+        // configurar nome/cidade/contato da primeira loja.
         var lojasResult = await api.GetAsync<List<Loja>>("lojas");
-        if (lojasResult.Success && lojasResult.Data is { Count: > 0 } lojas)
+        var jaTemLoja = lojasResult.Success && lojasResult.Data is { Count: > 0 };
+        if (jaTemLoja)
         {
+            var lojas = lojasResult.Data!;
             session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji, lojas[0].EmpresaId);
-        }
-        else
-        {
-            // Cria loja default sob demanda — usuário pode renomear depois.
-            var criar = await api.PostAsync<Loja>("lojas", new { nome = "Minha Loja", cidade = "" });
-            if (criar.Success && criar.Data is { } nova)
-                session.SetLoja(nova.Id, nova.Nome, nova.Emoji, nova.EmpresaId);
         }
 
         var claims = new List<Claim>
@@ -308,6 +305,12 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
             ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(480)
         };
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProps);
+
+        if (!jaTemLoja)
+        {
+            TempData["Toast"] = "success|Conta criada! Configure sua primeira loja para começar.";
+            return RedirectToAction(nameof(SelecionarLoja));
+        }
 
         TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias está ativo.";
         return RedirectToAction("Index", "Dashboard");

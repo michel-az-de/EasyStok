@@ -19,19 +19,35 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
 
     [HttpPost("/lojas/criar")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Criar(string nome)
+    public async Task<IActionResult> Criar(string nome, string? cidade = null, string? telefone = null, string? emoji = null)
     {
-        if (string.IsNullOrWhiteSpace(nome))
+        var nomeTrim = nome?.Trim();
+        if (string.IsNullOrWhiteSpace(nomeTrim))
         {
             Toast("error", "O nome da loja é obrigatório.");
-            return RedirectToAction(nameof(Index));
+            return string.IsNullOrEmpty(session.GetLojaId())
+                ? RedirectToAction("SelecionarLoja", "Auth")
+                : RedirectToAction(nameof(Index));
         }
 
-        var result = await svc.CriarAsync(nome.Trim());
-        if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
-        if (HasError(result)) return RedirectToAction(nameof(Index));
+        if (nomeTrim.Length > 80)
+        {
+            Toast("error", "O nome da loja deve ter no máximo 80 caracteres.");
+            return string.IsNullOrEmpty(session.GetLojaId())
+                ? RedirectToAction("SelecionarLoja", "Auth")
+                : RedirectToAction(nameof(Index));
+        }
 
-        Toast("success", $"Loja \"{nome.Trim()}\" criada!");
+        var result = await svc.CriarAsync(nomeTrim, cidade?.Trim(), telefone?.Trim());
+        if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
+        if (HasError(result))
+        {
+            return string.IsNullOrEmpty(session.GetLojaId())
+                ? RedirectToAction("SelecionarLoja", "Auth")
+                : RedirectToAction(nameof(Index));
+        }
+
+        Toast("success", $"Loja \"{nomeTrim}\" criada!");
 
         // Caso o usuário não tenha loja ativa (fluxo de onboarding após login sem
         // lojas vinculadas), auto-seleciona a loja recém-criada para que o
@@ -41,9 +57,9 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
             var listaResult = await svc.ListarAsync();
             if (listaResult.Success && listaResult.Data is { Count: > 0 } lojas)
             {
-                var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nome.Trim(), StringComparison.OrdinalIgnoreCase))
+                var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nomeTrim, StringComparison.OrdinalIgnoreCase))
                     ?? lojas.Last();
-                session.SetLoja(nova.Id.ToString(), nova.Nome, null, nova.EmpresaId.ToString());
+                session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId.ToString());
                 return RedirectToAction("Index", "Dashboard");
             }
         }

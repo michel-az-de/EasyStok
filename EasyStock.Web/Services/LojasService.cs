@@ -10,15 +10,15 @@ public class LojasService(ApiClient api, SessionService session)
     public Task<ApiResult<List<LojaApi>>> ListarAsync() =>
         api.GetAsync<List<LojaApi>>($"lojas?empresaId={GetEmpresaId()}");
 
-    public Task<ApiResult<object>> CriarAsync(string nome) =>
+    public Task<ApiResult<object>> CriarAsync(string nome, string? cidade = null, string? telefone = null, string? descricao = null) =>
         api.PostAsync<object>("lojas", new
         {
             empresaId = GetEmpresaId(),
             nome,
-            descricao = (string?)null,
+            descricao,
             documento = (string?)null,
-            endereco = (string?)null,
-            telefone = (string?)null
+            endereco = cidade,
+            telefone
         });
 
     public Task<ApiResult<object>> EditarAsync(string id, string nome) =>
