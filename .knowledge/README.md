@@ -72,6 +72,7 @@ Veja `do-not-do.md`. Top 5:
 - `recent-evolution.md` — últimos commits + decisões (auto-gerado por update.sh)
 - `quick-reference.md` — comandos Bash/dotnet/git mais usados
 - `audit-brutal.md` — última auditoria sênior pessimista completa
+- `dual-frontend-policy.md` — **POLÍTICA OBRIGATÓRIA**: PWA + MAUI coexistem; merge é unidirecional `PWA → MAUI`
 - `gcp-deploy.md` — passo-a-passo do deploy GCP
 - `stability-roadmap.md` — **checklist vivo** do que falta pra estabilizar (deploy, CI, observabilidade, testes integração). Atualizar marcando `[x]` ao resolver.
 - `update.sh` — script que regenera as partes auto-discovery
