@@ -15,6 +15,12 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadaEm { get; set; }
         public DateTime? LidaEm { get; set; }
 
+        /// <summary>
+        /// Correlaciona o item in-app com a mensagem do outbox que originou o envio multi-canal.
+        /// Null para notificações criadas pelo gerador legado (apenas in-app de estoque).
+        /// </summary>
+        public Guid? OutboxMensagemId { get; set; }
+
         public Empresa? Empresa { get; set; }
 
         public static Notificacao Criar(

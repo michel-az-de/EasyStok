@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Notifications;
 using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -76,6 +77,18 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AssinaturaEmpresa> AssinaturasEmpresa { get; set; } = null!;
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
+
+        // Notifications module DbSets
+        public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
+        public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;
+        public DbSet<RotinaNotificacao> NotifRotinas { get; set; } = null!;
+        public DbSet<EventoNotificacao> NotifEventos { get; set; } = null!;
+        public DbSet<OutboxMensagemNotificacao> NotifOutboxMensagens { get; set; } = null!;
+        public DbSet<LogEnvioNotificacao> NotifLogsEnvio { get; set; } = null!;
+        public DbSet<ConsentimentoNotificacao> NotifConsentimentos { get; set; } = null!;
+        public DbSet<ConfiguracaoCanal> NotifConfiguracoesCanal { get; set; } = null!;
+        public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
+        public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {

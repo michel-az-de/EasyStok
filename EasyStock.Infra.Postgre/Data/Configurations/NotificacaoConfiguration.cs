@@ -22,7 +22,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(n => n.ReferenciaId);
             builder.Property(n => n.CriadaEm).IsRequired();
             builder.Property(n => n.LidaEm);
+            builder.Property(n => n.OutboxMensagemId);
 
+            builder.HasIndex(n => n.OutboxMensagemId);
             builder.HasIndex(n => new { n.EmpresaId, n.Lida, n.CriadaEm });
             builder.HasIndex(n => new { n.EmpresaId, n.TipoAlerta, n.ReferenciaId });
             builder.HasIndex(n => new { n.EmpresaId, n.Severidade, n.Lida });
