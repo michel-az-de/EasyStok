@@ -1,5 +1,6 @@
 @page "{id:guid}"
 @model EasyStock.Admin.Pages.Tenants.DetailModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     var nome = Model.Empresa.ValueKind != System.Text.Json.JsonValueKind.Undefined && Model.Empresa.TryGetProperty("nome", out var np) ? np.GetString() : "Tenant";
     ViewData["Title"] = nome;
@@ -296,6 +297,37 @@
                                             @@click="open=false; sessoesUserId='@uid'; sessoesData=null; sessoesErro=''; sessoesLoading=true; fetch('/Tenants/Detail/@Model.Id?handler=SessoesUsuario&userId=@uid', { credentials: 'same-origin' }).then(r => r.json()).then(d => { sessoesData = d.data || d; sessoesLoading = false; }).catch(e => { sessoesErro = e.message; sessoesLoading = false; })">
                                         👁 Ver sessões
                                     </button>
+                                    <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
+                                            @@click="open=false; $dispatch('open-editar-usuario', { userId: '@uid', nome: @Html.Raw(unomeJs), email: @Html.Raw(uemailJs) })">
+                                        ✏️ Editar nome/email
+                                    </button>
+                                    @if (ativo)
+                                    {
+                                        <button type="button" class="w-full text-left px-3 py-2 text-xs text-amber-300 hover:bg-es-surface-2"
+                                                @@click="open=false; $dispatch('open-justificar', {
+                                                    endpoint: '/Tenants/Detail/@Model.Id?handler=DesativarUsuario&userId=@uid',
+                                                    acao: 'Desativar @unome',
+                                                    resumo: 'O usuário não conseguirá mais fazer login. Sessões ativas serão encerradas. Pode ser reativado depois.',
+                                                    variant: 'danger',
+                                                    confirmLabel: 'Desativar (auditado)'
+                                                })">
+                                            🚫 Desativar conta
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-basil hover:bg-es-surface-2"
+                                                @@click="open=false; $dispatch('open-justificar', {
+                                                    endpoint: '/Tenants/Detail/@Model.Id?handler=ReativarUsuario&userId=@uid',
+                                                    acao: 'Reativar @unome',
+                                                    resumo: 'O usuário voltará a conseguir fazer login. Tentativas de bloqueio serão zeradas.',
+                                                    variant: 'primary',
+                                                    confirmLabel: 'Reativar (auditado)'
+                                                })">
+                                            ✓ Reativar conta
+                                        </button>
+                                    }
                                 </div>
                             </td>
                         </tr>
@@ -342,25 +374,239 @@
                 </template>
             </div>
         </div>
+
+        @{ var afEditar = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+        <!-- Modal Editar usuário (com diff before/after) -->
+        <div x-data="editarUsuarioModal()" x-init="init()"
+             x-show="open" x-cloak class="modal-overlay"
+             @@click.self="close()" @@keydown.escape.window="close()">
+            <div class="modal-box max-w-md" @@click.stop>
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="text-2xl">✏️</div>
+                    <div class="flex-1">
+                        <h3 class="text-es-ink font-semibold">Editar dados do usuário</h3>
+                        <p class="text-es-ink-dim text-xs mt-1">As alterações são auditadas com seu nome.</p>
+                    </div>
+                </div>
+
+                <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AtualizarUsuario&userId=' + ctx.userId" @@submit="submitting = true">
+                    <input type="hidden" name="__RequestVerificationToken" value="@afEditar" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" x-model="nome" minlength="2" maxlength="120"
+                               class="form-input w-full text-sm" />
+                        <p x-show="nome !== ctx.nome" x-cloak class="text-xs text-es-accent mt-1">
+                            <span class="line-through text-red-400" x-text="ctx.nome"></span>
+                            → <span class="text-es-basil font-semibold" x-text="nome"></span>
+                        </p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">E-mail</label>
+                        <input type="email" name="email" x-model="email" maxlength="160"
+                               class="form-input w-full text-sm font-mono" />
+                        <p x-show="email !== ctx.email && email.length > 0" x-cloak class="text-xs mt-1">
+                            <span class="text-amber-400">⚠ Trocar email obriga o usuário a confirmar de novo.</span><br/>
+                            <span class="line-through text-red-400 font-mono" x-text="ctx.email"></span>
+                            → <span class="text-es-basil font-mono font-semibold" x-text="email"></span>
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                        <textarea name="motivo" x-model="motivo" rows="2" minlength="10" maxlength="1000" required
+                                  placeholder="Ex.: cliente acionou suporte chamado #1234"
+                                  class="form-input w-full text-sm font-mono"></textarea>
+                        <p class="text-xs mt-1" :class="motivo.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                            <span x-text="motivo.trim().length"></span> / 10 mínimo
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" @@click="close()" :disabled="submitting" class="btn-secondary text-sm">Cancelar</button>
+                        <button type="submit" :disabled="!podeEnviar || submitting" class="btn-primary text-sm">
+                            <span x-show="!submitting">Salvar (auditado)</span>
+                            <span x-show="submitting" x-cloak>Enviando…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
+        <script>
+        function editarUsuarioModal() {
+            return {
+                open: false,
+                submitting: false,
+                ctx: { userId: '', nome: '', email: '' },
+                nome: '',
+                email: '',
+                motivo: '',
+                init() {
+                    window.addEventListener('open-editar-usuario', (e) => {
+                        this.ctx = Object.assign({ userId: '', nome: '', email: '' }, e.detail || {});
+                        this.nome = this.ctx.nome || '';
+                        this.email = this.ctx.email || '';
+                        this.motivo = '';
+                        this.submitting = false;
+                        this.open = true;
+                    });
+                },
+                get podeEnviar() {
+                    if (this.motivo.trim().length < 10) return false;
+                    if (!this.ctx.userId) return false;
+                    // Pelo menos um campo precisa estar diferente do original.
+                    const trocouNome = this.nome.trim() && this.nome.trim() !== this.ctx.nome;
+                    const trocouEmail = this.email.trim() && this.email.trim() !== this.ctx.email;
+                    return trocouNome || trocouEmail;
+                },
+                close() {
+                    if (this.submitting) return;
+                    this.open = false;
+                }
+            };
+        }
+        </script>
+
     <!-- Lojas -->
-    <div x-show="tab === 'lojas'" x-cloak>
-        <div class="card p-0 overflow-hidden">
-            <table class="table-admin">
-                <thead><tr><th>Nome</th></tr></thead>
-                <tbody>
-                    @foreach (var l in Model.Lojas)
-                    {
-                        var lnome = l.TryGetProperty("nome", out var lnp) ? lnp.GetString() : "";
-                        <tr><td class="text-es-ink">@lnome</td></tr>
-                    }
-                    @if (!Model.Lojas.Any())
-                    {
-                        <tr><td class="text-center text-es-ink-mute py-6">Nenhuma loja cadastrada.</td></tr>
-                    }
-                </tbody>
-            </table>
+    @{ var afLojas = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+    <div x-show="tab === 'lojas'" x-cloak x-data="{ novaOpen: false, editandoLoja: null }">
+        <div class="flex justify-end mb-4">
+            <button type="button" @@click="novaOpen = true" class="btn-primary text-sm">+ Nova Loja</button>
+        </div>
+
+        @if (!Model.Lojas.Any())
+        {
+            <div class="card text-center text-es-ink-mute text-sm py-10">
+                Cliente ainda não criou lojas. Use <strong class="text-es-ink">+ Nova Loja</strong> acima.
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach (var l in Model.Lojas)
+                {
+                    var lid = l.TryGetProperty("id", out var lidp) ? lidp.GetString() : "";
+                    var lnome = l.TryGetProperty("nome", out var lnp) ? lnp.GetString() : "";
+                    var ldesc = l.TryGetProperty("descricao", out var ldp) && ldp.ValueKind != System.Text.Json.JsonValueKind.Null ? ldp.GetString() : "";
+                    var ldoc = l.TryGetProperty("documento", out var ldocp) && ldocp.ValueKind != System.Text.Json.JsonValueKind.Null ? ldocp.GetString() : "";
+                    var lend = l.TryGetProperty("endereco", out var lendp) && lendp.ValueKind != System.Text.Json.JsonValueKind.Null ? lendp.GetString() : "";
+                    var ltel = l.TryGetProperty("telefone", out var ltelp) && ltelp.ValueKind != System.Text.Json.JsonValueKind.Null ? ltelp.GetString() : "";
+                    var lativa = l.TryGetProperty("ativa", out var lap) && lap.GetBoolean();
+                    // Serializa JSON pra passar como contexto pro modal de edição (escape correto).
+                    var lojaJson = System.Text.Json.JsonSerializer.Serialize(new { id = lid, nome = lnome, descricao = ldesc, documento = ldoc, endereco = lend, telefone = ltel });
+                    <div class="card flex flex-col">
+                        <div class="flex items-start justify-between mb-2">
+                            <h4 class="text-es-ink font-semibold flex-1 truncate">@lnome</h4>
+                            <span class="status-badge ml-2 @(lativa ? "badge-ativa" : "badge-suspensa")">@(lativa ? "Ativa" : "Inativa")</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(ldesc))
+                        {
+                            <p class="text-es-ink-dim text-xs mb-2 line-clamp-2">@ldesc</p>
+                        }
+                        <dl class="text-xs space-y-1 text-es-ink-mute mt-1 mb-3">
+                            @if (!string.IsNullOrWhiteSpace(ldoc)) { <div><span class="text-es-ink-dim">Doc:</span> <span class="text-es-ink-dim font-mono">@ldoc</span></div> }
+                            @if (!string.IsNullOrWhiteSpace(lend)) { <div><span class="text-es-ink-dim">End:</span> <span class="text-es-ink-dim">@lend</span></div> }
+                            @if (!string.IsNullOrWhiteSpace(ltel)) { <div><span class="text-es-ink-dim">Tel:</span> <span class="text-es-ink-dim font-mono">@ltel</span></div> }
+                        </dl>
+                        <div class="flex gap-2 mt-auto pt-2" style="border-top:1px solid rgba(247,242,232,0.06)">
+                            <button type="button" @@click="editandoLoja = @Html.Raw(lojaJson)" class="btn-secondary text-xs flex-1">✏️ Editar</button>
+                            @if (lativa)
+                            {
+                                <button type="button"
+                                        @@click="$dispatch('open-justificar', {
+                                            endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
+                                            acao: 'Desativar loja @lnome',
+                                            resumo: 'A loja não aparecerá mais para o cliente. Histórico (vendas, estoque) é preservado. Pode ser reativada.',
+                                            variant: 'danger',
+                                            confirmLabel: 'Desativar (auditado)',
+                                            extraFields: '<input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;false&quot; />'
+                                        })"
+                                        class="btn-danger text-xs">🚫</button>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        @@click="$dispatch('open-justificar', {
+                                            endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
+                                            acao: 'Reativar loja @lnome',
+                                            resumo: 'A loja voltará a aparecer para o cliente.',
+                                            variant: 'primary',
+                                            confirmLabel: 'Reativar (auditado)',
+                                            extraFields: '<input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;true&quot; />'
+                                        })"
+                                        class="btn-primary text-xs">✓</button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Modal Nova Loja -->
+        <div x-show="novaOpen" x-cloak class="modal-overlay" @@click.self="novaOpen = false" @@keydown.escape.window="novaOpen = false">
+            <div class="modal-box max-w-md" @@click.stop>
+                <h3 class="text-es-ink font-semibold mb-4">Nova loja</h3>
+                <form method="post" action="/Tenants/Detail/@Model.Id?handler=CriarLoja">
+                    <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
+                    <div class="mb-3"><label class="form-label">Nome *</label>
+                        <input type="text" name="nome" required maxlength="150" class="form-input w-full text-sm" /></div>
+                    <div class="mb-3"><label class="form-label">Descrição</label>
+                        <input type="text" name="descricao" maxlength="500" class="form-input w-full text-sm" /></div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div><label class="form-label">Documento</label>
+                            <input type="text" name="documento" maxlength="30" class="form-input w-full text-sm" /></div>
+                        <div><label class="form-label">Telefone</label>
+                            <input type="text" name="telefone" maxlength="20" class="form-input w-full text-sm" /></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Endereço</label>
+                        <input type="text" name="endereco" maxlength="300" class="form-input w-full text-sm" /></div>
+                    <div class="mb-4"><label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                        <textarea name="motivo" rows="2" minlength="10" maxlength="1000" required
+                                  placeholder="Ex.: cliente solicitou via chamado #1234"
+                                  class="form-input w-full text-sm font-mono"></textarea></div>
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" @@click="novaOpen = false" class="btn-secondary text-sm">Cancelar</button>
+                        <button type="submit" class="btn-primary text-sm">Criar (auditado)</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Editar Loja -->
+        <div x-show="editandoLoja" x-cloak class="modal-overlay" @@click.self="editandoLoja = null" @@keydown.escape.window="editandoLoja = null">
+            <div class="modal-box max-w-md" @@click.stop x-show="editandoLoja">
+                <template x-if="editandoLoja">
+                    <div>
+                        <h3 class="text-es-ink font-semibold mb-4">Editar loja: <span x-text="editandoLoja.nome"></span></h3>
+                        <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AtualizarLoja&lojaId=' + editandoLoja.id">
+                            <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
+                            <div class="mb-3"><label class="form-label">Nome *</label>
+                                <input type="text" name="nome" required maxlength="150" :value="editandoLoja.nome" class="form-input w-full text-sm" /></div>
+                            <div class="mb-3"><label class="form-label">Descrição</label>
+                                <input type="text" name="descricao" maxlength="500" :value="editandoLoja.descricao" class="form-input w-full text-sm" /></div>
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div><label class="form-label">Documento</label>
+                                    <input type="text" name="documento" maxlength="30" :value="editandoLoja.documento" class="form-input w-full text-sm" /></div>
+                                <div><label class="form-label">Telefone</label>
+                                    <input type="text" name="telefone" maxlength="20" :value="editandoLoja.telefone" class="form-input w-full text-sm" /></div>
+                            </div>
+                            <div class="mb-3"><label class="form-label">Endereço</label>
+                                <input type="text" name="endereco" maxlength="300" :value="editandoLoja.endereco" class="form-input w-full text-sm" /></div>
+                            <div class="mb-4"><label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                                <textarea name="motivo" rows="2" minlength="10" maxlength="1000" required
+                                          placeholder="Ex.: cliente solicitou alteração de telefone"
+                                          class="form-input w-full text-sm font-mono"></textarea></div>
+                            <div class="flex gap-3 justify-end">
+                                <button type="button" @@click="editandoLoja = null" class="btn-secondary text-sm">Cancelar</button>
+                                <button type="submit" class="btn-primary text-sm">Salvar (auditado)</button>
+                            </div>
+                        </form>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 

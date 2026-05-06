@@ -17,8 +17,7 @@ public class DesativarLojaUseCase(
         if (loja is null || loja.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("Loja nao encontrada.");
 
-        loja.Ativa = false;
-        loja.AlteradoEm = DateTime.UtcNow;
+        loja.Desativar();
 
         await lojaRepository.UpdateAsync(loja);
         await unitOfWork.CommitAsync();

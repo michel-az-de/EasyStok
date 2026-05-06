@@ -171,7 +171,172 @@ public class AdminUsuariosTenantController(
         });
     }
 
+    // ─────────────────────────── #2: Editar nome/email ───────────────────────────
+
+    [HttpPatch("{userId:guid}")]
+    public async Task<IActionResult> Atualizar(Guid userId, [FromBody] AtualizarUsuarioRequest req)
+    {
+        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+            return DataBadRequest(erro!);
+
+        var nomeNovo = req?.Nome?.Trim();
+        var emailNovo = req?.Email?.Trim().ToLowerInvariant();
+
+        // Pelo menos um campo precisa estar presente.
+        if (string.IsNullOrWhiteSpace(nomeNovo) && string.IsNullOrWhiteSpace(emailNovo))
+            return DataBadRequest("Informe ao menos um campo (nome ou email) para atualizar.");
+
+        if (!string.IsNullOrWhiteSpace(nomeNovo) && (nomeNovo.Length is < 2 or > 120))
+            return DataBadRequest("Nome deve ter entre 2 e 120 caracteres.");
+
+        if (!string.IsNullOrWhiteSpace(emailNovo))
+        {
+            if (emailNovo.Length > 160 || !System.Text.RegularExpressions.Regex.IsMatch(emailNovo, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                return DataBadRequest("Email inválido.");
+        }
+
+        var usuario = await db.Usuarios.FindAsync(userId);
+        if (usuario is null) return DataNotFound("Usuário não encontrado.");
+
+        // Diff antes/depois — registra explicitamente no audit log pra forensics.
+        var nomeAntigo = usuario.Nome;
+        var emailAntigo = usuario.Email;
+        var alteracoes = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(nomeNovo) && !string.Equals(nomeNovo, nomeAntigo, StringComparison.Ordinal))
+        {
+            alteracoes.Add($"nome: '{nomeAntigo}' → '{nomeNovo}'");
+            usuario.Nome = nomeNovo;
+        }
+
+        if (!string.IsNullOrWhiteSpace(emailNovo) && !string.Equals(emailNovo, emailAntigo, StringComparison.OrdinalIgnoreCase))
+        {
+            // Conflito: outro usuário já usa esse email.
+            var ocupado = await db.Usuarios.AnyAsync(u => u.Email == emailNovo && u.Id != userId);
+            if (ocupado)
+                return Conflict(new { error = new { code = "EMAIL_DUPLICADO", message = "Este e-mail já está em uso por outro usuário." } });
+            alteracoes.Add($"email: '{MascararEmail(emailAntigo)}' → '{MascararEmail(emailNovo)}'");
+            usuario.Email = emailNovo;
+            usuario.EmailConfirmado = false; // Forçar reconfirmação na próxima ação que exigir.
+        }
+
+        if (alteracoes.Count == 0)
+            return DataOk(new { usuarioId = userId, alterado = false, mensagem = "Nenhuma alteração — valores idênticos aos atuais." });
+
+        usuario.AlteradoEm = DateTime.UtcNow;
+        await db.CommitAsync();
+
+        await audit.LogAsync(
+            "UsuarioTenantAtualizado",
+            $"UserId={userId}; {string.Join("; ", alteracoes)}",
+            tenantId: await ResolverTenantIdAsync(userId),
+            motivo: motivo,
+            entidadeAfetadaId: userId);
+
+        logger.LogInformation(
+            "AUDIT: Admin atualizou usuário {UserId}. Mudanças: {Alteracoes}. Motivo: {Motivo}",
+            userId, string.Join("; ", alteracoes), motivo);
+
+        return DataOk(new
+        {
+            usuarioId = userId,
+            alterado = true,
+            alteracoes,
+            mensagem = $"{alteracoes.Count} campo(s) atualizado(s)."
+        });
+    }
+
+    // ─────────────────────── #3 / #4: Desativar / Reativar ───────────────────────
+
+    [HttpPost("{userId:guid}/desativar")]
+    public async Task<IActionResult> Desativar(Guid userId, [FromBody] MotivoRequest req)
+    {
+        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+            return DataBadRequest(erro!);
+
+        var usuario = await db.Usuarios.FindAsync(userId);
+        if (usuario is null) return DataNotFound("Usuário não encontrado.");
+        if (!usuario.Ativo) return DataBadRequest("Usuário já está inativo.");
+
+        // Guard: nunca deixar tenant sem nenhum admin ativo. Se o usuário a desativar é
+        // o único admin do tenant, recusa — operador precisa criar outro admin antes.
+        if (await EhUltimoAdminAtivoAsync(userId))
+            return DataBadRequest("Este é o último Admin ativo deste cliente. Promova outro usuário antes de desativar este.");
+
+        usuario.Ativo = false;
+        usuario.AlteradoEm = DateTime.UtcNow;
+        await db.CommitAsync();
+
+        // Desativar implica logout — refresh tokens não devem mais funcionar.
+        var sessoesRevogadas = await refreshTokens.RevogarSessoesAtivasAsync(userId, DateTime.UtcNow);
+
+        await audit.LogAsync(
+            "UsuarioTenantDesativado",
+            $"UserId={userId}, Email={MascararEmail(usuario.Email)}, SessoesRevogadas={sessoesRevogadas}",
+            tenantId: await ResolverTenantIdAsync(userId),
+            motivo: motivo,
+            entidadeAfetadaId: userId);
+
+        return DataOk(new { usuarioId = userId, ativo = false, sessoesRevogadas });
+    }
+
+    [HttpPost("{userId:guid}/reativar")]
+    public async Task<IActionResult> Reativar(Guid userId, [FromBody] MotivoRequest req)
+    {
+        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+            return DataBadRequest(erro!);
+
+        var usuario = await db.Usuarios.FindAsync(userId);
+        if (usuario is null) return DataNotFound("Usuário não encontrado.");
+        if (usuario.Ativo) return DataBadRequest("Usuário já está ativo.");
+
+        usuario.Ativo = true;
+        usuario.ResetarTentativasFalha();
+        usuario.AlteradoEm = DateTime.UtcNow;
+        await db.CommitAsync();
+
+        await audit.LogAsync(
+            "UsuarioTenantReativado",
+            $"UserId={userId}, Email={MascararEmail(usuario.Email)}",
+            tenantId: await ResolverTenantIdAsync(userId),
+            motivo: motivo,
+            entidadeAfetadaId: userId);
+
+        return DataOk(new { usuarioId = userId, ativo = true });
+    }
+
     // ─────────────────────────── helpers ───────────────────────────
+
+    /// <summary>
+    /// True se o usuário é o último Admin/SuperAdmin ATIVO de algum tenant ao qual pertence.
+    /// Evita deixar cliente sem dono. Usa join via UsuarioPerfil + Perfil pra checar nivel.
+    /// </summary>
+    private async Task<bool> EhUltimoAdminAtivoAsync(Guid usuarioId)
+    {
+        var empresaIds = await db.UsuariosEmpresas
+            .Where(ue => ue.UsuarioId == usuarioId)
+            .Select(ue => ue.EmpresaId)
+            .ToListAsync();
+        if (empresaIds.Count == 0) return false;
+
+        foreach (var empresaId in empresaIds)
+        {
+            var totalAdmins = await db.UsuariosPerfis
+                .Where(up => up.EmpresaId == empresaId)
+                .Join(db.Perfis, up => up.PerfilId, p => p.Id, (up, p) => new { up.UsuarioId, p.Nivel })
+                .Where(x => x.Nivel == Domain.Enums.NivelAcesso.Admin || x.Nivel == Domain.Enums.NivelAcesso.SuperAdmin)
+                .Join(db.Usuarios, x => x.UsuarioId, u => u.Id, (x, u) => new { x.UsuarioId, u.Ativo })
+                .Where(x => x.Ativo)
+                .Select(x => x.UsuarioId)
+                .Distinct()
+                .CountAsync();
+
+            // Se o próprio usuário é o único admin ativo → bloqueia.
+            if (totalAdmins == 1) return true;
+        }
+        return false;
+    }
+
 
     private bool ValidarMotivo(string? motivo, out string motivoNormalizado, out string? erro)
     {
@@ -232,3 +397,4 @@ public class AdminUsuariosTenantController(
 
 public record MotivoRequest(string Motivo);
 public record ResetSenhaRequest(string Motivo, bool? EnviarPorEmail);
+public record AtualizarUsuarioRequest(string Motivo, string? Nome, string? Email);

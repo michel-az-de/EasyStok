@@ -17,8 +17,7 @@ public class ReativarLojaUseCase(
         if (loja is null || loja.EmpresaId != command.EmpresaId)
             throw new UseCaseValidationException("Loja nao encontrada.");
 
-        loja.Ativa = true;
-        loja.AlteradoEm = DateTime.UtcNow;
+        loja.Reativar();
 
         await lojaRepository.UpdateAsync(loja);
         await unitOfWork.CommitAsync();

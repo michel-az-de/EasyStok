@@ -290,4 +290,145 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
         }
     }
+
+    public async Task<IActionResult> OnPostAtualizarUsuarioAsync(Guid userId, string motivo, string? nome, string? email)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            var resp = await api.PatchAsync<JsonElement>(
+                $"api/admin/usuarios-tenant/{userId}",
+                new { motivo = motivoT, nome = nome?.Trim(), email = email?.Trim() });
+            var alterado = resp.TryGetProperty("alterado", out var ap) && ap.GetBoolean();
+            var msg = resp.TryGetProperty("mensagem", out var mp) ? mp.GetString() : null;
+            SetSucesso(alterado ? (msg ?? "Usuário atualizado.") : "Nenhuma alteração — valores idênticos.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao atualizar usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao atualizar usuário: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
+
+    public async Task<IActionResult> OnPostDesativarUsuarioAsync(Guid userId, string motivo)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>(
+                $"api/admin/usuarios-tenant/{userId}/desativar",
+                new { motivo = motivoT });
+            var sessoes = resp.TryGetProperty("sessoesRevogadas", out var srp) && srp.TryGetInt32(out var sr) ? sr : 0;
+            SetSucesso(sessoes > 0
+                ? $"Usuário desativado e {sessoes} sessão(ões) ativa(s) revogada(s)."
+                : "Usuário desativado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao desativar usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao desativar: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
+
+    public async Task<IActionResult> OnPostReativarUsuarioAsync(Guid userId, string motivo)
+    {
+        if (userId == Guid.Empty) { SetErro("Usuário inválido."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+
+        try
+        {
+            await api.PostAsync<JsonElement>(
+                $"api/admin/usuarios-tenant/{userId}/reativar",
+                new { motivo = motivoT });
+            SetSucesso("Usuário reativado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao reativar usuário {UserId} do tenant {TenantId}", userId, Id);
+            SetErro($"Falha ao reativar: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
+
+    // ─────────────────────── Lojas (CRUD via admin) ───────────────────────
+
+    public async Task<IActionResult> OnPostCriarLojaAsync(string motivo, string nome, string? descricao, string? documento, string? endereco, string? telefone)
+    {
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "lojas" }); }
+        if (string.IsNullOrWhiteSpace(nome)) { SetErro("Nome da loja é obrigatório."); return RedirectToPage(new { Id, tab = "lojas" }); }
+
+        try
+        {
+            await api.PostAsync<JsonElement>(
+                $"api/admin/clientes/{Id}/lojas",
+                new { motivo = motivoT, nome = nome.Trim(), descricao, documento, endereco, telefone });
+            SetSucesso($"Loja \"{nome.Trim()}\" criada.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao criar loja para tenant {TenantId}", Id);
+            SetErro($"Falha ao criar loja: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "lojas" });
+    }
+
+    public async Task<IActionResult> OnPostAtualizarLojaAsync(Guid lojaId, string motivo, string nome, string? descricao, string? documento, string? endereco, string? telefone)
+    {
+        if (lojaId == Guid.Empty) { SetErro("Loja inválida."); return RedirectToPage(new { Id, tab = "lojas" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "lojas" }); }
+        if (string.IsNullOrWhiteSpace(nome)) { SetErro("Nome da loja é obrigatório."); return RedirectToPage(new { Id, tab = "lojas" }); }
+
+        try
+        {
+            var resp = await api.PatchAsync<JsonElement>(
+                $"api/admin/clientes/{Id}/lojas/{lojaId}",
+                new { motivo = motivoT, nome = nome.Trim(), descricao, documento, endereco, telefone });
+            var alterado = resp.TryGetProperty("alterado", out var ap) && ap.GetBoolean();
+            SetSucesso(alterado ? "Loja atualizada." : "Nenhuma alteração efetiva.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao atualizar loja {LojaId} do tenant {TenantId}", lojaId, Id);
+            SetErro($"Falha ao atualizar loja: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "lojas" });
+    }
+
+    public async Task<IActionResult> OnPostToggleLojaAsync(Guid lojaId, string motivo, bool ativa)
+    {
+        if (lojaId == Guid.Empty) { SetErro("Loja inválida."); return RedirectToPage(new { Id, tab = "lojas" }); }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "lojas" }); }
+
+        try
+        {
+            await api.PostAsync<JsonElement>(
+                $"api/admin/clientes/{Id}/lojas/{lojaId}/toggle",
+                new { motivo = motivoT, ativa });
+            SetSucesso(ativa ? "Loja reativada." : "Loja desativada.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao alternar loja {LojaId} do tenant {TenantId}", lojaId, Id);
+            SetErro($"Falha ao alternar loja: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "lojas" });
+    }
 }
