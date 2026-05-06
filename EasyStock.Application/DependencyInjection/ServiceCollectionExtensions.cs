@@ -12,6 +12,7 @@ namespace EasyStock.Application.DependencyInjection;
 /// - ServiceCollectionExtensions.Clientes.cs (Clientes)
 /// - ServiceCollectionExtensions.Core.cs (Pedidos, Caixa, Estoque, etc)
 /// - ServiceCollectionExtensions.Analytics.cs (Analytics e Inteligência)
+/// - ServiceCollectionExtensions.Notifications.cs (Notificações multi-canal)
 ///
 /// A divisão melhora legibilidade e reduz usings desnecessários de ~103 para ~10 por arquivo.
 /// </summary>
@@ -30,7 +31,8 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockClienteUseCases()
             .AddEasyStockFornecedorUseCases()
             .AddEasyStockCoreUseCases()
-            .AddEasyStockAnalyticsUseCases();
+            .AddEasyStockAnalyticsUseCases()
+            .AddEasyStockNotificationsUseCases();
 
         return services;
     }
