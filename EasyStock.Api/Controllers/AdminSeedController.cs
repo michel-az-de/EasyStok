@@ -92,6 +92,67 @@ public class AdminSeedController(
     }
 
     /// <summary>
+    /// Seed enxuto pra testar o módulo de Gestão de Cliente do Admin: 4 tenants
+    /// com status variados (2 Ativa, 1 Suspensa, 1 Cancelada), 1-2 lojas cada,
+    /// 2-3 usuários cada, 5 tickets cobrindo status × prioridade, 3 notas internas
+    /// (incluindo 1 tipo Alerta pra acionar banner) e 5 audit logs recentes.
+    /// Bem mais leve que /demo (que cria empresas com produtos/movimentações
+    /// completas — útil quando você só quer testar o painel admin).
+    /// </summary>
+    [HttpPost("admin-test-scenarios")]
+    public async Task<IActionResult> ExecutarAdminTestScenarios()
+    {
+        if (!SeedApiEnabled())
+            return DataBadRequest("Seed via API não está habilitado. Defina SEED_API_ENABLED=true ou Seed:ApiEnabled=true.");
+
+        try
+        {
+            using var scope = services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var agora = new DateTime(
+                DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
+                DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, 0, DateTimeKind.Utc);
+
+            await EasyStock.Api.Data.Tenants.AdminTestScenariosSeed.ExecutarAsync(ctx, agora, logger);
+
+            await audit.LogAsync("SeedAdminTestScenariosExecutado",
+                "4 tenants + 5 tickets + 3 notas + 5 audit logs");
+
+            var counts = new
+            {
+                empresas = await db.Empresas.AsNoTracking().CountAsync(),
+                usuarios = await db.Usuarios.AsNoTracking().CountAsync(),
+                lojas = await db.Lojas.AsNoTracking().CountAsync(),
+                tickets = await db.AdminTickets.AsNoTracking().CountAsync()
+            };
+
+            return DataOk(new
+            {
+                ok = true,
+                cenario = "admin-test-scenarios",
+                counts,
+                credenciais = new
+                {
+                    senhaPadrao = EasyStock.Api.Data.Tenants.AdminTestScenariosSeed.SenhaPadrao,
+                    exemplos = new[]
+                    {
+                        "maria.carvalho@bistro-vila.test (Bistrô — Admin)",
+                        "ricardo@padaria-bairro.test (Padaria — Admin, trial)",
+                        "bruno.costa@cafe-quasela.test (Café — Suspensa)",
+                        "ze.pereira@lojadoze.test (Loja Do Zé — Cancelada)"
+                    }
+                },
+                mensagem = "Cenários de teste do Admin criados. Atualize Clientes/Dashboard/Tickets pra ver."
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao executar seed admin-test-scenarios");
+            return Problem(detail: ex.Message, statusCode: 500, title: "Erro ao executar seed.");
+        }
+    }
+
+    /// <summary>
     /// Seed mínimo: apenas 1 admin + 1 empresa + 1 loja. Não inclui dados de demonstração.
     /// </summary>
     [HttpPost("minimal")]

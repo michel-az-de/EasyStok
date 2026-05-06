@@ -148,16 +148,28 @@
             <span x-show="!executando">🚀 Rodar seed demo</span>
             <span x-show="executando" x-cloak>Executando…</span>
         </button>
+        <button type="button" @@click="executarAdminScenarios()" :disabled="!enabled || executando" class="btn-secondary text-sm" title="Carga focada pra testar Admin: 4 tenants variados, 5 tickets, 3 notas. Sem produtos/movimentações.">
+            🧪 Cenários do Admin
+        </button>
         <button type="button" @@click="executarMinimal()" :disabled="!enabled || executando" class="btn-secondary text-sm">
             ⚡ Seed mínimo (1 admin)
         </button>
         <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs ml-auto">→ Ver clientes</a>
     </div>
-    <p class="text-es-ink-mute text-[11px] mt-3">
-        Demo cria empresas fictícias (PastaBella, Cantina Mauricio, CasaDaBaba, MassasVeneza) com lojas, usuários
-        e movimentações pra testar o módulo de Gestão de Cliente. <strong>Idempotente</strong> — rodar múltiplas
-        vezes não duplica dados.
-    </p>
+    <div class="text-es-ink-mute text-[11px] mt-3 space-y-1">
+        <p>
+            <strong class="text-es-ink">🧪 Cenários do Admin</strong> — recomendado pra testar painel:
+            4 tenants variados (Ativa/Suspensa/Cancelada), 5 tickets cobrindo status × prioridade,
+            3 notas internas (1 com Alerta — banner aparece) e audit logs recentes. Senha padrão:
+            <code class="text-es-accent">Teste@123</code>.
+        </p>
+        <p>
+            <strong class="text-es-ink">🚀 Seed demo</strong> — empresas fictícias completas (PastaBella,
+            Cantina Mauricio, CasaDaBaba, MassasVeneza) com produtos, movimentações e vendas.
+            Carga maior, útil pra testar EasyStock.Web também.
+        </p>
+        <p>Todos os seeds são <strong>idempotentes</strong> — rodar múltiplas vezes não duplica dados.</p>
+    </div>
 </div>
 
 @section Scripts {
@@ -273,6 +285,9 @@ function seedPanel() {
         },
         async executarDemo() {
             await this._post('/Status?handler=SeedDemo&volume=' + encodeURIComponent(this.volume));
+        },
+        async executarAdminScenarios() {
+            await this._post('/Status?handler=SeedAdminScenarios');
         },
         async executarMinimal() {
             if (!confirm('Executar seed mínimo? Cria apenas 1 admin + 1 empresa + 1 loja.')) return;

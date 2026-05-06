@@ -70,4 +70,19 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
         }
     }
+
+    public async Task<IActionResult> OnPostSeedAdminScenariosAsync()
+    {
+        try
+        {
+            var data = await api.PostAsync<JsonElement>("api/admin/seed/admin-test-scenarios", new { });
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao executar seed admin-test-scenarios");
+            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+        }
+    }
 }
