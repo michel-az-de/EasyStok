@@ -14,6 +14,11 @@ public sealed record SeedEtapa(string Ts, string Level, string Mensagem, int Per
 /// <summary>
 /// Estado em memória de um run de seed. Atualizado pelo SeedRunner em background
 /// e lido pelos endpoints de polling da UI.
+///
+/// Thread-safety: o background task escreve via <see cref="AddEtapa"/> enquanto
+/// o endpoint de polling lê via <see cref="EtapasSnapshot"/>. Toda leitura/escrita
+/// da lista interna é protegida por lock — sem lock, <c>List&lt;T&gt;.Add</c>
+/// concorrente com iteração corrompe o array interno.
 /// </summary>
 public sealed class SeedRunState
 {
@@ -31,10 +36,25 @@ public sealed class SeedRunState
     public string? Erro { get; set; }
     public string? Resumo { get; set; }
 
-    private readonly List<SeedEtapa> _etapas = [];
-    public IReadOnlyList<SeedEtapa> Etapas => _etapas;
+    /// <summary>JSON com IDs das entidades deletadas antes de recriar (backup emergencial).</summary>
+    public string? BackupJson { get; set; }
 
-    internal void AddEtapa(SeedEtapa e) => _etapas.Add(e);
+    private readonly List<SeedEtapa> _etapas = [];
+    private readonly object _etapasLock = new();
+
+    internal void AddEtapa(SeedEtapa e)
+    {
+        lock (_etapasLock) _etapas.Add(e);
+    }
+
+    /// <summary>
+    /// Cópia imutável das etapas — serializável ou enumerável com segurança
+    /// enquanto o background task continua escrevendo na lista original.
+    /// </summary>
+    public SeedEtapa[] EtapasSnapshot()
+    {
+        lock (_etapasLock) return _etapas.ToArray();
+    }
 }
 
 /// <summary>
@@ -78,7 +98,22 @@ public sealed class SeedProgressService(IServiceProvider services, ILogger<SeedP
         log.LogInformation("[Seed:{RunId}] {Percent}% — {Msg}", runId.ToString()[..8], percent, mensagem);
     }
 
-    public void Success(Guid runId, string resumo)
+    /// <summary>
+    /// Anexa o backup JSON (IDs das entidades deletadas) ao estado do run.
+    /// Persistido junto com EtapasJson em <see cref="SeedRunLog.BackupJson"/>.
+    /// </summary>
+    public void SetBackup(Guid runId, string backupJson)
+    {
+        if (!_runs.TryGetValue(runId, out var s)) return;
+        s.BackupJson = backupJson;
+    }
+
+    /// <summary>
+    /// Marca o run como Success e persiste no DB. <b>Aguarde</b> a Task —
+    /// fire-and-forget faz o histórico ficar inconsistente quando o polling
+    /// já reportou done mas o SeedRunLog ainda não foi gravado.
+    /// </summary>
+    public async Task SuccessAsync(Guid runId, string resumo)
     {
         if (!_runs.TryGetValue(runId, out var s)) return;
         s.Status = "Success";
@@ -87,19 +122,32 @@ public sealed class SeedProgressService(IServiceProvider services, ILogger<SeedP
         s.Resumo = resumo;
         s.CompletedAt = DateTime.UtcNow;
         s.AddEtapa(new SeedEtapa(DateTime.UtcNow.ToString("HH:mm:ss.fff"), "success", resumo, 100));
-        _ = PersistAsync(s);
+        await PersistAsync(s);
     }
 
-    public void Failure(Guid runId, string erro, bool rolledBack = false)
+    /// <summary>
+    /// Marca o run como Failed (sem rollback) ou RolledBack (com rollback ativo).
+    /// Idempotente: chamadas repetidas com o mesmo runId não duplicam a etapa
+    /// nem persistem 2 vezes — a primeira chamada vence.
+    /// </summary>
+    public async Task FailureAsync(Guid runId, string erro, bool rolledBack = false)
     {
         if (!_runs.TryGetValue(runId, out var s)) return;
+        // Idempotência: se já está num estado terminal, ignora (evita duplo-Failure
+        // quando o seed lança exceção e o catch do controller também tenta logar).
+        if (s.Status == "Success" || s.Status == "Failed" || s.Status == "RolledBack")
+        {
+            log.LogDebug("[Seed:{RunId}] FailureAsync ignorado — estado já terminal: {Status}",
+                runId.ToString()[..8], s.Status);
+            return;
+        }
         s.Status = rolledBack ? "RolledBack" : "Failed";
         s.Erro = erro;
-        s.CurrentStep = rolledBack ? "Rollback efetuado — dados anteriores preservados." : "Falhou.";
+        s.CurrentStep = rolledBack ? "Rollback efetuado — dados anteriores preservados." : "Falhou (sem rollback — banco pode estar parcial).";
         s.CompletedAt = DateTime.UtcNow;
         s.AddEtapa(new SeedEtapa(DateTime.UtcNow.ToString("HH:mm:ss.fff"), "error",
             rolledBack ? $"Rollback — {erro}" : $"Erro — {erro}", s.Percent));
-        _ = PersistAsync(s);
+        await PersistAsync(s);
     }
 
     private async Task PersistAsync(SeedRunState s)
@@ -124,13 +172,16 @@ public sealed class SeedProgressService(IServiceProvider services, ILogger<SeedP
             existing.Status = s.Status;
             existing.Erro = s.Erro;
             existing.Resumo = s.Resumo;
-            existing.EtapasJson = JsonSerializer.Serialize(s.Etapas);
+            existing.BackupJson = s.BackupJson;
+            // Snapshot evita "collection modified during enumeration"
+            // se o background task ainda estiver reportando etapas.
+            existing.EtapasJson = JsonSerializer.Serialize(s.EtapasSnapshot());
 
             await db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            log.LogWarning(ex, "[Seed:{RunId}] Falha ao persistir SeedRunLog — progresso perdido no restart.", s.RunId);
+            log.LogWarning(ex, "[Seed:{RunId}] Falha ao persistir SeedRunLog — progresso em memória ainda OK, mas histórico no DB pode estar incompleto.", s.RunId);
         }
     }
 }

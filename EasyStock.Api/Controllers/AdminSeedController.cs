@@ -286,13 +286,16 @@ public class AdminSeedController(
             });
         }
 
+        // EtapasSnapshot retorna cópia imutável — evita race com background task
+        // que está adicionando etapas em paralelo (List<T>.Add + iteração concorrente
+        // pode corromper o array interno).
         return DataOk(new
         {
             runId = state.RunId,
             status = state.Status,
             percent = state.Percent,
             currentStep = state.CurrentStep,
-            etapas = state.Etapas.Select(e => new { e.Ts, e.Level, e.Mensagem, e.Percent }),
+            etapas = state.EtapasSnapshot().Select(e => new { e.Ts, e.Level, e.Mensagem, e.Percent }),
             erro = state.Erro,
             resumo = state.Resumo,
             startedAt = state.StartedAt,
@@ -328,22 +331,36 @@ public class AdminSeedController(
         return DataOk(new { items, total, page, pageSize });
     }
 
+    /// <summary>
+    /// Timeout máximo de execução de qualquer seed em background. Sem isso,
+    /// um run travado fica como Status=Running pra sempre até ser despejado
+    /// pelo cap de 50 do SeedProgressService.
+    /// </summary>
+    private static readonly TimeSpan SeedExecutionTimeout = TimeSpan.FromMinutes(5);
+
     private async Task ExecutarSeedBackgroundAsync(Guid runId, string tipo, string? volume, string adminEmail)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        using var cts = new CancellationTokenSource(SeedExecutionTimeout);
+        var ct = cts.Token;
+
         // CRÍTICO: scope NOVO criado via IServiceScopeFactory (singleton).
-        // Não dá pra usar `services` injetado: ele é o IServiceProvider do request,
-        // que é descartado quando o controller retorna 200 com o runId — Task.Run
-        // que executa essa função roda DEPOIS disso, então usar services aqui
-        // dispara "Cannot access a disposed object: IServiceProvider".
+        // IServiceProvider request-scoped seria descartado quando o controller
+        // retorna 200 com o runId — Task.Run roda DEPOIS, e `services.CreateScope()`
+        // dispararia "Cannot access a disposed object: IServiceProvider".
         using var scope = scopeFactory.CreateScope();
         var sp = scope.ServiceProvider;
         var ctx = sp.GetRequiredService<EasyStockDbContext>();
-        // audit também precisa ser resolvido do scope novo — o `audit` injetado
-        // no controller é scoped pro request, igualmente disposto.
+        // audit também é scoped — resolvido do scope novo (não do controller).
         var scopedAudit = sp.GetRequiredService<AdminAuditService>();
+
+        // Flag pra reportar honestamente: rolledBack=true só se de fato houve
+        // tx ativa quando o erro ocorreu. Antes mentíamos pra demo/minimal.
+        bool transactionActive = false;
+
         try
         {
+            ct.ThrowIfCancellationRequested();
 
             var agora = new DateTime(
                 DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
@@ -352,49 +369,80 @@ public class AdminSeedController(
             switch (tipo.ToLowerInvariant())
             {
                 case "admintestscenarios":
+                    // ExecutarAsync já gerencia sua própria tx + chama SuccessAsync por dentro.
+                    transactionActive = true;
                     await EasyStock.Api.Data.Tenants.AdminTestScenariosSeed.ExecutarAsync(
                         ctx, agora, logger, seedProgress, runId);
                     break;
 
                 case "demo":
-                    var originalVolume = Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME");
-                    var originalDemo = Environment.GetEnvironmentVariable("SEED_DEMO_DATA");
-                    try
                     {
-                        seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
-                        if (!string.IsNullOrWhiteSpace(volume))
-                            Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
-                        Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
-                        seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
-                        await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
-                        seedProgress.Success(runId, $"Seed demo (volume={volume ?? "large"}) concluído em {sw.ElapsedMilliseconds}ms.");
-                    }
-                    finally
-                    {
-                        Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", originalVolume);
-                        Environment.SetEnvironmentVariable("SEED_DEMO_DATA", originalDemo);
+                        var originalVolume = Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME");
+                        var originalDemo = Environment.GetEnvironmentVariable("SEED_DEMO_DATA");
+                        await using var demoTx = await ctx.Database.BeginTransactionAsync(ct);
+                        transactionActive = true;
+                        try
+                        {
+                            seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
+                            if (!string.IsNullOrWhiteSpace(volume))
+                                Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
+                            Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
+                            seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
+                            await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
+                            seedProgress.Report(runId, 95, "Confirmando transação no banco…");
+                            await demoTx.CommitAsync(ct);
+                            transactionActive = false;
+                            await seedProgress.SuccessAsync(runId,
+                                $"Seed demo (volume={volume ?? "large"}) concluído em {sw.ElapsedMilliseconds}ms.");
+                        }
+                        finally
+                        {
+                            Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", originalVolume);
+                            Environment.SetEnvironmentVariable("SEED_DEMO_DATA", originalDemo);
+                        }
                     }
                     break;
 
                 case "minimal":
-                    seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
-                    await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
-                    seedProgress.Success(runId, $"Seed mínimo concluído em {sw.ElapsedMilliseconds}ms.");
+                    {
+                        await using var minTx = await ctx.Database.BeginTransactionAsync(ct);
+                        transactionActive = true;
+                        seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
+                        await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
+                        seedProgress.Report(runId, 95, "Confirmando transação no banco…");
+                        await minTx.CommitAsync(ct);
+                        transactionActive = false;
+                        await seedProgress.SuccessAsync(runId,
+                            $"Seed mínimo concluído em {sw.ElapsedMilliseconds}ms.");
+                    }
                     break;
 
                 default:
-                    seedProgress.Failure(runId, $"Tipo de seed desconhecido: '{tipo}'.");
+                    await seedProgress.FailureAsync(runId, $"Tipo de seed desconhecido: '{tipo}'.", rolledBack: false);
                     return;
             }
 
             await scopedAudit.LogAsync("SeedRunAsyncConcluido",
                 $"RunId={runId}, Tipo={tipo}, Volume={volume ?? "-"}, Tempo={sw.ElapsedMilliseconds}ms");
         }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            sw.Stop();
+            logger.LogError("[Seed] Timeout ({Min}min) — RunId={RunId}, Tipo={Tipo}",
+                SeedExecutionTimeout.TotalMinutes, runId, tipo);
+            // Se havia tx ativa, EF Core já a marcou pra rollback no dispose do `await using`.
+            await seedProgress.FailureAsync(runId,
+                $"Timeout — execução excedeu {SeedExecutionTimeout.TotalMinutes} min.",
+                rolledBack: transactionActive);
+        }
         catch (Exception ex)
         {
             sw.Stop();
             logger.LogError(ex, "[Seed] ExecutarSeedBackgroundAsync falhou — RunId={RunId}, Tipo={Tipo}", runId, tipo);
-            seedProgress.Failure(runId, ex.Message, rolledBack: true);
+            // rolledBack é honesto agora: só true se havia tx ativa quando explodiu.
+            // Para casos onde a tx já tinha sido committed (transactionActive=false),
+            // o estado do banco ESTÁ alterado e o usuário precisa saber disso.
+            await seedProgress.FailureAsync(runId, ex.Message, rolledBack: transactionActive);
         }
     }
 

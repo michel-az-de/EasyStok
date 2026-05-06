@@ -43,15 +43,35 @@ public static class AdminTestScenariosSeed
 
         Report(5, "Verificando flags de segurança…");
 
-        // ── Etapa 1: Backup + limpeza de dados seed anteriores ──────────────────
-        Report(10, "Identificando dados seed anteriores para remoção segura…");
+        // ── Etapa 1a: Catch-up de seed legado ──────────────────────────────────
+        // Empresas criadas por seeds anteriores (antes do flag IsSeedData existir)
+        // ficariam órfãs pra sempre. Heurística: marca como seed qualquer empresa
+        // onde TODOS os usuários linkados têm email .test E não há marcação manual.
+        // Idempotente — se rodar 2x não muda nada.
+        Report(8, "Identificando seeds legados (sem marcação IsSeedData)…");
+        var legacyEmpresaIds = await context.UsuariosEmpresas
+            .GroupBy(ue => ue.EmpresaId)
+            .Where(g => g.All(ue =>
+                context.Usuarios.Any(u => u.Id == ue.UsuarioId && u.Email.EndsWith(".test"))))
+            .Select(g => g.Key)
+            .ToListAsync();
+        if (legacyEmpresaIds.Count > 0)
+        {
+            await context.Empresas
+                .Where(e => legacyEmpresaIds.Contains(e.Id) && !e.IsSeedData)
+                .ExecuteUpdateAsync(s => s.SetProperty(e => e.IsSeedData, true));
+            Report(10, $"Marcado(s) {legacyEmpresaIds.Count} empresa(s) seed legado(s) — serão removidas junto.", "warn");
+        }
+
+        // ── Etapa 1b: Backup + limpeza de dados seed anteriores ─────────────────
+        Report(12, "Identificando dados seed anteriores para remoção segura…");
 
         var seedEmpresas = await context.Empresas
             .Where(e => e.IsSeedData)
             .Select(e => new { e.Id, e.Nome, e.Documento })
             .ToListAsync();
 
-        string backupJson = "{}";
+        string backupJson = "{\"empresas\":[]}";
         if (seedEmpresas.Count > 0)
         {
             backupJson = JsonSerializer.Serialize(new
@@ -66,7 +86,9 @@ public static class AdminTestScenariosSeed
             Report(15, "Nenhum dado seed anterior encontrado — primeiro run ou banco limpo.");
         }
 
-        // Backup logado no server log pra recuperação emergencial.
+        // Persiste backup ANTES de qualquer delete — se a tx falhar e fizer rollback,
+        // o backup ainda fica registrado em SeedRunLog.BackupJson (e no log do server).
+        progress?.SetBackup(runId, backupJson);
         logger.LogInformation("[AdminTestScenarios] BackupJson: {Json}", backupJson.Length > 2000 ? backupJson[..2000] + "…" : backupJson);
 
         // ── Etapa 2: Delete das empresas seed (dentro de transação) ─────────────
@@ -246,16 +268,23 @@ public static class AdminTestScenariosSeed
             Report(100, resumo, "success");
             logger.LogInformation("[AdminTestScenarios] Seed concluído — {Resumo}", resumo);
 
-            // Retorna o backup JSON pra o caller persistir no SeedRunLog.
+            // SuccessAsync persiste o SeedRunLog ANTES de retornar — UI vê histórico
+            // consistente quando polling reportar status=Success.
             if (progress is not null && runId != default)
-                progress.Success(runId, resumo);
+                await progress.SuccessAsync(runId, resumo);
         }
         catch (Exception ex)
         {
-            await tx.RollbackAsync();
-            var msg = $"Rollback efetuado. Dados anteriores preservados. Erro: {ex.Message}";
-            logger.LogError(ex, "[AdminTestScenarios] {Msg}", msg);
-            progress?.Failure(runId, ex.Message, rolledBack: true);
+            // Tenta rollback. Se a tx já está num estado terminal (ex.: timeout no
+            // commit), engole o secundário pra preservar a exception original.
+            try { await tx.RollbackAsync(); } catch (Exception rbEx)
+            {
+                logger.LogWarning(rbEx, "[AdminTestScenarios] Rollback secundário falhou — tx provavelmente já completada.");
+            }
+            logger.LogError(ex, "[AdminTestScenarios] Falhou — rollback efetuado. Erro: {Msg}", ex.Message);
+            // NÃO chamar progress.Failure aqui — o controller (catch externo) é
+            // o ponto único que reporta o estado terminal. Chamar nos dois lugares
+            // duplicava etapa de erro e causava 2× PersistAsync concorrentes no DB.
             throw;
         }
     }
