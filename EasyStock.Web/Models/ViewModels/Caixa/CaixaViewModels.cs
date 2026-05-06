@@ -6,6 +6,8 @@ public class CaixaOperacaoViewModel
 {
     public CaixaDia? Dia { get; set; }
     public DateOnly DataSelecionada { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? ErrorCode { get; set; }
 }
 
 public class CaixaHistoricoViewModel

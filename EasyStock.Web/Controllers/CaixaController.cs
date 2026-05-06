@@ -15,7 +15,15 @@ public class CaixaController(CaixaService svc, SessionService session) : BaseCon
         var vm = new CaixaOperacaoViewModel { DataSelecionada = d };
 
         var result = await svc.ObterDiaAsync(d);
-        if (result.Success && result.Data is not null) vm.Dia = result.Data;
+        if (result.Success && result.Data is not null)
+        {
+            vm.Dia = result.Data;
+        }
+        else
+        {
+            vm.ErrorCode = result.ErrorCode;
+            vm.ErrorMessage = result.ErrorMessage;
+        }
 
         return View(vm);
     }

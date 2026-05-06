@@ -18,7 +18,65 @@
 
 @if (d == null)
 {
-    <div class="ws"><p class="text-slate-500">Não foi possível carregar o caixa do dia.</p></div>
+    var isLojaIssue = string.Equals(Model.ErrorCode, "EMPRESA_INVALIDA", StringComparison.OrdinalIgnoreCase)
+                      || string.Equals(Model.ErrorCode, "LOJA_NAO_SELECIONADA", StringComparison.OrdinalIgnoreCase)
+                      || string.IsNullOrEmpty(ViewBag.LojaAtualId as string);
+    var isAuthIssue = string.Equals(Model.ErrorCode, "UNAUTHORIZED", StringComparison.OrdinalIgnoreCase)
+                      || string.Equals(Model.ErrorCode, "TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase);
+
+    <div class="ws bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+        <svg class="w-12 h-12 mx-auto text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <p class="text-red-700 font-semibold text-base">Não foi possível carregar o caixa do dia.</p>
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <p class="text-sm text-red-600 mt-1">@Model.ErrorMessage</p>
+        }
+
+        @if (isLojaIssue)
+        {
+            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+                Selecione uma loja no seletor do topo da página antes de acessar o caixa.
+            </p>
+        }
+        else if (isAuthIssue)
+        {
+            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+                Sua sessão expirou. Faça login novamente para continuar.
+            </p>
+        }
+        else
+        {
+            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+                Verifique sua conexão e tente novamente. Se o problema persistir, contate o suporte.
+            </p>
+        }
+
+        <div class="flex justify-center gap-3 mt-5 flex-wrap">
+            <button type="button" onclick="location.reload()"
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Tentar novamente
+            </button>
+            @if (isAuthIssue)
+            {
+                <a href="/auth/login" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                    Ir para login
+                </a>
+            }
+            else
+            {
+                <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                    Ver histórico de fechamentos
+                </a>
+            }
+        </div>
+    </div>
 }
 else
 {

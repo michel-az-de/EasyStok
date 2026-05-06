@@ -421,8 +421,8 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Custo</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input type="text" inputmode="decimal"
-                               :value="$el === document.activeElement ? undefined : (custo > 0 ? custo.toFixed(2).replace('.', ',') : '')"
+                        <input type="text" inputmode="decimal" autocomplete="off"
+                               x-effect="syncMoneyInput($el, custo, 2)"
                                @@input="custo = parseDecimal($el.value); onCustoInput()"
                                @@blur="$el.value = custo > 0 ? custo.toFixed(2).replace('.', ',') : ''"
                                :class="{ 'field-calculated': lastEdited === 'margem' && custo > 0 }"
@@ -437,8 +437,8 @@
                         </span>
                     </label>
                     <div class="relative">
-                        <input type="text" inputmode="decimal"
-                               :value="$el === document.activeElement ? undefined : (margem > 0 ? margem.toFixed(1).replace('.', ',') : '')"
+                        <input type="text" inputmode="decimal" autocomplete="off"
+                               x-effect="syncMoneyInput($el, margem, 1)"
                                @@input="margem = parseDecimal($el.value); onMargemInput()"
                                @@blur="$el.value = margem > 0 ? margem.toFixed(1).replace('.', ',') : ''"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
@@ -464,8 +464,8 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preço de venda</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
-                        <input type="text" inputmode="decimal"
-                               :value="$el === document.activeElement ? undefined : (preco > 0 ? preco.toFixed(2).replace('.', ',') : '')"
+                        <input type="text" inputmode="decimal" autocomplete="off"
+                               x-effect="syncMoneyInput($el, preco, 2)"
                                @@input="preco = parseDecimal($el.value); onPrecoInput()"
                                @@blur="$el.value = preco > 0 ? preco.toFixed(2).replace('.', ',') : ''"
                                :class="{ 'field-calculated': lastEdited === 'margem' && preco > 0 }"
@@ -1720,7 +1720,31 @@
 
                 parseDecimal(val) {
                     if (typeof val === 'number') return val;
-                    return parseFloat(String(val).replace(',', '.')) || 0;
+                    if (val == null) return 0;
+                    // aceita "1.234,56" (BR) e "1234.56" (en) — remove separadores de milhar e normaliza vírgula
+                    let s = String(val).trim();
+                    const lastComma = s.lastIndexOf(',');
+                    const lastDot = s.lastIndexOf('.');
+                    if (lastComma > -1 && lastComma > lastDot) {
+                        // vírgula é o decimal → remove pontos (milhar)
+                        s = s.replace(/\./g, '').replace(',', '.');
+                    } else if (lastDot > -1 && lastComma > -1) {
+                        // ponto é o decimal e vírgula é milhar
+                        s = s.replace(/,/g, '');
+                    } else {
+                        // só vírgulas (ex: "12,5") ou só pontos
+                        s = s.replace(',', '.');
+                    }
+                    const n = parseFloat(s);
+                    return isFinite(n) ? n : 0;
+                },
+                // Sincroniza display do input com o estado reativo, sem sobrescrever enquanto o usuário digita.
+                // Sempre acessa `value` para que o Alpine re-rastreie a dependência mesmo quando o input está focado.
+                syncMoneyInput(el, value, decimals) {
+                    const formatted = value > 0 ? value.toFixed(decimals).replace('.', ',') : '';
+                    if (el !== document.activeElement && el.value !== formatted) {
+                        el.value = formatted;
+                    }
                 },
                 onPrecoInput() {
                     this.lastEdited = 'preco';
@@ -1731,10 +1755,12 @@
                 },
                 onCustoInput() {
                     this.lastEdited = 'custo';
-                    if (this.preco > 0 && this.custo > 0)
-                        this.margem = +( ((this.preco - this.custo) / this.preco) * 100 ).toFixed(1);
-                    else if (this.custo > 0 && this.margem > 0 && this.margem < 100)
+                    // Prioridade: se margem está definida, recalcula preço (preserva margem desejada pelo usuário).
+                    // Caso contrário, recalcula margem a partir do preço existente.
+                    if (this.custo > 0 && this.margem > 0 && this.margem < 100)
                         this.preco = +( this.custo / (1 - this.margem / 100) ).toFixed(2);
+                    else if (this.preco > 0 && this.custo > 0)
+                        this.margem = +( ((this.preco - this.custo) / this.preco) * 100 ).toFixed(1);
                 },
                 onMargemInput() {
                     this.lastEdited = 'margem';
