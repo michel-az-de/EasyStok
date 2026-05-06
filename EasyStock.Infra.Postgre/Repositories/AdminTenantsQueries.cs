@@ -66,7 +66,11 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
 
         var lojas = await db.Lojas.AsNoTracking()
             .Where(l => l.EmpresaId == empresaId)
-            .Select(l => new TenantLojaInfo(l.Id, l.Nome))
+            .OrderByDescending(l => l.Ativa)
+            .ThenBy(l => l.Nome)
+            .Select(l => new TenantLojaInfo(
+                l.Id, l.Nome, l.Descricao, l.Documento, l.Endereco, l.Telefone,
+                l.Ativa, l.CriadoEm, l.AlteradoEm))
             .ToListAsync();
 
         var usuarios = await db.UsuariosEmpresas.AsNoTracking()

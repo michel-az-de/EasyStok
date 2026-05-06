@@ -1,6 +1,7 @@
 @page
 @model EasyStock.Admin.Pages.Status.IndexModel
 @using System.Text.Json
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Status do Sistema";
 }
@@ -95,6 +96,70 @@
     </div>
 </div>
 
+<!-- Painel Seed (dev/staging — desabilitado em produção via Seed:ApiEnabled=false) -->
+@{ var afStatus = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+<div class="card mt-6" x-data="seedPanel()" x-init="carregarStatus()">
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <h3 class="text-es-ink font-semibold text-sm">🌱 Seed de dados</h3>
+            <p class="text-es-ink-mute text-xs mt-0.5">
+                Popula o banco com tenants/lojas/usuários de demonstração pra testes.
+                <span x-show="!enabled && enabled !== null" x-cloak class="text-amber-300 font-semibold">
+                    Desabilitado neste ambiente (defina <code>Seed:ApiEnabled=true</code> ou <code>SEED_API_ENABLED=true</code>).
+                </span>
+            </p>
+        </div>
+        <button type="button" @@click="carregarStatus()" class="btn-secondary text-xs">↻</button>
+    </div>
+
+    <div x-show="loadingStatus" x-cloak class="text-es-ink-mute text-sm py-3">Consultando status…</div>
+
+    <template x-if="!loadingStatus && counts">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="rounded-lg p-3 text-center" style="background:rgba(247,242,232,0.04)">
+                <div class="text-2xl font-bold text-es-ink" x-text="counts.empresas ?? 0"></div>
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute">Empresas</div>
+            </div>
+            <div class="rounded-lg p-3 text-center" style="background:rgba(247,242,232,0.04)">
+                <div class="text-2xl font-bold text-es-ink" x-text="counts.usuarios ?? 0"></div>
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute">Usuários</div>
+            </div>
+            <div class="rounded-lg p-3 text-center" style="background:rgba(247,242,232,0.04)">
+                <div class="text-2xl font-bold text-es-ink" x-text="counts.lojas ?? 0"></div>
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute">Lojas</div>
+            </div>
+            <div class="rounded-lg p-3 text-center" style="background:rgba(247,242,232,0.04)">
+                <div class="text-2xl font-bold text-es-ink" x-text="counts.planos ?? 0"></div>
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute">Planos</div>
+            </div>
+        </div>
+    </template>
+
+    <div x-show="erro" x-cloak class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-3" x-text="erro"></div>
+    <div x-show="sucesso" x-cloak class="bg-es-basil/10 border border-es-basil/30 text-es-basil rounded-lg px-3 py-2 text-sm mb-3" x-text="sucesso"></div>
+
+    <div class="flex flex-wrap gap-2 items-center">
+        <select x-model="volume" :disabled="!enabled || executando" class="form-input text-sm max-w-[200px]">
+            <option value="small">Small (2 tenants)</option>
+            <option value="medium">Medium (3 tenants)</option>
+            <option value="large">Large (4 tenants — default)</option>
+        </select>
+        <button type="button" @@click="executarDemo()" :disabled="!enabled || executando" class="btn-primary text-sm">
+            <span x-show="!executando">🚀 Rodar seed demo</span>
+            <span x-show="executando" x-cloak>Executando…</span>
+        </button>
+        <button type="button" @@click="executarMinimal()" :disabled="!enabled || executando" class="btn-secondary text-sm">
+            ⚡ Seed mínimo (1 admin)
+        </button>
+        <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs ml-auto">→ Ver clientes</a>
+    </div>
+    <p class="text-es-ink-mute text-[11px] mt-3">
+        Demo cria empresas fictícias (PastaBella, Cantina Mauricio, CasaDaBaba, MassasVeneza) com lojas, usuários
+        e movimentações pra testar o módulo de Gestão de Cliente. <strong>Idempotente</strong> — rodar múltiplas
+        vezes não duplica dados.
+    </p>
+</div>
+
 @section Scripts {
 <script>
 function statusPage() {
@@ -152,6 +217,68 @@ function statusPage() {
             return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
         }
     }
+}
+
+function seedPanel() {
+    return {
+        enabled: null,        // null = ainda não consultou; true/false após carregarStatus
+        loadingStatus: false,
+        executando: false,
+        counts: null,
+        volume: 'large',
+        erro: '',
+        sucesso: '',
+        async carregarStatus() {
+            this.loadingStatus = true; this.erro = ''; this.sucesso = '';
+            try {
+                const r = await fetch('/Status?handler=SeedStatus', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const d = await r.json();
+                if (!r.ok) {
+                    this.erro = (d && d.error) || ('Falha HTTP ' + r.status);
+                    return;
+                }
+                const data = d.data || d;
+                this.enabled = !!data.enabled;
+                this.counts = data.counts || null;
+            } catch (e) {
+                this.erro = 'Falha de rede ao consultar seed: ' + (e.message || e);
+            } finally {
+                this.loadingStatus = false;
+            }
+        },
+        async _post(url) {
+            if (!this.enabled || this.executando) return;
+            this.executando = true; this.erro = ''; this.sucesso = '';
+            try {
+                const fd = new FormData();
+                fd.append('__RequestVerificationToken', '@afStatus');
+                if (url.includes('handler=SeedDemo')) fd.append('volume', this.volume);
+                const r = await fetch(url, { method: 'POST', credentials: 'same-origin', body: fd });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const d = await r.json();
+                if (!r.ok) {
+                    this.erro = (d && (d.error || (d.error?.message))) || ('Falha HTTP ' + r.status);
+                    return;
+                }
+                const data = d.data || d;
+                this.sucesso = data.mensagem || 'Seed executado com sucesso.';
+                if (data.counts) this.counts = data.counts;
+                else await this.carregarStatus();
+            } catch (e) {
+                this.erro = 'Falha de rede ao executar seed: ' + (e.message || e);
+            } finally {
+                this.executando = false;
+            }
+        },
+        async executarDemo() {
+            await this._post('/Status?handler=SeedDemo&volume=' + encodeURIComponent(this.volume));
+        },
+        async executarMinimal() {
+            if (!confirm('Executar seed mínimo? Cria apenas 1 admin + 1 empresa + 1 loja.')) return;
+            await this._post('/Status?handler=SeedMinimal');
+        }
+    };
 }
 </script>
 }

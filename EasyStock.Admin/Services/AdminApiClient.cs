@@ -1,9 +1,28 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 
 namespace EasyStock.Admin.Services;
 
 public sealed class SessionExpiredException() : Exception("Sessão expirada. Faça login novamente.");
+
+/// <summary>
+/// Erro de chamada à API que carrega mensagem AMIGÁVEL extraída do envelope JSON
+/// quando disponível. Usar <c>ex.Message</c> em toasts é seguro — não vaza
+/// stacktrace nem mensagem padrão "Response status code does not indicate success".
+/// </summary>
+public sealed class ApiException : Exception
+{
+    public int HttpStatus { get; }
+    public string? ErrorCode { get; }
+
+    public ApiException(int httpStatus, string? errorCode, string mensagem)
+        : base(mensagem)
+    {
+        HttpStatus = httpStatus;
+        ErrorCode = errorCode;
+    }
+}
 
 /// <summary>
 /// Cliente HTTP para a API do EasyStock. O Bearer token e o retry com refresh
@@ -28,23 +47,96 @@ public class AdminApiClient(HttpClient httpClient)
 
     private static void ThrowIfUnauthorized(HttpResponseMessage response)
     {
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new SessionExpiredException();
     }
+
+    /// <summary>
+    /// Substitui <c>EnsureSuccessStatusCode</c> — em vez de jogar HttpRequestException
+    /// com mensagem técnica, parseia o corpo JSON e devolve <see cref="ApiException"/>
+    /// com mensagem amigável. Suporta os 3 envelopes que a API usa
+    /// ({error:{message}}, {errors:{}} validation, {message}). Se o body não tem
+    /// nada útil, fallback por status HTTP em português.
+    /// </summary>
+    private static async Task EnsureSuccessOrThrowAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var status = (int)response.StatusCode;
+        string? code = null;
+        string? msg = null;
+
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                // Format 1: { error: { code, message, detail } }
+                if (root.TryGetProperty("error", out var errEl))
+                {
+                    code = TryString(errEl, "code");
+                    msg = TryString(errEl, "detail") ?? TryString(errEl, "message");
+                }
+                // Format 2: { errors: { Field: ["msg", ...] } } — FluentValidation/ASP.NET
+                else if (root.TryGetProperty("errors", out var errorsEl) && errorsEl.ValueKind == JsonValueKind.Object)
+                {
+                    var primeira = errorsEl.EnumerateObject().FirstOrDefault();
+                    if (primeira.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        var arr = primeira.Value.EnumerateArray().Select(e => e.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+                        msg = arr.Count > 0 ? string.Join(" ", arr) : null;
+                        code = "VALIDATION_ERROR";
+                    }
+                }
+                // Format 3: { code, message } flat ou { title, detail } ProblemDetails
+                else
+                {
+                    code = TryString(root, "code");
+                    msg = TryString(root, "message") ?? TryString(root, "detail") ?? TryString(root, "title");
+                }
+            }
+        }
+        catch
+        {
+            // body não é JSON ou parse falhou — usa fallback por status.
+        }
+
+        msg ??= FallbackMessageForStatus(status);
+        throw new ApiException(status, code, msg);
+    }
+
+    private static string? TryString(JsonElement el, string prop) =>
+        el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private static string FallbackMessageForStatus(int status) => status switch
+    {
+        400 => "Dados inválidos. Revise os campos e tente novamente.",
+        401 => "Sessão expirada. Faça login novamente.",
+        403 => "Você não tem permissão para esta ação.",
+        404 => "Recurso não encontrado.",
+        409 => "Conflito de dados. O registro já existe ou está em uso.",
+        422 => "Não foi possível processar — algum dado está inconsistente.",
+        500 => "Erro interno no servidor. Tente novamente em instantes.",
+        502 => "Serviço temporariamente indisponível.",
+        503 => "Serviço temporariamente indisponível. Tente novamente em instantes.",
+        _   => $"Erro HTTP {status}. Tente novamente — se persistir, contate o suporte."
+    };
 
     private static T UnwrapData<T>(JsonElement root)
     {
         if (!root.TryGetProperty("data", out var data))
-            throw new InvalidOperationException("API response sem campo 'data'.");
+            throw new ApiException(0, "BAD_RESPONSE", "Resposta inesperada da API (sem campo 'data').");
         return data.Deserialize<T>(JsonOptions)
-            ?? throw new InvalidOperationException("API response data foi null.");
+            ?? throw new ApiException(0, "BAD_RESPONSE", "API devolveu corpo vazio quando esperávamos dados.");
     }
 
     public async Task<T> GetAsync<T>(string path)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Get, path));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return UnwrapData<T>(json.RootElement);
     }
@@ -53,7 +145,7 @@ public class AdminApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Get, path));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return json.RootElement.Clone();
     }
@@ -62,7 +154,7 @@ public class AdminApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return UnwrapData<T>(json.RootElement);
     }
@@ -70,7 +162,7 @@ public class AdminApiClient(HttpClient httpClient)
     /// <summary>
     /// Mantém o envelope cru pra o caller inspecionar `error`/`data` (usado pelo
     /// Login que precisa diferenciar credenciais inválidas de outros erros).
-    /// Não faz EnsureSuccessStatusCode; apenas diferencia 401 (sessão expirada).
+    /// Não faz EnsureSuccessOrThrow; apenas diferencia 401 (sessão expirada).
     /// Caller é responsável por checar `error` no payload retornado.
     /// </summary>
     public async Task<JsonElement> PostRawAsync(string path, object body)
@@ -93,7 +185,7 @@ public class AdminApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Patch, path, body));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return UnwrapData<T>(json.RootElement);
     }
@@ -102,14 +194,14 @@ public class AdminApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Delete, path));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
     }
 
     public async Task<(byte[] Bytes, string ContentType)> GetBytesAsync(string path)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Get, path));
         ThrowIfUnauthorized(response);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response);
         var bytes = await response.Content.ReadAsByteArrayAsync();
         var ct = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
         return (bytes, ct);

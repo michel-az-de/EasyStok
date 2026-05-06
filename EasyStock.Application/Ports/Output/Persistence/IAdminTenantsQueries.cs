@@ -50,7 +50,16 @@ public sealed record TenantPlanoInfo(
     Guid Id, string Nome, decimal PrecoMensal,
     int LimiteLojas, int LimiteUsuarios, int LimiteProdutos);
 
-public sealed record TenantLojaInfo(Guid Id, string Nome);
+public sealed record TenantLojaInfo(
+    Guid Id,
+    string Nome,
+    string? Descricao,
+    string? Documento,
+    string? Endereco,
+    string? Telefone,
+    bool Ativa,
+    DateTime CriadoEm,
+    DateTime AlteradoEm);
 
 public sealed record TenantUsuarioInfo(
     Guid Id, string Nome, string Email, bool Ativo,

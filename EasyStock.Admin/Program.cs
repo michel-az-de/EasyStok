@@ -78,6 +78,11 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
+// Aliases /Clientes → /Tenants (sidebar label foi renomeada na slice de Gestão de Cliente,
+// mas as rotas internas seguem `/Tenants`. Redirect mantém URLs digitadas funcionando).
+app.MapGet("/Clientes", () => Results.Redirect("/Tenants", permanent: false));
+app.MapGet("/Clientes/Detail/{id:guid}", (Guid id) => Results.Redirect($"/Tenants/Detail/{id}", permanent: false));
+
 // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
 app.MapGet("/api-proxy/dashboard-badges", async (
     EasyStock.Admin.Services.AdminApiClient api,
