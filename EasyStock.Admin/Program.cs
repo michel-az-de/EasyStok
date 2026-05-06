@@ -83,6 +83,10 @@ app.MapRazorPages();
 app.MapGet("/Clientes", () => Results.Redirect("/Tenants", permanent: false));
 app.MapGet("/Clientes/Detail/{id:guid}", (Guid id) => Results.Redirect($"/Tenants/Detail/{id}", permanent: false));
 
+// /Status absorvido em /Diagnostico (slice "Diagnóstico de Erros + Seed Visível").
+// Redirect 301 mantém bookmarks/links externos funcionando. Remover daqui a 1-2 releases.
+app.MapGet("/Status", () => Results.Redirect("/Diagnostico", permanent: true));
+
 // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
 app.MapGet("/api-proxy/dashboard-badges", async (
     EasyStock.Admin.Services.AdminApiClient api,
@@ -204,6 +208,85 @@ app.MapGet("/api-proxy/buscar-global", async (
     {
         log.LogError(ex, "Proxy buscar-global: falha");
         return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Proxies /api-proxy/diag/* — alimentam a tela /Diagnostico do Admin.
+// Mantemos a sessão cookie no Admin e injetamos o Bearer no AdminApiClient.
+// ──────────────────────────────────────────────────────────────────────
+
+// Header counters (última hora + 24h) — usa /diagnostico/logs/enhanced.
+app.MapGet("/api-proxy/diag/summary", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var hours = ctx.Request.Query["hours"].FirstOrDefault() ?? "24";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/logs/enhanced?hours={Uri.EscapeDataString(hours)}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/summary falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Listagem paginada+filtrada — núcleo da tab Erros.
+app.MapGet("/api-proxy/diag/search", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/logs/search?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/search falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Export JSON (binário passthrough) — alimenta o botão "Exportar JSON".
+// Não consegue usar GetAsync<JsonElement> porque o endpoint devolve File(); usa GetBytesAsync.
+app.MapGet("/api-proxy/diag/export", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var (bytes, ct) = await api.GetBytesAsync($"api/diagnostico/logs/exportar?{qs}");
+        var fileName = $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.json";
+        return Results.File(bytes, ct, fileName);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/export falhou");
+        return Results.Problem(
+            title: "Erro ao exportar logs",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
     }
 });
 

@@ -2,12 +2,23 @@ using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
-namespace EasyStock.Admin.Pages.Status;
+namespace EasyStock.Admin.Pages.Diagnostico;
 
+/// <summary>
+/// Página unificada de diagnóstico — substitui o /Status antigo. Tabs:
+/// Resumo (health-check, equivalente ao /Status anterior), Erros (lista
+/// paginada server-side com filtros) e Operações (seed + manutenção de logs).
+/// Live/Insights são P1/P2.
+/// </summary>
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log) : AdminPageBase(session)
 {
+    /// <summary>Carrega no GET pra hidratar a tab Resumo sem flash. Demais tabs lazy-load.</summary>
     public JsonElement StatusData { get; private set; }
     public string? Erro { get; private set; }
+
+    /// <summary>Tab inicial — controlada via QS pra deep-link.</summary>
+    [BindProperty(SupportsGet = true)]
+    public string Tab { get; set; } = "resumo";
 
     public async Task OnGetAsync()
     {
@@ -23,7 +34,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
     }
 
-    // ─────────────────── Seed (handlers) ───────────────────
+    // ─────────────────── Seed (handlers — migrados do /Status) ───────────────────
 
     public async Task<IActionResult> OnGetSeedStatusAsync()
     {

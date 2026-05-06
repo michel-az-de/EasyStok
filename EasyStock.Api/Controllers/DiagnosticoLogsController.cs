@@ -413,18 +413,166 @@ public sealed class DiagnosticoLogsController(
         });
     }
 
+    /// <summary>
+    /// Busca paginada server-side com filtros — alimenta a tela de Diagnóstico do Admin.
+    /// Reusa <see cref="DiagnosticoLogAnalyzer.ParseAllLogFiles"/>; aplica filtros e paginação
+    /// em memória. Retorna {items, total, page, pageSize, totalErros, niveis, endpointsTop}.
+    /// </summary>
+    /// <param name="level">Filtro multi-valor por nível (CSV: ERROR,FATAL,WARN,INFO,DEBUG).</param>
+    /// <param name="hours">Janela de tempo em horas (default 24, máx 168 = 7d).</param>
+    /// <param name="endpoint">Substring case-insensitive no campo Endpoint.</param>
+    /// <param name="cid">CorrelationId exato (sticky filter na UI).</param>
+    /// <param name="search">Substring em Message + Exception.</param>
+    /// <param name="page">1-based.</param>
+    /// <param name="pageSize">Default 50, máx 500.</param>
+    [HttpGet("logs/search")]
+    public IActionResult LogsSearch(
+        [FromQuery] string? level = null,
+        [FromQuery] int hours = 24,
+        [FromQuery] string? endpoint = null,
+        [FromQuery] string? cid = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        hours = Math.Clamp(hours, 1, 168);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 500);
+
+        var logsDir = GetLogDirectory();
+        if (!Directory.Exists(logsDir))
+            return Ok(new { items = Array.Empty<object>(), total = 0, page, pageSize, totalErros = 0, disponivel = false, motivo = "Diretório de logs não encontrado." });
+
+        try
+        {
+            var cutoff = DateTime.UtcNow.AddHours(-hours);
+            var allEntries = DiagnosticoLogAnalyzer.ParseAllLogFiles(logsDir, cutoff);
+
+            // Filtros — todos opcionais, AND lógico.
+            IEnumerable<EnhancedLogEntry> filtered = allEntries;
+
+            if (!string.IsNullOrWhiteSpace(level))
+            {
+                var levels = level.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => s.ToUpperInvariant())
+                    .ToHashSet();
+                filtered = filtered.Where(e => levels.Contains(e.Level.ToUpperInvariant()));
+            }
+
+            if (!string.IsNullOrWhiteSpace(endpoint))
+                filtered = filtered.Where(e => e.Endpoint?.Contains(endpoint, StringComparison.OrdinalIgnoreCase) == true);
+
+            if (!string.IsNullOrWhiteSpace(cid))
+                filtered = filtered.Where(e => string.Equals(e.CorrelationId, cid, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(search))
+                filtered = filtered.Where(e =>
+                    e.Message.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (e.Exception?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+            var filteredList = filtered
+                .OrderByDescending(e => e.Timestamp)
+                .ToList();
+
+            var total = filteredList.Count;
+            var totalErros = allEntries.Count(e =>
+                string.Equals(e.Level, "ERROR", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(e.Level, "FATAL", StringComparison.OrdinalIgnoreCase));
+
+            // Top 30 endpoints únicos pra alimentar datalist da UI (autocomplete).
+            var endpointsTop = allEntries
+                .Where(e => !string.IsNullOrWhiteSpace(e.Endpoint))
+                .GroupBy(e => e.Endpoint!)
+                .OrderByDescending(g => g.Count())
+                .Take(30)
+                .Select(g => g.Key)
+                .ToArray();
+
+            var items = filteredList
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToArray();
+
+            return Ok(new
+            {
+                disponivel = true,
+                items,
+                total,
+                page,
+                pageSize,
+                totalErros,
+                endpointsTop,
+                queryTimestamp = DateTimeOffset.UtcNow,
+                periodoHoras = hours
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao buscar logs via /logs/search.");
+            return Ok(new { disponivel = false, motivo = $"Erro ao processar logs: {ex.Message}", items = Array.Empty<object>(), total = 0, page, pageSize });
+        }
+    }
+
+    /// <summary>
+    /// Exporta logs. Default = arquivo .log (texto cru concatenado dos arquivos do período).
+    /// Com <c>format=json</c>, devolve array de <see cref="EnhancedLogEntry"/> filtrado
+    /// (mesmos filtros do /logs/search) — útil pra anexar em ticket.
+    /// </summary>
     [HttpGet("logs/exportar")]
-    public IActionResult ExportarLogs([FromQuery] int hours = 48)
+    public IActionResult ExportarLogs(
+        [FromQuery] int hours = 48,
+        [FromQuery] string? format = null,
+        [FromQuery] string? level = null,
+        [FromQuery] string? endpoint = null,
+        [FromQuery] string? cid = null,
+        [FromQuery] string? search = null)
     {
         hours = Math.Clamp(hours, 1, 168);
         var logsDir = GetLogDirectory();
         if (!Directory.Exists(logsDir))
             return NotFound(new { error = "Diretório de logs não encontrado." });
 
-        var cutoff = DateTime.UtcNow.AddHours(-hours);
+        // ── Format JSON (estruturado, com filtros) ─────────────────────────────
+        if (string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            var cutoff = DateTime.UtcNow.AddHours(-hours);
+            var entries = DiagnosticoLogAnalyzer.ParseAllLogFiles(logsDir, cutoff, maxEntries: 50_000);
+
+            IEnumerable<EnhancedLogEntry> filtered = entries;
+            if (!string.IsNullOrWhiteSpace(level))
+            {
+                var levels = level.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => s.ToUpperInvariant())
+                    .ToHashSet();
+                filtered = filtered.Where(e => levels.Contains(e.Level.ToUpperInvariant()));
+            }
+            if (!string.IsNullOrWhiteSpace(endpoint))
+                filtered = filtered.Where(e => e.Endpoint?.Contains(endpoint, StringComparison.OrdinalIgnoreCase) == true);
+            if (!string.IsNullOrWhiteSpace(cid))
+                filtered = filtered.Where(e => string.Equals(e.CorrelationId, cid, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(search))
+                filtered = filtered.Where(e =>
+                    e.Message.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (e.Exception?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+            var arr = filtered.OrderByDescending(e => e.Timestamp).ToArray();
+            var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                exportadoEm = DateTimeOffset.UtcNow,
+                periodoHoras = hours,
+                filtros = new { level, endpoint, cid, search },
+                total = arr.Length,
+                items = arr
+            }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            var fileName = $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.json";
+            return File(json, "application/json; charset=utf-8", fileName);
+        }
+
+        // ── Format texto cru (legado) ──────────────────────────────────────────
+        var fcutoff = DateTime.UtcNow.AddHours(-hours);
         var arquivos = new DirectoryInfo(logsDir)
             .GetFiles("easystock-*.log")
-            .Where(f => f.LastWriteTimeUtc >= cutoff || f.Name.Contains(DateTime.UtcNow.ToString("yyyyMMdd")))
+            .Where(f => f.LastWriteTimeUtc >= fcutoff || f.Name.Contains(DateTime.UtcNow.ToString("yyyyMMdd")))
             .OrderBy(f => f.Name)
             .ToArray();
 
@@ -453,8 +601,8 @@ public sealed class DiagnosticoLogsController(
         }
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
-        var fileName = $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log";
-        return File(bytes, "text/plain; charset=utf-8", fileName);
+        var fileNameTxt = $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log";
+        return File(bytes, "text/plain; charset=utf-8", fileNameTxt);
     }
 
     [HttpPost("logs/salvar-storage")]

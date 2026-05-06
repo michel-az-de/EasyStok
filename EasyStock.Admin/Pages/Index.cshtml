@@ -45,6 +45,26 @@
 
 <div>
 
+    @* Card grande de seed — aparece quando o tenant count chega em 0. CTA leva
+       direto pra tab Operações do /Diagnostico onde o painel completo de seed
+       (com 3 botões + console de debug + diagnóstico de flags) está disponível.
+       Sai automaticamente quando dash.totalTenants > 0. *@
+    <div x-show="dash.totalTenants === 0" x-cloak
+         class="card mb-6 flex flex-wrap items-center gap-4"
+         style="background:linear-gradient(135deg,rgba(232,88,20,0.08),rgba(247,242,232,0.04));border:1px solid rgba(232,88,20,0.2)">
+        <div class="text-5xl">🌱</div>
+        <div class="flex-1 min-w-[260px]">
+            <h3 class="text-es-ink font-bold text-base">Banco vazio — nada pra testar</h3>
+            <p class="text-es-ink-mute text-sm mt-0.5">
+                Ainda não há tenants. Popule o ambiente com um seed de cenários de teste do Admin
+                (4 tenants variados, tickets, notas internas, audit logs).
+            </p>
+        </div>
+        <a href="/Diagnostico?tab=operacoes" class="btn-primary text-sm whitespace-nowrap">
+            🚀 Popular ambiente
+        </a>
+    </div>
+
     <!-- Indicador de atualização -->
     <div class="flex items-center justify-end mb-3 gap-2 text-xs text-es-ink-mute">
         <span class="w-1.5 h-1.5 rounded-full bg-es-basil animate-pulse"></span>
