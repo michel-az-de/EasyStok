@@ -379,19 +379,26 @@ public class AdminSeedController(
                     {
                         var originalVolume = Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME");
                         var originalDemo = Environment.GetEnvironmentVariable("SEED_DEMO_DATA");
-                        await using var demoTx = await ctx.Database.BeginTransactionAsync(ct);
-                        transactionActive = true;
                         try
                         {
-                            seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
-                            if (!string.IsNullOrWhiteSpace(volume))
-                                Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
-                            Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
-                            seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
-                            await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
-                            seedProgress.Report(runId, 95, "Confirmando transação no banco…");
-                            await demoTx.CommitAsync(ct);
-                            transactionActive = false;
+                            // EnableRetryOnFailure (NpgsqlRetryingExecutionStrategy) NÃO suporta
+                            // BeginTransactionAsync direto — TUDO precisa ir dentro de
+                            // ExecutionStrategy.ExecuteAsync pra ser uma "unit retriable".
+                            var strategy = ctx.Database.CreateExecutionStrategy();
+                            await strategy.ExecuteAsync(async () =>
+                            {
+                                await using var demoTx = await ctx.Database.BeginTransactionAsync(ct);
+                                transactionActive = true;
+                                seedProgress.Report(runId, 10, $"Configurando demo volume={volume ?? "large"}…");
+                                if (!string.IsNullOrWhiteSpace(volume))
+                                    Environment.SetEnvironmentVariable("SEED_DEMO_VOLUME", volume);
+                                Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
+                                seedProgress.Report(runId, 20, "Iniciando seed demo completo…");
+                                await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
+                                seedProgress.Report(runId, 95, "Confirmando transação no banco…");
+                                await demoTx.CommitAsync(ct);
+                                transactionActive = false;
+                            });
                             await seedProgress.SuccessAsync(runId,
                                 $"Seed demo (volume={volume ?? "large"}) concluído em {sw.ElapsedMilliseconds}ms.");
                         }
@@ -405,13 +412,17 @@ public class AdminSeedController(
 
                 case "minimal":
                     {
-                        await using var minTx = await ctx.Database.BeginTransactionAsync(ct);
-                        transactionActive = true;
-                        seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
-                        await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
-                        seedProgress.Report(runId, 95, "Confirmando transação no banco…");
-                        await minTx.CommitAsync(ct);
-                        transactionActive = false;
+                        var strategy = ctx.Database.CreateExecutionStrategy();
+                        await strategy.ExecuteAsync(async () =>
+                        {
+                            await using var minTx = await ctx.Database.BeginTransactionAsync(ct);
+                            transactionActive = true;
+                            seedProgress.Report(runId, 20, "Executando seed mínimo (1 admin + 1 empresa + 1 loja)…");
+                            await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
+                            seedProgress.Report(runId, 95, "Confirmando transação no banco…");
+                            await minTx.CommitAsync(ct);
+                            transactionActive = false;
+                        });
                         await seedProgress.SuccessAsync(runId,
                             $"Seed mínimo concluído em {sw.ElapsedMilliseconds}ms.");
                     }

@@ -91,7 +91,13 @@ public static class AdminTestScenariosSeed
         progress?.SetBackup(runId, backupJson);
         logger.LogInformation("[AdminTestScenarios] BackupJson: {Json}", backupJson.Length > 2000 ? backupJson[..2000] + "…" : backupJson);
 
-        // ── Etapa 2: Delete das empresas seed (dentro de transação) ─────────────
+        // ── Etapa 2: Delete + insert (tudo dentro de tx) ─────────────────────────
+        // Com EnableRetryOnFailure ativo (NpgsqlRetryingExecutionStrategy), NÃO dá
+        // pra usar BeginTransactionAsync direto — toda a unit precisa rodar dentro
+        // de ExecutionStrategy.ExecuteAsync pra ser retriável atomicamente.
+        var strategy = context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
         await using var tx = await context.Database.BeginTransactionAsync();
         try
         {
@@ -287,6 +293,7 @@ public static class AdminTestScenariosSeed
             // duplicava etapa de erro e causava 2× PersistAsync concorrentes no DB.
             throw;
         }
+        }); // strategy.ExecuteAsync
     }
 
     // ─────────────────────────── helpers ───────────────────────────────────────
