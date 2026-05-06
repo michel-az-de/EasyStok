@@ -1,0 +1,97 @@
+@page
+@model EasyStock.Admin.Pages.Notificacoes.Envios.IndexModel
+@{
+    ViewData["Title"] = "Log de Envios";
+}
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Log de Envios</h1>
+            <p class="text-slate-400 text-sm mt-1">Histórico de tentativas de envio por canal</p>
+        </div>
+        <a href="?page=1&status=@Model.Status&canal=@Model.Canal" asp-page-handler="Export"
+           class="btn-secondary px-4 py-2 text-sm">Exportar CSV</a>
+    </div>
+
+    <form method="get" class="flex gap-3 flex-wrap">
+        <select name="status" class="input-dark text-sm">
+            <option value="">Todos os status</option>
+            <option value="Pendente" selected="@(Model.Status == "Pendente")">Pendente</option>
+            <option value="Enviado" selected="@(Model.Status == "Enviado")">Enviado</option>
+            <option value="Falhado" selected="@(Model.Status == "Falhado")">Falhado</option>
+            <option value="Suprimido" selected="@(Model.Status == "Suprimido")">Suprimido</option>
+        </select>
+        <select name="canal" class="input-dark text-sm">
+            <option value="">Todos os canais</option>
+            <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
+            <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
+            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
+            <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
+        </select>
+        <input type="date" name="de" value="@Model.De" class="input-dark text-sm" />
+        <input type="date" name="ate" value="@Model.Ate" class="input-dark text-sm" />
+        <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
+    </form>
+
+    @if (Model.Erro != null)
+    {
+        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+    }
+
+    <div class="card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase">
+                    <th class="px-4 py-3 text-left">OutboxId</th>
+                    <th class="px-4 py-3 text-left">Canal</th>
+                    <th class="px-4 py-3 text-left">Tentativa</th>
+                    <th class="px-4 py-3 text-left">Provider</th>
+                    <th class="px-4 py-3 text-left">Status HTTP</th>
+                    <th class="px-4 py-3 text-left">Duração</th>
+                    <th class="px-4 py-3 text-left">Ocorrido</th>
+                    <th class="px-4 py-3 text-left">Sucesso</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    @foreach (var log in Model.Data.EnumerateArray())
+                    {
+                        var sucesso = log.TryGetProperty("sucesso", out var s) && s.GetBoolean();
+                        var canal = log.TryGetProperty("canal", out var c) ? c.GetString() : "";
+                        var tentativa = log.TryGetProperty("tentativa", out var t) ? t.GetInt32() : 0;
+                        var provider = log.TryGetProperty("provider", out var p) ? p.GetString() : "";
+                        var status = log.TryGetProperty("statusHttp", out var st) && st.ValueKind != System.Text.Json.JsonValueKind.Null ? st.GetInt32().ToString() : "-";
+                        var duracaoMs = log.TryGetProperty("duracaoMs", out var d) ? d.GetInt64() : 0;
+                        var ocorrido = log.TryGetProperty("ocorridoEm", out var o) ? o.GetString() : "";
+                        var outboxId = log.TryGetProperty("outboxMensagemId", out var oid) ? oid.GetString() : "";
+                        var erro = log.TryGetProperty("erroDetalhado", out var er) && er.ValueKind != System.Text.Json.JsonValueKind.Null ? er.GetString() : null;
+
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40" title="@erro">
+                            <td class="px-4 py-3 font-mono text-slate-500 text-xs">@(outboxId?.Substring(0, 8))…</td>
+                            <td class="px-4 py-3 text-slate-300">@canal</td>
+                            <td class="px-4 py-3 text-slate-400">@tentativa</td>
+                            <td class="px-4 py-3 text-slate-400 font-mono text-xs">@provider</td>
+                            <td class="px-4 py-3 text-slate-400">@status</td>
+                            <td class="px-4 py-3 text-slate-400">@duracaoMs ms</td>
+                            <td class="px-4 py-3 text-slate-400 text-xs">@ocorrido</td>
+                            <td class="px-4 py-3">
+                                @if (sucesso)
+                                {
+                                    <span class="badge-green">✓</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-red" title="@erro">✗</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-slate-500 text-sm text-center">Total: @Model.Total envios — Página @Model.Page de @Model.TotalPages</p>
+</div>

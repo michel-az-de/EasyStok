@@ -1,0 +1,120 @@
+@page
+@model EasyStock.Admin.Pages.Notificacoes.Templates.IndexModel
+@{
+    ViewData["Title"] = "Templates de Notificação";
+}
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Templates</h1>
+            <p class="text-slate-400 text-sm mt-1">Modelos de mensagem por canal e tipo de evento</p>
+        </div>
+        <a href="/Notificacoes/Templates/Edit" class="btn-primary px-4 py-2 text-sm">+ Novo Template</a>
+    </div>
+
+    <form method="get" class="flex gap-3 flex-wrap">
+        <select name="canal" class="input-dark text-sm">
+            <option value="">Todos os canais</option>
+            <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
+            <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
+            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
+            <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
+        </select>
+        <select name="tipoEvento" class="input-dark text-sm">
+            <option value="">Todos os eventos</option>
+            <option value="ProdutoVencendo">Produto Vencendo</option>
+            <option value="AssinaturaExpirando">Assinatura Expirando</option>
+            <option value="ResetSenha">Reset de Senha</option>
+            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
+            <option value="BroadcastSuperAdmin">Broadcast</option>
+        </select>
+        <select name="ativo" class="input-dark text-sm">
+            <option value="">Todos</option>
+            <option value="true">Ativos</option>
+            <option value="false">Inativos</option>
+        </select>
+        <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
+    </form>
+
+    @if (Model.Erro != null)
+    {
+        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+    }
+
+    <div class="card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase">
+                    <th class="px-4 py-3 text-left">Código / Nome</th>
+                    <th class="px-4 py-3 text-left">Canal</th>
+                    <th class="px-4 py-3 text-left">Evento</th>
+                    <th class="px-4 py-3 text-left">Versão</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    @foreach (var t in Model.Data.EnumerateArray())
+                    {
+                        var id = t.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
+                        var codigo = t.TryGetProperty("codigo", out var c) ? c.GetString() : "";
+                        var nome = t.TryGetProperty("nome", out var n) ? n.GetString() : "";
+                        var canal = t.TryGetProperty("canal", out var ca) ? ca.GetString() : "";
+                        var evento = t.TryGetProperty("tipoEvento", out var ev) ? ev.GetString() : "";
+                        var versao = t.TryGetProperty("versao", out var v) ? v.GetInt32() : 0;
+                        var ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
+                        var aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
+
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors">
+                            <td class="px-4 py-3">
+                                <div class="font-mono text-amber-400 text-xs">@codigo</div>
+                                <div class="text-white">@nome</div>
+                            </td>
+                            <td class="px-4 py-3 text-slate-300">@canal</td>
+                            <td class="px-4 py-3 text-slate-300 text-xs">@evento</td>
+                            <td class="px-4 py-3 text-slate-400">v@versao</td>
+                            <td class="px-4 py-3">
+                                @if (ativo && aprovado)
+                                {
+                                    <span class="badge-green">Ativo</span>
+                                }
+                                else if (ativo && !aprovado)
+                                {
+                                    <span class="badge-yellow">Aguardando aprovação</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-gray">Inativo</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3 flex gap-2">
+                                <a href="/Notificacoes/Templates/Edit?id=@id" class="text-blue-400 hover:text-blue-300 text-xs">Editar</a>
+                                @if (ativo && !aprovado)
+                                {
+                                    <form method="post" asp-page-handler="Aprovar" class="inline">
+                                        <input type="hidden" name="id" value="@id" />
+                                        <button type="submit" class="text-green-400 hover:text-green-300 text-xs">Aprovar</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.TotalPages > 1)
+    {
+        <div class="flex justify-center gap-2">
+            @for (var p = 1; p <= Model.TotalPages; p++)
+            {
+                <a href="?page=@p&canal=@Model.Canal&tipoEvento=@Model.TipoEvento"
+                   class="px-3 py-1 rounded text-sm @(p == Model.Page ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white")">@p</a>
+            }
+        </div>
+    }
+</div>

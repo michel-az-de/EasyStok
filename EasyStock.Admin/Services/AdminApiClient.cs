@@ -190,6 +190,25 @@ public class AdminApiClient(HttpClient httpClient)
         return UnwrapData<T>(json.RootElement);
     }
 
+    public async Task PatchRawAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Patch, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+    }
+
+    public async Task<JsonElement> PutRawAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Put, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+            return default;
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
     public async Task DeleteAsync(string path)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Delete, path));

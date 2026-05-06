@@ -1,0 +1,107 @@
+@page "{id:guid?}"
+@model EasyStock.Admin.Pages.Notificacoes.Templates.EditModel
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Editar Template" : "Novo Template";
+}
+
+<div class="space-y-6 max-w-4xl">
+    <div class="flex items-center gap-3">
+        <a href="/Notificacoes/Templates" class="text-slate-400 hover:text-white">&larr;</a>
+        <h1 class="text-2xl font-bold text-white">@ViewData["Title"]</h1>
+        @if (Model.Id.HasValue)
+        {
+            <span class="badge-yellow text-xs">Nova versão será criada ao salvar</span>
+        }
+    </div>
+
+    @if (Model.Erro != null)
+    {
+        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+    }
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="space-y-4">
+            <form method="post">
+                @if (!Model.Id.HasValue)
+                {
+                    <div class="card p-4 space-y-4">
+                        <h2 class="text-white font-semibold">Identificação</h2>
+                        <div>
+                            <label class="label-dark">Código</label>
+                            <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
+                        </div>
+                        <div>
+                            <label class="label-dark">Nome</label>
+                            <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Email" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label-dark">Canal</label>
+                                <select asp-for="Canal" class="input-dark w-full">
+                                    <option value="Email">Email</option>
+                                    <option value="Sms">SMS</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                    <option value="InApp">In-App</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label-dark">Tipo de Evento</label>
+                                <select asp-for="TipoEvento" class="input-dark w-full">
+                                    <option value="ProdutoVencendo">Produto Vencendo</option>
+                                    <option value="ProdutoVencido">Produto Vencido</option>
+                                    <option value="AssinaturaExpirando">Assinatura Expirando</option>
+                                    <option value="ResetSenha">Reset de Senha</option>
+                                    <option value="AlertaEstoqueCritico">Alerta Estoque</option>
+                                    <option value="BroadcastSuperAdmin">Broadcast</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card p-4 space-y-4">
+                    <h2 class="text-white font-semibold">Conteúdo</h2>
+                    <div>
+                        <label class="label-dark">Assunto</label>
+                        <input asp-for="AssuntoTemplate" class="input-dark w-full"
+                               placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
+                        <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
+                    </div>
+                    <div>
+                        <label class="label-dark">Corpo (HTML)</label>
+                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs"
+                                  rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary px-6 py-2">Salvar</button>
+                    @if (Model.Id.HasValue)
+                    {
+                        <button type="submit" asp-page-handler="Preview" class="btn-secondary px-6 py-2">Preview</button>
+                    }
+                    <a href="/Notificacoes/Templates" class="btn-ghost px-6 py-2">Cancelar</a>
+                </div>
+            </form>
+        </div>
+
+        @if (Model.PreviewResult.HasValue)
+        {
+            <div class="space-y-4">
+                <h2 class="text-white font-semibold">Preview</h2>
+                <div class="card p-4">
+                    <p class="text-slate-400 text-xs mb-1">ASSUNTO</p>
+                    <p class="text-white font-medium">
+                        @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
+                    </p>
+                </div>
+                <div class="card p-4">
+                    <p class="text-slate-400 text-xs mb-2">CORPO</p>
+                    <iframe class="w-full h-80 bg-white rounded"
+                            srcdoc="@Html.Raw(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() : "")">
+                    </iframe>
+                </div>
+            </div>
+        }
+    </div>
+</div>
