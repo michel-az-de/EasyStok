@@ -106,8 +106,18 @@
                     }
                     else
                     {
-                        <input name="CategoriaId" x-model="categoriaId" placeholder="ID da categoria"
-                               class="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                            <p class="font-medium mb-1">Nenhuma categoria cadastrada.</p>
+                            <p class="text-xs mb-2">Você precisa cadastrar pelo menos uma categoria antes de criar produtos.</p>
+                            <a asp-controller="Categorias" asp-action="Index" target="_blank"
+                               class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-semibold text-xs">
+                                Cadastrar categoria
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                        </div>
+                        <input type="hidden" name="CategoriaId" x-model="categoriaId" />
                     }
                     <span asp-validation-for="CategoriaId" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
