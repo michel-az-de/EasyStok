@@ -21,7 +21,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/seed")]
 [Authorize(Policy = "SuperAdmin")]
 public class AdminSeedController(
-    IServiceProvider services,
+    IServiceScopeFactory scopeFactory,
     EasyStockDbContext db,
     AdminAuditService audit,
     SeedProgressService seedProgress,
@@ -83,7 +83,7 @@ public class AdminSeedController(
             Environment.SetEnvironmentVariable("SEED_DEMO_DATA", "true");
 
             // Cria scope dedicado — SeedData.ExecutarAsync espera IServiceProvider de scope.
-            using var scope = services.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             await SeedData.ExecutarAsync(scope.ServiceProvider, logger);
 
             await audit.LogAsync("SeedDemoExecutado", $"Volume={volume ?? "default"}");
@@ -139,7 +139,7 @@ public class AdminSeedController(
 
         try
         {
-            using var scope = services.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var agora = new DateTime(
                 DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
@@ -203,7 +203,7 @@ public class AdminSeedController(
 
         try
         {
-            using var scope = services.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             await SeedData.ExecutarMinimalAsync(scope.ServiceProvider, logger);
             await audit.LogAsync("SeedMinimalExecutado");
             return DataOk(new { ok = true, mensagem = "Seed mínimo executado." });
@@ -331,11 +331,19 @@ public class AdminSeedController(
     private async Task ExecutarSeedBackgroundAsync(Guid runId, string tipo, string? volume, string adminEmail)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        // CRÍTICO: scope NOVO criado via IServiceScopeFactory (singleton).
+        // Não dá pra usar `services` injetado: ele é o IServiceProvider do request,
+        // que é descartado quando o controller retorna 200 com o runId — Task.Run
+        // que executa essa função roda DEPOIS disso, então usar services aqui
+        // dispara "Cannot access a disposed object: IServiceProvider".
+        using var scope = scopeFactory.CreateScope();
+        var sp = scope.ServiceProvider;
+        var ctx = sp.GetRequiredService<EasyStockDbContext>();
+        // audit também precisa ser resolvido do scope novo — o `audit` injetado
+        // no controller é scoped pro request, igualmente disposto.
+        var scopedAudit = sp.GetRequiredService<AdminAuditService>();
         try
         {
-            using var scope = services.CreateScope();
-            var ctx = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-            var sp = scope.ServiceProvider;
 
             var agora = new DateTime(
                 DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day,
@@ -379,7 +387,7 @@ public class AdminSeedController(
                     return;
             }
 
-            await audit.LogAsync("SeedRunAsyncConcluido",
+            await scopedAudit.LogAsync("SeedRunAsyncConcluido",
                 $"RunId={runId}, Tipo={tipo}, Volume={volume ?? "-"}, Tempo={sw.ElapsedMilliseconds}ms");
         }
         catch (Exception ex)

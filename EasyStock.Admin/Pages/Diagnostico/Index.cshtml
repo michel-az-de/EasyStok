@@ -414,14 +414,14 @@
                     <option value="medium">Medium (3 tenants)</option>
                     <option value="large">Large (4 tenants — padrão)</option>
                 </select>
-                <button type="button" @@click="iniciarSeed('adminTestScenarios')" class="btn-secondary text-sm"
+                <button type="button" @@click="solicitarConfirmacao('adminTestScenarios')" class="btn-secondary text-sm"
                         title="4 tenants variados, 5 tickets, 3 notas. Sem produtos.">
                     🧪 Cenários Admin
                 </button>
-                <button type="button" @@click="iniciarSeed('demo')" class="btn-primary text-sm">
+                <button type="button" @@click="solicitarConfirmacao('demo')" class="btn-primary text-sm">
                     🚀 Seed demo
                 </button>
-                <button type="button" @@click="iniciarSeed('minimal')" class="btn-secondary text-sm">
+                <button type="button" @@click="solicitarConfirmacao('minimal')" class="btn-secondary text-sm">
                     ⚡ Seed mínimo
                 </button>
                 <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs ml-auto">→ Ver clientes</a>
@@ -458,6 +458,71 @@
                                   x-text="run.status"></span>
                         </div>
                     </template>
+                </div>
+            </div>
+
+            <!-- ─── Modal de confirmação (estilo Azure — digitar nome para confirmar) ───── -->
+            <div x-show="confirmModal" x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 style="background:rgba(0,0,0,.78); backdrop-filter:blur(4px)"
+                 @@keydown.escape.window="cancelarConfirmacao()">
+                <div class="rounded-2xl w-full max-w-lg flex flex-col"
+                     style="background:#1c1a17; border:1px solid rgba(247,242,232,0.12)">
+                    <!-- Cabeçalho com ícone de aviso -->
+                    <div class="flex items-start gap-3 px-6 py-4"
+                         style="border-bottom:1px solid rgba(247,242,232,0.08)">
+                        <div class="text-3xl shrink-0">⚠️</div>
+                        <div class="flex-1">
+                            <h3 class="text-es-ink font-bold text-base">Confirmar ação destrutiva</h3>
+                            <p class="text-es-ink-mute text-xs mt-1" x-text="confirmDesc"></p>
+                        </div>
+                    </div>
+                    <!-- Corpo: instrução + input -->
+                    <div class="px-6 py-4 space-y-3">
+                        <div class="rounded-lg px-3 py-2.5 text-xs"
+                             style="background:rgba(247,144,9,.06); border:1px solid rgba(247,144,9,.25)">
+                            <div class="text-amber-300 font-semibold mb-1">Esta ação é potencialmente destrutiva</div>
+                            <ul class="text-es-ink-mute text-[11px] space-y-0.5 list-disc pl-4">
+                                <li>Todos os registros marcados como <code class="text-es-accent">IsSeedData=true</code> serão deletados</li>
+                                <li>Dados reais de clientes <strong class="text-es-basil">não serão afetados</strong></li>
+                                <li>Operação transacional — rollback automático em caso de erro</li>
+                                <li>Log de auditoria completo será registrado em <code>SeedRunLogs</code></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-mono uppercase tracking-wide text-es-ink-mute mb-1.5">
+                                Para confirmar, digite <code class="text-es-accent font-bold" x-text="confirmKeyword"></code> abaixo:
+                            </label>
+                            <input type="text"
+                                   x-model="confirmInput"
+                                   x-ref="confirmInputRef"
+                                   class="form-input w-full font-mono text-sm"
+                                   :class="confirmInput === confirmKeyword ? 'border-es-basil' : ''"
+                                   :placeholder="confirmKeyword"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   @@keydown.enter="confirmInput === confirmKeyword && confirmarEExecutar()" />
+                            <div class="flex items-center gap-2 mt-1.5 text-[10px]"
+                                 :class="confirmInput.length === 0 ? 'text-es-ink-mute' : confirmInput === confirmKeyword ? 'text-es-basil' : 'text-amber-300'">
+                                <span x-show="confirmInput.length === 0" x-cloak>Aguardando entrada…</span>
+                                <span x-show="confirmInput.length > 0 && confirmInput !== confirmKeyword" x-cloak>✗ Não corresponde — verifique maiúsculas/minúsculas</span>
+                                <span x-show="confirmInput === confirmKeyword" x-cloak>✓ Correspondência exata — pode prosseguir</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Rodapé -->
+                    <div class="px-6 py-4 flex items-center justify-end gap-2"
+                         style="border-top:1px solid rgba(247,242,232,0.08)">
+                        <button type="button" @@click="cancelarConfirmacao()" class="btn-secondary text-sm">
+                            Cancelar
+                        </button>
+                        <button type="button"
+                                @@click="confirmarEExecutar()"
+                                :disabled="confirmInput !== confirmKeyword"
+                                class="btn-primary text-sm disabled:opacity-30 disabled:cursor-not-allowed">
+                            Executar <span x-text="confirmKeyword"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -843,6 +908,12 @@ function seedPanelV2() {
         // Status check
         enabled: null, loadingStatus: false, statusErro: '', diagnostico: null, counts: null,
         volume: 'large',
+        // Modal de confirmação (Azure-style: digitar palavra-chave)
+        confirmModal: false,
+        confirmTipo: '',
+        confirmKeyword: '',
+        confirmDesc: '',
+        confirmInput: '',
         // Modal de progresso
         modal: false, runId: null, poller: null,
         progress: 0, currentStep: 'Iniciando…', runStatus: 'Running',
@@ -853,6 +924,50 @@ function seedPanelV2() {
         async inicializar() {
             await this.carregarStatus();
             this.carregarHistorico();
+        },
+
+        // ── Confirmação Azure-style ──────────────────────────────────────────
+        solicitarConfirmacao(tipo) {
+            if (this.enabled === false) {
+                alert('Seed via API está desabilitado.\nDefina SEED_API_ENABLED=true (env) ou Seed:ApiEnabled=true (config) e reinicie a API.');
+                return;
+            }
+            const cfg = {
+                adminTestScenarios: {
+                    keyword: 'cenarios-admin',
+                    desc: 'Vai recriar 4 tenants de teste (Bistrô, Padaria, Café, Loja Do Zé) com tickets, notas e usuários — todos com email .test e flag IsSeedData=true.'
+                },
+                demo: {
+                    keyword: 'seed-demo-' + (this.volume || 'large'),
+                    desc: `Vai recriar empresas demo completas (PastaBella, Cantina Maurício, CasaDaBaba, MassasVeneza) — volume "${this.volume}". Inclui produtos, movimentações e vendas.`
+                },
+                minimal: {
+                    keyword: 'seed-minimal',
+                    desc: 'Vai recriar 1 admin + 1 empresa + 1 loja. Cenário mínimo de acesso.'
+                }
+            };
+            const c = cfg[tipo];
+            if (!c) return;
+            this.confirmTipo = tipo;
+            this.confirmKeyword = c.keyword;
+            this.confirmDesc = c.desc;
+            this.confirmInput = '';
+            this.confirmModal = true;
+            this.$nextTick(() => this.$refs.confirmInputRef?.focus());
+        },
+
+        cancelarConfirmacao() {
+            this.confirmModal = false;
+            this.confirmInput = '';
+            this.confirmTipo = '';
+        },
+
+        async confirmarEExecutar() {
+            if (this.confirmInput !== this.confirmKeyword) return;
+            const tipo = this.confirmTipo;
+            this.confirmModal = false;
+            this.confirmInput = '';
+            await this.iniciarSeed(tipo);
         },
 
         async carregarStatus() {
@@ -877,14 +992,7 @@ function seedPanelV2() {
         },
 
         async iniciarSeed(tipo) {
-            if (this.enabled === false) {
-                alert('Seed via API está desabilitado.\nDefina SEED_API_ENABLED=true (env) ou Seed:ApiEnabled=true (config) e reinicie a API.');
-                return;
-            }
-            const labels = { adminTestScenarios: 'Cenários Admin', demo: 'Seed demo', minimal: 'Seed mínimo' };
-            if (!confirm(`Executar "${labels[tipo] || tipo}"?\n\nApenas dados marcados como seed serão sobrescritos.\nDados reais de clientes não são afetados.`)) return;
-
-            // Abre modal e reinicia estado
+            // Confirmação já foi feita via modal Azure-style. Aqui só dispara o run.
             this.modal = true;
             this.runId = null;
             this.progress = 0;
