@@ -10,6 +10,15 @@ namespace EasyStock.Web.Controllers;
 [Authorize]
 public abstract class BaseController(SessionService session) : Controller
 {
+    // Controllers que podem ser acessados mesmo sem loja selecionada — usuário precisa
+    // chegar até a tela de Lojas para criar a primeira, e até Assinatura caso o trial
+    // tenha expirado. A lista é mantida pequena de propósito.
+    private static readonly HashSet<string> ControllersAllowedWithoutLoja = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Lojas",
+        "Assinatura"
+    };
+
     protected void Toast(string type, string message, string? undoUrl = null) =>
         TempData["Toast"] = undoUrl is not null ? $"{type}|{message}|{undoUrl}" : $"{type}|{message}";
 
@@ -43,8 +52,23 @@ public abstract class BaseController(SessionService session) : Controller
             return;
         }
 
+        // Bloqueia acesso a recursos transacionais quando não há loja selecionada.
+        // Sem loja, qualquer criação/edição cairia em estado inconsistente — empurra
+        // o usuário para o fluxo de seleção/criação de loja.
+        var lojaId = session.GetLojaId();
+        if (string.IsNullOrEmpty(lojaId))
+        {
+            var controllerName = context.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+            if (!ControllersAllowedWithoutLoja.Contains(controllerName))
+            {
+                TempData["Toast"] = "warning|Selecione ou cadastre uma loja para continuar.";
+                context.Result = RedirectToAction("SelecionarLoja", "Auth");
+                return;
+            }
+        }
+
         ViewBag.UsuarioNome = session.GetUsuarioNome();
-        ViewBag.LojaAtualId = session.GetLojaId();
+        ViewBag.LojaAtualId = lojaId;
         ViewBag.LojaAtualNome = session.GetLojaNome();
         ViewBag.LojaAtualEmoji = session.GetLojaEmoji() ?? "🏪";
         ViewBag.Role = session.GetUsuarioRole();

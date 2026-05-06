@@ -126,6 +126,10 @@
         <button @@click="activeTab='insights'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
             :class="activeTab==='insights' ? 'tab-active' : 'tab-inactive'">
             <span class="material-icons-round text-base align-middle mr-1">psychology</span>Insights
+            @if (overallStatus == "critical" || overallStatus == "degraded")
+            {
+                <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold" title="Estado crítico/degradado detectado">!</span>
+            }
             <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
                 x-text="patterns.length"></span>
         </button>
@@ -505,16 +509,38 @@
             <button @@click="fetchEndpoints()" :disabled="loadingEndpoints"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-lg transition">
                 <span class="material-icons-round text-base" :class="loadingEndpoints && 'animate-spin'">refresh</span>
-                Testar Todos
+                <span x-text="loadingEndpoints ? 'Testando...' : 'Testar Todos'">Testar Todos</span>
             </button>
         </div>
 
+        <!-- Loading -->
         <div x-show="loadingEndpoints && !endpoints" class="text-center py-12 text-slate-400">
             <span class="material-icons-round text-4xl animate-spin mb-2">hourglass_empty</span>
             <p>Testando endpoints...</p>
         </div>
 
-        <div x-show="endpoints" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <!-- Erro: API inacessível -->
+        <div x-show="!loadingEndpoints && !endpoints && endpointsError"
+             class="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+            <span class="material-icons-round text-4xl text-red-400 mb-2">cloud_off</span>
+            <p class="text-red-700 font-medium">Não foi possível testar os endpoints</p>
+            <p class="text-xs text-red-600 mt-1" x-text="endpointsError"></p>
+            <button @@click="fetchEndpoints()" :disabled="loadingEndpoints"
+                class="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-50">
+                <span class="material-icons-round text-sm" :class="loadingEndpoints && 'animate-spin'">refresh</span>
+                Tentar novamente
+            </button>
+        </div>
+
+        <!-- Resultados vazios (API respondeu mas sem itens) -->
+        <div x-show="!loadingEndpoints && endpoints && (endpoints.resultados?.length ?? 0) === 0"
+             class="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+            <span class="material-icons-round text-4xl text-slate-300 mb-2">inbox</span>
+            <p class="text-slate-600 font-medium">Nenhum endpoint configurado para teste</p>
+            <p class="text-xs text-slate-500 mt-1">A API respondeu, mas não retornou rotas para testar.</p>
+        </div>
+
+        <div x-show="endpoints && (endpoints.resultados?.length ?? 0) > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <template x-for="ep in endpoints?.resultados || []" :key="ep.rota">
                 <div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-2">
@@ -801,11 +827,62 @@
             <p>Analisando padroes...</p>
         </div>
 
-        <div x-show="!loadingLogs && patterns.length === 0" class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-            <span class="material-icons-round text-4xl text-green-400 mb-2">verified</span>
-            <p class="text-green-700 font-medium">Nenhum problema detectado</p>
-            <p class="text-xs text-green-600 mt-1">Os algoritmos de deteccao nao encontraram padroes anomalos nas ultimas 48h.</p>
-        </div>
+        @if (!apiOk)
+        {
+            <!-- API offline: análise indisponível -->
+            <div class="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+                <span class="material-icons-round text-4xl text-red-400 mb-2">cloud_off</span>
+                <p class="text-red-700 font-medium">Análise indisponível — API inacessível</p>
+                <p class="text-xs text-red-600 mt-1">Os algoritmos de detecção dependem de logs servidos pela API. Restaure a conexão para retomar a análise.</p>
+            </div>
+        }
+        else if (overallStatus == "critical" || overallStatus == "degraded")
+        {
+            <!-- API ok mas status global crítico/degradado: mostrar causas provaveis vindas da API -->
+            <div class="bg-red-50 border border-red-200 rounded-xl p-5 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="material-icons-round text-2xl @(overallStatus == "critical" ? "text-red-500" : "text-yellow-500")">@overallIcon</span>
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold @(overallStatus == "critical" ? "text-red-800" : "text-yellow-800")">@overallText</p>
+                        @if (Model is not null && Model.CausasProvaveis.Any())
+                        {
+                            <ul class="mt-2 space-y-1 text-xs text-slate-700">
+                                @foreach (var causa in Model.CausasProvaveis)
+                                {
+                                    <li class="flex gap-1.5">
+                                        <span class="material-icons-round text-sm @(causa.Severidade == "critical" ? "text-red-500" : causa.Severidade == "warning" ? "text-yellow-500" : "text-blue-500")">@(causa.Severidade == "critical" ? "error" : "warning")</span>
+                                        <div>
+                                            <span class="font-medium">@causa.Componente:</span>
+                                            <span>@causa.Descricao</span>
+                                            @if (!string.IsNullOrEmpty(causa.Sugestao))
+                                            {
+                                                <span class="text-slate-500"> &mdash; @causa.Sugestao</span>
+                                            }
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="text-xs text-slate-600 mt-1">Verifique a aba "Visao Geral" para detalhes do componente afetado.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div x-show="!loadingLogs && patterns.length === 0" class="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
+                <span class="material-icons-round text-3xl text-slate-300 mb-1">psychology_alt</span>
+                <p class="text-slate-600 text-sm">Nenhum padrão recorrente adicional detectado nas últimas 48h.</p>
+            </div>
+        }
+        else
+        {
+            <div x-show="!loadingLogs && patterns.length === 0" class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+                <span class="material-icons-round text-4xl text-green-400 mb-2">verified</span>
+                <p class="text-green-700 font-medium">Nenhum problema detectado</p>
+                <p class="text-xs text-green-600 mt-1">Os algoritmos de deteccao nao encontraram padroes anomalos nas ultimas 48h.</p>
+            </div>
+        }
 
         <!-- Patterns by Category -->
         <template x-for="category in patternCategories" :key="category.key">
@@ -905,6 +982,7 @@ function diagApp() {
 
         // Loading states
         loadingEndpoints: false,
+        endpointsError: '',
         loadingLogs: false,
         clearingLogs: false,
         clearLogsMsg: '',
@@ -936,6 +1014,9 @@ function diagApp() {
         healthChartInstance: null,
         errorsChartInstance: null,
         logVolumeChartInstance: null,
+
+        // Health-history auto-refresh interval (countdownInterval já declarado acima)
+        healthRefreshInterval: null,
 
         // Admin flag
         isAdmin: @(isAdmin ? "true" : "false"),
@@ -1013,8 +1094,9 @@ function diagApp() {
         },
 
         async init() {
-            // Start countdown
+            // Start countdown — guarda referencia para cleanup
             this.countdownInterval = setInterval(() => {
+                if (this.refreshing) return; // evita disparo duplicado se refresh em andamento
                 this.countdown--;
                 if (this.countdown <= 0) {
                     this.countdown = 60;
@@ -1030,8 +1112,16 @@ function diagApp() {
             this.fetchQueriesLentas();
             if (this.isAdmin) { this.fetchEnhancedLogs(); this.loadLixeira(); }
 
-            // Auto-refresh health history every 60s
-            setInterval(() => this.fetchHealthHistory(), 60000);
+            // Auto-refresh health history every 60s — referencia preservada para cleanup
+            this.healthRefreshInterval = setInterval(() => this.fetchHealthHistory(), 60000);
+
+            // Limpa timers se a aba/janela for fechada para evitar fetch zumbi após o user sair
+            window.addEventListener('beforeunload', () => this.cleanup());
+        },
+
+        cleanup() {
+            if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+            if (this.healthRefreshInterval) { clearInterval(this.healthRefreshInterval); this.healthRefreshInterval = null; }
         },
 
         async refreshAll() {
@@ -1049,10 +1139,23 @@ function diagApp() {
 
         async fetchEndpoints() {
             this.loadingEndpoints = true;
+            this.endpointsError = '';
             try {
                 const r = await fetch('/diagnostico/api/endpoints');
-                if (r.ok) this.endpoints = await r.json();
-            } catch (e) { console.error('endpoints fetch error', e); window.showToast && window.showToast('Erro ao carregar endpoints.', 'error'); }
+                if (r.ok) {
+                    this.endpoints = await r.json();
+                } else {
+                    this.endpoints = null;
+                    let msg = 'API inacessível (HTTP ' + r.status + ').';
+                    try { const data = await r.json(); if (data?.error) msg = data.error; } catch (e) { /* ignora json malformado */ }
+                    this.endpointsError = msg;
+                }
+            } catch (e) {
+                console.error('endpoints fetch error', e);
+                this.endpoints = null;
+                this.endpointsError = 'Falha de rede ao consultar a API.';
+                window.showToast && window.showToast('Erro ao carregar endpoints.', 'error');
+            }
             this.loadingEndpoints = false;
         },
 
@@ -1062,15 +1165,19 @@ function diagApp() {
                 if (r.ok) {
                     this.healthHistory = await r.json();
                     this.$nextTick(() => this.renderHealthChart());
+                } else {
+                    // 502 da API caiu — limpa para não exibir gráfico defasado como se fosse atual
+                    this.healthHistory = null;
                 }
-            } catch (e) { console.error('historico fetch error', e); window.showToast && window.showToast('Erro ao carregar histórico.', 'error'); }
+            } catch (e) { console.error('historico fetch error', e); this.healthHistory = null; window.showToast && window.showToast('Erro ao carregar histórico.', 'error'); }
         },
 
         async fetchSlo() {
             try {
                 const r = await fetch('/diagnostico/api/slo?hours=24');
                 if (r.ok) this.slo = await r.json();
-            } catch (e) { console.error('slo fetch error', e); window.showToast && window.showToast('Erro ao carregar SLO.', 'error'); }
+                else this.slo = null;
+            } catch (e) { console.error('slo fetch error', e); this.slo = null; window.showToast && window.showToast('Erro ao carregar SLO.', 'error'); }
         },
 
         async fetchEventos() {
@@ -1079,15 +1186,18 @@ function diagApp() {
                 if (r.ok) {
                     this.eventos = await r.json();
                     this.$nextTick(() => this.renderHealthChart());
+                } else {
+                    this.eventos = null;
                 }
-            } catch (e) { console.error('eventos fetch error', e); window.showToast && window.showToast('Erro ao carregar eventos.', 'error'); }
+            } catch (e) { console.error('eventos fetch error', e); this.eventos = null; window.showToast && window.showToast('Erro ao carregar eventos.', 'error'); }
         },
 
         async fetchQueriesLentas() {
             try {
                 const r = await fetch('/diagnostico/api/queries-lentas');
                 if (r.ok) this.queriesLentas = await r.json();
-            } catch (e) { console.error('queries-lentas fetch error', e); window.showToast && window.showToast('Erro ao carregar queries lentas.', 'error'); }
+                else this.queriesLentas = null;
+            } catch (e) { console.error('queries-lentas fetch error', e); this.queriesLentas = null; window.showToast && window.showToast('Erro ao carregar queries lentas.', 'error'); }
         },
 
         async fetchAcks() {

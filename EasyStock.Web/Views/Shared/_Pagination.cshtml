@@ -27,7 +27,14 @@
 @if (total > 1)
 {
     <nav class="pagination" aria-label="Paginação">
-        <a href="@buildHref(page - 1)" class="@(page == 1 ? "pg-disabled" : "")" aria-label="Anterior">‹</a>
+        @if (page == 1)
+        {
+            <span class="pg-disabled" aria-disabled="true" aria-label="Anterior (desabilitado)">‹</span>
+        }
+        else
+        {
+            <a href="@buildHref(page - 1)" aria-label="Anterior">‹</a>
+        }
         @if (from > 1)
         {
             <a href="@buildHref(1)">1</a>
@@ -49,6 +56,14 @@
             @if (to < total - 1) { <span class="pg-disabled">…</span> }
             <a href="@buildHref(total)">@total</a>
         }
-        <a href="@buildHref(page + 1)" class="@(page == total ? "pg-disabled" : "")" aria-label="Próxima">›</a>
+        @if (page == total)
+        {
+            <span class="pg-disabled" aria-disabled="true" aria-label="Próxima (desabilitado)">›</span>
+        }
+        else
+        {
+            <a href="@buildHref(page + 1)" aria-label="Próxima">›</a>
+        }
+        <span class="pg-info" aria-live="polite">Página @(page) de @total</span>
     </nav>
 }

@@ -140,17 +140,30 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
     [Authorize]
     [HttpGet("/auth/selecionar-loja")]
-    public IActionResult SelecionarLoja()
+    public async Task<IActionResult> SelecionarLoja()
     {
         if (!session.IsLoggedIn()) return RedirectToAction(nameof(Login));
 
+        // Sempre buscar lojas frescas da API — chegar aqui via menu/redirect não passa
+        // pelo Login, então TempData pode estar vazio e ainda assim haver lojas.
         var lojasJson = TempData["Lojas"] as string;
-        var lojas = string.IsNullOrEmpty(lojasJson)
-            ? new List<Loja>()
-            : JsonSerializer.Deserialize<List<Loja>>(lojasJson) ?? [];
+        List<Loja> lojas;
+        if (!string.IsNullOrEmpty(lojasJson))
+        {
+            lojas = JsonSerializer.Deserialize<List<Loja>>(lojasJson) ?? [];
+            TempData.Keep("Lojas");
+        }
+        else
+        {
+            var lojasResult = await api.GetAsync<List<Loja>>("lojas");
+            lojas = lojasResult.Success ? lojasResult.Data ?? [] : [];
+        }
 
-        // Keep for the POST
-        TempData.Keep("Lojas");
+        // SuperAdmin precisa enxergar o caminho para criar/vincular loja — não basta
+        // mostrar "nenhuma loja" sem ação. Para Admin/Operador a fonte correta é o
+        // gestor da empresa, mas o link para Logout segue disponível.
+        var role = session.GetUsuarioRole() ?? string.Empty;
+        ViewBag.PodeCriarLoja = role is "Admin" or "SuperAdmin";
         return View(lojas);
     }
 

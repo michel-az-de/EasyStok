@@ -2,6 +2,7 @@
 @{
     Layout = null;
     ViewBag.Title = "Selecionar Loja";
+    var podeCriarLoja = ViewBag.PodeCriarLoja == true;
 }
 <!DOCTYPE html>
 <html lang="pt-BR" class="h-full">
@@ -28,38 +29,79 @@
     <div class="w-full max-w-lg mx-auto px-4">
         <div class="text-center mb-8">
             <span class="text-4xl">🏪</span>
-            <h1 class="text-2xl font-extrabold auth-title mt-2">Selecione sua loja</h1>
-            <p class="auth-subtitle text-sm mt-1">Escolha qual loja você deseja gerenciar agora</p>
+            <h1 class="text-2xl font-extrabold auth-title mt-2">
+                @(Model.Any() ? "Selecione sua loja" : "Cadastre sua primeira loja")
+            </h1>
+            <p class="auth-subtitle text-sm mt-1">
+                @(Model.Any() ? "Escolha qual loja você deseja gerenciar agora" : "Você precisa de pelo menos uma loja vinculada para começar a usar o sistema")
+            </p>
         </div>
 
-        <div class="grid gap-3">
-            @foreach (var loja in Model)
-            {
-                <form asp-action="SelecionarLoja" asp-controller="Auth" method="post">
+        @if (Model.Any())
+        {
+            <div class="grid gap-3">
+                @foreach (var loja in Model)
+                {
+                    <form asp-action="SelecionarLoja" asp-controller="Auth" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="lojaId" value="@loja.Id" />
+                        <input type="hidden" name="lojaNome" value="@loja.Nome" />
+                        <input type="hidden" name="lojaEmoji" value="@loja.Emoji" />
+                        <input type="hidden" name="empresaId" value="@loja.EmpresaId" />
+                        <button type="submit" class="auth-loja-card w-full rounded-xl p-5 text-left flex items-center gap-4 transition-all shadow-sm group">
+                            <span class="text-3xl">@(loja.Emoji ?? "🏪")</span>
+                            <div>
+                                <div class="font-bold auth-card-title group-hover:text-indigo-500 transition-colors">@loja.Nome</div>
+                                <div class="auth-card-subtitle text-sm">@loja.Cidade · @loja.Plano</div>
+                            </div>
+                            <svg class="ml-auto w-5 h-5 auth-icon-muted group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </form>
+                }
+            </div>
+        }
+        else if (podeCriarLoja)
+        {
+            <div class="auth-card rounded-xl p-6">
+                <div class="flex items-start gap-3 mb-4 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);">
+                    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:#3b82f6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-xs auth-card-subtitle leading-relaxed">
+                        Sua conta de administrador ainda não tem nenhuma loja vinculada. Crie a primeira loja abaixo — você poderá adicionar mais depois em <strong>Configurações → Lojas</strong>.
+                    </p>
+                </div>
+                <form asp-action="Criar" asp-controller="Lojas" method="post" class="space-y-3">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="lojaId" value="@loja.Id" />
-                    <input type="hidden" name="lojaNome" value="@loja.Nome" />
-                    <input type="hidden" name="lojaEmoji" value="@loja.Emoji" />
-                    <input type="hidden" name="empresaId" value="@loja.EmpresaId" />
-                    <button type="submit" class="auth-loja-card w-full rounded-xl p-5 text-left flex items-center gap-4 transition-all shadow-sm group">
-                        <span class="text-3xl">@(loja.Emoji ?? "🏪")</span>
-                        <div>
-                            <div class="font-bold auth-card-title group-hover:text-indigo-500 transition-colors">@loja.Nome</div>
-                            <div class="auth-card-subtitle text-sm">@loja.Cidade · @loja.Plano</div>
-                        </div>
-                        <svg class="ml-auto w-5 h-5 auth-icon-muted group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
+                    <div>
+                        <label for="nome" class="block text-sm font-semibold auth-card-title mb-1">Nome da loja</label>
+                        <input id="nome" name="nome" type="text" required maxlength="80" autofocus
+                               placeholder="Ex.: Matriz Centro"
+                               class="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" />
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors">
+                        Criar loja e continuar
                     </button>
                 </form>
-            }
-        </div>
-
-        @if (!Model.Any())
+                <form asp-action="Logout" asp-controller="Auth" method="post" class="mt-3 text-center">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="text-xs auth-card-subtitle hover:underline">Sair desta conta</button>
+                </form>
+            </div>
+        }
+        else
         {
             <div class="auth-card rounded-xl p-8 text-center">
-                <p class="auth-card-subtitle">Nenhuma loja encontrada para este usuário.</p>
-                <form asp-action="Logout" asp-controller="Auth" method="post" class="mt-2">
+                <svg class="w-12 h-12 mx-auto mb-3 auth-icon-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <p class="auth-card-title font-semibold mb-1">Nenhuma loja vinculada à sua conta</p>
+                <p class="auth-card-subtitle text-sm mb-4">
+                    Você não tem permissão para criar lojas. Solicite ao administrador da sua empresa que vincule sua conta a uma loja existente.
+                </p>
+                <form asp-action="Logout" asp-controller="Auth" method="post">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="text-indigo-500 text-sm font-semibold hover:underline">Fazer logout</button>
                 </form>

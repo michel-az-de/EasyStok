@@ -32,6 +32,22 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
         Toast("success", $"Loja \"{nome.Trim()}\" criada!");
+
+        // Caso o usuário não tenha loja ativa (fluxo de onboarding após login sem
+        // lojas vinculadas), auto-seleciona a loja recém-criada para que o
+        // BaseController não bloqueie o acesso ao Dashboard.
+        if (string.IsNullOrEmpty(session.GetLojaId()))
+        {
+            var listaResult = await svc.ListarAsync();
+            if (listaResult.Success && listaResult.Data is { Count: > 0 } lojas)
+            {
+                var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nome.Trim(), StringComparison.OrdinalIgnoreCase))
+                    ?? lojas.Last();
+                session.SetLoja(nova.Id.ToString(), nova.Nome, null, nova.EmpresaId.ToString());
+                return RedirectToAction("Index", "Dashboard");
+            }
+        }
+
         return RedirectToAction(nameof(Index));
     }
 
