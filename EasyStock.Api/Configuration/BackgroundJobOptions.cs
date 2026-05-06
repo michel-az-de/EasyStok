@@ -17,4 +17,11 @@ public sealed class BackgroundJobOptions
     public bool EnableRelatorioMensalJob { get; set; }
     public bool EnableDiagnosticoEmailReport { get; set; }
     public bool EnableCobrancaAssinaturaJob { get; set; }
+
+    /// <summary>
+    /// Quando <c>true</c>, CobrancaAssinaturaJob envia emails de cobrança/dunning
+    /// diretamente via IEmailService (comportamento legado). Quando <c>false</c>
+    /// (padrão), publica EventoNotificacao e o Worker despacha via Outbox.
+    /// </summary>
+    public bool UseLegacyEmailAlerts { get; set; } = false;
 }

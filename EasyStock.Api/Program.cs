@@ -263,6 +263,17 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
     }
 
+    try
+    {
+        using var notifSeedScope = app.Services.CreateScope();
+        var notifDb = notifSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await NotificacoesGlobaisSeed.ExecutarAsync(notifDb, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Erro durante seed de notificações globais. Continuando.");
+    }
+
     // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).
     try
     {

@@ -1,15 +1,21 @@
+using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.BackgroundServices;
 
 public sealed class CobrancaAssinaturaJob(
     IServiceProvider serviceProvider,
+    IOptions<BackgroundJobOptions> options,
     ILogger<CobrancaAssinaturaJob> logger) : BackgroundService
 {
+    private readonly BackgroundJobOptions _options = options.Value;
     private const long LockKeyJob = 0x4B69_6C6C_4561_7379L; // arbitrary stable key
 
     private async Task RunWithAdvisoryLockAsync(long key, Func<CancellationToken, Task> action, CancellationToken ct)
@@ -113,6 +119,7 @@ public sealed class CobrancaAssinaturaJob(
         var cobrancaRepo = scope.ServiceProvider.GetRequiredService<ICobrancaAssinaturaRepository>();
         var pixService = scope.ServiceProvider.GetRequiredService<IEfiPixService>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+        var notificador = scope.ServiceProvider.GetRequiredService<INotificadorService>();
         var usuarioRepo = scope.ServiceProvider.GetRequiredService<IUsuarioRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
@@ -173,7 +180,7 @@ public sealed class CobrancaAssinaturaJob(
                 await cobrancaRepo.UpdateAsync(cobranca);
                 await unitOfWork.CommitAsync();
 
-                await EnviarEmailCobrancaAsync(emailService, usuarioRepo, assinatura, cobranca, ct);
+                await EnviarEmailCobrancaAsync(emailService, notificador, usuarioRepo, assinatura, cobranca, ct);
             }
             catch (Exception ex)
             {
@@ -217,6 +224,7 @@ public sealed class CobrancaAssinaturaJob(
         var cobrancaRepo = scope.ServiceProvider.GetRequiredService<ICobrancaAssinaturaRepository>();
         var usuarioRepo = scope.ServiceProvider.GetRequiredService<IUsuarioRepository>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+        var notificador = scope.ServiceProvider.GetRequiredService<INotificadorService>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         // Dias a esperar entre lembretes (D+1, D+3, D+7 = gaps de 1, 2, 4 dias)
@@ -244,7 +252,7 @@ public sealed class CobrancaAssinaturaJob(
                     && cobranca.UltimoLembreteEm.Value.Date == DateTime.UtcNow.Date)
                     continue;
 
-                await EnviarEmailDunningAsync(emailService, usuarioRepo, assinatura, cobranca, tentativa + 1, ct);
+                await EnviarEmailDunningAsync(emailService, notificador, usuarioRepo, assinatura, cobranca, tentativa + 1, ct);
                 cobranca.RegistrarLembrete();
                 await cobrancaRepo.UpdateAsync(cobranca);
                 logger.LogInformation("Dunning lembrete #{Num} enviado. EmpresaId={EmpresaId}", tentativa + 1, assinatura.EmpresaId);
@@ -289,6 +297,7 @@ public sealed class CobrancaAssinaturaJob(
 
     private async Task EnviarEmailDunningAsync(
         IEmailService emailService,
+        INotificadorService notificador,
         IUsuarioRepository usuarioRepo,
         Domain.Entities.AssinaturaEmpresa assinatura,
         Domain.Entities.CobrancaAssinatura cobranca,
@@ -301,18 +310,20 @@ public sealed class CobrancaAssinaturaJob(
             var admin = usuarios.FirstOrDefault();
             if (admin is null) return;
 
-            var valorFormatado = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
-            var urgencia = numeroLembrete switch
+            if (_options.UseLegacyEmailAlerts)
             {
-                1 => "Seu acesso está suspenso.",
-                2 => "⚠️ Segundo aviso — regularize sua assinatura.",
-                _ => "🚨 Último aviso antes do cancelamento definitivo."
-            };
-            var qrCodeImg = string.IsNullOrEmpty(cobranca.QrCodeBase64)
-                ? string.Empty
-                : $"<img src=\"data:image/png;base64,{cobranca.QrCodeBase64}\" alt=\"QR Code Pix\" style=\"width:200px;height:200px\" />";
+                var valorFormatado = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+                var urgencia = numeroLembrete switch
+                {
+                    1 => "Seu acesso está suspenso.",
+                    2 => "⚠️ Segundo aviso — regularize sua assinatura.",
+                    _ => "🚨 Último aviso antes do cancelamento definitivo."
+                };
+                var qrCodeImg = string.IsNullOrEmpty(cobranca.QrCodeBase64)
+                    ? string.Empty
+                    : $"<img src=\"data:image/png;base64,{cobranca.QrCodeBase64}\" alt=\"QR Code Pix\" style=\"width:200px;height:200px\" />";
 
-            var body = $@"
+                var body = $@"
 <html><body style=""font-family:sans-serif;max-width:600px;margin:auto"">
 <h2 style=""color:#dc2626"">EasyStock — Pagamento pendente</h2>
 <p>Olá, <strong>{admin.Nome}</strong>!</p>
@@ -324,16 +335,43 @@ public sealed class CobrancaAssinaturaJob(
 <p style=""color:#6b7280;font-size:12px"">Após o pagamento seu acesso será restaurado automaticamente em minutos.</p>
 </body></html>";
 
-            await emailService.SendAsync(admin.Email, $"EasyStock — Pagamento pendente (aviso {numeroLembrete}/3)", body, isHtml: true);
+                await emailService.SendAsync(admin.Email, $"EasyStock — Pagamento pendente (aviso {numeroLembrete}/3)", body, isHtml: true);
+            }
+            else
+            {
+                var urgencia = numeroLembrete switch
+                {
+                    1 => "Seu acesso está suspenso.",
+                    2 => "Segundo aviso — regularize sua assinatura.",
+                    _ => "Último aviso antes do cancelamento definitivo."
+                };
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    nome = admin.Nome,
+                    email = admin.Email,
+                    numero_lembrete = numeroLembrete,
+                    urgencia,
+                    valor = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR")),
+                    pix_copia_cola = cobranca.PixCopiaCola ?? string.Empty,
+                    qr_code = cobranca.QrCodeBase64 ?? string.Empty
+                });
+                await notificador.PublicarEventoAsync(
+                    TipoEventoNotificacao.AssinaturaExpirada,
+                    assinatura.EmpresaId,
+                    admin.Id,
+                    payload,
+                    ct: ct);
+            }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falha ao enviar email dunning #{Num} para empresa {EmpresaId}", numeroLembrete, assinatura.EmpresaId);
+            logger.LogWarning(ex, "Falha ao enviar dunning #{Num} para empresa {EmpresaId}", numeroLembrete, assinatura.EmpresaId);
         }
     }
 
     private async Task EnviarEmailCobrancaAsync(
         IEmailService emailService,
+        INotificadorService notificador,
         IUsuarioRepository usuarioRepo,
         AssinaturaEmpresa assinatura,
         CobrancaAssinatura cobranca,
@@ -345,13 +383,15 @@ public sealed class CobrancaAssinaturaJob(
             var admin = usuarios.FirstOrDefault();
             if (admin is null) return;
 
-            var vencimento = (assinatura.TrialFim ?? assinatura.DataFim)?.ToString("dd/MM/yyyy") ?? "em breve";
-            var valorFormatado = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
-            var qrCodeImg = string.IsNullOrEmpty(cobranca.QrCodeBase64)
-                ? string.Empty
-                : $"<img src=\"data:image/png;base64,{cobranca.QrCodeBase64}\" alt=\"QR Code Pix\" style=\"width:200px;height:200px\" />";
+            if (_options.UseLegacyEmailAlerts)
+            {
+                var vencimento = (assinatura.TrialFim ?? assinatura.DataFim)?.ToString("dd/MM/yyyy") ?? "em breve";
+                var valorFormatado = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+                var qrCodeImg = string.IsNullOrEmpty(cobranca.QrCodeBase64)
+                    ? string.Empty
+                    : $"<img src=\"data:image/png;base64,{cobranca.QrCodeBase64}\" alt=\"QR Code Pix\" style=\"width:200px;height:200px\" />";
 
-            var body = $@"
+                var body = $@"
 <html><body style=""font-family:sans-serif;max-width:600px;margin:auto"">
 <h2 style=""color:#4f46e5"">Renovação da sua assinatura EasyStock</h2>
 <p>Olá, <strong>{admin.Nome}</strong>!</p>
@@ -363,12 +403,32 @@ public sealed class CobrancaAssinaturaJob(
 <p style=""color:#6b7280;font-size:12px"">Após o pagamento, sua assinatura será renovada automaticamente por 30 dias.</p>
 </body></html>";
 
-            await emailService.SendAsync(admin.Email, "Renovação da sua assinatura EasyStock", body, isHtml: true);
-            logger.LogInformation("Email de cobrança enviado para {Email}, empresa {EmpresaId}", admin.Email, assinatura.EmpresaId);
+                await emailService.SendAsync(admin.Email, "Renovação da sua assinatura EasyStock", body, isHtml: true);
+                logger.LogInformation("Email de cobrança enviado para {Email}, empresa {EmpresaId}", admin.Email, assinatura.EmpresaId);
+            }
+            else
+            {
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    nome = admin.Nome,
+                    email = admin.Email,
+                    vencimento = (assinatura.TrialFim ?? assinatura.DataFim)?.ToString("dd/MM/yyyy") ?? "em breve",
+                    valor = cobranca.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR")),
+                    pix_copia_cola = cobranca.PixCopiaCola ?? string.Empty,
+                    qr_code = cobranca.QrCodeBase64 ?? string.Empty
+                });
+                await notificador.PublicarEventoAsync(
+                    TipoEventoNotificacao.AssinaturaExpirando,
+                    assinatura.EmpresaId,
+                    admin.Id,
+                    payload,
+                    ct: ct);
+                logger.LogInformation("Evento AssinaturaExpirando publicado para empresa {EmpresaId}", assinatura.EmpresaId);
+            }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falha ao enviar email de cobrança para empresa {EmpresaId}", assinatura.EmpresaId);
+            logger.LogWarning(ex, "Falha ao notificar cobrança para empresa {EmpresaId}", assinatura.EmpresaId);
         }
     }
 }
