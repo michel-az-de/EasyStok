@@ -81,15 +81,20 @@ app.MapRazorPages();
 // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
 app.MapGet("/api-proxy/dashboard-badges", async (
     EasyStock.Admin.Services.AdminApiClient api,
-    EasyStock.Admin.Services.AdminSessionService session) =>
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
 {
     if (string.IsNullOrEmpty(session.GetToken()))
         return Results.Unauthorized();
     try
     {
         var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/dashboard");
-        int G(string k) => data.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
-        decimal GD(string k) => data.TryGetProperty(k, out var v) ? v.GetDecimal() : 0m;
+        int G(string k) => data.TryGetProperty(k, out var v)
+            && v.ValueKind == System.Text.Json.JsonValueKind.Number
+            && v.TryGetInt32(out var n) ? n : 0;
+        decimal GD(string k) => data.TryGetProperty(k, out var v)
+            && v.ValueKind == System.Text.Json.JsonValueKind.Number
+            && v.TryGetDecimal(out var d) ? d : 0m;
         return Results.Ok(new
         {
             totalTenants              = G("totalTenants"),
@@ -105,22 +110,24 @@ app.MapGet("/api-proxy/dashboard-badges", async (
             receitaMensalEstimada     = GD("receitaMensalEstimada")
         });
     }
-    catch
+    catch (EasyStock.Admin.Services.SessionExpiredException)
     {
-        return Results.Ok(new
-        {
-            totalTenants = 0, tenantsAtivos = 0, tenantsSuspensos = 0, tenantsNovos = 0,
-            ticketsAbertos = 0, ticketsCriticos = 0, ticketsEmAtendimento = 0,
-            ticketsComNovaMensagem = 0, totalUsuariosAtivos = 0, logins24h = 0,
-            receitaMensalEstimada = 0m
-        });
+        return Results.Unauthorized();
+    }
+    catch (Exception ex)
+    {
+        // Antes devolvia 200 OK com tudo zerado, mascarando outage como "estado real".
+        // Agora 502 sinaliza falha pro JS do front exibir "atualizando…" em vez de "tudo zero".
+        log.LogError(ex, "Proxy dashboard-badges: falha ao consultar API");
+        return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
 
 // Proxy endpoint para Status Page (polling JS a cada 30s)
 app.MapGet("/api-proxy/status", async (
     EasyStock.Admin.Services.AdminApiClient api,
-    EasyStock.Admin.Services.AdminSessionService session) =>
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
 {
     if (string.IsNullOrEmpty(session.GetToken()))
         return Results.Unauthorized();
@@ -129,9 +136,14 @@ app.MapGet("/api-proxy/status", async (
         var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/status");
         return Results.Ok(data);
     }
-    catch
+    catch (EasyStock.Admin.Services.SessionExpiredException)
     {
-        return Results.Ok(new { });
+        return Results.Unauthorized();
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Proxy status: falha ao consultar API");
+        return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
 
@@ -139,13 +151,29 @@ app.MapGet("/api-proxy/status", async (
 app.MapGet("/api-proxy/audit-logs-csv", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
-    HttpContext ctx) =>
+    HttpContext ctx,
+    ILogger<Program> log) =>
 {
     if (string.IsNullOrEmpty(session.GetToken()))
         return Results.Unauthorized();
-    var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-    var (bytes, ct) = await api.GetBytesAsync($"api/admin/audit-logs?{qs}");
-    return Results.File(bytes, ct, "admin-audit-logs.csv");
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var (bytes, ct) = await api.GetBytesAsync($"api/admin/audit-logs?{qs}");
+        return Results.File(bytes, ct, "admin-audit-logs.csv");
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException)
+    {
+        return Results.Unauthorized();
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Proxy audit-logs-csv: falha ao baixar CSV");
+        return Results.Problem(
+            title: "Erro ao gerar CSV",
+            detail: "Não foi possível obter os logs de auditoria. Tente novamente em instantes.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
 });
 
 app.Run();

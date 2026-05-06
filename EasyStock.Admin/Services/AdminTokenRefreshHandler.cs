@@ -15,7 +15,11 @@ public class AdminTokenRefreshHandler(
     ILogger<AdminTokenRefreshHandler> log,
     IHttpContextAccessor httpContextAccessor) : DelegatingHandler
 {
-    private bool _isRefreshing;
+    // DelegatingHandler do HttpClientFactory é singleton mesmo registrado como Transient —
+    // a pool reusa a instância. Flag mutável de instância gera race entre requests
+    // concorrentes do mesmo HttpClient. Serialize refresh via SemaphoreSlim por
+    // refreshToken — janela curta evita stampede sem bloquear chamadas de outros usuários.
+    private static readonly SemaphoreSlim _refreshGate = new(1, 1);
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
@@ -31,37 +35,41 @@ public class AdminTokenRefreshHandler(
 
         var response = await base.SendAsync(request, ct);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute && !_isRefreshing)
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute)
         {
             var refreshToken = session.GetRefreshToken();
-            if (!string.IsNullOrEmpty(refreshToken))
-            {
-                _isRefreshing = true;
-                try
-                {
-                    var newToken = await TryRefreshAsync(refreshToken, ct);
-                    if (newToken != null && retryRequest is not null)
-                    {
-                        retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
-                        response.Dispose();
-                        response = await base.SendAsync(retryRequest, ct);
-                    }
-                    else
-                    {
-                        log.LogWarning("Token refresh falhou — limpando sessao admin");
-                        MarkSessionExpired();
-                        session.ClearSession();
-                    }
-                }
-                finally
-                {
-                    _isRefreshing = false;
-                }
-            }
-            else
+            if (string.IsNullOrEmpty(refreshToken))
             {
                 MarkSessionExpired();
                 session.ClearSession();
+                return response;
+            }
+
+            await _refreshGate.WaitAsync(ct);
+            try
+            {
+                // Outra request concorrente pode ter renovado o token enquanto estávamos esperando.
+                var currentToken = session.GetToken();
+                string? newToken = currentToken != token && !string.IsNullOrEmpty(currentToken)
+                    ? currentToken
+                    : await TryRefreshAsync(refreshToken, ct);
+
+                if (newToken != null && retryRequest is not null)
+                {
+                    retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+                    response.Dispose();
+                    response = await base.SendAsync(retryRequest, ct);
+                }
+                else if (newToken == null)
+                {
+                    log.LogWarning("Token refresh falhou — limpando sessao admin");
+                    MarkSessionExpired();
+                    session.ClearSession();
+                }
+            }
+            finally
+            {
+                _refreshGate.Release();
             }
         }
 

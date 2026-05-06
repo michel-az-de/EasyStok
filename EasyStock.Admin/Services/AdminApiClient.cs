@@ -67,10 +67,25 @@ public class AdminApiClient(HttpClient httpClient)
         return UnwrapData<T>(json.RootElement);
     }
 
+    /// <summary>
+    /// Mantém o envelope cru pra o caller inspecionar `error`/`data` (usado pelo
+    /// Login que precisa diferenciar credenciais inválidas de outros erros).
+    /// Não faz EnsureSuccessStatusCode; apenas diferencia 401 (sessão expirada).
+    /// Caller é responsável por checar `error` no payload retornado.
+    /// </summary>
     public async Task<JsonElement> PostRawAsync(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        ThrowIfUnauthorized(response);
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            // Sem corpo: gera envelope sintético com `error` para o caller tratar.
+            var fallback = $"{{\"error\":{{\"code\":\"EMPTY_RESPONSE\",\"message\":\"HTTP {(int)response.StatusCode} sem corpo.\"}}}}";
+            using var fb = JsonDocument.Parse(fallback);
+            return fb.RootElement.Clone();
+        }
+        using var json = JsonDocument.Parse(content);
         return json.RootElement.Clone();
     }
 

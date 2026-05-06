@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Tenants;
 
-public class DetailModel(AdminApiClient api, AdminSessionService session, IConfiguration config) : AdminPageBase(session)
+public class DetailModel(AdminApiClient api, AdminSessionService session, IConfiguration config, ILogger<DetailModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
@@ -29,44 +29,101 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     public IEnumerable<JsonElement> PlanosList { get; private set; } = Enumerable.Empty<JsonElement>();
     public IEnumerable<JsonElement> Features { get; private set; } = Enumerable.Empty<JsonElement>();
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync()
     {
+        if (Id == Guid.Empty) return NotFound();
         try
         {
             TenantData = await api.GetAsync<JsonElement>($"api/admin/tenants/{Id}");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao carregar tenant {TenantId}", Id);
+            Erro = "Não foi possível carregar este tenant. Verifique se ele ainda existe.";
+            return Page();
+        }
+
+        // Falhas em planos/features são degradação parcial — não bloqueia a página.
+        try
+        {
             var planosRaw = await api.GetAsync<JsonElement>("api/admin/planos");
             PlanosList = planosRaw.ValueKind == JsonValueKind.Array
                 ? planosRaw.EnumerateArray().ToList()
                 : Enumerable.Empty<JsonElement>();
+        }
+        catch (Exception ex) { log.LogWarning(ex, "Falha ao carregar planos no detail do tenant {TenantId}", Id); }
 
+        try
+        {
             var featuresRaw = await api.GetRawAsync($"api/admin/tenants/{Id}/features");
             Features = featuresRaw.TryGetProperty("data", out var fd)
                 ? fd.EnumerateArray().ToList()
                 : Enumerable.Empty<JsonElement>();
         }
-        catch (Exception ex) { Erro = ex.Message; }
+        catch (Exception ex) { log.LogWarning(ex, "Falha ao carregar features do tenant {TenantId}", Id); }
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostSuspenderAsync(string motivo)
     {
-        await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
-            new { status = "Suspensa", motivo });
-        SetSucesso("Tenant suspenso com sucesso.");
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 3)
+        {
+            SetErro("Informe um motivo com pelo menos 3 caracteres.");
+            return RedirectToPage(new { Id });
+        }
+        try
+        {
+            await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
+                new { status = "Suspensa", motivo = motivoT });
+            SetSucesso("Tenant suspenso com sucesso.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao suspender tenant {TenantId}", Id);
+            SetErro($"Falha ao suspender tenant: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostReativarAsync()
     {
-        await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
-            new { status = "Ativa", motivo = "Reativado pelo admin" });
-        SetSucesso("Tenant reativado com sucesso.");
+        try
+        {
+            await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/status",
+                new { status = "Ativa", motivo = "Reativado pelo admin" });
+            SetSucesso("Tenant reativado com sucesso.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao reativar tenant {TenantId}", Id);
+            SetErro($"Falha ao reativar tenant: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostTrocarPlanoAsync(Guid planoId)
     {
-        await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/plano", new { planoId });
-        SetSucesso("Plano alterado com sucesso.");
+        if (planoId == Guid.Empty)
+        {
+            SetErro("Selecione um plano válido.");
+            return RedirectToPage(new { Id });
+        }
+        try
+        {
+            await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/plano", new { planoId });
+            SetSucesso("Plano alterado com sucesso.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao trocar plano do tenant {TenantId} para {PlanoId}", Id, planoId);
+            SetErro($"Falha ao trocar plano: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 
@@ -76,12 +133,24 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         {
             var result = await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/impersonate", new { });
             var token = result.TryGetProperty("token", out var t) ? t.GetString() : null;
-            if (string.IsNullOrEmpty(token)) { SetErro("Falha ao gerar token de impersonação."); return RedirectToPage(new { Id }); }
-            var webUrl = config["EasyStockWebUrl"]?.TrimEnd('/') ?? "https://localhost:7001";
+            if (string.IsNullOrEmpty(token))
+            {
+                SetErro("Falha ao gerar token de impersonação.");
+                return RedirectToPage(new { Id });
+            }
+            var webUrl = IndexModel.ResolveWebUrl(config);
+            if (webUrl is null)
+            {
+                log.LogError("EasyStockWebUrl ausente ou inválido — impossível fazer handoff de impersonation.");
+                SetErro("Configuração de URL do EasyStock.Web inválida. Contate o administrador do sistema.");
+                return RedirectToPage(new { Id });
+            }
             return Content(IndexModel.BuildHandoffHtml(webUrl, token), "text/html; charset=utf-8");
         }
+        catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
+            log.LogError(ex, "Falha ao impersonar tenant {TenantId}", Id);
             SetErro($"Falha ao impersonar: {ex.Message}");
             return RedirectToPage(new { Id });
         }
@@ -89,22 +158,65 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
 
     public async Task<IActionResult> OnPostConcederTrialAsync(int diasTrial)
     {
-        try { await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/trial", new { diasTrial }); }
-        catch (Exception ex) { Erro = ex.Message; }
+        if (diasTrial is < 1 or > 365)
+        {
+            SetErro("Dias de trial deve estar entre 1 e 365.");
+            return RedirectToPage(new { Id });
+        }
+        try
+        {
+            await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/trial", new { diasTrial });
+            SetSucesso($"Trial de {diasTrial} dias concedido.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao conceder trial ({Dias}d) ao tenant {TenantId}", diasTrial, Id);
+            SetErro($"Falha ao conceder trial: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostAplicarCupomAsync(string codigo)
     {
-        try { await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/aplicar-cupom", new { codigo }); }
-        catch (Exception ex) { Erro = ex.Message; }
+        var codigoT = (codigo ?? "").Trim();
+        if (codigoT.Length is < 3 or > 50)
+        {
+            SetErro("Código do cupom deve ter entre 3 e 50 caracteres.");
+            return RedirectToPage(new { Id });
+        }
+        try
+        {
+            await api.PostAsync<JsonElement>($"api/admin/tenants/{Id}/aplicar-cupom", new { codigo = codigoT });
+            SetSucesso($"Cupom \"{codigoT}\" aplicado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao aplicar cupom {Codigo} ao tenant {TenantId}", codigoT, Id);
+            SetErro($"Falha ao aplicar cupom: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 
     public async Task<IActionResult> OnPostToggleFeatureAsync(string feature, bool ativo)
     {
-        try { await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/features/{feature}", new { ativo }); }
-        catch (Exception ex) { Erro = ex.Message; }
+        if (string.IsNullOrWhiteSpace(feature) || feature.Length > 80 || !System.Text.RegularExpressions.Regex.IsMatch(feature, "^[a-zA-Z0-9._-]+$"))
+        {
+            SetErro("Nome de feature inválido.");
+            return RedirectToPage(new { Id });
+        }
+        try
+        {
+            await api.PatchAsync<JsonElement>($"api/admin/tenants/{Id}/features/{Uri.EscapeDataString(feature)}", new { ativo });
+            SetSucesso($"Feature \"{feature}\" {(ativo ? "ativada" : "desativada")}.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao alternar feature {Feature} do tenant {TenantId}", feature, Id);
+            SetErro($"Falha ao alterar feature: {ex.Message}");
+        }
         return RedirectToPage(new { Id });
     }
 }
