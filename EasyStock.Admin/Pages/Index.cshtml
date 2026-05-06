@@ -11,18 +11,24 @@
     </div>
 }
 
+@{
+    // Cultura do thread é pt-BR (Program.cs) → ToString() default usa vírgula decimal,
+    // o que quebra Object.assign inline (vira "1500,50" em vez de "1500.50" → syntax
+    // error JS). Force InvariantCulture nos números pra emitir JSON-safe.
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+}
 <!-- Container reativo — usa $root.dash do adminApp() no body, seed com valores server-side -->
 <div x-init="Object.assign($root.dash, {
-    tenantsAtivos: @Model.TenantsAtivos,
-    totalTenants: @Model.TotalTenants,
-    tenantsSuspensos: @Model.TenantsSuspensos,
-    tenantsNovos: @Model.TenantsNovos,
-    ticketsAbertos: @Model.TicketsAbertos,
-    ticketsCriticos: @Model.TicketsCriticos,
-    ticketsEmAtendimento: @Model.TicketsEmAtendimento,
-    totalUsuariosAtivos: @Model.TotalUsuariosAtivos,
-    logins24h: @Model.Logins24h,
-    receitaMensalEstimada: @((double)Model.ReceitaMensal)
+    tenantsAtivos: @Model.TenantsAtivos.ToString(inv),
+    totalTenants: @Model.TotalTenants.ToString(inv),
+    tenantsSuspensos: @Model.TenantsSuspensos.ToString(inv),
+    tenantsNovos: @Model.TenantsNovos.ToString(inv),
+    ticketsAbertos: @Model.TicketsAbertos.ToString(inv),
+    ticketsCriticos: @Model.TicketsCriticos.ToString(inv),
+    ticketsEmAtendimento: @Model.TicketsEmAtendimento.ToString(inv),
+    totalUsuariosAtivos: @Model.TotalUsuariosAtivos.ToString(inv),
+    logins24h: @Model.Logins24h.ToString(inv),
+    receitaMensalEstimada: @Model.ReceitaMensal.ToString(inv)
 })">
 
     <!-- Indicador de atualização -->
