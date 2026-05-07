@@ -1,0 +1,99 @@
+@{
+    Layout = "_LayoutSite";
+    ViewBag.Title = "Precos";
+    ViewBag.Description = "EasyStok: 14 dias gratis. R$ 79/mes founder por 6 meses ou R$ 149/mes plano regular.";
+}
+
+<section class="site-section">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Precos</span>
+            <h2>Comece <span class="hl">gratis</span>. Pague so quando fizer sentido.</h2>
+            <p>Sem cartao no cadastro. Sem fidelidade. Cancela na propria conta.</p>
+        </div>
+
+        <div class="site-pricing">
+            <article class="site-plan">
+                <span class="site-plan-name">Inicial · 14 dias</span>
+                <h3 class="site-plan-headline">Tirar a planilha do meio.</h3>
+                <div class="site-plan-price">
+                    <span class="num">R$ 0</span>
+                    <span class="per">/ trial</span>
+                </div>
+                <p class="site-plan-meta">Tudo desbloqueado no trial. Cancela quando quiser.</p>
+                <ul>
+                    <li>1 loja, ate 100 produtos</li>
+                    <li>Validade, lote, entrada/saida</li>
+                    <li>Web + celular (PWA)</li>
+                    <li>Suporte por WhatsApp</li>
+                    <li>Exporta tudo em CSV</li>
+                </ul>
+                <a href="/auth/registrar?origem=precos-inicial" class="btn btn-secondary" data-track="precos-inicial">Comecar gratis</a>
+            </article>
+
+            <article class="site-plan featured">
+                <span class="site-plan-tag">Founder · 10 vagas</span>
+                <span class="site-plan-name">Foodservice</span>
+                <h3 class="site-plan-headline">Operacao real, multi-loja, equipe.</h3>
+                <div class="site-plan-price">
+                    <span class="crossed">R$ 149</span>
+                    <span class="num">R$ 79</span>
+                    <span class="per">/ mes · 6 meses</span>
+                </div>
+                <p class="site-plan-meta">Preco trava por 6 meses. Vagas founder limitadas.</p>
+                <ul>
+                    <li>Lojas e produtos ilimitados</li>
+                    <li>Auditoria completa (quem mexeu)</li>
+                    <li>Notificacao de validade por WhatsApp</li>
+                    <li>Multi-usuario com perfil de acesso</li>
+                    <li>Onboarding 1:1 com gente real</li>
+                    <li>Acesso direto ao Felipe (founder)</li>
+                </ul>
+                <a href="/auth/registrar?origem=precos-founder" class="btn btn-primary" data-track="precos-founder">Quero ser founder</a>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="site-section site-section--alt">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Comparativo</span>
+            <h2>O que esta incluso <span class="hl">em cada plano</span>.</h2>
+        </div>
+
+        <div class="site-faq" style="max-width:820px">
+            <details open>
+                <summary>O que muda do trial pro plano Foodservice?</summary>
+                <p>O trial libera todas as features por 14 dias, com limite de 1 loja e 100 SKUs. O Foodservice tira esses limites e adiciona auditoria, notificacao de validade por WhatsApp, multi-usuario com perfil e onboarding 1:1.</p>
+            </details>
+            <details>
+                <summary>Posso ficar so no trial pra sempre?</summary>
+                <p>O trial dura 14 dias. Depois disso, voce escolhe um plano (R$ 79 founder ou R$ 149 regular) ou exporta os dados e cancela. Nao convertemos cobranca automatica sem voce confirmar.</p>
+            </details>
+            <details>
+                <summary>Tem desconto pra anual?</summary>
+                <p>Hoje so cobramos mensal. Se voce quer pagar 6 ou 12 meses adiantado pra travar preco menor, fala com a gente — ajustamos no contrato.</p>
+            </details>
+            <details>
+                <summary>O preco founder e pra sempre?</summary>
+                <p>Nao. R$ 79/mes trava por 6 meses. Apos isso, sobe pro preco vigente do plano Foodservice. Se voce participa ativamente do feedback, voce continua na lista de founders pra travar promo no proximo ciclo.</p>
+            </details>
+            <details>
+                <summary>Aceitam Pix? Boleto? Cartao?</summary>
+                <p>Pix e cartao na primeira fase. Boleto sob pedido (PJ). Folha de pagamento futura.</p>
+            </details>
+        </div>
+    </div>
+</section>
+
+<section class="site-final">
+    <div class="site-container site-final-inner">
+        <h2>Sem letra miuda. <span class="hl">Sem surpresa.</span></h2>
+        <p>Voce paga so quando fizer sentido. Cancelamento e em 1 clique.</p>
+        <div class="site-hero-ctas" style="justify-content:center">
+            <a href="/auth/registrar?origem=precos-final" class="btn btn-primary btn-lg">Comecar trial gratis</a>
+            <a href="/contato?assunto=Quero conversar sobre planos" class="btn-link">Falar com a gente</a>
+        </div>
+    </div>
+</section>

@@ -868,7 +868,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Valor")
-                        .HasColumnType("decimal(14,2)");
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 

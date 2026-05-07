@@ -1,0 +1,68 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject Microsoft.Extensions.Options.IOptions<EasyStock.Web.Services.MarketingOptions> MarketingOpts
+@{
+    var marketing = MarketingOpts.Value;
+    var antiForgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var pageTitle = ViewBag.Title is string t && !string.IsNullOrWhiteSpace(t)
+        ? $"{t} — EasyStok"
+        : "EasyStok — Estoque vivo em 7 dias";
+    var pageDescription = ViewBag.Description as string
+        ?? "Controle de estoque, validade e movimentação para foodservice. Em 7 dias seu estoque vivo no celular. 14 dias grátis.";
+    var canonical = ViewBag.Canonical as string
+        ?? $"https://{marketing.DominioPublico}{Context.Request.Path}";
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@pageTitle</title>
+    <meta name="description" content="@pageDescription" />
+    <meta name="csrf-token" content="@antiForgeryToken" />
+    <link rel="canonical" href="@canonical" />
+
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@pageDescription" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="@canonical" />
+    <meta property="og:image" content="@($"https://{marketing.DominioPublico}/img/og-easystok.png")" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@@400;500;600;700;800&family=Fraunces:opsz,wght@@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@@400;500&display=swap" rel="stylesheet" />
+
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @RenderSection("Styles", required: false)
+</head>
+<body class="site-body">
+    <a href="#site-main" class="skip-link">Pular para o conteudo</a>
+
+    @await Html.PartialAsync("_HeaderSite", marketing)
+
+    <main id="site-main" tabindex="-1">
+        @if (TempData["Toast"] is string toastRaw && !string.IsNullOrWhiteSpace(toastRaw))
+        {
+            var toastParts = toastRaw.Split('|', 2);
+            var toastType = toastParts.Length > 0 ? toastParts[0] : "info";
+            var toastMsg = toastParts.Length > 1 ? toastParts[1] : toastRaw;
+            <div class="site-toast site-toast--@toastType" role="status" aria-live="polite">
+                <span>@toastMsg</span>
+                <button type="button" class="site-toast-close" aria-label="Fechar">×</button>
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    @await Html.PartialAsync("_FooterSite", marketing)
+    @await Html.PartialAsync("_WhatsAppFloat", marketing)
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

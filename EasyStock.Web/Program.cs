@@ -87,6 +87,10 @@ builder.Services.AddScoped<MobileDevicesService>();
 builder.Services.AddScoped<MobileProductsService>();
 builder.Services.AddScoped<OperacaoMobileService>();
 
+// 6b. Marketing options + Leads API service (landing publica)
+builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));
+builder.Services.AddScoped<LeadsApiService>();
+
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>
 {
@@ -165,9 +169,13 @@ app.UseAuthentication();
 app.UseMiddleware<SessionRestoreMiddleware>(); // Restaura sessão do _rt cookie após deploys
 app.UseAuthorization();
 
+// Roteamento — landing publica e raiz; Dashboard e o resto via path explicito.
+// Quando os dois dominios forem ativados (easystok.com.br + app.easystok.com.br),
+// adicionar middleware/RequireHost aqui para separar publico de autenticado.
+// SiteController tem [Route("/")] e redireciona pra Dashboard se ja autenticado.
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Dashboard}/{action=Index}/{id?}");
+    pattern: "{controller=Site}/{action=Index}/{id?}");
 
 // Health check — exigido pelo Dockerfile.Web e pelo Azure App Service
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))

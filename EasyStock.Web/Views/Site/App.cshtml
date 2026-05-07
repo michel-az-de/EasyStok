@@ -1,0 +1,164 @@
+@{
+    Layout = "_LayoutSite";
+    ViewBag.Title = "EasyStok no celular";
+    ViewBag.Description = "EasyStok roda no celular (PWA), Android (APK) e desktop. Mesma conta, dados sincronizados.";
+}
+
+<section class="site-hero" style="padding:64px 0 72px">
+    <div class="site-hero-curve"></div>
+    <div class="site-container site-app-hero">
+        <div>
+            <span class="site-hero-pill"><span class="pulse"></span> Mobile-first · funciona offline</span>
+            <h1 style="font-size:clamp(32px,4.6vw,56px)">
+                Estoque vivo <span class="hl">no bolso</span>, na cozinha.
+            </h1>
+            <p class="site-hero-lead">
+                EasyStok roda como app no celular Android (APK ou PWA) e como app web no desktop. Mesma conta, mesmos dados, sincronia automatica. Voce escolhe o dispositivo.
+            </p>
+            <div class="site-hero-ctas">
+                <a href="/auth/registrar?origem=app-android" class="btn btn-primary btn-lg" data-track="app-android">
+                    Instalar agora · gratis
+                </a>
+                <a href="#telas" class="btn-link">Ver as 5 telas →</a>
+            </div>
+            <div class="site-hero-trust">
+                <span class="it"><span class="check">✓</span> Funciona offline</span>
+                <span class="it"><span class="check">✓</span> Sincronia automatica</span>
+                <span class="it"><span class="check">✓</span> Web + Android</span>
+            </div>
+        </div>
+
+        <div class="site-phone" aria-hidden="true">
+            <div class="site-phone-screen">
+                <div class="site-phone-status"><span>14:32</span><span>•••</span></div>
+                <div class="site-phone-head">
+                    <div class="h-title">Produtos</div>
+                    <div class="h-sub">38 ativos · 4 alertas</div>
+                </div>
+                <div class="site-phone-list">
+                    <div class="site-phone-item">
+                        <div class="site-phone-glyph"></div>
+                        <div><div class="pname">Frango desfiado</div><div class="pmeta">Lote 24A · em estoque</div></div>
+                        <div class="pqty">12,4 kg</div>
+                    </div>
+                    <div class="site-phone-item">
+                        <div class="site-phone-glyph warn"></div>
+                        <div><div class="pname">Creme de leite</div><div class="pmeta" style="color:var(--warn-700)">Vence em 5 dias</div></div>
+                        <div class="pqty" style="color:var(--warn-700)">8 un.</div>
+                    </div>
+                    <div class="site-phone-item">
+                        <div class="site-phone-glyph crit"></div>
+                        <div><div class="pname">Embalagem 500 ml</div><div class="pmeta" style="color:var(--crit-700)">Critico · min. 50 un.</div></div>
+                        <div class="pqty" style="color:var(--crit-700)">12 un.</div>
+                    </div>
+                    <div class="site-phone-item">
+                        <div class="site-phone-glyph"></div>
+                        <div><div class="pname">Pao de hamburguer</div><div class="pmeta">SKU-1088</div></div>
+                        <div class="pqty">86 un.</div>
+                    </div>
+                </div>
+                <div class="site-phone-tabbar">
+                    <div class="site-phone-tab active"><div class="tg"></div>Produtos</div>
+                    <div class="site-phone-tab"><div class="tg"></div>Critico</div>
+                    <div class="site-phone-tab"><div class="tg"></div>Mover</div>
+                    <div class="site-phone-tab"><div class="tg"></div>Validade</div>
+                    <div class="site-phone-tab"><div class="tg"></div>Mais</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="site-section" id="telas">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">5 telas, dia-a-dia inteiro</span>
+            <h2>Tudo que a cozinha <span class="hl">precisa</span>, em 5 tiles.</h2>
+            <p>Sem menu enorme. Sem manual de 80 paginas. A primeira tela ja resolve 80% do uso.</p>
+        </div>
+
+        <div class="site-fornot">
+            <div class="col yes">
+                <h3>1. Produtos</h3>
+                <p class="sub">Lista filtrada por crítico, validade ou categoria.</p>
+                <ul>
+                    <li>Estoque atual e minimo</li>
+                    <li>Status visual (crítico, vencendo, OK)</li>
+                    <li>Busca rapida</li>
+                </ul>
+            </div>
+            <div class="col yes">
+                <h3>2. Critico</h3>
+                <p class="sub">O que falta agora, quanto falta, quanto repor.</p>
+                <ul>
+                    <li>Reposicao em 1 toque</li>
+                    <li>Atalho pra lista de compras</li>
+                </ul>
+            </div>
+            <div class="col yes">
+                <h3>3. Validade</h3>
+                <p class="sub">Janela de 7 dias, ordenado por urgencia.</p>
+                <ul>
+                    <li>Lote + data + dias restantes</li>
+                    <li>Alerta automatico antes de vencer</li>
+                </ul>
+            </div>
+            <div class="col yes">
+                <h3>4. Mover</h3>
+                <p class="sub">Entrada e saida em 2 toques.</p>
+                <ul>
+                    <li>Quantidade + lote + validade</li>
+                    <li>Vincula a NF ou pedido</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="margin-top:18px">
+            <div class="site-channel" style="grid-column:1/-1">
+                <h3>5. Historico</h3>
+                <p>Trilha de auditoria por dia. Quem mexeu, no que, quando. Pra cobrir saida sem registro, ajuste sem motivo, ou conferir contagem do mes.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="site-section site-section--alt">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Onde rodar</span>
+            <h2>Voce escolhe o <span class="hl">dispositivo</span>. Os dados acompanham.</h2>
+            <p>Mesma conta, mesma loja, mesmos produtos. Operador no celular, gestor no desktop, dono no tablet — funciona junto.</p>
+        </div>
+
+        <div class="site-channels">
+            <div class="site-channel">
+                <h3>📱 No celular</h3>
+                <p>App leve (PWA) que abre rapido na cozinha. Funciona offline, sincroniza quando volta o sinal. Tambem disponivel como APK Android pra instalar fora da Play Store.</p>
+                <ul>
+                    <li>Operador registra entrada/saida em 2 toques</li>
+                    <li>Alerta de validade no notification do telefone</li>
+                    <li>Camera pra leitura de codigo de barras</li>
+                </ul>
+                <a href="/auth/registrar?origem=app-mobile-celular" class="btn btn-primary" data-track="app-celular">Comecar no celular</a>
+            </div>
+            <div class="site-channel">
+                <h3>💻 No desktop</h3>
+                <p>Painel completo no computador. Ideal pro gestor que faz fechamento, gera relatorio, configura usuarios e analisa o mes.</p>
+                <ul>
+                    <li>Dashboard com numero do mes</li>
+                    <li>Lojas multi, equipe multi-perfil</li>
+                    <li>Exporta CSV pra contabilidade</li>
+                </ul>
+                <a href="/auth/registrar?origem=app-mobile-desktop" class="btn btn-secondary" data-track="app-desktop">Comecar no desktop</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="site-final">
+    <div class="site-container site-final-inner">
+        <h2>Cozinha <span class="hl">corre</span>. EasyStok corre junto.</h2>
+        <p>Cadastre. Instale como app. Equipe usando hoje.</p>
+        <a href="/auth/registrar?origem=app-final" class="btn btn-primary btn-lg">Comecar gratis</a>
+    </div>
+</section>

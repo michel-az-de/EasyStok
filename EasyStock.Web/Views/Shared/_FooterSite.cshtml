@@ -1,0 +1,65 @@
+@model EasyStock.Web.Services.MarketingOptions
+@{
+    var ano = DateTime.UtcNow.Year;
+}
+<footer class="site-foot">
+    <div class="site-container site-foot-grid">
+        <div class="site-foot-brand">
+            <a href="/" class="site-logo">
+                <svg class="site-logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+                    <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814" />
+                    <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E" />
+                    <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A" />
+                </svg>
+                <span class="site-logo-word"><span class="site-logo-easy">Easy</span><span class="site-logo-stok">Stok</span></span>
+            </a>
+            <p class="site-foot-tagline">Estoque simples para quem nao pode perder produto.</p>
+        </div>
+
+        <nav class="site-foot-col" aria-label="Produto">
+            <h4>Produto</h4>
+            <a href="/">Como funciona</a>
+            <a href="/app">No celular</a>
+            <a href="/precos">Precos</a>
+            <a href="/auth/registrar?origem=footer">Testar gratis</a>
+        </nav>
+
+        <nav class="site-foot-col" aria-label="Suporte">
+            <h4>Suporte</h4>
+            <a href="/contato">Fale com a gente</a>
+            <a href="@Model.LinkWhatsApp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+            <a href="mailto:@Model.EmailContato">@Model.EmailContato</a>
+        </nav>
+
+        <nav class="site-foot-col" aria-label="Institucional">
+            <h4>Institucional</h4>
+            <a href="/termos">Termos de uso</a>
+            <a href="/privacidade">Politica de privacidade</a>
+            @if (!string.IsNullOrWhiteSpace(Model.Instagram))
+            {
+                <a href="@Model.Instagram" target="_blank" rel="noopener noreferrer">Instagram</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.LinkedIn))
+            {
+                <a href="@Model.LinkedIn" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+            }
+        </nav>
+
+        <div class="site-foot-newsletter">
+            <h4>Newsletter</h4>
+            <p>Novidades sobre o produto, sem spam. Voce sai quando quiser.</p>
+            <form id="site-newsletter" method="post" action="/newsletter" class="site-newsletter-form" novalidate>
+                @Html.AntiForgeryToken()
+                <input type="email" name="Email" required maxlength="255" placeholder="seu@@email.com.br" autocomplete="email" />
+                <input type="text" name="Website" tabindex="-1" autocomplete="off" class="site-honeypot" aria-hidden="true" />
+                <button type="submit" class="btn btn-primary btn-sm">Quero receber</button>
+            </form>
+            <p class="site-newsletter-status" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
+    <div class="site-container site-foot-bottom">
+        <span>© @ano EasyStok. Feito no Brasil.</span>
+        <span class="site-foot-mono">v0.1 · founder beta</span>
+    </div>
+</footer>
