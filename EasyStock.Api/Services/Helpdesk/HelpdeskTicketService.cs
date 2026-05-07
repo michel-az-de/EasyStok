@@ -36,6 +36,9 @@ public sealed class HelpdeskTicketService(
 
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
 
+        // Webhook/sistema (F14) chama sem JWT — UsuarioId vira Guid.Empty, FK quebra. Coage para null.
+        Guid? criador = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId;
+
         var ticket = AdminTicket.Criar(
             empresaId: cmd.EmpresaId,
             titulo: cmd.Titulo,
@@ -45,12 +48,12 @@ public sealed class HelpdeskTicketService(
             nivel: cmd.Nivel,
             prazoResposta: sla.PrazoResposta,
             prazoResolucao: sla.PrazoResolucao,
-            criadoPorId: currentUser.UsuarioId);
+            criadoPorId: criador);
         ticket.FaturaId = fatura?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
-            ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.Criado,
+            ticket.Id, criador, TicketAcaoHistorico.Criado,
             metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
 
         // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o

@@ -62,3 +62,7 @@
   public sealed record Foo(int Bar);
   ```
   Funciona pra positional records em C# 11+ e propaga pra IntelliSense + XML doc.
+
+## 14. Não passar `currentUser.UsuarioId` direto em fluxo invocado de webhook/sistema
+- **O que aconteceu:** F14 (commit e29cc61) faz webhook Pix anônimo disparar `HelpdeskTicketService.AbrirAsync` quando há N falhas. `currentUser.UsuarioId` em contexto sem JWT retorna `Guid.Empty` (vide `CurrentUserAccessor.GetGuidClaimOrDefault`). `AdminTicket.CriadoPorId` e `TicketHistorico.AutorId` têm FK em `usuarios.id` com `OnDelete(SetNull)` mas só aceitam `NULL` ou GUID válido — `Guid.Empty` viola FK no insert. O `try/catch` envolvente do `AutoTicketFalhaPagamento` engolia a `DbUpdateException` silenciosamente: o `FaturaEvento` ficava órfão e o ticket nunca era criado. F14 quebrado em prod sem barulho.
+- **Como evitar:** qualquer serviço chamado de webhook/job/sistema deve coagir `currentUser.UsuarioId` para `Guid?` antes de gravar em FK nullable: `Guid? autor = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId`. Padrão aplicado em `HelpdeskTicketService.AbrirAsync`. Auditoria mental: "este service é chamável fora de um controller autenticado? entao FK de usuário nunca pode receber Guid.Empty direto".

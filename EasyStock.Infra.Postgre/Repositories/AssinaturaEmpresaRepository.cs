@@ -95,9 +95,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(Guid? empresaId = null, CancellationToken ct = default)
         {
-            var q = dbContext.AssinaturasEmpresa
-                .IgnoreQueryFilters()
-                .AsQueryable();
+            var q = dbContext.AssinaturasEmpresa.IgnoreQueryFilters();
             if (empresaId.HasValue && empresaId.Value != Guid.Empty)
                 q = q.Where(a => a.EmpresaId == empresaId.Value);
 

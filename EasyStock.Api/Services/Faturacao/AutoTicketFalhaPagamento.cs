@@ -48,6 +48,15 @@ public sealed class AutoTicketFalhaPagamento(
             return;
         }
 
+        // Defesa em camadas: caller declarou empresaId, fatura tem EmpresaId — devem bater.
+        if (empresaId != Guid.Empty && fatura.EmpresaId != empresaId)
+        {
+            logger.LogWarning(
+                "AutoTicketFalhaPagamento: fatura {FaturaId} pertence a {FaturaEmpresa}, mas caller declarou {CallerEmpresa} — recusando.",
+                fatura.Id, fatura.EmpresaId, empresaId);
+            return;
+        }
+
         // 1) Audita a falha em FaturaEvento.
         db.FaturaEventos.Add(FaturaEvento.Criar(
             fatura.Id,
