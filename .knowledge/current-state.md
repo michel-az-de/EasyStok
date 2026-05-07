@@ -51,7 +51,7 @@
 
 ## O que falta pro MVP-pago (atualizado)
 1. Deploy GCP estável (se decidir migrar — Azure paga hoje).
-2. Rate limiting em endpoints públicos (`/auth/login`, `/auth/registrar`, webhooks).
+2. Rate limiting em `/api/webhooks/pix` (login/register cobertos desde B-015).
 3. NF-e mínimo via emissor third-party (Focus NFe/eNotas).
 4. Onboarding cliente externo testado E2E (signup → trial → upgrade).
 5. CI bloqueando merge com teste vermelho.
