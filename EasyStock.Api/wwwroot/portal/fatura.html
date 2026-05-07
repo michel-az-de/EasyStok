@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Fatura — EasyStok</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="portal.css">
+<script defer src="portal.js"></script>
+</head>
+<body>
+
+<header class="topbar" id="topbar"></header>
+
+<main class="app">
+  <div style="margin-bottom:14px">
+    <a href="/portal/faturas.html" class="btn btn-secondary" style="font-size:13px">← Voltar</a>
+  </div>
+
+  <div id="alert-box"></div>
+  <div id="content" class="loading">Carregando…</div>
+</main>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const Portal = window.EasyStokPortal;
+    if (!Portal.requireAuth()) return;
+    Portal.renderTopbar('topbar');
+
+    const content = document.getElementById('content');
+    const alertBox = document.getElementById('alert-box');
+
+    // Pega ?id=
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+
+    if (!id) {
+      content.className = 'empty-state';
+      content.innerHTML = '<div class="icon">⚠️</div><h3>Fatura invalida</h3><p>Identificador ausente.</p>';
+      return;
+    }
+
+    function showError(msg) {
+      alertBox.innerHTML = '<div class="alert alert-error">' + Portal.ui.escapeHtml(msg) + '</div>';
+    }
+
+    async function carregar() {
+      try {
+        const env = await Portal.apiJson(`/api/faturas/${encodeURIComponent(id)}`);
+        const f = env && env.data;
+        if (!f) {
+          content.className = 'empty-state';
+          content.innerHTML = '<div class="icon">📄</div><h3>Fatura nao encontrada</h3><p>Pode ter sido cancelada ou voce nao tem acesso.</p>';
+          return;
+        }
+        renderDetalhe(f);
+      } catch (e) {
+        if (e.status === 404) {
+          content.className = 'empty-state';
+          content.innerHTML = '<div class="icon">📄</div><h3>Fatura nao encontrada</h3><p>Pode ter sido cancelada ou voce nao tem acesso.</p>';
+          return;
+        }
+        showError(e.message || 'Falha ao carregar fatura.');
+        content.className = '';
+        content.innerHTML = '';
+      }
+    }
+
+    function enderecoText(end) {
+      if (!end) return '';
+      const partes = [end.logradouro, end.numero, end.complemento, end.bairro, end.cidade, end.uf]
+        .filter(s => s && s.trim());
+      return partes.join(', ');
+    }
+
+    function renderDetalhe(f) {
+      content.className = '';
+      const cls = Portal.ui.statusBadgeClass(f.status);
+      const lbl = Portal.ui.statusLabel(f.status);
+      const E = Portal.ui.escapeHtml;
+
+      const itensHtml = (f.itens || []).map(i => `
+        <tr>
+          <td>${E(i.descricao)}</td>
+          <td class="right">${(Number(i.quantidade) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</td>
+          <td class="right">${Portal.fmt.currency(i.precoUnitario, f.moeda)}</td>
+          <td class="right">${Portal.fmt.currency(i.subtotal, f.moeda)}</td>
+        </tr>
+      `).join('');
+
+      const pagamentosConfirmados = (f.pagamentos || []).filter(p => p.status === 'Confirmado');
+      const pagamentosHtml = pagamentosConfirmados.length === 0 ? '' : `
+        <div class="card">
+          <h2>Pagamentos confirmados</h2>
+          <table class="itens-table">
+            <thead><tr><th>Data</th><th>Metodo</th><th class="right">Valor</th></tr></thead>
+            <tbody>
+              ${pagamentosConfirmados.map(p => `
+                <tr>
+                  <td>${Portal.fmt.dateTime(p.pagoEm || p.criadoEm)}</td>
+                  <td>${E(p.metodo)} ${p.gatewayProvedor && p.gatewayProvedor !== 'Manual' ? `<small style="color:var(--ink-mute)">via ${E(p.gatewayProvedor)}</small>` : ''}</td>
+                  <td class="right">${Portal.fmt.currency(p.valor, f.moeda)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Pagamento Pix pendente — exibe QR/CopiaCola se disponivel no DadosGatewayJson
+      const pagamentoPendentePix = (f.pagamentos || []).find(p =>
+        p.status === 'Pendente' && p.metodo === 'pix' && p.dadosGatewayJson);
+      let instrucaoPixHtml = '';
+      if (pagamentoPendentePix) {
+        try {
+          const dados = JSON.parse(pagamentoPendentePix.dadosGatewayJson);
+          const copiaCola = dados.pix_copia_cola || dados.pixCopiaCola;
+          const qr = dados.qr_code || dados.qrCodeBase64;
+          if (copiaCola || qr) {
+            instrucaoPixHtml = `
+              <div class="card" style="border-color:var(--accent)">
+                <h2 style="color:var(--accent)">📱 Pague via Pix</h2>
+                ${qr ? `<div style="text-align:center;margin-bottom:12px"><img src="data:image/png;base64,${E(qr)}" alt="QR Code Pix" style="max-width:200px;width:100%"/></div>` : ''}
+                ${copiaCola ? `
+                  <label class="form-label">Pix copia e cola</label>
+                  <textarea readonly class="form-input" style="font-family:ui-monospace,monospace;font-size:11px;height:80px" onclick="this.select()">${E(copiaCola)}</textarea>
+                  <button type="button" class="btn btn-secondary btn-block" style="margin-top:8px"
+                          onclick="navigator.clipboard.writeText('${E(copiaCola)}').then(()=>this.textContent='✓ Copiado').catch(()=>{})">
+                    📋 Copiar codigo
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          }
+        } catch (e) { /* silently skip if dadosGatewayJson invalid */ }
+      }
+
+      content.innerHTML = `
+        <div class="card">
+          <div class="detail-header">
+            <div>
+              <div class="numero">${E(f.numero)}</div>
+              <div style="margin-top:4px"><span class="badge ${cls}">${E(lbl)}</span></div>
+            </div>
+            <div>
+              <button type="button" id="btn-pdf" class="btn btn-primary">📄 Baixar recibo</button>
+            </div>
+          </div>
+          <div class="detail-grid" style="font-size:13px;color:var(--ink-dim)">
+            <div>
+              <div class="label">Emissao</div>
+              <div>${Portal.fmt.dateTime(f.dataEmissao)}</div>
+            </div>
+            <div>
+              <div class="label">Vencimento</div>
+              <div>${Portal.fmt.date(f.dataVencimento)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Itens</h2>
+          <table class="itens-table">
+            <thead>
+              <tr>
+                <th>Descricao</th>
+                <th class="right">Qtd</th>
+                <th class="right">Unit</th>
+                <th class="right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>${itensHtml}</tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Totais</h2>
+          <div class="totais-box">
+            <div class="row"><span>SubTotal</span><span>${Portal.fmt.currency(f.subTotal, f.moeda)}</span></div>
+            ${Number(f.descontos) > 0 ? `<div class="row" style="color:var(--success)"><span>Descontos</span><span>-${Portal.fmt.currency(f.descontos, f.moeda)}</span></div>` : ''}
+            ${Number(f.acrescimos) > 0 ? `<div class="row" style="color:var(--warning)"><span>Acrescimos</span><span>${Portal.fmt.currency(f.acrescimos, f.moeda)}</span></div>` : ''}
+            <div class="row total"><span>Total</span><span>${Portal.fmt.currency(f.total, f.moeda)}</span></div>
+            ${Number(f.totalPago) > 0 ? `<div class="row pago"><span>Pago</span><span>${Portal.fmt.currency(f.totalPago, f.moeda)}</span></div>` : ''}
+            ${Number(f.pendente) > 0 ? `<div class="row pendente"><span>Pendente</span><span>${Portal.fmt.currency(f.pendente, f.moeda)}</span></div>` : ''}
+          </div>
+        </div>
+
+        ${instrucaoPixHtml}
+
+        ${pagamentosHtml}
+
+        ${f.observacoes ? `<div class="card"><h2>Observacoes</h2><p style="margin:0;font-size:13px;color:var(--ink-dim);white-space:pre-line">${E(f.observacoes)}</p></div>` : ''}
+      `;
+
+      document.getElementById('btn-pdf').addEventListener('click', baixarPdf);
+    }
+
+    async function baixarPdf() {
+      const btn = document.getElementById('btn-pdf');
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = 'Gerando…';
+      try {
+        const blob = await Portal.apiBlob(`/api/faturas/${encodeURIComponent(id)}/pdf`);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `fatura-${id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // Pequeno delay antes de revogar para alguns browsers terminarem o save dialog
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        alert(e.message || 'Falha ao baixar PDF.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+
+    carregar();
+  });
+</script>
+</body>
+</html>

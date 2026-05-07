@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Minhas faturas — EasyStok</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="portal.css">
+<script defer src="portal.js"></script>
+</head>
+<body>
+
+<header class="topbar" id="topbar"></header>
+
+<main class="app">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0;font-size:20px;font-weight:700">Minhas faturas</h1>
+  </div>
+
+  <div class="filters" id="filters">
+    <button type="button" class="filter-chip active" data-status="">Todas</button>
+    <button type="button" class="filter-chip" data-status="Emitida">Em aberto</button>
+    <button type="button" class="filter-chip" data-status="ParcialmentePaga">Parcial</button>
+    <button type="button" class="filter-chip" data-status="Vencida">Vencidas</button>
+    <button type="button" class="filter-chip" data-status="Paga">Pagas</button>
+    <button type="button" class="filter-chip" data-status="Cancelada">Canceladas</button>
+  </div>
+
+  <div id="alert-box"></div>
+  <div id="content" class="loading">Carregando…</div>
+</main>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const Portal = window.EasyStokPortal;
+    if (!Portal.requireAuth()) return;
+    Portal.renderTopbar('topbar');
+
+    const content = document.getElementById('content');
+    const alertBox = document.getElementById('alert-box');
+    let statusFiltro = '';
+    let pagina = 1;
+    const pageSize = 25;
+
+    function showError(msg) {
+      alertBox.innerHTML = '<div class="alert alert-error">' + Portal.ui.escapeHtml(msg) + '</div>';
+    }
+
+    async function carregar() {
+      content.className = 'loading';
+      content.textContent = 'Carregando…';
+      alertBox.innerHTML = '';
+      try {
+        let url = `/api/faturas?page=${pagina}&pageSize=${pageSize}`;
+        if (statusFiltro) url += `&status=${encodeURIComponent(statusFiltro)}`;
+        const env = await Portal.apiJson(url);
+        const itens = (env && env.data) || [];
+        const meta = (env && env.meta) || {};
+        renderLista(itens, meta);
+      } catch (e) {
+        if (e.status === 403) {
+          content.className = 'empty-state';
+          content.innerHTML = `
+            <div class="icon">🔒</div>
+            <h3>Acesso restrito</h3>
+            <p>Sua conta nao tem permissao para visualizar faturas.<br>
+            Fale com o administrador da empresa.</p>
+          `;
+          return;
+        }
+        showError(e.message || 'Falha ao carregar faturas.');
+        content.className = 'empty-state';
+        content.innerHTML = '<div class="icon">⚠️</div><h3>Erro</h3><p>Tente recarregar a pagina.</p>';
+      }
+    }
+
+    function renderLista(itens, meta) {
+      content.className = '';
+      if (!itens || itens.length === 0) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📄</div>
+            <h3>Nenhuma fatura encontrada</h3>
+            <p>${statusFiltro ? 'Tente outro filtro.' : 'Ainda nao ha faturas para a sua empresa.'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      const html = ['<div class="fatura-list">'];
+      itens.forEach(f => {
+        const cls = Portal.ui.statusBadgeClass(f.status);
+        const lbl = Portal.ui.statusLabel(f.status);
+        const venc = Portal.fmt.date(f.dataVencimento);
+        const total = Portal.fmt.currency(f.total, f.moeda);
+        const pendente = Number(f.pendente) > 0
+          ? `<div class="pendente">${Portal.ui.escapeHtml('Pendente: ' + Portal.fmt.currency(f.pendente, f.moeda))}</div>`
+          : '';
+        html.push(`
+          <a class="fatura-item" href="/portal/fatura.html?id=${encodeURIComponent(f.id)}">
+            <div>
+              <div class="numero">${Portal.ui.escapeHtml(f.numero)}</div>
+              <div class="meta">${Portal.ui.escapeHtml(f.faturadoNome || '—')}</div>
+            </div>
+            <div>
+              <div class="total">${total}</div>
+              ${pendente}
+            </div>
+            <div class="status-row">
+              <span class="badge ${cls}">${Portal.ui.escapeHtml(lbl)}</span>
+              <span class="vencimento">Venc: ${venc}</span>
+            </div>
+          </a>
+        `);
+      });
+      html.push('</div>');
+
+      // Paginacao simples
+      if (meta.pages > 1) {
+        html.push('<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px">');
+        if (pagina > 1) {
+          html.push(`<button type="button" class="btn btn-secondary" data-pag="${pagina - 1}">← Anterior</button>`);
+        }
+        html.push(`<span style="font-size:12px;color:var(--ink-mute)">Pagina ${pagina} de ${meta.pages} — ${meta.total} fatura(s)</span>`);
+        if (pagina < meta.pages) {
+          html.push(`<button type="button" class="btn btn-secondary" data-pag="${pagina + 1}">Proximo →</button>`);
+        }
+        html.push('</div>');
+      }
+
+      content.innerHTML = html.join('');
+      content.querySelectorAll('button[data-pag]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          pagina = parseInt(btn.dataset.pag, 10) || 1;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          carregar();
+        });
+      });
+    }
+
+    document.getElementById('filters').addEventListener('click', e => {
+      const btn = e.target.closest('.filter-chip');
+      if (!btn) return;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      statusFiltro = btn.dataset.status || '';
+      pagina = 1;
+      carregar();
+    });
+
+    carregar();
+  });
+</script>
+</body>
+</html>
