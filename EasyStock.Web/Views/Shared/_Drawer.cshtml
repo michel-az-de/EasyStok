@@ -7,9 +7,9 @@
 *@
 @model dynamic
 @{
-    string title = null; try { title = Model.Title as string; } catch { }
-    string bodyHtml = null; try { bodyHtml = Model.BodyHtml as string; } catch { }
-    string footerHtml = null; try { footerHtml = Model.FooterHtml as string; } catch { }
+    string? title = null; try { title = Model.Title as string; } catch { }
+    string? bodyHtml = null; try { bodyHtml = Model.BodyHtml as string; } catch { }
+    string? footerHtml = null; try { footerHtml = Model.FooterHtml as string; } catch { }
 }
 <div x-show="open" x-cloak>
     <div class="drawer-backdrop" @@click="open=false" x-transition.opacity></div>

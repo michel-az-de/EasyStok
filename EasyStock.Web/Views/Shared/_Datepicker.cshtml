@@ -6,7 +6,7 @@
 @model dynamic
 @{
     bool range = false; try { range = (bool)Model.Range; } catch { }
-    string name = null, value = null, nameStart = null, nameEnd = null, valueStart = null, valueEnd = null;
+    string? name = null, value = null, nameStart = null, nameEnd = null, valueStart = null, valueEnd = null;
     try { name = Model.Name as string; } catch { }
     try { value = Model.Value as string; } catch { }
     try { nameStart = Model.NameStart as string; } catch { }

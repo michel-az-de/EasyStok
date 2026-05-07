@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class UsuariosController(UsuariosService svc, LojasService lojasSvc, SessionService session) : BaseController(session)
+public class UsuariosController(UsuariosService svc, LojasService lojasSvc, SessionService sessionSvc) : BaseController(sessionSvc)
 {
     [HttpGet("/usuarios")]
     public async Task<IActionResult> Index()
@@ -51,7 +51,7 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
             return RedirectToAction(nameof(Index));
         }
 
-        var empresaId = session.GetEmpresaId();
+        var empresaId = Session.GetEmpresaId();
         if (string.IsNullOrEmpty(empresaId))
         {
             Toast("error", "Não foi possível identificar a empresa. Faça login novamente.");

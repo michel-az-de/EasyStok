@@ -4,7 +4,7 @@
 @model dynamic
 @{
     var items = Model.Items as System.Collections.Generic.IList<System.ValueTuple<string,string,string>>;
-    string defaultId = null;
+    string? defaultId = null;
     try { defaultId = Model.Default as string; } catch { }
     if (string.IsNullOrEmpty(defaultId) && items != null && items.Count > 0) defaultId = items[0].Item1;
 }

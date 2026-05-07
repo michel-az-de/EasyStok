@@ -14,9 +14,9 @@
     string column = Model.Column as string ?? string.Empty;
     string currentSort = (Model.CurrentSort as string) ?? string.Empty;
     string currentDir = (Model.CurrentDir as string) ?? string.Empty;
-    string baseUrl = null;
+    string? baseUrl = null;
     try { baseUrl = Model.BaseUrl as string; } catch { }
-    string headerClass = null;
+    string? headerClass = null;
     try { headerClass = Model.HeaderClass as string; } catch { }
 
     var isActive = string.Equals(currentSort, column, StringComparison.OrdinalIgnoreCase);

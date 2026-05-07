@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class LojasController(LojasService svc, SessionService session) : BaseController(session)
+public class LojasController(LojasService svc, SessionService sessionSvc) : BaseController(sessionSvc)
 {
     [HttpGet("/lojas")]
     public async Task<IActionResult> Index()
@@ -25,7 +25,7 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         if (string.IsNullOrWhiteSpace(nomeTrim))
         {
             Toast("error", "O nome da loja é obrigatório.");
-            return string.IsNullOrEmpty(session.GetLojaId())
+            return string.IsNullOrEmpty(Session.GetLojaId())
                 ? RedirectToAction("SelecionarLoja", "Auth")
                 : RedirectToAction(nameof(Index));
         }
@@ -33,7 +33,7 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         if (nomeTrim.Length > 80)
         {
             Toast("error", "O nome da loja deve ter no máximo 80 caracteres.");
-            return string.IsNullOrEmpty(session.GetLojaId())
+            return string.IsNullOrEmpty(Session.GetLojaId())
                 ? RedirectToAction("SelecionarLoja", "Auth")
                 : RedirectToAction(nameof(Index));
         }
@@ -42,7 +42,7 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
         if (HasError(result))
         {
-            return string.IsNullOrEmpty(session.GetLojaId())
+            return string.IsNullOrEmpty(Session.GetLojaId())
                 ? RedirectToAction("SelecionarLoja", "Auth")
                 : RedirectToAction(nameof(Index));
         }
@@ -52,14 +52,14 @@ public class LojasController(LojasService svc, SessionService session) : BaseCon
         // Caso o usuário não tenha loja ativa (fluxo de onboarding após login sem
         // lojas vinculadas), auto-seleciona a loja recém-criada para que o
         // BaseController não bloqueie o acesso ao Dashboard.
-        if (string.IsNullOrEmpty(session.GetLojaId()))
+        if (string.IsNullOrEmpty(Session.GetLojaId()))
         {
             var listaResult = await svc.ListarAsync();
             if (listaResult.Success && listaResult.Data is { Count: > 0 } lojas)
             {
                 var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nomeTrim, StringComparison.OrdinalIgnoreCase))
                     ?? lojas.Last();
-                session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId.ToString());
+                Session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId.ToString());
                 return RedirectToAction("Index", "Dashboard");
             }
         }

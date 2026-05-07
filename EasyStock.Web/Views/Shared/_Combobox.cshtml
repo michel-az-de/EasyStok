@@ -11,8 +11,8 @@
 @model dynamic
 @{
     string name = Model.Name as string ?? "combobox";
-    object value = null; try { value = Model.Value; } catch { }
-    string placeholder = null; try { placeholder = Model.Placeholder as string; } catch { }
+    object? value = null; try { value = Model.Value; } catch { }
+    string? placeholder = null; try { placeholder = Model.Placeholder as string; } catch { }
     var itemsJson = System.Text.Json.JsonSerializer.Serialize(Model.Items);
     var valueJson = System.Text.Json.JsonSerializer.Serialize(value);
     var phEsc = (placeholder ?? "Selecionar...").Replace("\"", "&quot;");

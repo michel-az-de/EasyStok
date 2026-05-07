@@ -145,7 +145,7 @@
                     new { value = 4, label = "Mercearia" },
                     new { value = 5, label = "Frios" }
                 },
-                Value = (object)null,
+                Value = (object?)null,
                 Placeholder = "Selecionar categoria"
             }' />
         </div>
@@ -269,9 +269,9 @@
         <table class="w-full border-collapse">
             <thead>
                 <tr class="border-b border-[color:var(--border-soft)]">
-                    @await Html.PartialAsync("_SortableHeader", new { Label = "Nome", Column = "nome", CurrentSort = (string)Context.Request.Query["sort"], CurrentDir = (string)Context.Request.Query["dir"] })
-                    @await Html.PartialAsync("_SortableHeader", new { Label = "SKU", Column = "sku", CurrentSort = (string)Context.Request.Query["sort"], CurrentDir = (string)Context.Request.Query["dir"] })
-                    @await Html.PartialAsync("_SortableHeader", new { Label = "Estoque", Column = "qtd", CurrentSort = (string)Context.Request.Query["sort"], CurrentDir = (string)Context.Request.Query["dir"] })
+                    @await Html.PartialAsync("_SortableHeader", new { Label = "Nome", Column = "nome", CurrentSort = Context.Request.Query["sort"].ToString(), CurrentDir = Context.Request.Query["dir"].ToString() })
+                    @await Html.PartialAsync("_SortableHeader", new { Label = "SKU", Column = "sku", CurrentSort = Context.Request.Query["sort"].ToString(), CurrentDir = Context.Request.Query["dir"].ToString() })
+                    @await Html.PartialAsync("_SortableHeader", new { Label = "Estoque", Column = "qtd", CurrentSort = Context.Request.Query["sort"].ToString(), CurrentDir = Context.Request.Query["dir"].ToString() })
                 </tr>
             </thead>
             <tbody>

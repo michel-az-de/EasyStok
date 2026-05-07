@@ -10,9 +10,9 @@
 @model dynamic
 @{
     string size = "md"; try { size = (Model.Size as string) ?? "md"; } catch { }
-    string title = null; try { title = Model.Title as string; } catch { }
-    string bodyHtml = null; try { bodyHtml = Model.BodyHtml as string; } catch { }
-    string footerHtml = null; try { footerHtml = Model.FooterHtml as string; } catch { }
+    string? title = null; try { title = Model.Title as string; } catch { }
+    string? bodyHtml = null; try { bodyHtml = Model.BodyHtml as string; } catch { }
+    string? footerHtml = null; try { footerHtml = Model.FooterHtml as string; } catch { }
 }
 <div class="modal-backdrop" x-show="open" x-cloak @@keydown.escape.window="open=false" @@click.self="open=false" role="dialog" aria-modal="true" :aria-labelledby="$id('modal-title')">
     <div class="modal-panel modal-@size">

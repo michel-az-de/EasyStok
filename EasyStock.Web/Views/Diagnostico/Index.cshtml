@@ -27,7 +27,7 @@
     };
     string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
 
-    var overallStatus = apiOk && Model is not null ? Model.Status : "critical";
+    var overallStatus = apiOk && Model is not null ? (Model!.Status ?? "ok") : "critical";
     var overallIcon = overallStatus switch { "ok" => "check_circle", "degraded" => "warning", _ => "error" };
     var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Falha critica detectada" };
     var overallHero = overallStatus switch { "ok" => "from-green-500 to-emerald-600", "degraded" => "from-yellow-500 to-amber-600", _ => "from-red-500 to-rose-600" };
@@ -79,7 +79,7 @@
                         @if (apiOk && Model is not null)
                         {
                             <span class="opacity-75">
-                                &mdash; @Model.Ambiente &middot; v@(Model.Versao) &middot; Uptime @Model.Uptime
+                                &mdash; @Model!.Ambiente &middot; v@(Model!.Versao) &middot; Uptime @Model!.Uptime
                             </span>
                         }
                     </p>
@@ -146,8 +146,8 @@
             {
                 <div class="bg-white rounded-xl border border-slate-200 p-4">
                     <div class="text-xs text-slate-500 font-medium mb-1">Uptime</div>
-                    <div class="text-2xl font-bold text-slate-800">@Model.Uptime</div>
-                    <div class="text-xs text-slate-400 mt-1">@Model.Ambiente</div>
+                    <div class="text-2xl font-bold text-slate-800">@Model!.Uptime</div>
+                    <div class="text-xs text-slate-400 mt-1">@Model!.Ambiente</div>
                 </div>
             }
             else
@@ -370,7 +370,7 @@
                         <h3 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
                             <span class="material-icons-round text-base text-blue-500">storage</span>Banco de Dados
                         </h3>
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @StatusClass(Model.Banco.Conexao)">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @StatusClass(Model!.Banco.Conexao)">
                             <span class="w-1.5 h-1.5 rounded-full @DotClass(Model.Banco.Conexao)"></span>@Model.Banco.Conexao
                         </span>
                     </div>
@@ -475,7 +475,7 @@
         </div>
 
         <!-- Causas Provaveis -->
-        @if (apiOk && Model is not null && Model.CausasProvaveis.Count > 0)
+        @if (apiOk && Model is not null && Model!.CausasProvaveis.Count > 0)
         {
             <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
                 <h3 class="font-semibold text-sm text-slate-800 mb-3 flex items-center gap-1.5">
@@ -483,7 +483,7 @@
                     Causas Provaveis
                 </h3>
                 <div class="space-y-2">
-                    @foreach (var causa in Model.CausasProvaveis)
+                    @foreach (var causa in Model!.CausasProvaveis)
                     {
                         var sv = causa.Severidade == "critical" ? "border-l-red-500 bg-red-50" : "border-l-yellow-500 bg-yellow-50";
                         var tc = causa.Severidade == "critical" ? "text-red-800" : "text-yellow-800";

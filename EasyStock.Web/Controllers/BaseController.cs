@@ -10,6 +10,13 @@ namespace EasyStock.Web.Controllers;
 [Authorize]
 public abstract class BaseController(SessionService session) : Controller
 {
+    /// <summary>
+    /// Sessão exposta para subclasses que precisam ler EmpresaId/LojaId/UsuarioNome.
+    /// Subclasses devem usar <c>Session</c> (não recapturar SessionService no construtor primário,
+    /// que provoca CS9107 — duplicação de captura entre base e derivado).
+    /// </summary>
+    protected SessionService Session => session;
+
     // Controllers que podem ser acessados mesmo sem loja selecionada — usuário precisa
     // chegar até a tela de Lojas para criar a primeira, e até Assinatura caso o trial
     // tenha expirado. A lista é mantida pequena de propósito.
