@@ -1,42 +1,50 @@
-# EasyStock — Knowledge Base
+# EasyStok — Knowledge Base
 
-> **Para o próximo Claude/agente que abrir esse repo:** leia este README primeiro. Depois decida quais arquivos abaixo abrir conforme a tarefa. Não leia tudo cego.
+> **Para o próximo agente que abrir este repo:** este é o single source of truth técnico do projeto. O `CLAUDE.md` da raiz aponta pra cá. Leia este README, depois decida quais arquivos abrir conforme a tarefa. Não leia tudo cego.
 
 ## O que é o projeto (em 3 frases)
 
-EasyStock é um SaaS multi-tenant de gestão de estoque/foodservice em .NET 9 + Postgres + Clean Architecture, com PWA mobile e painel admin. Originado como white-label pra "Casa da Babá" (PWA mobile já em uso pelo dono Felipe + Thati). Hoje em **abril/2026** está sendo posicionado pra apresentar a clientes externos como ERP, mas está honestamente em **30-35% feature parity** vs Bling/Tiny/Omie.
+EasyStok é um SaaS multi-tenant de gestão de estoque/foodservice em **.NET 9 + Postgres** com Clean Architecture, PWA mobile (Casa da Babá em produção real) e MAUI Android (produto SaaS em maturação). Hoje em **2026-05-06** tem **714+ commits**, 17 projetos, ~50 controllers, 57 entidades. Posicionado como ERP para microempresas que NÃO precisam de NF-e ainda; auditoria honesta estima **30–35% de feature parity** vs Bling/Tiny/Omie (`audit-brutal.md`).
 
 ## Quem é o usuário
 
-Dono é **Felipe Azevedo** (`@michel-az-de` no GitHub, Avanade Brasil, .NET sênior). Estilo: direto, português BR, sem floreio, sem vírgulas sobrando, sem travessões. Já se irritou várias vezes com:
-- Estimativas de custo otimistas (Azure estourou $474 em 30d quando estimei $50)
+Dono é **Felipe Azevedo** (`@michel-az-de` no GitHub, Avanade Brasil, .NET sênior). Estilo: direto, português BR, sem floreio, sem vírgulas sobrando, sem travessões. Já se irritou com:
+- Estimativas de custo otimistas (Azure estourou $474 em 30d quando foi estimado $50)
 - Trabalho deixado pela metade ("e o que eu pedi do mobile?")
 - Floreio em respostas — quer ação direta
 
-**Sempre commit ao final de cada demanda, sem pedir confirmação** (memória persistente confirma isso).
+**Sempre commit + push ao final de cada demanda, sem pedir confirmação** (`feedback_commit.md` na auto-memória).
 
-## Estado atual da infra (atualize quando deploy mudar)
+## Estado atual da infra
 
-- **Azure subscription DESABILITADA** (spending limit hit, ~$474 estourados em 30d)
-- **Recursos no Azure**: 3 App Services (api/web/admin) AdminDisabled, PG Flexible Server `pg-easystock` no RG `easy-stock`, FileStorage `easystockfiles` (StandardV2_LRS — caro)
-- **Plano em andamento**: migrar pra **GCP Cloud Run + Cloud SQL** ($300 grátis 90d, free tier permanente). Script pronto em `scripts/gcp-deploy.sh`. Aguarda usuário criar conta GCP e mandar Project ID.
-- **Alternativa de emergência**: cloudflared instalado em `~/bin/cloudflared.exe` pra rodar local + tunnel HTTPS público $0
+- **Azure App Service ATIVO** (workflow `.github/workflows/deploy-azure.yml` faz auto-deploy em push pra master/main).
+- **Azure PostgreSQL Flexible** `pg-easystock` é o banco transacional vivo.
+- **GCP Cloud Run** documentado em `gcp-deploy.md` como plano alternativo (scripts em `scripts/gcp-deploy.sh`); **não migrado**, só preparação.
+- **Render** NÃO está em uso (referência antiga em memória de abril/2026 — desconsiderar).
+- **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público.
 
-## Estado do código (último commit relevante)
+## Estado do código
 
-Último commit: `340aff0 fix(99%): Produtos + Pedido→Estoque + Estoque(web)`. **457/457 testes verdes**.
+Último commit relevante: `78fdbc1 fix(notifications): pente fino — 30 correcoes`. Testes verdes em todas as suites principais (Domain.Tests, Application.Tests, Api.UnitTests, IntegrationTests com Testcontainers).
 
-Qualidade por área (auditoria honesta — `audit-brutal.md` tem detalhes):
+P0 antigos (`tech-debt.md`) RESOLVIDOS:
+- ✅ `PedidoFornecedorItem` persiste (entity criada)
+- ✅ Webhook Pix valida valor pago vs cobrança
+- ✅ `DiagnosticoController` `[Authorize(Policy="Admin")]`
+
+P0 atuais: NF-e, rate limiting endpoints públicos, CI gate de qualidade.
+
+Qualidade por área (auditoria `audit-brutal.md` 2026-04-30 — sem mudança estrutural desde):
 
 | Domínio | Q% | Prod-Ready |
 |---|---|---|
 | Identity/Auth/Multi-tenant | 49% | Parcial |
 | Estoque/Catálogo | 49% | Parcial |
-| Vendas/Pedidos/Compras/Caixa | 56% | ⚠️ Compras quebrada |
-| Subscription/Billing/Pix | 47% | ⚠️ Vuln R$0,01 |
-| Analytics/IA/Notifs | 47% | Parcial |
-| Admin/Diagnostics | 57% | 🚨 Diagnóstico público |
-| Mobile/PWA | 48% | Parcial (white-label OK) |
+| Vendas/Pedidos/Compras/Caixa | 56% | OK (PedidoFornecedor fixado) |
+| Subscription/Billing/Pix | 47% | OK (vuln R$0,01 fixada) |
+| Analytics/IA/Notifs | 47% → 60% (após PR1–PR7) | OK |
+| Admin/Diagnostics | 57% → 75% (após Gestão Cliente P0–P3) | OK |
+| Mobile/PWA + MAUI | 48% → 65% (após F0–F4c) | OK |
 | Infra/Jobs/Email | 60% | Parcial |
 
 ## Convenções ativas (siga)
@@ -47,46 +55,52 @@ Veja `conventions.md`. TL;DR:
 - xmin RowVersion em entidades-chave (Postgres system column, sem migration)
 - Use cases injetam interfaces de repos via primary constructor
 - Idempotência via `MovimentacaoEstoque.DocumentoReferencia = "{pedidoId}:{itemId}"`
-- Status de pedido como string ("aguardando", "preparando", "pronto", "entregue", "cancelado") com matriz de transições explícita
+- Status de pedido como string (`"aguardando" | "preparando" | "pronto" | "entregue" | "cancelado"`) com matriz de transições explícita
 - Testes: xUnit + NSubstitute + FluentAssertions
-- Sem comentários XML excessivos; comentar APENAS o "porquê" não-óbvio
+- Comentar APENAS o "porquê" não-óbvio
+- Outbox pattern para notificações (nunca despachar inline)
+- Auditoria E2E: mudanças em entidade chave gravam `XxxxAlteracao`
 
 ## Não-faça (mistakes registrados)
 
 Veja `do-not-do.md`. Top 5:
-1. **Não estimar custos cloud sem auditar TUDO da subscription** (estourei $474 vs estimativa de $50)
-2. **Não recomendar `[AllowAnonymous]` em endpoints destrutivos** (libei `/diagnostico` e expus `ProxyLimparLogs` etc)
-3. **Não criar dependência nova sem checar se pacote existe** (.NET Application layer não tinha `Microsoft.Extensions.Configuration`)
-4. **Não usar `Math.Ceiling` em qty fracionária pra desconto** (vira saldo negativo silencioso)
-5. **Não fazer migration EF que duplique tabelas já criadas em SQL raw** (Mobile schema vs `AddAdminModule`)
+1. **Não estimar custos cloud sem auditar TUDO da subscription** ($474 vs estimativa $50)
+2. **Não recomendar `[AllowAnonymous]` em endpoints destrutivos**
+3. **Não criar dependência nova sem checar se pacote existe** na camada
+4. **Não usar `Math.Ceiling` em qty fracionária** (vira saldo negativo silencioso)
+5. **Não fazer migration EF que duplique tabelas já criadas em SQL raw**
 
 ## Arquivos desta pasta
 
 - `README.md` — este arquivo (sempre comece aqui)
 - `architecture.md` — Clean Arch, projetos, fluxo de dependências
-- `domain-glossary.md` — Pedido vs Venda, MovimentacaoEstoque, etc
-- `conventions.md` — naming, padrões de código, DI, testes
-- `current-state.md` — features e probabilidades (atualizar conforme avança)
-- `tech-debt.md` — `[NotMapped]`, stubs, hardcoded, TODOs reais
+- `domain-glossary.md` — Pedido vs Venda, MovimentacaoEstoque, ItemEstoque, Caixa, Assinatura, Plano, IA, PWA
+- `conventions.md` — naming, padrões de código, DI, testes, multi-tenant, xmin
+- `current-state.md` — estado por área + infra + features (atualizar conforme avança)
+- `tech-debt.md` — P0/P1/P2 + resolvidos como histórico
 - `do-not-do.md` — erros já cometidos e por quê
-- `recent-evolution.md` — últimos commits + decisões (auto-gerado por update.sh)
+- `recent-evolution.md` — ondas de feature recentes + decisões de arquitetura
 - `quick-reference.md` — comandos Bash/dotnet/git mais usados
-- `audit-brutal.md` — última auditoria sênior pessimista completa
-- `dual-frontend-policy.md` — **POLÍTICA OBRIGATÓRIA**: PWA + MAUI coexistem; merge é unidirecional `PWA → MAUI`
-- `gcp-deploy.md` — passo-a-passo do deploy GCP
+- `audit-brutal.md` — auditoria sênior pessimista de 2026-04-30 (não regenere)
+- `dual-frontend-policy.md` — **POLÍTICA OBRIGATÓRIA**: PWA + MAUI coexistem; merge unidirecional `PWA → MAUI`
+- `gcp-deploy.md` — passo-a-passo do deploy GCP (plano alternativo)
 - `stability-roadmap.md` — **checklist vivo** do que falta pra estabilizar (deploy, CI, observabilidade, testes integração). Atualizar marcando `[x]` ao resolver.
-- `update.sh` — script que regenera as partes auto-discovery
 
 ## Como usar isso pra economizar tokens
 
-**Cenário 1 — começar uma conversa nova:** Lê só este README. Pergunta o que o usuário quer. Aí abre 1-2 arquivos específicos.
+**Cenário 1 — começar conversa nova:** lê este README. Pergunta o que o usuário quer. Aí abre 1-2 arquivos específicos.
 
-**Cenário 2 — usuário pediu algo de pedido/estoque:** Abre `domain-glossary.md` + `current-state.md` (seção pedidos) + arquivo do código relevante.
+**Cenário 2 — usuário pediu pedido/estoque:** abre `domain-glossary.md` + `current-state.md` + arquivo do código relevante.
 
-**Cenário 3 — usuário pediu deploy:** Abre `gcp-deploy.md` + `current-state.md` (seção infra).
+**Cenário 3 — usuário pediu deploy:** abre `current-state.md` (seção Infra) + `gcp-deploy.md` se for migração.
 
-**Cenário 4 — usuário pediu auditoria:** Abre `audit-brutal.md` (não roda novos agentes — já tem dados de 2026-05-01).
+**Cenário 4 — usuário pediu auditoria:** abre `audit-brutal.md` (não roda novos agentes — já tem dados).
+
+**Cenário 5 — tarefa toca PWA ou MAUI:** abre `dual-frontend-policy.md` SEMPRE.
 
 ## Manutenção
 
-Rode `bash .knowledge/update.sh` ao final de sessões grandes pra atualizar `recent-evolution.md` automaticamente. Os outros arquivos são curados manualmente.
+- Resolveu P0 do `tech-debt.md`? Move pra "Resolvidos" com data + commit hash.
+- Marcou `[x]` em `stability-roadmap.md` ao concluir item.
+- Atualizou `current-state.md` quando deploy/auditoria/teste mudou.
+- `recent-evolution.md` recebe ondas grandes de feature (não cada commit).

@@ -4,7 +4,7 @@
 >
 > Princípio: **código está em ~40% parity, operação em ~15%**. Estabilizar = fechar deploy, CI, backup, alerta, testes de integração.
 
-Última atualização: 2026-05-01
+Última atualização: 2026-05-06
 
 ---
 
@@ -84,9 +84,14 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 > Mover daqui pra cima ao concluir, com data e commit. Mantém memória institucional.
 
 - [x] **Webhook Pix valida valor pago vs cobrança** — 2026-05-01 (commit `37fb7d9`). Fechou último P0 da auditoria de abril.
-- [x] **`PedidoFornecedor.Itens [NotMapped]`** — 2026-04-30 (commits da série). Entity `PedidoFornecedorItem` persiste itens.
-- [x] **`DiagnosticoController` exposto** — 2026-04-30. Class agora `[Authorize(Policy="Admin")]`.
+- [x] **`PedidoFornecedor.Itens [NotMapped]`** — 2026-04-30. Entity `PedidoFornecedorItem` persiste itens (migration `20260502120000_AddPedidoFornecedorItemTable`).
+- [x] **`DiagnosticoController` exposto** — 2026-04-30 (`c5d2ad6`). Class agora `[Authorize(Policy="Admin")]`.
 - [x] **Pedido → estoque com idempotência por `{pedidoId}:{itemId}`** — 2026-04 (commit `340aff0`).
+- [x] **MongoDB descartado como provedor transacional** — 2026-05-01 (`820843c`). ADR 0001 formal em `docs/adr/0001-mongo-discarded.md`.
+- [x] **Seed bootstrap idempotente em SQL** — 2026-05-06 (`d754f84`, `93f4b4f`, `01eb29b`, `46a0c07`). 4 camadas: Npgsql direto + retry strategy compatível + `[NotMapped]` em IsSeedData + per-tenant files.
+- [x] **Notifications PR1–PR7 completo** — 2026-05-06. Outbox + adapters + Worker + painel Admin + LGPD + métricas OTel.
+- [x] **Helpdesk core E2E** — 2026-05-06. AdminTicket reformado + SLA monitor + 9 eventos globais + UI multi-nível.
+- [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
 
 ---
 

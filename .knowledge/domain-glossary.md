@@ -26,7 +26,8 @@
 
 ## Compras (PedidoFornecedor)
 - Documento de compra ao fornecedor. Quando "Recebido" → entra `MovimentacaoEstoque(Natureza=Compra)`.
-- ⚠️ `PedidoFornecedor.Itens` é `[NotMapped]` hoje — itens não persistem no banco. Tech-debt prioritário.
+- Entity `PedidoFornecedorItem` persiste itens (migration `20260502120000_AddPedidoFornecedorItemTable`). Tech-debt antigo do `[NotMapped]` foi resolvido.
+- Pendente: cobertura E2E do fluxo recebimento → entrada de estoque (tracked em `tech-debt.md` P1 #4).
 
 ## Caixa
 - Sessão (`Caixa`) com abertura/fechamento + lançamentos de `MovimentoCaixa`.

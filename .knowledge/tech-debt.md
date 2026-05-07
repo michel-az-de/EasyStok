@@ -1,52 +1,72 @@
-# Tech Debt — EasyStock
+# Tech Debt — EasyStok
 
-> Atualizar quando resolver. Ordenado por impacto.
+> Atualizar quando resolver. Ordenado por impacto. Itens fechados ficam ao final como histórico.
 
 ## P0 — Bloqueia produção real
 
-1. **`PedidoFornecedor.Itens` é `[NotMapped]`**
-   - Compras "funcionam" no UI mas itens não persistem.
-   - Recebimento de compra não dá entrada de estoque correta.
-   - Fix: adicionar `PedidoFornecedorItem` entity + configuration EF + migration.
+> Os 3 P0 antigos (PedidoFornecedor.Itens, Webhook Pix valor, DiagnosticoController) estão RESOLVIDOS — ver "Resolvidos" no fim deste arquivo.
 
-2. **Webhook Pix não valida valor recebido vs cobrança**
-   - Vulnerabilidade R$0,01: pagador pode pagar centavo e ativar plano.
-   - Fix: comparar `pix.valor` contra `cobranca.Valor` no `WebhookPixController`.
+1. **Sem NF-e/NFC-e**
+   - Cliente brasileiro real exigiu desde a primeira conversa de venda. Bling/Tiny tem de fábrica.
+   - Decisão pendente: integrar emissor third-party (Focus NFe / eNotas) ou construir interno.
 
-3. **`DiagnosticoController` ainda tem rotas perigosas**
-   - Verificar: `ProxyLimparLogs`, `ProxyEsvaziarLixeira`, `ProxyDeleteContainer` precisam estar `[Authorize(Roles="SuperAdmin")]`.
+2. **Sem rate limiting em endpoints públicos**
+   - `/auth/login`, `/auth/registrar`, `/api/webhooks/pix` sem limite por IP.
+   - Risco: brute-force credentials + DOS em webhook + replay attack.
+   - Fix: ASP.NET 9 RateLimiter middleware com policies por endpoint.
+
+3. **CI não bloqueia merge com teste vermelho**
+   - Workflows `deploy-azure.yml` deploy direto, sem gate de qualidade prévio.
+   - Fix: workflow separado `ci.yml` com `dotnet test` requerido em PR.
 
 ## P1 — Confiabilidade
 
 4. **Compras (recebimento) sem teste de integração**
-   - Fluxo de entrada de estoque por compra é manual, sem cobertura.
+   - Entity persiste agora, mas fluxo `ItemEstoque` não tem cobertura E2E.
 
 5. **Sem teste E2E pro fluxo Pedido→Venda→Caixa**
-   - Cobertura só unit. Bugs de integração escapam.
+   - Cobertura unit existe; bugs de integração escapam.
 
 6. **`Infra.MongoDb` é parcial e divergente do Postgre**
-   - `MongoUnitOfWork` tem fallback exótico pra "transação não suportada".
-   - Decidir: mantém ou remove. Hoje é dead-ish code com superfície de bug.
+   - ADR 0001 (`docs/adr/0001-mongo-discarded.md`) descartou Mongo como provedor transacional.
+   - Projetos `EasyStock.Infra.MongoDb` e `EasyStock.Infra.MongoDb.IntegrationTests` ainda fisicamente no repo.
+   - Decisão pendente: deletar fisicamente os projetos ou manter como dead-ish code.
+
+7. **Webhook Pix idempotência em duplo-fire**
+   - Efí pode mandar 2x dentro de 5 min — race em `ProcessarPagamentoAsync`.
+   - Fix: lock distribuído (`SELECT ... FOR UPDATE` em `cobrancas` por txid) ou idempotency key na request.
 
 ## P2 — Qualidade
 
-7. **PWA mobile com sync.js monolítico** (`EasyStock.Api/wwwroot/pwa/sync.js`)
-   - Sem testes. Sync offline complexo (~1000 linhas hoje).
+8. **PWA mobile com `sync.js` monolítico**
+   - `EasyStock.Api/wwwroot/pwa/sync.js` ~1000 linhas, sem testes.
    - Não migrar agora, mas isolar mudanças.
 
-8. **Falta migration formalizada para `xmin` em entidades novas**
-   - xmin é system column, mas a config Fluent API precisa ser repetida — fácil esquecer ao adicionar entidade.
+9. **Falta migration formalizada para `xmin` em entidades novas**
+   - `xmin` é system column, mas a config Fluent API precisa ser repetida — fácil esquecer ao adicionar entidade.
 
-9. **`appsettings.Production.json` com placeholders não-óbvios**
-   - `Efi:ClientId`, `Stripe:Webhook` etc. Onboarding novo dev confuso.
+10. **`appsettings.Production.json` com placeholders não-óbvios**
+    - `Efi:ClientId`, `Stripe:Webhook`, etc. Onboarding novo dev confuso.
 
-10. **`SubscriptionGateMiddleware` não tem cache**
-    - Bate no DB toda request autenticada. Latência cumulativa.
+11. **`SubscriptionGateMiddleware` não tem cache**
+    - Bate no DB toda request autenticada. Latência cumulativa em escala.
 
 ## P3 — Cosmético / Future
 
-11. Sem CI rodando os testes em PR.
 12. Sem feature flags maduras (`Microsoft.FeatureManagement`).
-13. Sem health-check estruturado (`/health/live`, `/health/ready`).
-14. Status de pedido como string — adicionar enum-string converter pra evitar typos.
-15. Logs sem `correlationId` propagado consistentemente.
+13. Sem health-check estruturado completo (`/health/live`, `/health/ready`) — middleware existe parcial.
+14. Status de pedido como `string` — adicionar enum-string converter pra evitar typos em transição.
+15. Logs sem `correlationId` propagado consistentemente em todas requests.
+
+---
+
+## Resolvidos (histórico — não regredir)
+
+- [x] **`PedidoFornecedor.Itens [NotMapped]`** — 2026-04-30. Entity `PedidoFornecedorItem` criada com migration `20260502120000_AddPedidoFornecedorItemTable`. Persiste e dá entrada de estoque correta no recebimento.
+- [x] **Webhook Pix sem validação de valor** — 2026-05-01 (`37fb7d9 fix(billing): webhook Pix valida valor pago vs cobrança`). Vuln R$0,01 fechada.
+- [x] **`DiagnosticoController` exposto com 21 `[AllowAnonymous]`** — 2026-04-30 (`c5d2ad6`). Class agora `[Authorize(Policy="Admin")]`.
+- [x] **`Math.Ceiling` em qty fracionária descontava errado** — 2026-04. Saldo negativo silencioso eliminado, usa decimal exato.
+- [x] **`pedido.Itens` vazio por falta de `Include`** — 2026-04. `GetByIdWithDetailsAsync` carrega aggregate completo.
+- [x] **Pedido → estoque com idempotência** — 2026-04 (`340aff0`). Chave `{pedidoId}:{itemId}`.
+- [x] **xmin RowVersion em entidades-chave** — 2026-04. Produto, Pedido, ItemEstoque, AssinaturaEmpresa.
+- [x] **Mongo descartado como provedor transacional** — 2026-05-01 (`820843c`). ADR 0001 formal.

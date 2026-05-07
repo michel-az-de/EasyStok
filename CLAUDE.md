@@ -1,35 +1,37 @@
 # CLAUDE.md — EasyStok
 
-Este arquivo e lido automaticamente pelo Claude Code ao abrir o projeto. Ele garante que **toda conversa neste repositorio carregue a skill de dev consolidada**, mesmo se a auto-memoria do harness nao estiver disponivel.
+Porta de entrada para qualquer agente (Claude Code, Copilot, etc.) abrindo este repo. Lido automaticamente pelo Claude Code.
 
-## Leitura obrigatoria antes de codar
+## Antes de tocar codigo
 
-A skill completa de dev do EasyStok vive em:
-**`C:\Users\f.michel.de.azevedo\.claude\projects\C--rep-EasyStok\memory\MEMORY.md`**
+**Leia, nesta ordem:**
+1. `.knowledge/README.md` — single source of truth tecnica do projeto. Indexa todos os outros docs.
+2. Conforme a tarefa, abra 1-2 arquivos do `.knowledge/` (mapa em `.knowledge/README.md`, secao "Como usar isso pra economizar tokens").
 
-Esse arquivo e auto-contido e cobre:
-1. O que e o EasyStok (stack, solucao, funcionalidades ja entregues)
-2. Regras de trabalho com o Felipe (commit + push, APK, PT-BR, etc)
-3. Padroes arquiteturais aceitos (CQRS-lite, VOs, Outbox, idempotency)
-4. Armadilhas ja superadas — NAO repetir (EF, multi-tenant, auth, DTO, CI, mobile, PWA+MAUI, performance, UX)
-5. Checklist por area antes de codar
-6. Indice de aprofundamento opcional (`lessons_learned.md`, `dev_playbook.md`, `project_structure.md` etc)
+**Toda regra tecnica vive no `.knowledge/`** (in-repo, gitada, evolui com o codigo). Este `CLAUDE.md` so resume o critico imediato.
 
-Se voce esta lendo este `CLAUDE.md` mas nao recebeu o conteudo do `MEMORY.md` injetado automaticamente, **leia ele explicitamente com a tool Read antes de tocar qualquer codigo**.
+## Resumo critico (vale para qualquer turno)
 
-## Atalhos de contexto (resumo critico que vale para qualquer turno)
+- **Stack**: .NET 9, PostgreSQL Azure, EF Core 9, Clean Architecture estrita.
+- **Solucao**: `EasyStok.sln` — 17 projetos. Pasta MAUI e `EasyStok.Mobile` (com K, sem ponto Maui).
+- **Branch principal**: `master`. **Deploy**: Azure App Service via push (`.github/workflows/deploy-azure.yml`). NAO Render.
+- **Frontends do operador**: PWA em `EasyStock.Api/wwwroot/pwa/` (fonte da verdade) + copia empacotada em `EasyStok.Mobile/Resources/Raw/pwa/`. **Merge unidirecional `PWA -> MAUI` no MESMO commit + hash SHA-256 conferido** (ver `.knowledge/dual-frontend-policy.md`).
+- **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR + `git push origin master`. Sem perguntar. Co-Author `Claude Opus 4.7 <noreply@anthropic.com>`.
+- **`git status` mostrando arquivos alheios**: NAO usar `git add -A`/`git add .` — adicionar so os especificos da demanda.
+- **Apos push tocando PWA ou casa-da-baba-mobile/apk**: workflow `build-casa-da-baba-apk.yml` dispara — aguardar e baixar APK pra `C:\rep\EasyStok\builds\app-debug.apk`.
+- **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; filtro manual por `EmpresaId`, NAO Global Query Filter; fail fast 400 se invalido.
+- **NAO criar `.md` de documentacao** salvo se Felipe pedir explicitamente.
+- **Estilo do Felipe**: PT-BR direto, sem floreio, sem virgula sobrando, sem travessoes. Resposta = acao + resultado.
 
-- **Stack**: .NET 9, PostgreSQL Azure, EF Core 9. Branch `master`. Render auto-deploy via push.
-- **Solucao**: `EasyStok.sln` com `EasyStock.Domain`, `EasyStock.Application`, `EasyStock.Infra.Postgre` (migrations), `EasyStock.Infra.Notifications` (Outbox), `EasyStock.Api`, `EasyStock.Admin` (back-office), `EasyStock.Web` (lojista MVC), `EasyStok.Mobile` (MAUI Android com K, sem ponto Maui), `EasyStock.Worker`.
-- **Frontends do operador**: PWA em `EasyStock.Api/wwwroot/pwa/` e copia em `EasyStok.Mobile/Resources/Raw/pwa/`. Merge unidirecional `PWA -> MAUI` no MESMO commit + hash SHA-256.
-- **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR + `git push origin master`. Sem perguntar.
-- **Apos push que toca PWA**: aguardar workflow APK + baixar pra `C:\rep\EasyStok\builds\app-debug.apk`.
-- **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; sub-recurso valida pertencimento; fail fast 400 se invalido.
-- **Nao criar arquivos `.md`** salvo se Felipe pedir explicitamente.
+## Atalho de roteamento
 
-## Quando tarefa for complexa, leia tambem
-
-- `lessons_learned.md` (na pasta de memoria) — cada armadilha com hash do commit do fix
-- `dev_playbook.md` — fluxo completo, checklists expandidos
-- `project_structure.md` — mapa detalhado dos 50 controllers e 57 entidades
-- `.knowledge/dual-frontend-policy.md` (no proprio repo) — politica PWA+MAUI canonica
+| Tarefa toca... | Abre... |
+|---|---|
+| EF Core / migration / VO | `.knowledge/conventions.md` + `.knowledge/do-not-do.md` |
+| multi-tenant / auth | `.knowledge/conventions.md` + `.knowledge/do-not-do.md` |
+| Pedido / Estoque / Caixa / Compras | `.knowledge/domain-glossary.md` + `.knowledge/current-state.md` |
+| PWA ou MAUI | `.knowledge/dual-frontend-policy.md` (SEMPRE, antes de qualquer change) |
+| "estado do projeto" | `.knowledge/current-state.md` + `.knowledge/recent-evolution.md` |
+| deploy | `.knowledge/current-state.md` (Infra) + `.knowledge/gcp-deploy.md` se for migracao |
+| auditoria pessimista | `.knowledge/audit-brutal.md` (nao regenere — usa muitos tokens) |
+| "o que falta" | `.knowledge/tech-debt.md` + `.knowledge/stability-roadmap.md` |

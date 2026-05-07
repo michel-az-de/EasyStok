@@ -1,28 +1,43 @@
 # Recent Evolution
 
-> Auto-gerável via `bash .knowledge/update.sh`. Atualizar manualmente se script não rodou.
+> Resumo curado das ondas de feature mais recentes. Atualizar manualmente após sessão grande.
 
-## Snapshot 2026-04-30
+## Snapshot 2026-05-06
+
+### Ondas concluídas (últimos 30 dias)
+- **Notifications PR1–PR7**: domain → ports → adapters Email/SMS/WhatsApp/InApp → Worker com Outbox → painel Admin → migração jobs legados → LGPD self-service + métricas OTel.
+- **Helpdesk core**: AdminTicket reformado (TicketAnexo, TicketHistorico, AdminTicketTecnicoMeta, SlaConfiguracao), SlaMonitorService, 9 eventos de notificação globais, UI Tickets multi-nível.
+- **Admin Gestão de Cliente P0–P3**: reset senha, força logout, sessões, edição usuário, CRUD lojas, atividade unificada, PII unmask + audit, LGPD anonimizar/exportar, Cmd+K + atalhos + recentes, notas internas + banner alerta.
+- **Mobile MAUI F0–F4c**: setup → estrutura → auth E2E (JWT+refresh+biometria) → multi-tenant pickers + permissões → produção SQLite + REST → mutations otimistas (outbox SQLite) → SyncEngine periódico → popup captura foto/peso/validade.
+- **Seed bootstrap idempotente**: 4 camadas de defesa (Npgsql direto + retry strategy compatível + `[NotMapped]` em IsSeedData + per-tenant files + script `CreateSuperAdmin`).
+- **Dual frontend formalizado**: política PWA → MAUI unidirecional documentada em `dual-frontend-policy.md` (commit `4e9ffda`).
+
+### Decisões de arquitetura recentes
+- **2026-05-01**: ADR 0001 — MongoDB descartado como provedor transacional (`docs/adr/0001-mongo-discarded.md`). Postgre é único.
+- **2026-05-01**: P0 Webhook Pix validação de valor pago (commit `37fb7d9`).
+- **2026-04-30**: P0 `PedidoFornecedorItem` criada — Compras agora persiste itens.
+- **2026-04**: PedidoEstoqueIntegrationService extraído com `PedidoEstoqueOptions`.
+- **2026-04**: `AtualizarStatusPedidoUseCase` com state machine matrix explícita + `GetByIdWithDetailsAsync`.
+- **2026-04**: xmin RowVersion em Produto, Pedido, ItemEstoque, AssinaturaEmpresa.
+- **2026-04**: SubscriptionGateMiddleware retornando 402 para tenants suspensos.
+- **2026-04**: Webhook Pix com HMAC-SHA256 + replay protection (com validação de valor adicionada em maio).
+
+### Direção atual
+- Foco P0 atual: NF-e (decidir emissor third-party), rate limiting endpoints públicos, CI gate de qualidade.
+- Helpdesk continua em maturação (próxima onda: SLA UI + reabertura + escalação).
+- Mobile MAUI saindo de F4 — próxima onda: bridge JS↔Native dentro do WebView.
+- Render NÃO é deploy alvo (referência antiga em memória ignorada). Hoje é Azure App Service via `deploy-azure.yml`. GCP é plano alternativo documentado.
 
 ### Últimos 10 commits
 ```
-1ce968c fix(bugs): 5 bugs confirmados — segurança, tenant isolation, middleware
-30b630f fix(admin): corrigir bypass de autenticação e URL hardcoded na listagem de tenants
-45dcd8d fix(admin): segunda revisão — 4 defeitos corrigidos
-e1b7ba8 fix(admin): corrigir bugs no painel admin - sessão, planos e impersonation
-2d16c28 fix(admin): auditoria e pente fino do design system
-340aff0 fix(99%): Produtos + Pedido→Estoque + Estoque(web)
+78fdbc1 fix(notifications): pente fino — 30 correcoes de seguranca, correcao e performance
+76d31af feat(helpdesk): reformar pagina Tickets (Index + Detail) — UI multi-nivel + SLA + LGPD
+44478f6 test(helpdesk): factories de Domain
+e66e8c4 feat(helpdesk): SlaMonitorService — varre tickets e dispara SlaProximoVencer/SlaViolado
+a0e556f feat(helpdesk): templates + rotinas globais para os 9 eventos novos de notificacao
+3a74550 feat(helpdesk): API controllers (admin tickets reformados + empresa preview LGPD + sla)
+46a0c07 fix(seed): [NotMapped] em IsSeedData — elimina coluna de todo SQL gerado pelo EF
+9909cc1 feat(helpdesk): services para abrir/responder/encaminhar/anexar/bug-fix/preview cliente
+aa542ea feat(helpdesk): migration AddHelpdeskCore + backfill SLA
+d754f84 fix(seed): solucao definitiva — schema bootstrap idempotente em SQL
 ```
-
-### Decisões de arquitetura recentes
-- **2026-04**: PedidoEstoqueIntegrationService extraído pra service dedicado com `PedidoEstoqueOptions` (PermiteEstoqueNegativo, RequerEstoqueExistente).
-- **2026-04**: `AtualizarStatusPedidoUseCase` com state machine matrix explícita + `GetByIdWithDetailsAsync` (corrige bug de itens vazios).
-- **2026-04**: xmin RowVersion adicionado a Produto, Pedido, ItemEstoque, AssinaturaEmpresa.
-- **2026-04**: SubscriptionGateMiddleware retornando 402 para tenants suspensos.
-- **2026-04**: Webhook Pix com HMAC-SHA256 + replay protection (mas SEM validação de valor — pendente).
-- **2026-04**: Idempotência de movimentação de estoque por `{pedidoId}:{itemId}` (não só pedidoId).
-
-### Direção atual
-- Migração Azure → GCP em andamento (aguarda Project ID do usuário)
-- Foco P0: corrigir `PedidoFornecedor.Itens [NotMapped]` e validação webhook Pix antes de cliente externo
-- Knowledge base (`.knowledge/`) criada pra reduzir custo de contexto em sessões futuras
