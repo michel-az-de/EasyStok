@@ -12,7 +12,6 @@ using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
