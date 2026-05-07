@@ -150,6 +150,34 @@ public class AdminApiClient(HttpClient httpClient)
         return json.RootElement.Clone();
     }
 
+    /// <summary>
+    /// GET sem desempacotar envelope <c>data</c>. Usado pelos endpoints
+    /// <c>/api/mobile/*</c> que devolvem JSON cru (não envelopado como os
+    /// admin/empresa endpoints). EnsureSuccess + parse direto pro tipo destino.
+    /// </summary>
+    public async Task<T> GetJsonAsync<T>(string path)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Get, path));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content)) return default!;
+        return JsonSerializer.Deserialize<T>(content, JsonOptions)
+            ?? throw new ApiException(0, "BAD_RESPONSE", "API devolveu corpo vazio.");
+    }
+
+    /// <summary>POST sem desempacotar envelope <c>data</c>. Mesmo motivo de <see cref="GetJsonAsync{T}"/>.</summary>
+    public async Task<T> PostJsonAsync<T>(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content)) return default!;
+        return JsonSerializer.Deserialize<T>(content, JsonOptions)
+            ?? throw new ApiException(0, "BAD_RESPONSE", "API devolveu corpo vazio.");
+    }
+
     public async Task<T> PostAsync<T>(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));

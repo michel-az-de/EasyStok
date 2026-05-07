@@ -1,4 +1,5 @@
 using System.Reflection;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -24,10 +25,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("mobile-anonymous")]
 public class MobileVersionController(
     EasyStockDbContext db,
-    IConfiguration configuration) : ControllerBase
+    IConfiguration configuration,
+    IPwaVersionProvider pwaVersion) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly IConfiguration _configuration = configuration;
+    private readonly IPwaVersionProvider _pwaVersion = pwaVersion;
 
     /// <summary>
     /// Retorna versão do contrato Mobile, hora do servidor e capabilities.
@@ -70,6 +73,15 @@ public class MobileVersionController(
             "cashEntry.upsert",
         };
 
+        // Comandos remotos que o servidor sabe enfileirar.
+        // PWA usa pra decidir se UI da web pode oferecer um botão (ex: pwa_update).
+        // Sincronizado com DevicePairingController.AllowedCommandTypes.
+        var supportedCommands = new[]
+        {
+            "flush_now", "pull_now", "reload", "message",
+            "pwa_update", "clear_cache",
+        };
+
         // Onda 1 entregue: pareamento de devices + ApiKey middleware.
         // ApiKeyEnforced reflete a flag Mobile:RequireApiKey:
         //   false (default) = transição. /sync aceita anônimo OU pareado.
@@ -83,14 +95,15 @@ public class MobileVersionController(
         );
 
         // OTA / atualização do app (PWA + APK).
-        // PwaCacheVersion: usado pelo PWA para decidir se chama
-        // ServiceWorkerRegistration.update() — se o valor mudou desde o último
-        // boot, força revalidação do SW e dos assets.
+        // PwaCacheVersion vem do IPwaVersionProvider, que lê o CACHE_VERSION
+        // diretamente do wwwroot/pwa/sw.js — fonte da verdade do bundle servido.
+        // PWA compara o valor recebido com o cdb-pwa-installed-version local; se
+        // diferir, dispara update do SW + reload (ver sync.js > checkPwaUpdate).
         // ApkUrl/ApkVersion/ApkSha256: APK lê esses campos no boot e oferece
         // download da nova build quando ApkVersion > versão local. URL aponta
         // pro Azure Blob Storage do bucket easystock-apk.
         var ota = new MobileOtaInfo(
-            PwaCacheVersion: _configuration["Mobile:PwaCacheVersion"] ?? "cdb-v3-20260429a",
+            PwaCacheVersion: _pwaVersion.GetCurrentCacheVersion(),
             ApkVersion: _configuration["Mobile:Apk:Version"] ?? "0.0.0",
             ApkUrl: _configuration["Mobile:Apk:Url"] ?? "",
             ApkSha256: _configuration["Mobile:Apk:Sha256"] ?? "",
@@ -104,6 +117,7 @@ public class MobileVersionController(
             Status: dbOk ? "ok" : "degraded",
             DatabaseOk: dbOk,
             SupportedMutations: supportedMutations,
+            SupportedCommands: supportedCommands,
             Features: features,
             Ota: ota
         ));
@@ -118,6 +132,7 @@ public record MobileVersionResponse(
     string Status,
     bool DatabaseOk,
     string[] SupportedMutations,
+    string[] SupportedCommands,
     MobileFeatures Features,
     MobileOtaInfo Ota
 );

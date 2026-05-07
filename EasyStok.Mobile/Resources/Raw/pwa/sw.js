@@ -10,8 +10,14 @@
 // CACHE_VERSION e substituida pelo CI a cada deploy (cdb-<sha>) — isso garante
 // que o activate descarte caches antigos, forcando o conteudo cacheado a ser
 // re-baixado apos cada release.
+//
+// Onda 9 — OTA controlado pelo servidor:
+// O backend reporta esse mesmo CACHE_VERSION em /api/mobile/version > Ota.PwaCacheVersion
+// (lido de wwwroot/pwa/sw.js pelo PwaVersionProvider). O sync.js compara o valor
+// recebido com cdb-pwa-installed-version local; quando diferente, pede update.
+// Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v3-20260429a';
+const CACHE_VERSION = 'cdb-v3-20260506a';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -78,6 +84,39 @@ function staleWhileRevalidate(req, url) {
     return cached || network;
   });
 }
+
+// Onda 9 — Canal de controle SW <- página.
+// O sync.js manda mensagens pra forçar update ou limpeza de cache, viabilizando
+// "atualização pelo web" sem o operador precisar fechar/reabrir o app.
+//   - SKIP_WAITING : ativa imediatamente o novo SW que está em waiting.
+//   - CHECK_UPDATE : pede ao browser que refaça fetch do sw.js.
+//   - CLEAR_CACHE  : apaga TODOS os caches mantidos por este SW.
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  const type = data.type;
+  if (type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+  if (type === 'CHECK_UPDATE') {
+    if (self.registration && self.registration.update) {
+      event.waitUntil(self.registration.update().catch(() => {}));
+    }
+    return;
+  }
+  if (type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => {
+          if (event.source && event.source.postMessage) {
+            try { event.source.postMessage({ type: 'CACHE_CLEARED' }); } catch (e) {}
+          }
+        })
+    );
+    return;
+  }
+});
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;

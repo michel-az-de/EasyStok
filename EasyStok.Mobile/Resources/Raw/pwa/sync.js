@@ -861,6 +861,19 @@
         } else if (typeof window.showToast === 'function') {
           try { window.showToast(text); } catch (_) {}
         }
+      } else if (type === 'pwa_update') {
+        // Onda 9 — gestor força atualizacao do bundle pelo painel web.
+        // Drena fila antes; trigger com {force:true} limpa caches e reload.
+        flush().finally(() => triggerPwaUpdate({ reason: 'remote-command', force: true }));
+      } else if (type === 'clear_cache') {
+        // Debug remoto: limpa caches do SW sem reload (operador continua trabalhando).
+        try {
+          if (typeof caches !== 'undefined' && caches.keys) {
+            caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {});
+          }
+          const ctrl = navigator.serviceWorker && navigator.serviceWorker.controller;
+          if (ctrl) ctrl.postMessage({ type: 'CLEAR_CACHE' });
+        } catch (e) {}
       }
     } catch (e) {
       console.warn('Comando remoto falhou:', type, e && e.message);
@@ -887,11 +900,115 @@
           ...data
         }));
       } catch (e) {}
+      // Onda 9 — auto-update OTA orquestrado pelo servidor.
+      // Se PwaCacheVersion mudou desde a ultima instalacao confirmada, dispara
+      // update do SW + reload assim que o novo SW assumir controle. Falha
+      // silenciosa: app continua funcionando offline com o bundle atual.
+      try { await maybeApplyPwaUpdate(data); } catch (e) {}
       return data;
     } catch (e) {
       // Sem rede / timeout / DNS / TLS — silencioso. PWA continua offline.
       try { console.warn('pingVersion falhou:', e && e.message); } catch (_) {}
       return null;
+    }
+  }
+
+  // ---- OTA: atualizacao do bundle PWA controlada pelo servidor (Onda 9) ----
+  // O backend reporta no /version qual o CACHE_VERSION servido pelo sw.js. O PWA
+  // guarda em cdb-pwa-installed-version o ultimo valor que ja viu. Quando o
+  // servidor anuncia versao diferente, pedimos pro browser refazer fetch do
+  // sw.js (registration.update()): se o conteudo mudou, o navegador instala o
+  // novo SW. O install_listener original ja chama skipWaiting() — entao o
+  // controllerchange dispara em seguida e o listener no index.html recarrega.
+  // Caso o SW novo trave em "waiting" por algum motivo, mandamos SKIP_WAITING
+  // explicito como ultimo recurso.
+  const PWA_INSTALLED_VERSION_KEY = 'cdb-pwa-installed-version';
+  let _pwaUpdating = false;
+
+  function getInstalledPwaVersion() {
+    try { return localStorage.getItem(PWA_INSTALLED_VERSION_KEY) || null; } catch (e) { return null; }
+  }
+
+  function setInstalledPwaVersion(v) {
+    try { if (v) localStorage.setItem(PWA_INSTALLED_VERSION_KEY, String(v)); } catch (e) {}
+  }
+
+  async function maybeApplyPwaUpdate(versionPayload) {
+    if (_pwaUpdating) return;
+    if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistration) return;
+    const remote = versionPayload && versionPayload.Ota && versionPayload.Ota.PwaCacheVersion;
+    if (!remote || typeof remote !== 'string') return;
+
+    const installed = getInstalledPwaVersion();
+    if (installed === null) {
+      // Primeira execucao com Onda 9 — apenas registra a versao corrente; nao
+      // dispara update (assumimos que o que esta cached eh o que o servidor servia
+      // ate agora; bump real no proximo deploy gera divergencia).
+      setInstalledPwaVersion(remote);
+      return;
+    }
+    if (installed === remote) return;
+
+    console.log('[OTA] versao do servidor', remote, 'difere da instalada', installed, '— atualizando');
+    await triggerPwaUpdate({ reason: 'version-bump', force: false });
+  }
+
+  // Forca atualizacao do bundle PWA: dispara registration.update() e, se o novo
+  // SW ficar em waiting, manda SKIP_WAITING. controllerchange listener no
+  // index.html cuida do reload. Se {force:true} (comando remoto pwa_update),
+  // limpa caches antes pra garantir que ate index.html cacheado seja descartado.
+  async function triggerPwaUpdate(opts) {
+    opts = opts || {};
+    if (_pwaUpdating) return;
+    _pwaUpdating = true;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        if (opts.force) location.reload();
+        return;
+      }
+
+      if (opts.force) {
+        // Limpa caches por dois caminhos: API direta da window (suficiente quando
+        // o SW responde) e via mensagem ao SW (caminho oficial). Ambos best-effort.
+        try {
+          if (typeof caches !== 'undefined' && caches.keys) {
+            const ks = await caches.keys();
+            await Promise.all(ks.map(k => caches.delete(k).catch(() => {})));
+          }
+        } catch (e) {}
+        try {
+          const ctrl = navigator.serviceWorker.controller;
+          if (ctrl) ctrl.postMessage({ type: 'CLEAR_CACHE' });
+        } catch (e) {}
+      }
+
+      try { await reg.update(); } catch (e) { console.warn('[OTA] reg.update() falhou', e); }
+
+      // Se ja existe um SW novo aguardando (waiting), pede skipWaiting.
+      if (reg.waiting) {
+        try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+      }
+
+      // Se a versao remota foi passada e nao havia waiting, marca a remota como
+      // installed agora pra evitar loop de update enquanto o browser instala.
+      // Caso o reload do controllerchange nao dispare (sem SW novo), o estado
+      // local fica consistente.
+      try {
+        const sv = JSON.parse(localStorage.getItem('cdb-server-version') || 'null');
+        if (sv && sv.Ota && sv.Ota.PwaCacheVersion) {
+          setInstalledPwaVersion(sv.Ota.PwaCacheVersion);
+        }
+      } catch (e) {}
+
+      // Force: garantia final de reload depois de um delay curto.
+      if (opts.force) {
+        setTimeout(() => { try { location.reload(); } catch (e) {} }, 1500);
+      }
+    } finally {
+      // Libera o lock depois de um pequeno tempo — evita reentry mas nao trava
+      // pra sempre se o reload nao acontecer.
+      setTimeout(() => { _pwaUpdating = false; }, 5000);
     }
   }
 
@@ -1003,6 +1120,9 @@
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
+    // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
+    forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
+    installedPwaVersion: getInstalledPwaVersion,
     deviceId,
     apiBaseUrl: API_BASE_URL
   };

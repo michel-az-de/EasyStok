@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
@@ -81,10 +82,14 @@ public class DevicePairingController(
         var userId = ResolveUserId();
 
         var code = GeneratePairingCode();
+        // Placeholder também é hash — entry vira inválida até o pareamento real
+        // sobrescrever com o hash da apiKey definitiva. Um valor único garante
+        // que a unique index não conflita entre placeholders.
+        var placeholderHash = TokenHashHelper.ComputeSha256Hash("placeholder-" + Guid.NewGuid().ToString("N"));
         var device = new MobileDevice
         {
             Id = req.DeviceId ?? "pending-" + Guid.NewGuid().ToString("N"),
-            ApiKey = "pending-" + Guid.NewGuid().ToString("N"), // placeholder até pareamento efetivo
+            ApiKeyHash = placeholderHash,
             EmpresaId = req.EmpresaId,
             LojaId = req.LojaId,
             PairedByUserId = userId,
@@ -150,6 +155,7 @@ public class DevicePairingController(
         // Caso o registro tenha sido criado com deviceId conhecido (pre-cadastrado),
         // só limpa código + gera key.
         var apiKey = GenerateApiKey();
+        var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
         var now = DateTime.UtcNow;
 
         if (device.Id.StartsWith("pending-"))
@@ -159,7 +165,7 @@ public class DevicePairingController(
             var newDevice = new MobileDevice
             {
                 Id = deviceFromApp,
-                ApiKey = apiKey,
+                ApiKeyHash = apiKeyHash,
                 EmpresaId = device.EmpresaId,
                 LojaId = device.LojaId,
                 PairedByUserId = device.PairedByUserId,
@@ -180,7 +186,7 @@ public class DevicePairingController(
         }
         else
         {
-            device.ApiKey = apiKey;
+            device.ApiKeyHash = apiKeyHash;
             device.PairingCode = null;
             device.PairingExpiresAt = null;
             device.PairedAt = now;
@@ -242,9 +248,29 @@ public class DevicePairingController(
     }
 
     /// <summary>
+    /// Conjunto de comandos remotos que o servidor sabe enfileirar e o PWA sabe executar.
+    /// Manter sincronizado com o switch em <c>sync.js > executeRemoteCommand</c>.
+    ///
+    /// <list type="bullet">
+    ///   <item><c>flush_now</c> — drena fila de mutations imediatamente.</item>
+    ///   <item><c>pull_now</c> — busca atualizações do servidor agora.</item>
+    ///   <item><c>reload</c> — recarrega a página (após flush).</item>
+    ///   <item><c>message</c> — exibe toast com texto vindo do payload.</item>
+    ///   <item><c>pwa_update</c> — força atualização do PWA: limpa caches, dispara
+    ///         <c>swReg.update()</c> e recarrega assim que o novo SW assume.
+    ///         É a primitiva que o gestor usa pra fazer "atualização pelo web".</item>
+    ///   <item><c>clear_cache</c> — limpa caches do SW sem reload (debug).</item>
+    /// </list>
+    /// </summary>
+    private static readonly HashSet<string> AllowedCommandTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "flush_now", "pull_now", "reload", "message", "pwa_update", "clear_cache"
+    };
+
+    /// <summary>
     /// Onda 4 — Web autenticado: enfileira um comando remoto pro device.
-    /// Tipos suportados: <c>flush_now</c>, <c>pull_now</c>, <c>reload</c>, <c>message</c>.
-    /// Device executa na próxima chamada de /sync ou /sync/pull.
+    /// Lista de tipos válidos em <see cref="AllowedCommandTypes"/>.
+    /// Device executa na próxima chamada de /sync, /sync/pull ou via SSE realtime.
     /// </summary>
     [HttpPost("{id}/commands")]
     [Authorize]
@@ -263,10 +289,8 @@ public class DevicePairingController(
         if (device == null) return NotFound();
         if (device.Revoked) return BadRequest(new { error = "device revogado" });
 
-        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "flush_now", "pull_now", "reload", "message" };
-        if (!allowed.Contains(req.CommandType))
-            return BadRequest(new { error = "commandType inválido. Use: " + string.Join(", ", allowed) });
+        if (!AllowedCommandTypes.Contains(req.CommandType))
+            return BadRequest(new { error = "commandType inválido. Use: " + string.Join(", ", AllowedCommandTypes) });
 
         var cmd = new DeviceCommand
         {
@@ -285,6 +309,64 @@ public class DevicePairingController(
         _log.LogInformation("Comando enfileirado: {Cmd} pra device {DeviceId} by {User}",
             cmd.CommandType, id, cmd.CreatedByUserId);
         return Ok(new { id = cmd.Id, commandType = cmd.CommandType, expiresAt = cmd.ExpiresAt });
+    }
+
+    /// <summary>
+    /// Onda 9 — Broadcast de comando para múltiplos devices duma empresa/loja.
+    ///
+    /// Usado principalmente pra "forçar atualização pelo web": o gestor empurra
+    /// pwa_update pra todos os devices de uma vez. Ignora devices revogados.
+    /// Filtra por <c>lojaId</c> opcional. Retorna quantos comandos foram enfileirados.
+    /// </summary>
+    [HttpPost("broadcast")]
+    [Authorize]
+    public async Task<ActionResult<object>> BroadcastCommand(
+        [FromBody] BroadcastCommandRequest req,
+        CancellationToken ct)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.CommandType))
+            return BadRequest(new { error = "commandType obrigatório" });
+        if (req.EmpresaId == Guid.Empty)
+            return BadRequest(new { error = "empresaId obrigatório" });
+
+        if (!RequestedEmpresaMatchesCurrentUser(req.EmpresaId)) return Forbid();
+        if (!AllowedCommandTypes.Contains(req.CommandType))
+            return BadRequest(new { error = "commandType inválido. Use: " + string.Join(", ", AllowedCommandTypes) });
+
+        var devicesQ = _db.Set<MobileDevice>().AsNoTracking()
+            .Where(d => d.EmpresaId == req.EmpresaId && !d.Revoked && d.PairingCode == null);
+        if (req.LojaId.HasValue && req.LojaId != Guid.Empty)
+            devicesQ = devicesQ.Where(d => d.LojaId == req.LojaId);
+
+        var deviceIds = await devicesQ.Select(d => d.Id).ToListAsync(ct);
+        if (deviceIds.Count == 0)
+            return Ok(new { enqueued = 0, deviceIds = Array.Empty<string>() });
+
+        var now = DateTime.UtcNow;
+        var userId = ResolveUserId();
+        var cmdType = req.CommandType.ToLowerInvariant();
+        var expires = now.AddHours(24);
+
+        var cmds = deviceIds.Select(did => new DeviceCommand
+        {
+            Id = Guid.NewGuid(),
+            DeviceId = did,
+            EmpresaId = req.EmpresaId,
+            CommandType = cmdType,
+            PayloadJson = req.PayloadJson,
+            CreatedAt = now,
+            CreatedByUserId = userId,
+            ExpiresAt = expires
+        }).ToList();
+
+        _db.Set<DeviceCommand>().AddRange(cmds);
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation(
+            "Broadcast {Cmd}: {Count} device(s) na empresa {EmpresaId} loja {LojaId} by {User}",
+            cmdType, cmds.Count, req.EmpresaId, req.LojaId, userId);
+
+        return Ok(new { enqueued = cmds.Count, deviceIds });
     }
 
     /// <summary>
@@ -434,6 +516,14 @@ public record DeviceSummary(
 
 /// <summary>Onda 4 — request pra enfileirar comando remoto.</summary>
 public record EnqueueCommandRequest(string CommandType, string? PayloadJson);
+
+/// <summary>Onda 9 — request pra broadcast (todos os devices de uma empresa/loja).</summary>
+public record BroadcastCommandRequest(
+    Guid EmpresaId,
+    Guid? LojaId,
+    string CommandType,
+    string? PayloadJson
+);
 
 /// <summary>Onda 6 — item da lista de lojas disponíveis pro device.</summary>
 public record LojaDisponivelDto(

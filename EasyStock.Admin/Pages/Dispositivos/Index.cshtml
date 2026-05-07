@@ -1,0 +1,394 @@
+@page
+@model EasyStock.Admin.Pages.Dispositivos.IndexModel
+@{
+    ViewData["Title"] = "Dispositivos";
+}
+
+<div x-data="dispositivosPage()" x-init="init()" class="space-y-6">
+
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Dispositivos</h2>
+            <p class="text-es-ink-mute text-sm">PWAs pareados, saúde, comandos remotos e atualização OTA.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-es-ink-mute">Versão do bundle:</span>
+            <span class="text-xs font-mono px-2 py-1 rounded bg-es-surface-2 text-es-ink"
+                  x-text="serverPwaVersion || '…'"></span>
+        </div>
+    </div>
+
+    <!-- Sem empresa selecionada -->
+    <template x-if="!empresaId">
+        <div class="rounded-xl p-6"
+             style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
+            <p class="text-es-ink-dim text-sm">
+                Para listar dispositivos, abra o detalhe de um cliente em
+                <a href="/Tenants" class="text-es-accent hover:underline">/Tenants</a>
+                ou informe o ID na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>.
+            </p>
+        </div>
+    </template>
+
+    <!-- Com empresa -->
+    <template x-if="empresaId">
+        <div class="space-y-6">
+
+            <!-- Toolbar -->
+            <div class="flex flex-wrap items-center gap-3 rounded-xl p-4"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="flex-1 min-w-[200px]">
+                    <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Empresa</div>
+                    <div class="text-es-ink font-mono text-xs truncate" x-text="empresaId"></div>
+                </div>
+                <button type="button" @@click="abrirNovoCodigo()"
+                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-es-accent text-es-ink hover:opacity-90 transition">
+                    + Novo código de pareamento
+                </button>
+                <button type="button" @@click="broadcastPwaUpdate()"
+                        :disabled="loading || !devices.length"
+                        class="px-4 py-2 rounded-lg text-sm font-semibold border border-es-accent text-es-accent hover:bg-es-accent/10 disabled:opacity-40 transition">
+                    Forçar atualização do PWA (todos)
+                </button>
+                <button type="button" @@click="recarregar()"
+                        :disabled="loading"
+                        class="px-3 py-2 rounded-lg text-sm border border-es-line text-es-ink-dim hover:bg-es-surface-2 transition">
+                    <span x-show="!loading">⟳ atualizar</span>
+                    <span x-show="loading">…</span>
+                </button>
+            </div>
+
+            <!-- Lista -->
+            <div class="rounded-xl overflow-hidden"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="grid grid-cols-12 gap-2 px-4 py-3 text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold"
+                     style="border-bottom:1px solid rgba(247,242,232,.08)">
+                    <div class="col-span-3">Device</div>
+                    <div class="col-span-2">Saúde</div>
+                    <div class="col-span-2">Última atividade</div>
+                    <div class="col-span-2">Loja</div>
+                    <div class="col-span-3 text-right">Ações</div>
+                </div>
+
+                <template x-if="!devices.length && !loading">
+                    <div class="px-4 py-10 text-center text-es-ink-mute text-sm">
+                        Nenhum dispositivo pareado nesta empresa.
+                    </div>
+                </template>
+
+                <template x-for="d in devices" :key="d.id">
+                    <div class="grid grid-cols-12 gap-2 px-4 py-3 items-center"
+                         style="border-bottom:1px solid rgba(247,242,232,.05)">
+                        <div class="col-span-3">
+                            <div class="text-es-ink text-sm font-medium truncate" x-text="d.label || '(sem rótulo)'"></div>
+                            <div class="text-es-ink-mute text-[11px] font-mono truncate" x-text="d.id"></div>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
+                                  :class="badgeClass(d.health?.status)">
+                                <span class="w-1.5 h-1.5 rounded-full"
+                                      :class="dotClass(d.health?.status)"></span>
+                                <span x-text="d.health?.statusLabel || statusFor(d)"></span>
+                            </span>
+                        </div>
+                        <div class="col-span-2 text-es-ink-dim text-xs" x-text="formatLastSeen(d.lastSeenAt)"></div>
+                        <div class="col-span-2 text-es-ink-dim text-xs font-mono truncate" x-text="(d.lojaId || '').slice(0,8)"></div>
+                        <div class="col-span-3 flex items-center justify-end gap-1.5 flex-wrap">
+                            <button @@click="cmd(d.id, 'pwa_update')" :disabled="d.revoked"
+                                    class="px-2 py-1 rounded text-[11px] border border-es-accent text-es-accent hover:bg-es-accent/10 disabled:opacity-30">
+                                Atualizar
+                            </button>
+                            <button @@click="cmd(d.id, 'reload')" :disabled="d.revoked"
+                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
+                                Reload
+                            </button>
+                            <button @@click="cmd(d.id, 'flush_now')" :disabled="d.revoked"
+                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
+                                Flush
+                            </button>
+                            <button @@click="enviarMsg(d.id)" :disabled="d.revoked"
+                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
+                                Msg
+                            </button>
+                            <button @@click="revogar(d.id)" :disabled="d.revoked"
+                                    class="px-2 py-1 rounded text-[11px] border border-red-500/40 text-red-400 hover:bg-red-500/10 disabled:opacity-30">
+                                Revogar
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <p x-show="erro" x-cloak class="text-red-400 text-sm" x-text="erro"></p>
+        </div>
+    </template>
+
+    <!-- Modal: gerar pair-code -->
+    <div x-show="modalCodigo.open" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+         @@click.self="modalCodigo.open = false"
+         @@keydown.escape.window="modalCodigo.open = false">
+        <div class="w-full max-w-md rounded-xl p-6"
+             style="background:#0b1530;border:1px solid rgba(247,242,232,.12)">
+            <h3 class="text-es-ink text-lg font-semibold mb-1">Novo código de pareamento</h3>
+            <p class="text-es-ink-mute text-xs mb-4">Mostre o código pro operador digitar no PWA. Válido por 10 min.</p>
+
+            <template x-if="!modalCodigo.codigo">
+                <div class="space-y-3">
+                    <label class="block">
+                        <span class="text-xs text-es-ink-mute">Loja (UUID)</span>
+                        <input type="text" x-model="modalCodigo.lojaId"
+                               placeholder="00000000-0000-..."
+                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm font-mono outline-none">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs text-es-ink-mute">Rótulo (opcional)</span>
+                        <input type="text" x-model="modalCodigo.label"
+                               placeholder="Ex: Tablet Caixa 1"
+                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm outline-none">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs text-es-ink-mute">Operador padrão (opcional)</span>
+                        <input type="text" x-model="modalCodigo.defaultOperatorName"
+                               placeholder="Ex: Maria"
+                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm outline-none">
+                    </label>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button @@click="modalCodigo.open = false"
+                                class="px-4 py-2 rounded-lg text-sm border border-es-line text-es-ink-dim hover:bg-es-surface-2">
+                            Cancelar
+                        </button>
+                        <button @@click="gerarCodigo()" :disabled="modalCodigo.loading"
+                                class="px-4 py-2 rounded-lg text-sm font-semibold bg-es-accent text-es-ink hover:opacity-90 disabled:opacity-50">
+                            <span x-show="!modalCodigo.loading">Gerar código</span>
+                            <span x-show="modalCodigo.loading">…</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="modalCodigo.codigo">
+                <div class="space-y-3 text-center">
+                    <div class="text-es-ink-mute text-xs uppercase tracking-widest">Código</div>
+                    <div class="text-5xl font-bold font-mono text-es-accent tracking-widest"
+                         x-text="modalCodigo.codigo"></div>
+                    <div class="text-es-ink-mute text-xs" x-text="'expira em ' + modalCodigo.expiraEm"></div>
+                    <button @@click="modalCodigo.open = false; recarregar();"
+                            class="mt-3 px-4 py-2 rounded-lg text-sm bg-es-accent text-es-ink hover:opacity-90">
+                        Pronto
+                    </button>
+                </div>
+            </template>
+
+            <p x-show="modalCodigo.erro" x-cloak class="mt-3 text-red-400 text-sm" x-text="modalCodigo.erro"></p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Página /Dispositivos: gestão de PWAs pareados.
+// Toda a interação com a API passa pelos proxies /api-proxy/mobile/* que já
+// injetam o Bearer token do AdminApiClient. SuperAdmin escolhe empresa via
+// query string ?empresaId=<guid> (ver Tenants/Detail no futuro pra deep-link).
+function dispositivosPage() {
+    return {
+        empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
+        lojaId: '@(Model.LojaId?.ToString() ?? "")',
+        devices: [],
+        healthByDevice: {},
+        loading: false,
+        erro: '',
+        serverPwaVersion: '',
+        modalCodigo: {
+            open: false, loading: false, codigo: '', expiraEm: '', erro: '',
+            lojaId: '', label: '', defaultOperatorName: ''
+        },
+
+        async init() {
+            this.fetchVersion();
+            if (this.empresaId) {
+                await this.recarregar();
+                // Pull contínuo a cada 15s pra refletir last_seen sem F5.
+                setInterval(() => { this.recarregar(); }, 15000);
+            }
+        },
+
+        async fetchVersion() {
+            try {
+                const r = await fetch('/api-proxy/mobile/version', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const d = await r.json();
+                this.serverPwaVersion = d?.ota?.pwaCacheVersion || d?.Ota?.PwaCacheVersion || '';
+            } catch {}
+        },
+
+        async recarregar() {
+            if (!this.empresaId) return;
+            this.loading = true; this.erro = '';
+            try {
+                // 1) lista de devices
+                const r1 = await fetch('/api-proxy/mobile/devices?empresaId=' + this.empresaId, { credentials: 'same-origin' });
+                if (r1.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r1.ok) throw new Error('devices: HTTP ' + r1.status);
+                const list = await r1.json();
+                this.devices = Array.isArray(list) ? list : [];
+
+                // 2) saúde
+                const r2 = await fetch('/api-proxy/mobile/operacao/devices-health?empresaId=' + this.empresaId, { credentials: 'same-origin' });
+                if (r2.ok) {
+                    const health = await r2.json();
+                    this.healthByDevice = {};
+                    if (Array.isArray(health)) {
+                        health.forEach(h => { this.healthByDevice[h.id] = h; });
+                    }
+                    this.devices.forEach(d => { d.health = this.healthByDevice[d.id]; });
+                }
+            } catch (e) {
+                this.erro = 'Falha ao carregar: ' + (e.message || e);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        statusFor(d) {
+            if (d.revoked) return 'revogado';
+            if (d.pendingPair) return 'aguardando';
+            if (!d.lastSeenAt) return 'nunca conectou';
+            return 'ativo';
+        },
+
+        badgeClass(status) {
+            return {
+                'bg-green-500/15 text-green-400': status === 'ok',
+                'bg-yellow-500/15 text-yellow-300': status === 'warn',
+                'bg-red-500/15 text-red-400': status === 'err',
+                'bg-es-surface-2 text-es-ink-mute': !status
+            };
+        },
+        dotClass(status) {
+            return {
+                'bg-green-400': status === 'ok',
+                'bg-yellow-400': status === 'warn',
+                'bg-red-400': status === 'err',
+                'bg-es-ink-mute': !status
+            };
+        },
+
+        formatLastSeen(iso) {
+            if (!iso) return '—';
+            try {
+                const d = new Date(iso);
+                const min = Math.floor((Date.now() - d.getTime()) / 60000);
+                if (min < 1) return 'agora';
+                if (min < 60) return min + ' min atrás';
+                if (min < 60 * 24) return Math.floor(min / 60) + ' h atrás';
+                return Math.floor(min / (60 * 24)) + ' d atrás';
+            } catch { return iso; }
+        },
+
+        // ── Comandos ──
+        async cmd(id, type, payload) {
+            if (!confirm('Enviar "' + type + '" pra ' + (id || '').slice(0, 12) + '...?')) return;
+            try {
+                const body = { commandType: type, payloadJson: payload ? JSON.stringify(payload) : null };
+                const r = await fetch('/api-proxy/mobile/devices/' + encodeURIComponent(id) + '/commands', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                this.erro = ''; this.toast('Comando enfileirado.');
+            } catch (e) {
+                this.erro = 'Falha: ' + (e.message || e);
+            }
+        },
+
+        async enviarMsg(id) {
+            const text = window.prompt('Mensagem (até 200 chars):');
+            if (!text) return;
+            await this.cmd(id, 'message', { text: text.slice(0, 200) });
+        },
+
+        async revogar(id) {
+            if (!confirm('Revogar este device? O PWA correspondente vai parar de sincronizar.')) return;
+            try {
+                const r = await fetch('/api-proxy/mobile/devices/' + encodeURIComponent(id), {
+                    method: 'DELETE', credentials: 'same-origin'
+                });
+                if (!r.ok && r.status !== 204) throw new Error('HTTP ' + r.status);
+                await this.recarregar();
+            } catch (e) {
+                this.erro = 'Falha: ' + (e.message || e);
+            }
+        },
+
+        async broadcastPwaUpdate() {
+            if (!confirm('Forçar atualização do PWA em TODOS os dispositivos desta empresa?')) return;
+            try {
+                const body = { empresaId: this.empresaId, lojaId: this.lojaId || null, commandType: 'pwa_update' };
+                const r = await fetch('/api-proxy/mobile/devices/broadcast', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                this.toast('Atualização enfileirada pra ' + (data.enqueued || 0) + ' device(s).');
+            } catch (e) {
+                this.erro = 'Falha: ' + (e.message || e);
+            }
+        },
+
+        // ── Modal pair-code ──
+        abrirNovoCodigo() {
+            this.modalCodigo = {
+                open: true, loading: false, codigo: '', expiraEm: '', erro: '',
+                lojaId: this.lojaId || '', label: '', defaultOperatorName: ''
+            };
+        },
+        async gerarCodigo() {
+            this.modalCodigo.loading = true; this.modalCodigo.erro = '';
+            try {
+                const body = {
+                    empresaId: this.empresaId,
+                    lojaId: this.modalCodigo.lojaId,
+                    label: this.modalCodigo.label || null,
+                    defaultOperatorName: this.modalCodigo.defaultOperatorName || null
+                };
+                const r = await fetch('/api-proxy/mobile/devices/pair-codes', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!r.ok) {
+                    const txt = await r.text();
+                    throw new Error('HTTP ' + r.status + ' ' + txt.slice(0, 120));
+                }
+                const data = await r.json();
+                this.modalCodigo.codigo = data.pairingCode || data.PairingCode;
+                const exp = data.expiresAt || data.ExpiresAt;
+                if (exp) {
+                    const d = new Date(exp);
+                    this.modalCodigo.expiraEm = d.toLocaleTimeString();
+                }
+            } catch (e) {
+                this.modalCodigo.erro = 'Falha: ' + (e.message || e);
+            } finally {
+                this.modalCodigo.loading = false;
+            }
+        },
+
+        toast(msg) {
+            // Fallback simples — _Layout já tem toast estrutural via TempData.
+            try { console.log('[toast]', msg); } catch {}
+        }
+    };
+}
+</script>
+}

@@ -410,4 +410,312 @@ app.MapGet("/api-proxy/diag/export", async (
     }
 });
 
+// ── Proxies SystemErrorLog + DiagnosticoMode ──────────────────────────────────
+
+// Recebe erros de frontend e repassa para a API.
+app.MapPost("/api-proxy/diag/frontend-error", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    HttpRequest req,
+    ILogger<Program> log) =>
+{
+    try
+    {
+        using var reader = new System.IO.StreamReader(req.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        await api.PostRawAsync("api/diagnostico/frontend-error", payload);
+        return Results.Ok(new { ok = true });
+    }
+    catch (Exception ex)
+    {
+        log.LogDebug(ex, "Proxy diag/frontend-error falhou (não crítico)");
+        return Results.Ok(new { ok = false }); // nunca 5xx — não quebra o UI
+    }
+});
+
+// Lista erros do banco (SystemErrorLog).
+app.MapGet("/api-proxy/diag/system-errors", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/system-errors?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/system-errors falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Purgar erros do banco.
+app.MapPost("/api-proxy/diag/system-errors/expurgar", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.PostAsync<System.Text.Json.JsonElement>($"api/diagnostico/system-errors/expurgar?{qs}", new { });
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/system-errors/expurgar falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Lê estado atual do logging mode.
+app.MapGet("/api-proxy/diag/logging-mode", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/diagnostico/logging-mode");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/logging-mode GET falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Altera logging mode.
+app.MapPost("/api-proxy/diag/logging-mode", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var data = await api.PostAsync<System.Text.Json.JsonElement>("api/diagnostico/logging-mode", payload);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/logging-mode POST falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Proxies /api-proxy/mobile/* — alimentam as páginas /Operacao e /Dispositivos
+// (gestão de devices PWA pareados, dashboard live, comandos remotos OTA).
+// SuperAdmin pode operar em qualquer empresa; Admin de empresa só na própria
+// (regra aplicada já no backend via ICurrentUserAccessor).
+// ──────────────────────────────────────────────────────────────────────
+
+// Dashboard live de operação (KPIs do dia da empresa/loja).
+app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/operation/dashboard?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/operacao/dashboard falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Saúde dos devices da empresa (badge ok/warn/err + último visto).
+app.MapGet("/api-proxy/mobile/operacao/devices-health", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/operation/devices-health?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/operacao/devices-health falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Listagem de devices pareados (sumarização básica).
+app.MapGet("/api-proxy/mobile/devices", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/devices?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/devices falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Gera código de pareamento (6 dígitos válidos por 10 min).
+app.MapPost("/api-proxy/mobile/devices/pair-codes", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/mobile/devices/pair-codes", payload);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/devices/pair-codes falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Enfileira comando remoto pra um device (flush_now, pull_now, reload, message,
+// pwa_update, clear_cache).
+app.MapPost("/api-proxy/mobile/devices/{id}/commands", async (
+    string id,
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>(
+            $"api/mobile/devices/{Uri.EscapeDataString(id)}/commands", payload);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/devices/{Id}/commands falhou", id);
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Broadcast: enfileira mesmo comando pra todos os devices da empresa/loja.
+// Use case primário: gestor força "atualização pelo web" (commandType=pwa_update)
+// pra todos os PWAs ativos de uma vez.
+app.MapPost("/api-proxy/mobile/devices/broadcast", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>(
+            "api/mobile/devices/broadcast", payload);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/devices/broadcast falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Revoga device pareado (DELETE).
+app.MapDelete("/api-proxy/mobile/devices/{id}", async (
+    string id,
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        await api.DeleteAsync($"api/mobile/devices/{Uri.EscapeDataString(id)}");
+        return Results.NoContent();
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/devices/{Id} (DELETE) falhou", id);
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Versão atual reportada pelo backend (pra mostrar no Admin qual CACHE_VERSION
+// o servidor está servindo).
+app.MapGet("/api-proxy/mobile/version", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>("api/mobile/version");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy mobile/version falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.Run();

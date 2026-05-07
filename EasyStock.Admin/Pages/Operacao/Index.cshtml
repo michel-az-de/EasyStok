@@ -1,0 +1,166 @@
+@page
+@model EasyStock.Admin.Pages.Operacao.IndexModel
+@{
+    ViewData["Title"] = "Operação";
+}
+
+<div x-data="operacaoPage()" x-init="init()" class="space-y-6">
+
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Operação</h2>
+            <p class="text-es-ink-mute text-sm">KPIs do dia · atualiza a cada 15s</p>
+        </div>
+        <div class="text-xs text-es-ink-mute" x-show="ultimaAtualizacao" x-cloak>
+            <span>atualizado <span x-text="formatLastUpdate()"></span></span>
+        </div>
+    </div>
+
+    <template x-if="!empresaId">
+        <div class="rounded-xl p-6"
+             style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
+            <p class="text-es-ink-dim text-sm">
+                Selecione um cliente em
+                <a href="/Tenants" class="text-es-accent hover:underline">/Tenants</a>
+                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>.
+            </p>
+        </div>
+    </template>
+
+    <template x-if="empresaId">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <!-- Vendas hoje -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Vendas hoje</div>
+                <div class="text-3xl font-bold text-es-ink mt-2" x-text="brl(d.vendasHojeValor)"></div>
+                <div class="text-xs text-es-ink-mute mt-1"><span x-text="d.vendasHojeCount || 0"></span> pedido(s) entregue(s)</div>
+            </div>
+
+            <!-- Caixa -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Saldo do caixa</div>
+                <div class="text-3xl font-bold text-es-ink mt-2" x-text="brl(d.caixaSaldoHoje)"></div>
+                <div class="text-xs text-es-ink-mute mt-1">
+                    +<span x-text="brl(d.caixaEntradasExtras)"></span> entradas ·
+                    -<span x-text="brl(d.caixaSaidas)"></span> saídas
+                </div>
+            </div>
+
+            <!-- Pedidos abertos -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Pedidos abertos</div>
+                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.pedidosAbertos || 0"></div>
+                <div class="text-xs text-es-ink-mute mt-1">
+                    <span x-text="d.pedidosPreparando || 0"></span> preparando ·
+                    <span x-text="d.pedidosProntos || 0"></span> prontos
+                </div>
+            </div>
+
+            <!-- Devices -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Dispositivos ativos</div>
+                <div class="text-3xl font-bold text-es-ink mt-2">
+                    <span x-text="d.devicesAtivos || 0"></span>
+                    <span class="text-es-ink-mute text-base">/ <span x-text="d.devicesTotal || 0"></span></span>
+                </div>
+                <div class="text-xs mt-1">
+                    <a :href="'/Dispositivos?empresaId=' + empresaId" class="text-es-accent hover:underline">gerenciar →</a>
+                </div>
+            </div>
+
+            <!-- Pedidos travados -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Pedidos travados</div>
+                <div class="text-3xl font-bold mt-2"
+                     :class="(d.pedidosTravados || 0) > 0 ? 'text-yellow-300' : 'text-es-ink'"
+                     x-text="d.pedidosTravados || 0"></div>
+                <div class="text-xs text-es-ink-mute mt-1">preparando há +30 min</div>
+            </div>
+
+            <!-- Conferência pendente -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Conferência pendente</div>
+                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.conferenciaPendente || 0"></div>
+                <div class="text-xs text-es-ink-mute mt-1">prontos sem confirmar</div>
+            </div>
+
+            <!-- Lotes -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Lotes hoje</div>
+                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.lotesHoje || 0"></div>
+            </div>
+
+            <!-- Divergências de estoque -->
+            <div class="rounded-xl p-5"
+                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Divergências estoque</div>
+                <div class="text-3xl font-bold mt-2"
+                     :class="(d.divergenciasEstoque || 0) > 0 ? 'text-yellow-300' : 'text-es-ink'"
+                     x-text="d.divergenciasEstoque || 0"></div>
+                <div class="text-xs text-es-ink-mute mt-1">PWA × ERP</div>
+            </div>
+        </div>
+    </template>
+
+    <p x-show="erro" x-cloak class="text-red-400 text-sm" x-text="erro"></p>
+</div>
+
+@section Scripts {
+<script>
+function operacaoPage() {
+    return {
+        empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
+        lojaId: '@(Model.LojaId?.ToString() ?? "")',
+        d: {},
+        erro: '',
+        ultimaAtualizacao: 0,
+        _timer: null,
+
+        async init() {
+            if (!this.empresaId) return;
+            await this.fetchDashboard();
+            this._timer = setInterval(() => this.fetchDashboard(), 15000);
+        },
+
+        async fetchDashboard() {
+            try {
+                let url = '/api-proxy/mobile/operacao/dashboard?empresaId=' + this.empresaId;
+                if (this.lojaId) url += '&lojaId=' + this.lojaId;
+                const r = await fetch(url, { credentials: 'same-origin' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                // Normaliza camel-case do backend (data.vendasHojeValor) — JsonElement
+                // do proxy preserva como veio.
+                this.d = data || {};
+                this.ultimaAtualizacao = Date.now();
+                this.erro = '';
+            } catch (e) {
+                this.erro = 'Falha ao carregar dashboard: ' + (e.message || e);
+            }
+        },
+
+        brl(v) {
+            const n = Number(v || 0);
+            try { return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+            catch { return 'R$ ' + n.toFixed(2); }
+        },
+
+        formatLastUpdate() {
+            const sec = Math.floor((Date.now() - this.ultimaAtualizacao) / 1000);
+            if (sec < 5) return 'agora';
+            if (sec < 60) return sec + 's atrás';
+            return Math.floor(sec / 60) + ' min atrás';
+        }
+    };
+}
+</script>
+}

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.json?v=20260429a">
+<link rel="manifest" href="manifest.json?v=20260506a">
 <meta name="theme-color" content="#111827">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18319,6 +18319,13 @@ function closeUpdateModal() {
 // Auto-update silencioso: ao detectar novo SW assumindo controle, recarrega
 // a pagina sem pedir nada pro usuario. Combinado com network-first no sw.js,
 // cada git push -> deploy SWA -> proxima abertura do app ja tem versao nova.
+//
+// Onda 9 — Atualizacao orquestrada pelo servidor:
+// (a) /api/mobile/version reporta Ota.PwaCacheVersion (lido de sw.js).
+// (b) sync.js compara com cdb-pwa-installed-version local; quando difere, chama
+//     reg.update() — se ha SW novo, o updatefound listener abaixo manda
+//     SKIP_WAITING pra ele ativar imediatamente, e o controllerchange recarrega.
+// (c) Web Admin pode forcar isso via comando pwa_update (ver sync.js executor).
 if ('serviceWorker' in navigator) {
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -18327,7 +18334,24 @@ if ('serviceWorker' in navigator) {
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260429a').then(reg => {
+    navigator.serviceWorker.register('sw.js?v=20260506a').then(reg => {
+      // Quando um SW novo entra em "installing", aguarda terminar e manda
+      // SKIP_WAITING — assim ele assume controle sem o operador precisar
+      // fechar/reabrir o app.
+      function attachUpdateListener(installing) {
+        if (!installing) return;
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            try { installing.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+          }
+        });
+      }
+      reg.addEventListener('updatefound', () => attachUpdateListener(reg.installing));
+      // Caso ja exista um SW em waiting na hora do registro (recarga depois de
+      // crash, por exemplo), pula direto.
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+      }
       // Forca check de update toda vez que o app vira visivel
       // (usuario abre o app, ou volta do background) — Felipe pediu "so ao abrir".
       document.addEventListener('visibilitychange', () => {

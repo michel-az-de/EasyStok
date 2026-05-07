@@ -188,6 +188,10 @@ builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>(
 // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
 // Em multi-instance, evoluir pra Redis pubsub.
 builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>();
+// Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
+// a versão real do bundle (sem depender de config drift-prone).
+builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.IPwaVersionProvider,
+    EasyStock.Api.Mobile.Services.PwaVersionProvider>();
 
 // SeedProgressService: Singleton pra compartilhar estado de runs entre requests.
 // O background job e o polling endpoint falam com a mesma instância.
