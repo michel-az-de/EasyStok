@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Events;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Services;
@@ -20,9 +21,11 @@ public static class ServiceCollectionExtensions
         string connectionString,
         IConfiguration configuration)
     {
-        services.AddDbContext<EasyStockDbContext>(options =>
+        services.AddSingleton<AuditTimestampsInterceptor>();
+        services.AddDbContext<EasyStockDbContext>((sp, options) =>
             options.UseSqlite(connectionString, sqlite =>
-                sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+                sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+            .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
         services.AddScoped<ICategoriaRepository, CategoriaRepository>();

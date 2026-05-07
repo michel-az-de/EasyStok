@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Events;
 using EasyStock.Infra.Postgre.Services;
@@ -27,7 +28,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // múltiplas réplicas, pool default 100 estoura imediatamente).
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
-            services.AddDbContext<EasyStockDbContext>(options =>
+            services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
                     npgsql.MigrationsAssembly("EasyStock.Infra.Postgre");
@@ -37,7 +39,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                         maxRetryCount: 3,
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
-                }));
+                })
+                .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
