@@ -1,6 +1,9 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async;
+using EasyStock.Infra.Async.Pagamentos;
+using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using EasyStock.Infra.Async.Pdf;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +46,18 @@ public static class ServiceCollectionExtensions
 
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
         services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
+
+        // Modulo Financeiro F3 — abstracao multi-gateway de pagamento.
+        // Os adapters precisam ser Scoped (consomem repos scoped via DI).
+        services.AddScoped<IPagamentoGateway, EfiPixGatewayAdapter>();
+        services.AddScoped<IPagamentoGateway, ManualGatewayAdapter>();
+        services.AddScoped<IPagamentoGatewayRouter, PagamentoGatewayRouter>();
+
+        // Webhook processors (scoped — consomem RegistrarPagamentoFaturaUseCase + repos)
+        services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
+
+        // Signature validators (singleton — stateless, leem IConfiguration uma vez por call)
+        services.AddSingleton<IWebhookSignatureValidator, EfiPixSignatureValidator>();
 
         // Efí Bank Pix Gateway
         var efiClientId = configuration["Efi:ClientId"];
