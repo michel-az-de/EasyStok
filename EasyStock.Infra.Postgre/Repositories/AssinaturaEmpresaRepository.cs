@@ -78,5 +78,25 @@ namespace EasyStock.Infra.Postgre.Repositories
                           || (a.SuspensaEm == null && a.AlteradoEm < limite)))
                 .ToListAsync(ct);
         }
+
+        public async Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default)
+        {
+            // JOIN para puxar PrecoMensal do plano vinculado.
+            return await dbContext.AssinaturasEmpresa
+                .IgnoreQueryFilters()
+                .Where(a => a.Status == StatusAssinatura.Ativa)
+                .Join(dbContext.Planos, a => a.PlanoId, p => p.Id, (a, p) => p.PrecoMensal)
+                .SumAsync(ct);
+        }
+
+        public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(CancellationToken ct = default)
+        {
+            var rows = await dbContext.AssinaturasEmpresa
+                .IgnoreQueryFilters()
+                .GroupBy(a => a.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync(ct);
+            return rows.ToDictionary(r => r.Status, r => r.Count);
+        }
     }
 }

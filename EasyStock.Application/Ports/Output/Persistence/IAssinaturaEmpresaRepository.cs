@@ -17,5 +17,16 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default);
         Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default);
         Task<IEnumerable<AssinaturaEmpresa>> GetSuspensasAntigasAsync(int diasMinimos, CancellationToken ct = default);
+
+        /// <summary>
+        /// Soma <c>Plano.PrecoMensal</c> de todas assinaturas Ativas (com Plano
+        /// JOIN). Base para calculo de MRR (F10). Retorna 0 se nao ha
+        /// assinaturas ativas.
+        /// </summary>
+        Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default);
+
+        /// <summary>Conta assinaturas por status — usado para MRR + churn snapshot.</summary>
+        Task<IReadOnlyDictionary<EasyStock.Domain.Enums.StatusAssinatura, int>> ContarPorStatusAsync(
+            CancellationToken ct = default);
     }
 }

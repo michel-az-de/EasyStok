@@ -1,0 +1,144 @@
+@page
+@model EasyStock.Admin.Pages.Faturas.DashboardModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Dashboard Financeiro";
+    string FmtCurrency(decimal v) => v.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+    string FmtNumber(int v) => v.ToString("N0", new System.Globalization.CultureInfo("pt-BR"));
+}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+    <div class="flex items-center gap-3">
+        <a href="/Faturas" class="btn-secondary text-sm">← Faturas</a>
+        <h1 class="text-es-ink text-xl font-semibold">📊 Dashboard Financeiro</h1>
+    </div>
+    <form method="get" class="flex items-center gap-2">
+        <label class="text-es-ink-mute text-sm">Janela:</label>
+        <select name="dias" onchange="this.form.submit()" class="form-input max-w-[120px]">
+            <option value="7"   selected="@(Model.Dias == 7)">7 dias</option>
+            <option value="30"  selected="@(Model.Dias == 30)">30 dias</option>
+            <option value="90"  selected="@(Model.Dias == 90)">90 dias</option>
+            <option value="180" selected="@(Model.Dias == 180)">180 dias</option>
+            <option value="365" selected="@(Model.Dias == 365)">12 meses</option>
+        </select>
+    </form>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+@if (Model.Carregada)
+{
+    <!-- Linha 1: receita -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">MRR</div>
+            <div class="text-es-ink text-2xl font-bold">@FmtCurrency(Model.Dec("mrr"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">Receita recorrente mensal</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">ARR</div>
+            <div class="text-es-ink text-2xl font-bold">@FmtCurrency(Model.Dec("arr"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">MRR × 12</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Receita no periodo</div>
+            <div class="text-green-400 text-2xl font-bold">@FmtCurrency(Model.Dec("receitaPeriodo"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">@Model.Int("faturasPagasPeriodo") fatura(s) paga(s)</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Em atraso</div>
+            <div class="text-red-400 text-2xl font-bold">@FmtCurrency(Model.Dec("valorVencido"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">@Model.Int("faturasVencidas") fatura(s) vencida(s)</div>
+        </div>
+    </div>
+
+    <!-- Linha 2: assinaturas -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Assinaturas ativas</div>
+            <div class="text-es-ink text-2xl font-bold">@FmtNumber(Model.Int("assinaturasAtivas"))</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Suspensas</div>
+            <div class="text-orange-400 text-2xl font-bold">@FmtNumber(Model.Int("assinaturasSuspensas"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">Inadimplencia provavel</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Canceladas</div>
+            <div class="text-es-ink-dim text-2xl font-bold">@FmtNumber(Model.Int("assinaturasCanceladas"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">Acumulado historico</div>
+        </div>
+        <div class="card">
+            @{
+                var ativas = Model.Int("assinaturasAtivas");
+                var canceladas = Model.Int("assinaturasCanceladas");
+                var totalCohort = ativas + canceladas;
+                var churnPct = totalCohort > 0
+                    ? Math.Round((decimal)canceladas / totalCohort * 100m, 1)
+                    : 0m;
+            }
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Churn aproximado</div>
+            <div class="@(churnPct > 10m ? "text-red-400" : "text-es-ink") text-2xl font-bold">@churnPct.ToString("0.0")%</div>
+            <div class="text-es-ink-mute text-xs mt-1">Cancel / (Ativa + Cancel)</div>
+        </div>
+    </div>
+
+    <!-- Linha 3: KPIs operacionais -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Conversao no periodo</div>
+            <div class="text-es-ink text-2xl font-bold">@Model.Dec("taxaConversao").ToString("0.0")%</div>
+            <div class="text-es-ink-mute text-xs mt-1">Pagas / Emitidas</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Ticket medio</div>
+            <div class="text-es-ink text-2xl font-bold">@FmtCurrency(Model.Dec("ticketMedio"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">Receita / Pagas</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Atraso medio</div>
+            <div class="@(Model.Dbl("atrasoMedioDias") > 30d ? "text-red-400" : "text-es-ink") text-2xl font-bold">
+                @Model.Dbl("atrasoMedioDias").ToString("0.0") d
+            </div>
+            <div class="text-es-ink-mute text-xs mt-1">Vencidas em aberto</div>
+        </div>
+        <div class="card">
+            <div class="text-es-ink-mute text-xs font-bold mb-1">Faturas no periodo</div>
+            <div class="text-es-ink text-2xl font-bold">@FmtNumber(Model.Int("faturasEmitidasPeriodo"))</div>
+            <div class="text-es-ink-mute text-xs mt-1">Inclui Paga, Emitida, Vencida</div>
+        </div>
+    </div>
+
+    @if (Model.TopInadimplentes.Any())
+    {
+        <div class="card">
+            <h2 class="text-es-ink font-semibold mb-3">🔥 Top inadimplentes</h2>
+            <table class="table-admin">
+                <thead>
+                    <tr>
+                        <th>Empresa</th>
+                        <th class="text-right">Vencidas</th>
+                        <th class="text-right">Valor total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.TopInadimplentes)
+                    {
+                        var empId = t.TryGetProperty("empresaId", out var eid) ? eid.GetString() : "";
+                        var empNome = t.TryGetProperty("empresaNome", out var en) && en.ValueKind != JsonValueKind.Null ? en.GetString() : "(sem nome)";
+                        var qtd = t.TryGetProperty("quantidadeVencidas", out var q) ? q.GetInt32() : 0;
+                        var valor = t.TryGetProperty("valorTotalVencido", out var v) ? v.GetDecimal() : 0m;
+                        <tr>
+                            <td><a href="/Tenants/Detail/@empId" class="text-es-accent hover:underline">@empNome</a></td>
+                            <td class="text-right text-red-400 font-semibold">@qtd</td>
+                            <td class="text-right text-red-400 font-semibold">@FmtCurrency(valor)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}

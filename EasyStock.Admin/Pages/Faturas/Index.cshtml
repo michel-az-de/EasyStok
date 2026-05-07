@@ -25,6 +25,7 @@
 <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
     <h1 class="text-es-ink text-xl font-semibold">Faturas</h1>
     <div class="flex gap-2">
+        <a href="/Faturas/Dashboard" class="btn-secondary text-sm">📊 Dashboard</a>
         @{
             var qsExport = new List<string>();
             if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");

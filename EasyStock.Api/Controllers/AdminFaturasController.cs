@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.Faturas.Common;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
+using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Enums;
@@ -35,6 +36,7 @@ public class AdminFaturasController(
     RegistrarPagamentoFaturaUseCase pagamentoUseCase,
     CancelarFaturaUseCase cancelarUseCase,
     ExportarFaturasCsvUseCase exportarCsvUseCase,
+    MetricasFinanceirasUseCase metricasUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Listar faturas (admin) com filtros amplos")]
@@ -257,6 +259,26 @@ public class AdminFaturasController(
 
         var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
         return File(bytes, "text/csv; charset=utf-8", $"faturas-{ts}.csv");
+    }
+
+    [SwaggerOperation(Summary = "Metricas financeiras (MRR, ARR, churn, atraso, top inadimplentes)")]
+    [HttpGet("metricas")]
+    public async Task<IActionResult> Metricas(
+        [FromQuery] int dias = 30,
+        [FromQuery] Guid? empresaId = null,
+        CancellationToken ct = default)
+    {
+        if (!RequerPermissao(Permissao.VisualizarFaturas, out var err)) return err!;
+
+        var efetivoEmpresaId = currentUser.Nivel == NivelAcesso.SuperAdmin
+            ? empresaId
+            : currentUser.EmpresaId;
+
+        var result = await metricasUseCase.ExecuteAsync(
+            new MetricasFinanceirasCommand(dias, efetivoEmpresaId),
+            ct);
+
+        return DataOk(result);
     }
 
     private bool RequerPermissao(Permissao permissao, out IActionResult? error)

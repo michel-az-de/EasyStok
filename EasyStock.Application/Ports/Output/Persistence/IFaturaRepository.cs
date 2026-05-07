@@ -48,4 +48,33 @@ public interface IFaturaRepository
 
     /// <summary>Busca por origem (ex: encontrar fatura existente para uma assinatura).</summary>
     Task<Fatura?> GetByOrigemAsync(Guid empresaId, OrigemFatura origem, Guid origemRefId, CancellationToken ct = default);
+
+    // ─── F10 — Metricas agregadas ──────────────────────────────────────
+
+    /// <summary>Conta faturas por status no periodo informado (filtro DataEmissao).</summary>
+    Task<IReadOnlyDictionary<StatusFatura, int>> ContarPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>Soma <c>Total</c> de faturas por status no periodo informado.</summary>
+    Task<IReadOnlyDictionary<StatusFatura, decimal>> SomarTotalPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Media de dias de atraso para faturas <c>Vencida</c> ainda em aberto
+    /// (DataPagamentoTotal == null). Retorna 0 se nao ha vencidas.
+    /// </summary>
+    Task<double> MediaDiasAtrasoVencidasAsync(Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Top inadimplentes — empresas com mais faturas <c>Vencida</c>. Retorna
+    /// tuplas <c>(EmpresaId, EmpresaNome, QtdVencidas, ValorTotalVencido)</c>.
+    /// </summary>
+    Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
+        int limit = 5, CancellationToken ct = default);
 }
+
+public sealed record TopInadimplenteResult(
+    Guid EmpresaId,
+    string? EmpresaNome,
+    int QuantidadeVencidas,
+    decimal ValorTotalVencido);

@@ -544,6 +544,25 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
             .ToListAsync(ct);
         return assinaturas;
     }
+
+    public async Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default)
+    {
+        // Mongo discarded (ADR 0001) — implementacao naive sem JOIN nativo.
+        var ativas = await Collection.Find(a => a.Status == StatusAssinatura.Ativa).ToListAsync(ct);
+        if (ativas.Count == 0) return 0m;
+
+        var planoIds = ativas.Select(a => a.PlanoId).Distinct().ToList();
+        var planos = await Planos.Find(p => planoIds.Contains(p.Id)).ToListAsync(ct);
+        var planoMap = planos.ToDictionary(p => p.Id, p => p.PrecoMensal);
+
+        return ativas.Sum(a => planoMap.TryGetValue(a.PlanoId, out var preco) ? preco : 0m);
+    }
+
+    public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(CancellationToken ct = default)
+    {
+        var todas = await Collection.Find(_ => true).ToListAsync(ct);
+        return todas.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count());
+    }
 }
 
 public sealed class UsuarioEmpresaRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

@@ -102,6 +102,96 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
                   && f.Status != StatusFatura.Cancelada,
                 ct);
 
+    // ─── F10 — Metricas ───────────────────────────────────────────────
+
+    public async Task<IReadOnlyDictionary<StatusFatura, int>> ContarPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default)
+    {
+        var q = db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.DataEmissao >= de && f.DataEmissao < ate);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        var rows = await q
+            .GroupBy(f => f.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        return rows.ToDictionary(r => r.Status, r => r.Count);
+    }
+
+    public async Task<IReadOnlyDictionary<StatusFatura, decimal>> SomarTotalPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default)
+    {
+        var q = db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.DataEmissao >= de && f.DataEmissao < ate);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        var rows = await q
+            .GroupBy(f => f.Status)
+            .Select(g => new { Status = g.Key, Sum = g.Sum(f => f.Total) })
+            .ToListAsync(ct);
+
+        return rows.ToDictionary(r => r.Status, r => r.Sum);
+    }
+
+    public async Task<double> MediaDiasAtrasoVencidasAsync(Guid? empresaId = null, CancellationToken ct = default)
+    {
+        var hoje = DateTime.UtcNow.Date;
+        var q = db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.Status == StatusFatura.Vencida && f.DataPagamentoTotal == null);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        // EF nao traduz EF.Functions.DateDiff facilmente cross-provider — tras pra memoria.
+        var datasVencimento = await q.Select(f => f.DataVencimento).ToListAsync(ct);
+        if (datasVencimento.Count == 0) return 0d;
+
+        return datasVencimento.Average(dv => (hoje - dv.Date).TotalDays);
+    }
+
+    public async Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
+        int limit = 5, CancellationToken ct = default)
+    {
+        if (limit < 1) limit = 5;
+        if (limit > 50) limit = 50;
+
+        var rows = await db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.Status == StatusFatura.Vencida)
+            .GroupBy(f => f.EmpresaId)
+            .Select(g => new
+            {
+                EmpresaId = g.Key,
+                Qtd = g.Count(),
+                Valor = g.Sum(f => f.Total)
+            })
+            .OrderByDescending(r => r.Qtd)
+            .ThenByDescending(r => r.Valor)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return Array.Empty<TopInadimplenteResult>();
+
+        var ids = rows.Select(r => r.EmpresaId).ToList();
+        var nomes = await db.Empresas
+            .IgnoreQueryFilters()
+            .Where(e => ids.Contains(e.Id))
+            .Select(e => new { e.Id, e.Nome })
+            .ToDictionaryAsync(e => e.Id, e => (string?)e.Nome, ct);
+
+        return rows.Select(r => new TopInadimplenteResult(
+            r.EmpresaId,
+            nomes.TryGetValue(r.EmpresaId, out var n) ? n : null,
+            r.Qtd,
+            r.Valor
+        )).ToList();
+    }
+
     private static IQueryable<Fatura> AplicarFiltros(
         IQueryable<Fatura> q,
         StatusFatura? status,
