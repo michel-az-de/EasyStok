@@ -93,6 +93,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.Crypto.IIntegrationCredentialResolver,
                 Integration.IntegrationCredentialResolver>();
 
+            // Modulo Integration (F4) — outbox transacional de eventos externos
+            services.AddScoped<IOutboxEventoIntegracaoRepository, OutboxEventoIntegracaoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao,
+                Integration.PublicadorEventoIntegracao>();
+
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
 

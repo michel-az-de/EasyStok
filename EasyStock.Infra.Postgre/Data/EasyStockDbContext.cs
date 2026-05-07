@@ -135,6 +135,9 @@ namespace EasyStock.Infra.Postgre.Data
         // Modulo Integration (F3+) — credenciais cifradas (AES-256-GCM) por tenant
         public DbSet<CredencialIntegracao> CredenciaisIntegracao { get; set; } = null!;
 
+        // Modulo Integration (F4+) — outbox transacional de eventos externos
+        public DbSet<OutboxEventoIntegracao> OutboxEventosIntegracao { get; set; } = null!;
+
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
         public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;
