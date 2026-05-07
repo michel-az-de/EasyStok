@@ -16,7 +16,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(m => m.FixVersion).HasMaxLength(50);
 
             builder.HasOne(m => m.Ticket)
-                .WithOne()
+                .WithOne(t => t.MetaTecnico!)
                 .HasForeignKey<AdminTicketTecnicoMeta>(m => m.TicketId)
                 .OnDelete(DeleteBehavior.Cascade);
         }

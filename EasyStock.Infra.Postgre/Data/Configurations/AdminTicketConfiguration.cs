@@ -34,10 +34,6 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(t => t.OrigemTicketId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            builder.HasOne(t => t.MetaTecnico)
-                .WithOne(m => m.Ticket!)
-                .HasForeignKey<AdminTicketTecnicoMeta>(m => m.TicketId);
-
             builder.HasMany(t => t.Mensagens)
                 .WithOne(m => m.Ticket)
                 .HasForeignKey(m => m.TicketId)
