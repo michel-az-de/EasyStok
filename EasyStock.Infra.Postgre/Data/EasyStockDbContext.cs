@@ -120,18 +120,15 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
-        // Modulo Financeiro (F1+) — DbSets comentados temporariamente.
-        // Commit 5b343c7 introduziu essas linhas, mas as classes Fatura/FaturaItem/
-        // FaturaPagamento/FaturaEvento/FaturaContador/WebhookRecebido + enums
-        // (OrigemFatura, StatusFatura, ...) e ValueObjects (DadosFaturado) ainda
-        // não foram commitados, deixando o build do master quebrado. Reativar
-        // junto com o restante da feature de Faturas no PR completo.
-        // public DbSet<Fatura> Faturas { get; set; } = null!;
-        // public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
-        // public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
-        // public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
-        // public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
-        // public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
+        // Modulo Financeiro (F1+) — entidades existem no projeto (untracked),
+        // repositorios em EasyStock.Infra.Postgre/Repositories/Fatura*Repository.cs
+        // dependem desses DbSets. Mantemos ativos para nao quebrar o build do WIP.
+        public DbSet<Fatura> Faturas { get; set; } = null!;
+        public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
+        public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
+        public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
+        public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
+        public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
