@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.TicketSuporte;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers
 {
@@ -21,6 +22,7 @@ namespace EasyStock.Api.Controllers
         ICurrentUserAccessor currentUser) : EasyStockControllerBase
     {
         [HttpPost]
+        [EnableRateLimiting("tickets-post")]
         public async Task<IActionResult> AbrirTicket([FromBody] AbrirTicketRequest req)
         {
             if (!currentUser.TemPermissao(Permissao.VisualizarTickets))
@@ -50,6 +52,7 @@ namespace EasyStock.Api.Controllers
         }
 
         [HttpPost("{id}/responder")]
+        [EnableRateLimiting("tickets-post")]
         public async Task<IActionResult> Responder(Guid id, [FromBody] ResponderRequest req)
         {
             if (!currentUser.TemPermissao(Permissao.ResponderTickets))

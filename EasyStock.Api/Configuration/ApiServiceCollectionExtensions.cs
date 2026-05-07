@@ -210,6 +210,23 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // Rate limit para criação/resposta de tickets de suporte. Particionado
+            // por IP para impedir cliente abusivo abrir centenas de tickets.
+            // Limite generoso o suficiente pra suporte legítimo (10/min/IP).
+            options.AddPolicy("tickets-post", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
