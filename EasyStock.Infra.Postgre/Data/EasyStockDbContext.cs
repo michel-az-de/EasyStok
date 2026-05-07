@@ -128,6 +128,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
+        // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
+        public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
+
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
         public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;
