@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -80,6 +81,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
             services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
             services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
+            services.AddScoped<IFaturaRepository, FaturaRepository>();
+            services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
