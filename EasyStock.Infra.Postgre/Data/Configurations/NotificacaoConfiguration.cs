@@ -19,6 +19,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(n => n.Severidade).HasConversion<string>().HasMaxLength(20).IsRequired()
                 .HasSentinel((SeveridadeNotificacao)(-1));
             builder.Property(n => n.Lida).IsRequired();
+            builder.Property(n => n.UsuarioId);
             builder.Property(n => n.ReferenciaId);
             builder.Property(n => n.CriadaEm).IsRequired();
             builder.Property(n => n.LidaEm);
@@ -28,6 +29,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasIndex(n => new { n.EmpresaId, n.Lida, n.CriadaEm });
             builder.HasIndex(n => new { n.EmpresaId, n.TipoAlerta, n.ReferenciaId });
             builder.HasIndex(n => new { n.EmpresaId, n.Severidade, n.Lida });
+            builder.HasIndex(n => new { n.EmpresaId, n.UsuarioId, n.Lida, n.CriadaEm });
 
             builder.HasOne(n => n.Empresa)
                 .WithMany()

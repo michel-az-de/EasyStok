@@ -32,19 +32,35 @@ public sealed class ColetorAssinaturasExpirando(
                      ))
             .ToListAsync(ct);
 
-        var processados = 0;
-        foreach (var assinatura in assinaturas)
-        {
-            var dataExpiracao = assinatura.TrialFim ?? assinatura.DataFim!.Value;
-            var diasRestantes = (int)(dataExpiracao.Date - agora.Date).TotalDays;
-            if (diasRestantes > DiasAntes) continue;
+        // Pré-carrega correlation IDs já existentes para evitar N+1 queries
+        var candidatos = assinaturas
+            .Select(a =>
+            {
+                var datas = new List<DateTime>();
+                if (a.TrialFim.HasValue) datas.Add(a.TrialFim.Value);
+                if (a.DataFim.HasValue) datas.Add(a.DataFim.Value);
+                var dataExpiracao = datas.Min();
+                var diasRestantes = (int)(dataExpiracao.Date - agora.Date).TotalDays;
+                return (assinatura: a, dataExpiracao, diasRestantes);
+            })
+            .Where(x => x.diasRestantes <= DiasAntes)
+            .ToList();
 
+        var correlationIdsCandidatos = candidatos
+            .Select(x => $"assinatura-expirando-{x.assinatura.Id}-d{x.diasRestantes}-{agora:yyyyMMdd}")
+            .ToHashSet();
+
+        var correlationIdsExistentes = await db.NotifEventos
+            .Where(e => correlationIdsCandidatos.Contains(e.CorrelationId!))
+            .Select(e => e.CorrelationId!)
+            .ToHashSetAsync(ct);
+
+        var processados = 0;
+        foreach (var (assinatura, dataExpiracao, diasRestantes) in candidatos)
+        {
             var correlationId = $"assinatura-expirando-{assinatura.Id}-d{diasRestantes}-{agora:yyyyMMdd}";
 
-            var jaExiste = await db.NotifEventos
-                .AnyAsync(e => e.CorrelationId == correlationId, ct);
-
-            if (jaExiste) continue;
+            if (correlationIdsExistentes.Contains(correlationId)) continue;
 
             var payload = JsonSerializer.Serialize(new
             {

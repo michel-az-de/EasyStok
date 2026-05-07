@@ -49,9 +49,14 @@ var builder = WebApplication.CreateBuilder(args);
     try { Directory.CreateDirectory(logDir); } catch { /* best-effort */ }
 }
 
+// LevelSwitch permite controlar o nível mínimo em tempo real via DiagnosticoModeService.
+// Criado aqui (antes do Serilog) para ser injetado no logger e nos serviços.
+var diagLevelSwitch = new Serilog.Core.LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
+
 // Configure Serilog — máximo de informações em cada log entry
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
+    .MinimumLevel.ControlledBy(diagLevelSwitch)
     .Enrich.FromLogContext()
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
@@ -188,6 +193,10 @@ builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>()
 // O background job e o polling endpoint falam com a mesma instância.
 builder.Services.AddSingleton<EasyStock.Api.Services.SeedProgressService>();
 
+// DiagnosticoModeService: Singleton que controla LoggingLevelSwitch em tempo real.
+builder.Services.AddSingleton(diagLevelSwitch);
+builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService>();
+
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
@@ -297,6 +306,20 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+    }
+}
+
+// Restaura modo de logging verbose salvo no DB (após migrations estarem aplicadas).
+if (resolvedProvider is "postgresql")
+{
+    try
+    {
+        var diagMode = app.Services.GetRequiredService<EasyStock.Api.Observability.DiagnosticoModeService>();
+        await diagMode.RestoreFromDbAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "[DiagnosticoMode] Falha ao restaurar modo — usando Information.");
     }
 }
 

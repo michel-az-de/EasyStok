@@ -20,8 +20,8 @@ public static class NotificationsInfraServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Renderer
-        services.AddScoped<IRendererTemplate, ScribanRenderer>();
+        // Renderer — Singleton: ScribanTemplate é thread-safe e caro de criar
+        services.AddSingleton<IRendererTemplate, ScribanRenderer>();
 
         // Canais
         services.AddScoped<ICanalNotificacao, SmtpEmailCanal>();

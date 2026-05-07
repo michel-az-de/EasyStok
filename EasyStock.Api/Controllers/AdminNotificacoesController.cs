@@ -105,8 +105,8 @@ public sealed class AdminNotificacoesController(
         [FromQuery] int pageSize = 20)
     {
         (page, pageSize) = NormalisePage(page, pageSize);
-        var items = await rotinaRepo.ListarAsync(empresaId, ativa, page, pageSize);
-        return DataPaged(items, items.Count, page, pageSize);
+        var (items, total) = await rotinaRepo.ListarAsync(empresaId, ativa, page, pageSize);
+        return DataPaged(items, total, page, pageSize);
     }
 
     [HttpGet("rotinas/{id:guid}")]
@@ -123,6 +123,14 @@ public sealed class AdminNotificacoesController(
             req.Codigo, req.Nome, req.TipoEvento, req.TriggerTipo,
             req.TemplateCodigo, req.Categoria,
             req.CronExpression, req.ParametrosJson, req.EmpresaId));
+        return DataOk(result);
+    }
+
+    [HttpPatch("rotinas/{id:guid}")]
+    public async Task<IActionResult> AtualizarRotina(Guid id, [FromBody] AtualizarRotinaRequest req)
+    {
+        var result = await atualizarRotina.ExecuteAsync(
+            new AtualizarRotinaCommand(id, req.CronExpression, req.ParametrosJson, Admin));
         return DataOk(result);
     }
 
@@ -233,6 +241,10 @@ public sealed class AdminNotificacoesController(
         string TemplateCodigo, CategoriaConteudoNotificacao Categoria,
         string? CronExpression = null, string? ParametrosJson = null,
         Guid? EmpresaId = null);
+
+    public record AtualizarRotinaRequest(
+        string? CronExpression = null,
+        string? ParametrosJson = null);
 
     public record KillSwitchRequest(
         string Motivo,

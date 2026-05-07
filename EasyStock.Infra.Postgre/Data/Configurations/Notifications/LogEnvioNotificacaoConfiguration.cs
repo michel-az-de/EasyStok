@@ -19,7 +19,7 @@ public class LogEnvioNotificacaoConfiguration : IEntityTypeConfiguration<LogEnvi
         b.Property(x => x.RespostaProviderJson).HasColumnType("jsonb");
         b.Property(x => x.DuracaoMs).IsRequired();
         b.Property(x => x.OcorridoEm).IsRequired();
-        b.Property(x => x.ErroDetalhado).HasMaxLength(4000);
+        b.Property(x => x.ErroDetalhado).HasColumnType("text");
         b.Property(x => x.BypassConsentimento).IsRequired();
         b.Property(x => x.Sucesso).IsRequired();
 

@@ -201,6 +201,27 @@
 }
 
 <script>
+    // Captura e encaminha erros JS não tratados ao servidor para rastreabilidade.
+    (function () {
+        function sendFrontendError(source, category, message, details, url) {
+            try {
+                fetch('/api-proxy/diag/frontend-error', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source, category, message: String(message).slice(0, 1500), details: String(details || '').slice(0, 7000), url: url || window.location.pathname })
+                }).catch(function () {});
+            } catch (e) {}
+        }
+        window.sendFrontendError = sendFrontendError;
+        window.addEventListener('unhandledrejection', function (ev) {
+            var msg = (ev.reason && ev.reason.message) ? ev.reason.message : String(ev.reason || 'UnhandledRejection');
+            sendFrontendError('admin_frontend', 'js_error', msg, ev.reason && ev.reason.stack, window.location.pathname);
+        });
+        window.addEventListener('error', function (ev) {
+            if (!ev.message || ev.message === 'Script error.') return;
+            sendFrontendError('admin_frontend', 'js_error', ev.message, ev.error && ev.error.stack, window.location.pathname);
+        });
+    })();
+
     const RECENT_TENANTS_KEY = 'easystok-admin-recent-tenants';
 
     function adminApp() {

@@ -23,14 +23,19 @@ public sealed class RotinaNotificacaoRepository(EasyStockDbContext db) : IRotina
         return await q.ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<RotinaNotificacao>> ListarAsync(
+    public async Task<(IReadOnlyList<RotinaNotificacao> Items, int Total)> ListarAsync(
         Guid? empresaId, bool? ativa = null, int page = 1, int pageSize = 20,
         CancellationToken ct = default)
     {
         var q = db.NotifRotinas.AsNoTracking()
             .Where(r => r.EmpresaId == empresaId);
         if (ativa.HasValue) q = q.Where(r => r.Ativa == ativa);
-        return await q.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var total = await q.CountAsync(ct);
+        var items = await q
+            .OrderBy(r => r.CriadaEm)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .ToListAsync(ct);
+        return (items, total);
     }
 
     public async Task AddAsync(RotinaNotificacao rotina, CancellationToken ct = default) =>

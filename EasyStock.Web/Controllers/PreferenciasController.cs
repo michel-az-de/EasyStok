@@ -32,20 +32,20 @@ public class PreferenciasController(ApiClient api, SessionService session) : Bas
         var categorias = PreferenciasViewModel.Categorias;
         var erros = new List<string>();
 
-        foreach (var canal in canais)
-        {
-            foreach (var categoria in categorias)
-            {
-                if (categoria == "Transacional") continue; // sempre opt-in, não modificar
+        var tarefas = from canal in canais
+                      from categoria in categorias
+                      where categoria != "Transacional" // sempre opt-in, não modificar
+                      let key = $"toggle_{canal}_{categoria}"
+                      let optIn = Request.Form.ContainsKey(key)
+                      let endpoint = optIn ? "api/consentimentos/opt-in" : "api/consentimentos/opt-out"
+                      select api.PostAsync<object>(endpoint, new { canal, categoria })
+                          .ContinueWith(t =>
+                          {
+                              if (t.IsCompletedSuccessfully && !t.Result.Success)
+                                  lock (erros) erros.Add($"{canal}/{categoria}: {t.Result.ErrorMessage}");
+                          });
 
-                var key = $"toggle_{canal}_{categoria}";
-                var optIn = Request.Form.ContainsKey(key);
-                var endpoint = optIn ? "api/consentimentos/opt-in" : "api/consentimentos/opt-out";
-                var result = await api.PostAsync<object>(endpoint, new { canal, categoria });
-                if (!result.Success)
-                    erros.Add($"{canal}/{categoria}: {result.ErrorMessage}");
-            }
-        }
+        await Task.WhenAll(tarefas);
 
         if (erros.Count > 0)
             Toast("error", $"Algumas preferências não foram salvas: {string.Join("; ", erros)}");

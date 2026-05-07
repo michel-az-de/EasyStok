@@ -1,3 +1,5 @@
+using System.Net.Mail;
+using System.Net.Sockets;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -19,7 +21,13 @@ public sealed class SmtpEmailCanal(
             MaxRetryAttempts = 3,
             BackoffType = DelayBackoffType.Exponential,
             Delay = TimeSpan.FromSeconds(2),
-            UseJitter = true
+            UseJitter = true,
+            // Retenta apenas erros transientes de rede; erros permanentes (auth, endereço inválido) propagam imediatamente
+            ShouldHandle = new PredicateBuilder()
+                .Handle<SmtpException>(ex => ex.StatusCode == SmtpStatusCode.ServiceNotAvailable
+                    || ex.StatusCode == SmtpStatusCode.ServiceClosingTransmissionChannel)
+                .Handle<SocketException>()
+                .Handle<IOException>()
         })
         .Build();
 

@@ -8,6 +8,9 @@ namespace EasyStock.Infra.Postgre.Repositories.Notifications;
 
 public sealed class BloqueioNotificacaoRepository(EasyStockDbContext db) : IBloqueioNotificacaoRepository
 {
+    public Task<BloqueioNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+        db.NotifBloqueios.FirstOrDefaultAsync(b => b.Id == id, ct);
+
     public async Task<IReadOnlyList<BloqueioNotificacao>> ListarAtivosAsync(
         Guid? empresaId, CanalNotificacao? canal = null, CancellationToken ct = default)
     {

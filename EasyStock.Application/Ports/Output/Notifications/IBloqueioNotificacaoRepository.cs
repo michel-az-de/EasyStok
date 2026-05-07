@@ -5,6 +5,8 @@ namespace EasyStock.Application.Ports.Output.Notifications;
 
 public interface IBloqueioNotificacaoRepository
 {
+    Task<BloqueioNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default);
+
     Task<IReadOnlyList<BloqueioNotificacao>> ListarAtivosAsync(
         Guid? empresaId,
         CanalNotificacao? canal = null,

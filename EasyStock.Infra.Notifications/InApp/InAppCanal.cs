@@ -32,6 +32,7 @@ public sealed class InAppCanal(
                 mensagem: mensagem.Corpo,
                 referenciaId: mensagem.OutboxId);
 
+            notificacao.UsuarioId = usuarioId;
             notificacao.OutboxMensagemId = mensagem.OutboxId;
 
             await notificacaoRepository.AddAsync(notificacao);

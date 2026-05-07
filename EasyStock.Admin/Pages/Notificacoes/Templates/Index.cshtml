@@ -24,8 +24,12 @@
         <select name="tipoEvento" class="input-dark text-sm">
             <option value="">Todos os eventos</option>
             <option value="ProdutoVencendo">Produto Vencendo</option>
+            <option value="ProdutoVencido">Produto Vencido</option>
             <option value="AssinaturaExpirando">Assinatura Expirando</option>
+            <option value="AssinaturaExpirada">Assinatura Expirada</option>
+            <option value="TarefaPendente">Tarefa Pendente</option>
             <option value="ResetSenha">Reset de Senha</option>
+            <option value="ConfirmacaoEmail">Confirmação de Email</option>
             <option value="AlertaEstoqueCritico">Alerta Estoque</option>
             <option value="BroadcastSuperAdmin">Broadcast</option>
         </select>
@@ -112,7 +116,7 @@
         <div class="flex justify-center gap-2">
             @for (var p = 1; p <= Model.TotalPages; p++)
             {
-                <a href="?page=@p&canal=@Model.Canal&tipoEvento=@Model.TipoEvento"
+                <a href="?page=@p&canal=@Model.Canal&tipoEvento=@Model.TipoEvento&ativo=@Model.Ativo"
                    class="px-3 py-1 rounded text-sm @(p == Model.Page ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white")">@p</a>
             }
         </div>

@@ -61,9 +61,17 @@ public sealed class AnonimizarLogsAntigosService(
                     .SetProperty(m => m.CorpoRenderizado, "[anonimizado]"),
                     ct);
 
+            var totalLogs = await db.NotifLogsEnvio
+                .Where(l => l.OcorridoEm < limiteAnonimizacao
+                         && (l.RespostaProviderJson != null || l.ErroDetalhado != null))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(l => l.RespostaProviderJson, (string?)null)
+                    .SetProperty(l => l.ErroDetalhado, (string?)null),
+                    ct);
+
             logger.LogInformation(
-                "Anonimização: {Total} mensagens outbox anonimizadas (>{Dias}d)",
-                totalOutbox, retencaoDias);
+                "Anonimização: {TotalOutbox} mensagens outbox e {TotalLogs} logs de envio anonimizados (>{Dias}d)",
+                totalOutbox, totalLogs, retencaoDias);
         }
         catch (Exception ex)
         {

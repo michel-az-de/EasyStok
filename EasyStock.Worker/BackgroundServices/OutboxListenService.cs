@@ -11,8 +11,8 @@ public sealed class OutboxListenService(
     IConfiguration configuration,
     ILogger<OutboxListenService> logger) : BackgroundService
 {
-    // Sinaliza ao dispatcher que há mensagens novas
-    internal static readonly SemaphoreSlim NotifySignal = new(0, int.MaxValue);
+    // Sinaliza ao dispatcher que há mensagens novas (maxCount=1: qualquer nº de NOTIFYs = 1 wakeup pendente)
+    internal static readonly SemaphoreSlim NotifySignal = new(0, 1);
 
     private const int FallbackPollingMs = 10_000;
 
@@ -35,7 +35,7 @@ public sealed class OutboxListenService(
                 {
                     logger.LogDebug("NOTIFY recebido: canal={Canal} payload={Payload}",
                         args.Channel, args.Payload);
-                    NotifySignal.Release();
+                    try { NotifySignal.Release(); } catch (SemaphoreFullException) { }
                 };
 
                 await conn.OpenAsync(stoppingToken);
@@ -48,7 +48,7 @@ public sealed class OutboxListenService(
                 {
                     // Aguarda notificação com timeout (fallback a polling)
                     await conn.WaitAsync(TimeSpan.FromMilliseconds(FallbackPollingMs), stoppingToken);
-                    NotifySignal.Release(); // garante tick mesmo sem NOTIFY
+                    try { NotifySignal.Release(); } catch (SemaphoreFullException) { }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -67,7 +67,7 @@ public sealed class OutboxListenService(
     {
         while (!ct.IsCancellationRequested)
         {
-            NotifySignal.Release();
+            try { NotifySignal.Release(); } catch (SemaphoreFullException) { }
             await Task.Delay(FallbackPollingMs, ct);
         }
     }

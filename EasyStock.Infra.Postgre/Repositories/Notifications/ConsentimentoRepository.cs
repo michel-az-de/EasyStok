@@ -18,14 +18,22 @@ public sealed class ConsentimentoRepository(EasyStockDbContext db) : IConsentime
             .FirstOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<ConsentimentoNotificacao>> ListarPorUsuarioAsync(
-        Guid usuarioId, CancellationToken ct = default) =>
-        await db.NotifConsentimentos
+        Guid usuarioId, CancellationToken ct = default)
+    {
+        // Carrega todos os registros do usuário e agrupa em memória.
+        // Cada mudança gera um novo registro (histórico imutável); o mais recente é o estado atual.
+        // Max 12 registros por usuário (4 canais × 3 categorias) — in-memory é seguro.
+        var all = await db.NotifConsentimentos
             .AsNoTracking()
             .Where(c => c.UsuarioId == usuarioId)
-            // Último registro por (canal, categoria) representa o estado atual
-            .GroupBy(c => new { c.Canal, c.Categoria })
-            .Select(g => g.OrderByDescending(c => c.AtualizadoEm).First())
+            .OrderByDescending(c => c.AtualizadoEm)
             .ToListAsync(ct);
+
+        return all
+            .GroupBy(c => new { c.Canal, c.Categoria })
+            .Select(g => g.First())
+            .ToList();
+    }
 
     public async Task AddAsync(ConsentimentoNotificacao consentimento, CancellationToken ct = default) =>
         await db.NotifConsentimentos.AddAsync(consentimento, ct);

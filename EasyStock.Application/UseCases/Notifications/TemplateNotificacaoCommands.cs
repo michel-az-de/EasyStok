@@ -63,11 +63,12 @@ public sealed class AtualizarTemplateUseCase(
         var original = await templateRepository.GetByIdAsync(command.TemplateId)
             ?? throw new InvalidOperationException($"Template {command.TemplateId} não encontrado.");
 
-        // Cria nova versão mantendo histórico do original
+        // Cria nova versão incrementando a versão do original
         var novaVersao = TemplateNotificacao.Criar(
             original.Codigo, original.Nome, original.Canal, original.TipoEvento,
             command.NovoAssunto, command.NovoCorpo,
             original.EmpresaId, original.Idioma, command.AtualizadoPor);
+        novaVersao.Versao = original.Versao + 1;
 
         // Desativa versão anterior
         original.Desativar();

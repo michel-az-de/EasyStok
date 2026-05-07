@@ -170,7 +170,7 @@ public sealed class NotificadorService(
             logger.LogWarning(
                 "Destinatário não resolvido para evento {EventoId} canal {Canal}",
                 evento.Id, canalPrimario);
-            evento.MarcarComoProcessado();
+            evento.MarcarComoFalhado($"Destinatário não encontrado para canal {canalPrimario}");
             await eventoRepository.UpdateAsync(evento, ct);
             return;
         }

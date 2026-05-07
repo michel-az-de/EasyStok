@@ -48,8 +48,7 @@ public sealed class RemoverKillSwitchUseCase(
 {
     public async Task<KillSwitchResult> ExecuteAsync(RemoverKillSwitchCommand command)
     {
-        var bloqueios = await bloqueioRepository.ListarAtivosAsync(null, null);
-        var bloqueio = bloqueios.FirstOrDefault(b => b.Id == command.BloqueioId)
+        var bloqueio = await bloqueioRepository.GetByIdAsync(command.BloqueioId)
             ?? throw new InvalidOperationException($"Bloqueio {command.BloqueioId} não encontrado.");
 
         bloqueio.Remover(command.RemovidoPor);

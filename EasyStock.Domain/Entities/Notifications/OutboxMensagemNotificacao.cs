@@ -74,7 +74,7 @@ public class OutboxMensagemNotificacao
             TenantTimezone = tenantTimezone,
             CanaisFallbackRestantesJson = canaisFallbackRestantesJson,
             CriadoEm = agora,
-            ShardKey = Math.Abs(idempotencyKey.GetHashCode()) % 4
+            ShardKey = Convert.FromHexString(idempotencyKey)[0] % 4
         };
     }
 

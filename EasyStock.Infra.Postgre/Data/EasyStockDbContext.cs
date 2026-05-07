@@ -54,6 +54,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
 
         // Admin Module DbSets
+        public DbSet<SystemErrorLog> SystemErrorLogs { get; set; } = null!;
         public DbSet<SeedRunLog> SeedRunLogs { get; set; } = null!;
         public DbSet<AdminTicket> AdminTickets { get; set; } = null!;
         public DbSet<AdminTicketMensagem> AdminTicketMensagens { get; set; } = null!;

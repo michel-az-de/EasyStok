@@ -94,9 +94,20 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 templateId = Id.Value,
                 variaveis = new Dictionary<string, object?>
                 {
+                    // ProdutoVencendo / AlertaEstoque
                     ["nomeProduto"] = "Produto Exemplo",
-                    ["diasRestantes"] = "3",
-                    ["expiraEm"] = DateTime.UtcNow.AddDays(3).ToString("dd/MM/yyyy"),
+                    ["diasRestantes"] = 3,
+                    ["expiraEm"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
+                    ["quantidade"] = 5,
+                    // AssinaturaExpirando
+                    ["dataExpiracao"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
+                    ["eTrial"] = false,
+                    // ResetSenha / ConfirmacaoEmail
+                    ["nomeUsuario"] = "Usuário Exemplo",
+                    ["email"] = "usuario@exemplo.com",
+                    ["linkRedefinicao"] = "#",
+                    ["linkConfirmacao"] = "#",
+                    // Footer LGPD
                     ["__unsubscribe_url"] = "#"
                 }
             });

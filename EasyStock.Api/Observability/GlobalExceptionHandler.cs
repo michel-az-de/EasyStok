@@ -1,6 +1,9 @@
+using System.Text.Json;
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -36,6 +39,16 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Erro tratado na API. CorrelationId: {CorrelationId} | {Method} {Path} | {ExceptionType}: {ExceptionMessage}",
                 correlationId, requestMethod, requestPath,
                 exception.GetType().FullName, exception.Message);
+
+        // Persiste erros 5xx no SystemErrorLog para rastreabilidade na tela de Diagnóstico.
+        // Fire-and-forget: não bloqueia a resposta HTTP.
+        if (statusCode >= 500)
+        {
+            _ = TrySaveSystemErrorLogAsync(
+                httpContext.RequestServices,
+                requestMethod, requestPath.ToString(), correlationId,
+                exception);
+        }
 
         // Em produção, nunca expor detalhes de exceção 5xx ao cliente (vaza informações sensíveis)
         var errorDetail = detail;
@@ -188,5 +201,42 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             inner = inner.InnerException;
         }
         return false;
+    }
+
+    private static async Task TrySaveSystemErrorLogAsync(
+        IServiceProvider services,
+        string method, string path, string correlationId,
+        Exception exception)
+    {
+        try
+        {
+            await using var scope = services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SystemErrorLogs.Add(new SystemErrorLog
+            {
+                Id = Guid.NewGuid(),
+                Source = "api_backend",
+                Level = "error",
+                Category = "api_exception",
+                Message = $"{exception.GetType().Name}: {exception.Message}",
+                Details = JsonSerializer.Serialize(new
+                {
+                    exceptionType = exception.GetType().FullName,
+                    message = exception.Message,
+                    innerException = exception.InnerException?.Message,
+                    stackTrace = exception.StackTrace?.Split('\n').Take(10),
+                    requestMethod = method,
+                    requestPath = path
+                }),
+                CorrelationId = correlationId,
+                Url = $"{method} {path}",
+                CriadoEm = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            // Best-effort — nunca lançar aqui para não mascarar o erro original.
+        }
     }
 }

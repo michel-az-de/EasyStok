@@ -5,7 +5,7 @@
 namespace EasyStock.Infra.Postgre.Migrations
 {
     /// <inheritdoc />
-    public partial class AddSeedRunLogAndIsSeedData : Migration
+    public partial class AddSystemErrorLog : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

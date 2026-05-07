@@ -64,6 +64,9 @@ public sealed class AtualizarRotinaUseCase(
         var rotina = await rotinaRepository.GetByIdAsync(command.RotinaId)
             ?? throw new InvalidOperationException($"Rotina {command.RotinaId} não encontrada.");
 
+        if (command.CronExpression is not null)
+            rotina.DefinirCronExpression(command.CronExpression, command.AtualizadoPor);
+
         if (command.ParametrosJson is not null)
             rotina.DefinirParametros(command.ParametrosJson, command.AtualizadoPor);
 

@@ -44,6 +44,17 @@
                 </div>
             </div>
 
+            <!-- Toggle verbose logging -->
+            <div class="flex items-center gap-2" x-show="logMode.loaded" x-cloak>
+                <button type="button" @@click="logMode.toggle()"
+                        :class="logMode.verbose ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300' : 'bg-es-surface-2 text-es-ink-mute hover:text-es-ink'"
+                        class="px-2.5 py-1 rounded text-[11px] font-semibold transition flex items-center gap-1.5"
+                        :title="logMode.verbose ? 'Verbose ativo — clique para desligar' : 'Ativar logging verbose (Debug+)'">
+                    <span>📡</span>
+                    <span x-text="logMode.verbose ? 'Verbose ON' : 'Verbose'"></span>
+                </button>
+            </div>
+
             <!-- Atender chamado (CID sticky filter) -->
             <div class="flex gap-2 items-center">
                 <template x-if="stickyCid">
@@ -81,6 +92,12 @@
                 class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
             🚨 Erros
             <span x-show="header.total24h > 0" x-cloak class="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold" x-text="header.total24h"></span>
+        </button>
+        <button type="button" @@click="setTab('sistema')"
+                :class="tab === 'sistema' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
+            🗄 Sistema
+            <span x-show="sysErros.total > 0" x-cloak class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold" x-text="sysErros.total"></span>
         </button>
         <button type="button" @@click="setTab('operacoes')"
                 :class="tab === 'operacoes' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
@@ -331,6 +348,126 @@
                         <button type="button" @@click="erros.nextPage()" :disabled="erros.page * erros.pageSize >= erros.total" class="btn-secondary text-xs">Próxima →</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: SISTEMA — erros persistidos no banco (SystemErrorLog)               -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'sistema'" x-cloak>
+
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-es-ink-mute text-sm">
+                Erros persistidos no banco (API 5xx, falhas de seed e erros de frontend). Independente de rotação de logs.
+            </div>
+            <div class="flex gap-2 items-center">
+                <button type="button" @@click="sysErros.refresh()" class="btn-secondary text-xs">↻ Atualizar</button>
+                <button type="button" @@click="sysErros.purgar()" :disabled="sysErros.purgando"
+                        class="btn-secondary text-xs text-amber-300 hover:text-amber-200">
+                    <span x-show="!sysErros.purgando">🗑 Purgar</span>
+                    <span x-show="sysErros.purgando" x-cloak>Purgando…</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Filtros inline -->
+        <div class="flex flex-wrap gap-2 mb-4">
+            <select x-model="sysErros.filtros.source" @@change="sysErros.refresh()" class="form-input text-xs w-40">
+                <option value="">Todas as origens</option>
+                <option value="api_backend">API Backend</option>
+                <option value="seed">Seed</option>
+                <option value="admin_frontend">Admin Frontend</option>
+                <option value="web_frontend">Web Frontend</option>
+                <option value="background">Background</option>
+            </select>
+            <select x-model="sysErros.filtros.level" @@change="sysErros.refresh()" class="form-input text-xs w-32">
+                <option value="">Todos os níveis</option>
+                <option value="error">Error</option>
+                <option value="fatal">Fatal</option>
+                <option value="warning">Warning</option>
+            </select>
+            <select x-model="sysErros.filtros.hours" @@change="sysErros.refresh()" class="form-input text-xs w-24">
+                <option value="6">6h</option>
+                <option value="24">24h</option>
+                <option value="72">3 dias</option>
+                <option value="168">7 dias</option>
+                <option value="720">30 dias</option>
+            </select>
+        </div>
+
+        <template x-if="sysErros.erro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-3" x-text="sysErros.erro"></div>
+        </template>
+
+        <template x-if="!sysErros.loading && sysErros.items.length === 0 && !sysErros.erro">
+            <div class="card text-center py-12">
+                <div class="text-5xl mb-3">✓</div>
+                <h3 class="text-es-ink font-semibold mb-1">Nenhum erro no período</h3>
+                <p class="text-es-ink-mute text-sm">Sem erros no banco para os filtros selecionados.</p>
+            </div>
+        </template>
+
+        <div x-show="sysErros.items.length > 0" class="card p-0 overflow-hidden">
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Quando</th>
+                        <th class="px-3 py-2 text-left">Origem</th>
+                        <th class="px-3 py-2 text-left">Categoria</th>
+                        <th class="px-3 py-2 text-left">Mensagem</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <template x-for="(item, i) in sysErros.items" :key="item.id">
+                    <tbody>
+                        <tr class="hover:bg-es-surface-2/40 transition cursor-pointer"
+                            @@click="sysErros.toggleExpand(i)" style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 font-mono text-es-ink-mute whitespace-nowrap" x-text="sysErros.formatTime(item.criadoEm)"></td>
+                            <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-es-surface-2 text-es-ink-mute" x-text="item.source"></span></td>
+                            <td class="px-3 py-2 text-es-ink-dim" x-text="item.category ?? '—'"></td>
+                            <td class="px-3 py-2 text-es-ink truncate max-w-[350px]" x-text="sysErros.shortMsg(item.message)"></td>
+                            <td class="px-3 py-2 text-es-ink-mute text-base" x-text="sysErros.expanded[i] ? '▼' : '▶'"></td>
+                        </tr>
+                        <tr x-show="sysErros.expanded[i]" x-cloak style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td colspan="5" class="bg-black/30 p-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <div class="text-es-ink-mute uppercase tracking-wide text-[10px] mb-1">Info</div>
+                                        <div class="font-mono text-es-ink-dim space-y-0.5">
+                                            <div><span class="text-es-ink-mute">URL:</span> <span x-text="item.url ?? '—'"></span></div>
+                                            <div><span class="text-es-ink-mute">CorrelationId:</span> <span class="text-es-accent" x-text="item.correlationId ?? '—'"></span></div>
+                                            <div><span class="text-es-ink-mute">AdminEmail:</span> <span x-text="item.adminEmail ?? '—'"></span></div>
+                                            <div><span class="text-es-ink-mute">TenantId:</span> <span x-text="item.tenantId ?? '—'"></span></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-es-ink-mute uppercase tracking-wide text-[10px] mb-1">Mensagem</div>
+                                        <pre class="text-es-ink whitespace-pre-wrap break-all font-mono text-[11px]" x-text="item.message"></pre>
+                                    </div>
+                                </div>
+                                <template x-if="item.details">
+                                    <div class="mt-3">
+                                        <div class="text-es-ink-mute uppercase tracking-wide text-[10px] mb-1">Detalhes (JSON)</div>
+                                        <pre class="text-amber-200 whitespace-pre-wrap break-all font-mono text-[10px] max-h-48 overflow-auto p-2 rounded bg-black/40" x-text="sysErros.prettyJson(item.details)"></pre>
+                                    </div>
+                                </template>
+                            </td>
+                        </tr>
+                    </tbody>
+                </template>
+            </table>
+        </div>
+
+        <!-- Paginação -->
+        <div x-show="sysErros.total > sysErros.pageSize" x-cloak class="flex items-center justify-between mt-3 text-sm">
+            <div class="text-es-ink-mute text-xs">
+                Página <b class="text-es-ink" x-text="sysErros.page"></b> de <b class="text-es-ink" x-text="Math.ceil(sysErros.total / sysErros.pageSize)"></b>
+                · <b class="text-es-ink" x-text="sysErros.total"></b> registros
+            </div>
+            <div class="flex gap-1">
+                <button type="button" @@click="sysErros.prevPage()" :disabled="sysErros.page === 1" class="btn-secondary text-xs">← Anterior</button>
+                <button type="button" @@click="sysErros.nextPage()" :disabled="sysErros.page * sysErros.pageSize >= sysErros.total" class="btn-secondary text-xs">Próxima →</button>
             </div>
         </div>
     </div>
@@ -622,12 +759,17 @@ function diagnosticoPage() {
         // ── Sub-states (factories internas) ──────────────────────────────────
         resumo: null,
         erros: null,
+        sysErros: null,
+        logMode: null,
 
         init() {
             this.resumo = resumoState.call(this);
             this.erros = errosState.call(this);
+            this.sysErros = systemErrosState.call(this);
+            this.logMode = loggingModeState.call(this);
 
             this.resumo.init();
+            this.logMode.init();
 
             // Carrega header counters (compartilhado entre tabs).
             this.loadHeaderCounters();
@@ -637,10 +779,12 @@ function diagnosticoPage() {
             this.$watch('tab', (val) => {
                 this._syncUrl();
                 if (val === 'erros' && !this.erros._loadedOnce) this.erros.refresh();
+                if (val === 'sistema' && !this.sysErros._loadedOnce) this.sysErros.refresh();
             });
 
             // Hidrata erros se entrou direto na tab.
             if (this.tab === 'erros') this.erros.refresh();
+            if (this.tab === 'sistema') this.sysErros.refresh();
         },
 
         setTab(t) { this.tab = t; },
@@ -809,6 +953,7 @@ function errosState() {
                 this.expanded = {};
             } catch (e) {
                 this.erro = 'Falha de rede: ' + (e.message || e);
+                sendFrontendError('admin_frontend', 'component_load', e.message, e.stack, '/Diagnostico?tab=erros');
             } finally {
                 this.loading = false;
             }
@@ -894,6 +1039,136 @@ function errosState() {
                 this.erro = 'Falha de rede ao exportar: ' + (e.message || e);
             } finally {
                 this.exportando = false;
+            }
+        }
+    };
+}
+
+// ─── Helper global: envia erros de JS para o servidor ─────────────────────
+function sendFrontendError(source, category, message, details, url) {
+    try {
+        fetch('/api-proxy/diag/frontend-error', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source, category, message: String(message).slice(0, 1500), details: String(details || '').slice(0, 7000), url: url || window.location.pathname })
+        }).catch(() => {}); // fire-and-forget, nunca quebra o UI
+    } catch {}
+}
+
+// Captura global de erros JS não tratados — registra em SystemErrorLog.
+window.addEventListener('unhandledrejection', (ev) => {
+    const msg = ev.reason?.message || String(ev.reason || 'UnhandledRejection');
+    sendFrontendError('admin_frontend', 'js_error', msg, ev.reason?.stack, window.location.pathname);
+});
+window.addEventListener('error', (ev) => {
+    if (!ev.message || ev.message === 'Script error.') return; // cross-origin ruído
+    sendFrontendError('admin_frontend', 'js_error', ev.message, ev.error?.stack, window.location.pathname);
+});
+
+// ─── Factory: SystemErrorLog (tab Sistema) ────────────────────────────────
+function systemErrosState() {
+    const root = this;
+    return {
+        _loadedOnce: false,
+        loading: false,
+        erro: '',
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 50,
+        expanded: {},
+        purgando: false,
+
+        filtros: { source: '', level: '', hours: '24' },
+
+        _buildQs() {
+            const p = new URLSearchParams();
+            if (this.filtros.source) p.set('source', this.filtros.source);
+            if (this.filtros.level) p.set('level', this.filtros.level);
+            p.set('hours', this.filtros.hours);
+            p.set('page', this.page);
+            p.set('pageSize', this.pageSize);
+            return p.toString();
+        },
+
+        async refresh() {
+            this.loading = true; this.erro = ''; this._loadedOnce = true;
+            try {
+                const r = await fetch('/api-proxy/diag/system-errors?' + this._buildQs(), { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.erro = `HTTP ${r.status}`; return; }
+                const d = await r.json();
+                this.items = d.items || [];
+                this.total = d.total || 0;
+                this.expanded = {};
+            } catch (e) {
+                this.erro = 'Falha de rede: ' + (e.message || e);
+                sendFrontendError('admin_frontend', 'component_load', e.message, e.stack, '/Diagnostico?tab=sistema');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async purgar() {
+            if (!confirm('Purgar erros com mais de 7 dias do banco?\nEsta ação não pode ser desfeita.')) return;
+            this.purgando = true;
+            try {
+                const r = await fetch('/api-proxy/diag/system-errors/expurgar?diasManter=7', { method: 'POST', credentials: 'same-origin' });
+                if (!r.ok) { alert('Erro ao purgar: HTTP ' + r.status); return; }
+                const d = await r.json();
+                alert(`Purgados ${d.deleted} registros.`);
+                await this.refresh();
+            } catch (e) {
+                alert('Falha de rede ao purgar: ' + (e.message || e));
+            } finally {
+                this.purgando = false;
+            }
+        },
+
+        prevPage() { if (this.page > 1) { this.page--; this.refresh(); } },
+        nextPage() { if (this.page * this.pageSize < this.total) { this.page++; this.refresh(); } },
+        toggleExpand(i) { this.expanded = { ...this.expanded, [i]: !this.expanded[i] }; },
+        shortMsg(msg) { return msg && msg.length > 120 ? msg.slice(0, 120) + '…' : (msg || '—'); },
+        formatTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }); },
+        prettyJson(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } }
+    };
+}
+
+// ─── Factory: Toggle de logging verbose ───────────────────────────────────
+function loggingModeState() {
+    return {
+        verbose: false,
+        loaded: false,
+        toggling: false,
+
+        async init() {
+            try {
+                const r = await fetch('/api-proxy/diag/logging-mode', { credentials: 'same-origin', cache: 'no-store' });
+                if (!r.ok) return;
+                const d = await r.json();
+                this.verbose = d.isVerbose ?? false;
+                this.loaded = true;
+            } catch {}
+        },
+
+        async toggle() {
+            if (this.toggling) return;
+            this.toggling = true;
+            try {
+                const r = await fetch('/api-proxy/diag/logging-mode', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ verbose: this.verbose })
+                });
+                if (!r.ok) {
+                    this.verbose = !this.verbose; // revert
+                    alert('Falha ao alterar modo de logging: HTTP ' + r.status);
+                }
+            } catch (e) {
+                this.verbose = !this.verbose;
+                alert('Falha de rede: ' + e.message);
+            } finally {
+                this.toggling = false;
             }
         }
     };

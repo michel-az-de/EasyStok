@@ -3,6 +3,7 @@ using System.Text.Json;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Api.Services;
 
@@ -147,6 +148,11 @@ public sealed class SeedProgressService(IServiceProvider services, ILogger<SeedP
         s.CompletedAt = DateTime.UtcNow;
         s.AddEtapa(new SeedEtapa(DateTime.UtcNow.ToString("HH:mm:ss.fff"), "error",
             rolledBack ? $"Rollback — {erro}" : $"Erro — {erro}", s.Percent));
+
+        // LogError garante que o erro aparece na aba Erros do Diagnóstico (filtra ERR/FATAL do Serilog).
+        log.LogError("[Seed:{RunId}] {Status} — Tipo:{Tipo} Volume:{Volume} | {Erro}",
+            runId.ToString()[..8], s.Status, s.TipoSeed, s.Volume ?? "—", erro);
+
         await PersistAsync(s);
     }
 
@@ -176,6 +182,28 @@ public sealed class SeedProgressService(IServiceProvider services, ILogger<SeedP
             // Snapshot evita "collection modified during enumeration"
             // se o background task ainda estiver reportando etapas.
             existing.EtapasJson = JsonSerializer.Serialize(s.EtapasSnapshot());
+
+            // Se falhou, persiste também no SystemErrorLog para aparecer na tela de diagnóstico.
+            if (s.Status != "Success")
+            {
+                db.SystemErrorLogs.Add(new SystemErrorLog
+                {
+                    Id = Guid.NewGuid(),
+                    Source = "seed",
+                    Level = "error",
+                    Category = "seed_failure",
+                    Message = $"[{s.TipoSeed}/{s.Volume ?? "—"}] {s.Erro}",
+                    Details = JsonSerializer.Serialize(new
+                    {
+                        runId = s.RunId,
+                        status = s.Status,
+                        adminEmail = s.AdminEmail,
+                        ultimasEtapas = s.EtapasSnapshot().TakeLast(5)
+                    }),
+                    AdminEmail = s.AdminEmail,
+                    CriadoEm = s.CompletedAt ?? DateTime.UtcNow
+                });
+            }
 
             await db.SaveChangesAsync();
         }

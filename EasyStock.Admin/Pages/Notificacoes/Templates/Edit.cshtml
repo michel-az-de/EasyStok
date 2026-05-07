@@ -98,7 +98,7 @@
                 <div class="card p-4">
                     <p class="text-slate-400 text-xs mb-2">CORPO</p>
                     <iframe class="w-full h-80 bg-white rounded"
-                            srcdoc="@Html.Raw(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() : "")">
+                            srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
                     </iframe>
                 </div>
             </div>

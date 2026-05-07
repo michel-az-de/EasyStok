@@ -28,6 +28,11 @@ public sealed class LogEnvioNotificacaoRepository(EasyStockDbContext db) : ILogE
                 (l, m) => new { Log = l, Mensagem = m })
             .Where(x => empresaId == null || x.Mensagem.EmpresaId == empresaId);
 
+        if (status.HasValue)
+        {
+            // Status fica no OutboxMensagem, não no Log — filtra pela mensagem associada
+            q = q.Where(x => x.Mensagem.Status == status);
+        }
         if (canal.HasValue) q = q.Where(x => x.Log.Canal == canal);
         if (de.HasValue) q = q.Where(x => x.Log.OcorridoEm >= de);
         if (ate.HasValue) q = q.Where(x => x.Log.OcorridoEm <= ate);

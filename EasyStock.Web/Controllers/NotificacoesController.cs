@@ -77,6 +77,7 @@ public class NotificacoesController(NotificacoesService svc, SessionService sess
     }
 
     [HttpPost("/notificacoes/{id}/lida-ajax")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarcarLidaAjax(string id)
     {
         var result = await svc.MarcarLidaAsync(id);

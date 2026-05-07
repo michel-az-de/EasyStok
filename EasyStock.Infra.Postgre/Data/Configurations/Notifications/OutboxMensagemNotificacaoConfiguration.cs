@@ -26,7 +26,7 @@ public class OutboxMensagemNotificacaoConfiguration : IEntityTypeConfiguration<O
         b.Property(x => x.ProximaTentativaEm).IsRequired();
         b.Property(x => x.EnviadoEm);
         b.Property(x => x.ProviderUsado).HasMaxLength(40);
-        b.Property(x => x.ErroUltimaTentativa).HasMaxLength(2000);
+        b.Property(x => x.ErroUltimaTentativa).HasColumnType("text");
         b.Property(x => x.IdempotencyKey).HasMaxLength(64).IsRequired();
         b.Property(x => x.TenantTimezone).HasMaxLength(64).IsRequired();
         b.Property(x => x.CanaisFallbackRestantesJson).HasColumnType("jsonb").IsRequired();

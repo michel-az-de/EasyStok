@@ -32,21 +32,28 @@ public sealed class ColetorProdutosVencendo(
                      && i.Lote != null)
             .ToListAsync(ct);
 
+        // Pré-carrega correlation IDs já existentes para evitar N+1 queries
+        var candidatos = itensVencendo
+            .Select(i => (item: i, diasRestantes: (int)(i.ExpiraEm!.Value.Date - agora.Date).TotalDays))
+            .Where(x => DiasPadrao.Contains(x.diasRestantes))
+            .ToList();
+
+        var correlationIdsCandidatos = candidatos
+            .Select(x => $"produto-vencendo-{x.item.Id}-d{x.diasRestantes}-{agora:yyyyMMdd}")
+            .ToHashSet();
+
+        var correlationIdsExistentes = await db.NotifEventos
+            .Where(e => correlationIdsCandidatos.Contains(e.CorrelationId!))
+            .Select(e => e.CorrelationId!)
+            .ToHashSetAsync(ct);
+
         var processados = 0;
-        foreach (var item in itensVencendo)
+        foreach (var (item, diasRestantes) in candidatos)
         {
-            var diasRestantes = (int)(item.ExpiraEm!.Value.Date - agora.Date).TotalDays;
-
-            if (!DiasPadrao.Contains(diasRestantes)) continue;
-
             var empresaId = item.Lote!.EmpresaId;
             var correlationId = $"produto-vencendo-{item.Id}-d{diasRestantes}-{agora:yyyyMMdd}";
 
-            // Idempotência: não duplicar evento para o mesmo item/dia
-            var jaExiste = await db.NotifEventos
-                .AnyAsync(e => e.CorrelationId == correlationId, ct);
-
-            if (jaExiste) continue;
+            if (correlationIdsExistentes.Contains(correlationId)) continue;
 
             var payload = JsonSerializer.Serialize(new
             {
@@ -55,7 +62,7 @@ public sealed class ColetorProdutosVencendo(
                 produtoId = item.ProdutoId,
                 nomeProduto = item.Nome,
                 quantidade = item.Quantidade,
-                expiraEm = item.ExpiraEm.Value.ToString("yyyy-MM-dd"),
+                expiraEm = item.ExpiraEm!.Value.ToString("yyyy-MM-dd"),
                 diasRestantes,
                 empresaId
             });

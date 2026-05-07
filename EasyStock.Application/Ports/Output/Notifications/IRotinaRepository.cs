@@ -12,7 +12,7 @@ public interface IRotinaRepository
         TipoEventoNotificacao? tipoEvento = null,
         CancellationToken ct = default);
 
-    Task<IReadOnlyList<RotinaNotificacao>> ListarAsync(
+    Task<(IReadOnlyList<RotinaNotificacao> Items, int Total)> ListarAsync(
         Guid? empresaId,
         bool? ativa = null,
         int page = 1,

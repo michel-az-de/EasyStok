@@ -1,9 +1,13 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Domain.Entities;
+using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Controllers;
 
@@ -18,7 +22,9 @@ namespace EasyStock.Api.Controllers;
 [ApiExplorerSettings(GroupName = "v1-ptbr")]
 public sealed class DiagnosticoLogsController(
     IConfiguration configuration,
-    ILogger<DiagnosticoLogsController> logger) : ControllerBase
+    ILogger<DiagnosticoLogsController> logger,
+    EasyStockDbContext db,
+    DiagnosticoModeService diagMode) : ControllerBase
 {
     // ──────────────────────────────────────────────────────────────────────
     // Regex para parsing de log simples (endpoint /logs)
@@ -740,6 +746,135 @@ public sealed class DiagnosticoLogsController(
     }
 
     // ──────────────────────────────────────────────────────────────────────
+    // SystemErrorLog — erros persistidos no banco (DB, não arquivos Serilog)
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Recebe erros originados no frontend (Admin ou Web).
+    /// Grava em SystemErrorLog + loga via Serilog (aparece na aba Erros do Diagnóstico).
+    /// </summary>
+    [HttpPost("frontend-error")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RegistrarFrontendError([FromBody] FrontendErrorRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Message)) return BadRequest(new { error = "message é obrigatório." });
+
+        var source = req.Source is "admin_frontend" or "web_frontend" ? req.Source : "admin_frontend";
+        var msg = req.Message[..Math.Min(req.Message.Length, 1500)];
+
+        logger.LogWarning("[FrontendError] Source:{Source} Category:{Category} Url:{Url} | {Message}",
+            source, req.Category, req.Url, msg);
+
+        try
+        {
+            db.SystemErrorLogs.Add(new SystemErrorLog
+            {
+                Id = Guid.NewGuid(),
+                Source = source,
+                Level = "error",
+                Category = req.Category ?? "js_error",
+                Message = msg,
+                Details = req.Details?[..Math.Min(req.Details.Length, 7000)],
+                CorrelationId = req.CorrelationId,
+                Url = req.Url?[..Math.Min(req.Url.Length, 490)],
+                CriadoEm = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao persistir frontend-error no DB.");
+        }
+
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>Lista paginada de erros do SystemErrorLog (banco).</summary>
+    [HttpGet("system-errors")]
+    public async Task<IActionResult> ListarSystemErrors(
+        [FromQuery] string? source,
+        [FromQuery] string? level,
+        [FromQuery] int hours = 24,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        hours = Math.Clamp(hours, 1, 720);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+
+        var cutoff = DateTime.UtcNow.AddHours(-hours);
+        var query = db.SystemErrorLogs.Where(x => x.CriadoEm >= cutoff);
+
+        if (!string.IsNullOrWhiteSpace(source))
+            query = query.Where(x => x.Source == source);
+        if (!string.IsNullOrWhiteSpace(level))
+            query = query.Where(x => x.Level == level);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(x => x.CriadoEm)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new
+            {
+                x.Id,
+                x.Source,
+                x.Level,
+                x.Category,
+                x.Message,
+                x.Details,
+                x.CorrelationId,
+                x.Url,
+                x.AdminEmail,
+                x.TenantId,
+                x.CriadoEm
+            })
+            .ToListAsync();
+
+        return Ok(new { total, page, pageSize, items });
+    }
+
+    /// <summary>Remove entradas mais antigas que N dias do SystemErrorLog.</summary>
+    [HttpPost("system-errors/expurgar")]
+    public async Task<IActionResult> ExpurgarSystemErrors([FromQuery] int diasManter = 7)
+    {
+        diasManter = Math.Clamp(diasManter, 1, 365);
+        var cutoff = DateTime.UtcNow.AddDays(-diasManter);
+        var deleted = await db.SystemErrorLogs
+            .Where(x => x.CriadoEm < cutoff)
+            .ExecuteDeleteAsync();
+        logger.LogInformation("[SystemErrorLog] Expurgados {Count} registros anteriores a {Cutoff}", deleted, cutoff);
+        return Ok(new { deleted, diasManter, cutoff });
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Toggle de logging verbose (DiagnosticoModeService)
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>Retorna o estado atual do modo de logging.</summary>
+    [HttpGet("logging-mode")]
+    public IActionResult GetLoggingMode() =>
+        Ok(new
+        {
+            isVerbose = diagMode.IsVerboseEnabled,
+            minimumLevel = diagMode.LevelSwitch.MinimumLevel.ToString(),
+            changedAt = diagMode.ChangedAt,
+            changedBy = diagMode.ChangedBy
+        });
+
+    /// <summary>Altera o modo de logging em tempo real. Persiste no DB.</summary>
+    [HttpPost("logging-mode")]
+    public async Task<IActionResult> SetLoggingMode([FromBody] LoggingModeRequest req)
+    {
+        var adminEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                      ?? User.FindFirst("email")?.Value
+                      ?? "admin";
+        await diagMode.SetVerboseAsync(req.Verbose, adminEmail);
+        logger.LogInformation("[DiagnosticoMode] Verbose={Verbose} ativado por {Admin}", req.Verbose, adminEmail);
+        return Ok(new { isVerbose = req.Verbose, minimumLevel = diagMode.LevelSwitch.MinimumLevel.ToString() });
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
     // Helpers privados
     // ──────────────────────────────────────────────────────────────────────
 
@@ -765,3 +900,15 @@ public sealed class DiagnosticoLogsController(
         return new LogEntry { Timestamp = ts, Level = DiagnosticoLogAnalyzer.NormalizeLevel(match.Groups[2].Value.ToUpperInvariant()), Message = message };
     }
 }
+
+// ─── Request DTOs ──────────────────────────────────────────────────────────────
+
+public sealed record FrontendErrorRequest(
+    string? Source,
+    string? Category,
+    string Message,
+    string? Details,
+    string? CorrelationId,
+    string? Url);
+
+public sealed record LoggingModeRequest(bool Verbose);

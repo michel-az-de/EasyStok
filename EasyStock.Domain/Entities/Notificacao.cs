@@ -11,6 +11,7 @@ namespace EasyStock.Domain.Entities
         public string Mensagem { get; set; } = null!;
         public SeveridadeNotificacao Severidade { get; set; } = SeveridadeNotificacao.Media;
         public bool Lida { get; set; }
+        public Guid? UsuarioId { get; set; }
         public Guid? ReferenciaId { get; set; }
         public DateTime CriadaEm { get; set; }
         public DateTime? LidaEm { get; set; }

@@ -77,6 +77,13 @@ public class RotinaNotificacao
         AtualizadaEm = DateTime.UtcNow;
     }
 
+    public void DefinirCronExpression(string cronExpression, string atualizadaPor)
+    {
+        CronExpression = cronExpression;
+        AtualizadaPor = atualizadaPor;
+        AtualizadaEm = DateTime.UtcNow;
+    }
+
     public void DefinirFallback(string canaisOrdemFallbackJson, string atualizadaPor)
     {
         CanaisOrdemFallbackJson = canaisOrdemFallbackJson;
