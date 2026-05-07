@@ -76,6 +76,12 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaResolver>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskTicketService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskAnexoService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskBugFixService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
