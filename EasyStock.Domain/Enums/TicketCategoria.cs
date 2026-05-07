@@ -5,6 +5,9 @@ namespace EasyStock.Domain.Enums
         Bug,
         Duvida,
         Financeiro,
-        Outro
+        Outro,
+        Solicitacao,
+        Incidente,
+        BugFixDev
     }
 }

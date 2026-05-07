@@ -4,6 +4,7 @@ namespace EasyStock.Domain.Enums
     {
         Normal,
         Alta,
-        Critica
+        Critica,
+        Baixa
     }
 }

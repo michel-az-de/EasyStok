@@ -10,5 +10,14 @@ public enum TipoEventoNotificacao
     AssinaturaExpirada = 6,
     BroadcastSuperAdmin = 7,
     ConfirmacaoEmail = 8,
-    AlertaEstoqueCritico = 9
+    AlertaEstoqueCritico = 9,
+    TicketCriado = 10,
+    TicketRespondidoCliente = 11,
+    TicketRespondidoAdmin = 12,
+    TicketStatusAlterado = 13,
+    TicketAtribuido = 14,
+    TicketEncaminhadoNivel = 15,
+    SlaProximoVencer = 16,
+    SlaViolado = 17,
+    BugFixCriado = 18
 }

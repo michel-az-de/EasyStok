@@ -5,6 +5,7 @@ namespace EasyStock.Domain.Enums
         Aberto,
         EmAtendimento,
         Resolvido,
-        Fechado
+        Fechado,
+        AguardandoCliente
     }
 }

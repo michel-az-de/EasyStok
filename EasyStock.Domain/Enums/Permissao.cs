@@ -12,6 +12,11 @@ namespace EasyStock.Domain.Enums
         AcessarInteligencia,
         VisualizarTickets,
         ResponderTickets,
-        GerenciarTickets
+        GerenciarTickets,
+        ResponderTicketsInternos,
+        EncaminharTicketNivel,
+        RevelarPiiCliente,
+        GerarBugFix,
+        ConfigurarSla
     }
 }
