@@ -93,7 +93,7 @@
         <p>Voce paga so quando fizer sentido. Cancelamento e em 1 clique.</p>
         <div class="site-hero-ctas" style="justify-content:center">
             <a href="/auth/registrar?origem=precos-final" class="btn btn-primary btn-lg">Comecar trial gratis</a>
-            <a href="/contato?assunto=Quero conversar sobre planos" class="btn-link">Falar com a gente</a>
+            <a href="@("/contato?assunto=" + Uri.EscapeDataString("Quero conversar sobre planos"))" class="btn-link">Falar com a gente</a>
         </div>
     </div>
 </section>

@@ -88,6 +88,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
+            // Modulo Integration (F3) — credenciais cifradas por tenant + resolver AES-256-GCM
+            services.AddScoped<ICredencialIntegracaoRepository, CredencialIntegracaoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Integration.Crypto.IIntegrationCredentialResolver,
+                Integration.IntegrationCredentialResolver>();
+
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
 

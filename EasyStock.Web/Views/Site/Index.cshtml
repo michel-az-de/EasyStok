@@ -3,6 +3,7 @@
     Layout = "_LayoutSite";
     ViewBag.Title = "Estoque vivo em 7 dias";
     ViewBag.Description = "Pare de depender da planilha pra nao perder produto. EasyStok e estoque, validade e movimentacao no celular. 14 dias gratis.";
+    var contatoFinalUrl = "/contato?origem=cta-final&assunto=" + Uri.EscapeDataString("Gostaria de saber mais sobre o EasyStok");
 }
 
 <section class="site-hero">
@@ -250,7 +251,7 @@
             <a href="/auth/registrar?origem=cta-final" class="btn btn-primary btn-lg" data-track="cta-final-teste">
                 Testar gratis por 14 dias
             </a>
-            <a href="/contato?origem=cta-final&assunto=Gostaria de saber mais sobre o EasyStok" class="btn-link" data-track="cta-final-fale">
+            <a href="@contatoFinalUrl" class="btn-link" data-track="cta-final-fale">
                 Falar com a gente
             </a>
         </div>

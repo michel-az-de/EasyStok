@@ -23,11 +23,11 @@ public sealed class ContatoViewModel
     public string? TipoNegocio { get; set; }
 
     [Required(ErrorMessage = "Conta pra gente o que precisa.")]
-    [StringLength(2000, MinimumLength = 5, ErrorMessage = "Mensagem muito curta.")]
+    [StringLength(2000, MinimumLength = 10, ErrorMessage = "Mensagem muito curta — escreve pelo menos 10 caracteres.")]
     public string Mensagem { get; set; } = string.Empty;
 
     [Display(Name = "Concordo com a Politica de Privacidade")]
-    [Range(typeof(bool), "true", "true", ErrorMessage = "Voce precisa aceitar para enviar.")]
+    [MustBeTrue(ErrorMessage = "Voce precisa aceitar a Politica de Privacidade para enviar.")]
     public bool ConsentimentoLgpd { get; set; }
 
     public bool ReceberNewsletter { get; set; }
@@ -48,6 +48,24 @@ public sealed class NewsletterViewModel
     public string Email { get; set; } = string.Empty;
 
     public string? Nome { get; set; }
+
+    /// <summary>
+    /// Default true — newsletter inscricao implica consentimento LGPD basico.
+    /// Esquema mais explicito (checkbox dedicado) fica para um banner LGPD em P1.
+    /// </summary>
     public bool ConsentimentoLgpd { get; set; } = true;
+
     public string? Website { get; set; }
+}
+
+/// <summary>
+/// Valida que um campo bool e <c>true</c>. Substitui o <c>[Range(typeof(bool),
+/// "true", "true")]</c> que e fragil em .NET 9 — RangeAttribute usa
+/// <c>Convert.ChangeType</c> + <c>IComparable</c>, mas <c>bool</c> nao
+/// implementa <c>IComparable&lt;bool&gt;</c>, podendo lancar runtime.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+public sealed class MustBeTrueAttribute : ValidationAttribute
+{
+    public override bool IsValid(object? value) => value is true;
 }

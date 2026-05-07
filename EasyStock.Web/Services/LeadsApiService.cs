@@ -37,22 +37,8 @@ public sealed class LeadsApiService(ApiClient api)
             website = vm.Website
         });
 
-    public Task<Models.Api.ApiResult<LeadResponse>> RegistrarTesteGratisAsync(
-        string nome, string email, string? telefone, string? empresa, string? tipoNegocio,
-        string? utmSource, string? utmMedium, string? utmCampaign) =>
-        api.PostAsync<LeadResponse>("public/leads", new
-        {
-            nome,
-            email,
-            origem = "TesteGratis",
-            consentimentoLgpd = true,
-            telefone,
-            empresa,
-            tipoNegocio,
-            utmSource,
-            utmMedium,
-            utmCampaign
-        });
+    // RegistrarTesteGratisAsync sera adicionado em P1 quando AuthController.Registrar
+    // capturar lead com origem antes do POST de empresas/registrar.
 }
 
 public sealed record LeadResponse(Guid LeadId, string Mensagem);

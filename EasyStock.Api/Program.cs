@@ -294,6 +294,20 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         app.Logger.LogError(ex, "[SeedSchema] Bootstrap falhou no startup — seed via UI vai tentar de novo no próprio run.");
     }
 
+    // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
+    // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
+    // de empresa). Idempotente: no-op se ja existe.
+    try
+    {
+        using var superSeedScope = app.Services.CreateScope();
+        var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Erro durante SuperAdminSeed. Painel admin pode ficar inacessivel.");
+    }
+
     try
     {
         using var seedScope = app.Services.CreateScope();
