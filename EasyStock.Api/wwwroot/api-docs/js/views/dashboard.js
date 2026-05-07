@@ -22,7 +22,7 @@ export function renderDashboard(root, state) {
                     <aside class="es-splash-headline">
                         <span class="es-section-tag">// runtime</span>
                         <h1>${escapeHtml(info.title || 'EasyStock API')} ${cacheBadge}</h1>
-                        <p class="es-splash-version">v${escapeHtml(info.version || '1')}</p>
+                        <p class="es-splash-version">${formatVersion(info.version)}</p>
                         <dl class="es-splash-stats">
                             <div><dt>endpoints</dt><dd>${counts.endpoints}</dd></div>
                             <div><dt>paths</dt><dd>${counts.paths}</dd></div>
@@ -52,6 +52,11 @@ export function renderDashboard(root, state) {
             </section>
         </main>
     `;
+}
+
+function formatVersion(v) {
+    const s = String(v || '1');
+    return /^v/i.test(s) ? escapeHtml(s) : 'v' + escapeHtml(s);
 }
 
 function renderCard(m, i) {
