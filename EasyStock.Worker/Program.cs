@@ -1,6 +1,5 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Notifications.DependencyInjection;
@@ -9,7 +8,6 @@ using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
-using EasyStock.Worker.Collectors;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -75,16 +73,13 @@ builder.Services.AddEasyStockApplication();
 // Advisory lock utility
 builder.Services.AddScoped<PostgresAdvisoryLock>();
 
-// Event collectors
-builder.Services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
-builder.Services.AddScoped<IColetorEventoNotificacao, ColetorAssinaturasExpirando>();
-
-// Hosting do pipeline de notificações — registra orchestrators (core), wrappers
-// BackgroundService (loops) e signaler PG. Modo lido de "Notifications:Hosting:Mode".
+// Hosting do pipeline de notificações — coletores e dispatcher orchestrator já vêm de
+// AddEasyStockNotificationsRepositories() acima. AddNotificationsHosting chama
+// AddNotificationsCore internamente (idempotente), então não duplicar.
+// Mode lido de "Notifications:Hosting:Mode".
 builder.Services
-    .AddNotificationsCore(builder.Configuration)
-    .AddNotificationsHosting(builder.Configuration);
-builder.Services.AddPostgresOutboxSignaler();
+    .AddNotificationsHosting(builder.Configuration)
+    .AddPostgresOutboxSignaler();
 
 // Jobs de manutenção (não fazem parte do pipeline outbox)
 builder.Services.AddHostedService<AnonimizarLogsAntigosService>();

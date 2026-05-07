@@ -4,12 +4,15 @@ using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
-namespace EasyStock.Worker.Collectors;
+namespace EasyStock.Infra.Postgre.Notifications.Collectors;
 
 /// <summary>
 /// Coleta lotes com itens expirando nos próximos N dias e gera EventoNotificacao.
-/// Roda pelo ColetorEventosDeEstadoService a cada ColetorIntervalSeconds.
+/// Roda pelo orchestrator do coletor (loop in-process ou trigger HTTP cron).
+/// Movido de EasyStock.Worker/Collectors/ para permitir uso pela API
+/// quando Mode=Hosted ou via endpoint /api/internal/notif-jobs/coletor/run.
 /// </summary>
 public sealed class ColetorProdutosVencendo(
     EasyStockDbContext db,
@@ -79,9 +82,9 @@ public sealed class ColetorProdutosVencendo(
         }
 
         if (processados > 0)
+        {
             logger.LogInformation("ColetorProdutosVencendo: {Count} eventos gerados.", processados);
-
-        if (processados > 0)
             await db.SaveChangesAsync(ct);
+        }
     }
 }

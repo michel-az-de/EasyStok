@@ -2,8 +2,10 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Infra.Postgre.Notifications;
+using EasyStock.Infra.Postgre.Notifications.Collectors;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Infra.Postgre.DependencyInjection;
@@ -28,6 +30,11 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddSingleton<NotificacoesDispatcherOrchestrator>();
         services.AddSingleton<INotificacoesDispatcherOrchestrator>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
         services.AddSingleton<INotificationDispatcher>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
+
+        // Coletores de eventos de estado — vivem em Infra.Postgre porque dependem de
+        // EasyStockDbContext. Worker e API ambos consomem via INotificacoesColetorOrchestrator.
+        services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
+        services.AddScoped<IColetorEventoNotificacao, ColetorAssinaturasExpirando>();
 
         return services;
     }

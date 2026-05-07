@@ -1,11 +1,11 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
-using EasyStock.Infra.Notifications.Hosting;
 
 namespace EasyStock.Api.Controllers.Internal;
 

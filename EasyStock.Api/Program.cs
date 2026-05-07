@@ -178,13 +178,14 @@ builder.Services.Configure<EasyStockConfiguracoes>(
 builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfiguracoes>(sp =>
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EasyStockConfiguracoes>>().Value);
 
-// ── Notifications: infra (canal adapters + Scriban) + core (orchestrators/options) ──
+// ── Notifications: infra (canal adapters + Scriban) + hosting (orchestrators/options) ──
 // Hosting fica como "Disabled" por default na API — ative trocando "Notifications:Hosting:Mode"
 // para "Hosted" se quiser rodar o pipeline in-process (modo sem Worker).
+// AddPostgresOutboxSignaler é no-op se Mode=Disabled ou Signaler!=Postgres (ver impl).
 builder.Services.AddNotificationsInfra(builder.Configuration);
-builder.Services.AddNotificationsCore(builder.Configuration);
-builder.Services.AddNotificationsHosting(builder.Configuration);
-builder.Services.AddPostgresOutboxSignaler();
+builder.Services
+    .AddNotificationsHosting(builder.Configuration)
+    .AddPostgresOutboxSignaler();
 builder.Services.AddScoped<PostgresAdvisoryLock>();
 
 // ── Background Services + misc ────────────────────────────────────────────────

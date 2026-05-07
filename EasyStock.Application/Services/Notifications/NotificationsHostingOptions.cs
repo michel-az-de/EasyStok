@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Notifications.Hosting;
+namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Modos de hosting do pipeline de notificações.
@@ -26,6 +26,8 @@ public enum OutboxSignalerKind
 /// <summary>
 /// Opções unificadas do hosting de notificações. Lê seção "Notifications:Hosting".
 /// Substitui WorkerOptions (que mantém retro-compat por 1 release).
+/// POCO de config — vive na Application para ser consumido pelos signalers (Postgre)
+/// e wrappers hosted (Infra.Notifications) sem dep cruzada entre infras.
 /// </summary>
 public sealed class NotificationsHostingOptions
 {

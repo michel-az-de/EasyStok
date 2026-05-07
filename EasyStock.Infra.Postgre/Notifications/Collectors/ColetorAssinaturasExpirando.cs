@@ -1,16 +1,18 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
-namespace EasyStock.Worker.Collectors;
+namespace EasyStock.Infra.Postgre.Notifications.Collectors;
 
 /// <summary>
-/// Detecta assinaturas e trials que expiram em 3 dias e gera EventoNotificacao.
+/// Detecta assinaturas e trials que expiram em até <see cref="DiasAntes"/> dias e gera
+/// EventoNotificacao. Movido de EasyStock.Worker/Collectors/ para uso unificado
+/// (Worker, API in-process, cron HTTP).
 /// </summary>
 public sealed class ColetorAssinaturasExpirando(
     EasyStockDbContext db,
