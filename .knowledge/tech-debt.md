@@ -48,8 +48,7 @@
 10. **`appsettings.Production.json` com placeholders não-óbvios**
     - `Efi:ClientId`, `Stripe:Webhook`, etc. Onboarding novo dev confuso.
 
-11. **`SubscriptionGateMiddleware` não tem cache**
-    - Bate no DB toda request autenticada. Latência cumulativa em escala.
+11. ~~**`SubscriptionGateMiddleware` não tem cache**~~ — RESOLVIDO 2026-05-07 (ver "Resolvidos").
 
 ## P3 — Cosmético / Future
 
@@ -70,3 +69,4 @@
 - [x] **Pedido → estoque com idempotência** — 2026-04 (`340aff0`). Chave `{pedidoId}:{itemId}`.
 - [x] **xmin RowVersion em entidades-chave** — 2026-04. Produto, Pedido, ItemEstoque, AssinaturaEmpresa.
 - [x] **Mongo descartado como provedor transacional** — 2026-05-01 (`820843c`). ADR 0001 formal.
+- [x] **`SubscriptionGateMiddleware` sem cache** — 2026-05-07. `ISubscriptionStatusCache` (IMemoryCache, TTL 60s configurável via `Cache:SubscriptionStatusDuration`) com snapshot imutável `SubscriptionStatusSnapshot`. Invalidação automática via `AssinaturaCacheInvalidationInterceptor` (EF SaveChangesInterceptor) — captura `Added/Modified/Deleted` em `AssinaturaEmpresa` e dispara `Invalidate(empresaId)` apenas após SaveChanges bem-sucedido. Cobre webhook Pix, cancelar, alterar plano, jobs e admin sem precisar tocar cada call site.

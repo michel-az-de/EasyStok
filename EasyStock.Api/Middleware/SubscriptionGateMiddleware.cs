@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
 using System.Security.Claims;
@@ -17,6 +18,15 @@ namespace EasyStock.Api.Middleware;
 ///
 /// Sem assinatura ativa = bloqueia. Mantém o sistema honesto: cliente
 /// inadimplente não deve usar features.
+///
+/// <para>
+/// O snapshot da assinatura ativa e cacheado por <c>empresaId</c> via
+/// <see cref="ISubscriptionStatusCache"/> (TTL 60s). Sem cache, cada
+/// request autenticada batia uma query no Postgres — em escala isso vira
+/// latencia cumulativa e custo de DB. Invalidacao automatica e disparada
+/// pelo <c>AssinaturaCacheInvalidationInterceptor</c> apos qualquer
+/// SaveChanges que altere <c>AssinaturaEmpresa</c>.
+/// </para>
 /// </summary>
 public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<SubscriptionGateMiddleware> logger)
 {
@@ -36,7 +46,10 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
         "/api/mobile/devices",
     };
 
-    public async Task InvokeAsync(HttpContext context, IAssinaturaEmpresaRepository assinaturaRepo)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IAssinaturaEmpresaRepository assinaturaRepo,
+        ISubscriptionStatusCache statusCache)
     {
         var path = context.Request.Path.Value ?? "";
         if (PathPrefixesAllowed.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
@@ -67,33 +80,43 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
             return;
         }
 
-        var assinatura = await assinaturaRepo.GetAtivaAsync(empresaId);
+        var snapshot = await statusCache.GetOrFetchAsync(
+            empresaId,
+            async ct =>
+            {
+                var assinatura = await assinaturaRepo.GetAtivaAsync(empresaId);
+                return assinatura is null
+                    ? null
+                    : new SubscriptionStatusSnapshot(assinatura.Status, assinatura.TrialFim, assinatura.DataFim);
+            },
+            context.RequestAborted);
+
         var now = DateTime.UtcNow;
 
         string? blockCode = null;
         string? blockMsg = null;
 
-        if (assinatura is null)
+        if (snapshot is null)
         {
             blockCode = "NO_SUBSCRIPTION";
             blockMsg = "Empresa sem assinatura ativa.";
         }
-        else if (assinatura.Status == StatusAssinatura.Suspensa)
+        else if (snapshot.Status == StatusAssinatura.Suspensa)
         {
             blockCode = "SUBSCRIPTION_SUSPENDED";
             blockMsg = "Assinatura suspensa por inadimplência. Realize o pagamento para reativar.";
         }
-        else if (assinatura.Status == StatusAssinatura.Cancelada)
+        else if (snapshot.Status == StatusAssinatura.Cancelada)
         {
             blockCode = "SUBSCRIPTION_CANCELLED";
             blockMsg = "Assinatura cancelada. Crie uma nova para continuar.";
         }
-        else if (assinatura.Status == StatusAssinatura.Expirada)
+        else if (snapshot.Status == StatusAssinatura.Expirada)
         {
             blockCode = "SUBSCRIPTION_EXPIRED";
             blockMsg = "Assinatura expirada.";
         }
-        else if (TrialExpiradoSemPlanoAtivo(assinatura, now))
+        else if (TrialExpiradoSemPlanoAtivo(snapshot, now))
         {
             blockCode = "TRIAL_EXPIRED";
             blockMsg = "Período de teste expirado. Faça upgrade para continuar.";
@@ -123,11 +146,11 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
 
     // Trial expirou E não há plano pago vigente (DataFim null = nunca pagou; DataFim < now = plano expirado).
     // Usuário com plano pago vigente passa mesmo se TrialFim < now.
-    private static bool TrialExpiradoSemPlanoAtivo(EasyStock.Domain.Entities.AssinaturaEmpresa assinatura, DateTime now)
+    private static bool TrialExpiradoSemPlanoAtivo(SubscriptionStatusSnapshot snapshot, DateTime now)
     {
-        if (!assinatura.TrialFim.HasValue) return false;
-        if (assinatura.TrialFim.Value >= now) return false;
-        var planoPagoVigente = assinatura.DataFim.HasValue && assinatura.DataFim.Value >= now;
+        if (!snapshot.TrialFim.HasValue) return false;
+        if (snapshot.TrialFim.Value >= now) return false;
+        var planoPagoVigente = snapshot.DataFim.HasValue && snapshot.DataFim.Value >= now;
         return !planoPagoVigente;
     }
 }

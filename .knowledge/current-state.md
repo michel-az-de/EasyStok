@@ -47,7 +47,7 @@
 
 ## Vulnerabilidades conhecidas
 - **Webhook Pix replay window**: Efí pode mandar 2x simultâneo dentro de 5 min — race em `ProcessarPagamentoAsync` ainda possível. Tracked em `stability-roadmap.md` Bloco 5.
-- **`SubscriptionGateMiddleware` sem cache**: bate no DB toda request autenticada.
+- ~~**`SubscriptionGateMiddleware` sem cache**~~: resolvido 2026-05-07 — `ISubscriptionStatusCache` (TTL 60s) + interceptor que invalida em qualquer SaveChanges sobre `AssinaturaEmpresa`.
 
 ## O que falta pro MVP-pago (atualizado)
 1. Deploy GCP estável (se decidir migrar — Azure paga hoje).
