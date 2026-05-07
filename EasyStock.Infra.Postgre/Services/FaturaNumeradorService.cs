@@ -1,9 +1,3 @@
-// Modulo Faturas (F1+) — temporariamente desabilitado.
-// Felipe reverteu commit 9ad8c21 (commitar Faturas WIP) em 709c1d8, removendo
-// IFaturaNumeradorService, Fatura entity e FaturaContador. Este servico fica
-// envolvido em #if false ate a feature voltar. Reativar junto com a reintroducao
-// completa do modulo Financeiro.
-#if false
 using System.Data.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Postgre.Data;
@@ -111,4 +105,3 @@ public sealed class FaturaNumeradorService(EasyStockDbContext db) : IFaturaNumer
         cmd.Parameters.Add(p);
     }
 }
-#endif

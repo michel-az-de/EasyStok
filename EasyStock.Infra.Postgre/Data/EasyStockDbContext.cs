@@ -120,16 +120,13 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
-        // Modulo Financeiro (F1+) — DbSets temporariamente comentados.
-        // Felipe reverteu commit 9ad8c21 (commitar Faturas WIP) em 709c1d8,
-        // entidades Fatura/FaturaItem/etc. nao existem mais no Domain. Reativar
-        // junto com a reintroducao da feature de Faturas no PR completo.
-        // public DbSet<Fatura> Faturas { get; set; } = null!;
-        // public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
-        // public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
-        // public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
-        // public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
-        // public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
+        // Modulo Financeiro (F1+)
+        public DbSet<Fatura> Faturas { get; set; } = null!;
+        public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
+        public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
+        public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
+        public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
+        public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
