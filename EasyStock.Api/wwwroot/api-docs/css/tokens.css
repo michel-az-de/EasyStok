@@ -1,0 +1,139 @@
+/* Design tokens — copiados literal do PWA (wwwroot/pwa/index.html) com extensões pra HTTP methods. */
+
+:root {
+    /* Surfaces */
+    --bg:           #0b0908;
+    --bg-1:         #111827;
+    --bg-2:         #151f31;
+    --bg-3:         #202b42;
+    --bg-card:      #151f31;
+    --bg-elev:      #172033;
+    --bg-elev-2:    #202b42;
+
+    /* Ink */
+    --ink:          #f7f2e8;
+    --ink-dim:      #c8c1b4;
+    --ink-mute:     #8793a7;
+    --ink-faint:    #5d6878;
+
+    /* Accents (do PWA) */
+    --accent:       #e76845;
+    --basil:        #4fbf9f;
+    --gold:         #f0b84a;
+    --cream:        #f1dcc0;
+
+    /* Accents extras (HTTP methods) */
+    --magenta:      #d65a8c;
+    --danger:       #ff5566;
+    --cyan:         #5fc8d8;
+    --info:         #5fc8d8;
+
+    /* Soft (rgba pra hovers/badges) */
+    --accent-soft:  rgba(231, 104, 69, 0.16);
+    --basil-soft:   rgba(79, 191, 159, 0.15);
+    --gold-soft:    rgba(240, 184, 74, 0.14);
+    --magenta-soft: rgba(214, 90, 140, 0.16);
+    --danger-soft:  rgba(255, 85, 102, 0.16);
+    --cyan-soft:    rgba(95, 200, 216, 0.16);
+    --ink-soft:     rgba(247, 242, 232, 0.06);
+
+    /* HTTP method colors (acessadas como var(--m-{method})) */
+    --m-get:        var(--basil);
+    --m-post:       var(--accent);
+    --m-put:        var(--gold);
+    --m-patch:      var(--magenta);
+    --m-delete:     var(--danger);
+    --m-head:       var(--cyan);
+    --m-options:    var(--ink-dim);
+
+    /* Borders */
+    --border:        rgba(247, 242, 232, 0.10);
+    --border-strong: rgba(247, 242, 232, 0.18);
+    --border-soft:   rgba(247, 242, 232, 0.05);
+
+    /* Effects */
+    --shadow:       0 20px 56px rgba(4, 8, 18, 0.56);
+    --shadow-md:    0 8px 24px rgba(4, 8, 18, 0.36);
+    --shadow-sm:    0 2px 8px rgba(4, 8, 18, 0.24);
+    --glow:         0 0 0 1px rgba(247, 242, 232, 0.04), 0 18px 48px rgba(3, 7, 18, 0.32);
+    --glow-cyan:    0 0 0 1px var(--cyan), 0 0 28px -8px var(--cyan);
+    --glow-accent:  0 0 0 1px var(--accent), 0 0 28px -8px var(--accent);
+    --glow-basil:   0 0 0 1px var(--basil), 0 0 28px -8px var(--basil);
+
+    /* Radius */
+    --radius-xs:    6px;
+    --radius-sm:    10px;
+    --radius-md:    14px;
+    --radius-lg:    18px;
+    --radius-xl:    24px;
+    --radius-pill:  100px;
+
+    /* Spacing */
+    --sp-1:         4px;
+    --sp-2:         8px;
+    --sp-3:         12px;
+    --sp-4:         16px;
+    --sp-5:         20px;
+    --sp-6:         24px;
+    --sp-8:         32px;
+    --sp-10:        40px;
+    --sp-12:        48px;
+
+    /* Type */
+    --font-serif:   'Fraunces', 'Georgia', serif;
+    --font-sans:    'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono:    'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+
+    /* Layout */
+    --hud-h:        56px;
+    --rail-w:       300px;
+    --max-w:        1480px;
+
+    /* Motion */
+    --ease:         cubic-bezier(.2, .7, .2, 1);
+    --ease-out:     cubic-bezier(.16, 1, .3, 1);
+    --t-fast:       .12s var(--ease);
+    --t-base:       .2s var(--ease);
+    --t-slow:       .35s var(--ease);
+}
+
+/* Light theme override (toggle) */
+:root[data-theme="light"] {
+    --bg:           #f5f7fb;
+    --bg-1:         #ebe6dc;
+    --bg-2:         #ffffff;
+    --bg-3:         #fbfaf6;
+    --bg-card:      #ffffff;
+    --bg-elev:      #ffffff;
+    --bg-elev-2:    #f1ede4;
+
+    --ink:          #172033;
+    --ink-dim:      #526071;
+    --ink-mute:     #8793a7;
+    --ink-faint:    #b6bdc7;
+
+    --accent:       #cf5738;
+    --basil:        #168f7a;
+    --gold:         #b78122;
+    --cream:        #d2bf9f;
+    --magenta:      #b54375;
+    --danger:       #d63a4d;
+    --cyan:         #2f8a9b;
+
+    --accent-soft:  rgba(207, 87, 56, 0.10);
+    --basil-soft:   rgba(22, 143, 122, 0.10);
+    --gold-soft:    rgba(183, 129, 34, 0.10);
+    --magenta-soft: rgba(181, 67, 117, 0.10);
+    --danger-soft:  rgba(214, 58, 77, 0.10);
+    --cyan-soft:    rgba(47, 138, 155, 0.10);
+    --ink-soft:     rgba(23, 32, 51, 0.04);
+
+    --border:       rgba(23, 32, 51, 0.10);
+    --border-strong:rgba(23, 32, 51, 0.18);
+    --border-soft:  rgba(23, 32, 51, 0.05);
+
+    --shadow:       0 20px 56px rgba(80, 90, 110, 0.18);
+    --shadow-md:    0 8px 24px rgba(80, 90, 110, 0.12);
+    --shadow-sm:    0 2px 8px rgba(80, 90, 110, 0.08);
+    --glow:         0 0 0 1px rgba(23, 32, 51, 0.04), 0 18px 48px rgba(80, 90, 110, 0.10);
+}

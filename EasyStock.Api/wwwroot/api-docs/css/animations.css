@@ -1,0 +1,61 @@
+/* Animações reusáveis — glow, pulse, fade, shake, glitch.
+   Usadas pelo boot, FIRE, hovers e transições de view. */
+
+@keyframes es-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes es-fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+@keyframes es-pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 1px var(--cyan), 0 0 12px -4px var(--cyan); }
+    50%      { box-shadow: 0 0 0 1px var(--cyan), 0 0 28px -2px var(--cyan); }
+}
+
+@keyframes es-pulse-accent {
+    0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 14px -4px var(--accent); }
+    50%      { box-shadow: 0 0 0 1px var(--accent), 0 0 32px 0 var(--accent); }
+}
+
+@keyframes es-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-2px); }
+    75%      { transform: translateX(2px); }
+}
+
+@keyframes es-blink {
+    0%, 50%   { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+}
+
+@keyframes es-glitch {
+    0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    10%      { clip-path: inset(8% 0 88% 0); transform: translate(-1px, 0); }
+    20%      { clip-path: inset(58% 0 28% 0); transform: translate(1px, 0); }
+    30%      { clip-path: inset(38% 0 48% 0); transform: translate(0, 1px); }
+    40%      { clip-path: inset(0 0 0 0); transform: translate(0); }
+    50%      { clip-path: inset(78% 0 8% 0); transform: translate(-1px, -1px); }
+    60%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+}
+
+@keyframes es-tag-tick {
+    0%   { opacity: 0; transform: translateY(2px); }
+    100% { opacity: 1; transform: none; }
+}
+
+.es-fade-in   { animation: es-fade-in var(--t-slow) var(--ease) both; }
+.es-pulse     { animation: es-pulse-glow 2s ease-in-out infinite; }
+.es-pulse-fire{ animation: es-pulse-accent 1.6s ease-in-out infinite; }
+.es-shake     { animation: es-shake .35s var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
