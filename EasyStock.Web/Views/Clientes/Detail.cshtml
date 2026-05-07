@@ -57,7 +57,7 @@
                     @if (!string.IsNullOrEmpty(c.Email))    { <div><dt class="text-slate-500">E-mail</dt><dd class="font-medium">@c.Email</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Documento)){ <div><dt class="text-slate-500">CPF/CNPJ</dt><dd class="font-medium">@c.Documento</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Observacoes)) { <div><dt class="text-slate-500">Observações</dt><dd class="font-medium whitespace-pre-line">@c.Observacoes</dd></div> }
-                    <div class="pt-2 border-t"><dt class="text-slate-500">Pedidos</dt><dd class="font-medium">@c.OrderCount @(c.LastOrderAt.HasValue ? $"(último: {c.LastOrderAt.Value.ToLocalTime():dd/MM/yy})" : "")</dd></div>
+                    <div class="pt-2 border-t"><dt class="text-slate-500">Pedidos</dt><dd class="font-medium">@c.OrderCount @(c.LastOrderAt.HasValue ? $"(último: {c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")})" : "")</dd></div>
                     <div><dt class="text-slate-500">Cadastrado em</dt><dd class="font-medium">@c.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
                 </dl>
             </div>
