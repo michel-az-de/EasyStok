@@ -9,6 +9,9 @@ using EasyStock.Application.Services;
 using EasyStock.Application.Validators;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
+using EasyStock.Infra.Notifications.DependencyInjection;
+using EasyStock.Infra.Notifications.Hosting;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Sqlite.DependencyInjection;
@@ -175,6 +178,15 @@ builder.Services.Configure<EasyStockConfiguracoes>(
 builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfiguracoes>(sp =>
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EasyStockConfiguracoes>>().Value);
 
+// ── Notifications: infra (canal adapters + Scriban) + core (orchestrators/options) ──
+// Hosting fica como "Disabled" por default na API — ative trocando "Notifications:Hosting:Mode"
+// para "Hosted" se quiser rodar o pipeline in-process (modo sem Worker).
+builder.Services.AddNotificationsInfra(builder.Configuration);
+builder.Services.AddNotificationsCore(builder.Configuration);
+builder.Services.AddNotificationsHosting(builder.Configuration);
+builder.Services.AddPostgresOutboxSignaler();
+builder.Services.AddScoped<PostgresAdvisoryLock>();
+
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 builder.Services.AddHttpClient(); // for DiagnosticoInfraController self-testing
@@ -338,6 +350,9 @@ if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Contains("${JWT_SECRET_KEY
     throw new InvalidOperationException("JWT_SECRET_KEY environment variable is required (min 32 chars). Set it before starting the API.");
 if (jwtSecret.Length < 32)
     throw new InvalidOperationException("JWT_SECRET_KEY must be at least 32 characters long.");
+// Bloquear o secret de dev conhecido em qualquer ambiente — caso vaze de novo, falha rápido.
+if (jwtSecret.Contains("EasyStock-Dev-SuperSecretKey", StringComparison.Ordinal))
+    throw new InvalidOperationException("CRITICAL: known leaked dev JWT secret detected in configuration. Rotate JWT_SECRET_KEY immediately.");
 
 // Validar connection strings não têm placeholders
 if (postgresConnectionString?.Contains("${") == true)
@@ -349,6 +364,18 @@ if (mongoConnectionString?.Contains("${") == true)
 // Validar que database credentials não são defaults/placeholders
 if (postgresConnectionString?.Contains("Username=postgres") == true && postgresConnectionString?.Contains("Password=postgres") == true)
     throw new InvalidOperationException("CRITICAL: Default PostgreSQL credentials detected. Set DB_PASSWORD to a secure value before deployment.");
+
+// Validar Mobile:ApiKey: rejeitar valor literal vazado e exigir tamanho mínimo em Production.
+var mobileApiKey = builder.Configuration["Mobile:ApiKey"];
+if (!string.IsNullOrEmpty(mobileApiKey))
+{
+    if (mobileApiKey.Contains("${MOBILE_API_KEY}", StringComparison.Ordinal))
+        throw new InvalidOperationException("MOBILE_API_KEY environment variable is required when Mobile:ApiKey is configured. Set it via env var or user-secrets.");
+    if (mobileApiKey.Equals("cdb-dev-key-change-in-production-2026", StringComparison.Ordinal))
+        throw new InvalidOperationException("CRITICAL: known leaked dev Mobile API key detected in configuration. Rotate Mobile:ApiKey immediately.");
+    if (builder.Environment.IsProduction() && mobileApiKey.Length < 24)
+        throw new InvalidOperationException("Mobile:ApiKey must be at least 24 characters long in Production.");
+}
 
 Log.Information("""
 

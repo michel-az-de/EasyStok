@@ -38,6 +38,13 @@
 ## 9. Não deixar trabalho pela metade
 - **Padrão registrado:** Felipe se irrita com "fiz parte do que pediu". Se pedir 3 features, entregar 3 ou avisar antes que vai entregar 1.
 
+## 11. Não commitar valor real em `appsettings.*.json`
+- **O que aconteceu:** `appsettings.Development.json` ficou ~28 dias com PG Azure (host/user/senha), JWT secret literal e Mobile ApiKey literal. Repo é público no GitHub. Senha PG já foi descontinuada com Azure; secrets restantes rotacionados na auditoria 2026-05-06.
+- **Como evitar:**
+  - `appsettings.*.json` versionado contém **apenas placeholders** (`${VAR}`) ou strings vazias. Valor real vai em env var (Render) ou `dotnet user-secrets` (dev local).
+  - Workflow `.github/workflows/secret-scan.yml` roda gitleaks em todo PR/push e falha o build se encontrar token vazado conhecido.
+  - `Program.cs` tem fail-fast pra `JWT_SECRET_KEY`, `Mobile:ApiKey` e connection strings com placeholder não substituído ou valor literal vazado conhecido.
+
 ## 10. Não floreio em resposta
 - Português BR direto, sem "Claro!", sem "Vou agora...", sem travessões enfeitando, sem vírgula sobrando.
 - Resposta = ação + resultado.
