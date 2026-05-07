@@ -79,20 +79,29 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync(ct);
         }
 
-        public async Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default)
+        public async Task<decimal> SomarPrecoMensalAtivasAsync(Guid? empresaId = null, CancellationToken ct = default)
         {
-            // JOIN para puxar PrecoMensal do plano vinculado.
-            return await dbContext.AssinaturasEmpresa
+            var q = dbContext.AssinaturasEmpresa
                 .IgnoreQueryFilters()
-                .Where(a => a.Status == StatusAssinatura.Ativa)
+                .Where(a => a.Status == StatusAssinatura.Ativa);
+            if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+                q = q.Where(a => a.EmpresaId == empresaId.Value);
+
+            // JOIN para puxar PrecoMensal do plano vinculado.
+            return await q
                 .Join(dbContext.Planos, a => a.PlanoId, p => p.Id, (a, p) => p.PrecoMensal)
                 .SumAsync(ct);
         }
 
-        public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(CancellationToken ct = default)
+        public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(Guid? empresaId = null, CancellationToken ct = default)
         {
-            var rows = await dbContext.AssinaturasEmpresa
+            var q = dbContext.AssinaturasEmpresa
                 .IgnoreQueryFilters()
+                .AsQueryable();
+            if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+                q = q.Where(a => a.EmpresaId == empresaId.Value);
+
+            var rows = await q
                 .GroupBy(a => a.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
                 .ToListAsync(ct);

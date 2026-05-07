@@ -21,12 +21,17 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>
         /// Soma <c>Plano.PrecoMensal</c> de todas assinaturas Ativas (com Plano
         /// JOIN). Base para calculo de MRR (F10). Retorna 0 se nao ha
-        /// assinaturas ativas.
+        /// assinaturas ativas. Quando <paramref name="empresaId"/> for informado,
+        /// limita ao tenant — evita vazar MRR global pra admin operacional.
         /// </summary>
-        Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default);
+        Task<decimal> SomarPrecoMensalAtivasAsync(Guid? empresaId = null, CancellationToken ct = default);
 
-        /// <summary>Conta assinaturas por status — usado para MRR + churn snapshot.</summary>
+        /// <summary>
+        /// Conta assinaturas por status — usado para MRR + churn snapshot.
+        /// Filtro opcional por empresa (multi-tenant): quando <paramref name="empresaId"/>
+        /// for informado, retorna apenas o tenant.
+        /// </summary>
         Task<IReadOnlyDictionary<EasyStock.Domain.Enums.StatusAssinatura, int>> ContarPorStatusAsync(
-            CancellationToken ct = default);
+            Guid? empresaId = null, CancellationToken ct = default);
     }
 }

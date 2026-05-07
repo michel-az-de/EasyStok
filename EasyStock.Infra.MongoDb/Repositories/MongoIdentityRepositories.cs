@@ -545,10 +545,12 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
         return assinaturas;
     }
 
-    public async Task<decimal> SomarPrecoMensalAtivasAsync(CancellationToken ct = default)
+    public async Task<decimal> SomarPrecoMensalAtivasAsync(Guid? empresaId = null, CancellationToken ct = default)
     {
         // Mongo discarded (ADR 0001) — implementacao naive sem JOIN nativo.
-        var ativas = await Collection.Find(a => a.Status == StatusAssinatura.Ativa).ToListAsync(ct);
+        var ativas = empresaId.HasValue && empresaId.Value != Guid.Empty
+            ? await Collection.Find(a => a.Status == StatusAssinatura.Ativa && a.EmpresaId == empresaId.Value).ToListAsync(ct)
+            : await Collection.Find(a => a.Status == StatusAssinatura.Ativa).ToListAsync(ct);
         if (ativas.Count == 0) return 0m;
 
         var planoIds = ativas.Select(a => a.PlanoId).Distinct().ToList();
@@ -558,9 +560,11 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
         return ativas.Sum(a => planoMap.TryGetValue(a.PlanoId, out var preco) ? preco : 0m);
     }
 
-    public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<StatusAssinatura, int>> ContarPorStatusAsync(Guid? empresaId = null, CancellationToken ct = default)
     {
-        var todas = await Collection.Find(_ => true).ToListAsync(ct);
+        var todas = empresaId.HasValue && empresaId.Value != Guid.Empty
+            ? await Collection.Find(a => a.EmpresaId == empresaId.Value).ToListAsync(ct)
+            : await Collection.Find(_ => true).ToListAsync(ct);
         return todas.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count());
     }
 }

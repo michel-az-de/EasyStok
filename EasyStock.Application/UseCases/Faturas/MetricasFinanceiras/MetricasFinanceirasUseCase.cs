@@ -4,52 +4,48 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 
+/// <summary>Comando do dashboard financeiro.</summary>
+/// <param name="DiasRetroativo">Janela retroativa em dias para o calculo de "no periodo" (default 30, clampeado [1,365]).</param>
+/// <param name="EmpresaId">Filtro opcional por empresa — admin operacional ja injeta sua empresa via controller.</param>
+/// <param name="ForcarRefresh">F13 — quando true, ignora cache e recalcula. Default false (TTL 5min).</param>
 public sealed record MetricasFinanceirasCommand(
-    /// <summary>Janela retroativa em dias para o calculo de "no mes" (default 30).</summary>
     int DiasRetroativo = 30,
-    /// <summary>Filtro opcional por empresa — admin operacional ja injeta sua empresa.</summary>
     Guid? EmpresaId = null,
-    /// <summary>F13 — quando true, ignora cache e recalcula. Default false (TTL 5min).</summary>
     bool ForcarRefresh = false
 );
 
-/// <summary>
-/// DTO de metricas financeiras consumido pelo dashboard admin.
-/// </summary>
+/// <summary>DTO de metricas financeiras consumido pelo dashboard admin.</summary>
+/// <param name="Mrr">Monthly Recurring Revenue (soma de Plano.PrecoMensal de assinaturas Ativas).</param>
+/// <param name="Arr">Annual Recurring Revenue = MRR × 12.</param>
+/// <param name="AssinaturasAtivas">Quantidade de assinaturas Ativas.</param>
+/// <param name="AssinaturasSuspensas">Quantidade de assinaturas Suspensas (proxy de churn em risco).</param>
+/// <param name="AssinaturasCanceladas">Quantidade de assinaturas Canceladas (acumulado historico).</param>
+/// <param name="FaturasEmitidasPeriodo">Faturas emitidas no periodo (todas excluindo Cancelada).</param>
+/// <param name="FaturasPagasPeriodo">Faturas pagas no periodo.</param>
+/// <param name="FaturasVencidas">Faturas vencidas (status atual = Vencida — snapshot dos ultimos 365d).</param>
+/// <param name="TaxaConversao">% de conversao (pagas / emitidas) no periodo.</param>
+/// <param name="ReceitaPeriodo">Soma R$ de faturas Paga no periodo (revenue realizado).</param>
+/// <param name="ValorVencido">Soma R$ de faturas Vencida (em aberto agora — receita perdida temporariamente).</param>
+/// <param name="TicketMedio">Ticket medio das faturas pagas no periodo (Receita / Pagas).</param>
+/// <param name="AtrasoMedioDias">Media de dias de atraso das vencidas em aberto.</param>
+/// <param name="TopInadimplentes">Top inadimplentes — empresas com mais faturas vencidas.</param>
+/// <param name="PeriodoInicio">Inicio da janela considerada (UTC).</param>
+/// <param name="PeriodoFim">Fim da janela considerada (UTC).</param>
 public sealed record MetricasFinanceirasResult(
-    /// <summary>Monthly Recurring Revenue (soma de Plano.PrecoMensal de assinaturas Ativas).</summary>
     decimal Mrr,
-    /// <summary>Annual Recurring Revenue = MRR × 12.</summary>
     decimal Arr,
-    /// <summary>Quantidade de assinaturas Ativas.</summary>
     int AssinaturasAtivas,
-    /// <summary>Quantidade de assinaturas Suspensas (uma proxy de churn em risco).</summary>
     int AssinaturasSuspensas,
-    /// <summary>Quantidade de assinaturas Canceladas (acumulado historico).</summary>
     int AssinaturasCanceladas,
-
-    /// <summary>Faturas emitidas no periodo (todas excluindo Cancelada).</summary>
     int FaturasEmitidasPeriodo,
-    /// <summary>Faturas pagas no periodo.</summary>
     int FaturasPagasPeriodo,
-    /// <summary>Faturas vencidas (status atual = Vencida — instantaneo, nao do periodo).</summary>
     int FaturasVencidas,
-    /// <summary>% de conversao (pagas / emitidas) no periodo.</summary>
     decimal TaxaConversao,
-
-    /// <summary>Soma R$ de faturas Paga no periodo (revenue realizado).</summary>
     decimal ReceitaPeriodo,
-    /// <summary>Soma R$ de faturas Vencida (em aberto agora — receita perdida temporariamente).</summary>
     decimal ValorVencido,
-    /// <summary>Ticket medio das faturas pagas no periodo (Receita / Pagas).</summary>
     decimal TicketMedio,
-    /// <summary>Media de dias de atraso das vencidas em aberto.</summary>
     double AtrasoMedioDias,
-
-    /// <summary>Top inadimplentes — empresas com mais faturas vencidas.</summary>
     IReadOnlyList<TopInadimplenteResult> TopInadimplentes,
-
-    /// <summary>Janela considerada (UTC).</summary>
     DateTime PeriodoInicio,
     DateTime PeriodoFim
 );
@@ -92,9 +88,10 @@ public class MetricasFinanceirasUseCase(
         var fim = DateTime.UtcNow;
         var inicio = fim.AddDays(-dias);
 
-        // Assinaturas — MRR baseia-se em PrecoMensal das Ativas.
-        var mrr = await assinaturaRepo.SomarPrecoMensalAtivasAsync(ct);
-        var statusAssinaturas = await assinaturaRepo.ContarPorStatusAsync(ct);
+        // Assinaturas — MRR baseia-se em PrecoMensal das Ativas. Filtra por empresa
+        // pra evitar vazar MRR/contagens globais a admin operacional.
+        var mrr = await assinaturaRepo.SomarPrecoMensalAtivasAsync(empresaId, ct);
+        var statusAssinaturas = await assinaturaRepo.ContarPorStatusAsync(empresaId, ct);
         var ativas = statusAssinaturas.GetValueOrDefault(StatusAssinatura.Ativa, 0);
         var suspensas = statusAssinaturas.GetValueOrDefault(StatusAssinatura.Suspensa, 0);
         var canceladas = statusAssinaturas.GetValueOrDefault(StatusAssinatura.Cancelada, 0);
@@ -103,8 +100,8 @@ public class MetricasFinanceirasUseCase(
         var contagensPeriodo = await faturaRepo.ContarPorStatusAsync(inicio, fim, empresaId, ct);
         var totaisPeriodo = await faturaRepo.SomarTotalPorStatusAsync(inicio, fim, empresaId, ct);
 
-        // Vencidas: usamos um range "all-time" (1 ano) — vencidas que nao foram pagas
-        // antes do periodo continuam relevantes. Se quiser snapshot, basta nao filtrar.
+        // Vencidas: janela de 365d sobre DataEmissao — vencidas emitidas alem disso
+        // nao contam (acomoda corner cases muito antigos sem inflar a query).
         var inicioVencidas = fim.AddDays(-365);
         var contagensVencidas = await faturaRepo.ContarPorStatusAsync(inicioVencidas, fim, empresaId, ct);
         var totaisVencidas = await faturaRepo.SomarTotalPorStatusAsync(inicioVencidas, fim, empresaId, ct);
