@@ -7,6 +7,7 @@ using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Controllers;
@@ -755,6 +756,7 @@ public sealed class DiagnosticoLogsController(
     /// </summary>
     [HttpPost("frontend-error")]
     [AllowAnonymous]
+    [EnableRateLimiting("mobile-anonymous")]
     public async Task<IActionResult> RegistrarFrontendError([FromBody] FrontendErrorRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Message)) return BadRequest(new { error = "message é obrigatório." });

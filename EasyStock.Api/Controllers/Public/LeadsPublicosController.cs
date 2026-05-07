@@ -17,12 +17,12 @@ public sealed record LeadPublicoRequest(
     bool ConsentimentoLgpd,
     [property: MaxLength(32)] string? Telefone = null,
     [property: MaxLength(150)] string? Empresa = null,
-    string? Mensagem = null,
+    [property: MaxLength(5000)] string? Mensagem = null,
     [property: MaxLength(80)] string? TipoNegocio = null,
     bool ReceberNewsletter = false,
-    string? UtmSource = null,
-    string? UtmMedium = null,
-    string? UtmCampaign = null,
+    [property: MaxLength(120)] string? UtmSource = null,
+    [property: MaxLength(120)] string? UtmMedium = null,
+    [property: MaxLength(120)] string? UtmCampaign = null,
     [property: MaxLength(120)] string? Website = null);
 
 public sealed record LeadPublicoResponse(Guid LeadId, string Mensagem);
