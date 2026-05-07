@@ -21,5 +21,13 @@ public enum TipoEventoFatura
     Cancelada,
     ReenviadaCliente,
     PdfGerado,
-    TicketRelacionadoVinculado
+    TicketRelacionadoVinculado,
+
+    // F6 — Notificacoes de vencimento (anti-duplicacao via FaturaEvento)
+    NotificadaVencendoD3,
+    NotificadaVencendoD1,
+
+    // F6 — Reconciliacao gateway
+    ReconciliacaoConsultouGateway,
+    ReconciliacaoFechouGap
 }

@@ -26,6 +26,21 @@ public sealed class BackgroundJobOptions
     public bool EnableFaturaBackfillJob { get; set; }
 
     /// <summary>
+    /// Quando <c>true</c>, registra o <c>FaturaReconciliacaoJob</c> (F6) que
+    /// roda hora em hora consultando o gateway para fechar gaps de webhooks
+    /// perdidos. Default false — habilitar quando IEfiPixService.GetCobrancaAsync
+    /// estiver implementado (atualmente o adapter retorna Desconhecido, NO-OP).
+    /// </summary>
+    public bool EnableFaturaReconciliacaoJob { get; set; }
+
+    /// <summary>
+    /// Quando <c>true</c>, registra o <c>FaturaVencimentoJob</c> (F6) que roda
+    /// 1x/dia (09:00 UTC) processando notificacoes D-3, D-1 e marcando faturas
+    /// como Vencida no D+0+. Default true em producao — recomendado.
+    /// </summary>
+    public bool EnableFaturaVencimentoJob { get; set; }
+
+    /// <summary>
     /// Quando <c>true</c>, CobrancaAssinaturaJob envia emails de cobrança/dunning
     /// diretamente via IEmailService (comportamento legado). Quando <c>false</c>
     /// (padrão), publica EventoNotificacao e o Worker despacha via Outbox.
