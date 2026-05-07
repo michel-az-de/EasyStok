@@ -18,7 +18,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(t => t.CriadoPorId == clienteId);
 
             return await query
-                .Include(t => t.Mensagens)
+                .Include(t => t.Mensagens.Where(m => !m.Interno))
                 .Include(t => t.CriadoPor)
                 .FirstOrDefaultAsync();
         }

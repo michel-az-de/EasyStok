@@ -1,5 +1,7 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.TicketSuporte;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +16,8 @@ namespace EasyStock.Api.Controllers
         AbrirTicketClienteUseCase abrirUseCase,
         ResponderTicketClienteUseCase responderUseCase,
         ListarMeusTicketsUseCase listarUseCase,
+        IClienteTicketRepository ticketRepo,
+        HelpdeskAnexoService anexoService,
         ICurrentUserAccessor currentUser) : EasyStockControllerBase
     {
         [HttpPost]
@@ -55,6 +59,29 @@ namespace EasyStock.Api.Controllers
             await responderUseCase.ExecuteAsync(cmd);
 
             return NoContent();
+        }
+
+        [HttpPost("{id:guid}/anexos")]
+        [RequestSizeLimit(15 * 1024 * 1024)]
+        public async Task<IActionResult> AnexarCliente(Guid id, IFormFile file)
+        {
+            if (!currentUser.TemPermissao(Permissao.ResponderTickets))
+                return Forbid();
+            if (file is null || file.Length == 0) return DataBadRequest("Arquivo obrigatorio.");
+
+            // Garantir que o ticket pertence ao cliente atual antes de aceitar upload.
+            var ticket = await ticketRepo.GetByIdAsync(currentUser.EmpresaId, id, clienteId: currentUser.UsuarioId);
+            if (ticket is null) return DataNotFound("Ticket nao encontrado.");
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            try
+            {
+                var anexo = await anexoService.AnexarAsync(new AnexarArquivoCommand(
+                    id, MensagemId: null, file.FileName, file.ContentType, ms.ToArray(), IsAdmin: false));
+                return DataCreated($"/api/tickets/{id}/anexos/{anexo.Id}", new { anexo.Id, anexo.Url });
+            }
+            catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
         }
     }
 }
