@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,8 +37,6 @@ public sealed class FaturaVencimentoJob(
     IServiceProvider serviceProvider,
     ILogger<FaturaVencimentoJob> logger) : BackgroundService
 {
-    private const long LockKeyJob = 0x4661_7475_5665_6E63L; // "FaturVenc"
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("FaturaVencimentoJob iniciado");
@@ -54,7 +53,7 @@ public sealed class FaturaVencimentoJob(
                 if (delay > TimeSpan.Zero)
                     await Task.Delay(delay, stoppingToken);
 
-                await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarAsync, stoppingToken);
+                await RunWithAdvisoryLockAsync(LockKeys.FaturaVencimento, ProcessarAsync, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
