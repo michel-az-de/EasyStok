@@ -67,3 +67,69 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 - Adapters stub (Stripe/MP) documentam corretamente seu estado provisório com guide de integração — não tocar.
 - `IgnoreQueryFilters()` em queries de métricas/background é intencional — não remover.
 - Block-scoped namespace ainda aparece esporadicamente em arquivos mais antigos ou de nova criação sem padrão imposto; converter para file-scoped ao encontrar.
+
+---
+
+## 2026-05-07 (segunda rodada) — Admin + Web redesign/landing (Program.cs, Faturas, Tickets, DiagnosticoController)
+
+### Contexto da rodada
+
+Arquivos modificados na última hora incluíam componentes do Admin (novos page models de Faturas, Tickets, proxy endpoints mobile) e Web (redesign de landing, novos controllers de site). Muitas alterações de design system (cshtml, CSS, tokens) estavam em andamento — não commitadas. A limpeza aqui se aplica apenas aos arquivos `.cs` com mudanças só de minha autoria.
+
+### Arquivos analisados nesta rodada
+
+| Arquivo | Status |
+|---|---|
+| `EasyStock.Admin/Program.cs` | **Fix aplicado** |
+| `Admin/Pages/Faturas/Dashboard.cshtml.cs` | **Fix aplicado** |
+| `Admin/Pages/Faturas/Detail.cshtml.cs` | **Fix aplicado** (doc) |
+| `Admin/Pages/Faturas/Emitir.cshtml.cs` | **Fix aplicado** |
+| `Admin/Pages/Faturas/Index.cshtml.cs` | **Fix aplicado** (doc) |
+| `Admin/Pages/Faturas/Emitir.cshtml.cs` | **Fix aplicado** |
+| `Admin/Pages/Operacao/Index.cshtml.cs` | Limpo — já tinha XML doc |
+| `Admin/Pages/Dispositivos/Index.cshtml.cs` | Limpo — já tinha XML doc |
+| `Admin/Pages/Tickets/Detail.cshtml.cs` | **Fix aplicado** |
+| `Admin/Services/AdminApiClient.cs` | Limpo — doc completo |
+| `Web/Controllers/DiagnosticoController.cs` | **Fix aplicado** |
+| `Web/Controllers/BaseController.cs` | Limpo — doc completo |
+| `Web/Controllers/LojasController.cs` | Limpo |
+| `Web/Controllers/UsuariosController.cs` | Limpo |
+| `Web/Controllers/SiteController.cs` | Limpo — doc completo, sitemap/robots novos bem documentados |
+| `Web/Models/ViewModels/Site/ContatoViewModel.cs` | Limpo — `MustBeTrueAttribute` com doc |
+| `Web/Models/ViewModels/Site/LandingViewModel.cs` | Limpo — XML doc justifica classe vazia |
+| `Web/Services/LeadsApiService.cs` | Limpo |
+| `Web/Services/MarketingOptions.cs` | Limpo — doc completo por property |
+
+### Fixes aplicados
+
+#### 1. `EasyStock.Admin/Program.cs` — `using System.Text.Json;` + remoção de prefixos qualificados
+- Adicionado `using System.Text.Json;` ao topo.
+- Removidos ~30 prefixos `System.Text.Json.` espalhados pelo arquivo (JsonElement, JsonDocument, JsonSerializer, JsonValueKind).
+- Removidos prefixos `System.IO.StreamReader` (System.IO já está nos global usings .NET 9).
+- Motivo: o arquivo top-level não tinha o using, forçando qualificação completa em cada endpoint proxy.
+
+#### 2. `Admin/Pages/Faturas/Dashboard.cshtml.cs` — doc + simplificação de GetAsync
+- Adicionado XML doc na classe.
+- Substituído `GetRawAsync` + extração manual de `"data"` por `GetAsync<JsonElement>` que já faz o unwrap. Reduz 2 linhas e elimina duplicação de lógica que existe em `AdminApiClient.UnwrapData`.
+
+#### 3. `Admin/Pages/Faturas/Detail.cshtml.cs` e `Index.cshtml.cs` — XML doc
+- Adicionado XML doc nas classes descrevendo responsabilidade e ações principais.
+
+#### 4. `Admin/Pages/Faturas/Emitir.cshtml.cs` — doc + sync OnGet
+- Adicionado XML doc na classe.
+- Alterado `public Task OnGetAsync() => Task.CompletedTask;` para `public void OnGet() { }`. Um handler GET vazio não precisa de state machine de async; a versão sync evita alocação desnecessária.
+
+#### 5. `Admin/Pages/Tickets/Detail.cshtml.cs` — doc + catch SessionExpiredException faltante
+- Adicionado XML doc na classe.
+- **Bug funcional corrigido**: `OnPostAssumirAsync`, `OnPostEncaminharAsync` e `OnPostBugFixAsync` não tinham `catch (SessionExpiredException) { throw; }` antes do `catch (Exception ex)`, ao contrário de todos os outros handlers do mesmo arquivo. Sem o rethrow, sessão expirada nessas ações gerava `SetErro("Falha ao assumir: Sessão expirada.")` em vez de redirecionar para login.
+
+#### 6. `Web/Controllers/DiagnosticoController.cs` — doc + `[HttpGet]` explícito
+- Adicionado XML doc na classe.
+- Adicionado `[HttpGet]` em 6 actions que tinham apenas `[Route(...)]`: `Index`, `Json`, `ProxyEndpoints`, `ProxyHistorico`, `ProxyEnhancedLogs`, `ProxyExportarLogs`. Actions com somente `[Route]` aceitam qualquer método HTTP — para endpoints GET isso é inconsistente com o padrão dos métodos mais novos no mesmo controller.
+
+### Padrões observados (aprendizado acumulado)
+
+- Novos page models de Faturas/Tickets já nascem com boa cobertura funcional mas sem XML doc nas classes — adicionar é tarefa de rotina desta sessão.
+- `GetRawAsync` + extração manual de `"data"` é um anti-padrão quando `GetAsync<T>` já encapsula isso. Trocar quando o caller não precisa de outras propriedades do envelope (ex: `meta`).
+- Controllers com `[Route]` sem `[HttpGet]` são aceitos pelo framework mas permitem acesso via POST/PUT, o que não é intenção. Sempre adicionar `[HttpGet]` em endpoints read-only.
+- Handlers de ação em Razor Pages Admin devem sempre ter `catch (SessionExpiredException) { throw; }` antes do `catch (Exception)` genérico. Sem isso, expiração de sessão aparece como erro de negócio no toast em vez de redirecionar para login.

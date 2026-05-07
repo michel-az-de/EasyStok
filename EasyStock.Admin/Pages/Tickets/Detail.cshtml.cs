@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Tickets;
 
+/// <summary>
+/// Detalhe de ticket de suporte: leitura, resposta, escalação, resolução e
+/// encaminhamento de bug-fix para o time de desenvolvimento.
+/// </summary>
 public class DetailModel(AdminApiClient api, AdminSessionService session, ILogger<DetailModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
@@ -156,6 +160,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
             await api.PostAsync<JsonElement>($"api/admin/tickets/{Id}/assumir", new { });
             SetSucesso("Ticket assumido.");
         }
+        catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao assumir ticket {TicketId}", Id);
@@ -176,6 +181,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
             await api.PostAsync<JsonElement>($"api/admin/tickets/{Id}/encaminhar", new { novoNivel, motivo });
             SetSucesso($"Ticket encaminhado para {novoNivel}.");
         }
+        catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao encaminhar ticket {TicketId}", Id);
@@ -199,6 +205,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
                 new { titulo = tT, descricao = dT, severidade = severidade ?? "Media", componente, stackTrace });
             SetSucesso("Bug-fix encaminhado para o time de desenvolvimento.");
         }
+        catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao gerar bug-fix do ticket {TicketId}", Id);

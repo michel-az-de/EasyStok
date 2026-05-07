@@ -5,9 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
+/// <summary>
+/// Diagnóstico da infra para operadores e admins. Todos os endpoints /diagnostico/api/*
+/// são proxies para a API principal — mantém a sessão cookie do Web e injeta o Bearer
+/// via <see cref="DiagnosticoWebService"/>.
+/// </summary>
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
     [Authorize]
+    [HttpGet]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
     {
@@ -29,6 +35,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/json")]
     public async Task<IActionResult> Json()
     {
@@ -48,6 +55,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     // ──────────────────────────────────────────────────────────────────────
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/endpoints")]
     public async Task<IActionResult> ProxyEndpoints()
     {
@@ -58,6 +66,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/historico")]
     public async Task<IActionResult> ProxyHistorico()
     {
@@ -68,6 +77,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/logs-enhanced")]
     public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 48)
     {
@@ -90,6 +100,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/logs/exportar")]
     public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
     {
