@@ -15,7 +15,6 @@ namespace EasyStock.Api.Controllers;
 [Authorize(Policy = "SuperAdmin")]
 public class AdminTicketsController(
     EasyStockDbContext db,
-    ICurrentUserAccessor currentUser,
     AdminAuditService audit,
     HelpdeskTicketService ticketService,
     HelpdeskAnexoService anexoService,

@@ -20,8 +20,7 @@ namespace EasyStock.Api.Controllers;
 [Authorize(Policy = "SuperAdmin")]
 public class AdminBuscaGlobalController(
     EasyStockDbContext db,
-    AdminAuditService audit,
-    ILogger<AdminBuscaGlobalController> logger) : EasyStockControllerBase
+    AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Buscar([FromQuery] string q, [FromQuery] int limit = 8)

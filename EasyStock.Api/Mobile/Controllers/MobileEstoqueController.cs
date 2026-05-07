@@ -11,8 +11,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [ApiController]
 [Route("api/mobile/estoque")]
 public class MobileEstoqueController(
-    IItemEstoqueRepository itemEstoqueRepo,
-    ILogger<MobileEstoqueController> log) : ControllerBase
+    IItemEstoqueRepository itemEstoqueRepo) : ControllerBase
 {
     [HttpGet("buscar")]
     [MobileApiKey]

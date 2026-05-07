@@ -31,7 +31,7 @@ public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IIm
             if (newWidth != original.Width || newHeight != original.Height)
             {
                 // Redimensionar
-                target = original.Resize(new SKImageInfo(newWidth, newHeight), SKFilterQuality.High);
+                target = original.Resize(new SKImageInfo(newWidth, newHeight), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
                 if (target is null)
                 {
                     logger.LogWarning("SkiaSharp falhou ao redimensionar {W}x{H} -> {NW}x{NH}. Usando original.",

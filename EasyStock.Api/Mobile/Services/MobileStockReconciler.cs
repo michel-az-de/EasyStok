@@ -8,25 +8,26 @@ using Microsoft.EntityFrameworkCore;
 namespace EasyStock.Api.Mobile.Services;
 
 /// <summary>
-/// Onda 2 parte 2 — reconciliação de estoque mobile <-> ERP.
-///
-/// Quando um <see cref="Product"/> mobile está linkado a um <c>Produto</c>
+/// Onda 2 parte 2 — reconciliação de estoque mobile (Product) com ERP (Produto).
+/// <para>
+/// Quando um <see cref="Product"/> mobile está linkado a um Produto
 /// ERP (ErpProductId != null) E pertence a uma loja (LojaId != null),
 /// mutações de estoque vindas do app refletem-se também em
-/// <c>itens_estoque</c> + <c>movimentacoes_estoque</c> do ERP.
-///
-/// Estratégia:
-///   - Localiza ItemEstoque do (ProdutoId, LojaId, EmpresaId).
-///   - Se existe: aplica delta na QuantidadeAtual via Add/Subtract.
-///   - Cria MovimentacaoEstoque com natureza apropriada (Venda, Producao,
-///     Estorno, etc).
-///   - Se NÃO existe ItemEstoque: log warning. O operador web cria via
-///     /produtos-mobile (futura aba "Divergências") ou via fluxo normal
-///     do ERP. Não bloqueia o sync — app continua offline-first.
-///
-/// FAIL-SAFE: qualquer exceção neste fluxo é loggada mas NÃO propaga.
-/// Sync do app não pode quebrar por falha do ERP — fila persiste local
-/// e reconciler tenta de novo no próximo flush.
+/// itens_estoque e movimentacoes_estoque do ERP.
+/// </para>
+/// <para>
+/// Estratégia: localiza ItemEstoque por (ProdutoId, LojaId, EmpresaId);
+/// se existe, aplica delta na QuantidadeAtual via Add/Subtract e cria
+/// MovimentacaoEstoque com natureza apropriada (Venda, Producao, Estorno).
+/// Se nao existe, loga warning — operador web cria via /produtos-mobile
+/// (aba "Divergencias") ou via fluxo normal do ERP. Nao bloqueia o sync,
+/// app continua offline-first.
+/// </para>
+/// <para>
+/// FAIL-SAFE: qualquer excecao neste fluxo e loggada mas NAO propaga.
+/// Sync do app nao pode quebrar por falha do ERP — fila persiste local
+/// e reconciler tenta de novo no proximo flush.
+/// </para>
 /// </summary>
 public class MobileStockReconciler(
     EasyStockDbContext db,
@@ -43,6 +44,7 @@ public class MobileStockReconciler(
     /// <param name="natureza">Natureza da movimentação no ERP.</param>
     /// <param name="descricao">Texto livre pra audit (ex: "Pedido #abc123 entregue").</param>
     /// <param name="referenciaDocumento">Id do documento origem (ex: order.Id, batch.Id).</param>
+    /// <param name="ct">Token de cancelamento.</param>
     /// <returns>true se reconciliou, false se pulou (não linkado, ou ItemEstoque ausente).</returns>
     public async Task<bool> ApplyDeltaAsync(
         Product mobileProduct,
