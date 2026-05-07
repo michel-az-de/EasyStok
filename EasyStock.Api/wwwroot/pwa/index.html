@@ -6377,6 +6377,204 @@ body.ux-calm [data-screen="producao"] .section-label {
   from { transform: translateY(-100%); }
   to   { transform: translateY(0); }
 }
+
+/* ========== KDS (Kitchen Display System — alpha) ==========
+   Tela paralela pra cozinha. Tema escuro forcado pra contraste alto em
+   ambiente bem iluminado, tipografia grande pra leitura a 1-2m de distancia,
+   botoes grandes pra "bumpar" com luva ou maos molhadas. Layout adaptativo:
+   tablet/TV em landscape (>=900px) vira grid amplo; mobile portrait vira
+   pilha de cards. */
+[data-screen="kds"] {
+  background: #0b1220;
+  color: #e8eef9;
+  min-height: 100vh;
+  padding: 0;
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+[data-screen="kds"].active { display: flex; flex-direction: column; }
+.kds-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #131c30 0%, #0b1220 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky; top: 0; z-index: 5;
+  gap: 12px;
+}
+.kds-topbar h1 {
+  margin: 0;
+  font-size: 18px; font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #f0b84a;
+  display: flex; align-items: center; gap: 8px;
+}
+.kds-topbar h1::before { content: '👨‍🍳'; font-size: 22px; }
+.kds-topbar-meta {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: #94a3c5;
+}
+.kds-conn { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.kds-conn::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: #4fbf9f; box-shadow: 0 0 0 0 rgba(79,191,159,.6);
+  animation: kds-pulse 1.8s infinite;
+}
+.kds-conn.offline::before { background: #ef6a6a; animation: none; }
+.kds-conn.offline { color: #ef6a6a; }
+@keyframes kds-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79,191,159,.5); }
+  70% { box-shadow: 0 0 0 8px rgba(79,191,159,0); }
+  100% { box-shadow: 0 0 0 0 rgba(79,191,159,0); }
+}
+.kds-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e8eef9; border-radius: 999px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700;
+  cursor: pointer;
+}
+.kds-toggle.on { background: rgba(240,184,74,0.18); border-color: #f0b84a; color: #f0b84a; }
+.kds-back {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e8eef9;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer;
+}
+.kds-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px;
+  align-content: start;
+}
+@media (min-width: 720px) {
+  .kds-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1100px) {
+  .kds-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; }
+  .kds-topbar h1 { font-size: 22px; }
+}
+@media (min-width: 1500px) {
+  .kds-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.kds-card {
+  background: #131c30;
+  border: 2px solid rgba(255,255,255,0.06);
+  border-left: 6px solid #4fbf9f;
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.kds-card.warn   { border-left-color: #f0b84a; box-shadow: 0 6px 20px rgba(240,184,74,0.18); }
+.kds-card.alert  {
+  border-left-color: #ef6a6a;
+  box-shadow: 0 6px 22px rgba(239,106,106,0.28);
+  animation: kds-flash 1.6s ease-in-out infinite;
+}
+.kds-card.ready  { opacity: 0.78; border-left-color: #6b7896; }
+@keyframes kds-flash {
+  0%, 100% { border-color: rgba(255,255,255,0.06) rgba(255,255,255,0.06) rgba(255,255,255,0.06) #ef6a6a; }
+  50%      { border-color: rgba(239,106,106,0.55) rgba(239,106,106,0.55) rgba(239,106,106,0.55) #ef6a6a; }
+}
+.kds-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  border-bottom: 1px dashed rgba(255,255,255,0.08);
+  padding-bottom: 8px;
+}
+.kds-card-cliente {
+  font-size: 18px; font-weight: 800; line-height: 1.15;
+  color: #f5f8ff;
+  flex: 1;
+  word-break: break-word;
+}
+.kds-card-ref {
+  font-size: 12px; font-weight: 600; color: #94a3c5; margin-top: 2px;
+}
+.kds-card-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px; font-weight: 900;
+  color: #4fbf9f;
+  min-width: 64px; text-align: right;
+  letter-spacing: 0.02em;
+}
+.kds-card.warn  .kds-card-timer { color: #f0b84a; }
+.kds-card.alert .kds-card-timer { color: #ef6a6a; }
+.kds-card.ready .kds-card-timer { color: #6b7896; }
+.kds-status-pill {
+  display: inline-block; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(255,255,255,0.08); color: #e8eef9;
+  margin-left: 8px;
+}
+.kds-status-pill.aguardando { background: rgba(79,191,159,0.18); color: #4fbf9f; }
+.kds-status-pill.preparando { background: rgba(240,184,74,0.18); color: #f0b84a; }
+.kds-status-pill.pronto     { background: rgba(107,120,150,0.22); color: #c2cce0; }
+.kds-card-itens {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.kds-card-item {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 16px; line-height: 1.25; color: #e8eef9;
+}
+.kds-card-item .qty {
+  font-weight: 900; color: #f0b84a; min-width: 40px;
+  font-variant-numeric: tabular-nums;
+}
+.kds-card-item .nome { font-weight: 600; flex: 1; }
+.kds-card-item .emoji { font-size: 18px; }
+.kds-card-notes {
+  background: rgba(231,104,69,0.10);
+  border-left: 3px solid #e76845;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px; font-weight: 700; color: #ffb89e;
+  white-space: pre-wrap;
+}
+.kds-card-actions { display: flex; gap: 8px; margin-top: auto; }
+.kds-pronto-btn {
+  flex: 1;
+  background: linear-gradient(180deg, #4fbf9f 0%, #3aa589 100%);
+  color: #062018;
+  border: none; border-radius: 12px;
+  padding: 14px;
+  font-size: 16px; font-weight: 900;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; min-height: 56px;
+  box-shadow: 0 4px 14px rgba(79,191,159,0.30);
+  transition: transform 0.08s ease, box-shadow 0.2s ease;
+}
+.kds-pronto-btn:hover { box-shadow: 0 6px 18px rgba(79,191,159,0.45); }
+.kds-pronto-btn:active { transform: scale(0.98); }
+.kds-pronto-btn.entregar {
+  background: linear-gradient(180deg, #6b7896 0%, #4a5470 100%);
+  color: #f5f8ff;
+  box-shadow: 0 4px 14px rgba(107,120,150,0.30);
+}
+.kds-pronto-btn[disabled] { opacity: 0.5; cursor: progress; }
+.kds-empty {
+  grid-column: 1 / -1;
+  text-align: center; padding: 40px 20px;
+  color: #94a3c5; font-size: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.kds-empty::before {
+  content: '☕'; font-size: 56px;
+}
+@media (min-width: 1100px) {
+  .kds-card { padding: 18px; }
+  .kds-card-cliente { font-size: 22px; }
+  .kds-card-timer { font-size: 28px; }
+  .kds-card-item { font-size: 18px; }
+  .kds-pronto-btn { font-size: 18px; padding: 18px; min-height: 64px; }
+}
 </style>
 </head>
 <body>
@@ -6926,6 +7124,28 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button data-f="batch" onclick="setStockFilter('batch')">Produção</button>
       </div>
       <div id="stockTimeline"></div>
+    </div>
+
+    <!-- KDS (Kitchen Display System — alpha). Tela paralela pra cozinha:
+         lista pedidos abertos com tempo decorrido e botão "Pronto" grande.
+         Renderizada por startKdsScreen() / stopKdsScreen(); fonte de dados
+         vem direto do backend via /api/kds/pedidos (não usa o estado local
+         do PWA balcão pra evitar drift). Real-time via evento
+         'cdb-mutations-applied' disparado pelo sync.js no SSE existente. -->
+    <div class="screen" data-screen="kds">
+      <div class="kds-topbar">
+        <button class="kds-back" onclick="goBack()" aria-label="Voltar">← Voltar</button>
+        <h1>KDS — Cozinha</h1>
+        <div class="kds-topbar-meta">
+          <button class="kds-toggle" id="kdsToggleProntos" onclick="toggleKdsProntos()" aria-pressed="false">
+            <span>Mostrar prontos</span>
+          </button>
+          <span class="kds-conn" id="kdsConn">Online</span>
+        </div>
+      </div>
+      <div class="kds-grid" id="kdsGrid">
+        <div class="kds-empty">Sem pedidos no momento.</div>
+      </div>
     </div>
 
   </div>
@@ -7625,6 +7845,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
     </div>
     <div class="more-menu-grid">
+      <button class="more-menu-item" onclick="go('kds')"><strong>KDS Cozinha</strong><span>Painel da cozinha em tempo real (alpha).</span></button>
       <button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
       <button class="more-menu-item" onclick="go('estoque')"><strong>Estoque</strong><span>Saldo, rastreabilidade e saídas.</span></button>
       <button class="more-menu-item" onclick="go('clientes')"><strong>Clientes</strong><span>Recorrencia, ticket e retorno.</span></button>
@@ -8981,7 +9202,7 @@ function go(screen, opts) {
   if (!opts.preserveHistory) syncScreenHistory(screen);
   currentScreen = screen;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
-  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte'];
+  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte', 'kds'];
   document.querySelectorAll('.nav-btn').forEach(n => {
     const nav = n.dataset.nav;
     n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
@@ -9004,6 +9225,8 @@ function go(screen, opts) {
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
   if (screen === 'caixa')        renderCashDetails();
+  if (screen === 'kds')          { try { startKdsScreen(); } catch (e) { console.error('startKdsScreen', e); } }
+  else                           { try { stopKdsScreen(); } catch (e) {} }
   if (typeof updateFab === 'function') updateFab(screen);
 }
 
@@ -18409,6 +18632,241 @@ document.addEventListener('DOMContentLoaded', function () {
     if (longPressed) { ev.stopImmediatePropagation(); ev.preventDefault(); longPressed = false; }
   }, true);
 });
+
+// =========================
+// KDS — Kitchen Display System (alpha)
+// =========================
+// View paralela do operador da cozinha. Lê /api/kds/pedidos com X-Mobile-Api-Key
+// (mesmo pareamento da PWA balcão), escuta evento 'cdb-mutations-applied'
+// disparado pelo sync.js (via SSE existente) pra refazer fetch sem polling.
+// Polling de fallback de 20s caso SSE caia.
+// Wakelock pra prevenir sleep do tablet em parede.
+(function () {
+  const POLL_MS = 20000;
+  const LS_INCLUDE_PRONTOS = 'cdb-kds-include-prontos';
+
+  let kdsTimer = null;
+  let kdsTickTimer = null;
+  let kdsWakeLock = null;
+  let kdsPedidos = [];
+  let kdsIncludeProntos = false;
+  let kdsBumping = new Set();
+  let kdsActive = false;
+
+  function readPairing() {
+    try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); } catch (e) { return null; }
+  }
+  function kdsApiHeaders(extra) {
+    const p = readPairing();
+    const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    if (p && p.apiKey) h['X-Mobile-Api-Key'] = p.apiKey;
+    if (p && p.deviceId) h['X-Device-Id'] = p.deviceId;
+    return h;
+  }
+
+  async function kdsFetch() {
+    const statuses = kdsIncludeProntos ? 'aguardando,preparando,pronto' : 'aguardando,preparando';
+    try {
+      const resp = await fetch('/api/kds/pedidos?statuses=' + encodeURIComponent(statuses), {
+        headers: kdsApiHeaders(),
+      });
+      if (!resp.ok) {
+        kdsSetConn(false);
+        return;
+      }
+      kdsSetConn(true);
+      kdsPedidos = await resp.json() || [];
+      kdsRender();
+    } catch (e) {
+      kdsSetConn(false);
+    }
+  }
+
+  function kdsSetConn(online) {
+    const el = document.getElementById('kdsConn');
+    if (!el) return;
+    if (online) { el.classList.remove('offline'); el.textContent = 'Online'; }
+    else        { el.classList.add('offline');    el.textContent = 'Offline — vou tentar de novo'; }
+  }
+
+  function fmtAge(criadoMs) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - criadoMs) / 1000));
+    const m = Math.floor(diffSec / 60);
+    const s = diffSec % 60;
+    if (m < 60) return m + ':' + String(s).padStart(2, '0');
+    const h = Math.floor(m / 60);
+    return h + 'h' + String(m % 60).padStart(2, '0');
+  }
+  function ageBucket(criadoMs) {
+    const min = (Date.now() - criadoMs) / 60000;
+    if (min < 5)  return '';
+    if (min < 10) return 'warn';
+    return 'alert';
+  }
+  function escapeHtmlKds(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
+  }
+
+  function kdsRender() {
+    const grid = document.getElementById('kdsGrid');
+    if (!grid) return;
+    if (!kdsPedidos.length) {
+      grid.innerHTML = '<div class="kds-empty">Sem pedidos no momento.</div>';
+      return;
+    }
+    // Ordena: prontos no fim; ativos por idade asc (mais antigo primeiro).
+    const ordered = kdsPedidos.slice().sort((a, b) => {
+      const ap = a.status === 'pronto' ? 1 : 0;
+      const bp = b.status === 'pronto' ? 1 : 0;
+      if (ap !== bp) return ap - bp;
+      return a.criadoEm - b.criadoEm;
+    });
+    grid.innerHTML = ordered.map(renderCard).join('');
+  }
+
+  function renderCard(p) {
+    const isReady = p.status === 'pronto';
+    const bucket = isReady ? 'ready' : ageBucket(p.criadoEm);
+    const cls = ['kds-card'];
+    if (bucket) cls.push(bucket);
+    const itensHtml = (p.itens || []).map(i =>
+      '<li class="kds-card-item">' +
+        (i.emoji ? '<span class="emoji">' + escapeHtmlKds(i.emoji) + '</span>' : '') +
+        '<span class="qty">' + (i.quantidade || 1) + '×</span>' +
+        '<span class="nome">' + escapeHtmlKds(i.nome) + (i.unidade ? ' <small style="opacity:.6">' + escapeHtmlKds(i.unidade) + '</small>' : '') + '</span>' +
+      '</li>'
+    ).join('');
+    const notes = p.notes ? '<div class="kds-card-notes">⚠️ ' + escapeHtmlKds(p.notes) + '</div>' : '';
+    const cliente = escapeHtmlKds(p.clienteNome || 'Pedido balcão');
+    const ref = p.clienteRef ? '<div class="kds-card-ref">' + escapeHtmlKds(p.clienteRef) + '</div>' : '';
+    const bumping = kdsBumping.has(p.id);
+
+    let acaoLabel, acaoCls = 'kds-pronto-btn', proximoStatus;
+    if (p.status === 'aguardando') { acaoLabel = '▶ Iniciar preparo';   proximoStatus = 'preparando'; }
+    else if (p.status === 'preparando') { acaoLabel = '✓ Pronto';        proximoStatus = 'pronto'; }
+    else                                { acaoLabel = 'Entregar';        proximoStatus = 'entregue'; acaoCls += ' entregar'; }
+
+    const dis = bumping ? 'disabled' : '';
+    return (
+      '<article class="' + cls.join(' ') + '" data-id="' + escapeHtmlKds(p.id) + '">' +
+        '<div class="kds-card-head">' +
+          '<div>' +
+            '<div class="kds-card-cliente">' + cliente +
+              '<span class="kds-status-pill ' + escapeHtmlKds(p.status) + '">' + escapeHtmlKds(p.status) + '</span>' +
+            '</div>' +
+            ref +
+          '</div>' +
+          '<div class="kds-card-timer" data-criado="' + p.criadoEm + '">' + fmtAge(p.criadoEm) + '</div>' +
+        '</div>' +
+        '<ul class="kds-card-itens">' + itensHtml + '</ul>' +
+        notes +
+        '<div class="kds-card-actions">' +
+          '<button class="' + acaoCls + '" ' + dis + ' onclick="bumpKdsPedido(\'' + escapeHtmlKds(p.id) + '\', \'' + proximoStatus + '\')">' +
+            (bumping ? 'Enviando...' : acaoLabel) +
+          '</button>' +
+        '</div>' +
+      '</article>'
+    );
+  }
+
+  function tickTimers() {
+    document.querySelectorAll('#kdsGrid .kds-card-timer').forEach(el => {
+      const ms = parseInt(el.dataset.criado, 10);
+      if (!ms) return;
+      el.textContent = fmtAge(ms);
+      const card = el.closest('.kds-card');
+      if (!card || card.classList.contains('ready')) return;
+      const want = ageBucket(ms);
+      card.classList.remove('warn', 'alert');
+      if (want) card.classList.add(want);
+    });
+  }
+
+  window.bumpKdsPedido = async function (id, novoStatus) {
+    if (kdsBumping.has(id)) return;
+    kdsBumping.add(id);
+    kdsRender();
+    try {
+      const resp = await fetch('/api/kds/pedidos/' + encodeURIComponent(id) + '/status', {
+        method: 'PATCH',
+        headers: kdsApiHeaders(),
+        body: JSON.stringify({ status: novoStatus }),
+      });
+      if (!resp.ok) {
+        kdsSetConn(false);
+        kdsBumping.delete(id);
+        kdsRender();
+        return;
+      }
+      const updated = await resp.json();
+      // Atualiza local; refetch garantirá consistência se broker já notificou.
+      const idx = kdsPedidos.findIndex(p => p.id === id);
+      if (idx >= 0) kdsPedidos[idx] = updated;
+      kdsBumping.delete(id);
+      kdsRender();
+    } catch (e) {
+      kdsBumping.delete(id);
+      kdsSetConn(false);
+      kdsRender();
+    }
+  };
+
+  window.toggleKdsProntos = function () {
+    kdsIncludeProntos = !kdsIncludeProntos;
+    try { localStorage.setItem(LS_INCLUDE_PRONTOS, kdsIncludeProntos ? '1' : '0'); } catch (_) {}
+    const btn = document.getElementById('kdsToggleProntos');
+    if (btn) {
+      btn.classList.toggle('on', kdsIncludeProntos);
+      btn.setAttribute('aria-pressed', String(kdsIncludeProntos));
+    }
+    kdsFetch();
+  };
+
+  function kdsHandleMutations() { if (kdsActive) kdsFetch(); }
+
+  async function kdsRequestWakeLock() {
+    try {
+      if ('wakeLock' in navigator && navigator.wakeLock.request) {
+        kdsWakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (_) { /* ignore — alguns browsers/SO não suportam */ }
+  }
+  function kdsReleaseWakeLock() {
+    try { if (kdsWakeLock) kdsWakeLock.release(); } catch (_) {}
+    kdsWakeLock = null;
+  }
+
+  window.startKdsScreen = function () {
+    if (kdsActive) return;
+    kdsActive = true;
+    try { kdsIncludeProntos = localStorage.getItem(LS_INCLUDE_PRONTOS) === '1'; } catch (_) {}
+    const btn = document.getElementById('kdsToggleProntos');
+    if (btn) { btn.classList.toggle('on', kdsIncludeProntos); btn.setAttribute('aria-pressed', String(kdsIncludeProntos)); }
+    kdsFetch();
+    kdsTimer = setInterval(kdsFetch, POLL_MS);
+    kdsTickTimer = setInterval(tickTimers, 1000);
+    window.addEventListener('cdb-mutations-applied', kdsHandleMutations);
+    kdsRequestWakeLock();
+  };
+  window.stopKdsScreen = function () {
+    if (!kdsActive) return;
+    kdsActive = false;
+    if (kdsTimer)     { clearInterval(kdsTimer);     kdsTimer = null; }
+    if (kdsTickTimer) { clearInterval(kdsTickTimer); kdsTickTimer = null; }
+    window.removeEventListener('cdb-mutations-applied', kdsHandleMutations);
+    kdsReleaseWakeLock();
+  };
+
+  // Reentrega wakelock se vier de background (Android Chrome libera em hide).
+  document.addEventListener('visibilitychange', function () {
+    if (kdsActive && document.visibilityState === 'visible') {
+      kdsRequestWakeLock();
+      kdsFetch();
+    }
+  });
+})();
 </script>
 
 </body>

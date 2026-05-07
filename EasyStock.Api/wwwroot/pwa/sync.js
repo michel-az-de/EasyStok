@@ -780,6 +780,11 @@
             // Outro device sincronizou — puxa atualizações.
             console.log('[realtime] mutations-applied de', data.originDeviceId);
             pull();
+            // KDS e outras views standalone escutam esse evento pra refazer
+            // fetch independente sem depender do estado local da PWA.
+            try {
+              window.dispatchEvent(new CustomEvent('cdb-mutations-applied', { detail: data }));
+            } catch (_) {}
           } else if (data && data.type === 'command-queued') {
             console.log('[realtime] command-queued', data.commandType);
             fetchAndProcessCommands();
