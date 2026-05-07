@@ -4,7 +4,7 @@
 	             android:icon="@mipmap/appicon"
 	             android:roundIcon="@mipmap/appicon_round"
 	             android:supportsRtl="true"
-	             android:usesCleartextTraffic="true" />
+	             android:networkSecurityConfig="@xml/network_security_config" />
 
 	<!-- Rede -->
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -17,9 +17,6 @@
 	<!-- Camera (modal de foto da producao) -->
 	<uses-permission android:name="android.permission.CAMERA" />
 	<uses-feature android:name="android.hardware.camera" android:required="false" />
-
-	<!-- OTA self-hosted (F7): instalar APK baixado -->
-	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
 	<!-- Imagens / backup local -->
 	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
