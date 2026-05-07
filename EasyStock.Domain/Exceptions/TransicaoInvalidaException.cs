@@ -1,4 +1,6 @@
-namespace EasyStock.Domain.Sales;
+using EasyStock.Domain.Sales;
+
+namespace EasyStock.Domain.Exceptions;
 
 /// <summary>
 /// Lançada quando um <see cref="Entities.Pedido"/> tenta sair de um estado

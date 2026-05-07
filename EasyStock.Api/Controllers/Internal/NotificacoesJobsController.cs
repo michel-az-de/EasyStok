@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EasyStock.Api.Authorization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
@@ -45,48 +46,71 @@ public sealed class NotificacoesJobsController(
     /// <param name="shard">Shard alvo [0..ShardCount-1]. Se omitido, processa todos.</param>
     /// <param name="ct">Cancellation token da request.</param>
     [HttpPost("dispatcher/run")]
+    [ProducesResponseType(typeof(DispatcherRunResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> ExecutarDispatcher(
         [FromQuery] int? shard,
         CancellationToken ct)
     {
         var opts = options.Value;
+        var sw = Stopwatch.StartNew();
         int processadas;
+
         if (shard.HasValue)
         {
             if (shard.Value < 0 || shard.Value >= opts.ShardCount)
                 return BadRequest(new { error = $"shard fora de range [0..{opts.ShardCount - 1}]" });
             processadas = await dispatcherSingleShard.ProcessarBatchAsync(shard.Value, opts.DispatcherBatchSize, ct);
-            logger.LogInformation("[CronJob] dispatcher shard={Shard} processadas={Count}", shard.Value, processadas);
         }
         else
         {
             processadas = await dispatcher.ExecutarRodadaAsync(opts.ShardCount, opts.DispatcherBatchSize, ct);
-            logger.LogInformation("[CronJob] dispatcher all shards — processadas={Count}", processadas);
         }
-        return Ok(new { processadas, shard });
+
+        sw.Stop();
+        logger.LogInformation(
+            "[CronJob] dispatcher shard={Shard} processadas={Count} duracaoMs={DuracaoMs}",
+            shard?.ToString() ?? "all", processadas, sw.ElapsedMilliseconds);
+
+        return Ok(new DispatcherRunResponse(processadas, shard, sw.ElapsedMilliseconds));
     }
 
     /// <summary>
     /// Dispara 1 rodada do avaliador (eventos pendentes + cron rotinas).
     /// </summary>
     [HttpPost("avaliador/run")]
+    [ProducesResponseType(typeof(JobRunResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> ExecutarAvaliador(CancellationToken ct)
     {
         var opts = options.Value;
         var janela = TimeSpan.FromSeconds(opts.AvaliadorIntervalSeconds * 2);
+        var sw = Stopwatch.StartNew();
         await avaliador.ExecutarRodadaAsync(janela, ct);
-        logger.LogInformation("[CronJob] avaliador executado");
-        return Ok(new { ok = true });
+        sw.Stop();
+        logger.LogInformation("[CronJob] avaliador executado duracaoMs={DuracaoMs}", sw.ElapsedMilliseconds);
+        return Ok(new JobRunResponse(true, sw.ElapsedMilliseconds));
     }
 
     /// <summary>
     /// Dispara 1 rodada de coletores de eventos de estado (produtos vencendo, assinaturas, etc.).
     /// </summary>
     [HttpPost("coletor/run")]
+    [ProducesResponseType(typeof(JobRunResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> ExecutarColetor(CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
         await coletor.ExecutarRodadaAsync(ct);
-        logger.LogInformation("[CronJob] coletor executado");
-        return Ok(new { ok = true });
+        sw.Stop();
+        logger.LogInformation("[CronJob] coletor executado duracaoMs={DuracaoMs}", sw.ElapsedMilliseconds);
+        return Ok(new JobRunResponse(true, sw.ElapsedMilliseconds));
     }
 }
+
+/// <summary>Resposta dos endpoints de gatilho de cron.</summary>
+public sealed record JobRunResponse(bool Ok, long DuracaoMs);
+
+/// <summary>Resposta do endpoint dispatcher/run com contagem de mensagens processadas.</summary>
+public sealed record DispatcherRunResponse(int Processadas, int? Shard, long DuracaoMs);

@@ -19,8 +19,9 @@ public sealed class PollingOutboxSignaler : IOutboxSignaler, IDisposable
 
     public async Task WaitAsync(CancellationToken ct)
     {
-        try { await _timer.WaitForNextTickAsync(ct); }
-        catch (OperationCanceledException) { /* shutdown — ok */ }
+        // Propaga OperationCanceledException ao invés de engolir — alinha com
+        // PostgresOutboxSignaler. Loops dos wrappers já tratam OCE.
+        await _timer.WaitForNextTickAsync(ct);
     }
 
     public void Signal() { /* no-op — polling não suporta wakeup imediato */ }

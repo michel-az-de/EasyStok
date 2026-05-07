@@ -94,7 +94,11 @@ public class AnonimizarMeusDadosUseCaseTests
         usuario.Nome.Should().Be("[Anonimizado]");
         usuario.Email.Should().StartWith("anonimizado-").And.EndWith("@anonimizado.local");
         usuario.AvatarUrl.Should().BeNull();
-        usuario.SenhaHash.Should().BeEmpty();
+        // SenhaHash recebe um marcador bcrypt invalido ($2a$10$INVALIDATED_*)
+        // que e impossivel de bater com qualquer senha em BCrypt.Verify.
+        // Anteriormente era string.Empty — inseguro porque caminhos que
+        // comparavam literal podiam aceitar entrada em branco.
+        usuario.SenhaHash.Should().StartWith("$2a$10$INVALIDATED_");
         usuario.Ativo.Should().BeFalse();
         usuario.EmailConfirmado.Should().BeFalse();
 

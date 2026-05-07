@@ -57,8 +57,38 @@ public sealed class NotificadorService(
         }
         catch (JsonException) { /* payload inválido — continua sem usuário específico */ }
 
-        await ProcessarEventoInternoAsync(evento, usuarioDestinoId, varsAdicionais: null, ct);
-        await unitOfWork.CommitAsync();
+        try
+        {
+            await ProcessarEventoInternoAsync(evento, usuarioDestinoId, varsAdicionais: null, ct);
+            await unitOfWork.CommitAsync();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Shutdown — não marca como falhado, evento volta a ser pendente na próxima rodada.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Defesa contra "evento veneno": qualquer exceção não tratada vira Falhado
+            // pra evitar loop infinito com starvation dos demais (orderBy OcorridoEm + Take 200).
+            logger.LogError(ex,
+                "Falha não recuperável ao avaliar evento {EventoId} (Tipo={Tipo}) — marcado como Falhado",
+                evento.Id, evento.Tipo);
+            try
+            {
+                evento.MarcarComoFalhado($"Erro não tratado: {ex.GetType().Name}: {ex.Message}");
+                await eventoRepository.UpdateAsync(evento, ct);
+                await unitOfWork.CommitAsync();
+            }
+            catch (Exception saveEx)
+            {
+                // Se nem conseguimos persistir o status Falhado, propaga o erro original.
+                logger.LogError(saveEx,
+                    "Erro adicional ao tentar marcar evento {EventoId} como Falhado",
+                    evento.Id);
+                throw;
+            }
+        }
     }
 
     private async Task ProcessarEventoInternoAsync(

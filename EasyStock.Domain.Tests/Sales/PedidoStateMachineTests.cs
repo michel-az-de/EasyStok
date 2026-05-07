@@ -1,3 +1,4 @@
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Sales;
 using FluentAssertions;
 

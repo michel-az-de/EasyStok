@@ -121,8 +121,8 @@ public sealed class PedidoEstoqueIntegrationService(
                         item.ProdutoId.Value, qtdInt, atual);
 
                 logger.LogWarning(
-                    "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — descontando só {Atual} (PermiteEstoqueNegativo=true).",
-                    pedido.Id, item.ProdutoId, atual, qtdInt);
+                    "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — descontando só {AtualDescontado} (PermiteEstoqueNegativo=true).",
+                    pedido.Id, item.ProdutoId, atual, qtdInt, atual);
                 qtdInt = atual; // só desconta o que tem
             }
 

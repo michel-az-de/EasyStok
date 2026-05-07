@@ -2,6 +2,7 @@ using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Notifications.Hosting;
 
@@ -68,8 +69,21 @@ public static class NotificationsHostingServiceCollectionExtensions
         // Postgres signaler — consumidor registra via AddPostgresOutboxSignaler() em Infra.Postgre.
         if (opts.Signaler == OutboxSignalerKind.Polling)
         {
-            var intervalo = TimeSpan.FromMilliseconds(Math.Max(1_000, opts.DispatcherPollingIntervalMs));
-            services.AddSingleton<IOutboxSignaler>(_ => new PollingOutboxSignaler(intervalo));
+            const int MinIntervaloMs = 1_000;
+            var intervaloMs = opts.DispatcherPollingIntervalMs;
+            services.AddSingleton<IOutboxSignaler>(sp =>
+            {
+                var efetivo = intervaloMs;
+                if (efetivo < MinIntervaloMs)
+                {
+                    var log = sp.GetRequiredService<ILogger<PollingOutboxSignaler>>();
+                    log.LogWarning(
+                        "Notifications:Hosting:DispatcherPollingIntervalMs={Configurado}ms abaixo do mínimo {Min}ms — usando {Efetivo}ms",
+                        intervaloMs, MinIntervaloMs, MinIntervaloMs);
+                    efetivo = MinIntervaloMs;
+                }
+                return new PollingOutboxSignaler(TimeSpan.FromMilliseconds(efetivo));
+            });
         }
 
         // Wrappers de loop

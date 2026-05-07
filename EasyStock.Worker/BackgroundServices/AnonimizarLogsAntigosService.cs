@@ -19,6 +19,13 @@ public sealed class AnonimizarLogsAntigosService(
     {
         logger.LogInformation("AnonimizarLogsAntigosService iniciado");
 
+        // Catch-up no startup: se o processo passou da hora alvo enquanto estava down
+        // (restarts frequentes, deploy), roda imediatamente uma vez. Caso contrário,
+        // o ciclo de schedule pula a janela e nunca anonimiza durante uma janela de
+        // restarts próximos da hora — risco de violação de retenção LGPD.
+        try { await ExecutarAnonimizacaoAsync(options.Value.RetencaoLogsDias, stoppingToken); }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var opts = options.Value;

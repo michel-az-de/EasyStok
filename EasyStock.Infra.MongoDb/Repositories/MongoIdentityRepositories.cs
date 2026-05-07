@@ -304,8 +304,10 @@ public sealed class UsuarioRepository(MongoEasyStockContext context, MongoUnitOf
 
     public Task UpdateAsync(Usuario usuario)
     {
-        usuario.Empresas = null;
-        usuario.Perfis = null;
+        // Limpar navigations pra nao serializar grafo aninhado no doc Mongo.
+        // Coleções viraram non-nullable na auditoria 2.5 — limpar via clear().
+        usuario.Empresas.Clear();
+        usuario.Perfis.Clear();
         EnqueueReplace(Usuarios, usuario.Id, usuario);
         return Task.CompletedTask;
     }
