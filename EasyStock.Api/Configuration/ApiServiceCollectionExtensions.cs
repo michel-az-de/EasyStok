@@ -84,6 +84,9 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
         services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
+        // F14 — auto-ticket categoria=Financeiro apos N falhas de pagamento.
+        services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
+            EasyStock.Api.Services.Faturacao.AutoTicketFalhaPagamento>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
