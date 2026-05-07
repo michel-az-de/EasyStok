@@ -60,6 +60,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<TicketAnexo> TicketAnexos { get; set; } = null!;
         public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
         public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
+        public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;

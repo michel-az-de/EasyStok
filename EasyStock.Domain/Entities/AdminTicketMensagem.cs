@@ -10,12 +10,13 @@ namespace EasyStock.Domain.Entities
         public string Conteudo { get; set; } = null!;
         public bool IsAdmin { get; set; }
         public bool LidoPeloAdmin { get; set; }
+        public bool Interno { get; set; }
         public DateTime CriadoEm { get; set; }
 
         public AdminTicket? Ticket { get; set; }
         public Usuario? Autor { get; set; }
 
-        public static AdminTicketMensagem Criar(Guid ticketId, Guid autorId, string conteudo, bool isAdmin)
+        public static AdminTicketMensagem Criar(Guid ticketId, Guid autorId, string conteudo, bool isAdmin, bool interno = false)
         {
             return new AdminTicketMensagem
             {
@@ -24,6 +25,7 @@ namespace EasyStock.Domain.Entities
                 AutorId = autorId,
                 Conteudo = conteudo.Trim(),
                 IsAdmin = isAdmin,
+                Interno = interno,
                 CriadoEm = DateTime.UtcNow
             };
         }

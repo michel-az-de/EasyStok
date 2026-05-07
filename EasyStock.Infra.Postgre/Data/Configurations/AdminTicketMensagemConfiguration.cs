@@ -12,11 +12,15 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasKey(m => m.Id);
             builder.Property(m => m.Conteudo).IsRequired().HasMaxLength(8000);
             builder.Property(m => m.LidoPeloAdmin).HasDefaultValue(false);
+            builder.Property(m => m.Interno).HasDefaultValue(false);
 
             builder.HasOne(m => m.Autor)
                 .WithMany()
                 .HasForeignKey(m => m.AutorId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(m => new { m.TicketId, m.Interno, m.CriadoEm })
+                .HasDatabaseName("ix_admin_ticket_mensagens_ticket_interno_criado");
         }
     }
 }
