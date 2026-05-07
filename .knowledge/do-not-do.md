@@ -48,3 +48,17 @@
 ## 10. Não floreio em resposta
 - Português BR direto, sem "Claro!", sem "Vou agora...", sem travessões enfeitando, sem vírgula sobrando.
 - Resposta = ação + resultado.
+
+## 12. Não criar agregação cross-tenant sem parâmetro `Guid? empresaId`
+- **O que aconteceu:** dashboard F10 (commit 74a2b08) introduziu `SomarPrecoMensalAtivasAsync()` e `ContarPorStatusAsync()` (assinaturas) sem aceitar `empresaId`. `IgnoreQueryFilters()` somado à ausência de `.Where(EmpresaId == ...)` retornava agregados GLOBAIS. Operacional admin com `VisualizarFaturas` filtrando dashboard por sua empresa via MRR/ARR/contagens de assinaturas vazavam dados de TODOS os tenants. F13 (cache) propagou o bug porque a chave de cache incluía empresaId mas o valor cacheado era global. Fixado em 191f685.
+- **Como evitar:** todo método de agregação que use `IgnoreQueryFilters()` em entidade tenant-aware DEVE aceitar `Guid? empresaId = null` e aplicar `.Where(x => x.EmpresaId == empresaId.Value)` quando `empresaId.HasValue && != Guid.Empty`. Auditoria mental antes de commit: "este metodo tem `IgnoreQueryFilters()`? entao precisa de empresaId opcional". Cache key contendo empresaId NÃO substitui o filtro — só evita colisão entre buckets já errados.
+
+## 13. Não documentar parâmetros posicionais de record com `///` antes do parâmetro
+- **O que aconteceu:** F10/F13 usaram `public sealed record Foo(/// <summary>...</summary> int Bar)`. C#/Roslyn silently ignora — nenhum doc é gerado para o parâmetro. Compilador não emite warning quando `GenerateDocumentationFile` está off (Application layer não gera).
+- **Como evitar:** documentar com `<param name="Bar">desc</param>` no doc-comment do tipo:
+  ```csharp
+  /// <summary>...</summary>
+  /// <param name="Bar">desc</param>
+  public sealed record Foo(int Bar);
+  ```
+  Funciona pra positional records em C# 11+ e propaga pra IntelliSense + XML doc.
