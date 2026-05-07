@@ -1,0 +1,258 @@
+@model EasyStock.Web.Models.ViewModels.Site.LandingViewModel
+@{
+    Layout = "_LayoutSite";
+    ViewBag.Title = "Estoque vivo em 7 dias";
+    ViewBag.Description = "Pare de depender da planilha pra nao perder produto. EasyStok e estoque, validade e movimentacao no celular. 14 dias gratis.";
+}
+
+<section class="site-hero">
+    <div class="site-hero-curve"></div>
+    <div class="site-hero-curve site-hero-curve--inner"></div>
+    <div class="site-container site-hero-grid">
+        <div>
+            <span class="site-hero-pill"><span class="pulse"></span> Estoque vivo em 7 dias · founder beta</span>
+            <h1>
+                Sua planilha <span class="strike">nao avisa</span> quando o produto vai vencer.
+            </h1>
+            <p class="site-hero-lead">
+                EasyStok e controle de estoque pratico pra marmitaria, cafe, dark kitchen e foodservice pequeno.
+                Estoque, validade, lote e movimentacao no celular. <strong style="color:var(--orange-400)">Em 7 dias o seu estoque esta vivo.</strong>
+            </p>
+            <div class="site-hero-ctas">
+                <a href="/auth/registrar?origem=hero-teste" class="btn btn-primary btn-lg" data-track="hero-teste">
+                    Testar gratis por 14 dias
+                </a>
+                <a href="#como-funciona" class="btn-link" data-track="hero-como-funciona">
+                    Como funciona →
+                </a>
+            </div>
+            <div class="site-hero-trust">
+                <span class="it"><span class="check">✓</span> Sem cartao</span>
+                <span class="it"><span class="check">✓</span> Cancela quando quiser</span>
+                <span class="it"><span class="check">✓</span> Setup com gente real</span>
+            </div>
+        </div>
+
+        <aside class="site-loss-card" aria-label="Estimativa de perda mensal">
+            <div class="site-loss-head">
+                <span class="ttl">Perda invisivel · estimativa mensal</span>
+                <span class="live">ao vivo</span>
+            </div>
+            <div class="site-loss-body">
+                <div class="site-loss-row"><span class="lbl">Produto vencido na geladeira</span><span class="val">R$ 480</span></div>
+                <div class="site-loss-row"><span class="lbl">Compra em duplicidade</span><span class="val">R$ 320</span></div>
+                <div class="site-loss-row"><span class="lbl">Venda perdida (acabou)</span><span class="val">R$ 540</span></div>
+                <div class="site-loss-row"><span class="lbl">Ajuste de contagem manual</span><span class="val">R$ 220</span></div>
+            </div>
+            <div class="site-loss-foot">
+                <span class="total-lbl">Custo medio mensal sem controle</span>
+                <span class="total-val">R$ 1.560</span>
+            </div>
+            <p class="site-loss-note">Estimativa para um operador de marmitaria de pequeno porte.</p>
+        </aside>
+    </div>
+</section>
+
+<section class="site-section" id="como-funciona">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">A dor e a mesma</span>
+            <h2>4 perguntas que <span class="hl">custam dinheiro</span> toda semana.</h2>
+            <p>Nao e falta de organizacao. E que planilha e caderno nao avisam — nem sao multi-loja, nem mostram lote, nem rastreiam quem mexeu.</p>
+        </div>
+
+        <div class="site-pains">
+            <article class="site-pain crit">
+                <span class="site-pain-tag"><span class="dot"></span>Validade</span>
+                <p class="site-pain-q">"O que vence essa semana?"</p>
+                <p>Voce abre a geladeira na sexta e descobre tres produtos vencidos no fundo. De novo.</p>
+                <div class="site-pain-cost"><span class="v">R$ 480</span><span class="l">/ mes em produto perdido</span></div>
+            </article>
+            <article class="site-pain">
+                <span class="site-pain-tag"><span class="dot"></span>Reposicao</span>
+                <p class="site-pain-q">"O que estou prestes a ficar sem?"</p>
+                <p>Sabado a noite acaba pao de hamburguer. Cliente vai embora, equipe perde 20 minutos no mercado.</p>
+                <div class="site-pain-cost"><span class="v">3-7</span><span class="l">vendas perdidas por semana</span></div>
+            </article>
+            <article class="site-pain">
+                <span class="site-pain-tag"><span class="dot"></span>Compra</span>
+                <p class="site-pain-q">"Ja comprei isso semana passada?"</p>
+                <p>Sem registro, voce repete compra. Caixa do estoque com 12 latas que ninguem sabe que tem.</p>
+                <div class="site-pain-cost"><span class="v">+18%</span><span class="l">de excesso de compra</span></div>
+            </article>
+            <article class="site-pain crit">
+                <span class="site-pain-tag"><span class="dot"></span>Auditoria</span>
+                <p class="site-pain-q">"Quem mexeu nisso?"</p>
+                <p>O ajuste apareceu segunda-feira. Sem trilha de auditoria, voce nao sabe se foi erro de contagem ou furto.</p>
+                <div class="site-pain-cost"><span class="v">0</span><span class="l">trilha hoje</span></div>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="site-section site-section--alt" id="resultado">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Em 7 dias</span>
+            <h2>Estoque vivo no celular, <span class="hl">com gente da sua equipe</span> usando.</h2>
+            <p>Nao e mais um ERP que ninguem abre. Sao 5 telas que resolvem o dia-a-dia, e onboarding com pessoa de verdade.</p>
+        </div>
+
+        <div class="site-days">
+            <div class="site-day done">
+                <div class="num"><strong>1-2</strong>dia</div>
+                <div class="body">
+                    <h4>Setup com voce, em chamada</h4>
+                    <p>Cadastro de empresa, primeira loja, importacao do que voce ja tem (foto da planilha funciona). 1h de chamada.</p>
+                </div>
+                <div class="out"><span>Pronto pra usar</span>cadastro completo</div>
+            </div>
+            <div class="site-day done">
+                <div class="num"><strong>3-4</strong>dia</div>
+                <div class="body">
+                    <h4>Equipe usando no celular</h4>
+                    <p>Treinamento curto — quem registra entrada, quem registra saida, quem ve validade. Sem manual de 80 paginas.</p>
+                </div>
+                <div class="out"><span>Em campo</span>equipe treinada</div>
+            </div>
+            <div class="site-day done">
+                <div class="num"><strong>5-7</strong>dia</div>
+                <div class="body">
+                    <h4>Primeira semana com numero</h4>
+                    <p>Voce ve o que vendeu, o que vai vencer, o que esta em falta. Numero da semana, nao palpite.</p>
+                </div>
+                <div class="out"><span>Decisao com dado</span>relatorio real</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="site-section" id="para-quem">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Pra quem e (e pra quem nao e)</span>
+            <h2>A gente nao serve <span class="hl">todo mundo</span>. Faz questao de avisar.</h2>
+        </div>
+        <div class="site-fornot">
+            <div class="col yes">
+                <h3>✅ Pra voce, se</h3>
+                <p class="sub">Pequeno foodservice com operacao real e equipe enxuta.</p>
+                <ul>
+                    <li>Marmitaria, cafe, dark kitchen, hamburgueria, pizzaria, conveniencia</li>
+                    <li>1 a 5 lojas, equipe de 2 a 15 pessoas</li>
+                    <li>Quer parar de perder produto na validade e na ruptura</li>
+                    <li>Nao quer ERP de R$ 800/mes pra controlar 80 SKUs</li>
+                    <li>Aceita comecar simples e crescer aos poucos</li>
+                </ul>
+            </div>
+            <div class="col no">
+                <h3>⛔ Nao serve, se</h3>
+                <p class="sub">Tem outra ferramenta certa pra esses casos.</p>
+                <ul>
+                    <li>Voce precisa emitir NFe / NFC-e pelo sistema</li>
+                    <li>Voce vende em marketplace (Mercado Livre, Shopee) e quer integracao</li>
+                    <li>Voce precisa de BI complexo, IA preditiva, OCR de nota</li>
+                    <li>Voce so quer testar — sem usar de verdade</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="site-section site-section--alt" id="planos">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Precos</span>
+            <h2>Comece <span class="hl">gratis</span>. Pague so quando fizer sentido.</h2>
+            <p>14 dias gratis para testar com sua operacao. Sem cartao. Sem letra miuda.</p>
+        </div>
+        <div class="site-pricing">
+            <article class="site-plan">
+                <span class="site-plan-name">Inicial</span>
+                <h3 class="site-plan-headline">Tirar a planilha do meio.</h3>
+                <div class="site-plan-price">
+                    <span class="num">R$ 0</span>
+                    <span class="per">/ 14 dias</span>
+                </div>
+                <p class="site-plan-meta">Tudo desbloqueado. Cancela quando quiser.</p>
+                <ul>
+                    <li>1 loja, ate 100 produtos</li>
+                    <li>Validade, lote, entrada/saida</li>
+                    <li>Web + celular</li>
+                    <li>Suporte por WhatsApp</li>
+                </ul>
+                <a href="/auth/registrar?origem=plano-inicial" class="btn btn-secondary" data-track="plano-inicial">Comecar gratis</a>
+            </article>
+
+            <article class="site-plan featured">
+                <span class="site-plan-tag">Recomendado · founder</span>
+                <span class="site-plan-name">Foodservice</span>
+                <h3 class="site-plan-headline">Operacao real, multi-loja, equipe.</h3>
+                <div class="site-plan-price">
+                    <span class="crossed">R$ 149</span>
+                    <span class="num">R$ 79</span>
+                    <span class="per">/ mes · 6 meses travado</span>
+                </div>
+                <p class="site-plan-meta">Vagas founder limitadas (10). Depois volta pro preco normal.</p>
+                <ul>
+                    <li>Lojas ilimitadas, produtos ilimitados</li>
+                    <li>Auditoria completa (quem mexeu)</li>
+                    <li>Notificacao de validade por WhatsApp</li>
+                    <li>Onboarding 1:1 com gente real</li>
+                    <li>Acesso direto ao dev (Felipe)</li>
+                </ul>
+                <a href="/auth/registrar?origem=plano-founder" class="btn btn-primary" data-track="plano-founder">Quero ser founder</a>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="site-section" id="faq">
+    <div class="site-container">
+        <div class="site-section-h">
+            <span class="eyebrow">Duvidas comuns</span>
+            <h2>Pergunta direta. <span class="hl">Resposta direta.</span></h2>
+        </div>
+        <div class="site-faq">
+            <details>
+                <summary>EasyStok emite nota fiscal?</summary>
+                <p>Nao. A gente nao emite NFe nem NFC-e. Emissor fiscal e outra ferramenta. Se voce precisa de emissor, te indicamos um parceiro.</p>
+            </details>
+            <details>
+                <summary>Funciona offline na cozinha?</summary>
+                <p>Sim. O app celular (PWA) funciona offline e sincroniza quando volta o sinal. Nao trava operacao se cair internet.</p>
+            </details>
+            <details>
+                <summary>Quanto tempo leva pra implantar?</summary>
+                <p>7 dias na pratica. Dias 1-2: setup com chamada. Dias 3-4: equipe treinada. Dias 5-7: primeiros relatorios. Sem implantacao de 3 meses.</p>
+            </details>
+            <details>
+                <summary>Posso cancelar quando quiser?</summary>
+                <p>Pode. Sem multa, sem fidelidade, sem ligacao pra cancelar. Cancela na propria conta. Seus dados ficam exportaveis em CSV por 30 dias.</p>
+            </details>
+            <details>
+                <summary>Os meus dados sao seguros?</summary>
+                <p>Banco PostgreSQL hospedado no Azure (Brasil), backup diario automatico, criptografia em transito. Voce e dona dos seus dados — exporta em CSV quando quiser.</p>
+            </details>
+            <details>
+                <summary>Quem trabalha no produto?</summary>
+                <p>Felipe (dev e fundador) + designer parceira. Time enxuto, decisao rapida, voce fala direto com quem constroi.</p>
+            </details>
+        </div>
+    </div>
+</section>
+
+<section class="site-final">
+    <div class="site-container site-final-inner">
+        <h2>Estoque vivo <span class="hl">em 7 dias.</span> Sem promessa de revolucao.</h2>
+        <p>Voce abre o app, sua equipe abre o app, e o que vence, o que falta e o que voce ja vendeu fica claro. Comece hoje.</p>
+        <div class="site-hero-ctas" style="justify-content:center">
+            <a href="/auth/registrar?origem=cta-final" class="btn btn-primary btn-lg" data-track="cta-final-teste">
+                Testar gratis por 14 dias
+            </a>
+            <a href="/contato?origem=cta-final&assunto=Gostaria de saber mais sobre o EasyStok" class="btn-link" data-track="cta-final-fale">
+                Falar com a gente
+            </a>
+        </div>
+    </div>
+</section>
