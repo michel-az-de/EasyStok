@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
 using Microsoft.Extensions.Logging;
@@ -12,6 +15,7 @@ namespace EasyStock.Infra.Postgre.Data
     public class EasyStockDbContext : DbContext, IUnitOfWork
     {
         private readonly ILogger<EasyStockDbContext>? _logger;
+        private readonly ICurrentUserAccessor? _currentUser;
 
         public EasyStockDbContext(DbContextOptions<EasyStockDbContext> options)
             : base(options) { }
@@ -21,6 +25,39 @@ namespace EasyStock.Infra.Postgre.Data
         {
             _logger = logger;
         }
+
+        public EasyStockDbContext(
+            DbContextOptions<EasyStockDbContext> options,
+            ICurrentUserAccessor currentUser)
+            : base(options)
+        {
+            _currentUser = currentUser;
+        }
+
+        public EasyStockDbContext(
+            DbContextOptions<EasyStockDbContext> options,
+            ILogger<EasyStockDbContext> logger,
+            ICurrentUserAccessor currentUser)
+            : base(options)
+        {
+            _logger = logger;
+            _currentUser = currentUser;
+        }
+
+        /// <summary>
+        /// Tenant atual usado pelo <c>HasQueryFilter</c> global. Quando não há
+        /// usuário autenticado (jobs, seeds, migrations) retorna
+        /// <see cref="Guid.Empty"/> — o filtro elimina tudo, exigindo que o
+        /// chamador use <c>IgnoreQueryFilters()</c> explicitamente.
+        /// </summary>
+        public Guid CurrentTenantId => _currentUser is { IsAuthenticated: true } u ? u.EmpresaId : Guid.Empty;
+
+        /// <summary>
+        /// Bypass do filtro multi-tenant para SuperAdmin (back-office cross-tenant).
+        /// Usuarios normais nao podem setar isso — vem do <see cref="ICurrentUserAccessor"/>.
+        /// Para jobs/seeds sem contexto, use <c>IgnoreQueryFilters()</c> diretamente.
+        /// </summary>
+        public bool IsSuperAdmin => _currentUser is { IsAuthenticated: true, Nivel: NivelAcesso.SuperAdmin };
 
 
         // Domain DbSets
@@ -83,13 +120,18 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
-        // Modulo Financeiro (F1+)
-        public DbSet<Fatura> Faturas { get; set; } = null!;
-        public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
-        public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
-        public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
-        public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
-        public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
+        // Modulo Financeiro (F1+) — DbSets comentados temporariamente.
+        // Commit 5b343c7 introduziu essas linhas, mas as classes Fatura/FaturaItem/
+        // FaturaPagamento/FaturaEvento/FaturaContador/WebhookRecebido + enums
+        // (OrigemFatura, StatusFatura, ...) e ValueObjects (DadosFaturado) ainda
+        // não foram commitados, deixando o build do master quebrado. Reativar
+        // junto com o restante da feature de Faturas no PR completo.
+        // public DbSet<Fatura> Faturas { get; set; } = null!;
+        // public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
+        // public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
+        // public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
+        // public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
+        // public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
@@ -186,6 +228,65 @@ namespace EasyStock.Infra.Postgre.Data
             // schema aplicado via SQL raw (MobileSchemaInitializer), mas o EF
             // precisa conhecer as entidades para queries via Set<T>().
             modelBuilder.RegisterMobileModels();
+
+            // Multi-tenancy global query filter — qualquer entidade com
+            // propriedade EmpresaId (Guid) ganha filtro automatico
+            // EmpresaId == CurrentTenantId. Anteriormente o isolamento dependia
+            // 100% do dev lembrar do .Where(...) — risco LGPD/multi-tenant.
+            //
+            // Excecoes (admin/cross-tenant) ficam em SkipTenantFilter abaixo.
+            // Endpoints SuperAdmin que precisem ler outros tenants devem usar
+            // explicitamente .IgnoreQueryFilters().
+            ApplyTenantQueryFilters(modelBuilder);
+        }
+
+        private void ApplyTenantQueryFilters(ModelBuilder modelBuilder)
+        {
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var clr = entityType.ClrType;
+                if (SkipTenantFilter(clr)) continue;
+
+                var empresaIdProp = clr.GetProperty("EmpresaId");
+                if (empresaIdProp is null) continue;
+                if (empresaIdProp.PropertyType != typeof(Guid) &&
+                    empresaIdProp.PropertyType != typeof(Guid?)) continue;
+
+                // Constroi: e => this.IsSuperAdmin || EF.Property<Guid>(e, "EmpresaId") == this.CurrentTenantId
+                var parameter = Expression.Parameter(clr, "e");
+                var efPropertyMethod = typeof(EF).GetMethod(nameof(EF.Property))!
+                    .MakeGenericMethod(empresaIdProp.PropertyType);
+                var efPropertyCall = Expression.Call(
+                    efPropertyMethod,
+                    parameter,
+                    Expression.Constant("EmpresaId"));
+                var contextRef = Expression.Constant(this);
+                var tenantAccess = Expression.Property(contextRef, nameof(CurrentTenantId));
+                Expression tenantExpr = empresaIdProp.PropertyType == typeof(Guid?)
+                    ? Expression.Convert(tenantAccess, typeof(Guid?))
+                    : tenantAccess;
+                var equality = Expression.Equal(efPropertyCall, tenantExpr);
+                var superAdminBypass = Expression.Property(contextRef, nameof(IsSuperAdmin));
+                var body = Expression.OrElse(superAdminBypass, equality);
+                var lambda = Expression.Lambda(body, parameter);
+
+                modelBuilder.Entity(clr).HasQueryFilter(lambda);
+            }
+        }
+
+        /// <summary>
+        /// Tipos isentos do filtro global de tenant — admin tooling cross-tenant
+        /// e modulo Mobile (esquema separado, escopo e a loja, nao a empresa).
+        /// </summary>
+        private static bool SkipTenantFilter(Type clrType)
+        {
+            // Modulo Casa da Baba Mobile — esquema mobile_* e escopo proprio.
+            if (clrType.Namespace?.StartsWith("EasyStock.Domain.Entities.Mobile", StringComparison.Ordinal) == true)
+                return true;
+
+            // Admin tooling — auditoria/feature flags cross-tenant.
+            return clrType == typeof(AdminImpersonationLog)
+                || clrType == typeof(TenantFeatureFlag);
         }
     }
 }
