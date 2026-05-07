@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Integration;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -130,6 +131,9 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
+
+        // Modulo Integration (F3+) — credenciais cifradas (AES-256-GCM) por tenant
+        public DbSet<CredencialIntegracao> CredenciaisIntegracao { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
