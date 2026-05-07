@@ -308,11 +308,11 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
         if (!jaTemLoja)
         {
-            TempData["Toast"] = "success|Conta criada! Configure sua primeira loja para começar.";
-            return RedirectToAction(nameof(SelecionarLoja));
+            TempData["Toast"] = "success|Conta criada! Vamos configurar sua loja em poucos passos.";
+            return Redirect("/onboarding");
         }
 
-        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias está ativo.";
+        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias esta ativo.";
         return RedirectToAction("Index", "Dashboard");
     }
 
