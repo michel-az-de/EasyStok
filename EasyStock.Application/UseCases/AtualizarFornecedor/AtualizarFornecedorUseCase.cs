@@ -39,8 +39,8 @@ public class AtualizarFornecedorUseCase(
         if (!string.IsNullOrWhiteSpace(command.Email))
             EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 
-        var fornecedor = await fornecedorRepository.GetByIdAsync(command.FornecedorId);
-        if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)
+        var fornecedor = await fornecedorRepository.GetByIdAsync(command.EmpresaId, command.FornecedorId);
+        if (fornecedor is null)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
         // Normalização via VOs: se o formato for válido, armazena só os dígitos;

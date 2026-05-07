@@ -13,6 +13,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(c => c.SubCategorias)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
+        public Task<Categoria?> GetByIdAsync(Guid empresaId, Guid id) =>
+            dbContext.Categorias
+                .Include(c => c.SubCategorias)
+                .FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id);
+
         public async Task<IEnumerable<Categoria>> GetByEmpresaAsync(Guid empresaId) =>
             await dbContext.Categorias
                 .AsNoTracking()

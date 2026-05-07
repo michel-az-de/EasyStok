@@ -5,6 +5,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public interface ICategoriaRepository
     {
         Task<Categoria?> GetByIdAsync(Guid id);
+        Task<Categoria?> GetByIdAsync(Guid empresaId, Guid id);
         Task<IEnumerable<Categoria>> GetByEmpresaAsync(Guid empresaId);
         Task<bool> ExisteProdutosNaCategoriaAsync(Guid categoriaId);
         Task AddAsync(Categoria categoria);

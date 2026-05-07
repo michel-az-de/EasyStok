@@ -14,8 +14,8 @@ public class DesativarFornecedorUseCase(
 {
     public async Task ExecuteAsync(DesativarFornecedorCommand command)
     {
-        var fornecedor = await fornecedorRepository.GetByIdAsync(command.FornecedorId);
-        if (fornecedor is null || fornecedor.EmpresaId != command.EmpresaId)
+        var fornecedor = await fornecedorRepository.GetByIdAsync(command.EmpresaId, command.FornecedorId);
+        if (fornecedor is null)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
         var pedidosEmAberto = await pedidoFornecedorRepository.CountPedidosAbertosOuEmTransitoAsync(command.EmpresaId, command.FornecedorId);

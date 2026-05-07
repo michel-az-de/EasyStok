@@ -41,8 +41,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
 
             if (command.CategoriaPaiId.HasValue)
             {
-                var pai = await categoriaRepository.GetByIdAsync(command.CategoriaPaiId.Value);
-                if (pai == null || pai.EmpresaId != command.EmpresaId)
+                var pai = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaPaiId.Value);
+                if (pai == null)
                     throw new UseCaseValidationException("Categoria pai nao encontrada ou nao pertence a esta empresa.");
             }
 
@@ -69,16 +69,16 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (string.IsNullOrWhiteSpace(command.Nome))
                 throw new UseCaseValidationException("Nome da categoria é obrigatório.");
 
-            var categoria = await categoriaRepository.GetByIdAsync(command.Id);
-            if (categoria == null || categoria.EmpresaId != command.EmpresaId)
+            var categoria = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.Id);
+            if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
             if (command.CategoriaPaiId.HasValue)
             {
                 if (command.CategoriaPaiId == command.Id)
                     throw new UseCaseValidationException("Uma categoria nao pode ser filha de si mesma.");
-                var pai = await categoriaRepository.GetByIdAsync(command.CategoriaPaiId.Value);
-                if (pai == null || pai.EmpresaId != command.EmpresaId)
+                var pai = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaPaiId.Value);
+                if (pai == null)
                     throw new UseCaseValidationException("Categoria pai nao encontrada ou nao pertence a esta empresa.");
             }
 
@@ -95,8 +95,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
 
         public async Task AtualizarLimiaresAsync(Guid empresaId, Guid id, int? quantidadeMinima, int? quantidadeCritica)
         {
-            var categoria = await categoriaRepository.GetByIdAsync(id);
-            if (categoria == null || categoria.EmpresaId != empresaId)
+            var categoria = await categoriaRepository.GetByIdAsync(empresaId, id);
+            if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
             if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
@@ -116,8 +116,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
 
         public async Task RemoverAsync(Guid id, Guid empresaId)
         {
-            var categoria = await categoriaRepository.GetByIdAsync(id);
-            if (categoria == null || categoria.EmpresaId != empresaId)
+            var categoria = await categoriaRepository.GetByIdAsync(empresaId, id);
+            if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
             if (await categoriaRepository.ExisteProdutosNaCategoriaAsync(id))
@@ -137,8 +137,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
 
         public async Task<CategoriaResult?> ObterAsync(Guid id, Guid empresaId)
         {
-            var categoria = await categoriaRepository.GetByIdAsync(id);
-            if (categoria == null || categoria.EmpresaId != empresaId)
+            var categoria = await categoriaRepository.GetByIdAsync(empresaId, id);
+            if (categoria == null)
                 return null;
             return ToResult(categoria);
         }

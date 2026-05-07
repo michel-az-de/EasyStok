@@ -21,6 +21,15 @@ public sealed class CategoriaRepository(MongoEasyStockContext context, MongoUnit
         return categoria;
     }
 
+    public async Task<Categoria?> GetByIdAsync(Guid empresaId, Guid id)
+    {
+        var categoria = await Collection.Find(x => x.EmpresaId == empresaId && x.Id == id).FirstOrDefaultAsync();
+        if (categoria is null) return null;
+
+        categoria.SubCategorias = await Collection.Find(x => x.EmpresaId == empresaId && x.CategoriaPaiId == id).ToListAsync();
+        return categoria;
+    }
+
     public async Task<IEnumerable<Categoria>> GetByEmpresaAsync(Guid empresaId)
     {
         var categorias = await Collection.Find(x => x.EmpresaId == empresaId)

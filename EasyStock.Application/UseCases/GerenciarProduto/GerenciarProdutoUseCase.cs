@@ -176,18 +176,13 @@ public sealed class GerenciarProdutoUseCase(
         var codigoBarrasAntes = produto.CodigoBarras;
         var observacaoAntes   = produto.ObservacaoInterna;
 
-        var categoria = await categoriaRepository.GetByIdAsync(command.CategoriaId)
+        var categoria = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaId)
             ?? throw new UseCaseValidationException("Categoria nao encontrada.");
-
-        if (categoria.EmpresaId != command.EmpresaId)
-            throw new UseCaseValidationException("A categoria informada nao pertence a empresa.");
 
         if (command.SubcategoriaId.HasValue)
         {
-            var subcategoria = await categoriaRepository.GetByIdAsync(command.SubcategoriaId.Value)
+            var subcategoria = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.SubcategoriaId.Value)
                 ?? throw new UseCaseValidationException("Subcategoria nao encontrada.");
-            if (subcategoria.EmpresaId != command.EmpresaId)
-                throw new UseCaseValidationException("A subcategoria informada nao pertence a empresa.");
             if (subcategoria.CategoriaPaiId != command.CategoriaId)
                 throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
         }
