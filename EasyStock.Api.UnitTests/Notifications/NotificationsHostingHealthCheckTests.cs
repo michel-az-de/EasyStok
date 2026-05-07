@@ -135,4 +135,32 @@ public class NotificationsHostingHealthCheckTests
             .And.ContainKey("avaliador_idle_seconds")
             .And.ContainKey("coletor_idle_seconds");
     }
+
+    [Fact]
+    public async Task Idle_seconds_usa_TimeProvider_injetado()
+    {
+        // Garante que o calculo de idle nao depende de DateTimeOffset.UtcNow estatico —
+        // se um TimeProvider falso e injetado, o health check usa ele coerentemente.
+        var fakeNow = new DateTimeOffset(2026, 5, 7, 12, 0, 0, TimeSpan.Zero);
+        var time = new FixedTimeProvider(fakeNow);
+        var heartbeat = Substitute.For<INotificationsLoopHeartbeat>();
+        heartbeat.LastBeat(NotificationsLoops.Dispatcher).Returns(fakeNow.AddSeconds(-42));
+        heartbeat.LastBeat(NotificationsLoops.Avaliador).Returns(fakeNow.AddSeconds(-42));
+        heartbeat.LastBeat(NotificationsLoops.Coletor).Returns(fakeNow.AddSeconds(-42));
+
+        var sut = new NotificationsHostingHealthCheck(Opts(NotificationsHostingMode.Hosted), heartbeat, time);
+        var result = await sut.CheckHealthAsync(new HealthCheckContext());
+
+        result.Status.Should().Be(HealthStatus.Healthy);
+        result.Data["dispatcher_idle_seconds"].Should().Be(42);
+        result.Data["avaliador_idle_seconds"].Should().Be(42);
+        result.Data["coletor_idle_seconds"].Should().Be(42);
+    }
+
+    private sealed class FixedTimeProvider : TimeProvider
+    {
+        private readonly DateTimeOffset _now;
+        public FixedTimeProvider(DateTimeOffset now) => _now = now;
+        public override DateTimeOffset GetUtcNow() => _now;
+    }
 }
