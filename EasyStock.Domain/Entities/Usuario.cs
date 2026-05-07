@@ -26,8 +26,8 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public NivelAtendimento? NivelAtendimentoPreferido { get; set; }
 
-        public ICollection<UsuarioEmpresa>? Empresas { get; set; }
-        public ICollection<UsuarioPerfil>? Perfis { get; set; }
+        public ICollection<UsuarioEmpresa> Empresas { get; set; } = new List<UsuarioEmpresa>();
+        public ICollection<UsuarioPerfil> Perfis { get; set; } = new List<UsuarioPerfil>();
 
         public static Usuario Criar(string nome, string email, string senhaHash)
         {

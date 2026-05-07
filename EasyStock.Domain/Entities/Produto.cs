@@ -44,11 +44,11 @@ namespace EasyStock.Domain.Entities
         public Empresa? Empresa { get; set; }
         public Categoria? Categoria { get; set; }
         public Categoria? Subcategoria { get; set; }
-        public ICollection<ProdutoCaracteristica>? Caracteristicas { get; set; }
-        public ICollection<ProdutoEmbalagem>? Embalagens { get; set; }
-        public ICollection<ProdutoVariacao>? Variacoes { get; set; }
-        public ICollection<ItemEstoque>? ItensEstoque { get; set; }
-        public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
-        public ICollection<ItemVenda>? ItensVenda { get; set; }
+        public ICollection<ProdutoCaracteristica> Caracteristicas { get; set; } = new List<ProdutoCaracteristica>();
+        public ICollection<ProdutoEmbalagem> Embalagens { get; set; } = new List<ProdutoEmbalagem>();
+        public ICollection<ProdutoVariacao> Variacoes { get; set; } = new List<ProdutoVariacao>();
+        public ICollection<ItemEstoque> ItensEstoque { get; set; } = new List<ItemEstoque>();
+        public ICollection<MovimentacaoEstoque> Movimentacoes { get; set; } = new List<MovimentacaoEstoque>();
+        public ICollection<ItemVenda> ItensVenda { get; set; } = new List<ItemVenda>();
     }
 }

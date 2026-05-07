@@ -18,8 +18,8 @@ namespace EasyStock.Domain.Entities
         public DateTime AlteradoEm { get; set; }
 
         public Empresa? Empresa { get; set; }
-        public ICollection<ItemEstoque>? Itens { get; set; }
-        public ICollection<Venda>? Vendas { get; set; }
+        public ICollection<ItemEstoque> Itens { get; set; } = new List<ItemEstoque>();
+        public ICollection<Venda> Vendas { get; set; } = new List<Venda>();
 
         public static Loja Criar(Guid empresaId, string nome)
         {

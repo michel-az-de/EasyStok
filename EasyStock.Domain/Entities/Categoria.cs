@@ -20,7 +20,7 @@ namespace EasyStock.Domain.Entities
 
         public Empresa? Empresa { get; set; }
         public Categoria? CategoriaPai { get; set; }
-        public ICollection<Categoria>? SubCategorias { get; set; }
-        public ICollection<Produto>? Produtos { get; set; }
+        public ICollection<Categoria> SubCategorias { get; set; } = new List<Categoria>();
+        public ICollection<Produto> Produtos { get; set; } = new List<Produto>();
     }
 }

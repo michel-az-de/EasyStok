@@ -31,14 +31,14 @@ namespace EasyStock.Domain.Entities
             };
         }
 
-        public ICollection<Categoria>? Categorias { get; set; }
-        public ICollection<Produto>? Produtos { get; set; }
-        public ICollection<ProdutoVariacao>? VariacoesProduto { get; set; }
-        public ICollection<ProdutoCaracteristica>? CaracteristicasProduto { get; set; }
-        public ICollection<ProdutoEmbalagem>? EmbalagensProduto { get; set; }
-        public ICollection<ItemEstoque>? ItensEstoque { get; set; }
-        public ICollection<Venda>? Vendas { get; set; }
-        public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
-        public ICollection<Loja>? Lojas { get; set; }
+        public ICollection<Categoria> Categorias { get; set; } = new List<Categoria>();
+        public ICollection<Produto> Produtos { get; set; } = new List<Produto>();
+        public ICollection<ProdutoVariacao> VariacoesProduto { get; set; } = new List<ProdutoVariacao>();
+        public ICollection<ProdutoCaracteristica> CaracteristicasProduto { get; set; } = new List<ProdutoCaracteristica>();
+        public ICollection<ProdutoEmbalagem> EmbalagensProduto { get; set; } = new List<ProdutoEmbalagem>();
+        public ICollection<ItemEstoque> ItensEstoque { get; set; } = new List<ItemEstoque>();
+        public ICollection<Venda> Vendas { get; set; } = new List<Venda>();
+        public ICollection<MovimentacaoEstoque> Movimentacoes { get; set; } = new List<MovimentacaoEstoque>();
+        public ICollection<Loja> Lojas { get; set; } = new List<Loja>();
     }
 }

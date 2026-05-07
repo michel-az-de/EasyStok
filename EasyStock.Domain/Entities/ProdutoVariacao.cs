@@ -23,8 +23,8 @@ namespace EasyStock.Domain.Entities
 
         public Empresa? Empresa { get; set; }
         public Produto? Produto { get; set; }
-        public ICollection<ItemEstoque>? ItensEstoque { get; set; }
-        public ICollection<ItemVenda>? ItensVenda { get; set; }
-        public ICollection<MovimentacaoEstoque>? Movimentacoes { get; set; }
+        public ICollection<ItemEstoque> ItensEstoque { get; set; } = new List<ItemEstoque>();
+        public ICollection<ItemVenda> ItensVenda { get; set; } = new List<ItemVenda>();
+        public ICollection<MovimentacaoEstoque> Movimentacoes { get; set; } = new List<MovimentacaoEstoque>();
     }
 }

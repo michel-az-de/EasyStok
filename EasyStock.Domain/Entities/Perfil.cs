@@ -14,7 +14,7 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
 
         public Empresa? Empresa { get; set; }
-        public ICollection<PerfilPermissao>? Permissoes { get; set; }
-        public ICollection<UsuarioPerfil>? Usuarios { get; set; }
+        public ICollection<PerfilPermissao> Permissoes { get; set; } = new List<PerfilPermissao>();
+        public ICollection<UsuarioPerfil> Usuarios { get; set; } = new List<UsuarioPerfil>();
     }
 }
