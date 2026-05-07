@@ -27,5 +27,12 @@ public enum TipoEventoNotificacao
     FaturaPaga = 21,
     FaturaVencida = 22,
     PagamentoConfirmado = 23,
-    PagamentoFalhou = 24
+    PagamentoFalhou = 24,
+
+    // Contas a Pagar / Contas a Receber (CAP/CAR)
+    ContaPagarVencendo = 25,
+    ContaPagarVencida = 26,
+    ContaReceberVencendo = 27,
+    ContaReceberVencida = 28,
+    ParcelaRecebida = 29
 }

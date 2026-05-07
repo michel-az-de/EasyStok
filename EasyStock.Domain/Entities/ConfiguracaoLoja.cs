@@ -17,6 +17,12 @@ public class ConfiguracaoLoja
     public bool FifoAtivo { get; set; } = true;
     public string Moeda { get; set; } = OperacionalDefaults.Moeda;
     public string Timezone { get; set; } = OperacionalDefaults.Timezone;
+
+    // Geracao automatica financeiro (CAP/CAR) — opt-in por loja
+    public bool GerarContaReceberAutomaticaDePedido { get; set; } = false;
+    public bool GerarContaPagarAutomaticaDePedidoFornecedor { get; set; } = false;
+    public string StatusPedidoQueGeraContaReceber { get; set; } = "entregue";
+
     public DateTime CriadoEm { get; set; }
     public DateTime AlteradoEm { get; set; }
 
@@ -45,7 +51,10 @@ public class ConfiguracaoLoja
         bool? fifoAtivo,
         string? moeda,
         string? timezone,
-        int? quantidadeCriticaPadrao = null)
+        int? quantidadeCriticaPadrao = null,
+        bool? gerarContaReceberAutomaticaDePedido = null,
+        bool? gerarContaPagarAutomaticaDePedidoFornecedor = null,
+        string? statusPedidoQueGeraContaReceber = null)
     {
         if (diasAlertaValidade.HasValue) DiasAlertaValidade = diasAlertaValidade.Value;
         if (diasAlertaParado.HasValue) DiasAlertaParado = diasAlertaParado.Value;
@@ -58,6 +67,9 @@ public class ConfiguracaoLoja
         if (fifoAtivo.HasValue) FifoAtivo = fifoAtivo.Value;
         if (!string.IsNullOrWhiteSpace(moeda)) Moeda = moeda.Trim();
         if (!string.IsNullOrWhiteSpace(timezone)) Timezone = timezone.Trim();
+        if (gerarContaReceberAutomaticaDePedido.HasValue) GerarContaReceberAutomaticaDePedido = gerarContaReceberAutomaticaDePedido.Value;
+        if (gerarContaPagarAutomaticaDePedidoFornecedor.HasValue) GerarContaPagarAutomaticaDePedidoFornecedor = gerarContaPagarAutomaticaDePedidoFornecedor.Value;
+        if (!string.IsNullOrWhiteSpace(statusPedidoQueGeraContaReceber)) StatusPedidoQueGeraContaReceber = statusPedidoQueGeraContaReceber.Trim();
         AlteradoEm = DateTime.UtcNow;
     }
 
@@ -74,6 +86,9 @@ public class ConfiguracaoLoja
         FifoAtivo = true;
         Moeda = OperacionalDefaults.Moeda;
         Timezone = OperacionalDefaults.Timezone;
+        GerarContaReceberAutomaticaDePedido = false;
+        GerarContaPagarAutomaticaDePedidoFornecedor = false;
+        StatusPedidoQueGeraContaReceber = "entregue";
         AlteradoEm = DateTime.UtcNow;
     }
 }
