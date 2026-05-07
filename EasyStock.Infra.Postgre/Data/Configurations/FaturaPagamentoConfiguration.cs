@@ -20,6 +20,21 @@ public class FaturaPagamentoConfiguration : IEntityTypeConfiguration<FaturaPagam
         builder.Property(p => p.Observacao).HasMaxLength(2000);
         builder.Property(p => p.RegistradoPorNome).HasMaxLength(120);
 
+        // FK explicita — pagamento nao existe sem fatura (Cascade).
+        builder.HasOne(p => p.Fatura)
+            .WithMany(f => f.Pagamentos)
+            .HasForeignKey(p => p.FaturaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // FK opcional pra Usuario via RegistradoPorUserId. Sem navigation
+        // property na entity — usamos overload sem nav. SetNull preserva
+        // o pagamento mesmo se o usuario for anonimizado/excluido (LGPD).
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(p => p.RegistradoPorUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(p => p.FaturaId).HasDatabaseName("ix_fatura_pagamentos_fatura_id");
         builder.HasIndex(p => new { p.GatewayProvedor, p.GatewayTransactionId })
             .HasDatabaseName("ix_fatura_pagamentos_gateway_tx")

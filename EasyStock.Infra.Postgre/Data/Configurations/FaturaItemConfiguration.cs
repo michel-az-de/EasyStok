@@ -16,6 +16,13 @@ public class FaturaItemConfiguration : IEntityTypeConfiguration<FaturaItem>
         builder.Property(i => i.Subtotal).HasColumnType("decimal(14,2)");
         builder.Property(i => i.Tipo).HasConversion<string>().IsRequired().HasMaxLength(20);
 
+        // FK explicita — antes EF gerava ClientSetNull por default; aqui a
+        // semantica correta e Cascade (item nao existe sem fatura).
+        builder.HasOne(i => i.Fatura)
+            .WithMany(f => f.Itens)
+            .HasForeignKey(i => i.FaturaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(i => i.FaturaId).HasDatabaseName("ix_fatura_itens_fatura_id");
         builder.HasIndex(i => new { i.FaturaId, i.Ordem }).HasDatabaseName("ix_fatura_itens_fatura_ordem");
     }
