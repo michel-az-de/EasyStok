@@ -223,6 +223,14 @@ var app = builder.Build();
 var runMigrationsOnStartup = builder.Configuration.GetValue("RunMigrationsOnStartup", defaultValue: !app.Environment.IsProduction());
 if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
+    // R6: serializa migrations + seeds entre replicas via advisory lock pg_try_advisory_lock.
+    // Replica que adquirir o lock executa todo o bloco; outras logam skip e seguem boot.
+    // Health check /health/ready bloqueia trafego ate a primeira replica concluir.
+    using var lockScope = app.Services.CreateScope();
+    var advisoryLock = lockScope.ServiceProvider.GetRequiredService<PostgresAdvisoryLock>();
+
+    var acquired = await advisoryLock.TentarExecutarAsync(LockKeys.StartupMigrationsAndSeed, async lockToken =>
+    {
     try
     {
         List<string> pendingMigrations;
@@ -297,25 +305,43 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
     // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
     // de empresa). Idempotente: no-op se ja existe.
+    // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
+    // por bug de config (env var ausente, senha fraca) e blocker — melhor falhar deploy
+    // do que subir API silenciosamente quebrada.
     try
     {
         using var superSeedScope = app.Services.CreateScope();
         var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger);
+        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
     }
-    catch (Exception ex)
+    catch (Exception ex) when (!app.Environment.IsProduction())
     {
-        app.Logger.LogError(ex, "Erro durante SuperAdminSeed. Painel admin pode ficar inacessivel.");
+        app.Logger.LogError(ex, "Erro durante SuperAdminSeed (nao-Production, continuando). Painel admin pode ficar inacessivel.");
     }
+    // Em Production: nao captura — exception sobe e derruba o startup com mensagem clara.
 
-    try
+    // R6: SeedData popula tenants demo (PastaBella, CasaDaBaba, etc.) — proibido em Production.
+    // Roda apenas se Development OU SEED_DEMO_DATA=true (opt-in explicito pra staging).
+    // SuperAdminSeed e NotificacoesGlobaisSeed seguem rodando (sao infra, nao demo).
+    var seedDemoEnabled = app.Environment.IsDevelopment()
+        || string.Equals(Environment.GetEnvironmentVariable("SEED_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
+    if (seedDemoEnabled)
     {
-        using var seedScope = app.Services.CreateScope();
-        await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        try
+        {
+            using var seedScope = app.Services.CreateScope();
+            await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        }
     }
-    catch (Exception ex)
+    else
     {
-        app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        app.Logger.LogInformation(
+            "[SeedData] Skipped — env={Env}, SEED_DEMO_DATA nao e 'true'. Demo seed bloqueado fora de Development (R6).",
+            app.Environment.EnvironmentName);
     }
 
     try
@@ -337,6 +363,14 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+    }
+    }, CancellationToken.None);
+
+    if (!acquired)
+    {
+        app.Logger.LogInformation(
+            "[Startup] Outra replica detem advisory lock 0x{LockKey:X} — pulando migrations/seeds. Health check /health/ready confirmara consistencia.",
+            LockKeys.StartupMigrationsAndSeed);
     }
 }
 
