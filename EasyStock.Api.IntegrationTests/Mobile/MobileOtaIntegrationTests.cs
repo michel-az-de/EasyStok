@@ -2,6 +2,7 @@ using DotNet.Testcontainers.Builders;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -65,6 +66,10 @@ public sealed class MobileOtaIntegrationTests : IAsyncLifetime
             _factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(b =>
                 {
+                    // Production pula o auto-detect de provider (que faz check de
+                    // 3s no Postgres; em CI lento ele expira e cai em SQLite, que
+                    // NÃO registra os repositórios novos — quebrando o DI).
+                    b.UseEnvironment("Production");
                     b.ConfigureAppConfiguration((_, cfg) =>
                     {
                         cfg.AddInMemoryCollection(new Dictionary<string, string?>
