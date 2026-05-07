@@ -18,5 +18,20 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </para>
         /// </summary>
         Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Executa <paramref name="action"/> dentro de uma transacao explicita,
+        /// respeitando a retry strategy do provedor (Postgres EnableRetryOnFailure).
+        /// O bloco inteiro pode ser reexecutado em falha transitoria — escreva
+        /// <paramref name="action"/> de forma idempotente.
+        /// <para>
+        /// Use quando combinar <c>FOR UPDATE</c> + mutacao + <c>SaveChanges</c>
+        /// num unico bloco atomico. <c>action</c> NAO deve abrir transacao
+        /// propria — esta API ja faz Begin/Commit.
+        /// </para>
+        /// </summary>
+        Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> action,
+            CancellationToken ct = default);
     }
 }

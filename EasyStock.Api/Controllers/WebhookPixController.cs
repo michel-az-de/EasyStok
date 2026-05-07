@@ -112,108 +112,116 @@ public class WebhookPixController(
 
     private async Task ProcessarPagamentoAsync(string txid, decimal? valorPago)
     {
-        var cobranca = await cobrancaRepo.GetByTxidAsync(txid);
-        if (cobranca is null)
+        // Lock pessimista em "Txid" via SELECT FOR UPDATE serializa duplo-fire do
+        // Efi (ate 5 retentativas em 5 min) — sem isso, dois webhooks simultaneos
+        // passam o check Pendente e renovam a assinatura em duplicidade. O bloco
+        // inteiro roda dentro de IExecutionStrategy pra ser compativel com
+        // EnableRetryOnFailure (Npgsql).
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            logger.LogWarning("Webhook Pix: cobrança não encontrada para txid {Txid}", txid);
-            return;
-        }
-
-        if (cobranca.Status != Domain.Enums.StatusCobranca.Pendente)
-        {
-            logger.LogDebug("Webhook Pix: cobrança {Txid} já processada (status {Status})", txid, cobranca.Status);
-            return;
-        }
-
-        // Validação de valor: o pago precisa ser >= esperado (tolerância 1 centavo
-        // pra arredondamento). Subpagamento não ativa plano. Webhook sem campo
-        // valor é recusado pra evitar bypass.
-        if (valorPago is null)
-        {
-            logger.LogWarning("Webhook Pix: txid {Txid} sem campo valor — recusando.", txid);
-            return;
-        }
-
-        if (valorPago.Value + 0.01m < cobranca.Valor)
-        {
-            logger.LogWarning(
-                "Webhook Pix: valor pago ({Pago}) menor que esperado ({Esperado}) para txid {Txid}. Recusando.",
-                valorPago.Value, cobranca.Valor, txid);
-            return;
-        }
-
-        cobranca.MarcarComoPaga();
-        await cobrancaRepo.UpdateAsync(cobranca);
-
-        // F5 — Convivencia: se a cobranca tem FaturaId linkada (gerada apos F5),
-        // registra FaturaPagamento confirmado. Idempotencia: se chamado duas vezes
-        // (webhook duplicado mas que escapa do filtro de status acima — improvavel),
-        // o UseCase chama Fatura.RegistrarPagamento que adiciona um pagamento novo,
-        // o que recalcularia status para Paga (idempotente quando ja Paga). Erros
-        // aqui NAO bloqueiam a renovacao SaaS — apenas log warning.
-        if (cobranca.FaturaId.HasValue)
-        {
-            try
+            var cobranca = await cobrancaRepo.GetByTxidComLockAsync(txid, ct);
+            if (cobranca is null)
             {
-                await registrarPagamentoFaturaUseCase.ExecuteAsync(new RegistrarPagamentoFaturaCommand(
-                    EmpresaId: cobranca.EmpresaId,
-                    FaturaId: cobranca.FaturaId.Value,
-                    Metodo: "pix",
-                    Valor: valorPago.Value,
-                    GatewayProvedor: "EfiPix",
-                    GatewayTransactionId: txid,
-                    DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { txid, valorPago = valorPago.Value }),
-                    StatusInicial: StatusFaturaPagamento.Confirmado,
-                    Observacao: "Confirmado via webhook Efi Pix",
-                    OrigemRegistro: "webhook-pix"
-                ));
-                logger.LogInformation(
-                    "Pagamento Pix registrado na Fatura. FaturaId={FaturaId} Txid={Txid} Valor={Valor}",
-                    cobranca.FaturaId, txid, valorPago.Value);
+                logger.LogWarning("Webhook Pix: cobrança não encontrada para txid {Txid}", txid);
+                return;
             }
-            catch (Exception ex)
+
+            if (cobranca.Status != Domain.Enums.StatusCobranca.Pendente)
             {
-                logger.LogWarning(ex,
-                    "Falha ao registrar pagamento Pix na Fatura {FaturaId} (cobranca {Txid}). " +
-                    "SaaS renova vigencia normalmente, mas Fatura ficara sem o pagamento ate reconciliacao.",
-                    cobranca.FaturaId, txid);
+                logger.LogDebug("Webhook Pix: cobrança {Txid} já processada (status {Status})", txid, cobranca.Status);
+                return;
             }
-        }
 
-        var assinatura = await assinaturaRepo.GetAtivaAsync(cobranca.EmpresaId)
-            ?? (await assinaturaRepo.GetByEmpresaAsync(cobranca.EmpresaId))
-                .OrderByDescending(a => a.CriadoEm)
-                .FirstOrDefault();
-
-        if (assinatura is not null)
-        {
-            try
+            // Validação de valor: o pago precisa ser >= esperado (tolerância 1 centavo
+            // pra arredondamento). Subpagamento não ativa plano. Webhook sem campo
+            // valor é recusado pra evitar bypass.
+            if (valorPago is null)
             {
-                // Reativar lança se status for Cancelada — nesse caso
-                // criamos nova vigência sem chamar Reativar.
-                if (assinatura.Status == Domain.Enums.StatusAssinatura.Suspensa ||
-                    assinatura.Status == Domain.Enums.StatusAssinatura.Expirada)
+                logger.LogWarning("Webhook Pix: txid {Txid} sem campo valor — recusando.", txid);
+                return;
+            }
+
+            if (valorPago.Value + 0.01m < cobranca.Valor)
+            {
+                logger.LogWarning(
+                    "Webhook Pix: valor pago ({Pago}) menor que esperado ({Esperado}) para txid {Txid}. Recusando.",
+                    valorPago.Value, cobranca.Valor, txid);
+                return;
+            }
+
+            cobranca.MarcarComoPaga();
+            await cobrancaRepo.UpdateAsync(cobranca);
+
+            // F5 — Convivencia: se a cobranca tem FaturaId linkada (gerada apos F5),
+            // registra FaturaPagamento confirmado. Idempotencia: se chamado duas vezes
+            // (webhook duplicado mas que escapa do filtro de status acima — improvavel),
+            // o UseCase chama Fatura.RegistrarPagamento que adiciona um pagamento novo,
+            // o que recalcularia status para Paga (idempotente quando ja Paga). Erros
+            // aqui NAO bloqueiam a renovacao SaaS — apenas log warning.
+            if (cobranca.FaturaId.HasValue)
+            {
+                try
                 {
-                    assinatura.Reativar();
+                    await registrarPagamentoFaturaUseCase.ExecuteAsync(new RegistrarPagamentoFaturaCommand(
+                        EmpresaId: cobranca.EmpresaId,
+                        FaturaId: cobranca.FaturaId.Value,
+                        Metodo: "pix",
+                        Valor: valorPago.Value,
+                        GatewayProvedor: "EfiPix",
+                        GatewayTransactionId: txid,
+                        DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { txid, valorPago = valorPago.Value }),
+                        StatusInicial: StatusFaturaPagamento.Confirmado,
+                        Observacao: "Confirmado via webhook Efi Pix",
+                        OrigemRegistro: "webhook-pix"
+                    ));
+                    logger.LogInformation(
+                        "Pagamento Pix registrado na Fatura. FaturaId={FaturaId} Txid={Txid} Valor={Valor}",
+                        cobranca.FaturaId, txid, valorPago.Value);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "Falha ao registrar pagamento Pix na Fatura {FaturaId} (cobranca {Txid}). " +
+                        "SaaS renova vigencia normalmente, mas Fatura ficara sem o pagamento ate reconciliacao.",
+                        cobranca.FaturaId, txid);
                 }
             }
-            catch (Exception ex)
+
+            var assinatura = await assinaturaRepo.GetAtivaAsync(cobranca.EmpresaId)
+                ?? (await assinaturaRepo.GetByEmpresaAsync(cobranca.EmpresaId))
+                    .OrderByDescending(a => a.CriadoEm)
+                    .FirstOrDefault();
+
+            if (assinatura is not null)
             {
-                logger.LogWarning(ex, "Não foi possível reativar assinatura {Id}; renovando vigência apenas.", assinatura.Id);
+                try
+                {
+                    // Reativar lança se status for Cancelada — nesse caso
+                    // criamos nova vigência sem chamar Reativar.
+                    if (assinatura.Status == Domain.Enums.StatusAssinatura.Suspensa ||
+                        assinatura.Status == Domain.Enums.StatusAssinatura.Expirada)
+                    {
+                        assinatura.Reativar();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Não foi possível reativar assinatura {Id}; renovando vigência apenas.", assinatura.Id);
+                }
+
+                // ACUMULA vigência: se DataFim ainda no futuro, soma a partir dela
+                // (evita perder dias quando paga adiantado). Senão, soma a partir de hoje.
+                var now = DateTime.UtcNow;
+                var baseDate = (assinatura.DataFim.HasValue && assinatura.DataFim.Value > now)
+                    ? assinatura.DataFim.Value
+                    : now;
+                assinatura.DataFim = baseDate.AddDays(30);
+                await assinaturaRepo.UpdateAsync(assinatura);
+                logger.LogInformation("Assinatura renovada via Pix. EmpresaId: {EmpresaId}, Txid: {Txid}, novo DataFim: {Fim}",
+                    cobranca.EmpresaId, txid, assinatura.DataFim);
             }
 
-            // ACUMULA vigência: se DataFim ainda no futuro, soma a partir dela
-            // (evita perder dias quando paga adiantado). Senão, soma a partir de hoje.
-            var now = DateTime.UtcNow;
-            var baseDate = (assinatura.DataFim.HasValue && assinatura.DataFim.Value > now)
-                ? assinatura.DataFim.Value
-                : now;
-            assinatura.DataFim = baseDate.AddDays(30);
-            await assinaturaRepo.UpdateAsync(assinatura);
-            logger.LogInformation("Assinatura renovada via Pix. EmpresaId: {EmpresaId}, Txid: {Txid}, novo DataFim: {Fim}",
-                cobranca.EmpresaId, txid, assinatura.DataFim);
-        }
-
-        await unitOfWork.CommitAsync();
+            await unitOfWork.CommitAsync();
+        });
     }
 }

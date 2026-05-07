@@ -69,6 +69,15 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient, ILogger<MongoUnitO
     public Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
         => Task.FromResult<IDbTransactionScope>(new NoopScope());
 
+    public async Task ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken ct = default)
+    {
+        // Mongo nao tem retry strategy do EF; rodamos direto. Caller agrega
+        // operacoes via Enqueue + CommitAsync.
+        await action(ct);
+    }
+
     private sealed class NoopScope : IDbTransactionScope
     {
         public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;

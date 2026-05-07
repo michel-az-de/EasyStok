@@ -21,6 +21,14 @@ public sealed class CobrancaAssinaturaRepository(EasyStockDbContext dbContext) :
         dbContext.CobrancasAssinatura
             .FirstOrDefaultAsync(c => c.Txid == txid);
 
+    public async Task<CobrancaAssinatura?> GetByTxidComLockAsync(string txid, CancellationToken ct = default)
+    {
+        const string sql = "SELECT * FROM \"CobrancasAssinatura\" WHERE \"Txid\" = {0} FOR UPDATE";
+        return await dbContext.CobrancasAssinatura
+            .FromSqlRaw(sql, txid)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public Task<bool> ExistePendenteAsync(Guid empresaId) =>
         dbContext.CobrancasAssinatura
             .AnyAsync(c => c.EmpresaId == empresaId && c.Status == StatusCobranca.Pendente);

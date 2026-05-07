@@ -179,6 +179,22 @@ namespace EasyStock.Infra.Postgre.Data
             return new TransactionScope(tx);
         }
 
+        public Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> action,
+            CancellationToken ct = default)
+        {
+            // CreateExecutionStrategy reusa a politica do provedor (EnableRetryOnFailure
+            // do Npgsql). Sem isso, BeginTransactionAsync direto lanca
+            // InvalidOperationException quando retry esta ligado.
+            var strategy = Database.CreateExecutionStrategy();
+            return strategy.ExecuteAsync(ct, async (token) =>
+            {
+                await using var tx = await Database.BeginTransactionAsync(token);
+                await action(token);
+                await tx.CommitAsync(token);
+            });
+        }
+
         /// <summary>
         /// Escopo transacional com semântica explícita: rollback-by-default no
         /// <c>Dispose</c> a menos que <see cref="CommitAsync"/> tenha sido chamado.
