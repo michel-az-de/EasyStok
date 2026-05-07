@@ -401,3 +401,29 @@ html, body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ----- Z-index hierarchy (canonical layers) -----
+   Use these instead of arbitrary z-[xx] values to avoid overlap bugs.
+   Order from bottom to top:
+     base content      0
+     dropdown          20
+     sticky/topbar     30
+     mobile bottom-nav 35
+     drawer/sidebar    40
+     modal backdrop    50
+     modal panel       55
+     toast / snackbar  60
+     command palette   70   (Ctrl+K — must be above modals)
+     loading overlay   80
+*/
+:root {
+  --z-dropdown:        20;
+  --z-sticky:          30;
+  --z-bottom-nav:      35;
+  --z-drawer:          40;
+  --z-modal-backdrop:  50;
+  --z-modal:           55;
+  --z-toast:           60;
+  --z-command:         70;
+  --z-loading:         80;
+}

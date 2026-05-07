@@ -828,9 +828,9 @@ function alertaBanner(tenantId) {
                         <input type="text" name="descricao" maxlength="500" class="form-input w-full text-sm" /></div>
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div><label class="form-label">Documento</label>
-                            <input type="text" name="documento" maxlength="30" class="form-input w-full text-sm" /></div>
+                            <input type="text" name="documento" maxlength="18" data-mask="doc" inputmode="numeric" placeholder="CPF ou CNPJ" class="form-input w-full text-sm" /></div>
                         <div><label class="form-label">Telefone</label>
-                            <input type="text" name="telefone" maxlength="20" class="form-input w-full text-sm" /></div>
+                            <input type="tel" name="telefone" maxlength="15" data-mask="phone" inputmode="numeric" placeholder="(11) 99999-0000" class="form-input w-full text-sm" /></div>
                     </div>
                     <div class="mb-3"><label class="form-label">Endereço</label>
                         <input type="text" name="endereco" maxlength="300" class="form-input w-full text-sm" /></div>
@@ -860,9 +860,9 @@ function alertaBanner(tenantId) {
                                 <input type="text" name="descricao" maxlength="500" :value="editandoLoja.descricao" class="form-input w-full text-sm" /></div>
                             <div class="grid grid-cols-2 gap-3 mb-3">
                                 <div><label class="form-label">Documento</label>
-                                    <input type="text" name="documento" maxlength="30" :value="editandoLoja.documento" class="form-input w-full text-sm" /></div>
+                                    <input type="text" name="documento" maxlength="18" x-mask:doc inputmode="numeric" placeholder="CPF ou CNPJ" :value="editandoLoja.documento" class="form-input w-full text-sm" /></div>
                                 <div><label class="form-label">Telefone</label>
-                                    <input type="text" name="telefone" maxlength="20" :value="editandoLoja.telefone" class="form-input w-full text-sm" /></div>
+                                    <input type="tel" name="telefone" maxlength="15" x-mask:phone inputmode="numeric" placeholder="(11) 99999-0000" :value="editandoLoja.telefone" class="form-input w-full text-sm" /></div>
                             </div>
                             <div class="mb-3"><label class="form-label">Endereço</label>
                                 <input type="text" name="endereco" maxlength="300" :value="editandoLoja.endereco" class="form-input w-full text-sm" /></div>

@@ -29,7 +29,8 @@ else
             <h2 class="text-base font-semibold text-slate-900">@Model.Count backup@(Model.Count == 1 ? "" : "s") disponíveis</h2>
             <p class="text-xs text-slate-500 mt-1">Mantemos os 7 mais recentes. Mais antigos rotacionam ao novo upload.</p>
         </div>
-        <table class="w-full">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[640px]">
             <thead>
                 <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <th class="px-4 py-3">Quando</th>
@@ -69,6 +70,7 @@ else
                 }
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="text-xs text-slate-400 mt-4 px-2 leading-relaxed">

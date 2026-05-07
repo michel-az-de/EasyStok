@@ -126,13 +126,13 @@
                 <form asp-action="AddEndereco" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
                     <input type="text" name="tipo" placeholder="Tipo (residencial/comercial)" class="ui-field text-sm" />
-                    <input type="text" name="cep" placeholder="CEP" class="ui-field text-sm" />
+                    <input type="text" name="cep" placeholder="CEP" data-mask="cep" inputmode="numeric" maxlength="9" class="ui-field text-sm" />
                     <input type="text" name="logradouro" placeholder="Logradouro" class="ui-field text-sm col-span-2" />
                     <input type="text" name="numero" placeholder="Número" class="ui-field text-sm" />
                     <input type="text" name="complemento" placeholder="Complemento" class="ui-field text-sm" />
                     <input type="text" name="bairro" placeholder="Bairro" class="ui-field text-sm" />
                     <input type="text" name="cidade" placeholder="Cidade" class="ui-field text-sm" />
-                    <input type="text" name="estado" placeholder="UF" maxlength="2" class="ui-field text-sm" />
+                    <input type="text" name="estado" placeholder="UF" maxlength="2" style="text-transform:uppercase" class="ui-field text-sm" />
                     <input type="text" name="pais" placeholder="País" class="ui-field text-sm" />
                     <input type="text" name="referencia" placeholder="Referência" class="ui-field text-sm col-span-2" />
                     <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="padrao" value="true" /> padrão</label>
@@ -167,7 +167,7 @@
 
                 <form asp-action="AddTelefone" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <input type="text" name="numero" placeholder="Número *" required class="ui-field text-sm col-span-2" />
+                    <input type="tel" name="numero" placeholder="Número *" required data-mask="phone" inputmode="numeric" maxlength="15" class="ui-field text-sm col-span-2" />
                     <input type="text" name="tipo" placeholder="Tipo (celular/fixo/...)" class="ui-field text-sm" />
                     <input type="text" name="observacao" placeholder="Observação" class="ui-field text-sm" />
                     <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> principal</label>
@@ -206,11 +206,11 @@
 
                 <form asp-action="AddDocumento" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <select name="tipo" required class="ui-select text-sm">
+                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask); else $refs.docValor.value = $refs.docValor.value.replace(/\D/g,'')">
                         <option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="rg">RG</option>
                         <option value="cnh">CNH</option><option value="passaporte">Passaporte</option><option value="outro">Outro</option>
                     </select>
-                    <input type="text" name="valor" placeholder="Valor *" required class="ui-field text-sm" />
+                    <input type="text" name="valor" placeholder="Valor *" required data-mask="cpf" inputmode="numeric" x-ref="docValor" class="ui-field text-sm" />
                     <input type="text" name="emissor" placeholder="Emissor" class="ui-field text-sm" />
                     <input type="date" name="emitidoEm" class="ui-field text-sm" />
                     <input type="date" name="validoAte" class="ui-field text-sm" />

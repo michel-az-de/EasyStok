@@ -52,16 +52,19 @@
   /* ----- Color: status ----- */
   --warn-700: #8A5A00;
   --warn-600: #B57A00;            /* alerta validade próxima */
+  --warn-200: #F0DC9A;
   --warn-100: #FBEBC4;
   --warn-50:  #FCF5E0;
 
   --crit-700: #8E2A1E;
   --crit-600: #C03B2A;            /* crítico / vencido / sem estoque */
+  --crit-200: #EFB7AD;
   --crit-100: #F8D8D2;
   --crit-50:  #FBEAE6;
 
   --ok-700: #0E6B3D;
   --ok-600: #18874E;              /* sucesso */
+  --ok-200: #BFE0CC;
   --ok-100: #D6EFDF;
   --ok-50:  #ECF7F0;
 
@@ -96,6 +99,10 @@
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
   --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px;
   --s-9: 56px; --s-10: 72px; --s-11: 96px; --s-12: 128px;
+
+  /* ----- Focus rings (keyboard navigation) ----- */
+  --focus-ring-navy: 0 0 0 3px rgba(30, 72, 168, .25);
+  --focus-ring-orange: 0 0 0 3px rgba(232, 88, 20, .25);
 }
 
 /* ----- Dark theme ----- */
@@ -137,6 +144,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 * { box-sizing: border-box; }
@@ -215,38 +223,57 @@ html, body {
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
-  transition: transform .05s ease, background .15s ease, border-color .15s ease;
+  transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
   white-space: nowrap;
+  position: relative;
 }
 .btn:active { transform: translateY(1px); }
+.btn:focus { outline: none; box-shadow: var(--focus-ring-navy); }
 .btn-primary {
   background: var(--orange-600);
   color: var(--white);
 }
 .btn-primary:hover { background: var(--orange-700); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary:focus { box-shadow: var(--focus-ring-orange); }
 .btn-navy {
   background: var(--navy-700);
   color: var(--white);
 }
 .btn-navy:hover { background: var(--navy-800); }
+.btn-navy:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-navy:focus { box-shadow: var(--focus-ring-navy); }
 .btn-secondary {
   background: var(--bg-surface);
   color: var(--navy-700);
   border-color: var(--border-soft);
 }
-.btn-secondary:hover { border-color: var(--navy-500); color: var(--navy-800); }
+.btn-secondary:hover {
+  border-color: var(--navy-500);
+  color: var(--navy-800);
+  background: var(--ink-50);
+}
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary:focus { box-shadow: var(--focus-ring-navy); }
 [data-theme="dark"] .btn-secondary { color: var(--navy-100); }
-[data-theme="dark"] .btn-secondary:hover { color: var(--white); }
+[data-theme="dark"] .btn-secondary:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+}
 .btn-ghost {
   background: transparent;
   color: var(--navy-700);
 }
 .btn-ghost:hover { background: var(--ink-100); }
+.btn-ghost:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-ghost:focus { box-shadow: var(--focus-ring-navy); }
 .btn-dark {
   background: var(--navy-900);
   color: var(--white);
 }
 .btn-dark:hover { background: var(--navy-800); }
+.btn-dark:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-dark:focus { box-shadow: var(--focus-ring-navy); }
 .btn-sm { padding: 10px 14px; font-size: 14px; }
 .btn-lg { padding: 18px 28px; font-size: 17px; }
 
@@ -275,11 +302,12 @@ html, body {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: 1px solid transparent;
+  border: 1px solid;
+  transition: background-color .15s ease, color .15s ease;
 }
-.badge-ok    { background: var(--ok-50);    color: var(--ok-700);    border-color: #BFE0CC; }
-.badge-warn  { background: var(--warn-50);  color: var(--warn-700);  border-color: #F0DC9A; }
-.badge-crit  { background: var(--crit-50);  color: var(--crit-700);  border-color: #EFB7AD; }
+.badge-ok    { background: var(--ok-50);    color: var(--ok-700);    border-color: var(--ok-200); }
+.badge-warn  { background: var(--warn-50);  color: var(--warn-700);  border-color: var(--warn-200); }
+.badge-crit  { background: var(--crit-50);  color: var(--crit-700);  border-color: var(--crit-200); }
 .badge-info  { background: var(--navy-50);  color: var(--navy-700);  border-color: var(--navy-200); }
 .badge-accent{ background: var(--orange-50);color: var(--orange-700);border-color: var(--orange-200); }
 .badge-neutral { background: var(--ink-100); color: var(--ink-700);  border-color: var(--ink-200); }
@@ -344,4 +372,58 @@ html, body {
   height: 60%;
   pointer-events: none;
   opacity: 0.55;
+}
+
+/* ----- Dark mode overrides for legacy hardcoded Tailwind classes -----
+   Many Razor views still ship `text-slate-900`, `text-gray-900`, `bg-white`, etc.
+   Until each view is migrated to tokens, these rules ensure dark mode stays legible. */
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-800 { color: var(--text-primary) !important; }
+[data-theme="dark"] .text-slate-700,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-600 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-slate-500,
+[data-theme="dark"] .text-slate-400,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-400 { color: var(--text-muted) !important; }
+
+/* ----- Accessibility: respect prefers-reduced-motion ----- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ----- Z-index hierarchy (canonical layers) -----
+   Use these instead of arbitrary z-[xx] values to avoid overlap bugs.
+   Order from bottom to top:
+     base content      0
+     dropdown          20
+     sticky/topbar     30
+     mobile bottom-nav 35
+     drawer/sidebar    40
+     modal backdrop    50
+     modal panel       55
+     toast / snackbar  60
+     command palette   70   (Ctrl+K — must be above modals)
+     loading overlay   80
+*/
+:root {
+  --z-dropdown:        20;
+  --z-sticky:          30;
+  --z-bottom-nav:      35;
+  --z-drawer:          40;
+  --z-modal-backdrop:  50;
+  --z-modal:           55;
+  --z-toast:           60;
+  --z-command:         70;
+  --z-loading:         80;
 }
