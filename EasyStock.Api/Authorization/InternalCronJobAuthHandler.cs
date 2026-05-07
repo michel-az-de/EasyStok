@@ -11,7 +11,17 @@ namespace EasyStock.Api.Authorization;
 /// Esquema de autenticação para endpoints internos de cron job.
 /// Valida header <c>X-Internal-Cron-Token</c> contra <c>Notifications:CronJob:Token</c>
 /// (que SEMPRE deve vir de secret store / env var, NUNCA do appsettings.json em prod).
-/// Sem token = 401. Token inválido = 403 (via AuthorizationHandler default).
+/// <para>
+/// Status code retornado: <b>401</b> em qualquer cenário de falha de autenticação
+/// (sem header, header vazio, token inválido, endpoints desabilitados, token do servidor
+/// não configurado). O handler usa apenas <c>AuthenticateResult.NoResult</c>
+/// e <c>AuthenticateResult.Fail</c> — não há requirement adicional pós-autenticação
+/// que justifique 403.
+/// </para>
+/// <para>
+/// Tentativas com token inválido são logadas como <c>Warning</c> com IP da origem
+/// para auditoria de segurança (detecção de força bruta).
+/// </para>
 /// Habilitação controlada por <c>Notifications:CronJob:Habilitado</c> (default false).
 /// </summary>
 public sealed class InternalCronJobAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
@@ -54,7 +64,14 @@ public sealed class InternalCronJobAuthHandler : AuthenticationHandler<Authentic
 
         // Comparação tempo-constante para evitar timing attacks.
         if (!CryptographicEquals(providedToken, expectedToken))
+        {
+            // Auditoria de segurança — registra tentativa de força bruta com origem.
+            var remoteIp = Context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            Logger.LogWarning(
+                "InternalCronJob: tentativa de autenticação rejeitada (token inválido) — IP={RemoteIp}",
+                remoteIp);
             return Task.FromResult(AuthenticateResult.Fail("Token inválido."));
+        }
 
         var identity = new ClaimsIdentity(
             new[] { new Claim(ClaimTypes.Name, "internal-cron-job"), new Claim("scheme", SchemeName) },

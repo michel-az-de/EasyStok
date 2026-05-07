@@ -185,7 +185,7 @@ builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfigu
 builder.Services.AddNotificationsInfra(builder.Configuration);
 builder.Services
     .AddNotificationsHosting(builder.Configuration)
-    .AddPostgresOutboxSignaler();
+    .AddPostgresOutboxSignaler(builder.Configuration);
 builder.Services.AddScoped<PostgresAdvisoryLock>();
 
 // ── Background Services + misc ────────────────────────────────────────────────

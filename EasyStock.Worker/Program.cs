@@ -79,7 +79,7 @@ builder.Services.AddScoped<PostgresAdvisoryLock>();
 // Mode lido de "Notifications:Hosting:Mode".
 builder.Services
     .AddNotificationsHosting(builder.Configuration)
-    .AddPostgresOutboxSignaler();
+    .AddPostgresOutboxSignaler(builder.Configuration);
 
 // Jobs de manutenção (não fazem parte do pipeline outbox)
 builder.Services.AddHostedService<AnonimizarLogsAntigosService>();

@@ -20,6 +20,7 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
     private readonly ILogger<PostgresOutboxSignaler> _logger;
     private CancellationTokenSource? _cts;
     private Task? _listenLoop;
+    private volatile bool _disposed;
 
     private const int FallbackPollingMs = 10_000;
 
@@ -33,7 +34,12 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
 
     public void Signal()
     {
-        try { _signal.Release(); } catch (SemaphoreFullException) { /* já há wakeup pendente */ }
+        // Race-safe: callback do NpgsqlConnection.Notification pode disparar
+        // durante DisposeAsync. Checa flag antes de tocar no semáforo.
+        if (_disposed) return;
+        try { _signal.Release(); }
+        catch (SemaphoreFullException) { /* já há wakeup pendente */ }
+        catch (ObjectDisposedException) { /* race entre check e release — ignora */ }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -107,6 +113,10 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
 
     public async ValueTask DisposeAsync()
     {
+        // Marca disposed ANTES de cancelar/disposed objetos — Signal() vai virar no-op
+        // mesmo se o callback do Npgsql disparar entre o cancel e o dispose do semáforo.
+        _disposed = true;
+
         if (_cts is not null) _cts.Cancel();
         if (_listenLoop is not null)
         {

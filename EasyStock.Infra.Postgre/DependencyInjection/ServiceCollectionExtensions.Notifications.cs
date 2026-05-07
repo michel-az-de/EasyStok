@@ -40,12 +40,33 @@ public static partial class ServiceCollectionExtensionsNotifications
     }
 
     /// <summary>
-    /// Registra <see cref="PostgresOutboxSignaler"/> como singleton + IHostedService.
-    /// Use quando <c>Notifications:Hosting:Signaler = Postgres</c> (default).
-    /// Para Polling, basta chamar <c>AddNotificationsHosting</c> em Infra.Notifications.
+    /// Registra <see cref="PostgresOutboxSignaler"/> como singleton + IHostedService —
+    /// MAS apenas quando <c>Notifications:Hosting:Mode == Hosted</c> e
+    /// <c>Notifications:Hosting:Signaler == Postgres</c>. Caso contrário é no-op.
+    /// <para>
+    /// Antes desse fix, o signaler era registrado incondicionalmente — em modos
+    /// "Disabled" (API default) ou "Polling", abria conexão LISTEN/NOTIFY zumbi
+    /// que ninguém consumia. Agora chamada é seguro em qualquer host.
+    /// </para>
     /// </summary>
-    public static IServiceCollection AddPostgresOutboxSignaler(this IServiceCollection services)
+    public static IServiceCollection AddPostgresOutboxSignaler(
+        this IServiceCollection services,
+        IConfiguration? configuration = null)
     {
+        // Se não passar configuration, registra incondicional (compat). Recomendado passar.
+        if (configuration is not null)
+        {
+            var opts = configuration
+                .GetSection(NotificationsHostingOptions.Section)
+                .Get<NotificationsHostingOptions>() ?? new NotificationsHostingOptions();
+
+            if (opts.Mode != NotificationsHostingMode.Hosted ||
+                opts.Signaler != OutboxSignalerKind.Postgres)
+            {
+                return services;
+            }
+        }
+
         services.AddSingleton<PostgresOutboxSignaler>();
         services.AddSingleton<IOutboxSignaler>(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
         services.AddHostedService(sp => sp.GetRequiredService<PostgresOutboxSignaler>());

@@ -32,8 +32,18 @@ public sealed class NotificacoesJobsController(
     /// <summary>
     /// Dispara 1 rodada do dispatcher. Se <paramref name="shard"/> for informado, processa
     /// apenas aquele shard (granularidade fina para schedulers que querem paralelizar).
-    /// Caso contrário, processa todos os shards configurados.
+    /// Caso contrário, processa todos os shards configurados sequencialmente.
+    /// <para>
+    /// <b>Recomendação para cron externo:</b> usar <c>?shard=N</c> e disparar 4 chamadas
+    /// paralelas (uma por shard 0..3). A versão sem shard processa todos os 4 shards
+    /// sequencialmente — sob carga (50 mensagens × 4 shards × ~200ms SMTP médio) pode
+    /// levar ~40s, próximo de timeouts típicos de gateway/scheduler externo.
+    /// A versão sem shard é destinada a Worker/API in-process onde latência total não
+    /// é restrição (loops contínuos).
+    /// </para>
     /// </summary>
+    /// <param name="shard">Shard alvo [0..ShardCount-1]. Se omitido, processa todos.</param>
+    /// <param name="ct">Cancellation token da request.</param>
     [HttpPost("dispatcher/run")]
     public async Task<IActionResult> ExecutarDispatcher(
         [FromQuery] int? shard,
