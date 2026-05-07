@@ -1,4 +1,5 @@
 ﻿using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -36,6 +37,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(n => n.EmpresaId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
+
+            // FK explícita pra OutboxMensagem evita referências orfãs quando
+            // outbox é purgado por retenção. SetNull preserva a notificação
+            // in-app mas zera o link com a mensagem morta.
+            builder.HasOne<OutboxMensagemNotificacao>()
+                .WithMany()
+                .HasForeignKey(n => n.OutboxMensagemId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

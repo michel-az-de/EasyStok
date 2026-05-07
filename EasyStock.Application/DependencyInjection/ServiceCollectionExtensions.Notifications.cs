@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
+using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Application.UseCases.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +16,10 @@ public static partial class ServiceCollectionExtensions
         services.AddSingleton<RotinaScheduler>();
         services.AddScoped<NotificadorService>();
         services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
+
+        // Orchestrators (Avaliador e Coletor são puros — Dispatcher é registrado em Infra.Postgre)
+        services.AddScoped<INotificacoesAvaliadorOrchestrator, NotificacoesAvaliadorOrchestrator>();
+        services.AddScoped<INotificacoesColetorOrchestrator, NotificacoesColetorOrchestrator>();
 
         // Use cases — eventos
         services.AddScoped<PublicarEventoNotificacaoUseCase>();

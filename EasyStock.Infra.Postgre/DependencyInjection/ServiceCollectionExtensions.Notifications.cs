@@ -1,4 +1,6 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications.Orchestrators;
+using EasyStock.Infra.Postgre.Notifications.Dispatcher;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +20,12 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IBloqueioNotificacaoRepository, BloqueioNotificacaoRepository>();
         services.AddScoped<ILogEnvioNotificacaoRepository, LogEnvioNotificacaoRepository>();
         services.AddScoped<IVariavelTemplateCatalogoRepository, VariavelTemplateCatalogoRepository>();
+
+        // Dispatcher orchestrator — implementa também o port INotificationDispatcher (1 shard).
+        // Singleton porque é stateless e cria scopes internamente via IServiceProvider.
+        services.AddSingleton<NotificacoesDispatcherOrchestrator>();
+        services.AddSingleton<INotificacoesDispatcherOrchestrator>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
+        services.AddSingleton<INotificationDispatcher>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
 
         return services;
     }
