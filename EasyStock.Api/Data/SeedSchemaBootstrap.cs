@@ -1,5 +1,5 @@
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EasyStock.Api.Data;
 
@@ -15,16 +15,10 @@ namespace EasyStock.Api.Data;
 /// </para>
 ///
 /// <para>
-/// A solução é simples: NÃO depender que migrations tenham aplicado tudo certo.
-/// SQL idempotente (<c>ADD COLUMN IF NOT EXISTS</c>, <c>CREATE TABLE IF NOT EXISTS</c>)
-/// roda no startup da API e como primeira coisa de qualquer seed. Se o schema
-/// já existe, é no-op. Se faltava algo, agora está lá.
-/// </para>
-///
-/// <para>
-/// Postgres 9.6+ é necessário (Render usa 16+, OK). Cada SQL é uma única
-/// statement, então roda fora de transação user-initiated — compatível com
-/// <c>NpgsqlRetryingExecutionStrategy</c>.
+/// A solução definitiva: usar <c>NpgsqlConnection</c> DIRETAMENTE, sem passar
+/// pelo EF Core nem pelo <c>NpgsqlRetryingExecutionStrategy</c>. Elimina qualquer
+/// interferência de retry strategy, connection state ou transaction tracking do EF.
+/// Se o schema já existe, é no-op. Se faltava algo, agora está lá.
 /// </para>
 /// </summary>
 public static class SeedSchemaBootstrap
@@ -32,22 +26,31 @@ public static class SeedSchemaBootstrap
     /// <summary>
     /// Garante que <c>Empresas.IsSeedData</c> e a tabela <c>SeedRunLogs</c>
     /// existem. Idempotente — pode ser chamado múltiplas vezes sem efeito.
+    /// Usa Npgsql diretamente (não passa pelo EF) para máxima confiabilidade.
     /// </summary>
     public static async Task EnsureAsync(
         EasyStockDbContext ctx,
         ILogger logger,
         CancellationToken ct = default)
     {
+        var connectionString = ctx.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("[SeedSchema] Connection string nula — impossível garantir schema.");
+
+        logger.LogInformation("[SeedSchema] Abrindo conexão Npgsql direta para bootstrap de schema…");
+
         try
         {
-            // 1. Coluna IsSeedData em Empresas (boolean NOT NULL DEFAULT false).
-            //    DEFAULT false cobre rows existentes — não precisa de UPDATE separado.
-            await ctx.Database.ExecuteSqlRawAsync(
-                @"ALTER TABLE ""Empresas"" ADD COLUMN IF NOT EXISTS ""IsSeedData"" boolean NOT NULL DEFAULT false;",
-                ct);
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync(ct);
 
-            // 2. Tabela SeedRunLogs (auditoria de runs de seed).
-            await ctx.Database.ExecuteSqlRawAsync(@"
+            // Cada statement roda isolada em autocommit — DDL é transacional no Postgres
+            // mas sem tx explícita cada statement commita imediatamente e é visível
+            // a todas as conexões (sem risco de rollback acidental).
+
+            await ExecAsync(conn, ct,
+                @"ALTER TABLE ""Empresas"" ADD COLUMN IF NOT EXISTS ""IsSeedData"" boolean NOT NULL DEFAULT false");
+
+            await ExecAsync(conn, ct, @"
                 CREATE TABLE IF NOT EXISTS ""SeedRunLogs"" (
                     ""Id"" uuid NOT NULL,
                     ""AdminEmail"" text NOT NULL,
@@ -61,21 +64,26 @@ public static class SeedSchemaBootstrap
                     ""Erro"" text NULL,
                     ""Resumo"" text NULL,
                     CONSTRAINT ""PK_SeedRunLogs"" PRIMARY KEY (""Id"")
-                );", ct);
+                )");
 
-            // 3. Registra no __EFMigrationsHistory pra futuras migrations EF
-            //    não tentarem recriar (caso alguém regenere a migration limpa).
-            await ctx.Database.ExecuteSqlRawAsync(@"
+            await ExecAsync(conn, ct, @"
                 INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
                 VALUES ('20260506233022_AddSeedRunLogAndIsSeedData', '9.0.0')
-                ON CONFLICT DO NOTHING;", ct);
+                ON CONFLICT DO NOTHING");
 
-            logger.LogInformation("[SeedSchema] Schema verificado: Empresas.IsSeedData + SeedRunLogs OK.");
+            logger.LogInformation("[SeedSchema] Schema OK — Empresas.IsSeedData + SeedRunLogs verificados via Npgsql direto.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[SeedSchema] Falha ao garantir schema — seed vai falhar até DBA intervir.");
+            logger.LogError(ex, "[SeedSchema] Falha ao garantir schema via Npgsql direto. Seed vai falhar.");
             throw;
         }
+    }
+
+    private static async Task ExecAsync(NpgsqlConnection conn, CancellationToken ct, string sql)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 }

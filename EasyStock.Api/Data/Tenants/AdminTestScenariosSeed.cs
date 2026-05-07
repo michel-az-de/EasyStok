@@ -53,14 +53,16 @@ public static class AdminTestScenariosSeed
         // ── Etapa 1a: Catch-up de seed legado ──────────────────────────────────
         // Empresas criadas por seeds anteriores (antes do flag IsSeedData existir)
         // ficariam órfãs pra sempre. Heurística: marca como seed qualquer empresa
-        // onde TODOS os usuários linkados têm email .test E não há marcação manual.
+        // onde NÃO existe nenhum usuário vinculado sem email .test.
+        // Usa NOT EXISTS em vez de GroupBy.All — EF Core traduz melhor.
         // Idempotente — se rodar 2x não muda nada.
         Report(8, "Identificando seeds legados (sem marcação IsSeedData)…");
         var legacyEmpresaIds = await context.UsuariosEmpresas
-            .GroupBy(ue => ue.EmpresaId)
-            .Where(g => g.All(ue =>
-                context.Usuarios.Any(u => u.Id == ue.UsuarioId && u.Email.EndsWith(".test"))))
-            .Select(g => g.Key)
+            .Where(ue => !context.UsuariosEmpresas
+                .Any(ue2 => ue2.EmpresaId == ue.EmpresaId
+                    && !context.Usuarios.Any(u => u.Id == ue2.UsuarioId && u.Email.EndsWith(".test"))))
+            .Select(ue => ue.EmpresaId)
+            .Distinct()
             .ToListAsync();
         if (legacyEmpresaIds.Count > 0)
         {
