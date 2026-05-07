@@ -71,7 +71,7 @@ jobs:
           hide_complexity: true
           indicators: true
           output: both
-          thresholds: '29 60'
+          thresholds: '38 60'
 
       - name: Coverage gate per module (Domain/Application/Api)
         shell: pwsh
