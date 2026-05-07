@@ -23,6 +23,7 @@ public class RegistrarSaidaEstoque_FefoTests
         var itemVendaRepo = Substitute.For<IItemVendaRepository>();
         var movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
         var uow = Substitute.For<IUnitOfWork>();
+        uow.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
         var configRepo = Substitute.For<IConfiguracaoLojaRepository>();
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
 
