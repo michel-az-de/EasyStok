@@ -1,5 +1,7 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async;
+using EasyStock.Infra.Async.Pdf;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -38,6 +40,9 @@ public static class ServiceCollectionExtensions
 
         // Storage Service
         services.AddSingleton<IStorageService, S3StorageService>();
+
+        // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
+        services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
 
         // Efí Bank Pix Gateway
         var efiClientId = configuration["Efi:ClientId"];
