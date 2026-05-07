@@ -1,6 +1,10 @@
 /**
- * EasyStock API – Custom Swagger UI JavaScript
- * Features: Language selector (EN / PT-BR) · Dark/Light theme toggle
+ * EasyStok API – Custom Swagger UI JavaScript
+ * Features:
+ *  - Botao "Site" linkando pra landing publica (easystok.com.br ou /home em dev)
+ *  - Botao "Documentacao" linkando pra README/docs no repo
+ *  - Seletor de idioma (EN / PT-BR)
+ *  - Toggle de tema (light / dark)
  */
 (function () {
     'use strict';
@@ -25,6 +29,44 @@
         }
     };
 
+    /* ── External links ───────────────────────────────────────────────────── */
+    /**
+     * Resolve URL da landing publica baseado no host atual.
+     * Em prod (easystok.com.br ou app.easystok.com.br): aponta pro dominio publico.
+     * Em dev/staging: aponta pra propria origem na rota raiz "/".
+     */
+    function resolveSiteUrl() {
+        const host = window.location.hostname || '';
+        // Producao com dominios separados — landing fica no apex
+        if (host === 'app.easystok.com.br') return 'https://easystok.com.br/';
+        // Producao com dominio unico ou outros casos
+        if (host.endsWith('.easystok.com.br') || host === 'easystok.com.br') {
+            return 'https://easystok.com.br/';
+        }
+        // Dev/staging/azurewebsites — landing roda no proprio EasyStock.Web,
+        // mas a API e um host separado, entao aponta pro dominio publico oficial.
+        // Felipe pode trocar pra "/" se rodar API e Web no mesmo host.
+        return 'https://easystok.com.br/';
+    }
+
+    const EXTERNAL_LINKS = [
+        {
+            id:   'es-site-btn',
+            label:'🏠 Site',
+            title:'Abrir landing publica do EasyStok',
+            cta:  true,
+            href: resolveSiteUrl(),
+            target: '_blank'
+        },
+        {
+            id:   'es-repo-btn',
+            label:'📖 Repo',
+            title:'Repositorio publico no GitHub',
+            href: 'https://github.com/michel-az-de/EasyStok',
+            target: '_blank'
+        }
+    ];
+
     /* ── Helpers ──────────────────────────────────────────────────────────── */
     function getStoredLang()  { return localStorage.getItem(LANG_KEY)  || 'ptbr'; }
     function getStoredTheme() { return localStorage.getItem(THEME_KEY) || 'light'; }
@@ -38,24 +80,21 @@
 
     function selectLang(code) {
         localStorage.setItem(LANG_KEY, code);
-        // Switch the Swagger UI to the matching document
         const lang = LANGS[code];
         if (!lang) return;
-        // The SwaggerUI instance is exposed on window.ui by our Swagger config
         if (window.ui && typeof window.ui.specActions !== 'undefined') {
             window.ui.specActions.updateUrl(`/swagger/${lang.docName}/swagger.json`);
             window.ui.specActions.download(`/swagger/${lang.docName}/swagger.json`);
         } else {
-            // Fallback: reload with spec URL param
             const url = new URL(window.location.href);
             url.searchParams.set('urls.primaryName', lang.docTitle);
             window.location.replace(url.toString());
         }
-        updateButtons(code);
+        updateLangButtons(code);
     }
 
-    function updateButtons(activeLang) {
-        document.querySelectorAll('#es-lang-btn').forEach(btn => {
+    function updateLangButtons(activeLang) {
+        document.querySelectorAll('#es-toolbar [data-lang]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.lang === activeLang);
         });
     }
@@ -67,7 +106,7 @@
 
     /* ── Toolbar injection ────────────────────────────────────────────────── */
     function injectToolbar() {
-        if (document.getElementById('es-toolbar')) return; // already injected
+        if (document.getElementById('es-toolbar')) return;
 
         const wrapper = document.querySelector('.swagger-ui .topbar .topbar-wrapper');
         if (!wrapper) return;
@@ -78,16 +117,34 @@
         const toolbar = document.createElement('div');
         toolbar.id = 'es-toolbar';
 
-        /* Language buttons */
+        // Botoes de links externos (Site, Repo) — destacam vinculo com landing
+        EXTERNAL_LINKS.forEach(link => {
+            const a = document.createElement('a');
+            a.id = link.id;
+            a.href = link.href;
+            a.textContent = link.label;
+            a.title = link.title;
+            a.target = link.target;
+            a.rel = 'noopener noreferrer';
+            if (link.cta) a.classList.add('es-cta');
+            toolbar.appendChild(a);
+        });
+
+        // Separador antes dos toggles
+        const sepLinks = document.createElement('span');
+        sepLinks.id = 'es-lang-sep';
+        sepLinks.textContent = '|';
+        toolbar.appendChild(sepLinks);
+
+        // Botoes de idioma
         Object.values(LANGS).forEach((lang, idx) => {
             if (idx > 0) {
                 const sep = document.createElement('span');
                 sep.id = 'es-lang-sep';
-                sep.textContent = '|';
+                sep.textContent = '·';
                 toolbar.appendChild(sep);
             }
             const btn = document.createElement('button');
-            btn.id        = 'es-lang-btn';
             btn.dataset.lang = lang.code;
             btn.textContent  = lang.label;
             btn.title        = `Switch to ${lang.docTitle}`;
@@ -96,13 +153,13 @@
             toolbar.appendChild(btn);
         });
 
-        /* Separator */
-        const sep2 = document.createElement('span');
-        sep2.id = 'es-lang-sep';
-        sep2.textContent = '|';
-        toolbar.appendChild(sep2);
+        // Separador antes do theme
+        const sepTheme = document.createElement('span');
+        sepTheme.id = 'es-lang-sep';
+        sepTheme.textContent = '|';
+        toolbar.appendChild(sepTheme);
 
-        /* Theme toggle */
+        // Toggle de tema
         const themeBtn = document.createElement('button');
         themeBtn.id = 'es-theme-btn';
         themeBtn.textContent = currentTheme === 'dark' ? '☀️ Light' : '🌙 Dark';
@@ -119,15 +176,12 @@
 
     /* ── Initialize on DOM ready ──────────────────────────────────────────── */
     function init() {
-        /* Apply persisted theme immediately */
         applyTheme(getStoredTheme());
 
-        /* Wait for topbar to render, then inject controls */
         const observer = new MutationObserver(() => {
             const topbar = document.querySelector('.swagger-ui .topbar .topbar-wrapper');
             if (topbar) {
                 injectToolbar();
-                // If lang differs from displayed doc, switch
                 const currentLang = getStoredLang();
                 const lang = LANGS[currentLang];
                 if (lang && window.ui) {
