@@ -200,7 +200,7 @@
 
                 <!-- Foto + identidade -->
                 <div class="flex items-start gap-3">
-                    <a :href="'/produtos/' + produtoId" target="_blank"
+                    <a :href="'/produtos/' + produtoId" target="_blank" rel="noopener noreferrer"
                        class="flex-shrink-0 block rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-indigo-400 transition-all"
                        title="Ver produto">
                         <template x-if="produtoFotoUrl">
@@ -216,7 +216,7 @@
                            :class="produtoSku ? 'text-slate-400' : 'text-slate-300'"
                            x-text="produtoSku || 'Sem SKU'"></p>
                         <p x-show="produtoMarca" class="text-xs text-slate-400 mt-0.5" x-text="produtoMarca"></p>
-                        <a :href="'/produtos/' + produtoId" target="_blank"
+                        <a :href="'/produtos/' + produtoId" target="_blank" rel="noopener noreferrer"
                            class="text-xs text-indigo-500 hover:text-indigo-700 hover:underline mt-1 inline-block">
                             ↗ Ver cadastro completo
                         </a>

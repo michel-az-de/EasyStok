@@ -180,7 +180,7 @@
                         var nome = a.TryGetProperty("nomeArquivo", out var np) ? np.GetString() : "anexo";
                         var url = a.TryGetProperty("url", out var up) ? up.GetString() : "#";
                         var tam = a.TryGetProperty("tamanhoBytes", out var tp) ? tp.GetInt64() : 0L;
-                        <a href="@url" target="_blank" class="bg-es-surface-2 hover:bg-es-surface-3 border border-es-ink-mute/20 rounded-lg p-2 text-sm">
+                        <a href="@url" target="_blank" rel="noopener noreferrer" class="bg-es-surface-2 hover:bg-es-surface-3 border border-es-ink-mute/20 rounded-lg p-2 text-sm">
                             <div class="text-es-ink truncate">@nome</div>
                             <div class="text-es-ink-mute text-xs">@(tam / 1024) KB</div>
                         </a>
