@@ -99,7 +99,6 @@ public sealed class EfiPixService(
         if (string.IsNullOrWhiteSpace(idSolicitacao))
             idSolicitacao = Guid.NewGuid().ToString("N")[..32]; // Efi exige <=35 chars
 
-        if (cache.TryGetValue(TokenCacheKey, out string? _) is false) { /* warmup */ }
         var token = await ObterTokenAsync(ct);
 
         var body = new

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
