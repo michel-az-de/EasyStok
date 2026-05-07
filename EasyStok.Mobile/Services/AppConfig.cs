@@ -21,6 +21,30 @@ public static class AppConfig
 		return string.IsNullOrEmpty(custom) ? DefaultBaseUrl : custom;
 	}
 
-	public static void SetBaseUrl(string url) =>
-		Preferences.Default.Set(PreferenceKeyBaseUrl, url);
+	/// <summary>
+	/// Persiste a URL custom. Em release exige HTTPS — anteriormente aceitava
+	/// qualquer string, vetor de phishing/MITM se Suporte page fosse invocada
+	/// com URL maliciosa. Em debug aceita HTTP (emulador/dev local).
+	/// </summary>
+	/// <exception cref="ArgumentException">URL invalida ou esquema nao suportado.</exception>
+	public static void SetBaseUrl(string url)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+			throw new ArgumentException("URL nao pode ser vazia.", nameof(url));
+
+		if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+			throw new ArgumentException($"URL invalida: '{url}'.", nameof(url));
+
+#if DEBUG
+		if (uri.Scheme is not ("http" or "https"))
+			throw new ArgumentException(
+				$"Esquema '{uri.Scheme}' nao suportado. Use http ou https.", nameof(url));
+#else
+		if (uri.Scheme != "https")
+			throw new ArgumentException(
+				$"Em release apenas HTTPS e aceito (esquema recebido: '{uri.Scheme}').", nameof(url));
+#endif
+
+		Preferences.Default.Set(PreferenceKeyBaseUrl, uri.ToString());
+	}
 }

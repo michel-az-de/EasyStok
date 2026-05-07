@@ -81,7 +81,8 @@ namespace EasyStock.Domain.Entities
         /// LGPD Art. 18 — direito ao esquecimento. Substitui campos PII por valores
         /// pseudonimizados deterministicos baseados no Id (preserva FKs em audit logs,
         /// movimentacoes e demais entidades com valor historico/forense).
-        /// Login fica impossivel (SenhaHash=null + Ativo=false). Operacao irreversivel.
+        /// Login fica impossivel (SenhaHash com prefixo bcrypt invalido + Ativo=false).
+        /// Operacao irreversivel.
         /// </summary>
         public void Anonimizar()
         {
@@ -89,7 +90,11 @@ namespace EasyStock.Domain.Entities
             Nome = "[Anonimizado]";
             Email = $"anonimizado-{pseudoId}@anonimizado.local";
             AvatarUrl = null;
-            SenhaHash = string.Empty;
+            // Hash invalido com prefixo bcrypt $2a$ — impede match com qualquer senha
+            // (BCrypt.Verify devolve false para hash que nao bate o pattern). Usar
+            // string.Empty era inseguro: alguns caminhos comparavam literal e podiam
+            // aceitar entrada em branco.
+            SenhaHash = $"$2a$10$INVALIDATED_{pseudoId}";
             Ativo = false;
             EmailConfirmado = false;
             FailedLoginAttempts = 0;

@@ -279,12 +279,16 @@
     });
     if (changed) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
-      // F6 (estabilizacao): tenta flushar mutacoes locais pendentes ANTES
-      // do reload — se o operador acabou de salvar algo offline e nesse
-      // momento chegou um pull do servidor, sem isso a mutacao local
-      // poderia ficar so na fila e o reload mascararia o estado.
-      // flush() ja é idempotente (flushing flag) e respeita online.
-      flush().finally(() => setTimeout(() => location.reload(), 500));
+      // Onda 3.5: aguarda flush() resolver com await em vez de finally+setTimeout.
+      // Anteriormente usava .finally(() => setTimeout(reload, 500)) — o reload
+      // disparava 500ms depois do *inicio* do flush, podendo recarregar antes
+      // dele terminar (operador perdia mutacao local).
+      // Agora flush() resolve, ai sim o reload acontece.
+      (async () => {
+        try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
+        // Pequeno delay pra garantir que IndexedDB persistiu antes do reload.
+        setTimeout(() => location.reload(), 100);
+      })();
     }
   }
 
