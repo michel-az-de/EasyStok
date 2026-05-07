@@ -1,5 +1,7 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using EasyStock.Infra.Postgre.Notifications;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,19 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddSingleton<INotificacoesDispatcherOrchestrator>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
         services.AddSingleton<INotificationDispatcher>(sp => sp.GetRequiredService<NotificacoesDispatcherOrchestrator>());
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registra <see cref="PostgresOutboxSignaler"/> como singleton + IHostedService.
+    /// Use quando <c>Notifications:Hosting:Signaler = Postgres</c> (default).
+    /// Para Polling, basta chamar <c>AddNotificationsHosting</c> em Infra.Notifications.
+    /// </summary>
+    public static IServiceCollection AddPostgresOutboxSignaler(this IServiceCollection services)
+    {
+        services.AddSingleton<PostgresOutboxSignaler>();
+        services.AddSingleton<IOutboxSignaler>(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
+        services.AddHostedService(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
         return services;
     }
 }

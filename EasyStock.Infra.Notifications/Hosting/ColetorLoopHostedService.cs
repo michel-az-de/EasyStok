@@ -1,20 +1,23 @@
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Worker.BackgroundServices;
+namespace EasyStock.Infra.Notifications.Hosting;
 
 /// <summary>
 /// Wrapper hosted — chama <see cref="INotificacoesColetorOrchestrator"/> a cada
-/// <see cref="WorkerOptions.ColetorIntervalSeconds"/>.
+/// <see cref="NotificationsHostingOptions.ColetorIntervalSeconds"/>.
 /// </summary>
-public sealed class ColetorEventosDeEstadoService(
+public sealed class ColetorLoopHostedService(
     IServiceProvider serviceProvider,
-    IOptions<WorkerOptions> options,
-    ILogger<ColetorEventosDeEstadoService> logger) : BackgroundService
+    IOptions<NotificationsHostingOptions> options,
+    ILogger<ColetorLoopHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("ColetorEventosDeEstadoService iniciado.");
+        logger.LogInformation("ColetorLoopHostedService iniciado.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -26,7 +29,7 @@ public sealed class ColetorEventosDeEstadoService(
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogError(ex, "Erro no ColetorEventosDeEstadoService — continuando próxima rodada.");
+                logger.LogError(ex, "Erro no ColetorLoopHostedService — continuando próxima rodada.");
             }
 
             try

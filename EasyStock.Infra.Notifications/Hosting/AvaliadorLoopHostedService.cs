@@ -1,20 +1,24 @@
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Worker.BackgroundServices;
+namespace EasyStock.Infra.Notifications.Hosting;
 
 /// <summary>
 /// Wrapper hosted — chama <see cref="INotificacoesAvaliadorOrchestrator"/> a cada
-/// <see cref="WorkerOptions.AvaliadoresIntervalSeconds"/>.
+/// <see cref="NotificationsHostingOptions.AvaliadorIntervalSeconds"/>.
+/// Cria scope a cada rodada (orchestrator depende de repos Scoped).
 /// </summary>
-public sealed class AvaliadorRotinasService(
+public sealed class AvaliadorLoopHostedService(
     IServiceProvider serviceProvider,
-    IOptions<WorkerOptions> options,
-    ILogger<AvaliadorRotinasService> logger) : BackgroundService
+    IOptions<NotificationsHostingOptions> options,
+    ILogger<AvaliadorLoopHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("AvaliadorRotinasService iniciado.");
+        logger.LogInformation("AvaliadorLoopHostedService iniciado.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -22,18 +26,18 @@ public sealed class AvaliadorRotinasService(
             {
                 using var scope = serviceProvider.CreateScope();
                 var orchestrator = scope.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>();
-                var janela = TimeSpan.FromSeconds(options.Value.AvaliadoresIntervalSeconds * 2);
+                var janela = TimeSpan.FromSeconds(options.Value.AvaliadorIntervalSeconds * 2);
                 await orchestrator.ExecutarRodadaAsync(janela, stoppingToken);
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogError(ex, "Erro no AvaliadorRotinasService — continuando próxima rodada.");
+                logger.LogError(ex, "Erro no AvaliadorLoopHostedService — continuando próxima rodada.");
             }
 
             try
             {
                 await Task.Delay(
-                    TimeSpan.FromSeconds(options.Value.AvaliadoresIntervalSeconds),
+                    TimeSpan.FromSeconds(options.Value.AvaliadorIntervalSeconds),
                     stoppingToken);
             }
             catch (OperationCanceledException) { break; }

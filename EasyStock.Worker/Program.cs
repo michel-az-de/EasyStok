@@ -1,13 +1,12 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Services.Notifications;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Notifications.DependencyInjection;
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
-using EasyStock.Infra.Postgre.Notifications;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.Collectors;
@@ -36,7 +35,8 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Services.AddSerilog();
 
-// Options
+// Options — WorkerOptions mantido por retro-compat (lê seção "Worker"); seção canônica é
+// "Notifications:Hosting" lida via AddNotificationsCore.
 builder.Services.Configure<WorkerOptions>(
     builder.Configuration.GetSection(WorkerOptions.Section));
 
@@ -79,15 +79,14 @@ builder.Services.AddScoped<PostgresAdvisoryLock>();
 builder.Services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
 builder.Services.AddScoped<IColetorEventoNotificacao, ColetorAssinaturasExpirando>();
 
-// Outbox signaler (LISTEN/NOTIFY do PG) — singleton + IHostedService (gerencia conexão dedicada)
-builder.Services.AddSingleton<PostgresOutboxSignaler>();
-builder.Services.AddSingleton<IOutboxSignaler>(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
+// Hosting do pipeline de notificações — registra orchestrators (core), wrappers
+// BackgroundService (loops) e signaler PG. Modo lido de "Notifications:Hosting:Mode".
+builder.Services
+    .AddNotificationsCore(builder.Configuration)
+    .AddNotificationsHosting(builder.Configuration);
+builder.Services.AddPostgresOutboxSignaler();
 
-// Background services
-builder.Services.AddHostedService<DispatcherOutboxService>();
-builder.Services.AddHostedService<AvaliadorRotinasService>();
-builder.Services.AddHostedService<ColetorEventosDeEstadoService>();
+// Jobs de manutenção (não fazem parte do pipeline outbox)
 builder.Services.AddHostedService<AnonimizarLogsAntigosService>();
 builder.Services.AddHostedService<SlaMonitorService>();
 
