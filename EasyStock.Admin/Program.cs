@@ -211,6 +211,56 @@ app.MapGet("/api-proxy/buscar-global", async (
     }
 });
 
+// Proxy revelar dados de cliente (LGPD). POST com motivo no body — o motivo
+// vai para AdminAuditLog. Usado pelo modal "Revelar dados completos" no detalhe
+// do ticket (Pages/Tickets/Detail.cshtml).
+app.MapPost("/api-proxy/admin-empresas-revelar", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+
+    var empresaIdStr = ctx.Request.Query["empresaId"].FirstOrDefault();
+    if (!Guid.TryParse(empresaIdStr, out var empresaId))
+        return Results.BadRequest(new { error = "empresaId inválido." });
+
+    Guid? ticketId = null;
+    if (Guid.TryParse(ctx.Request.Query["ticketId"].FirstOrDefault(), out var tid))
+        ticketId = tid;
+
+    string? motivo = null;
+    try
+    {
+        using var doc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
+        if (doc.RootElement.TryGetProperty("motivo", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String)
+            motivo = m.GetString();
+    }
+    catch { /* corpo invalido — vai cair na validacao do backend */ }
+
+    if (string.IsNullOrWhiteSpace(motivo) || motivo.Length < 10)
+        return Results.BadRequest(new { error = "motivo deve ter no mínimo 10 caracteres." });
+
+    try
+    {
+        var data = await api.PostAsync<System.Text.Json.JsonElement>(
+            $"api/admin/empresas/{empresaId}/preview/revelar",
+            new { motivo, ticketIdContexto = ticketId });
+        return Results.Ok(new { data });
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException)
+    {
+        return Results.Unauthorized();
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Proxy admin-empresas-revelar: falha");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // Proxies /api-proxy/diag/* — alimentam a tela /Diagnostico do Admin.
 // Mantemos a sessão cookie no Admin e injetamos o Bearer no AdminApiClient.
