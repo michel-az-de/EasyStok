@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Adapters de integração externa (pagamentos, fiscal, marketplace, logística) com pipelines de resiliência Polly e helpers de keyed DI. Implementa portas definidas em EasyStock.Application.Ports.Output.Integration.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Polly v8 e Resilience extensions: pipelines de retry/circuit-breaker/timeout
+         por categoria (payments, fiscal, marketplace, logistics). Logging e
+         DependencyInjection.Abstractions vêm transitive via EasyStock.Application
+         (10.0.5) — não fixar aqui pra evitar downgrade. -->
+    <PackageReference Include="Polly.Core" Version="8.5.2" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
+    <PackageReference Include="Scrutor" Version="5.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
+    <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
+    <ProjectReference Include="..\EasyStock.Contracts\EasyStock.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
