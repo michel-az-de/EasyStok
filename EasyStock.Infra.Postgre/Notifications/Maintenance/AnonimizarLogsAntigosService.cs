@@ -1,18 +1,28 @@
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Worker.BackgroundServices;
+namespace EasyStock.Infra.Postgre.Notifications.Maintenance;
 
 /// <summary>
-/// Anonimiza dados pessoais (Destinatario e CorpoRenderizado) em mensagens do outbox
-/// com mais de <see cref="WorkerOptions.RetencaoLogsDias"/> dias, preservando metadados
-/// estatísticos. Roda uma vez por dia (hora configurável UTC).
+/// Anonimiza dados pessoais (Destinatario, CorpoRenderizado, RespostaProviderJson, ErroDetalhado)
+/// em mensagens do outbox e logs de envio com mais de
+/// <see cref="NotificationsHostingOptions.RetencaoLogsDias"/> dias, preservando metadados
+/// estatísticos. Roda 1x ao iniciar (catch-up) e diariamente na hora configurada UTC.
+/// <para>
+/// Movido de EasyStock.Worker/BackgroundServices para uso unificado por Worker e API
+/// (ambos resolvem via Mode=Hosted no AddNotificationsHosting). Idempotente — re-rodar
+/// não muda registros já anonimizados (filtro != "[anonimizado]").
+/// </para>
 /// </summary>
 public sealed class AnonimizarLogsAntigosService(
     IServiceProvider serviceProvider,
-    IOptions<WorkerOptions> options,
+    IOptions<NotificationsHostingOptions> options,
     ILogger<AnonimizarLogsAntigosService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -20,9 +30,7 @@ public sealed class AnonimizarLogsAntigosService(
         logger.LogInformation("AnonimizarLogsAntigosService iniciado");
 
         // Catch-up no startup: se o processo passou da hora alvo enquanto estava down
-        // (restarts frequentes, deploy), roda imediatamente uma vez. Caso contrário,
-        // o ciclo de schedule pula a janela e nunca anonimiza durante uma janela de
-        // restarts próximos da hora — risco de violação de retenção LGPD.
+        // (restarts frequentes, deploy), roda imediatamente uma vez.
         try { await ExecutarAnonimizacaoAsync(options.Value.RetencaoLogsDias, stoppingToken); }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
 
@@ -39,10 +47,7 @@ public sealed class AnonimizarLogsAntigosService(
                 "AnonimizarLogsAntigosService: próxima execução em {ProximaExecucao} (daqui {Delay})",
                 proximaExecucao, delay);
 
-            try
-            {
-                await Task.Delay(delay, stoppingToken);
-            }
+            try { await Task.Delay(delay, stoppingToken); }
             catch (OperationCanceledException) { break; }
 
             await ExecutarAnonimizacaoAsync(opts.RetencaoLogsDias, stoppingToken);
@@ -58,7 +63,6 @@ public sealed class AnonimizarLogsAntigosService(
             using var scope = serviceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
 
-            // Anonimiza OutboxMensagemNotificacao — apaga destinatário e corpo renderizado
             var totalOutbox = await db.NotifOutboxMensagens
                 .Where(m => m.CriadoEm < limiteAnonimizacao
                          && m.Status != StatusOutbox.Pendente

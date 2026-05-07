@@ -81,8 +81,8 @@ builder.Services
     .AddNotificationsHosting(builder.Configuration)
     .AddPostgresOutboxSignaler(builder.Configuration);
 
-// Jobs de manutenção (não fazem parte do pipeline outbox)
-builder.Services.AddHostedService<AnonimizarLogsAntigosService>();
+// Jobs de Helpdesk (notificação tem manutenção própria via AddPostgresOutboxSignaler).
+// SlaMonitorService monitora tickets e gera EventoNotificacao — pertence ao Worker mesmo.
 builder.Services.AddHostedService<SlaMonitorService>();
 
 // Health checks

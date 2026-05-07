@@ -83,6 +83,7 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskBugFixService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
+        services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
@@ -109,7 +110,7 @@ public static class ApiServiceCollectionExtensions
                     RoleClaimType            = "nivel"
                 };
             })
-            .AddInternalCronJobScheme();
+            .AddInternalCronJobScheme(configuration);
 
         services.AddAuthorization(opts =>
         {

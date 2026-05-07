@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,7 +8,7 @@ namespace EasyStock.Api.Authorization;
 
 /// <summary>
 /// Esquema de autenticação para endpoints internos de cron job.
-/// Valida header <c>X-Internal-Cron-Token</c> contra <c>Notifications:CronJob:Token</c>
+/// Valida header <c>X-Internal-Cron-Token</c> contra <see cref="InternalCronJobOptions.Token"/>
 /// (que SEMPRE deve vir de secret store / env var, NUNCA do appsettings.json em prod).
 /// <para>
 /// Status code retornado: <b>401</b> em qualquer cenário de falha de autenticação
@@ -22,7 +21,10 @@ namespace EasyStock.Api.Authorization;
 /// Tentativas com token inválido são logadas como <c>Warning</c> com IP da origem
 /// para auditoria de segurança (detecção de força bruta).
 /// </para>
-/// Habilitação controlada por <c>Notifications:CronJob:Habilitado</c> (default false).
+/// <para>
+/// Hot-reload: opções via <see cref="IOptionsMonitor{TOptions}"/> — rotação de token
+/// e habilitar/desabilitar refletem sem restart do processo.
+/// </para>
 /// </summary>
 public sealed class InternalCronJobAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -30,23 +32,25 @@ public sealed class InternalCronJobAuthHandler : AuthenticationHandler<Authentic
     public const string PolicyName = "InternalCronJob";
     private const string HeaderName = "X-Internal-Cron-Token";
 
-    private readonly IConfiguration _configuration;
+    private readonly IOptionsMonitor<InternalCronJobOptions> _cronOptions;
 
     public InternalCronJobAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory loggerFactory,
         UrlEncoder encoder,
-        IConfiguration configuration)
+        IOptionsMonitor<InternalCronJobOptions> cronOptions)
         : base(options, loggerFactory, encoder)
     {
-        _configuration = configuration;
+        _cronOptions = cronOptions;
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var habilitado = _configuration.GetValue<bool>("Notifications:CronJob:Habilitado");
-        if (!habilitado)
-            return Task.FromResult(AuthenticateResult.Fail("Cron job endpoints desabilitados (Notifications:CronJob:Habilitado=false)."));
+        var cron = _cronOptions.CurrentValue;
+
+        if (!cron.Habilitado)
+            return Task.FromResult(AuthenticateResult.Fail(
+                "Cron job endpoints desabilitados (Notifications:CronJob:Habilitado=false)."));
 
         if (!Request.Headers.TryGetValue(HeaderName, out var headerValues))
             return Task.FromResult(AuthenticateResult.NoResult());
@@ -55,7 +59,7 @@ public sealed class InternalCronJobAuthHandler : AuthenticationHandler<Authentic
         if (string.IsNullOrWhiteSpace(providedToken))
             return Task.FromResult(AuthenticateResult.NoResult());
 
-        var expectedToken = _configuration["Notifications:CronJob:Token"];
+        var expectedToken = cron.Token;
         if (string.IsNullOrWhiteSpace(expectedToken))
         {
             Logger.LogWarning("InternalCronJob: token configurado vazio — rejeitando requisição.");

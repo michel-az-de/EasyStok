@@ -4,9 +4,11 @@ using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Infra.Postgre.Notifications;
 using EasyStock.Infra.Postgre.Notifications.Collectors;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
+using EasyStock.Infra.Postgre.Notifications.Maintenance;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace EasyStock.Infra.Postgre.DependencyInjection;
 
@@ -70,6 +72,11 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddSingleton<PostgresOutboxSignaler>();
         services.AddSingleton<IOutboxSignaler>(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
         services.AddHostedService(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
+
+        // Anonimização de logs antigos — pertence ao pipeline de notificações (não Helpdesk),
+        // só faz sentido em Mode=Hosted (rodando in-process aqui). Compartilha NotificationsHostingOptions.
+        services.AddHostedService<AnonimizarLogsAntigosService>();
+
         return services;
     }
 }

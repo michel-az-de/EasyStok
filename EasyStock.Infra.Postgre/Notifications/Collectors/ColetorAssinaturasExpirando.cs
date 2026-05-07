@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
@@ -19,6 +21,11 @@ public sealed class ColetorAssinaturasExpirando(
     IEventoNotificacaoRepository eventoRepo,
     ILogger<ColetorAssinaturasExpirando> logger) : IColetorEventoNotificacao
 {
+    private static readonly Meter Meter = new("EasyStock.Notifications", "1.0");
+    private static readonly Counter<long> EventsGenerated = Meter.CreateCounter<long>(
+        "notifications.collector.events_generated", "events",
+        "Eventos gerados pelos coletores de estado");
+
     private const int DiasAntes = 3;
 
     public async Task ColetarAsync(CancellationToken ct = default)
@@ -89,6 +96,7 @@ public sealed class ColetorAssinaturasExpirando(
         {
             logger.LogInformation("ColetorAssinaturasExpirando: {Count} eventos gerados.", processados);
             await db.SaveChangesAsync(ct);
+            EventsGenerated.Add(processados, new KeyValuePair<string, object?>("collector", nameof(ColetorAssinaturasExpirando)));
         }
     }
 }

@@ -29,6 +29,8 @@ public sealed class NotificacoesDispatcherOrchestrator(
     private static readonly Counter<long> FailedCounter = NotifMeter.CreateCounter<long>("notifications.failed", "notifications", "Total de notificações com falha");
     private static readonly Histogram<long> BatchSizeHistogram = NotifMeter.CreateHistogram<long>("dispatcher.batch.size", "notifications", "Tamanho do batch processado por rodada");
     private static readonly Histogram<double> OutboxLagHistogram = NotifMeter.CreateHistogram<double>("outbox.lag.seconds", "s", "Atraso entre criação e envio da mensagem outbox");
+    private static readonly Histogram<double> RunDuration = NotifMeter.CreateHistogram<double>(
+        "notifications.dispatcher.run.duration", "ms", "Duração de 1 rodada completa do dispatcher (todos os shards)");
 
     // Base de lock: 0x4E4F5449 = "NOTI" em ASCII
     private const long LockBase = 0x4E4F_5449_0000_0000L;
@@ -40,13 +42,23 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
     public async Task<int> ExecutarRodadaAsync(int shardCount, int batchSize, CancellationToken ct = default)
     {
+        var sw = Stopwatch.StartNew();
         var totalProcessadas = 0;
-        for (var shard = 0; shard < shardCount; shard++)
+        try
         {
-            if (ct.IsCancellationRequested) break;
-            totalProcessadas += await ProcessarBatchAsync(shard, batchSize, ct);
+            for (var shard = 0; shard < shardCount; shard++)
+            {
+                if (ct.IsCancellationRequested) break;
+                totalProcessadas += await ProcessarBatchAsync(shard, batchSize, ct);
+            }
+            return totalProcessadas;
         }
-        return totalProcessadas;
+        finally
+        {
+            sw.Stop();
+            RunDuration.Record(sw.Elapsed.TotalMilliseconds,
+                new TagList { { "shards", shardCount.ToString() } });
+        }
     }
 
     public async Task<int> ProcessarBatchAsync(int shardKey, int batchSize = 50, CancellationToken ct = default)

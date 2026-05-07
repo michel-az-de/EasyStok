@@ -42,4 +42,10 @@ public sealed class NotificationsHostingOptions
 
     public int AvaliadorIntervalSeconds { get; set; } = 60;
     public int ColetorIntervalSeconds { get; set; } = 300;
+
+    /// <summary>Dias de retenção de destinatário/corpo nos logs de envio. Padrão 90d.</summary>
+    public int RetencaoLogsDias { get; set; } = 90;
+
+    /// <summary>Hora UTC em que o serviço de anonimização roda diariamente. Padrão 3h.</summary>
+    public int AnonimizarHoraUtc { get; set; } = 3;
 }
