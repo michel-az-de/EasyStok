@@ -1,4 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -16,6 +18,7 @@ public class WebhookPixController(
     IAssinaturaEmpresaRepository assinaturaRepo,
     IUnitOfWork unitOfWork,
     IConfiguration configuration,
+    RegistrarPagamentoFaturaUseCase registrarPagamentoFaturaUseCase,
     ILogger<WebhookPixController> logger) : ControllerBase
 {
     [HttpPost("pix")]
@@ -141,6 +144,41 @@ public class WebhookPixController(
 
         cobranca.MarcarComoPaga();
         await cobrancaRepo.UpdateAsync(cobranca);
+
+        // F5 — Convivencia: se a cobranca tem FaturaId linkada (gerada apos F5),
+        // registra FaturaPagamento confirmado. Idempotencia: se chamado duas vezes
+        // (webhook duplicado mas que escapa do filtro de status acima — improvavel),
+        // o UseCase chama Fatura.RegistrarPagamento que adiciona um pagamento novo,
+        // o que recalcularia status para Paga (idempotente quando ja Paga). Erros
+        // aqui NAO bloqueiam a renovacao SaaS — apenas log warning.
+        if (cobranca.FaturaId.HasValue)
+        {
+            try
+            {
+                await registrarPagamentoFaturaUseCase.ExecuteAsync(new RegistrarPagamentoFaturaCommand(
+                    EmpresaId: cobranca.EmpresaId,
+                    FaturaId: cobranca.FaturaId.Value,
+                    Metodo: "pix",
+                    Valor: valorPago.Value,
+                    GatewayProvedor: "EfiPix",
+                    GatewayTransactionId: txid,
+                    DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { txid, valorPago = valorPago.Value }),
+                    StatusInicial: StatusFaturaPagamento.Confirmado,
+                    Observacao: "Confirmado via webhook Efi Pix",
+                    OrigemRegistro: "webhook-pix"
+                ));
+                logger.LogInformation(
+                    "Pagamento Pix registrado na Fatura. FaturaId={FaturaId} Txid={Txid} Valor={Valor}",
+                    cobranca.FaturaId, txid, valorPago.Value);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Falha ao registrar pagamento Pix na Fatura {FaturaId} (cobranca {Txid}). " +
+                    "SaaS renova vigencia normalmente, mas Fatura ficara sem o pagamento ate reconciliacao.",
+                    cobranca.FaturaId, txid);
+            }
+        }
 
         var assinatura = await assinaturaRepo.GetAtivaAsync(cobranca.EmpresaId)
             ?? (await assinaturaRepo.GetByEmpresaAsync(cobranca.EmpresaId))

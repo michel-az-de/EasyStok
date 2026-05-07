@@ -52,6 +52,12 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCobrancaAssinaturaJob)
             services.AddHostedService<CobrancaAssinaturaJob>();
 
+        // FaturaBackfillJob (F5) — rodada unica para gerar Fatura para
+        // CobrancaAssinatura historicas. Habilitar via env var apenas durante
+        // migracao controlada; uma vez concluida a migracao, desabilitar.
+        if (options.EnableFaturaBackfillJob)
+            services.AddHostedService<FaturaBackfillJob>();
+
         return services;
     }
 }

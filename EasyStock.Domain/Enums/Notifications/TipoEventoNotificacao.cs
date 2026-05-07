@@ -19,5 +19,13 @@ public enum TipoEventoNotificacao
     TicketEncaminhadoNivel = 15,
     SlaProximoVencer = 16,
     SlaViolado = 17,
-    BugFixCriado = 18
+    BugFixCriado = 18,
+
+    // Modulo Financeiro (F5)
+    FaturaCriada = 19,
+    FaturaVencendo = 20,
+    FaturaPaga = 21,
+    FaturaVencida = 22,
+    PagamentoConfirmado = 23,
+    PagamentoFalhou = 24
 }

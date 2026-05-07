@@ -1,7 +1,9 @@
 using EasyStock.Api.Configuration;
+using EasyStock.Api.Services.Faturacao;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -121,6 +123,9 @@ public sealed class CobrancaAssinaturaJob(
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
         var notificador = scope.ServiceProvider.GetRequiredService<INotificadorService>();
         var usuarioRepo = scope.ServiceProvider.GetRequiredService<IUsuarioRepository>();
+        var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
+        var emitirFaturaUseCase = scope.ServiceProvider.GetRequiredService<EmitirFaturaUseCase>();
+        var faturaFactory = scope.ServiceProvider.GetRequiredService<FaturaSaasFactory>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         var vencendo = await assinaturaRepo.GetAtivasVencendoEmAsync(3, ct);
@@ -146,6 +151,35 @@ public sealed class CobrancaAssinaturaJob(
                 var txid = Guid.NewGuid().ToString("N")[..35];
                 var descricao = $"Assinatura EasyStock — {plano?.Nome ?? "Plano"}";
 
+                // F5 — Convivencia: emite Fatura junto com a Cobranca, para que
+                // o cliente veja o documento no portal e possa baixar PDF. Idempotente
+                // por (Origem=Assinatura, OrigemRefId=assinatura.Id) — se ja existir
+                // fatura ativa para esta vigencia, reutiliza. Erros aqui NAO bloqueiam
+                // a criacao da Cobranca (fatura e convivencia, nao critica para SaaS).
+                Guid? faturaIdParaCobranca = null;
+                try
+                {
+                    var empresa = await empresaRepo.GetByIdAsync(assinatura.EmpresaId);
+                    if (empresa is not null && plano is not null)
+                    {
+                        var faturaCmd = faturaFactory.BuildParaAssinatura(
+                            assinatura, plano, empresa,
+                            dataEmissao: DateTime.UtcNow,
+                            dataVencimento: DateTime.UtcNow.AddDays(7));
+                        var faturaResult = await emitirFaturaUseCase.ExecuteAsync(faturaCmd, ct);
+                        faturaIdParaCobranca = faturaResult.FaturaId;
+                        logger.LogInformation(
+                            "Fatura emitida junto com cobranca. EmpresaId={EmpresaId} FaturaId={FaturaId} Numero={Numero}",
+                            assinatura.EmpresaId, faturaResult.FaturaId, faturaResult.Numero);
+                    }
+                }
+                catch (Exception faturaEx)
+                {
+                    logger.LogWarning(faturaEx,
+                        "Falha ao emitir Fatura para empresa {EmpresaId} — seguindo sem fatura linkada.",
+                        assinatura.EmpresaId);
+                }
+
                 // 1) Persiste cobrança como Pendente ANTES de chamar Efí.
                 //    Se Efí responde 200 mas commit local falha, na próxima
                 //    rodada o ExistePendenteAsync evita gerar nova cobrança.
@@ -158,6 +192,7 @@ public sealed class CobrancaAssinaturaJob(
                     pixCopiaCola: string.Empty,
                     qrCodeBase64: string.Empty,
                     expiracaoEm: DateTime.UtcNow.AddDays(1));
+                cobranca.FaturaId = faturaIdParaCobranca;
 
                 await cobrancaRepo.AddAsync(cobranca);
                 await unitOfWork.CommitAsync();
