@@ -98,8 +98,10 @@ public class AdminTicketsController(
                 t.SlaResolucaoViolado,
                 t.CriadoEm,
                 t.AlteradoEm,
-                mensagensNaoLidas = db.AdminTicketMensagens
-                    .Count(m => m.TicketId == t.Id && !m.IsAdmin && !m.LidoPeloAdmin)
+                // N+1 fix: usa navigation .Mensagens em vez de db.AdminTicketMensagens
+                // separado. EF Core traduz como subquery escalar (UMA query, nao
+                // 1+pageSize). Anteriormente: 21 queries por pagina de 20 tickets.
+                mensagensNaoLidas = t.Mensagens.Count(m => !m.IsAdmin && !m.LidoPeloAdmin)
             })
             .ToListAsync();
 
