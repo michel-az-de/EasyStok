@@ -1,0 +1,295 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Faturas.DetailModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = $"Fatura {Model.Numero}";
+
+    string FmtCurrency(decimal v) => v.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+
+    string StatusBadge(string s) => (s ?? "").ToLowerInvariant().Replace(" ", "") switch
+    {
+        "rascunho" => "badge-normal",
+        "emitida" => "badge-aberto",
+        "parcialmentepaga" => "badge-alta",
+        "paga" => "badge-resolvido",
+        "vencida" => "badge-critica",
+        "cancelada" => "badge-fechado",
+        _ => "badge-normal"
+    };
+
+    string StatusPagamentoBadge(string s) => (s ?? "").ToLowerInvariant() switch
+    {
+        "confirmado" => "badge-resolvido",
+        "pendente" => "badge-aberto",
+        "estornosolicitado" => "badge-alta",
+        "estornado" => "badge-fechado",
+        "falhou" => "badge-critica",
+        _ => "badge-normal"
+    };
+
+    string EnderecoText(JsonElement e)
+    {
+        if (e.ValueKind == JsonValueKind.Undefined || e.ValueKind == JsonValueKind.Null) return "";
+        var partes = new List<string>();
+        foreach (var k in new[] { "logradouro", "numero", "complemento", "bairro", "cidade", "uf", "cep" })
+        {
+            if (e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()))
+                partes.Add(v.GetString()!);
+        }
+        return string.Join(", ", partes);
+    }
+
+    bool podeMarcarPaga = Model.Status is "Emitida" or "ParcialmentePaga" or "Vencida";
+    bool podeCancelar = Model.Status is "Rascunho" or "Emitida" or "ParcialmentePaga" or "Vencida";
+}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+    <div class="flex items-center gap-3">
+        <a href="/Faturas" class="btn-secondary text-sm">← Voltar</a>
+        <h1 class="text-es-ink text-xl font-semibold">
+            Fatura <span class="font-mono">@Model.Numero</span>
+            <span class="status-badge @StatusBadge(Model.Status) ml-2">@Model.Status</span>
+        </h1>
+    </div>
+    <div class="flex gap-2" x-data="{ modalPaga:false, modalCancelar:false }">
+        <a href="/Faturas/Detail/@Model.Id?handler=Pdf" target="_blank" class="btn-secondary text-sm">📄 Baixar PDF</a>
+        @if (podeMarcarPaga)
+        {
+            <button type="button" @@click="modalPaga = true" class="btn-primary text-sm">✓ Registrar pagamento</button>
+        }
+        @if (podeCancelar)
+        {
+            <button type="button" @@click="modalCancelar = true" class="btn-danger text-sm">✕ Cancelar</button>
+        }
+
+        <!-- Modal: marcar paga -->
+        <div x-show="modalPaga" x-cloak class="modal-overlay" @@click.self="modalPaga = false">
+            <div class="modal-box" @@click.stop>
+                <h3 class="text-es-ink font-semibold mb-4">Registrar pagamento</h3>
+                <form method="post" asp-page-handler="MarcarPaga" class="space-y-4">
+                    @Html.AntiForgeryToken()
+                    <div>
+                        <label class="form-label">Valor</label>
+                        <input type="number" step="0.01" name="valor" value="@Model.Pendente" class="form-input" required min="0.01" />
+                        <small class="text-es-ink-mute text-xs">Pendente: @FmtCurrency(Model.Pendente) de @FmtCurrency(Model.Total)</small>
+                    </div>
+                    <div>
+                        <label class="form-label">Metodo</label>
+                        <select name="metodo" class="form-input">
+                            <option value="manual">Manual</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="pix">Pix (registro manual)</option>
+                            <option value="boleto">Boleto (registro manual)</option>
+                            <option value="cartao">Cartao (registro manual)</option>
+                            <option value="transferencia">Transferencia</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Observacao</label>
+                        <input type="text" name="observacao" class="form-input" maxlength="500" />
+                    </div>
+                    <div class="flex gap-3 justify-end pt-2">
+                        <button type="button" @@click="modalPaga = false" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: cancelar -->
+        <div x-show="modalCancelar" x-cloak class="modal-overlay" @@click.self="modalCancelar = false">
+            <div class="modal-box" @@click.stop>
+                <h3 class="text-es-ink font-semibold mb-4">Cancelar fatura</h3>
+                <form method="post" asp-page-handler="Cancelar" class="space-y-4">
+                    @Html.AntiForgeryToken()
+                    <p class="text-es-ink-dim text-sm">Esta acao nao pode ser desfeita. Faturas pagas nao podem ser canceladas — use estorno.</p>
+                    <div>
+                        <label class="form-label">Motivo</label>
+                        <textarea name="motivo" rows="3" class="form-input" maxlength="500" placeholder="Ex: emitida em duplicidade"></textarea>
+                    </div>
+                    <div class="flex gap-3 justify-end pt-2">
+                        <button type="button" @@click="modalCancelar = false" class="btn-secondary">Voltar</button>
+                        <button type="submit" class="btn-danger">Cancelar fatura</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Sucesso"] is string sucesso)
+{
+    <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">@sucesso</div>
+}
+@if (TempData["Erro"] is string erro)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erro</div>
+}
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+@if (Model.Carregada)
+{
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <!-- Emissor -->
+        <div class="card">
+            <div class="text-xs font-bold text-es-ink-mute mb-2">EMISSOR</div>
+            <div class="text-es-ink font-semibold">@(Model.DadosEmissor.TryGetProperty("razaoSocial", out var rs) && rs.ValueKind == JsonValueKind.String ? rs.GetString() : Model.DadosEmissor.GetProperty("nome").GetString())</div>
+            @if (Model.DadosEmissor.TryGetProperty("documento", out var docE) && docE.ValueKind == JsonValueKind.String)
+            {
+                <div class="text-es-ink-dim text-sm">CNPJ/CPF: @docE.GetString()</div>
+            }
+            @{ var endE = Model.DadosEmissor.TryGetProperty("endereco", out var ee) ? ee : default; }
+            @if (endE.ValueKind != JsonValueKind.Undefined && endE.ValueKind != JsonValueKind.Null)
+            {
+                <div class="text-es-ink-dim text-sm mt-1">@EnderecoText(endE)</div>
+            }
+        </div>
+
+        <!-- Faturado -->
+        <div class="card">
+            <div class="text-xs font-bold text-es-ink-mute mb-2">FATURADO</div>
+            <div class="text-es-ink font-semibold">@Model.DadosFaturado.GetProperty("nome").GetString()</div>
+            @if (Model.DadosFaturado.TryGetProperty("documento", out var docF) && docF.ValueKind == JsonValueKind.String)
+            {
+                <div class="text-es-ink-dim text-sm">CNPJ/CPF: @docF.GetString()</div>
+            }
+            <div class="text-es-ink-dim text-xs mt-2">Empresa: <a href="/Tenants/Detail/@Model.EmpresaId" class="text-es-accent hover:underline">@Model.EmpresaNome</a></div>
+        </div>
+
+        <!-- Resumo financeiro -->
+        <div class="card">
+            <div class="text-xs font-bold text-es-ink-mute mb-2">RESUMO</div>
+            <div class="space-y-1 text-sm">
+                <div class="flex justify-between"><span class="text-es-ink-dim">SubTotal</span><span class="text-es-ink">@FmtCurrency(Model.SubTotal)</span></div>
+                @if (Model.Descontos > 0)
+                {
+                    <div class="flex justify-between"><span class="text-green-400">Descontos</span><span class="text-green-400">-@FmtCurrency(Model.Descontos)</span></div>
+                }
+                @if (Model.Acrescimos > 0)
+                {
+                    <div class="flex justify-between"><span class="text-orange-400">Acrescimos</span><span class="text-orange-400">@FmtCurrency(Model.Acrescimos)</span></div>
+                }
+                <div class="flex justify-between border-t border-es-ink-mute/20 pt-2 mt-2"><span class="text-es-ink font-bold">Total</span><span class="text-es-ink font-bold text-lg">@FmtCurrency(Model.Total)</span></div>
+                <div class="flex justify-between"><span class="text-es-ink-dim">Pago</span><span class="text-green-400">@FmtCurrency(Model.TotalPago)</span></div>
+                @if (Model.Pendente > 0)
+                {
+                    <div class="flex justify-between"><span class="text-red-400 font-semibold">Pendente</span><span class="text-red-400 font-semibold">@FmtCurrency(Model.Pendente)</span></div>
+                }
+            </div>
+            <div class="text-xs text-es-ink-mute mt-3 space-y-1">
+                <div>Origem: <span class="text-es-ink-dim">@Model.Origem</span></div>
+                <div>Emissao: <span class="text-es-ink-dim">@Model.DataEmissao?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+                <div>Vencimento: <span class="@(Model.Status == "Vencida" ? "text-red-400" : "text-es-ink-dim")">@Model.DataVencimento?.ToLocalTime().ToString("dd/MM/yyyy")</span></div>
+                @if (Model.DataPagamentoTotal.HasValue)
+                {
+                    <div>Pago em: <span class="text-green-400">@Model.DataPagamentoTotal?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Itens -->
+    <div class="card mb-4">
+        <h2 class="text-es-ink font-semibold mb-3">Itens</h2>
+        <div class="overflow-x-auto">
+            <table class="table-admin">
+                <thead>
+                    <tr><th>Descricao</th><th>Tipo</th><th class="text-right">Qtd</th><th class="text-right">Unit</th><th class="text-right">Subtotal</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Itens)
+                    {
+                        var desc = item.TryGetProperty("descricao", out var dx) ? dx.GetString() : "";
+                        var tipo = item.TryGetProperty("tipo", out var tx) ? tx.GetString() : "";
+                        var qtd = item.TryGetProperty("quantidade", out var qx) ? qx.GetDecimal() : 0m;
+                        var unit = item.TryGetProperty("precoUnitario", out var ux) ? ux.GetDecimal() : 0m;
+                        var sub = item.TryGetProperty("subtotal", out var sx) ? sx.GetDecimal() : 0m;
+                        <tr>
+                            <td class="text-es-ink">@desc</td>
+                            <td class="text-es-ink-dim text-xs">@tipo</td>
+                            <td class="text-es-ink-dim text-right">@qtd.ToString("0.###")</td>
+                            <td class="text-es-ink-dim text-right">@FmtCurrency(unit)</td>
+                            <td class="text-es-ink @(sub < 0 ? "text-green-400" : "") text-right font-semibold">@FmtCurrency(sub)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagamentos -->
+    @if (Model.Pagamentos.Any())
+    {
+        <div class="card mb-4">
+            <h2 class="text-es-ink font-semibold mb-3">Pagamentos</h2>
+            <div class="overflow-x-auto">
+                <table class="table-admin">
+                    <thead>
+                        <tr><th>Data</th><th>Metodo</th><th>Provedor</th><th>Tx ID</th><th>Status</th><th class="text-right">Valor</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Pagamentos.OrderByDescending(x => (x.TryGetProperty("pagoEm", out var pe) && pe.ValueKind == JsonValueKind.String) ? pe.GetString() : (x.GetProperty("criadoEm").GetString())))
+                        {
+                            var dataS = p.TryGetProperty("pagoEm", out var pe2) && pe2.ValueKind == JsonValueKind.String ? pe2.GetString() : (p.TryGetProperty("criadoEm", out var ce) ? ce.GetString() : null);
+                            DateTime.TryParse(dataS, out var dataDt);
+                            var metodo = p.TryGetProperty("metodo", out var m) ? m.GetString() : "";
+                            var prov = p.TryGetProperty("gatewayProvedor", out var gp) ? gp.GetString() : "";
+                            var txId = p.TryGetProperty("gatewayTransactionId", out var gtx) && gtx.ValueKind == JsonValueKind.String ? gtx.GetString() : "—";
+                            var st = p.TryGetProperty("status", out var ss) ? ss.GetString() : "";
+                            var valor = p.TryGetProperty("valor", out var vx) ? vx.GetDecimal() : 0m;
+                            <tr>
+                                <td class="text-es-ink-dim text-sm">@dataDt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-es-ink">@metodo</td>
+                                <td class="text-es-ink-dim text-sm">@prov</td>
+                                <td class="text-es-ink-dim text-xs font-mono">@txId</td>
+                                <td><span class="status-badge @StatusPagamentoBadge(st ?? "")">@st</span></td>
+                                <td class="text-es-ink text-right font-semibold">@FmtCurrency(valor)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Observacoes -->
+    @if (!string.IsNullOrWhiteSpace(Model.Observacoes))
+    {
+        <div class="card mb-4">
+            <h2 class="text-es-ink font-semibold mb-2">Observacoes</h2>
+            <p class="text-es-ink-dim text-sm whitespace-pre-line">@Model.Observacoes</p>
+        </div>
+    }
+
+    <!-- Eventos (timeline) -->
+    @if (Model.Eventos.Any())
+    {
+        <div class="card mb-4">
+            <h2 class="text-es-ink font-semibold mb-3">Linha do tempo</h2>
+            <ul class="space-y-2">
+                @foreach (var ev in Model.Eventos)
+                {
+                    var tipo = ev.TryGetProperty("tipo", out var et) ? et.GetString() : "";
+                    var ocorrido = ev.TryGetProperty("ocorridoEm", out var oc) ? oc.GetString() : null;
+                    DateTime.TryParse(ocorrido, out var ocDt);
+                    var quem = ev.TryGetProperty("usuarioNome", out var un) && un.ValueKind == JsonValueKind.String ? un.GetString() : ev.TryGetProperty("origem", out var oo) && oo.ValueKind == JsonValueKind.String ? oo.GetString() : null;
+                    var valorDepois = ev.TryGetProperty("valorDepois", out var vd) && vd.ValueKind == JsonValueKind.String ? vd.GetString() : null;
+                    <li class="flex items-start gap-3 pb-2 border-b border-es-ink-mute/10 last:border-0">
+                        <span class="w-2 h-2 rounded-full bg-es-accent mt-2 flex-shrink-0"></span>
+                        <div class="flex-1">
+                            <div class="text-es-ink text-sm font-medium">@tipo</div>
+                            @if (!string.IsNullOrWhiteSpace(valorDepois))
+                            {
+                                <div class="text-es-ink-dim text-xs">@valorDepois</div>
+                            }
+                            <div class="text-es-ink-mute text-xs mt-1">@ocDt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@if (!string.IsNullOrWhiteSpace(quem)) { <text> · @quem</text> }</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+}

@@ -103,6 +103,10 @@
                 <span class="text-base">🏷️</span>
                 <span class="text-sm font-medium">Cupons</span>
             </a>
+            <a href="/Faturas" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Faturas") == true ? "active" : "")">
+                <span class="text-base">💰</span>
+                <span class="text-sm font-medium">Faturas</span>
+            </a>
             <a href="/AuditLogs" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/AuditLogs") == true ? "active" : "")">
                 <span class="text-base">🔍</span>
                 <span class="text-sm font-medium">Audit Logs</span>
