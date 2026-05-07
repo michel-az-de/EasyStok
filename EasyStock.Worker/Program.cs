@@ -1,11 +1,13 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Notifications;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.Collectors;
@@ -77,8 +79,12 @@ builder.Services.AddScoped<PostgresAdvisoryLock>();
 builder.Services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
 builder.Services.AddScoped<IColetorEventoNotificacao, ColetorAssinaturasExpirando>();
 
+// Outbox signaler (LISTEN/NOTIFY do PG) — singleton + IHostedService (gerencia conexão dedicada)
+builder.Services.AddSingleton<PostgresOutboxSignaler>();
+builder.Services.AddSingleton<IOutboxSignaler>(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PostgresOutboxSignaler>());
+
 // Background services
-builder.Services.AddHostedService<OutboxListenService>();
 builder.Services.AddHostedService<DispatcherOutboxService>();
 builder.Services.AddHostedService<AvaliadorRotinasService>();
 builder.Services.AddHostedService<ColetorEventosDeEstadoService>();

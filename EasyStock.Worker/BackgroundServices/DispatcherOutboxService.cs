@@ -1,15 +1,18 @@
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Worker.BackgroundServices;
 
 /// <summary>
-/// Wrapper hosted que aguarda sinal de wakeup (LISTEN/NOTIFY ou polling) e delega
-/// a 1 rodada completa ao <see cref="INotificacoesDispatcherOrchestrator"/>.
-/// Toda a lógica de despacho/retry/fallback vive no orchestrator (Infra.Postgre).
+/// Wrapper hosted que aguarda sinal de wakeup (LISTEN/NOTIFY ou polling) via
+/// <see cref="IOutboxSignaler"/> e delega a 1 rodada completa ao
+/// <see cref="INotificacoesDispatcherOrchestrator"/>. Toda a lógica de
+/// despacho/retry/fallback vive no orchestrator (Infra.Postgre).
 /// </summary>
 public sealed class DispatcherOutboxService(
     INotificacoesDispatcherOrchestrator orchestrator,
+    IOutboxSignaler signaler,
     IOptions<WorkerOptions> options,
     ILogger<DispatcherOutboxService> logger) : BackgroundService
 {
@@ -23,8 +26,7 @@ public sealed class DispatcherOutboxService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            // Aguarda sinal de LISTEN/NOTIFY ou timeout de polling
-            await OutboxListenService.NotifySignal.WaitAsync(stoppingToken);
+            await signaler.WaitAsync(stoppingToken);
 
             try
             {
