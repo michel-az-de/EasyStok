@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EasyStock.Domain.Entities
 {
@@ -11,9 +12,10 @@ namespace EasyStock.Domain.Entities
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
         /// <summary>
-        /// Marcador de dados de seed/demo. Quando true, o seed inteligente pode
-        /// deletar este registro antes de recriar a carga — nunca toca empresas reais.
+        /// Marcador de seed — [NotMapped] pois a coluna não existe em produção
+        /// (migration ficou vazia). Cleanup usa documento fixo via SeedDocumentos[].
         /// </summary>
+        [NotMapped]
         public bool IsSeedData { get; set; }
 
         public static Empresa Criar(string nome, string? documento)
