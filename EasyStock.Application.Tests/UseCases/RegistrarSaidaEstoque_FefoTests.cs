@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Events;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -37,6 +38,8 @@ public class RegistrarSaidaEstoque_FefoTests
         // stub only the call with matching fefo value
         itemRepo.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, fifoAtivo).Returns([lote]);
         itemRepo.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, !fifoAtivo).Returns([]);
+
+        uow.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
 
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepo, itemRepo, vendaRepo, itemVendaRepo, movRepo, uow, logger,

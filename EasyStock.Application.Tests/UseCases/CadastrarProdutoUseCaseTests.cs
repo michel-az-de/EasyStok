@@ -34,7 +34,7 @@ public class CadastrarProdutoUseCaseTests
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
-        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
 
         var command = new CadastrarProdutoCommand(
             empresaId,
@@ -101,7 +101,7 @@ public class CadastrarProdutoUseCaseTests
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
-        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
         produtoRepository.ExistsSkuBaseAsync(empresaId, "BUDS-FE", Arg.Any<Guid?>()).Returns(true);
 
         var command = new CadastrarProdutoCommand(
@@ -150,9 +150,9 @@ public class CadastrarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         var subcategoriaId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
-        categoriaRepository.GetByIdAsync(subcategoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, subcategoriaId)
             .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = categoriaId });
 
         var command = new CadastrarProdutoCommand(
@@ -187,10 +187,10 @@ public class CadastrarProdutoUseCaseTests
         var outraCategoriaId = Guid.NewGuid();
         var subcategoriaId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
         // subcategoria pertence a outra categoria
-        categoriaRepository.GetByIdAsync(subcategoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, subcategoriaId)
             .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = outraCategoriaId });
 
         var command = new CadastrarProdutoCommand(
@@ -223,7 +223,7 @@ public class CadastrarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         var variacaoId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Roupas" });
 
         var command = new CadastrarProdutoCommand(

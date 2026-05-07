@@ -168,7 +168,7 @@ public class ProdutoControllerTests
             null,
             null,
             null);
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,
