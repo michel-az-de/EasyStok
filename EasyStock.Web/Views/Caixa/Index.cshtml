@@ -130,9 +130,10 @@ else
                 <form asp-action="Abrir" asp-controller="Caixa" method="post" data-validate class="flex gap-2 items-center" x-data>
                     @Html.AntiForgeryToken()
                     <input type="number" step="0.01" min="0" name="saldoInicial" placeholder="Saldo inicial" required
+                           aria-label="Saldo inicial do caixa"
                            data-error-message="Informe um saldo inicial válido (use 0 se não houver caixa físico)."
                            class="ui-field text-sm" />
-                    <input type="text" name="observacoes" placeholder="Obs (opcional)" maxlength="200" class="ui-field text-sm" />
+                    <input type="text" name="observacoes" placeholder="Obs (opcional)" maxlength="200" aria-label="Observações" class="ui-field text-sm" />
                     <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                         🔓 Abrir caixa
                     </button>
@@ -147,7 +148,7 @@ else
                 <form asp-action="Fechar" asp-controller="Caixa" method="post" class="flex gap-2 items-center"
                       onsubmit="return confirm('Fechar caixa do dia? Saldo final: @d.SaldoEsperado.ToString("C")');">
                     @Html.AntiForgeryToken()
-                    <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" class="ui-field text-sm" />
+                    <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" aria-label="Observações do fechamento" class="ui-field text-sm" />
                     <button type="submit" class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50">
                         🔒 Fechar caixa
                     </button>

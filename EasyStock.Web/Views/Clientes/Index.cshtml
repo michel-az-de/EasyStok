@@ -24,9 +24,10 @@
 
 <!-- Filtros -->
 <div class="ws mb-6">
-    <form method="get" class="flex gap-3 flex-wrap items-center">
+    <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar clientes">
         <div class="flex flex-1 min-w-48 gap-3">
-            <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome, telefone, documento, e-mail ou apt..."
+            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome, telefone, documento, e-mail ou apt..."
+                   aria-label="Buscar cliente"
                    class="ui-field flex-1 min-w-48" />
             <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
                 Buscar

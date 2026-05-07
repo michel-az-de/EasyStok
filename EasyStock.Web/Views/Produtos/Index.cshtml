@@ -20,11 +20,11 @@
 
 <!-- Filtros -->
 <div class="ws mb-4">
-    <form method="get" class="flex flex-wrap gap-3 items-center">
-        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome ou SKU..."
-               class="ui-field flex-1 min-w-48" />
+    <form method="get" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar produtos">
+        <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome ou SKU..."
+               aria-label="Buscar por nome ou SKU" class="ui-field flex-1 min-w-48" />
         <div class="ui-select-shell">
-            <select name="categoria" class="ui-select ui-select--plain text-sm">
+            <select name="categoria" aria-label="Filtrar por categoria" class="ui-select ui-select--plain text-sm">
                 <option value="">Todas as categorias</option>
                 @foreach (var cat in Model.Categorias)
                 {
@@ -45,7 +45,7 @@
             </span>
         </div>
         <div class="ui-select-shell">
-            <select name="status" class="ui-select ui-select--plain text-sm">
+            <select name="status" aria-label="Filtrar por status" class="ui-select ui-select--plain text-sm">
                 <option value="">Todos os status</option>
                 @if (Model.Status == "Ativo")
                 {

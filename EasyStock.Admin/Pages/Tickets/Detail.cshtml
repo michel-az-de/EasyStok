@@ -64,9 +64,14 @@
                             <button type="submit" class="btn-primary text-sm">✓ Resolver</button>
                         </form>
                     }
-                    <form method="post" asp-page-handler="AlterarStatus" class="flex items-center gap-2">
+                    <form method="post" asp-page-handler="AlterarStatus" class="flex items-center gap-2"
+                          x-data="{ submitting: false }"
+                          @@submit="submitting = true">
                         @Html.AntiForgeryToken()
-                        <select name="status" class="form-input text-sm py-1.5" style="width:160px" onchange="this.form.submit()">
+                        <select name="status" class="form-input text-sm py-1.5" style="width:160px"
+                                aria-label="Alterar status do ticket"
+                                :disabled="submitting"
+                                onchange="if (!this.dataset.submitted) { this.dataset.submitted = '1'; this.form.submit(); }">
                             <option value="Aberto" selected="@(Model.Status == "Aberto")">Aberto</option>
                             <option value="EmAtendimento" selected="@(Model.Status == "EmAtendimento")">Em Atend.</option>
                             <option value="AguardandoCliente" selected="@(Model.Status == "AguardandoCliente")">Aguard. Cliente</option>
@@ -317,8 +322,8 @@
             <form method="post" asp-page-handler="Encaminhar" class="space-y-4">
                 @Html.AntiForgeryToken()
                 <div>
-                    <label class="form-label">Nível destino</label>
-                    <select name="novoNivel" class="form-input" required>
+                    <label class="form-label" for="encaminhar-novoNivel">Nível destino</label>
+                    <select id="encaminhar-novoNivel" name="novoNivel" class="form-input" required aria-label="Nível de destino">
                         <option value="N1">N1 - Triagem</option>
                         <option value="N2">N2 - Suporte</option>
                         <option value="N3">N3 - Técnico</option>
@@ -353,8 +358,8 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="form-label">Severidade</label>
-                        <select name="severidade" class="form-input">
+                        <label class="form-label" for="bugfix-severidade">Severidade</label>
+                        <select id="bugfix-severidade" name="severidade" class="form-input" aria-label="Severidade do bug">
                             <option value="Baixa">Baixa</option>
                             <option value="Media" selected>Média</option>
                             <option value="Alta">Alta</option>

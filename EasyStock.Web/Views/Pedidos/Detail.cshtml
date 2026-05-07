@@ -156,12 +156,12 @@
 
                 @if (p.Status != "entregue" && p.Status != "cancelado")
                 {
-                    <form asp-action="AddItem" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t">
+                    <form asp-action="AddItem" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t" aria-label="Adicionar item ao pedido">
                         @Html.AntiForgeryToken()
-                        <input type="text"   name="nome"          placeholder="Nome *"      required class="ui-field text-sm col-span-5" />
-                        <input type="number" name="quantidade"    placeholder="Qtd"   step="0.01" min="0.01" required class="ui-field text-sm col-span-2" />
-                        <input type="number" name="precoUnitario" placeholder="Preço" step="0.01" min="0"   required class="ui-field text-sm col-span-2" />
-                        <input type="text"   name="unidade"       placeholder="Un"           class="ui-field text-sm col-span-1" />
+                        <input type="text"   name="nome"          placeholder="Nome *"      required aria-label="Nome do item" class="ui-field text-sm col-span-5" />
+                        <input type="number" name="quantidade"    placeholder="Qtd"   step="0.01" min="0.01" required aria-label="Quantidade" class="ui-field text-sm col-span-2" />
+                        <input type="number" name="precoUnitario" placeholder="Preço" step="0.01" min="0"   required aria-label="Preço unitário" class="ui-field text-sm col-span-2" />
+                        <input type="text"   name="unidade"       placeholder="Un"          aria-label="Unidade de medida" class="ui-field text-sm col-span-1" />
                         <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Item</button>
                     </form>
                 }
@@ -190,16 +190,16 @@
                 }
                 else { <p class="text-sm text-slate-500 mb-4">Nenhum pagamento registrado.</p> }
 
-                <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t">
+                <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t" aria-label="Registrar pagamento">
                     @Html.AntiForgeryToken()
-                    <select name="metodo" required class="ui-select text-sm col-span-3">
+                    <select name="metodo" required aria-label="Método de pagamento" class="ui-select text-sm col-span-3">
                         <option value="pix">PIX</option><option value="dinheiro">Dinheiro</option>
                         <option value="credito">Crédito</option><option value="debito">Débito</option>
                         <option value="transferencia">Transferência</option><option value="outro">Outro</option>
                     </select>
-                    <input type="number" name="valor" placeholder="Valor *" step="0.01" min="0.01" required class="ui-field text-sm col-span-3" />
-                    <input type="text" name="referencia" placeholder="Referência (txid, NSU)" class="ui-field text-sm col-span-3" />
-                    <input type="text" name="observacao" placeholder="Observação" class="ui-field text-sm col-span-3" />
+                    <input type="number" name="valor" placeholder="Valor *" step="0.01" min="0.01" required aria-label="Valor do pagamento" class="ui-field text-sm col-span-3" />
+                    <input type="text" name="referencia" placeholder="Referência (txid, NSU)" aria-label="Referência do pagamento" class="ui-field text-sm col-span-3" />
+                    <input type="text" name="observacao" placeholder="Observação" aria-label="Observação" class="ui-field text-sm col-span-3" />
                     <button type="submit" class="app-primary-btn col-span-12 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Registrar Pagamento</button>
                 </form>
             </div>
