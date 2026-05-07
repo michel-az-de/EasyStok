@@ -60,10 +60,13 @@ namespace EasyStock.Api.Services
             // Sem claims de permissao, aplicar fallback por nivel.
             return Nivel switch
             {
-                NivelAcesso.SuperAdmin or NivelAcesso.Admin => true,
-                NivelAcesso.Gerente => permissao is not Permissao.GerenciarUsuarios,
+                NivelAcesso.SuperAdmin => true,
+                NivelAcesso.Admin => permissao is not Permissao.ConfigurarSla,
+                NivelAcesso.Gerente => permissao is not Permissao.GerenciarUsuarios
+                    and not Permissao.ConfigurarSla,
                 NivelAcesso.Operador => permissao is Permissao.GerenciarEstoque or Permissao.GerenciarProdutos
-                    or Permissao.VisualizarTickets or Permissao.ResponderTickets,
+                    or Permissao.VisualizarTickets or Permissao.ResponderTickets
+                    or Permissao.ResponderTicketsInternos,
                 _ => permissao is Permissao.VisualizarRelatorios or Permissao.VisualizarTickets
             };
         }

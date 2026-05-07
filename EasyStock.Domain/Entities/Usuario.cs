@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using EasyStock.Domain.Enums;
 
 namespace EasyStock.Domain.Entities
 {
@@ -18,6 +19,12 @@ namespace EasyStock.Domain.Entities
         public DateTime AlteradoEm { get; set; }
         public int FailedLoginAttempts { get; set; }
         public DateTime? LockoutEnd { get; set; }
+
+        /// <summary>
+        /// Nivel preferencial do atendente no helpdesk (N1..N4). NULL para usuarios
+        /// que nao atuam no atendimento. Define a fila de tickets que ele ve por default.
+        /// </summary>
+        public NivelAtendimento? NivelAtendimentoPreferido { get; set; }
 
         public ICollection<UsuarioEmpresa>? Empresas { get; set; }
         public ICollection<UsuarioPerfil>? Perfis { get; set; }
