@@ -27,7 +27,15 @@
     };
     string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
 
-    var overallStatus = apiOk && Model is not null ? (Model!.Status ?? "ok") : "critical";
+    // Normaliza valores desconhecidos pra "critical" — assim header (que cai no _ default
+    // pra qualquer coisa fora de ok/degraded) e a aba Insights (que so reconhecia
+    // critical/degraded) param de divergir quando a API devolve Status vazio/desconhecido.
+    var rawStatus = apiOk && Model is not null ? Model!.Status : null;
+    var overallStatus = rawStatus switch
+    {
+        "ok" or "degraded" or "critical" => rawStatus!,
+        _ => "critical"
+    };
     var overallIcon = overallStatus switch { "ok" => "check_circle", "degraded" => "warning", _ => "error" };
     var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Falha critica detectada" };
     var overallHero = overallStatus switch { "ok" => "from-green-500 to-emerald-600", "degraded" => "from-yellow-500 to-amber-600", _ => "from-red-500 to-rose-600" };
