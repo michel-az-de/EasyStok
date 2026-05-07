@@ -2,7 +2,13 @@
 
 > Resumo curado das ondas de feature mais recentes. Atualizar manualmente após sessão grande.
 
-## Snapshot 2026-05-06
+## Snapshot 2026-05-07
+
+### Onda atual: CI gate de cobertura (Fase 1)
+- Workflow `.github/workflows/tests.yml` em pull_request e push pra master/main: build Release + 6 projetos de teste com `--collect:"XPlat Code Coverage"` + `coverlet.runsettings` na raiz com excludes (Migrations, Program.cs, DTOs, geradores, Mobile, Worker, Mongo, Sqlite, Async).
+- Cobertura agregada via ReportGenerator → HTML/Cobertura/Markdown/Badges. Job summary + comentário sticky no PR (`marocchino/sticky-pull-request-comment`). TRX → check via `dorny/test-reporter`.
+- Gate baseline: line 10% / branch 5% — não bloqueia PRs hoje, mas detecta drop crítico. Fase 2 sobe pra 90% line nos paths Pix/Webhook/Faturas.
+- Scripts locais `scripts/coverage.{ps1,sh}` espelhando o workflow pra Felipe rodar offline.
 
 ### Ondas concluídas (últimos 30 dias)
 - **Notifications PR1–PR7**: domain → ports → adapters Email/SMS/WhatsApp/InApp → Worker com Outbox → painel Admin → migração jobs legados → LGPD self-service + métricas OTel.

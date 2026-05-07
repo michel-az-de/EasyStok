@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura,opencover</Format>
+          <ExcludeByFile>**/Migrations/*.cs,**/Migrations/**/*.cs,**/*.Designer.cs,**/*.g.cs,**/Program.cs,**/GlobalUsings.cs,**/EasyStockDbContextModelSnapshot.cs</ExcludeByFile>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <Exclude>[*.Tests]*,[*.Tests.*]*,[*.IntegrationTests]*,[*.IntegrationTests.*]*,[*.ArchitectureTests]*,[*.UnitTests]*,[*.Benchmarks]*,[EasyStock.Mobile]*,[EasyStok.Mobile]*,[EasyStock.Worker]*,[EasyStock.Infra.MongoDb]*,[EasyStock.Infra.Sqlite]*,[EasyStock.Infra.Async]*</Exclude>
+          <Include>[EasyStock.Api]*,[EasyStock.Application]*,[EasyStock.Domain]*,[EasyStock.Infra.Postgre]*,[EasyStock.Infra.Notifications]*,[EasyStock.Infra.Integrations]*,[EasyStock.Contracts]*</Include>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <DeterministicReport>true</DeterministicReport>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

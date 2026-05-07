@@ -4,7 +4,7 @@
 >
 > Princípio: **código está em ~40% parity, operação em ~15%**. Estabilizar = fechar deploy, CI, backup, alerta, testes de integração.
 
-Última atualização: 2026-05-06
+Última atualização: 2026-05-07
 
 ---
 
@@ -12,7 +12,7 @@
 
 - [ ] **Deploy estável GCP**: Cloud Run + Cloud SQL com 1 prod + 1 staging. Dockerfiles prontos (`Dockerfile.cloudrun.{api,web,admin}`). Aguarda Project ID. Ver `.knowledge/gcp-deploy.md`.
 - [ ] **Backup Postgres + restore testado**: Cloud SQL faz daily, mas restore precisa ser exercitado. Documentar passo-a-passo no runbook.
-- [ ] **CI rodando 474 testes em cada PR**: GitHub Actions com `dotnet build` + `dotnet test` + lint. Bloquear merge se vermelho.
+- [x] **CI rodando todos os testes em cada PR** — 2026-05-07. Workflow `.github/workflows/tests.yml` faz build + dotnet test em 6 projetos (Domain, Application, Architecture, Api.Unit, Api.Integration, Infra.Postgre.Integration) + cobertura agregada via ReportGenerator + comentário sticky no PR + gate em line 10% / branch 5% (baseline). TRX vira check via dorny/test-reporter. **Falta Fase 2**: subir threshold pra 90% line nos paths Pix/Webhook/Faturas conforme adicionarmos testes (ver Bloco 3).
 - [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar.
 - [ ] **Compras → estoque ponta-a-ponta testado**: `PedidoFornecedorItem` foi criada (commit recente) mas fluxo de recebimento → entrada de movimentação **sem teste de integração**.
 
@@ -83,6 +83,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 
 > Mover daqui pra cima ao concluir, com data e commit. Mantém memória institucional.
 
+- [x] **CI gate de qualidade (Fase 1)** — 2026-05-07. Workflow tests.yml + coverlet.runsettings + scripts coverage local. Threshold baseline 10% line / 5% branch — Fase 2 sobe nos paths críticos.
 - [x] **Webhook Pix valida valor pago vs cobrança** — 2026-05-01 (commit `37fb7d9`). Fechou último P0 da auditoria de abril.
 - [x] **`PedidoFornecedor.Itens [NotMapped]`** — 2026-04-30. Entity `PedidoFornecedorItem` persiste itens (migration `20260502120000_AddPedidoFornecedorItemTable`).
 - [x] **`DiagnosticoController` exposto** — 2026-04-30 (`c5d2ad6`). Class agora `[Authorize(Policy="Admin")]`.
