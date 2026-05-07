@@ -36,6 +36,9 @@ public static partial class SeedData
         logger.LogInformation("Seed demo iniciando — volume={Volume}", volume);
 
         var context = services.GetRequiredService<EasyStockDbContext>();
+        // Schema bootstrap defensivo — mesmo de SeedData via startup hook ou
+        // chamada direta. Garante IsSeedData/SeedRunLogs antes de tocar Empresas.
+        await SeedSchemaBootstrap.EnsureAsync(context, logger);
         var strategy = context.Database.CreateExecutionStrategy();
 
         await strategy.ExecuteAsync(async () =>
@@ -84,6 +87,8 @@ public static partial class SeedData
         var adminSenha  = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD") ?? "Admin@123";
 
         var context  = services.GetRequiredService<EasyStockDbContext>();
+        // Schema bootstrap defensivo (mesma justificativa do ExecutarAsync acima).
+        await SeedSchemaBootstrap.EnsureAsync(context, logger);
         var strategy = context.Database.CreateExecutionStrategy();
 
         await strategy.ExecuteAsync(async () =>

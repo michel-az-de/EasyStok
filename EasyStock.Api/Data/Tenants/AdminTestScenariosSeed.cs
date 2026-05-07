@@ -41,6 +41,13 @@ public static class AdminTestScenariosSeed
                 progress.Report(runId, pct, msg, level);
         }
 
+        // ── Etapa 0: Schema bootstrap (defesa em profundidade) ──────────────────
+        // Mesmo que startup hook + controller path tenham passado, garante uma 3ª
+        // vez que IsSeedData/SeedRunLogs existem antes de qualquer query usá-los.
+        // Idempotente — se schema OK, é no-op.
+        Report(2, "Verificando schema (defesa em profundidade)…");
+        await SeedSchemaBootstrap.EnsureAsync(context, logger);
+
         Report(5, "Verificando flags de segurança…");
 
         // ── Etapa 1a: Catch-up de seed legado ──────────────────────────────────
