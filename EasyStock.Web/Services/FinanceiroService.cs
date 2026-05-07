@@ -207,6 +207,11 @@ public class FinanceiroService(ApiClient api, SessionService session)
         return api.PostAsync<PixQrResultApi>($"contas-a-receber/parcelas/{parcelaId}/pix",
             new { empresaId });
     }
+
+    // ── Dashboard ─────────────────────────────────────────────────────────
+
+    public Task<ApiResult<DashboardFinanceiroApi>> ObterDashboardAsync() =>
+        api.GetAsync<DashboardFinanceiroApi>($"financeiro/dashboard?empresaId={GetEmpresaId()}");
 }
 
 public class PixQrResultApi
@@ -216,4 +221,17 @@ public class PixQrResultApi
     public string QrCodeBase64 { get; set; } = "";
     public DateTime ExpiraEm { get; set; }
     public decimal Valor { get; set; }
+}
+
+public class DashboardFinanceiroApi
+{
+    public decimal TotalAVencer30dPagar { get; set; }
+    public decimal TotalAVencer30dReceber { get; set; }
+    public decimal TotalVencidoPagar { get; set; }
+    public decimal TotalVencidoReceber { get; set; }
+    public decimal TotalPagoMes { get; set; }
+    public decimal TotalRecebidoMes { get; set; }
+    public int QtdContasPagarAbertas { get; set; }
+    public int QtdContasReceberAbertas { get; set; }
+    public int QtdParcelasVencidasHoje { get; set; }
 }

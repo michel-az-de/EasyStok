@@ -68,6 +68,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableFaturaVencimentoJob)
             services.AddHostedService<FaturaVencimentoJob>();
 
+        // ContaFinanceiraVencimentoJob (CAP/CAR) — diario 09:30 UTC, marca
+        // parcelas vencidas e atualiza status agregado das contas.
+        if (options.EnableContaFinanceiraVencimentoJob)
+            services.AddHostedService<ContaFinanceiraVencimentoJob>();
+
         return services;
     }
 }

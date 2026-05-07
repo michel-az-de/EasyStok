@@ -1,0 +1,64 @@
+@model EasyStock.Web.Services.DashboardFinanceiroApi
+
+<div class="page-content">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Financeiro</h1>
+            <p class="text-sm text-gray-500">Visao geral do fluxo de caixa, contas a pagar e a receber.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card">
+            <div class="text-xs text-gray-500 uppercase">A Receber 30d</div>
+            <div class="text-2xl font-semibold text-blue-700 mt-1">@Model.TotalAVencer30dReceber.ToString("C")</div>
+            <div class="text-xs text-gray-500 mt-1">@Model.QtdContasReceberAbertas conta(s) em aberto</div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-500 uppercase">A Pagar 30d</div>
+            <div class="text-2xl font-semibold text-orange-700 mt-1">@Model.TotalAVencer30dPagar.ToString("C")</div>
+            <div class="text-xs text-gray-500 mt-1">@Model.QtdContasPagarAbertas conta(s) em aberto</div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-500 uppercase">Vencidas hoje</div>
+            <div class="text-2xl font-semibold text-red-700 mt-1">
+                @((Model.TotalVencidoPagar + Model.TotalVencidoReceber).ToString("C"))
+            </div>
+            <div class="text-xs text-gray-500 mt-1">@Model.QtdParcelasVencidasHoje parcela(s) atrasadas</div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-500 uppercase">No mes</div>
+            <div class="text-sm text-green-700 font-medium mt-2">+ @Model.TotalRecebidoMes.ToString("C") recebido</div>
+            <div class="text-sm text-red-700 font-medium">- @Model.TotalPagoMes.ToString("C") pago</div>
+            <div class="text-xs text-gray-500 mt-1">
+                Saldo: @((Model.TotalRecebidoMes - Model.TotalPagoMes).ToString("C"))
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">Vencido em aberto</h3>
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600">A Pagar vencido</span>
+                    <span class="text-red-700 font-medium">@Model.TotalVencidoPagar.ToString("C")</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600">A Receber vencido</span>
+                    <span class="text-red-700 font-medium">@Model.TotalVencidoReceber.ToString("C")</span>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">Atalhos</h3>
+            <div class="flex flex-wrap gap-2">
+                <a href="/contas-a-receber/criar" class="btn btn-primary btn-sm">+ Nova Conta a Receber</a>
+                <a href="/contas-a-pagar/criar" class="btn btn-secondary btn-sm">+ Nova Conta a Pagar</a>
+                <a href="/contas-a-receber" class="btn btn-ghost btn-sm">Ver Recebiveis</a>
+                <a href="/contas-a-pagar" class="btn btn-ghost btn-sm">Ver Pagaveis</a>
+                <a href="/caixa" class="btn btn-ghost btn-sm">Caixa do Dia</a>
+            </div>
+        </div>
+    </div>
+</div>

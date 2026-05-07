@@ -2,9 +2,10 @@
 
 > Resumo curado das ondas de feature mais recentes. Atualizar manualmente após sessão grande.
 
-## Snapshot 2026-05-06
+## Snapshot 2026-05-07
 
 ### Ondas concluídas (últimos 30 dias)
+- **CAP/CAR (Contas a Pagar/Receber) Ondas 1–5** (2026-05-07): módulo financeiro operacional completo. (1) Domain: 8 entidades (`ContaPagar/Receber`, `ParcelaPagar/Receber`, `PagamentoParcela` polimórfico, `CategoriaFinanceira` hierárquica, `CentroCusto`, `ContaFinanceiraEvento`) + 7 enums + 6 permissões + xmin RowVersion + audit por campo; migration `Add_Financeiro_CapCar_Core` com 10 tabelas, check constraints XOR e índices UNIQUE para idempotência. (2) Use cases CRUD completos com guard tenant. (3) API REST 4 controllers (`/api/contas-a-pagar`, `/api/contas-a-receber`, `/api/financeiro/categorias`, `/api/financeiro/centros-custo`) + UI Web (Index/Criar/Detalhe Tailwind+Alpine). (4) Pagamento + integração Caixa (mesma transação cria PagamentoParcela + MovimentoCaixa, idempotente via GatewayTransactionId UNIQUE) + estorno simétrico + Pix QR via `IEfiPixService` reutilizado + extensão `WebhookPixController` (prefixo `cr...` para parcela CR). (5) `ContaFinanceiraVencimentoJob` diário 09:30 UTC marca parcelas vencidas + dashboard `/financeiro` com KPIs (a vencer 30d, vencido, recebido/pago no mês). Commits `81bfb2d` → `2b00e5c`.
 - **Notifications PR1–PR7**: domain → ports → adapters Email/SMS/WhatsApp/InApp → Worker com Outbox → painel Admin → migração jobs legados → LGPD self-service + métricas OTel.
 - **Helpdesk core**: AdminTicket reformado (TicketAnexo, TicketHistorico, AdminTicketTecnicoMeta, SlaConfiguracao), SlaMonitorService, 9 eventos de notificação globais, UI Tickets multi-nível.
 - **Admin Gestão de Cliente P0–P3**: reset senha, força logout, sessões, edição usuário, CRUD lojas, atividade unificada, PII unmask + audit, LGPD anonimizar/exportar, Cmd+K + atalhos + recentes, notas internas + banner alerta.
