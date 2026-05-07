@@ -23,6 +23,11 @@ public class CancelarPedidoFornecedorUseCase(
         if (pedido.Status == StatusPedidoFornecedor.Recebido)
             throw new RegraDeDominioVioladaException("Pedido já recebido não pode ser cancelado.");
 
+        if (pedido.Status == StatusPedidoFornecedor.RecebidoParcial)
+            throw new RegraDeDominioVioladaException(
+                "Pedido com recebimento parcial não pode ser cancelado — parte ja entrou no estoque. " +
+                "Faca devolucao/estorno antes.");
+
         if (pedido.Status == StatusPedidoFornecedor.Cancelado)
             throw new RegraDeDominioVioladaException("Pedido já está cancelado.");
 

@@ -26,6 +26,12 @@ public class ReceberPedidoFornecedorUseCase(
         if (pedido.Status == StatusPedidoFornecedor.Recebido)
             throw new RegraDeDominioVioladaException("Pedido já foi recebido.");
 
+        // RecebidoParcial: este UseCase nao processa entrada de estoque por item.
+        // Forcar uso de ProcessarRecebimentoPedidoFornecedorUseCase para fechar.
+        if (pedido.Status == StatusPedidoFornecedor.RecebidoParcial)
+            throw new RegraDeDominioVioladaException(
+                "Pedido com recebimento parcial — use ProcessarRecebimento com itens para concluir.");
+
         pedido.Status = StatusPedidoFornecedor.Recebido;
         pedido.DataRecebimento = command.DataRecebimento ?? DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(command.Tracking))

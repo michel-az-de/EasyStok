@@ -51,11 +51,14 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
 
         if (pedido.Status == Domain.Enums.StatusPedidoFornecedor.Recebido)
         {
-            logger.LogWarning("Pedido {PedidoId} já foi recebido (idempotência)", command.PedidoId);
+            logger.LogWarning("Pedido {PedidoId} já foi totalmente recebido (idempotência)", command.PedidoId);
             return new ProcessarRecebimentoPedidoFornecedorResult("Pedido já recebido", 0);
         }
 
-        var itens = await itemRepository.GetByPedidoIdAsync(command.PedidoId, ct);
+        // Aberto / EmTransito / RecebidoParcial caem no fluxo abaixo — permite
+        // multiplos recebimentos parciais ate completar.
+
+        var itens = (await itemRepository.GetByPedidoIdAsync(command.PedidoId, ct)).ToList();
         if (!itens.Any())
             throw new UseCaseValidationException("Pedido sem itens.");
 
@@ -67,13 +70,24 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         {
             foreach (var item in itens)
             {
-                // Skip se quantidade é 0 ou item não existe em command
-                if (!command.ItensRecebidos.TryGetValue(item.Id, out var qtdRecebida))
-                    qtdRecebida = 0;
+                // command.ItensRecebidos[itemId] e o NOVO TOTAL absoluto recebido
+                // (nao o delta). Permite multiplos recebimentos: cliente envia
+                // sucessivamente 3, 7, 10 ate fechar quantidade pedida.
+                if (!command.ItensRecebidos.TryGetValue(item.Id, out var novoTotalRecebido))
+                    novoTotalRecebido = item.QuantidadeRecebida;
 
-                if (qtdRecebida <= 0)
+                if (novoTotalRecebido < item.QuantidadeRecebida)
                 {
-                    logger.LogDebug("Item {ItemId} com qty=0, pulando", item.Id);
+                    logger.LogWarning(
+                        "Item {ItemId} novoTotal ({Novo}) menor que ja recebido ({Anterior}); estorno nao suportado, pulando.",
+                        item.Id, novoTotalRecebido, item.QuantidadeRecebida);
+                    continue;
+                }
+
+                var delta = novoTotalRecebido - item.QuantidadeRecebida;
+                if (delta <= 0)
+                {
+                    logger.LogDebug("Item {ItemId} sem delta a aplicar, pulando.", item.Id);
                     continue;
                 }
 
@@ -81,17 +95,26 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 if (!item.ProdutoId.HasValue)
                 {
                     logger.LogWarning("Item {ItemId} sem ProdutoId, pula entrada estoque", item.Id);
-                    item.QuantidadeRecebida = qtdRecebida;
+                    item.QuantidadeRecebida = novoTotalRecebido;
                     await itemRepository.UpdateAsync(item, ct);
                     continue;
                 }
+
+                // Estoque atual exige int. Quantidade fracionaria (1.5kg) nao
+                // entra ate refactor que troque RegistrarEntradaEstoqueCommand
+                // pra decimal. Falhar explicito evita o cast (int) silencioso
+                // que truncava 1.5 -> 1 e gerava saldo errado em compra.
+                if (delta % 1m != 0m)
+                    throw new UseCaseValidationException(
+                        $"Quantidade fracionaria ({delta}) ainda nao suportada no recebimento. " +
+                        "Cadastre delta inteiro ou aguarde suporte a decimal no estoque.");
 
                 // Cria entrada de estoque (REUTILIZA RegistrarEntradaEstoqueUseCase)
                 var entradaCmd = new RegistrarEntradaEstoqueCommand(
                     EmpresaId: command.EmpresaId,
                     ProdutoId: item.ProdutoId.Value,
                     ProdutoVariacaoId: null,
-                    Quantidade: (int)qtdRecebida,
+                    Quantidade: (int)delta,
                     CustoUnitario: item.CustoUnitario,
                     PrecoVendaSugerido: null,
                     DataEntrada: dataRecebimento,
@@ -106,7 +129,9 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                     Validade: null,
                     Observacoes: item.Observacao,
                     DescricaoAnuncio: null,
-                    DocumentoReferencia: $"{command.PedidoId}:{item.Id}", // IDEMPOTÊNCIA
+                    // IDEMPOTENCIA inclui novoTotalRecebido para permitir
+                    // multiplos recebimentos parciais (cada delta vira chave unica).
+                    DocumentoReferencia: $"{command.PedidoId}:{item.Id}:r{novoTotalRecebido}",
                     DimensoesReais: null,
                     InstrucoesGeracaoDescricao: null,
                     LojaId: pedido.LojaId);
@@ -115,11 +140,13 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 {
                     var resultadoEntrada = await entradaUseCase.ExecuteAsync(entradaCmd);
 
-                    // Atualiza quantidade recebida no item
-                    item.QuantidadeRecebida = qtdRecebida;
+                    // Atualiza quantidade recebida no item — total absoluto agora.
+                    item.QuantidadeRecebida = novoTotalRecebido;
                     await itemRepository.UpdateAsync(item, ct);
 
-                    // Publica evento item recebido
+                    // Publica evento item recebido — QuantidadeRecebida no evento
+                    // e o DELTA aplicado nesta chamada (compativel com listeners
+                    // existentes que esperam "qty desta entrada", nao total).
                     if (publicadorEventos != null)
                     {
                         var eventoItem = new PedidoFornecedorItemRecebido(
@@ -129,7 +156,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                             ItemId: item.Id,
                             ProdutoId: item.ProdutoId.Value,
                             EmpresaId: command.EmpresaId,
-                            QuantidadeRecebida: qtdRecebida,
+                            QuantidadeRecebida: delta,
                             DataRecebimento: dataRecebimento);
 
                         await publicadorEventos.PublicarAsync(eventoItem);
@@ -148,11 +175,19 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 }
             }
 
-            // 3. ATUALIZAR PEDIDO
-            pedido.Status = Domain.Enums.StatusPedidoFornecedor.Recebido;
+            // 3. ATUALIZAR PEDIDO — total absoluto vs pedido determina parcial/total.
+            var totalPedido = itens.Sum(i => i.Quantidade);
+            var totalRecebidoApos = itens.Sum(i => i.QuantidadeRecebida);
+            pedido.Status = totalRecebidoApos >= totalPedido
+                ? Domain.Enums.StatusPedidoFornecedor.Recebido
+                : Domain.Enums.StatusPedidoFornecedor.RecebidoParcial;
             pedido.DataRecebimento = dataRecebimento;
             pedido.AlteradoEm = DateTime.UtcNow;
             await pedidoRepository.UpdateAsync(pedido);
+
+            logger.LogInformation(
+                "Pedido {PedidoId} status apos recebimento: {Status} (recebido {Recebido} de {Pedido})",
+                command.PedidoId, pedido.Status, totalRecebidoApos, totalPedido);
 
             // 4. COMMIT TRANSAÇÃO
             await unitOfWork.CommitAsync();

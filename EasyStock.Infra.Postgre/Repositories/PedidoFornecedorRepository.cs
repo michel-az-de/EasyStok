@@ -40,7 +40,8 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
         await dbContext.PedidosFornecedor
             .AsNoTracking()
             .Where(x => x.EmpresaId == empresaId &&
-                        x.Status == StatusPedidoFornecedor.Recebido &&
+                        (x.Status == StatusPedidoFornecedor.Recebido
+                         || x.Status == StatusPedidoFornecedor.RecebidoParcial) &&
                         x.DataRecebimento.HasValue &&
                         x.DataRecebimento.Value >= de &&
                         x.DataRecebimento.Value <= ate)

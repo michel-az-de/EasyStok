@@ -171,7 +171,8 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
 
     public async Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosRecebidosNoPeriodoAsync(Guid empresaId, DateTime de, DateTime ate) =>
         await Collection.Find(x => x.EmpresaId == empresaId &&
-                                   x.Status == StatusPedidoFornecedor.Recebido &&
+                                   (x.Status == StatusPedidoFornecedor.Recebido
+                                    || x.Status == StatusPedidoFornecedor.RecebidoParcial) &&
                                    x.DataRecebimento.HasValue &&
                                    x.DataRecebimento.Value >= de &&
                                    x.DataRecebimento.Value <= ate)
