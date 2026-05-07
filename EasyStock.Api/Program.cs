@@ -604,17 +604,17 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 
-// Aviso de seguranca em Production: se Mobile:RequireApiKey ainda esta false,
-// /api/mobile/sync aceita request anonimo. Configurar a env var
-// Mobile__RequireApiKey=true no App Service quando todos os APKs estiverem
-// pareados (ver Mobile/DEPLOY-RUNBOOK.md, Passo 6).
+// Aviso de seguranca em Production: o default agora e RequireApiKey=true
+// (appsettings.Production.json). Se algum operador setou Mobile__RequireApiKey=false
+// via env var explicita, o sync mobile aceita requests anonimos e isso fica
+// gritando como warning ate ele virar de volta.
 if (app.Environment.IsProduction()
     && !app.Configuration.GetValue<bool>("Mobile:RequireApiKey"))
 {
     app.Logger.LogWarning(
-        "Mobile:RequireApiKey={Value} em Production — /api/mobile/sync aceita request anonimo. " +
-        "Recomendado virar true via env var Mobile__RequireApiKey=true.",
-        false);
+        "Mobile:RequireApiKey=false em Production por override explicito — " +
+        "/api/mobile/sync aceita request anonimo. Restaurar default true assim " +
+        "que todos os APKs estiverem pareados via /dispositivos.");
 }
 
 app.Run();
