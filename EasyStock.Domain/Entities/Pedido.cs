@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Domain.Entities
 {
@@ -19,6 +20,13 @@ namespace EasyStock.Domain.Entities
     /// no momento da criação. Se o cliente editar dados depois, o pedido
     /// preserva como era na hora — importante pra histórico/audit.
     /// </para>
+    ///
+    /// <para>
+    /// Status: <see cref="Status"/> (string) é o formato legado preservado
+    /// pra compat com DB, PWA, mobile e MAUI. Use <see cref="StatusEnum"/>
+    /// pra leitura tipada e <see cref="MudarStatus"/> pra mudanças validadas
+    /// pela <see cref="PedidoStateMachine"/>.
+    /// </para>
     /// </summary>
     public class Pedido
     {
@@ -35,8 +43,24 @@ namespace EasyStock.Domain.Entities
         public string? ClienteApt { get; set; }
         public string? ClienteTelefone { get; set; }
 
-        /// <summary>"aguardando" | "preparando" | "pronto" | "entregue" | "cancelado".</summary>
-        public string Status { get; set; } = "aguardando";
+        /// <summary>
+        /// Status legado em string lowercase: "aguardando" | "preparando" |
+        /// "pronto" | "entregue" | "cancelado". Mantido público e mutable
+        /// pra compat com Sync mobile, EF, testes existentes e SeedData.
+        ///
+        /// Pra mudanças seguras com validação de transição use
+        /// <see cref="MudarStatus"/>. Pra leitura tipada use
+        /// <see cref="StatusEnum"/>.
+        /// </summary>
+        public string Status { get; set; } = StatusPedidoMapper.Aguardando;
+
+        /// <summary>
+        /// Leitura tipada do <see cref="Status"/>. Lança
+        /// <see cref="ArgumentException"/> se a string atual não for um
+        /// status conhecido (sinaliza dado corrompido em DB ou bug de
+        /// caller que escreveu valor inválido).
+        /// </summary>
+        public StatusPedido StatusEnum => StatusPedidoMapper.Parse(Status);
 
         public decimal Total { get; set; }
         public string? Observacoes { get; set; }
@@ -82,7 +106,7 @@ namespace EasyStock.Domain.Entities
                 ClienteNome = cliente?.Nome,
                 ClienteApt = cliente?.Apt,
                 ClienteTelefone = cliente?.Telefone,
-                Status = "aguardando",
+                Status = StatusPedidoMapper.Aguardando,
                 Total = 0m,
                 Origem = origem,
                 CriadoEm = agora,
@@ -98,21 +122,42 @@ namespace EasyStock.Domain.Entities
             AlteradoEm = DateTime.UtcNow;
         }
 
-        public bool EstaFinalizado => Status == "entregue" || Status == "cancelado";
+        public bool EstaFinalizado => PedidoStateMachine.EstaFinalizado(StatusEnum);
 
-        public void MarcarEntregue()
+        /// <summary>
+        /// Aplica transição de status validada pela
+        /// <see cref="PedidoStateMachine"/>. Idempotente: se já estiver no
+        /// status alvo, é no-op silenciosa.
+        ///
+        /// <para>
+        /// Side effects automáticos: <see cref="EntreguEm"/> setado em
+        /// transição para Entregue, <see cref="CanceladoEm"/> em transição
+        /// para Cancelado. <see cref="AlteradoEm"/> sempre atualiza.
+        /// </para>
+        ///
+        /// <exception cref="TransicaoInvalidaException">
+        /// Se a transição do status atual pra <paramref name="novo"/> não
+        /// for permitida pela máquina de estados.
+        /// </exception>
+        /// </summary>
+        public void MudarStatus(StatusPedido novo)
         {
-            Status = "entregue";
-            EntreguEm = DateTime.UtcNow;
-            AlteradoEm = DateTime.UtcNow;
+            var atual = StatusEnum;
+            if (atual == novo) return; // idempotência
+
+            PedidoStateMachine.EnsureTransicaoValida(atual, novo);
+
+            var agora = DateTime.UtcNow;
+            Status = StatusPedidoMapper.Format(novo);
+            AlteradoEm = agora;
+
+            if (novo == StatusPedido.Entregue) EntreguEm = agora;
+            else if (novo == StatusPedido.Cancelado) CanceladoEm = agora;
         }
 
-        public void Cancelar()
-        {
-            Status = "cancelado";
-            CanceladoEm = DateTime.UtcNow;
-            AlteradoEm = DateTime.UtcNow;
-        }
+        public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
+
+        public void Cancelar() => MudarStatus(StatusPedido.Cancelado);
 
         public decimal TotalPago
         {

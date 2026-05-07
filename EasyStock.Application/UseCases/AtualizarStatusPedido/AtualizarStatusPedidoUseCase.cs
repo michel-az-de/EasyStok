@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -20,17 +21,17 @@ public sealed record AtualizarStatusPedidoCommand(
 /// <summary>
 /// Atualiza o status do pedido (aguardando → preparando → pronto → entregue).
 ///
-/// State machine explícita (transições válidas):
-///   aguardando  → {preparando, cancelado}
-///   preparando  → {pronto, cancelado}
-///   pronto      → {entregue, cancelado}
-///   entregue    → {cancelado}  (cancelamento pós-entrega devolve estoque)
-///   cancelado   → ∅
+/// Validação de transição é feita pela <see cref="PedidoStateMachine"/>
+/// (centralizada no Domain). Este use case orquestra apenas:
+///   1. parse do status string do command para enum
+///   2. integração com estoque conforme a transição
+///   3. delegação a <see cref="Pedido.MudarStatus"/>
+///   4. registro de evento de auditoria + commit
 ///
 /// Integração com estoque (PedidoEstoqueIntegrationService):
-///   - Transição → "pronto" ou "entregue" (e estoque ainda não foi descontado):
+///   - Transição → Pronto ou Entregue (e estoque ainda não foi descontado):
 ///     desconta itens com ProdutoId.
-///   - Transição → "cancelado" (e estoque havia sido descontado):
+///   - Transição → Cancelado (e estoque havia sido descontado):
 ///     devolve itens com ProdutoId.
 ///   - Idempotente: usa MovimentacaoEstoque.ReferenciaDocumento = pedidoId
 ///     pra evitar duplicação em retries.
@@ -41,28 +42,12 @@ public class AtualizarStatusPedidoUseCase(
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
-    // Matriz de transições válidas (origem → conjunto de destinos permitidos).
-    private static readonly Dictionary<string, HashSet<string>> Transicoes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["aguardando"] = new(StringComparer.OrdinalIgnoreCase) { "preparando", "cancelado" },
-        ["preparando"] = new(StringComparer.OrdinalIgnoreCase) { "pronto", "cancelado" },
-        ["pronto"]     = new(StringComparer.OrdinalIgnoreCase) { "entregue", "cancelado" },
-        ["entregue"]   = new(StringComparer.OrdinalIgnoreCase) { "cancelado" },
-        ["cancelado"]  = new(StringComparer.OrdinalIgnoreCase)
-    };
-
-    private static readonly HashSet<string> StatusQueDescontamEstoque = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "pronto", "entregue"
-    };
-
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.Id, "Id");
 
-        var status = (cmd.Status ?? "").Trim().ToLowerInvariant();
-        if (!Transicoes.ContainsKey(status))
+        if (!StatusPedidoMapper.TryParse(cmd.Status, out var statusNovo))
             throw new UseCaseValidationException($"Status inválido: {cmd.Status}");
 
         // CRITICAL: usar GetByIdWithDetailsAsync para carregar Itens (Include).
@@ -71,22 +56,26 @@ public class AtualizarStatusPedidoUseCase(
         var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
         if (pedido == null) return null;
 
-        var statusAtual = (pedido.Status ?? "").Trim().ToLowerInvariant();
+        var statusAtual = pedido.StatusEnum;
 
-        if (statusAtual == status)
+        if (statusAtual == statusNovo)
             return CriarPedidoUseCase.Map(pedido); // idempotente
 
-        // Validação de transição.
-        if (!Transicoes.TryGetValue(statusAtual, out var destinosValidos)
-            || !destinosValidos.Contains(status))
+        // Validação de transição (lança TransicaoInvalidaException se inválida).
+        // Convertemos pra UseCaseValidationException pra preservar o contrato
+        // HTTP atual (400 Bad Request) que clients (PWA, mobile, MAUI) esperam.
+        try
         {
-            throw new UseCaseValidationException(
-                $"Transição inválida: {statusAtual} → {status}.");
+            PedidoStateMachine.EnsureTransicaoValida(statusAtual, statusNovo);
+        }
+        catch (TransicaoInvalidaException ex)
+        {
+            throw new UseCaseValidationException(ex.Message);
         }
 
-        var statusAntigo = pedido.Status;
-        var eraEstoqueDescontado = StatusQueDescontamEstoque.Contains(statusAtual);
-        var seraEstoqueDescontado = StatusQueDescontamEstoque.Contains(status);
+        var statusAntigoStr = pedido.Status;
+        var eraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusAtual);
+        var seraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusNovo);
 
         // Integração estoque PRIMEIRO — se falhar (ex: estoque insuficiente),
         // status não é alterado e o caller recebe a exceção. Atomicidade
@@ -96,23 +85,24 @@ public class AtualizarStatusPedidoUseCase(
         {
             await estoqueIntegration.DescontarAsync(pedido);
         }
-        else if (eraEstoqueDescontado && status == "cancelado")
+        else if (eraEstoqueDescontado && statusNovo == StatusPedido.Cancelado)
         {
             await estoqueIntegration.DevolverAsync(pedido);
         }
 
-        // Só agora muda o status (estoque já reservado/devolvido com sucesso).
-        if (status == "entregue") pedido.MarcarEntregue();
-        else if (status == "cancelado") pedido.Cancelar();
-        else { pedido.Status = status; pedido.AlteradoEm = DateTime.UtcNow; }
+        // Estoque OK — agora aplica transição no agregado. MudarStatus é
+        // idempotente e re-valida (defesa em profundidade); como já validamos
+        // acima, o re-check é apenas paranoia barata.
+        pedido.MudarStatus(statusNovo);
 
+        var statusNovoStr = StatusPedidoMapper.Format(statusNovo);
         await pedidoRepo.AddEventoAsync(new PedidoEvento
         {
             Id = Guid.NewGuid(),
             PedidoId = pedido.Id,
             Tipo = "status_changed",
-            StatusAntigo = statusAntigo,
-            StatusNovo = status,
+            StatusAntigo = statusAntigoStr,
+            StatusNovo = statusNovoStr,
             UsuarioId = cmd.UsuarioId,
             UsuarioNome = cmd.UsuarioNome,
             Origem = cmd.Origem,
@@ -122,7 +112,7 @@ public class AtualizarStatusPedidoUseCase(
         await pedidoRepo.UpdateAsync(pedido);
         await uow.CommitAsync();
 
-        logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigo, status);
+        logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigoStr, statusNovoStr);
         return CriarPedidoUseCase.Map(pedido);
     }
 }

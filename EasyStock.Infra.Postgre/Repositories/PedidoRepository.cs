@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -87,11 +88,16 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task RemovePagamentoAsync(Guid pagamentoId) =>
             db.Set<PedidoPagamento>().Where(p => p.Id == pagamentoId).ExecuteDeleteAsync();
 
+        // Strings canônicas dos status "abertos" derivadas da PedidoStateMachine.
+        // Materializa em ToArray() pra que o EF Core traduza em IN (...) no SQL.
+        private static readonly string[] StatusAbertos = PedidoStateMachine.Abertos
+            .Select(StatusPedidoMapper.Format)
+            .ToArray();
+
         public Task<bool> ExistemPedidosAbertosComProdutoAsync(Guid empresaId, Guid produtoId)
         {
-            var statusAbertos = new[] { "aguardando", "preparando", "pronto" };
             return db.Pedidos.AsNoTracking()
-                .Where(p => p.EmpresaId == empresaId && statusAbertos.Contains(p.Status))
+                .Where(p => p.EmpresaId == empresaId && StatusAbertos.Contains(p.Status))
                 .SelectMany(p => p.Itens)
                 .AnyAsync(i => i.ProdutoId == produtoId);
         }
