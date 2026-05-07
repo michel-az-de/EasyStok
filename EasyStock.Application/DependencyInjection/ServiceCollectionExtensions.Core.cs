@@ -42,6 +42,12 @@ using EasyStock.Application.UseCases.ListarPlanos;
 using EasyStock.Application.UseCases.ListarFaturas;
 using EasyStock.Application.UseCases.CancelarAssinatura;
 using EasyStock.Application.UseCases.AlterarPlano;
+using EasyStock.Application.UseCases.Faturas.EmitirFatura;
+using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
+using EasyStock.Application.UseCases.Faturas.CancelarFatura;
+using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
+using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
+using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -123,6 +129,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarFaturasUseCase>();
         services.AddScoped<CancelarAssinaturaUseCase>();
         services.AddScoped<AlterarPlanoUseCase>();
+
+        // Modulo Financeiro (F1+) — Faturas
+        services.AddScoped<EmitirFaturaUseCase>();
+        services.AddScoped<RegistrarPagamentoFaturaUseCase>();
+        services.AddScoped<CancelarFaturaUseCase>();
+        services.AddScoped<ListarFaturasClienteUseCase>();
+        services.AddScoped<ListarFaturasAdminUseCase>();
+        services.AddScoped<ObterFaturaDetalheUseCase>();
 
         return services;
     }

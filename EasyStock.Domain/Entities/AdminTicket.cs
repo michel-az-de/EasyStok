@@ -32,11 +32,19 @@ namespace EasyStock.Domain.Entities
         // Auto-relacionamento (bug-fix encaminhado para dev)
         public Guid? OrigemTicketId { get; set; }
 
+        /// <summary>
+        /// FK opcional a uma <see cref="Fatura"/> relacionada (categoria=Financeiro).
+        /// Permite cliente abrir ticket sobre uma fatura especifica e admin ver
+        /// fatura linkada no detalhe. ON DELETE SET NULL.
+        /// </summary>
+        public Guid? FaturaId { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Usuario? CriadoPor { get; set; }
         public Usuario? Atendente { get; set; }
         public AdminTicket? OrigemTicket { get; set; }
         public AdminTicketTecnicoMeta? MetaTecnico { get; set; }
+        public Fatura? Fatura { get; set; }
         public ICollection<AdminTicketMensagem> Mensagens { get; set; } = new List<AdminTicketMensagem>();
 
         public static AdminTicket Criar(

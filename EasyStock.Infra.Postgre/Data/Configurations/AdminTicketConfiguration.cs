@@ -41,6 +41,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(t => t.OrigemTicketId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // FK opcional para Fatura (categoria=Financeiro)
+            builder.HasOne(t => t.Fatura)
+                .WithMany()
+                .HasForeignKey(t => t.FaturaId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasMany(t => t.Mensagens)
                 .WithOne(m => m.Ticket)
                 .HasForeignKey(m => m.TicketId)
@@ -56,6 +62,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ix_admin_tickets_nivel_status");
             builder.HasIndex(t => t.OrigemTicketId)
                 .HasDatabaseName("ix_admin_tickets_origem_ticket_id");
+            builder.HasIndex(t => t.FaturaId)
+                .HasDatabaseName("ix_admin_tickets_fatura_id")
+                .HasFilter("\"FaturaId\" IS NOT NULL");
             builder.HasIndex(t => new { t.Status, t.PrazoResposta })
                 .HasDatabaseName("ix_admin_tickets_status_prazo_resposta")
                 .HasFilter("\"Status\" IN ('Aberto','EmAtendimento','AguardandoCliente') AND \"PrazoResposta\" IS NOT NULL");
