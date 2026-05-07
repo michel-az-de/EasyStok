@@ -1,0 +1,85 @@
+name: dual-frontend-drift
+
+on:
+  pull_request:
+    paths:
+      - 'EasyStock.Api/wwwroot/pwa/**'
+      - 'EasyStok.Mobile/Resources/Raw/pwa/**'
+  push:
+    branches: [master]
+    paths:
+      - 'EasyStock.Api/wwwroot/pwa/**'
+      - 'EasyStok.Mobile/Resources/Raw/pwa/**'
+
+permissions:
+  contents: read
+
+jobs:
+  check-sha256-drift:
+    name: PWA <-> MAUI Resources/Raw byte-identicidade
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare SHA256 of PWA files
+        run: |
+          set -e
+          PWA_SRC="EasyStock.Api/wwwroot/pwa"
+          PWA_MAUI="EasyStok.Mobile/Resources/Raw/pwa"
+
+          if [ ! -d "$PWA_SRC" ]; then
+            echo "::error::Diretorio fonte do PWA nao encontrado: $PWA_SRC"
+            exit 1
+          fi
+          if [ ! -d "$PWA_MAUI" ]; then
+            echo "::error::Diretorio empacotado MAUI nao encontrado: $PWA_MAUI"
+            exit 1
+          fi
+
+          # Lista arquivos relativos a $PWA_SRC, calcula sha256 dos dois lados,
+          # falha se algum diverge ou esta ausente em um lado.
+          rc=0
+          declare -A miss
+          while IFS= read -r f; do
+            rel="${f#$PWA_SRC/}"
+            src_hash=$(sha256sum "$f" | awk '{print $1}')
+            maui_path="$PWA_MAUI/$rel"
+            if [ ! -f "$maui_path" ]; then
+              echo "::error file=$maui_path::Arquivo presente em $PWA_SRC mas ausente em $PWA_MAUI ($rel)"
+              rc=1
+              miss[$rel]=1
+              continue
+            fi
+            maui_hash=$(sha256sum "$maui_path" | awk '{print $1}')
+            if [ "$src_hash" != "$maui_hash" ]; then
+              echo "::error file=$maui_path::Hash divergente em $rel"
+              echo "  PWA  ($f): $src_hash"
+              echo "  MAUI ($maui_path): $maui_hash"
+              rc=1
+            else
+              echo "[ok] $rel"
+            fi
+          done < <(find "$PWA_SRC" -type f \( -name '*.html' -o -name '*.js' -o -name '*.json' -o -name '*.css' -o -name '*.svg' -o -name '*.png' -o -name '*.ico' \))
+
+          # Verifica reverso: arquivos em MAUI mas nao em PWA src.
+          while IFS= read -r f; do
+            rel="${f#$PWA_MAUI/}"
+            src_path="$PWA_SRC/$rel"
+            if [ ! -f "$src_path" ] && [ -z "${miss[$rel]:-}" ]; then
+              echo "::error file=$f::Arquivo presente em MAUI mas ausente em $PWA_SRC ($rel)"
+              rc=1
+            fi
+          done < <(find "$PWA_MAUI" -type f \( -name '*.html' -o -name '*.js' -o -name '*.json' -o -name '*.css' -o -name '*.svg' -o -name '*.png' -o -name '*.ico' \))
+
+          if [ $rc -ne 0 ]; then
+            echo ""
+            echo "::error::PWA fora de sincronia com copia empacotada MAUI."
+            echo "Execute: cp -r EasyStock.Api/wwwroot/pwa/* EasyStok.Mobile/Resources/Raw/pwa/"
+            echo "Bump tambem ApplicationVersion e ApplicationDisplayVersion no .csproj do MAUI."
+            echo "Ver .knowledge/dual-frontend-policy.md."
+            exit $rc
+          fi
+
+          echo ""
+          echo "OK: PWA byte-identico em wwwroot e MAUI Resources/Raw."
