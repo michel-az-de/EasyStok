@@ -12,7 +12,6 @@ namespace EasyStock.Api.Controllers;
 
 [ApiController]
 [Route("api/webhooks")]
-[AllowAnonymous]
 public class WebhookPixController(
     ICobrancaAssinaturaRepository cobrancaRepo,
     IAssinaturaEmpresaRepository assinaturaRepo,
@@ -22,6 +21,7 @@ public class WebhookPixController(
     ILogger<WebhookPixController> logger) : ControllerBase
 {
     [HttpPost("pix")]
+    [AllowAnonymous]
     public async Task<IActionResult> Pix()
     {
         // Lê body bruto pra calcular HMAC e desserializar.
@@ -80,27 +80,40 @@ public class WebhookPixController(
         var secret = configuration["Efi:WebhookSecret"];
         if (string.IsNullOrWhiteSpace(secret))
         {
-            return string.Equals(configuration["Efi:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase);
+            // Bool tipado: "true" string ou bool true caem em true; qualquer outra
+            // coisa = false. Evita interpretacao frouxa de string.
+            var allowUnsigned = configuration.GetValue<bool>("Efi:WebhookAllowUnsigned", false);
+            if (allowUnsigned)
+            {
+                logger.LogWarning(
+                    "Webhook Pix: secret ausente E WebhookAllowUnsigned=true — aceitando sem assinatura. " +
+                    "NAO usar essa combinacao em Production.");
+            }
+            return allowUnsigned;
         }
 
         var headerSig = Request.Headers["X-Efi-Signature"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(headerSig)) return false;
 
-        // Replay protection: header X-Efi-Timestamp em ms unix; aceita janela ±5min.
+        // Replay protection: header X-Efi-Timestamp em ms unix; janela ±5min.
+        // Fail-secure: timestamp ausente ou invalido = recusa (antes pulava o
+        // check, abrindo brecha de replay sem o header).
         var tsHeader = Request.Headers["X-Efi-Timestamp"].FirstOrDefault();
-        if (long.TryParse(tsHeader, out var ts))
+        if (string.IsNullOrWhiteSpace(tsHeader) || !long.TryParse(tsHeader, out var ts))
         {
-            var diff = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - ts);
-            if (diff > 5 * 60 * 1000)
-            {
-                logger.LogWarning("Webhook Pix: timestamp fora da janela ({Diff}ms). Recusando.", diff);
-                return false;
-            }
+            logger.LogWarning("Webhook Pix: X-Efi-Timestamp ausente ou invalido. Recusando.");
+            return false;
         }
 
-        // Inclui timestamp no payload assinado se presente (defesa contra replay
-        // mesmo se atacante reenviar com timestamp atualizado).
-        var toSign = string.IsNullOrWhiteSpace(tsHeader) ? body : $"{tsHeader}.{body}";
+        var diff = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - ts);
+        if (diff > 5 * 60 * 1000)
+        {
+            logger.LogWarning("Webhook Pix: timestamp fora da janela ({Diff}ms). Recusando.", diff);
+            return false;
+        }
+
+        // Timestamp prefixa o body assinado — defesa contra replay com novo ts.
+        var toSign = $"{tsHeader}.{body}";
 
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(toSign));
@@ -141,12 +154,26 @@ public class WebhookPixController(
                 return;
             }
 
-            if (valorPago.Value + 0.01m < cobranca.Valor)
+            const decimal toleranciaCentavo = 0.01m;
+            var diferenca = decimal.Round(valorPago.Value - cobranca.Valor, 2);
+
+            if (diferenca < -toleranciaCentavo)
             {
                 logger.LogWarning(
                     "Webhook Pix: valor pago ({Pago}) menor que esperado ({Esperado}) para txid {Txid}. Recusando.",
                     valorPago.Value, cobranca.Valor, txid);
                 return;
+            }
+
+            if (diferenca > toleranciaCentavo)
+            {
+                // Superpagamento detectado: confirma renovacao mas grita no log
+                // pra reconciliacao manual (eventual reembolso/ajuste contabil).
+                // NAO bloqueia ativacao do plano — cliente pagou de fato.
+                logger.LogWarning(
+                    "Webhook Pix: SUPERPAGAMENTO em txid {Txid}. Pago={Pago} Esperado={Esperado} Diferenca={Diferenca}. " +
+                    "Renovando assinatura, mas registrar reconciliacao manual.",
+                    txid, valorPago.Value, cobranca.Valor, diferenca);
             }
 
             cobranca.MarcarComoPaga();
