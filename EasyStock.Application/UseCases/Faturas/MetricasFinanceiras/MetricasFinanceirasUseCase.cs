@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 
@@ -7,7 +8,9 @@ public sealed record MetricasFinanceirasCommand(
     /// <summary>Janela retroativa em dias para o calculo de "no mes" (default 30).</summary>
     int DiasRetroativo = 30,
     /// <summary>Filtro opcional por empresa — admin operacional ja injeta sua empresa.</summary>
-    Guid? EmpresaId = null
+    Guid? EmpresaId = null,
+    /// <summary>F13 — quando true, ignora cache e recalcula. Default false (TTL 5min).</summary>
+    bool ForcarRefresh = false
 );
 
 /// <summary>
@@ -56,20 +59,36 @@ public sealed record MetricasFinanceirasResult(
 /// no <see cref="IFaturaRepository"/> e <see cref="IAssinaturaEmpresaRepository"/>.
 ///
 /// <para>
-/// Custos: 6 queries SQL no caso geral (4 GroupBy/Sum + 1 media + 1 top N).
-/// Para 100k faturas e 10k assinaturas, executa em &lt; 200ms em Postgres
-/// com indices em (EmpresaId, Status) e (DataEmissao). Cache server-side
-/// pode ser adicionado em F11+ se necessario.
+/// F13 — cache em <see cref="IMemoryCache"/> com TTL 5 minutos. Chave
+/// <c>metricas:{empresaId|null}:{dias}</c>. Sem cache, 6 queries SQL custavam
+/// ~200ms em Postgres com indices. Com cache, &lt; 1ms na hit. Invalidacao
+/// via <c>ForcarRefresh=true</c> (admin pode disparar pelo dashboard).
 /// </para>
 /// </summary>
 public class MetricasFinanceirasUseCase(
     IFaturaRepository faturaRepo,
-    IAssinaturaEmpresaRepository assinaturaRepo)
+    IAssinaturaEmpresaRepository assinaturaRepo,
+    IMemoryCache cache)
 {
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
     public async Task<MetricasFinanceirasResult> ExecuteAsync(
         MetricasFinanceirasCommand cmd, CancellationToken ct = default)
     {
         var dias = Math.Clamp(cmd.DiasRetroativo, 1, 365);
+        var cacheKey = $"metricas:{cmd.EmpresaId?.ToString("N") ?? "all"}:{dias}";
+
+        if (!cmd.ForcarRefresh && cache.TryGetValue(cacheKey, out MetricasFinanceirasResult? cached) && cached is not null)
+            return cached;
+
+        var result = await ComputarAsync(dias, cmd.EmpresaId, ct);
+        cache.Set(cacheKey, result, CacheTtl);
+        return result;
+    }
+
+    private async Task<MetricasFinanceirasResult> ComputarAsync(
+        int dias, Guid? empresaId, CancellationToken ct)
+    {
         var fim = DateTime.UtcNow;
         var inicio = fim.AddDays(-dias);
 
@@ -81,14 +100,14 @@ public class MetricasFinanceirasUseCase(
         var canceladas = statusAssinaturas.GetValueOrDefault(StatusAssinatura.Cancelada, 0);
 
         // Faturas — agregacoes do periodo + estado atual (vencidas).
-        var contagensPeriodo = await faturaRepo.ContarPorStatusAsync(inicio, fim, cmd.EmpresaId, ct);
-        var totaisPeriodo = await faturaRepo.SomarTotalPorStatusAsync(inicio, fim, cmd.EmpresaId, ct);
+        var contagensPeriodo = await faturaRepo.ContarPorStatusAsync(inicio, fim, empresaId, ct);
+        var totaisPeriodo = await faturaRepo.SomarTotalPorStatusAsync(inicio, fim, empresaId, ct);
 
         // Vencidas: usamos um range "all-time" (1 ano) — vencidas que nao foram pagas
         // antes do periodo continuam relevantes. Se quiser snapshot, basta nao filtrar.
         var inicioVencidas = fim.AddDays(-365);
-        var contagensVencidas = await faturaRepo.ContarPorStatusAsync(inicioVencidas, fim, cmd.EmpresaId, ct);
-        var totaisVencidas = await faturaRepo.SomarTotalPorStatusAsync(inicioVencidas, fim, cmd.EmpresaId, ct);
+        var contagensVencidas = await faturaRepo.ContarPorStatusAsync(inicioVencidas, fim, empresaId, ct);
+        var totaisVencidas = await faturaRepo.SomarTotalPorStatusAsync(inicioVencidas, fim, empresaId, ct);
 
         var emitidas = contagensPeriodo.GetValueOrDefault(StatusFatura.Emitida, 0)
             + contagensPeriodo.GetValueOrDefault(StatusFatura.Paga, 0)
@@ -101,8 +120,8 @@ public class MetricasFinanceirasUseCase(
 
         var taxa = emitidas > 0 ? Math.Round((decimal)pagas / emitidas * 100m, 1) : 0m;
         var ticketMedio = pagas > 0 ? Math.Round(receita / pagas, 2) : 0m;
-        var atrasoMedio = await faturaRepo.MediaDiasAtrasoVencidasAsync(cmd.EmpresaId, ct);
-        var topInadimplentes = cmd.EmpresaId.HasValue
+        var atrasoMedio = await faturaRepo.MediaDiasAtrasoVencidasAsync(empresaId, ct);
+        var topInadimplentes = empresaId.HasValue
             ? Array.Empty<TopInadimplenteResult>() // filtro por 1 empresa elimina top-N
             : await faturaRepo.TopInadimplentesAsync(limit: 5, ct);
 
