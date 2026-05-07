@@ -8,6 +8,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : IAssinaturaEmpresaRepository
     {
+        public Task<AssinaturaEmpresa?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+            dbContext.AssinaturasEmpresa
+                .Include(a => a.Plano)
+                .FirstOrDefaultAsync(a => a.Id == id, ct);
+
         public async Task<IEnumerable<AssinaturaEmpresa>> GetByEmpresaAsync(Guid empresaId) =>
             await dbContext.AssinaturasEmpresa
                 .AsNoTracking()

@@ -444,6 +444,14 @@ public sealed class AssinaturaEmpresaRepository(MongoEasyStockContext context, M
     private IMongoCollection<AssinaturaEmpresa> Collection => Context.GetCollection<AssinaturaEmpresa>(MongoCollectionNames.AssinaturasEmpresa);
     private IMongoCollection<Plano> Planos => Context.GetCollection<Plano>(MongoCollectionNames.Planos);
 
+    public async Task<AssinaturaEmpresa?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var assinatura = await Collection.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+        if (assinatura is null) return null;
+        assinatura.Plano = await Planos.Find(x => x.Id == assinatura.PlanoId).FirstOrDefaultAsync(ct);
+        return assinatura;
+    }
+
     public async Task<IEnumerable<AssinaturaEmpresa>> GetByEmpresaAsync(Guid empresaId)
     {
         var assinaturas = await Collection.Find(x => x.EmpresaId == empresaId).ToListAsync();
