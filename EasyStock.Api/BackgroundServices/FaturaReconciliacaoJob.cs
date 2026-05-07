@@ -1,9 +1,7 @@
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -64,7 +62,7 @@ public sealed class FaturaReconciliacaoJob(
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                logger.LogError(ex, "FaturaReconciliacaoJob: erro fatal — aguardando 30min antes do proximo retry.");
+                logger.LogError(ex, "FaturaReconciliacaoJob: erro fatal — aguardando 1h antes do proximo retry.");
             }
 
             try { await Task.Delay(TimeSpan.FromHours(1), stoppingToken); }
@@ -120,7 +118,6 @@ public sealed class FaturaReconciliacaoJob(
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IPagamentoGatewayRouter>();
-        var registrar = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoFaturaUseCase>();
 
         var agora = DateTime.UtcNow;
         var idadeMinima = agora.AddHours(-1);
@@ -180,23 +177,29 @@ public sealed class FaturaReconciliacaoJob(
 
                     if (status == StatusGateway.Confirmado)
                     {
-                        // Fecha o gap — registra um pagamento confirmado adicional
-                        // (idempotencia local: o RegistrarPagamentoFaturaUseCase chama
-                        //  Fatura.RegistrarPagamento que e atomico).
+                        // Fecha o gap operando direto no agregado ja tracked: o use case
+                        // RegistrarPagamentoFaturaUseCase nao serve aqui porque o repo dele
+                        // aplica Global Query Filter de tenant — em background sem
+                        // ICurrentUserAccessor o GetByIdAsync sempre retorna null. Trabalhar
+                        // direto na entidade evita o filtro e mantem a operacao atomica.
                         try
                         {
-                            await registrar.ExecuteAsync(new RegistrarPagamentoFaturaCommand(
-                                EmpresaId: fatura.EmpresaId,
-                                FaturaId: fatura.Id,
-                                Metodo: pag.Metodo,
-                                Valor: pag.Valor,
-                                GatewayProvedor: pag.GatewayProvedor,
-                                GatewayTransactionId: pag.GatewayTransactionId,
-                                DadosGatewayJson: pag.DadosGatewayJson,
-                                StatusInicial: StatusFaturaPagamento.Confirmado,
-                                Observacao: $"Confirmado via reconciliacao (webhook perdido).",
-                                OrigemRegistro: "job-reconciliacao"
-                            ), ct);
+                            var pagamentoConfirmado = FaturaPagamento.CriarConfirmado(
+                                faturaId: fatura.Id,
+                                metodo: pag.Metodo,
+                                valor: pag.Valor,
+                                gatewayProvedor: pag.GatewayProvedor,
+                                gatewayTransactionId: pag.GatewayTransactionId,
+                                dadosGatewayJson: pag.DadosGatewayJson,
+                                observacao: "Confirmado via reconciliacao (webhook perdido).");
+
+                            fatura.RegistrarPagamento(pagamentoConfirmado);
+
+                            db.FaturaEventos.Add(FaturaEvento.Criar(
+                                fatura.Id,
+                                TipoEventoFatura.PagamentoConfirmado,
+                                origem: "job-reconciliacao",
+                                valorDepois: $"+{pagamentoConfirmado.Valor:F2} {fatura.Moeda} via {pagamentoConfirmado.Metodo} ({pagamentoConfirmado.GatewayProvedor})"));
 
                             db.FaturaEventos.Add(FaturaEvento.Criar(
                                 fatura.Id,
@@ -209,10 +212,10 @@ public sealed class FaturaReconciliacaoJob(
                                 "FaturaReconciliacaoJob: gap fechado. FaturaId={FaturaId} Numero={Numero} txid={Txid}",
                                 fatura.Id, fatura.Numero, pag.GatewayTransactionId);
                         }
-                        catch (Exception regEx)
+                        catch (RegraDeDominioVioladaException regEx)
                         {
-                            logger.LogError(regEx,
-                                "FaturaReconciliacaoJob: falha ao registrar pagamento confirmado. FaturaId={FaturaId}",
+                            logger.LogWarning(regEx,
+                                "FaturaReconciliacaoJob: regra de dominio impediu fechar gap. FaturaId={FaturaId}",
                                 fatura.Id);
                         }
                     }
