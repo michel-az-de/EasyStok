@@ -27,5 +27,8 @@ public enum TipoEventoNotificacao
     FaturaPaga = 21,
     FaturaVencida = 22,
     PagamentoConfirmado = 23,
-    PagamentoFalhou = 24
+    PagamentoFalhou = 24,
+
+    // Modulo Helpdesk — convite CSAT pos fechamento
+    ConviteCsat = 25
 }

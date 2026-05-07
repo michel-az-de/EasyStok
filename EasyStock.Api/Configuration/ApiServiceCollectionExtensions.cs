@@ -78,11 +78,15 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaResolver>();
+        services.AddScoped<EasyStock.Application.Ports.Output.Helpdesk.ISlaResolver>(sp =>
+            sp.GetRequiredService<EasyStock.Api.Services.Helpdesk.SlaResolver>());
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskTicketService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskAnexoService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskBugFixService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskDashboardService>();
+        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskRelatorioService>();
         services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
         // F14 — auto-ticket categoria=Financeiro apos N falhas de pagamento.
         services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
