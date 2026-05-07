@@ -103,6 +103,23 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IEfiBoletoService, NoopEfiBoletoService>();
         }
 
+        // F12 — Adapters de gateways internacionais (stubs).
+        // Registrados apenas quando ha credenciais OU quando AllowUnsigned=true
+        // (DEV/sandbox). Em prod sem credenciais, permanecem fora do router para
+        // nao oferecer metodos que vao falhar.
+        if (!string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"])
+            || string.Equals(configuration["Stripe:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IPagamentoGateway, StripeGatewayAdapter>();
+            services.AddSingleton<IWebhookSignatureValidator, StripeSignatureValidator>();
+        }
+        if (!string.IsNullOrWhiteSpace(configuration["MercadoPago:AccessToken"])
+            || string.Equals(configuration["MercadoPago:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IPagamentoGateway, MercadoPagoGatewayAdapter>();
+            services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
+        }
+
         return services;
     }
 }
