@@ -2,6 +2,28 @@
 
 > Resumo curado das ondas de feature mais recentes. Atualizar manualmente após sessão grande.
 
+## Snapshot 2026-05-07 — R6 Seed fragil mitigado (Onda 1)
+
+### O que mudou
+**R6 (Seed fragil, 35% de probabilidade de zerar dados em proximo deploy ou rebuild) caiu pra <5%** com 6 fixes em 1 PR. Cobre os 3 cenarios mais provaveis: (A) toggle humano `/seed/demo` em prod, (B) pipeline mascarando falha de migration via `|| true`, (C) seed automatico contra BD errado em rebuild.
+
+- **Advisory lock no startup** envolvendo migrations + todos os seeds — serializa multi-replica, mata race em DDL/seed concorrente. Chave centralizada em `EasyStock.Infra.Postgre/Concurrency/LockKeys.cs`. Refatorou os 5 callsites existentes (Cobranca, FaturaVenc, FaturaReco, SlaMonitor, NotifDispatcher) pra usar a mesma classe.
+- **Pipeline `deploy-azure.yml` fail-loud**: removido `|| true` da migration step + retry 3x com backoff exponencial + timeout 10min + idempotent SQL no GITHUB_STEP_SUMMARY (audit trail). Health check virou erro com polling 6x50s + depende do `migrate` job.
+- **`SeedData.ExecutarAsync` skipped fora de Development** salvo opt-in `SEED_DEMO_DATA=true`. Mata cenario C (banco errado + RunMigrationsOnStartup=true).
+- **Endpoint `/api/admin/seed/*` em Production exige double opt-in** (`SEED_API_ENABLED=true` E `SEED_API_ALLOW_PROD=true`) + `LogCritical` com email do caller, IP, timestamp, payload em todo hit em prod.
+- **`SuperAdminSeed` fail-fast em Production**: `SEED_SUPERADMIN_EMAIL`/`SEED_SUPERADMIN_PASSWORD` agora OBRIGATORIAS em prod, senha minimo 12 chars + lista de senhas conhecidas/fracas rejeitada (`Admin@2026!Secure`, `admin123` etc.). Catch generico em `Program.cs` so engole exception fora de prod.
+- **Testes de integracao** `EasyStock.Api.IntegrationTests/SeedFlowIntegrationTests.cs`: DB-do-zero + idempotencia 3x bloqueando merge via novo `.github/workflows/ci.yml`.
+- **Runbook PITR manual** em `docs/runbook/pg-restore-pitr.md` com procedimento exato + exercicio mensal + RTO ≤30min.
+
+### Roadmap R6 (proximas ondas)
+- **Onda 2 (P1)**: migration formal de `Empresa.IsSeedData` (remove `[NotMapped]`), dupla checagem em `UpsertEmpresaAsync` antes de pisar dados reais com CNPJ colidindo, dry-run mode, backup pre-deploy automatizado (precisa Service Principal Azure), alertas em prod via dispatcher de notificacoes.
+- **Onda 3 (P2)**: `SeedFingerprint` table + early-exit por hash, endpoint rollback `/api/admin/seed/rollback/{runId}`, cleanup script CLI, sentinela `Empresa.Source` enum.
+
+### BREAKING CHANGE
+`SEED_SUPERADMIN_PASSWORD` agora e env var **OBRIGATORIA em Production**. Senha hardcoded `Admin@2026!Secure` foi removida. App Service settings precisam ter a env var antes do merge — senao o startup quebra com mensagem clara apontando o que esta faltando.
+
+---
+
 ## Snapshot 2026-05-06
 
 ### Ondas concluídas (últimos 30 dias)
