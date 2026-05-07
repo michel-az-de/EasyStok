@@ -10,16 +10,10 @@ namespace EasyStock.Infra.Async.Pagamentos;
 /// envolve as chamadas e converte tipos.
 ///
 /// <para>
-/// Limitacoes atuais (refletem a interface <c>IEfiPixService</c>):
+/// F11 — implementacao completa de <c>ConsultarAsync</c> via <c>GET /v2/cob/{txid}</c>
+/// e <c>EstornarAsync</c> via <c>PUT /v2/pix/{e2eId}/devolucao/{idSolicitacao}</c>.
+/// Reconciliacao automatica (F6) agora destrava para Pix.
 /// </para>
-/// <list type="bullet">
-///   <item><c>ConsultarAsync</c> retorna <see cref="StatusGateway.Desconhecido"/> —
-///   o servico legado nao expoe consulta. Pode ser estendido em F6 (reconciliacao)
-///   adicionando endpoint <c>GET /v2/cob/{txid}</c> ao <see cref="IEfiPixService"/>.</item>
-///   <item><c>EstornarAsync</c> retorna falha com mensagem — Pix permite estorno
-///   ate 90 dias mas requer endpoint dedicado (<c>POST /v2/pix/{e2eId}/devolucao</c>).
-///   Implementar quando a feature for solicitada.</item>
-/// </list>
 /// </summary>
 public sealed class EfiPixGatewayAdapter(IEfiPixService pixService) : IPagamentoGateway
 {
@@ -56,18 +50,38 @@ public sealed class EfiPixGatewayAdapter(IEfiPixService pixService) : IPagamento
         );
     }
 
-    public Task<StatusGateway> ConsultarAsync(string transactionId, CancellationToken ct = default)
+    public async Task<StatusGateway> ConsultarAsync(string transactionId, CancellationToken ct = default)
     {
-        // Servico legado nao expoe consulta — F6 deve estender IEfiPixService
-        // com GetCobrancaAsync(txid) e atualizar este metodo.
-        return Task.FromResult(StatusGateway.Desconhecido);
+        if (string.IsNullOrWhiteSpace(transactionId)) return StatusGateway.Desconhecido;
+        var status = await pixService.ConsultarCobrancaAsync(transactionId, ct);
+        return status.Status switch
+        {
+            EfiCobrancaStatus.Concluida => StatusGateway.Confirmado,
+            EfiCobrancaStatus.Ativa => StatusGateway.Pendente,
+            EfiCobrancaStatus.RemovidaPeloUsuario => StatusGateway.Falhou,
+            EfiCobrancaStatus.RemovidaPeloPsp => StatusGateway.Falhou,
+            _ => StatusGateway.Desconhecido
+        };
     }
 
-    public Task<EstornoResult> EstornarAsync(string transactionId, decimal valor, CancellationToken ct = default)
+    public async Task<EstornoResult> EstornarAsync(string transactionId, decimal valor, CancellationToken ct = default)
     {
-        return Task.FromResult(new EstornoResult(
-            Sucesso: false,
-            Mensagem: "Estorno via Pix Efi nao implementado nesta versao. Use o portal Efi diretamente."
-        ));
+        if (string.IsNullOrWhiteSpace(transactionId))
+            return new EstornoResult(false, Mensagem: "transactionId vazio.");
+
+        // transactionId aqui e o txid da cobranca. Para estornar Pix, precisamos
+        // do e2eId (end-to-end ID do pagamento recebido), que esta no Pix
+        // recebido — consultamos a cobranca primeiro.
+        var consulta = await pixService.ConsultarCobrancaAsync(transactionId, ct);
+        if (string.IsNullOrWhiteSpace(consulta.E2eId))
+            return new EstornoResult(false, Mensagem: "e2eId nao disponivel — cobranca nao foi paga ou Efi nao retornou o id.");
+
+        var idSolicitacao = $"rev{Guid.NewGuid():N}"[..32]; // Efi exige <=35 chars alfanum
+        var resultado = await pixService.EstornarAsync(consulta.E2eId, idSolicitacao, valor, ct);
+        return new EstornoResult(
+            Sucesso: resultado.Sucesso,
+            ProtocoloEstorno: resultado.Id ?? idSolicitacao,
+            Mensagem: resultado.Mensagem
+        );
     }
 }

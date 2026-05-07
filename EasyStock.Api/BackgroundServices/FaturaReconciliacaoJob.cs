@@ -33,10 +33,8 @@ namespace EasyStock.Api.BackgroundServices;
 /// </para>
 ///
 /// <para>
-/// Limitacao atual: o <c>EfiPixGatewayAdapter.ConsultarAsync</c> retorna
-/// sempre <see cref="StatusGateway.Desconhecido"/> ate o
-/// <see cref="IEfiPixService"/> ser estendido com <c>GetCobrancaAsync(txid)</c>
-/// (TODO em release futura). Por enquanto o job roda mas e NO-OP para Pix.
+/// F11 — <see cref="IEfiPixService.ConsultarCobrancaAsync"/> ja foi implementado
+/// (<c>GET /v2/cob/{txid}</c>); reconciliacao agora funciona ponta-a-ponta para Pix.
 /// </para>
 /// </summary>
 public sealed class FaturaReconciliacaoJob(
