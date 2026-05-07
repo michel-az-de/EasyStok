@@ -16,6 +16,10 @@ public class CobrancaAssinaturaConfiguration : IEntityTypeConfiguration<Cobranca
     {
         builder.ToTable("CobrancasAssinatura");
 
+        // Valor: sem HasColumnType anteriormente, EF gerava numeric default
+        // (sem escala) — risco de truncamento em valores cobrados em centavos.
+        builder.Property(c => c.Valor).HasColumnType("decimal(14,2)");
+
         builder.HasOne(c => c.Fatura)
             .WithMany()
             .HasForeignKey(c => c.FaturaId)
