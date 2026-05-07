@@ -16,4 +16,7 @@ public sealed class WorkerOptions
 
     /// <summary>Hora UTC em que o serviço de anonimização roda diariamente. Padrão 3h.</summary>
     public int AnonimizarHoraUtc { get; set; } = 3;
+
+    /// <summary>Intervalo (em segundos) entre ticks do SlaMonitorService. Mínimo 60. Padrão 300 (5 min).</summary>
+    public int SlaMonitorIntervalSeconds { get; set; } = 300;
 }

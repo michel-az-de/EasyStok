@@ -83,6 +83,7 @@ builder.Services.AddHostedService<DispatcherOutboxService>();
 builder.Services.AddHostedService<AvaliadorRotinasService>();
 builder.Services.AddHostedService<ColetorEventosDeEstadoService>();
 builder.Services.AddHostedService<AnonimizarLogsAntigosService>();
+builder.Services.AddHostedService<SlaMonitorService>();
 
 // Health checks
 builder.Services.AddHealthChecks();
