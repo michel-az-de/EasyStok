@@ -203,7 +203,7 @@ public class AdminTicketsController(
         try
         {
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
-                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, AnexoIds: null, FaturaId: req.FaturaId));
+                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, FaturaId: req.FaturaId));
             await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }

@@ -14,7 +14,6 @@ public sealed record AbrirAdminTicketCommand(
     TicketCategoria Categoria,
     TicketPrioridade Prioridade,
     NivelAtendimento Nivel,
-    Guid? AnexoIds,
     Guid? FaturaId = null);
 
 public sealed record ResponderAdminTicketCommand(
