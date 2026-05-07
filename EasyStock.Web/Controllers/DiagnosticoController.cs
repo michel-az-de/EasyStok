@@ -23,6 +23,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         ViewBag.LatenciaApiMs = latenciaApiMs;
 
         ViewBag.IsAdmin = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+        ViewBag.ActiveMenuItem = "Diagnostico";
 
         return View(apiResult);
     }
