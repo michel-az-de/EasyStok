@@ -41,6 +41,10 @@ public sealed record EfiEstornoResult(
 
 public interface IEfiPixService
 {
+    /// <summary>
+    /// Emite uma cobranca Pix imediata via <c>POST /v2/cob/{txid}</c>.
+    /// Retorna QR code Base64 e copia-e-cola prontos para exibir ao pagador.
+    /// </summary>
     Task<EfiCobrancaResult> CriarCobrancaAsync(
         string txid,
         decimal valor,
