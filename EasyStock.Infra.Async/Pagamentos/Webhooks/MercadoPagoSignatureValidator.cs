@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -51,11 +52,11 @@ public sealed class MercadoPagoSignatureValidator(
         string? dataId = null;
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(rawBody);
+            using var doc = JsonDocument.Parse(rawBody);
             if (doc.RootElement.TryGetProperty("data", out var dataEl)
                 && dataEl.TryGetProperty("id", out var idEl))
             {
-                dataId = idEl.ValueKind == System.Text.Json.JsonValueKind.String
+                dataId = idEl.ValueKind == JsonValueKind.String
                     ? idEl.GetString()
                     : idEl.ToString();
             }

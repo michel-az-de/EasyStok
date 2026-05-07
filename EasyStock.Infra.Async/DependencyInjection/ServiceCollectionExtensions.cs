@@ -81,9 +81,8 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IEfiPixService, NoopEfiPixService>();
         }
 
-        // Efí Bank Boleto Gateway (reutiliza mesmo baseUrl que Pix, só muda endpoint v1)
-        var efiClientIdBoleto = configuration["Efi:ClientId"];
-        if (!string.IsNullOrWhiteSpace(efiClientIdBoleto))
+        // Efí Bank Boleto Gateway (reutiliza mesmo ClientId e chave Sandbox que Pix, só muda baseUrl e endpoint v1)
+        if (!string.IsNullOrWhiteSpace(efiClientId))
         {
             var isSandboxStr = configuration["Efi:Sandbox"];
             var isSandbox = !bool.TryParse(isSandboxStr, out var sb2) || sb2;
