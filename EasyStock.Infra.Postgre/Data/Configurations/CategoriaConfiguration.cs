@@ -11,6 +11,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.ToTable("categorias");
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Nome).IsRequired().HasMaxLength(120);
+            builder.Property(c => c.Descricao).HasMaxLength(1000);
             builder.HasOne(c => c.Empresa).WithMany(e => e.Categorias).HasForeignKey(c => c.EmpresaId);
             builder.HasOne(c => c.CategoriaPai).WithMany(c => c.SubCategorias).HasForeignKey(c => c.CategoriaPaiId).IsRequired(false);
         }

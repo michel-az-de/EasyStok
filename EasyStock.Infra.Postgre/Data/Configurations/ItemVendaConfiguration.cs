@@ -11,6 +11,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
         {
             builder.ToTable("itens_venda");
             builder.HasKey(iv => iv.Id);
+            builder.Property(iv => iv.DescricaoSnapshot).HasMaxLength(500);
             builder.Property(iv => iv.VariacaoSnapshot).HasMaxLength(180);
             builder.Property(iv => iv.Quantidade)
                 .HasConversion(
