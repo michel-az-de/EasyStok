@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.Financeiro.Categorias;
 using EasyStock.Application.UseCases.Financeiro.CentrosCusto;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
+using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -47,6 +48,15 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverParcelaContaReceberUseCase>();
         services.AddScoped<ListarContasReceberUseCase>();
         services.AddScoped<ObterContaReceberDetalheUseCase>();
+
+        // Pagamentos + Pix (Onda 4)
+        services.AddScoped<RegistrarPagamentoParcelaPagarUseCase>();
+        services.AddScoped<RegistrarPagamentoParcelaReceberUseCase>();
+        services.AddScoped<EstornarPagamentoParcelaPagarUseCase>();
+        services.AddScoped<EstornarPagamentoParcelaReceberUseCase>();
+        services.AddScoped<GerarPixQrParcelaReceberUseCase>();
+        services.AddScoped<LimparPixParcelaReceberUseCase>();
+        services.AddScoped<ReconciliarPixParcelaReceberUseCase>();
 
         return services;
     }

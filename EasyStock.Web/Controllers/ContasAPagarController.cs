@@ -112,6 +112,18 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
         return RedirectToAction(nameof(Detalhe), new { id });
     }
 
+    [HttpPost("/contas-a-pagar/{id:guid}/parcelas/{parcelaId:guid}/pagar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Pagar(Guid id, Guid parcelaId, decimal valor, string metodo, string? observacao = null)
+    {
+        if (valor <= 0m) { Toast("error", "Valor deve ser positivo."); return RedirectToAction(nameof(Detalhe), new { id }); }
+        if (string.IsNullOrWhiteSpace(metodo)) { Toast("error", "Metodo e obrigatorio."); return RedirectToAction(nameof(Detalhe), new { id }); }
+        var r = await svc.RegistrarPagamentoCpAsync(id, parcelaId, valor, metodo, observacao);
+        if (HasError(r)) return RedirectToAction(nameof(Detalhe), new { id });
+        Toast("success", $"Pagamento de {valor:C} registrado.");
+        return RedirectToAction(nameof(Detalhe), new { id });
+    }
+
     [HttpPost("/contas-a-pagar/{id:guid}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(Guid id, string motivo)

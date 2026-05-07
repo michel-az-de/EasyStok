@@ -163,4 +163,57 @@ public class FinanceiroService(ApiClient api, SessionService session)
 
     public Task<ApiResult<ContaReceberApi>> CancelarContaReceberAsync(Guid id, string motivo) =>
         api.PostAsync<ContaReceberApi>($"contas-a-receber/{id}/cancelar", new { empresaId = GetEmpresaId(), motivo });
+
+    // ── Pagamentos ────────────────────────────────────────────────────────
+
+    public Task<ApiResult<object>> RegistrarPagamentoCpAsync(Guid contaId, Guid parcelaId, decimal valor, string metodo, string? observacao)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
+        return api.PostAsync<object>($"contas-a-pagar/{contaId}/parcelas/{parcelaId}/pagamentos",
+            new { empresaId, valor, metodo, observacao, gatewayProvedor = "Manual" });
+    }
+
+    public Task<ApiResult<object>> RegistrarPagamentoCrAsync(Guid contaId, Guid parcelaId, decimal valor, string metodo, string? observacao)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
+        return api.PostAsync<object>($"contas-a-receber/{contaId}/parcelas/{parcelaId}/pagamentos",
+            new { empresaId, valor, metodo, observacao, gatewayProvedor = "Manual" });
+    }
+
+    public Task<ApiResult<object>> EstornarPagamentoCpAsync(Guid parcelaId, Guid pagId, string? motivo)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
+        return api.PostAsync<object>($"contas-a-pagar/parcelas/{parcelaId}/pagamentos/{pagId}/estornar",
+            new { empresaId, motivo });
+    }
+
+    public Task<ApiResult<object>> EstornarPagamentoCrAsync(Guid parcelaId, Guid pagId, string? motivo)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
+        return api.PostAsync<object>($"contas-a-receber/parcelas/{parcelaId}/pagamentos/{pagId}/estornar",
+            new { empresaId, motivo });
+    }
+
+    // ── Pix QR ────────────────────────────────────────────────────────────
+
+    public Task<ApiResult<PixQrResultApi>> GerarPixAsync(Guid parcelaId)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<PixQrResultApi>());
+        return api.PostAsync<PixQrResultApi>($"contas-a-receber/parcelas/{parcelaId}/pix",
+            new { empresaId });
+    }
+}
+
+public class PixQrResultApi
+{
+    public string Txid { get; set; } = "";
+    public string PixCopiaCola { get; set; } = "";
+    public string QrCodeBase64 { get; set; } = "";
+    public DateTime ExpiraEm { get; set; }
+    public decimal Valor { get; set; }
 }

@@ -2,6 +2,7 @@ using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
+using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Financeiro;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +25,8 @@ public class ContasAPagarController(
     RemoverParcelaContaPagarUseCase removerParcelaUseCase,
     ListarContasPagarUseCase listarUseCase,
     ObterContaPagarDetalheUseCase detalheUseCase,
+    RegistrarPagamentoParcelaPagarUseCase registrarPagamentoUseCase,
+    EstornarPagamentoParcelaPagarUseCase estornarPagamentoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [HttpGet]
@@ -143,7 +146,53 @@ public class ContasAPagarController(
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
     }
 
+    [HttpPost("{id:guid}/parcelas/{parcelaId:guid}/pagamentos")]
+    public async Task<IActionResult> RegistrarPagamento(
+        Guid id, Guid parcelaId,
+        [FromBody] RegistrarPagamentoBody body,
+        CancellationToken ct = default)
+    {
+        if (!RequerVisualizar(out var permErr)) return permErr!;
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var eid, out var err)) return err!;
+        try
+        {
+            var r = await registrarPagamentoUseCase.ExecuteAsync(new RegistrarPagamentoParcelaPagarCommand(
+                eid, parcelaId, body.Valor, body.Metodo, body.DataPagamento,
+                body.Observacao, body.GatewayProvedor ?? "Manual", body.GatewayTransactionId,
+                currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
+            return r is null ? DataNotFound() : DataOk(r);
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+    }
+
+    [HttpPost("parcelas/{parcelaId:guid}/pagamentos/{pagId:guid}/estornar")]
+    public async Task<IActionResult> EstornarPagamento(
+        Guid parcelaId, Guid pagId,
+        [FromBody] EstornarPagamentoBody body,
+        CancellationToken ct = default)
+    {
+        if (!RequerGerenciar(out var permErr)) return permErr!;
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var eid, out var err)) return err!;
+        try
+        {
+            var ok = await estornarPagamentoUseCase.ExecuteAsync(new EstornarPagamentoParcelaPagarCommand(
+                eid, parcelaId, pagId, body.Motivo,
+                currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
+            return ok ? NoContent() : DataNotFound();
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+    }
+
     public sealed record CancelarContaRequest(Guid EmpresaId, string Motivo);
+    public sealed record RegistrarPagamentoBody(
+        Guid EmpresaId,
+        decimal Valor,
+        string Metodo,
+        DateTime? DataPagamento,
+        string? Observacao,
+        string? GatewayProvedor,
+        string? GatewayTransactionId);
+    public sealed record EstornarPagamentoBody(Guid EmpresaId, string? Motivo);
 
     private bool RequerVisualizar(out IActionResult? error)
     {

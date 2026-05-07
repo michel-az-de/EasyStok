@@ -72,18 +72,57 @@
                     <th class="px-3 py-2 text-right">Pago</th>
                     <th class="px-3 py-2 text-right">Saldo</th>
                     <th class="px-3 py-2">Status</th>
+                    <th class="px-3 py-2">Acao</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @foreach (var p in c.Parcelas.OrderBy(x => x.Numero))
                 {
-                    <tr>
+                    var podePagar = c.Status != "Cancelada" && p.Status != "Paga" && p.Status != "Cancelada" && c.Status != "Rascunho";
+                    <tr x-data="{ open: false }">
                         <td class="px-3 py-2">@p.Numero</td>
                         <td class="px-3 py-2 text-sm">@p.DataVencimento.ToString("dd/MM/yyyy")</td>
                         <td class="px-3 py-2 text-right">@p.Valor.ToString("C")</td>
                         <td class="px-3 py-2 text-right text-green-700">@p.ValorPago.ToString("C")</td>
                         <td class="px-3 py-2 text-right">@p.Saldo.ToString("C")</td>
                         <td class="px-3 py-2 text-sm">@p.Status</td>
+                        <td class="px-3 py-2">
+                            @if (podePagar)
+                            {
+                                <button type="button" @@click="open = !open" class="text-blue-600 text-sm hover:underline">Pagar</button>
+                            }
+                        </td>
+                        @if (podePagar)
+                        {
+                            <td colspan="7" class="px-3 pb-3" x-show="open" x-cloak>
+                                <form method="post" action="/contas-a-pagar/@c.Id/parcelas/@p.Id/pagar" class="grid grid-cols-1 md:grid-cols-5 gap-2 items-end bg-gray-50 p-2 rounded">
+                                    @Html.AntiForgeryToken()
+                                    <div>
+                                        <label class="form-label text-xs">Valor (R$) *</label>
+                                        <input type="number" name="valor" required step="0.01" min="0.01" max="@p.Saldo" value="@p.Saldo" class="form-input" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-xs">Metodo *</label>
+                                        <select name="metodo" required class="form-input">
+                                            <option value="dinheiro">Dinheiro</option>
+                                            <option value="pix">Pix</option>
+                                            <option value="debito">Debito</option>
+                                            <option value="credito">Credito</option>
+                                            <option value="transferencia">Transferencia</option>
+                                            <option value="outro">Outro</option>
+                                        </select>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="form-label text-xs">Observacao</label>
+                                        <input type="text" name="observacao" maxlength="500" class="form-input" />
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button type="submit" class="btn btn-primary btn-sm">Confirmar</button>
+                                        <button type="button" @@click="open = false" class="btn btn-ghost btn-sm">Cancelar</button>
+                                    </div>
+                                </form>
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>

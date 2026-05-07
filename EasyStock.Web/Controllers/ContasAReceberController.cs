@@ -112,6 +112,28 @@ public class ContasAReceberController(FinanceiroService svc, SessionService sess
         return RedirectToAction(nameof(Detalhe), new { id });
     }
 
+    [HttpPost("/contas-a-receber/{id:guid}/parcelas/{parcelaId:guid}/pagar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Pagar(Guid id, Guid parcelaId, decimal valor, string metodo, string? observacao = null)
+    {
+        if (valor <= 0m) { Toast("error", "Valor deve ser positivo."); return RedirectToAction(nameof(Detalhe), new { id }); }
+        if (string.IsNullOrWhiteSpace(metodo)) { Toast("error", "Metodo e obrigatorio."); return RedirectToAction(nameof(Detalhe), new { id }); }
+        var r = await svc.RegistrarPagamentoCrAsync(id, parcelaId, valor, metodo, observacao);
+        if (HasError(r)) return RedirectToAction(nameof(Detalhe), new { id });
+        Toast("success", $"Recebimento de {valor:C} registrado.");
+        return RedirectToAction(nameof(Detalhe), new { id });
+    }
+
+    [HttpPost("/contas-a-receber/{id:guid}/parcelas/{parcelaId:guid}/pix")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GerarPix(Guid id, Guid parcelaId)
+    {
+        var result = await svc.GerarPixAsync(parcelaId);
+        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Detalhe), new { id });
+        Toast("success", "Pix gerado.");
+        return RedirectToAction(nameof(Detalhe), new { id });
+    }
+
     [HttpPost("/contas-a-receber/{id:guid}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(Guid id, string motivo)
