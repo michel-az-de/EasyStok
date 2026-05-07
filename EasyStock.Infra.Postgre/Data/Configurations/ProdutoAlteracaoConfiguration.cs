@@ -61,5 +61,8 @@ public class ProdutoAlteracaoConfiguration : IEntityTypeConfiguration<ProdutoAlt
 
         builder.HasIndex(a => new { a.ProdutoId, a.AlteradoEm });
         builder.HasIndex(a => new { a.EmpresaId, a.ProdutoId });
+        // Feed de "últimas alterações" por tenant — dashboard admin.
+        builder.HasIndex(a => new { a.EmpresaId, a.AlteradoEm })
+            .HasDatabaseName("ix_produto_alteracoes_empresa_alterado_em");
     }
 }

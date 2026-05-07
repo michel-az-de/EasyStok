@@ -36,14 +36,14 @@ public class MobileDevice
     public string Id { get; set; } = default!;
 
     /// <summary>
-    /// Chave secreta enviada no header X-Mobile-Api-Key. Gerada na hora do
-    /// pareamento (UUID), única por device. Armazenada em texto plano por
-    /// simplicidade — não é credencial de usuário, é token de máquina e
-    /// pode ser rotacionada (revogar + parear de novo).
+    /// SHA-256 da chave secreta enviada no header X-Mobile-Api-Key. O plaintext
+    /// é gerado no pareamento (UUID), devolvido uma única vez ao app, e nunca
+    /// persistido — em breach o atacante não consegue se passar pelo device.
+    /// Lookup do middleware: hash do header e busca por <c>api_key_hash</c>.
     /// </summary>
-    [Required, MaxLength(64)]
-    [Column("api_key")]
-    public string ApiKey { get; set; } = default!;
+    [Required, MaxLength(128)]
+    [Column("api_key_hash")]
+    public string ApiKeyHash { get; set; } = default!;
 
     /// <summary>Empresa proprietária do device. Resolve multi-tenant.</summary>
     [Column("empresa_id")]

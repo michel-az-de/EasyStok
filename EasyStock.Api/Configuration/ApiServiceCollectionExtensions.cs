@@ -1,3 +1,4 @@
+using EasyStock.Api.Authorization;
 using EasyStock.Api.Http;
 using EasyStock.Api.Observability;
 using EasyStock.Api.Services;
@@ -107,7 +108,8 @@ public static class ApiServiceCollectionExtensions
                     NameClaimType            = "sub",
                     RoleClaimType            = "nivel"
                 };
-            });
+            })
+            .AddInternalCronJobScheme();
 
         services.AddAuthorization(opts =>
         {
@@ -115,6 +117,7 @@ public static class ApiServiceCollectionExtensions
             opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
+            opts.AddInternalCronJobPolicy();
         });
 
         return services;

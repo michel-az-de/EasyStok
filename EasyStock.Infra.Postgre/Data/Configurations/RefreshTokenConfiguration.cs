@@ -49,9 +49,15 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(rt => rt.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasIndex(rt => rt.TokenHash);
+            // Hash unique evita colisão e garante lookup O(1) no refresh.
+            builder.HasIndex(rt => rt.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("ux_refresh_tokens_token_hash");
             builder.HasIndex(rt => rt.UsuarioId);
-            builder.HasIndex(rt => rt.ExpiraEm);
+            // Cleanup job só varre tokens ainda ativos — partial index reduz IO.
+            builder.HasIndex(rt => rt.ExpiraEm)
+                .HasFilter("\"Revogado\" = false")
+                .HasDatabaseName("ix_refresh_tokens_expira_ativo");
         }
     }
 }

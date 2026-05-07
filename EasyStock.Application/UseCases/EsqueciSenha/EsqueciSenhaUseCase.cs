@@ -37,11 +37,13 @@ public sealed class EsqueciSenhaUseCase(
             return new EsqueciSenhaResult(true);
         }
 
+        // Token plaintext só circula em memória/email; persistimos só o hash.
         var token = Guid.NewGuid().ToString();
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(token);
         var expiraEm = DateTime.UtcNow.AddHours(1);
         var resetToken = ResetToken.Criar(
             usuario.Id,
-            token,
+            tokenHash,
             expiraEm,
             null,
             null);

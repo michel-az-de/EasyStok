@@ -4,6 +4,7 @@ using System.Text;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
@@ -383,8 +384,10 @@ public class OperationController(
         else if (!string.IsNullOrWhiteSpace(apiKey))
         {
             // Caminho legado — APKs antigos ainda mandam apiKey na URL.
+            // Hash antes do lookup pra bater com o que está persistido.
+            var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
             device = await _db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.ApiKey == apiKey, ct);
+                .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash, ct);
         }
         else
         {

@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -9,8 +10,11 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
 {
     private readonly EasyStockDbContext _context = context;
 
-    public Task<ResetToken?> GetByTokenAsync(string token) =>
-        _context.ResetTokens.FirstOrDefaultAsync(rt => rt.Token == token);
+    public Task<ResetToken?> GetByTokenAsync(string token)
+    {
+        var hash = TokenHashHelper.ComputeSha256Hash(token);
+        return _context.ResetTokens.FirstOrDefaultAsync(rt => rt.TokenHash == hash);
+    }
 
     public async Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await _context.ResetTokens.Where(rt => rt.UsuarioId == usuarioId).ToListAsync();

@@ -6,7 +6,9 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid UsuarioId { get; set; }
-        public string Token { get; set; } = null!;
+        // SHA-256 do token enviado por email. Plaintext nunca persiste — em
+        // breach o atacante não consegue confirmar email com o que está no DB.
+        public string TokenHash { get; set; } = null!;
         public DateTime CriadoEm { get; set; }
         public DateTime ExpiraEm { get; set; }
         public bool Confirmado { get; set; }
@@ -16,13 +18,13 @@ namespace EasyStock.Domain.Entities
 
         public Usuario? Usuario { get; set; }
 
-        public static EmailConfirmationToken Criar(Guid usuarioId, string token, string? ip, string? userAgent)
+        public static EmailConfirmationToken Criar(Guid usuarioId, string tokenHash, string? ip, string? userAgent)
         {
             return new EmailConfirmationToken
             {
                 Id = Guid.NewGuid(),
                 UsuarioId = usuarioId,
-                Token = token,
+                TokenHash = tokenHash,
                 CriadoEm = DateTime.UtcNow,
                 ExpiraEm = DateTime.UtcNow.AddHours(24),
                 Confirmado = false,

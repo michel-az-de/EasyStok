@@ -29,6 +29,13 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(t => t.AtendenteId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // FK pra criador. SetNull preserva o ticket histórico mesmo se
+            // o usuário for anonimizado/removido — só perde o link.
+            builder.HasOne(t => t.CriadoPor)
+                .WithMany()
+                .HasForeignKey(t => t.CriadoPorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasOne(t => t.OrigemTicket)
                 .WithMany()
                 .HasForeignKey(t => t.OrigemTicketId)
@@ -41,6 +48,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             builder.HasIndex(t => new { t.EmpresaId, t.Status, t.Prioridade })
                 .HasDatabaseName("ix_admin_tickets_empresa_status_prioridade");
+            builder.HasIndex(t => t.CriadoPorId)
+                .HasDatabaseName("ix_admin_tickets_criado_por_id");
             builder.HasIndex(t => new { t.AtendenteId, t.Status })
                 .HasDatabaseName("ix_admin_tickets_atendente_status");
             builder.HasIndex(t => new { t.Nivel, t.Status })

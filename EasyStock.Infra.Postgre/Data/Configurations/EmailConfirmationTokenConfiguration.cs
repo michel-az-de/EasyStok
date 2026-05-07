@@ -12,10 +12,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             builder.HasKey(e => e.Id);
 
-            builder.Property(e => e.Token)
+            builder.Property(e => e.TokenHash)
                 .IsRequired()
-                .HasMaxLength(500)
-                .HasColumnType("character varying(500)");
+                .HasMaxLength(128)
+                .HasColumnType("character varying(128)");
 
             builder.Property(e => e.CriadoEm)
                 .IsRequired()
@@ -46,9 +46,13 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(e => e.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasIndex(e => e.Token);
+            builder.HasIndex(e => e.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("ux_email_confirmation_tokens_token_hash");
             builder.HasIndex(e => e.UsuarioId);
-            builder.HasIndex(e => e.ExpiraEm);
+            builder.HasIndex(e => e.ExpiraEm)
+                .HasFilter("\"Confirmado\" = false")
+                .HasDatabaseName("ix_email_confirmation_tokens_expira_pendente");
         }
     }
 }

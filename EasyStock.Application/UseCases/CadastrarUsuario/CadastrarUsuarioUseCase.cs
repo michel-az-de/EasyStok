@@ -42,8 +42,10 @@ public sealed class CadastrarUsuarioUseCase(
             null);
         await auditLogRepository.AddAsync(auditLog);
 
+        // Token plaintext só vai pro email; persistimos só o hash.
         var confirmationToken = Guid.NewGuid().ToString();
-        var emailToken = EmailConfirmationToken.Criar(usuario.Id, confirmationToken, null, null);
+        var confirmationTokenHash = TokenHashHelper.ComputeSha256Hash(confirmationToken);
+        var emailToken = EmailConfirmationToken.Criar(usuario.Id, confirmationTokenHash, null, null);
         await emailTokenRepository.AddAsync(emailToken);
 
         if (emailService is not null)

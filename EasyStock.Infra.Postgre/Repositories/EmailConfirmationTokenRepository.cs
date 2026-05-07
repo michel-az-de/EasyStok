@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,13 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class EmailConfirmationTokenRepository(EasyStockDbContext context) : IEmailConfirmationTokenRepository
     {
-        public Task<EmailConfirmationToken?> GetByTokenAsync(string token) =>
-            context.EmailConfirmationTokens
+        public Task<EmailConfirmationToken?> GetByTokenAsync(string token)
+        {
+            var hash = TokenHashHelper.ComputeSha256Hash(token);
+            return context.EmailConfirmationTokens
                 .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Token == token);
+                .FirstOrDefaultAsync(t => t.TokenHash == hash);
+        }
 
         public async Task<IEnumerable<EmailConfirmationToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
             await context.EmailConfirmationTokens

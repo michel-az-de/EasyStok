@@ -19,10 +19,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(rt => rt.UsuarioId)
                 .HasColumnType("uuid");
 
-            builder.Property(rt => rt.Token)
+            builder.Property(rt => rt.TokenHash)
                 .IsRequired()
-                .HasMaxLength(500)
-                .HasColumnType("character varying(500)");
+                .HasMaxLength(128)
+                .HasColumnType("character varying(128)");
 
             builder.Property(rt => rt.CriadoEm)
                 .HasColumnType("timestamp with time zone");
@@ -46,9 +46,15 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(rt => rt.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasIndex(rt => rt.Token);
+            // Unique evita reuso de token e habilita lookup por hash O(1).
+            builder.HasIndex(rt => rt.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("ux_reset_tokens_token_hash");
             builder.HasIndex(rt => rt.UsuarioId);
-            builder.HasIndex(rt => rt.ExpiraEm);
+            // Cleanup job consulta apenas tokens ainda válidos.
+            builder.HasIndex(rt => rt.ExpiraEm)
+                .HasFilter("\"Usado\" = false")
+                .HasDatabaseName("ix_reset_tokens_expira_pendente");
         }
     }
 }

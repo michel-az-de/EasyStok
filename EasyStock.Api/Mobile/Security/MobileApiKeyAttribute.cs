@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -67,12 +68,12 @@ internal sealed class MobileApiKeyFilter(
         }
 
         var apiKey = provided.ToString().Trim();
+        var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
 
-        // Lookup pelo api_key (indexed unique). Compara em tempo constante
-        // só dentro dos candidatos retornados — em prática só 1 candidato.
+        // Lookup pelo hash (indexed unique). DB nunca vê plaintext da key.
         var device = await db.Set<MobileDevice>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.ApiKey == apiKey);
+            .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash);
 
         if (device == null || device.Revoked)
         {
@@ -84,9 +85,8 @@ internal sealed class MobileApiKeyFilter(
             return;
         }
 
-        // Defesa contra timing attack — comparação em tempo constante mesmo
-        // que o lookup já tenha matched (em caso de hash futuro).
-        if (!FixedTimeEquals(device.ApiKey, apiKey))
+        // Defesa contra timing attack — comparação em tempo constante do hash.
+        if (!FixedTimeEquals(device.ApiKeyHash, apiKeyHash))
         {
             context.Result = new UnauthorizedResult();
             return;

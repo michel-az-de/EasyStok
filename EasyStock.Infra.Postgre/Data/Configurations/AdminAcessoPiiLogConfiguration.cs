@@ -19,5 +19,8 @@ public class AdminAcessoPiiLogConfiguration : IEntityTypeConfiguration<AdminAces
         b.HasIndex(x => x.AdminEmail);
         b.HasIndex(x => x.CriadoEm);
         b.HasIndex(x => new { x.TenantId, x.EntidadeId });
+        // Relatório por tenant: "todos os acessos PII na minha empresa nos últimos N dias".
+        b.HasIndex(x => new { x.TenantId, x.CriadoEm })
+            .HasDatabaseName("ix_admin_acessos_pii_logs_tenant_criado");
     }
 }

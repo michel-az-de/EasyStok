@@ -6,7 +6,9 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid UsuarioId { get; set; }
-        public string Token { get; set; } = null!;
+        // SHA-256 do token enviado por email. Plaintext nunca persiste — em
+        // breach o atacante não consegue redefinir senha com o que está no DB.
+        public string TokenHash { get; set; } = null!;
         public DateTime CriadoEm { get; set; }
         public DateTime ExpiraEm { get; set; }
         public bool Usado { get; set; }
@@ -15,13 +17,13 @@ namespace EasyStock.Domain.Entities
 
         public Usuario? Usuario { get; set; }
 
-        public static ResetToken Criar(Guid usuarioId, string token, DateTime expiraEm, string? ip, string? userAgent)
+        public static ResetToken Criar(Guid usuarioId, string tokenHash, DateTime expiraEm, string? ip, string? userAgent)
         {
             return new ResetToken
             {
                 Id = Guid.NewGuid(),
                 UsuarioId = usuarioId,
-                Token = token,
+                TokenHash = tokenHash,
                 CriadoEm = DateTime.UtcNow,
                 ExpiraEm = expiraEm,
                 Usado = false,

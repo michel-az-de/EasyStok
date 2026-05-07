@@ -643,8 +643,11 @@ public sealed class ResetTokenRepository(MongoEasyStockContext context, MongoUni
 {
     private IMongoCollection<ResetToken> Collection => Context.GetCollection<ResetToken>(MongoCollectionNames.ResetTokens);
 
-    public async Task<ResetToken?> GetByTokenAsync(string token) =>
-        await Collection.Find(x => x.Token == token).FirstOrDefaultAsync();
+    public async Task<ResetToken?> GetByTokenAsync(string token)
+    {
+        var hash = EasyStock.Application.UseCases.Common.TokenHashHelper.ComputeSha256Hash(token);
+        return await Collection.Find(x => x.TokenHash == hash).FirstOrDefaultAsync();
+    }
 
     public async Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await Collection.Find(x => x.UsuarioId == usuarioId).ToListAsync();
