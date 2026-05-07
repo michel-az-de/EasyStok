@@ -1,0 +1,110 @@
+@page
+@model EasyStock.Admin.Pages.Tickets.DashboardModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Dashboard Helpdesk";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-es-ink text-xl font-semibold">📊 Dashboard Helpdesk</h1>
+    <a href="/Tickets" class="btn-secondary text-sm">← Lista de tickets</a>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<!-- KPIs -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+    <div class="card text-center">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">Abertos</div>
+        <div class="text-2xl font-bold text-es-ink">@Model.Abertos</div>
+    </div>
+    <div class="card text-center">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">Em Atendimento</div>
+        <div class="text-2xl font-bold text-blue-400">@Model.EmAtendimento</div>
+    </div>
+    <div class="card text-center">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">Aguard. Cliente</div>
+        <div class="text-2xl font-bold text-yellow-400">@Model.AguardandoCliente</div>
+    </div>
+    <div class="card text-center">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">Resolvidos hoje</div>
+        <div class="text-2xl font-bold text-green-400">@Model.ResolvidosHoje</div>
+    </div>
+    <div class="card text-center" style="background:rgba(234,179,8,.06); border-color:rgba(234,179,8,.30)">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">⚠ SLA em risco</div>
+        <div class="text-2xl font-bold text-yellow-400">@Model.SlaRisco</div>
+    </div>
+    <div class="card text-center" style="background:rgba(220,38,38,.06); border-color:rgba(220,38,38,.30)">
+        <div class="text-es-ink-mute text-xs uppercase mb-1">🚨 SLA violado</div>
+        <div class="text-2xl font-bold text-red-400">@Model.SlaViolado</div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Fila de criticidade -->
+    <div class="lg:col-span-2 card">
+        <h3 class="text-es-ink font-semibold mb-3">🔥 Fila de Criticidade (top 10)</h3>
+        <table class="table-admin">
+            <thead>
+                <tr>
+                    <th>Ticket</th>
+                    <th>Empresa</th>
+                    <th>Prio</th>
+                    <th>Nível</th>
+                    <th>SLA</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model.FilaCriticidade)
+                {
+                    var tid = t.TryGetProperty("id", out var tidP) ? tidP.GetString() : "";
+                    var titulo = t.TryGetProperty("titulo", out var titP) ? titP.GetString() : "";
+                    var empresa = t.TryGetProperty("empresaNome", out var empP) ? empP.GetString() : "—";
+                    var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
+                    var nivel = t.TryGetProperty("nivel", out var nvP) ? nvP.GetString() : "";
+                    var slaRespV = t.TryGetProperty("slaRespostaViolado", out var sv) && sv.GetBoolean();
+                    var prazoResp = t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null ? pp.GetString() : null;
+                    DateTime.TryParse(prazoResp, out var prazoDt);
+                    string slaText = slaRespV ? "VIOLADO" :
+                        (prazoDt != default ? $"{(int)(prazoDt - DateTime.UtcNow).TotalMinutes}m" : "—");
+                    string slaCss = slaRespV ? "text-red-400" : "text-yellow-400";
+                    <tr class="cursor-pointer" onclick="window.location.href='/Tickets/Detail/@tid'">
+                        <td class="text-es-ink">@titulo</td>
+                        <td class="text-es-ink-dim text-sm">@empresa</td>
+                        <td class="text-es-ink-dim text-sm">@pri</td>
+                        <td class="text-es-accent text-sm font-bold">@nivel</td>
+                        <td class="@slaCss font-bold text-sm">@slaText</td>
+                    </tr>
+                }
+                @if (!Model.FilaCriticidade.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-es-ink-mute py-6">Sem tickets criticos no momento. 🎉</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Por nivel -->
+    <div class="card">
+        <h3 class="text-es-ink font-semibold mb-3">Tickets ativos por nível</h3>
+        <div class="space-y-3">
+            @foreach (var (nivel, count) in Model.PorNivel)
+            {
+                var max = Model.PorNivel.Values.DefaultIfEmpty(1).Max();
+                var pct = max == 0 ? 0 : (count * 100 / max);
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-es-accent font-bold">@nivel</span>
+                        <span class="text-es-ink-dim">@count</span>
+                    </div>
+                    <div class="h-2 bg-es-surface-2 rounded overflow-hidden">
+                        <div class="h-full bg-es-accent" style="width:@(pct)%"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,107 @@
+@page
+@model EasyStock.Admin.Pages.Configuracoes.SlaMatrizModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Matriz SLA";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-es-ink text-xl font-semibold">⚙ Matriz de SLA</h1>
+        <p class="text-es-ink-mute text-sm">Tempos default de resposta e resolução por prioridade. Editáveis.</p>
+    </div>
+    <a href="/Tickets" class="btn-secondary text-sm">← Voltar</a>
+</div>
+
+@if (Model.Erro != null)
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+}
+
+<div class="card">
+    <form method="post">
+        @Html.AntiForgeryToken()
+        <table class="table-admin">
+            <thead>
+                <tr>
+                    <th>Escopo</th>
+                    <th>Prioridade</th>
+                    <th>Minutos para resposta</th>
+                    <th>Minutos para resolução</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var prioridadesOrdenadas = new[] { "Critica", "Alta", "Normal", "Baixa" };
+                    var idx = 0;
+                    var existentesGlobais = Model.Itens
+                        .Where(i => (!i.TryGetProperty("empresaId", out var ep) || ep.ValueKind == JsonValueKind.Null)
+                                 && (!i.TryGetProperty("planoId", out var pp) || pp.ValueKind == JsonValueKind.Null))
+                        .ToDictionary(i => i.GetProperty("prioridade").GetString() ?? "", i => i);
+                }
+                @foreach (var prio in prioridadesOrdenadas)
+                {
+                    var minResp = existentesGlobais.TryGetValue(prio, out var ex) && ex.TryGetProperty("minutosResposta", out var mr) ? mr.GetInt32() : 0;
+                    var minResol = existentesGlobais.TryGetValue(prio, out var ex2) && ex2.TryGetProperty("minutosResolucao", out var mres) ? mres.GetInt32() : 0;
+                    <tr>
+                        <td class="text-es-ink-mute text-sm">Global (default)</td>
+                        <td>
+                            <input type="hidden" name="Prioridades" value="@prio" />
+                            <span class="status-badge @(prio == "Critica" ? "badge-critica" : prio == "Alta" ? "badge-alta" : "badge-normal")">@prio</span>
+                        </td>
+                        <td>
+                            <input type="number" name="MinutosResposta" value="@minResp" min="1" class="form-input" style="max-width:140px" />
+                            <span class="text-es-ink-mute text-xs">(@(minResp / 60)h @(minResp % 60)m)</span>
+                        </td>
+                        <td>
+                            <input type="number" name="MinutosResolucao" value="@minResol" min="1" class="form-input" style="max-width:140px" />
+                            <span class="text-es-ink-mute text-xs">(@(minResol / 60)h)</span>
+                        </td>
+                    </tr>
+                    idx++;
+                }
+            </tbody>
+        </table>
+        <div class="flex justify-end mt-4">
+            <button type="submit" class="btn-primary">Salvar matriz</button>
+        </div>
+    </form>
+
+    <div class="border-t border-es-ink-mute/20 mt-6 pt-4">
+        <h3 class="text-es-ink font-semibold mb-2 text-sm">Overrides existentes (por plano ou empresa)</h3>
+        @{
+            var overrides = Model.Itens.Where(i =>
+                (i.TryGetProperty("empresaId", out var ep) && ep.ValueKind != JsonValueKind.Null)
+                || (i.TryGetProperty("planoId", out var pp) && pp.ValueKind != JsonValueKind.Null)).ToList();
+        }
+        @if (!overrides.Any())
+        {
+            <p class="text-es-ink-mute text-xs">Nenhum override cadastrado. Tudo segue o default global.</p>
+        }
+        else
+        {
+            <table class="table-admin">
+                <thead>
+                    <tr><th>EmpresaId</th><th>PlanoId</th><th>Prioridade</th><th>Resposta</th><th>Resolução</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in overrides)
+                    {
+                        var emp = o.TryGetProperty("empresaId", out var ep2) && ep2.ValueKind != JsonValueKind.Null ? ep2.GetString() : "—";
+                        var pl = o.TryGetProperty("planoId", out var pp2) && pp2.ValueKind != JsonValueKind.Null ? pp2.GetString() : "—";
+                        var pr = o.TryGetProperty("prioridade", out var prp) ? prp.GetString() : "";
+                        var mr = o.TryGetProperty("minutosResposta", out var mrp) ? mrp.GetInt32() : 0;
+                        var mres = o.TryGetProperty("minutosResolucao", out var mrep) ? mrep.GetInt32() : 0;
+                        <tr>
+                            <td class="text-es-ink-mute text-xs font-mono">@emp</td>
+                            <td class="text-es-ink-mute text-xs font-mono">@pl</td>
+                            <td class="text-es-ink-dim">@pr</td>
+                            <td class="text-es-ink-dim">@mr min</td>
+                            <td class="text-es-ink-dim">@mres min</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
