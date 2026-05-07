@@ -11,6 +11,7 @@
 - **Mobile MAUI F0–F4c**: setup → estrutura → auth E2E (JWT+refresh+biometria) → multi-tenant pickers + permissões → produção SQLite + REST → mutations otimistas (outbox SQLite) → SyncEngine periódico → popup captura foto/peso/validade.
 - **Seed bootstrap idempotente**: 4 camadas de defesa (Npgsql direto + retry strategy compatível + `[NotMapped]` em IsSeedData + per-tenant files + script `CreateSuperAdmin`).
 - **Dual frontend formalizado**: política PWA → MAUI unidirecional documentada em `dual-frontend-policy.md` (commit `4e9ffda`).
+- **Notifications health check separado** (PR #72, 2026-05-07): `/health/dispatcher` isolado do `/health/api` por tags + heartbeat singleton dos 3 loops Hosted, evita cascata onde dispatcher travado marca a API inteira como Unhealthy nos LBs. Health check usa `TimeProvider` injetável para coerência com o heartbeat (fix da revisão diária).
 
 ### Decisões de arquitetura recentes
 - **2026-05-01**: ADR 0001 — MongoDB descartado como provedor transacional (`docs/adr/0001-mongo-discarded.md`). Postgre é único.
