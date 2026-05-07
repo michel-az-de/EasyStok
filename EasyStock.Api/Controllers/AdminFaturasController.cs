@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Faturas.CancelarFatura;
 using EasyStock.Application.UseCases.Faturas.Common;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
+using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
 using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
@@ -33,6 +34,7 @@ public class AdminFaturasController(
     EmitirFaturaUseCase emitirUseCase,
     RegistrarPagamentoFaturaUseCase pagamentoUseCase,
     CancelarFaturaUseCase cancelarUseCase,
+    ExportarFaturasCsvUseCase exportarCsvUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Listar faturas (admin) com filtros amplos")]
@@ -224,6 +226,37 @@ public class AdminFaturasController(
         {
             return DataBadRequest(ex.Message);
         }
+    }
+
+    [SwaggerOperation(Summary = "Exportar faturas filtradas como CSV (UTF-8 BOM, separador ;)")]
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> ExportarCsv(
+        [FromQuery] Guid? empresaId,
+        [FromQuery] StatusFatura? status,
+        [FromQuery] OrigemFatura? origem,
+        [FromQuery] DateTime? vencimentoDe,
+        [FromQuery] DateTime? vencimentoAte,
+        [FromQuery] decimal? valorMin,
+        [FromQuery] decimal? valorMax,
+        [FromQuery] string? busca,
+        CancellationToken ct = default)
+    {
+        if (!RequerPermissao(Permissao.VisualizarFaturas, out var err)) return err!;
+
+        // Admin operacional: forca empresa do user (igual a Listar).
+        var efetivoEmpresaId = currentUser.Nivel == NivelAcesso.SuperAdmin
+            ? empresaId
+            : currentUser.EmpresaId;
+
+        var bytes = await exportarCsvUseCase.ExecuteAsync(
+            new ExportarFaturasCsvCommand(
+                efetivoEmpresaId, status, origem,
+                vencimentoDe, vencimentoAte,
+                valorMin, valorMax, busca),
+            ct);
+
+        var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return File(bytes, "text/csv; charset=utf-8", $"faturas-{ts}.csv");
     }
 
     private bool RequerPermissao(Permissao permissao, out IActionResult? error)

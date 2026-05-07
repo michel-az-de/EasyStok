@@ -149,6 +149,59 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
         return RedirectToPage(new { Id });
     }
 
+    public async Task<IActionResult> OnPostAbrirTicketAsync(string titulo, string descricao, string? prioridade, string? nivel)
+    {
+        if (Id == Guid.Empty)
+        {
+            SetErro("Fatura invalida.");
+            return RedirectToPage(new { Id });
+        }
+        var tituloT = (titulo ?? "").Trim();
+        var descricaoT = (descricao ?? "").Trim();
+        if (tituloT.Length is < 3 or > 200)
+        {
+            SetErro("Titulo deve ter entre 3 e 200 caracteres.");
+            return RedirectToPage(new { Id });
+        }
+        if (descricaoT.Length is < 5 or > 4000)
+        {
+            SetErro("Descricao deve ter entre 5 e 4000 caracteres.");
+            return RedirectToPage(new { Id });
+        }
+
+        // Buscar empresaId da fatura para criar o ticket no contexto correto.
+        var fatura = await api.GetRawAsync($"api/admin/faturas/{Id}");
+        var empresaId = fatura.TryGetProperty("data", out var d) && d.TryGetProperty("empresaId", out var eid)
+            ? eid.GetGuid() : Guid.Empty;
+        if (empresaId == Guid.Empty)
+        {
+            SetErro("Nao foi possivel resolver a empresa da fatura.");
+            return RedirectToPage(new { Id });
+        }
+
+        try
+        {
+            await api.PostAsync<JsonElement>("api/admin/tickets", new
+            {
+                empresaId,
+                titulo = tituloT,
+                descricao = descricaoT,
+                categoria = "Financeiro",
+                prioridade = string.IsNullOrWhiteSpace(prioridade) ? "Normal" : prioridade.Trim(),
+                nivel = string.IsNullOrWhiteSpace(nivel) ? "N1" : nivel.Trim(),
+                faturaId = Id
+            });
+            SetSucesso("Ticket interno aberto.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao abrir ticket interno sobre fatura {FaturaId}", Id);
+            SetErro($"Falha ao abrir ticket: {ex.Message}");
+        }
+        return RedirectToPage(new { Id });
+    }
+
     public async Task<IActionResult> OnPostCancelarAsync(string? motivo)
     {
         if (Id == Guid.Empty)

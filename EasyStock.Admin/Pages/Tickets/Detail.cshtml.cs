@@ -29,6 +29,8 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
     public bool SlaResolucaoViolado => Bool("slaResolucaoViolado");
     public string? OrigemTicketId => Str("origemTicketId");
     public string? OrigemTicketTitulo => Str("origemTicketTitulo");
+    public string? FaturaId => Str("faturaId");
+    public string? FaturaNumero => Str("faturaNumero");
 
     public IEnumerable<JsonElement> Mensagens =>
         TicketData.ValueKind != JsonValueKind.Undefined && TicketData.TryGetProperty("mensagens", out var v)

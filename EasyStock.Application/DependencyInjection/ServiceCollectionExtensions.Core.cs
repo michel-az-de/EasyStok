@@ -49,6 +49,7 @@ using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
 using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
+using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -139,6 +140,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarFaturasAdminUseCase>();
         services.AddScoped<ObterFaturaDetalheUseCase>();
         services.AddScoped<GerarPdfFaturaUseCase>();
+        services.AddScoped<ExportarFaturasCsvUseCase>();
 
         return services;
     }

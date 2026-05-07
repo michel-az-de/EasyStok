@@ -115,6 +115,7 @@ public class AdminTicketsController(
             .Include(t => t.Atendente)
             .Include(t => t.OrigemTicket)
             .Include(t => t.MetaTecnico)
+            .Include(t => t.Fatura)
             .Include(t => t.Mensagens)
                 .ThenInclude(m => m.Autor)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -160,6 +161,8 @@ public class AdminTicketsController(
             ticket.SlaResolucaoViolado,
             ticket.OrigemTicketId,
             origemTicketTitulo = ticket.OrigemTicket?.Titulo,
+            ticket.FaturaId,
+            faturaNumero = ticket.Fatura?.Numero,
             metaTecnico = ticket.MetaTecnico is null ? null : new
             {
                 ticket.MetaTecnico.SeveridadeTecnica,
@@ -200,8 +203,8 @@ public class AdminTicketsController(
         try
         {
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
-                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, AnexoIds: null));
-            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}", req.EmpresaId);
+                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, AnexoIds: null, FaturaId: req.FaturaId));
+            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -309,7 +312,7 @@ public class AdminTicketsController(
     }
 }
 
-public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null);
+public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null);
 public record PatchTicketRequest(string? Status, string? Prioridade, Guid? AtendenteId);
 public record AddMensagemRequest(string Conteudo, bool Interno = false, IReadOnlyList<Guid>? AnexoIds = null);
 public record EncaminharRequest(string NovoNivel, string? Motivo);

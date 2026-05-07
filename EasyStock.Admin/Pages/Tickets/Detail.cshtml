@@ -54,6 +54,10 @@
                         {
                             <a href="/Tickets/Detail/@Model.OrigemTicketId" class="text-es-accent hover:text-es-cream text-xs">↳ Origem: @Model.OrigemTicketTitulo</a>
                         }
+                        @if (!string.IsNullOrEmpty(Model.FaturaId))
+                        {
+                            <a href="/Faturas/Detail/@Model.FaturaId" class="text-es-accent hover:text-es-cream text-xs px-2 py-0.5 bg-es-accent/10 border border-es-accent/30 rounded">💰 Fatura @Model.FaturaNumero</a>
+                        }
                     </div>
                 </div>
                 <div class="flex gap-2 flex-wrap">

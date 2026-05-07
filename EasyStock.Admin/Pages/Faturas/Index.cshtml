@@ -25,6 +25,19 @@
 <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
     <h1 class="text-es-ink text-xl font-semibold">Faturas</h1>
     <div class="flex gap-2">
+        @{
+            var qsExport = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
+            if (!string.IsNullOrWhiteSpace(Model.Origem)) qsExport.Add($"origem={Uri.EscapeDataString(Model.Origem)}");
+            if (Model.EmpresaId.HasValue) qsExport.Add($"empresaId={Model.EmpresaId.Value}");
+            if (Model.VencimentoDe.HasValue) qsExport.Add($"vencimentoDe={Model.VencimentoDe.Value:yyyy-MM-dd}");
+            if (Model.VencimentoAte.HasValue) qsExport.Add($"vencimentoAte={Model.VencimentoAte.Value:yyyy-MM-dd}");
+            if (Model.ValorMin.HasValue) qsExport.Add($"valorMin={Model.ValorMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            if (Model.ValorMax.HasValue) qsExport.Add($"valorMax={Model.ValorMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            if (!string.IsNullOrWhiteSpace(Model.Busca)) qsExport.Add($"busca={Uri.EscapeDataString(Model.Busca.Trim())}");
+            var exportQs = qsExport.Count > 0 ? "?" + string.Join("&", qsExport) : "";
+        }
+        <a href="/Faturas?handler=ExportCsv@(exportQs.StartsWith("?") ? "&" + exportQs.Substring(1) : exportQs)" class="btn-secondary text-sm" title="Exporta com os filtros aplicados">📊 CSV</a>
         <a href="/Faturas/Emitir" class="btn-primary text-sm">+ Emitir avulsa</a>
     </div>
 </div>

@@ -5,7 +5,9 @@ namespace EasyStock.Application.UseCases.TicketSuporte
     public sealed record AbrirTicketRequest(
         string Titulo,
         string Descricao,
-        TicketCategoria Categoria);
+        TicketCategoria Categoria,
+        /// <summary>F9 — FK opcional a uma Fatura que motivou o ticket.</summary>
+        Guid? FaturaId = null);
 
     public sealed record ResponderRequest(string Resposta);
 

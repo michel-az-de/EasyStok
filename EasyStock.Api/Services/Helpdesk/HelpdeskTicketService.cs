@@ -25,6 +25,15 @@ public sealed class HelpdeskTicketService(
         var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
             ?? throw new KeyNotFoundException("Empresa nao encontrada.");
 
+        // F9 — valida fatura pertence a empresa quando informada.
+        Domain.Entities.Fatura? fatura = null;
+        if (cmd.FaturaId.HasValue && cmd.FaturaId.Value != Guid.Empty)
+        {
+            fatura = await db.Faturas
+                .FirstOrDefaultAsync(f => f.Id == cmd.FaturaId.Value && f.EmpresaId == cmd.EmpresaId, ct)
+                ?? throw new KeyNotFoundException("Fatura nao encontrada para esta empresa.");
+        }
+
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
 
         var ticket = AdminTicket.Criar(
@@ -37,11 +46,19 @@ public sealed class HelpdeskTicketService(
             prazoResposta: sla.PrazoResposta,
             prazoResolucao: sla.PrazoResolucao,
             criadoPorId: currentUser.UsuarioId);
+        ticket.FaturaId = fatura?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.Criado,
-            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria })));
+            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
+
+        // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
+        // primeiro ticket sobre ela (idempotente — se ja vinculada, mantem).
+        if (fatura is not null && fatura.VinculaTicket(ticket.Id))
+        {
+            db.Faturas.Update(fatura);
+        }
 
         await db.CommitAsync();
 

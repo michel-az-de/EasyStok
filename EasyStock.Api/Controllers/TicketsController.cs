@@ -28,7 +28,7 @@ namespace EasyStock.Api.Controllers
             if (!currentUser.TemPermissao(Permissao.VisualizarTickets))
                 return Forbid();
 
-            var cmd = new AbrirTicketClienteCommand(req.Titulo, req.Descricao, req.Categoria);
+            var cmd = new AbrirTicketClienteCommand(req.Titulo, req.Descricao, req.Categoria, req.FaturaId);
             var result = await abrirUseCase.ExecuteAsync(cmd);
 
             return DataCreated($"api/tickets/{result.TicketId}", result);

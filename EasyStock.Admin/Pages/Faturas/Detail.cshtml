@@ -51,8 +51,9 @@
             <span class="status-badge @StatusBadge(Model.Status) ml-2">@Model.Status</span>
         </h1>
     </div>
-    <div class="flex gap-2" x-data="{ modalPaga:false, modalCancelar:false }">
+    <div class="flex gap-2 flex-wrap" x-data="{ modalPaga:false, modalCancelar:false, modalTicket:false }">
         <a href="/Faturas/Detail/@Model.Id?handler=Pdf" target="_blank" class="btn-secondary text-sm">📄 Baixar PDF</a>
+        <button type="button" @@click="modalTicket = true" class="btn-secondary text-sm">💬 Abrir ticket</button>
         @if (podeMarcarPaga)
         {
             <button type="button" @@click="modalPaga = true" class="btn-primary text-sm">✓ Registrar pagamento</button>
@@ -91,6 +92,51 @@
                     <div class="flex gap-3 justify-end pt-2">
                         <button type="button" @@click="modalPaga = false" class="btn-secondary">Cancelar</button>
                         <button type="submit" class="btn-primary">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: abrir ticket interno -->
+        <div x-show="modalTicket" x-cloak class="modal-overlay" @@click.self="modalTicket = false">
+            <div class="modal-box" @@click.stop>
+                <h3 class="text-es-ink font-semibold mb-4">Abrir ticket interno sobre esta fatura</h3>
+                <form method="post" asp-page-handler="AbrirTicket" class="space-y-4">
+                    @Html.AntiForgeryToken()
+                    <p class="text-es-ink-dim text-sm">O ticket sera criado com categoria <strong>Financeiro</strong> e
+                    vinculado bidirecionalmente a esta fatura (@Model.Numero).</p>
+                    <div>
+                        <label class="form-label">Titulo</label>
+                        <input type="text" name="titulo" class="form-input" required minlength="3" maxlength="200" />
+                    </div>
+                    <div>
+                        <label class="form-label">Descricao</label>
+                        <textarea name="descricao" rows="4" class="form-input" required minlength="5" maxlength="4000"
+                                  placeholder="Detalhe o problema ou contexto..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="form-label">Prioridade</label>
+                            <select name="prioridade" class="form-input">
+                                <option value="Baixa">Baixa</option>
+                                <option value="Normal" selected>Normal</option>
+                                <option value="Alta">Alta</option>
+                                <option value="Critica">Critica</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Nivel inicial</label>
+                            <select name="nivel" class="form-input">
+                                <option value="N1" selected>N1 - Triagem</option>
+                                <option value="N2">N2 - Suporte</option>
+                                <option value="N3">N3 - Tecnico</option>
+                                <option value="N4">N4 - Engenharia</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 justify-end pt-2">
+                        <button type="button" @@click="modalTicket = false" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Abrir ticket</button>
                     </div>
                 </form>
             </div>
@@ -252,6 +298,17 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.TicketRelacionadoId))
+    {
+        <div class="card mb-4" style="border-color: var(--es-accent)">
+            <h2 class="text-es-ink font-semibold mb-2">🎫 Ticket relacionado</h2>
+            <p class="text-es-ink-dim text-sm mb-2">
+                Esta fatura tem um ticket categoria=Financeiro vinculado.
+            </p>
+            <a href="/Tickets/Detail/@Model.TicketRelacionadoId" class="btn-secondary text-sm">Ver ticket →</a>
         </div>
     }
 

@@ -26,6 +26,42 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     private static readonly HashSet<string> OrigemValidas = new(StringComparer.OrdinalIgnoreCase)
         { "Assinatura", "Pedido", "Avulsa" };
 
+    public async Task<IActionResult> OnGetExportCsvAsync(CancellationToken ct)
+    {
+        // Reusa exatamente os mesmos filtros bind-pelo-Get da listagem.
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
+            qs.Add($"status={Uri.EscapeDataString(Status)}");
+        if (!string.IsNullOrWhiteSpace(Origem) && OrigemValidas.Contains(Origem))
+            qs.Add($"origem={Uri.EscapeDataString(Origem)}");
+        if (EmpresaId.HasValue && EmpresaId.Value != Guid.Empty)
+            qs.Add($"empresaId={EmpresaId.Value}");
+        if (VencimentoDe.HasValue) qs.Add($"vencimentoDe={VencimentoDe.Value:yyyy-MM-dd}");
+        if (VencimentoAte.HasValue) qs.Add($"vencimentoAte={VencimentoAte.Value:yyyy-MM-dd}");
+        if (ValorMin.HasValue && ValorMin.Value >= 0)
+            qs.Add($"valorMin={ValorMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        if (ValorMax.HasValue && ValorMax.Value > 0)
+            qs.Add($"valorMax={ValorMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        if (!string.IsNullOrWhiteSpace(Busca))
+            qs.Add($"busca={Uri.EscapeDataString(Busca.Trim())}");
+
+        var query = qs.Count > 0 ? "?" + string.Join("&", qs) : "";
+
+        try
+        {
+            var (bytes, contentType) = await api.GetBytesAsync($"api/admin/faturas/export.csv{query}");
+            var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            return File(bytes, contentType ?? "text/csv", $"faturas-{ts}.csv");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao exportar CSV de faturas");
+            SetErro($"Falha ao exportar CSV: {ex.Message}");
+            return RedirectToPage();
+        }
+    }
+
     public async Task OnGetAsync()
     {
         if (Page < 1) Page = 1;

@@ -143,6 +143,7 @@
             </div>
             <div>
               <button type="button" id="btn-pdf" class="btn btn-primary">📄 Baixar recibo</button>
+              <button type="button" id="btn-ticket" class="btn btn-secondary" style="margin-top:6px;width:100%">💬 Reportar problema</button>
             </div>
           </div>
           <div class="detail-grid" style="font-size:13px;color:var(--ink-dim)">
@@ -192,6 +193,66 @@
       `;
 
       document.getElementById('btn-pdf').addEventListener('click', baixarPdf);
+      document.getElementById('btn-ticket').addEventListener('click', abrirModalTicket);
+    }
+
+    // ── Modal "Reportar problema" ─────────────────────────────────────
+    function abrirModalTicket() {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px';
+      overlay.innerHTML = `
+        <div class="card" style="max-width:480px;width:100%;margin:0">
+          <h2>Reportar problema sobre esta fatura</h2>
+          <div id="ticket-alert"></div>
+          <div class="form-group">
+            <label class="form-label">Titulo</label>
+            <input type="text" id="ticket-titulo" class="form-input" maxlength="200" placeholder="Ex: cobranca duplicada" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descricao</label>
+            <textarea id="ticket-descricao" class="form-input" rows="5" maxlength="5000" placeholder="Detalhe o problema..." required></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" id="ticket-cancel" class="btn btn-secondary">Cancelar</button>
+            <button type="button" id="ticket-submit" class="btn btn-primary">Abrir ticket</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const close = () => overlay.remove();
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      document.getElementById('ticket-cancel').addEventListener('click', close);
+
+      document.getElementById('ticket-submit').addEventListener('click', async () => {
+        const titulo = document.getElementById('ticket-titulo').value.trim();
+        const descricao = document.getElementById('ticket-descricao').value.trim();
+        const alertEl = document.getElementById('ticket-alert');
+        if (titulo.length < 3) { alertEl.innerHTML = '<div class="alert alert-error">Titulo deve ter ao menos 3 caracteres.</div>'; return; }
+        if (descricao.length < 5) { alertEl.innerHTML = '<div class="alert alert-error">Descricao deve ter ao menos 5 caracteres.</div>'; return; }
+
+        const submit = document.getElementById('ticket-submit');
+        submit.disabled = true;
+        submit.textContent = 'Enviando…';
+        try {
+          await Portal.apiJson('/api/tickets', {
+            method: 'POST',
+            body: JSON.stringify({ titulo, descricao, categoria: 'Financeiro', faturaId: id })
+          });
+          close();
+          // Toast simples
+          const t = document.createElement('div');
+          t.className = 'alert alert-success';
+          t.style.cssText = 'position:fixed;top:20px;right:20px;z-index:200;max-width:340px';
+          t.textContent = '✓ Ticket aberto! Nossa equipe vai retornar em breve.';
+          document.body.appendChild(t);
+          setTimeout(() => t.remove(), 4000);
+        } catch (e) {
+          alertEl.innerHTML = '<div class="alert alert-error">' + Portal.ui.escapeHtml(e.message || 'Falha ao abrir ticket.') + '</div>';
+          submit.disabled = false;
+          submit.textContent = 'Abrir ticket';
+        }
+      });
     }
 
     async function baixarPdf() {
