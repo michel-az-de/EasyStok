@@ -33,7 +33,7 @@
 
 ## 8. Não usar `FOR UPDATE` sem transação explícita
 - **O que aconteceu:** lock liberado no fim do statement, não até `SaveChanges`. Race condition em concorrência.
-- **Como evitar:** sempre `using var tx = await uow.BeginTransactionAsync();` ao redor de leitura-locked + escrita.
+- **Como evitar:** preferir `await unitOfWork.ExecuteInTransactionAsync(async ct => { ... })` — usa `IExecutionStrategy` (compativel com Npgsql retry). `BeginTransactionAsync()` direto perde a retentativa em falha transitoria, ficando para legados.
 
 ## 9. Não deixar trabalho pela metade
 - **Padrão registrado:** Felipe se irrita com "fiz parte do que pediu". Se pedir 3 features, entregar 3 ou avisar antes que vai entregar 1.

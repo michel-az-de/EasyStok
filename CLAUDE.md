@@ -19,7 +19,7 @@ Porta de entrada para qualquer agente (Claude Code, Copilot, etc.) abrindo este 
 - **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR + `git push origin master`. Sem perguntar. Co-Author `Claude Opus 4.7 <noreply@anthropic.com>`.
 - **`git status` mostrando arquivos alheios**: NAO usar `git add -A`/`git add .` — adicionar so os especificos da demanda.
 - **Apos push tocando PWA ou casa-da-baba-mobile/apk**: workflow `build-casa-da-baba-apk.yml` dispara — aguardar e baixar APK pra `C:\rep\EasyStok\builds\app-debug.apk`.
-- **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; filtro manual por `EmpresaId`, NAO Global Query Filter; fail fast 400 se invalido.
+- **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; defesa em camadas = Global Query Filter automatico (`EasyStockDbContext.ApplyTenantQueryFilters`) **+** checagem `entity.EmpresaId == command.EmpresaId` no use case; fail fast 400 se invalido.
 - **NAO criar `.md` de documentacao** salvo se Felipe pedir explicitamente.
 - **Estilo do Felipe**: PT-BR direto, sem floreio, sem virgula sobrando, sem travessoes. Resposta = acao + resultado.
 

@@ -7,14 +7,17 @@
 - Infra tem 3 projetos separados: `Infra.Postgre` (EF Core), `Infra.MongoDb` (legado/feature flag), `Infra.Async` (jobs/HTTP externo).
 
 ## Multi-tenant
-- Filtro **manual** por `EmpresaId` em toda query. **NÃO** usar EF Global Query Filter (já causou bugs).
-- Sempre `WHERE EmpresaId = @empresaId AND ...` no repo. Se esquecer, vaza tenant.
+- **Defesa em camadas** (vigente desde `EasyStockDbContext.ApplyTenantQueryFilters`):
+  1. **Global Query Filter** automatico em toda entity com propriedade `EmpresaId` (Guid) — instala `IsSuperAdmin || EmpresaId == CurrentTenantId` no `OnModelCreating`. Read da query nunca devolve linha de outro tenant pra usuario comum.
+  2. **Filtro manual no Where** + checagem `entity.EmpresaId != command.EmpresaId` apos buscar — defesa em profundidade caso o filtro global seja removido ou bypassado por `IgnoreQueryFilters()`.
+- Sempre preferir o overload do repo que recebe `empresaId` (`GetByIdAsync(empresaId, id)`) — overload sem tenant existe em alguns repos por legado, mas e code smell e pode ser removido.
+- Excecoes do filtro global: tipos em `EasyStock.Domain.Entities.Mobile.*`, `AdminImpersonationLog`, `TenantFeatureFlag` (ver `SkipTenantFilter` no DbContext).
 - IDs de FK validados contra `EmpresaId` antes de salvar (cliente, loja, produto).
 
 ## Concorrência
 - `xmin` (Postgres system column) como RowVersion em entidades-chave: `Pedido`, `Produto`, `ItemEstoque`, `AssinaturaEmpresa`.
 - Configuração via Fluent API: `.Property<uint>("xmin").IsRowVersion().HasColumnName("xmin")`. Sem migration (system column).
-- `FOR UPDATE` apenas dentro de `BeginTransactionAsync()`.
+- `FOR UPDATE` exige transacao explicita. **Preferir** `IUnitOfWork.ExecuteInTransactionAsync(...)` — usa `IExecutionStrategy.ExecuteAsync` internamente (compativel com Npgsql `EnableRetryOnFailure`). `BeginTransactionAsync()` direto fica para legados; nao retenta sob falha transitoria.
 
 ## Use Cases
 - Um use case por arquivo: `XxxUseCase.cs` + `XxxCommand.cs`/`XxxQuery.cs` + `XxxResult.cs` no mesmo folder.
