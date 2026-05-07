@@ -60,7 +60,7 @@ jobs:
           path: coverage-report
           retention-days: 30
 
-      - name: Coverage Summary
+      - name: Coverage summary (global)
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: coverage-report/Cobertura.xml
@@ -71,7 +71,11 @@ jobs:
           hide_complexity: true
           indicators: true
           output: both
-          thresholds: '62 75'
+          thresholds: '29 60'
+
+      - name: Coverage gate per module (Domain/Application/Api)
+        shell: pwsh
+        run: ./scripts/check-coverage-thresholds.ps1 -CoberturaXmlPath ./coverage-report/Cobertura.xml
 
       - name: PR comment with coverage
         if: github.event_name == 'pull_request'
