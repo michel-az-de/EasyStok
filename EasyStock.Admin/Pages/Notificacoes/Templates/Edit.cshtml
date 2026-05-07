@@ -97,7 +97,12 @@
                 </div>
                 <div class="card p-4">
                     <p class="text-slate-400 text-xs mb-2">CORPO</p>
+                    @* sandbox sem nenhuma flag bloqueia scripts/forms/popups dentro do iframe.
+                       Se um template HTML contiver <script>, ele será renderizado mas inerte —
+                       evita execução acidental de JS injetado em variáveis. *@
                     <iframe class="w-full h-80 bg-white rounded"
+                            sandbox=""
+                            title="Preview do corpo do template"
                             srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
                     </iframe>
                 </div>

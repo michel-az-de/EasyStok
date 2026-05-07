@@ -5,7 +5,7 @@
     var ptBR = new System.Globalization.CultureInfo("pt-BR");
 
     string ItemLabel(EasyStock.Web.Models.Api.ItemEstoqueInteligenciaApi item) =>
-        !string.IsNullOrEmpty(item.CodigoInterno) ? item.CodigoInterno : item.ProdutoId.ToString("N")[..8].ToUpper();
+        !string.IsNullOrWhiteSpace(item.CodigoInterno) ? item.CodigoInterno : item.ProdutoId.ToString("N")[..8].ToUpper();
 }
 
 <div class="flex items-center justify-between mb-6">
