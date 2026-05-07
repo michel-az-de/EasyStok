@@ -23,9 +23,20 @@ public static class AdminTestScenariosSeed
 {
     public const string SenhaPadrao = "Teste@123";
 
+    // Documentos fixos dos 4 cenários — usados pra identificar e limpar runs anteriores
+    // sem depender da coluna IsSeedData (que pode não existir na migration).
+    private static readonly string[] SeedDocumentos =
+    [
+        "12.345.678/0001-90",  // Bistrô da Vila
+        "98.765.432/0001-10",  // Padaria do Bairro
+        "55.444.333/0001-20",  // Café Quase Lá
+        "11.222.333/0001-44"   // Loja Do Zé
+    ];
+
     /// <summary>
     /// Executa o seed com progresso em tempo real reportado via <paramref name="progress"/>.
-    /// Usa transação — rollback automático se qualquer etapa falhar.
+    /// Limpa dados anteriores por documento (não usa IsSeedData em LINQ — coluna pode
+    /// não existir em deploys antigos). Cada etapa de delete é autocommit via EF.
     /// </summary>
     public static async Task ExecutarAsync(
         EasyStockDbContext context,
@@ -41,42 +52,14 @@ public static class AdminTestScenariosSeed
                 progress.Report(runId, pct, msg, level);
         }
 
-        // ── Etapa 0: Schema bootstrap (defesa em profundidade) ──────────────────
-        // Mesmo que startup hook + controller path tenham passado, garante uma 3ª
-        // vez que IsSeedData/SeedRunLogs existem antes de qualquer query usá-los.
-        // Idempotente — se schema OK, é no-op.
-        Report(2, "Verificando schema (defesa em profundidade)…");
-        await SeedSchemaBootstrap.EnsureAsync(context, logger);
+        Report(5, "Verificando dados seed anteriores para remoção…");
 
-        Report(5, "Verificando flags de segurança…");
-
-        // ── Etapa 1a: Catch-up de seed legado ──────────────────────────────────
-        // Empresas criadas por seeds anteriores (antes do flag IsSeedData existir)
-        // ficariam órfãs pra sempre. Heurística: marca como seed qualquer empresa
-        // onde NÃO existe nenhum usuário vinculado sem email .test.
-        // Usa NOT EXISTS em vez de GroupBy.All — EF Core traduz melhor.
-        // Idempotente — se rodar 2x não muda nada.
-        Report(8, "Identificando seeds legados (sem marcação IsSeedData)…");
-        var legacyEmpresaIds = await context.UsuariosEmpresas
-            .Where(ue => !context.UsuariosEmpresas
-                .Any(ue2 => ue2.EmpresaId == ue.EmpresaId
-                    && !context.Usuarios.Any(u => u.Id == ue2.UsuarioId && u.Email.EndsWith(".test"))))
-            .Select(ue => ue.EmpresaId)
-            .Distinct()
-            .ToListAsync();
-        if (legacyEmpresaIds.Count > 0)
-        {
-            await context.Empresas
-                .Where(e => legacyEmpresaIds.Contains(e.Id) && !e.IsSeedData)
-                .ExecuteUpdateAsync(s => s.SetProperty(e => e.IsSeedData, true));
-            Report(10, $"Marcado(s) {legacyEmpresaIds.Count} empresa(s) seed legado(s) — serão removidas junto.", "warn");
-        }
-
-        // ── Etapa 1b: Backup + limpeza de dados seed anteriores ─────────────────
-        Report(12, "Identificando dados seed anteriores para remoção segura…");
-
+        // ── Limpeza por documento — sem IsSeedData ────────────────────────────────
+        // Detecta pelo CNPJ fixo dos 4 cenários (invariante entre runs).
+        // NÃO usa e.IsSeedData no LINQ — coluna pode estar ausente em produção se
+        // migration não aplicou. Não depende de nenhuma coluna nova.
         var seedEmpresas = await context.Empresas
-            .Where(e => e.IsSeedData)
+            .Where(e => SeedDocumentos.Contains(e.Documento))
             .Select(e => new { e.Id, e.Nome, e.Documento })
             .ToListAsync();
 
@@ -88,39 +71,31 @@ public static class AdminTestScenariosSeed
                 deletedAt = DateTime.UtcNow,
                 empresas = seedEmpresas.Select(e => new { e.Id, e.Nome, e.Documento })
             });
-            Report(15, $"Backup criado — {seedEmpresas.Count} empresa(s) seed identificadas.");
+            Report(10, $"Backup criado — {seedEmpresas.Count} empresa(s) encontradas para remoção.");
         }
         else
         {
-            Report(15, "Nenhum dado seed anterior encontrado — primeiro run ou banco limpo.");
+            Report(10, "Primeiro run — nenhum dado anterior encontrado.");
         }
 
-        // Persiste backup ANTES de qualquer delete — se a tx falhar e fizer rollback,
-        // o backup ainda fica registrado em SeedRunLog.BackupJson (e no log do server).
         progress?.SetBackup(runId, backupJson);
-        logger.LogInformation("[AdminTestScenarios] BackupJson: {Json}", backupJson.Length > 2000 ? backupJson[..2000] + "…" : backupJson);
+        logger.LogInformation("[AdminTestScenarios] Backup: {Json}", backupJson.Length > 500 ? backupJson[..500] + "…" : backupJson);
 
-        // ── Etapa 2: Delete + insert (tudo dentro de tx) ─────────────────────────
-        // Com EnableRetryOnFailure ativo (NpgsqlRetryingExecutionStrategy), NÃO dá
-        // pra usar BeginTransactionAsync direto — toda a unit precisa rodar dentro
-        // de ExecutionStrategy.ExecuteAsync pra ser retriável atomicamente.
-        var strategy = context.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
-        {
-        await using var tx = await context.Database.BeginTransactionAsync();
+        // ── Delete + insert sem tx explícita ──────────────────────────────────────
+        // Não usa BeginTransactionAsync — conflita com NpgsqlRetryingExecutionStrategy.
+        // Cada ExecuteDeleteAsync / SaveChangesAsync é auto-transacional.
+        // O seed é idempotente: se falhar a meio, re-run recupera o estado.
         try
         {
             if (seedEmpresas.Count > 0)
             {
-                Report(20, $"Removendo {seedEmpresas.Count} empresa(s) seed + dados relacionados…", "warn");
+                Report(15, $"Removendo {seedEmpresas.Count} empresa(s) seed + dados relacionados…", "warn");
 
                 var ids = seedEmpresas.Select(e => e.Id).ToList();
 
-                // Deleta entidades Admin vinculadas às empresas seed (sem cascade automático).
                 await context.AdminTickets.Where(t => ids.Contains(t.EmpresaId)).ExecuteDeleteAsync();
                 await context.AdminNotasTenant.Where(n => ids.Contains(n.TenantId)).ExecuteDeleteAsync();
 
-                // UsuarioPerfis → UsuariosEmpresas → (Usuarios orphans depois)
                 var usuarioIds = await context.UsuariosEmpresas
                     .Where(ue => ids.Contains(ue.EmpresaId))
                     .Select(ue => ue.UsuarioId)
@@ -132,7 +107,6 @@ public static class AdminTestScenariosSeed
                 await context.Lojas.Where(l => ids.Contains(l.EmpresaId)).ExecuteDeleteAsync();
                 await context.Perfis.Where(p => p.EmpresaId.HasValue && ids.Contains(p.EmpresaId.Value)).ExecuteDeleteAsync();
 
-                // Remove usuários que agora são órfãos (sem empresa nenhuma) E têm email .test
                 var orphanIds = await context.Usuarios
                     .Where(u => usuarioIds.Contains(u.Id)
                         && !context.UsuariosEmpresas.Any(ue => ue.UsuarioId == u.Id)
@@ -142,10 +116,9 @@ public static class AdminTestScenariosSeed
                 if (orphanIds.Count > 0)
                     await context.Usuarios.Where(u => orphanIds.Contains(u.Id)).ExecuteDeleteAsync();
 
-                // Remove as próprias empresas seed.
                 await context.Empresas.Where(e => ids.Contains(e.Id)).ExecuteDeleteAsync();
 
-                Report(30, $"Removido: {seedEmpresas.Count} empresa(s) + {orphanIds.Count} usuário(s) orphan.");
+                Report(25, $"Removido: {seedEmpresas.Count} empresa(s) + {orphanIds.Count} usuário(s) orphan.");
             }
 
             // ── Etapa 3: Planos ────────────────────────────────────────────────────
@@ -213,7 +186,7 @@ public static class AdminTestScenariosSeed
 
             await context.SaveChangesAsync();
 
-            // ── Etapa 5: Tickets ──────────────────────────────────────────────────
+            // ── Tickets ───────────────────────────────────────────────────────────
             Report(80, "Criando tickets de suporte (5 cenários)…");
 
             await UpsertTicketAsync(context, c1.Empresa.Id, c1.AdminUsuario.Id,
@@ -248,7 +221,7 @@ public static class AdminTestScenariosSeed
 
             await context.SaveChangesAsync();
 
-            // ── Etapa 6: Notas + Audit logs ───────────────────────────────────────
+            // ── Notas + Audit logs ────────────────────────────────────────────────
             Report(88, "Criando notas internas e audit logs…");
 
             var operadorAdminId = await GetSuperAdminIdAsync(context);
@@ -275,34 +248,18 @@ public static class AdminTestScenariosSeed
 
             await context.SaveChangesAsync();
 
-            // ── Commit ────────────────────────────────────────────────────────────
-            Report(95, "Confirmando transação no banco…");
-            await tx.CommitAsync();
-
-            var resumo = $"4 tenants criados ({c1.Empresa.Nome}, {c2.Empresa.Nome}, {c3.Empresa.Nome}, {c4.Empresa.Nome}), 5 tickets, 3 notas, 5 audit logs.";
+            var resumo = $"4 tenants ({c1.Empresa.Nome}, {c2.Empresa.Nome}, {c3.Empresa.Nome}, {c4.Empresa.Nome}), 5 tickets, 3 notas, 5 audit logs.";
             Report(100, resumo, "success");
             logger.LogInformation("[AdminTestScenarios] Seed concluído — {Resumo}", resumo);
 
-            // SuccessAsync persiste o SeedRunLog ANTES de retornar — UI vê histórico
-            // consistente quando polling reportar status=Success.
             if (progress is not null && runId != default)
                 await progress.SuccessAsync(runId, resumo);
         }
         catch (Exception ex)
         {
-            // Tenta rollback. Se a tx já está num estado terminal (ex.: timeout no
-            // commit), engole o secundário pra preservar a exception original.
-            try { await tx.RollbackAsync(); } catch (Exception rbEx)
-            {
-                logger.LogWarning(rbEx, "[AdminTestScenarios] Rollback secundário falhou — tx provavelmente já completada.");
-            }
-            logger.LogError(ex, "[AdminTestScenarios] Falhou — rollback efetuado. Erro: {Msg}", ex.Message);
-            // NÃO chamar progress.Failure aqui — o controller (catch externo) é
-            // o ponto único que reporta o estado terminal. Chamar nos dois lugares
-            // duplicava etapa de erro e causava 2× PersistAsync concorrentes no DB.
+            logger.LogError(ex, "[AdminTestScenarios] Falhou: {Msg}", ex.Message);
             throw;
         }
-        }); // strategy.ExecuteAsync
     }
 
     // ─────────────────────────── helpers ───────────────────────────────────────
@@ -323,9 +280,8 @@ public static class AdminTestScenariosSeed
     {
         var criadoEm = agora.AddDays(-criadoHaDias);
 
-        // isSeedData=true marca esta empresa pra limpeza no próximo run.
         var empresa = await SeedData.UpsertEmpresaAsync(context, nome, documento, agora,
-            criadoEmOverride: criadoEm, isSeedData: true);
+            criadoEmOverride: criadoEm);
         await context.SaveChangesAsync();
 
         await SeedData.UpsertAssinaturaAsync(context, empresa.Id, plano.Id, agora, diasDesdeInicio: criadoHaDias);

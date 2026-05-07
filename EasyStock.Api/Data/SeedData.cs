@@ -19,8 +19,6 @@ namespace EasyStock.Api.Data;
 /// </summary>
 public static partial class SeedData
 {
-    private const long AdvisoryLockKey = 840240017320251L;
-
     public enum Volume { Small, Medium, Large }
 
     public static async Task ExecutarAsync(IServiceProvider services, ILogger logger)
@@ -36,45 +34,34 @@ public static partial class SeedData
         logger.LogInformation("Seed demo iniciando — volume={Volume}", volume);
 
         var context = services.GetRequiredService<EasyStockDbContext>();
-        // Schema bootstrap defensivo — mesmo de SeedData via startup hook ou
-        // chamada direta. Garante IsSeedData/SeedRunLogs antes de tocar Empresas.
-        await SeedSchemaBootstrap.EnsureAsync(context, logger);
-        var strategy = context.Database.CreateExecutionStrategy();
+        var agora = ArredondarAoMinuto(DateTime.UtcNow);
 
-        await strategy.ExecuteAsync(async () =>
+        // Cada tenant é idempotente (upsert). Rodar sem tx explícita elimina o conflito
+        // com NpgsqlRetryingExecutionStrategy ("does not support user-initiated transactions").
+        // SaveChanges de cada tenant já é transacional internamente.
+        logger.LogInformation("Seed demo — T1: PastaBella");
+        await PastaBellaSpSeed.ExecutarAsync(context, agora, logger);
+        await context.SaveChangesAsync(); context.ChangeTracker.Clear();
+
+        logger.LogInformation("Seed demo — T2: CantinaMauricio");
+        await CantinaMauricioSeed.ExecutarAsync(context, agora, logger);
+        await context.SaveChangesAsync(); context.ChangeTracker.Clear();
+
+        if (volume >= Volume.Medium)
         {
-            var agora = ArredondarAoMinuto(DateTime.UtcNow);
+            logger.LogInformation("Seed demo — T3: CasaDaBaba");
+            await CasaDaBabaSeed.ExecutarAsync(context, agora, logger);
+            await context.SaveChangesAsync(); context.ChangeTracker.Clear();
+        }
 
-            await using var tx = await context.Database.BeginTransactionAsync();
-            await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey})");
+        if (volume >= Volume.Large)
+        {
+            logger.LogInformation("Seed demo — T4: MassasVeneza");
+            await MassasVenezaSeed.ExecutarAsync(context, agora, logger);
+            await context.SaveChangesAsync(); context.ChangeTracker.Clear();
+        }
 
-            // T1 — sempre roda (custo trivial; força fluxo de onboarding)
-            await PastaBellaSpSeed.ExecutarAsync(context, agora, logger);
-            await context.SaveChangesAsync();
-            context.ChangeTracker.Clear();
-
-            // T2 — sempre roda (small já cobre)
-            await CantinaMauricioSeed.ExecutarAsync(context, agora, logger);
-            await context.SaveChangesAsync();
-            context.ChangeTracker.Clear();
-
-            if (volume >= Volume.Medium)
-            {
-                await CasaDaBabaSeed.ExecutarAsync(context, agora, logger);
-                await context.SaveChangesAsync();
-                context.ChangeTracker.Clear();
-            }
-
-            if (volume >= Volume.Large)
-            {
-                await MassasVenezaSeed.ExecutarAsync(context, agora, logger);
-                await context.SaveChangesAsync();
-                context.ChangeTracker.Clear();
-            }
-
-            await tx.CommitAsync();
-            logger.LogInformation("Seed demo concluído.");
-        });
+        logger.LogInformation("Seed demo concluído.");
     }
 
     public static async Task ExecutarMinimalAsync(IServiceProvider services, ILogger logger)
@@ -87,95 +74,83 @@ public static partial class SeedData
         var adminSenha  = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD") ?? "Admin@123";
 
         var context  = services.GetRequiredService<EasyStockDbContext>();
-        // Schema bootstrap defensivo (mesma justificativa do ExecutarAsync acima).
-        await SeedSchemaBootstrap.EnsureAsync(context, logger);
-        var strategy = context.Database.CreateExecutionStrategy();
+        var agora = ArredondarAoMinuto(DateTime.UtcNow);
 
-        await strategy.ExecuteAsync(async () =>
+        if (await context.Usuarios.AnyAsync())
         {
-            var agora = ArredondarAoMinuto(DateTime.UtcNow);
+            logger.LogInformation("Seed minimal: usuário já existe, pulando.");
+            return;
+        }
 
-            await using var tx = await context.Database.BeginTransactionAsync();
-            await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey})");
+        logger.LogInformation("Executando seed minimal para '{Empresa}'...", empresaNome);
 
-            if (await context.Usuarios.AnyAsync())
+        var plano = await context.Planos.FirstOrDefaultAsync();
+        if (plano is null)
+        {
+            plano = new Plano
             {
-                logger.LogInformation("Seed minimal: usuário já existe, pulando.");
-                await tx.CommitAsync();
-                return;
-            }
+                Id = Guid.NewGuid(),
+                Nome = "Plano Local",
+                Descricao = "Plano para uso local",
+                LimiteLojas = Plano.SemLimite,
+                LimiteUsuarios = Plano.SemLimite,
+                LimiteProdutos = Plano.SemLimite,
+                LimiteGeracoesIaMensais = Plano.SemLimite,
+                PrecoMensal = 0m,
+                Ativo = true,
+                CriadoEm = agora
+            };
+            context.Planos.Add(plano);
+        }
 
-            logger.LogInformation("Executando seed minimal para '{Empresa}'...", empresaNome);
+        var empresa = await context.Empresas.FirstOrDefaultAsync(e => e.Documento == empresaDoc)
+                   ?? await context.Empresas.FirstOrDefaultAsync(e => e.Nome == empresaNome);
+        if (empresa is null)
+        {
+            empresa = Empresa.Criar(empresaNome, empresaDoc);
+            context.Empresas.Add(empresa);
+        }
 
-            var plano = await context.Planos.FirstOrDefaultAsync();
-            if (plano is null)
+        var assinatura = await context.AssinaturasEmpresa.FirstOrDefaultAsync(a => a.EmpresaId == empresa.Id);
+        if (assinatura is null)
+        {
+            context.AssinaturasEmpresa.Add(new AssinaturaEmpresa
             {
-                plano = new Plano
-                {
-                    Id = Guid.NewGuid(),
-                    Nome = "Plano Local",
-                    Descricao = "Plano para uso local",
-                    LimiteLojas = Plano.SemLimite,
-                    LimiteUsuarios = Plano.SemLimite,
-                    LimiteProdutos = Plano.SemLimite,
-                    LimiteGeracoesIaMensais = Plano.SemLimite,
-                    PrecoMensal = 0m,
-                    Ativo = true,
-                    CriadoEm = agora
-                };
-                context.Planos.Add(plano);
-            }
+                Id = Guid.NewGuid(),
+                EmpresaId = empresa.Id,
+                PlanoId = plano.Id,
+                DataInicio = agora.Date,
+                DataFim = agora.Date.AddYears(10),
+                Status = StatusAssinatura.Ativa,
+                CriadoEm = agora
+            });
+        }
 
-            var empresa = await context.Empresas.FirstOrDefaultAsync(e => e.Documento == empresaDoc)
-                       ?? await context.Empresas.FirstOrDefaultAsync(e => e.Nome == empresaNome);
-            if (empresa is null)
-            {
-                empresa = Empresa.Criar(empresaNome, empresaDoc);
-                context.Empresas.Add(empresa);
-            }
+        var loja = await context.Lojas.FirstOrDefaultAsync(l => l.EmpresaId == empresa.Id);
+        if (loja is null)
+        {
+            loja = Loja.Criar(empresa.Id, lojaNome);
+            loja.Ativa = true;
+            context.Lojas.Add(loja);
+        }
 
-            var assinatura = await context.AssinaturasEmpresa.FirstOrDefaultAsync(a => a.EmpresaId == empresa.Id);
-            if (assinatura is null)
-            {
-                context.AssinaturasEmpresa.Add(new AssinaturaEmpresa
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = empresa.Id,
-                    PlanoId = plano.Id,
-                    DataInicio = agora.Date,
-                    DataFim = agora.Date.AddYears(10),
-                    Status = StatusAssinatura.Ativa,
-                    CriadoEm = agora
-                });
-            }
+        if (!await context.ConfiguracoesLoja.AnyAsync(c => c.LojaId == loja.Id))
+            context.ConfiguracoesLoja.Add(ConfiguracaoLoja.CriarPadrao(loja.Id));
 
-            var loja = await context.Lojas.FirstOrDefaultAsync(l => l.EmpresaId == empresa.Id);
-            if (loja is null)
-            {
-                loja = Loja.Criar(empresa.Id, lojaNome);
-                loja.Ativa = true;
-                context.Lojas.Add(loja);
-            }
+        var perfilAdmin = await UpsertPerfilAsync(context, empresa.Id, "Admin", "Administrador com acesso total", NivelAcesso.Admin, agora);
+        await UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestão operacional e analytics", NivelAcesso.Gerente, agora);
+        await UpsertPerfilAsync(context, empresa.Id, "Operador", "Operação diária de estoque e vendas", NivelAcesso.Operador, agora);
 
-            if (!await context.ConfiguracoesLoja.AnyAsync(c => c.LojaId == loja.Id))
-                context.ConfiguracoesLoja.Add(ConfiguracaoLoja.CriarPadrao(loja.Id));
+        var usuario = await UpsertUsuarioAsync(context, adminNome, adminEmail, adminSenha, agora);
 
-            var perfilAdmin = await UpsertPerfilAsync(context, empresa.Id, "Admin", "Administrador com acesso total", NivelAcesso.Admin, agora);
-            await UpsertPerfilAsync(context, empresa.Id, "Gerente", "Gestão operacional e analytics", NivelAcesso.Gerente, agora);
-            await UpsertPerfilAsync(context, empresa.Id, "Operador", "Operação diária de estoque e vendas", NivelAcesso.Operador, agora);
+        await EnsureUsuarioEmpresaAsync(context, usuario.Id, empresa.Id, agora);
+        await EnsureUsuarioPerfilAsync(context, usuario.Id, empresa.Id, perfilAdmin.Id, null, agora);
 
-            var usuario = await UpsertUsuarioAsync(context, adminNome, adminEmail, adminSenha, agora);
+        await context.SaveChangesAsync();
 
-            await EnsureUsuarioEmpresaAsync(context, usuario.Id, empresa.Id, agora);
-            await EnsureUsuarioPerfilAsync(context, usuario.Id, empresa.Id, perfilAdmin.Id, null, agora);
-
-            await context.SaveChangesAsync();
-            await tx.CommitAsync();
-
-            logger.LogInformation(
-                "Seed minimal concluído. Empresa='{Empresa}' Loja='{Loja}' Admin='{Email}'",
-                empresaNome, lojaNome, adminEmail);
-        });
+        logger.LogInformation(
+            "Seed minimal concluído. Empresa='{Empresa}' Loja='{Loja}' Admin='{Email}'",
+            empresaNome, lojaNome, adminEmail);
     }
 
     private static Volume ParseVolume(string? raw) => (raw ?? string.Empty).Trim().ToLowerInvariant() switch
