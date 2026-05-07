@@ -149,17 +149,21 @@ switch (resolvedProvider)
     case "postgresql":
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            // /health/dispatcher fica isolado com a tag "dispatcher" — pipeline travado nao
+            // marca a API como Unhealthy nos LBs (que so olham /health/api ou /health/ready).
+            .AddNotificationsHosting();
         break;
 
     case "sqlite":
         builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready"
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            .AddNotificationsHosting();
         break;
 
     default:
@@ -187,6 +191,20 @@ builder.Services
     .AddNotificationsHosting(builder.Configuration)
     .AddPostgresOutboxSignaler(builder.Configuration);
 builder.Services.AddScoped<PostgresAdvisoryLock>();
+
+// Aviso explicito quando o pipeline de notificacoes vai rodar in-process: nao ha bulkhead
+// real entre HTTP da API e os 3 loops (compartilham ThreadPool, GC e memoria). Modo
+// suportado para Render free tier ou dev/teste; em producao prefira Worker como deploy
+// separado (Notifications:Hosting:Mode=Disabled aqui + Mode=Hosted no Worker).
+{
+    var notifMode = builder.Configuration["Notifications:Hosting:Mode"];
+    if (string.Equals(notifMode, "Hosted", StringComparison.OrdinalIgnoreCase))
+    {
+        Log.Warning(
+            "Notifications:Hosting:Mode=Hosted na API — pipeline rodando in-process. " +
+            "Sem isolamento de processo entre HTTP e loops; monitore /health/dispatcher.");
+    }
+}
 
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
@@ -602,6 +620,23 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+// /health/api: dependencias HTTP da API (PG + Redis + config) — NAO inclui dispatcher.
+// Loop de notificacoes preso nao deve marcar a API inteira como down nos LBs.
+app.MapHealthChecks("/health/api", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("api"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+// /health/dispatcher: heartbeats dos 3 BackgroundServices do pipeline de notificacoes.
+// Healthy quando Mode=Disabled (pipeline em Worker separado). Unhealthy quando algum
+// loop nao bate dentro de 5x intervalo configurado — sinal de pendurada.
+app.MapHealthChecks("/health/dispatcher", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("dispatcher"),
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 

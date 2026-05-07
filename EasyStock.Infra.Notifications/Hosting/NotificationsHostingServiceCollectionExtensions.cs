@@ -1,6 +1,7 @@
 using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,11 @@ public static class NotificationsHostingServiceCollectionExtensions
     {
         services.Configure<NotificationsHostingOptions>(
             configuration.GetSection(NotificationsHostingOptions.Section));
+
+        // Heartbeat e usado pelos wrappers Hosted E pelo health check (NotificationsHostingHealthCheck).
+        // Singleton sempre — custo zero quando Mode=Disabled (so guarda dictionary vazio) e simplifica
+        // o registro pra hosts que so precisam do health check (API com pipeline em Worker separado).
+        services.TryAddSingleton<INotificationsLoopHeartbeat, NotificationsLoopHeartbeat>();
 
         // Retro-compat: se a seção legada "Worker" existir, copia chaves equivalentes.
         var legacyWorker = configuration.GetSection("Worker");
