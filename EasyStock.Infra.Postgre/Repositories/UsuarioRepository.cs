@@ -16,8 +16,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .FirstOrDefaultAsync(u => u.Id == id);
 
         public Task<Usuario?> GetByEmailAsync(string email) =>
+            // Login precede o contexto de tenant: CurrentTenantId=Guid.Empty e
+            // IsSuperAdmin=false durante a autenticacao. O global query filter
+            // (Onda 1.2) elimina Perfil/UsuarioPerfil/UsuarioEmpresa com EmpresaId
+            // != Guid.Empty (todos eles), e Perfil com EmpresaId=null (SuperAdmin
+            // global) tambem cai porque null != Guid.Empty. Sem IgnoreQueryFilters
+            // o use case nao consegue resolver nivel/empresa de NINGUEM no login.
             dbContext.Usuarios
                 .AsNoTracking()
+                .IgnoreQueryFilters()
                 .Include(u => u.Empresas)
                 .Include(u => u.Perfis!)
                     .ThenInclude(up => up.Perfil)

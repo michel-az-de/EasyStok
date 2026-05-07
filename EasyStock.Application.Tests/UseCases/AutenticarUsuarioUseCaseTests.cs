@@ -165,6 +165,58 @@ public class AutenticarUsuarioUseCaseTests
     }
 
     [Fact]
+    public async Task Autenticar_DeveRetornarSuperAdmin_QuandoUsuarioTemPerfilGlobal()
+    {
+        // Regressao: o login do SuperAdmin (admin@easystok.com no painel admin)
+        // quebrou apos a Onda 1.2 de multi-tenancy. SuperAdmin tem Perfil.EmpresaId=null
+        // e nenhum vinculo em UsuarioEmpresa, entao o fluxo padrao deixava
+        // nivel=Visualizador e a tela /Auth/Login do EasyStock.Admin rejeitava.
+        var usuarioId = Guid.NewGuid();
+        var perfilSuperId = Guid.NewGuid();
+
+        var usuario = new Usuario
+        {
+            Id = usuarioId,
+            Nome = "Super Admin",
+            Email = "admin@easystok.com",
+            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            Ativo = true,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+            Empresas = new List<UsuarioEmpresa>(),
+            Perfis = new List<UsuarioPerfil>
+            {
+                new UsuarioPerfil
+                {
+                    Id = Guid.NewGuid(),
+                    UsuarioId = usuarioId,
+                    EmpresaId = Guid.Empty,
+                    PerfilId = perfilSuperId,
+                    AtribuidoEm = DateTime.UtcNow,
+                    Perfil = new Perfil
+                    {
+                        Id = perfilSuperId,
+                        Nome = "SuperAdmin",
+                        EmpresaId = null,
+                        Nivel = NivelAcesso.SuperAdmin,
+                        Permissoes = new List<PerfilPermissao>()
+                    }
+                }
+            }
+        };
+
+        var usuarioRepository = Substitute.For<IUsuarioRepository>();
+        usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        var useCase = CriarUseCase(usuarioRepository);
+        var result = await useCase.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senha123", null));
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Null(result.EmpresaId);
+        Assert.Equal(usuarioId, result.UsuarioId);
+    }
+
+    [Fact]
     public async Task Autenticar_DeveLancarCredenciaisInvalidas_QuandoEmpresaNaoVinculada()
     {
         var usuarioId = Guid.NewGuid();

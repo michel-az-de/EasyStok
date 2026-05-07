@@ -78,6 +78,39 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.ResetarTentativasFalha();
 
+            // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
+            // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
+            // deixava nivel=Visualizador como default e a tela /Auth/Login do
+            // EasyStock.Admin rejeitava o usuario com "Acesso restrito a administradores".
+            var perfilSuperAdmin = usuario.Perfis?
+                .Select(up => up.Perfil)
+                .FirstOrDefault(p => p != null && p.Nivel == NivelAcesso.SuperAdmin);
+
+            if (perfilSuperAdmin is not null)
+            {
+                var permissoesSuper = perfilSuperAdmin.Permissoes?
+                    .Select(pp => pp.Permissao)
+                    .Distinct()
+                    .ToArray() ?? [];
+
+                usuario.AtualizarUltimoAcesso();
+                await usuarioRepository.UpdateAsync(usuario);
+                await unitOfWork.CommitAsync();
+
+                swTotal.Stop();
+                logger.LogInformation(
+                    "Autenticacao SuperAdmin bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms)",
+                    usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds, swHash.ElapsedMilliseconds);
+
+                return new AutenticarUsuarioResult(
+                    UsuarioId: usuario.Id,
+                    EmpresaId: null,
+                    Nome: usuario.Nome,
+                    Email: usuario.Email,
+                    Nivel: NivelAcesso.SuperAdmin,
+                    Permissoes: permissoesSuper);
+            }
+
             var empresaId = command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario);
 
             if (empresaId.HasValue)
