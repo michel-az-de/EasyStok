@@ -127,7 +127,9 @@
     </div>
 
     <!-- Modal de confirmação -->
-    <div x-show="confirmId !== null" x-cloak class="modal-overlay" @@click.self="confirmId = null">
+    <div x-show="confirmId !== null" x-cloak class="modal-overlay"
+         @@click.self="confirmId = null"
+         @@keydown.escape.window="if (confirmId !== null) confirmId = null">
         <div class="modal-box" @@click.stop>
             <h3 class="text-es-ink font-semibold mb-4" x-text="confirmAcao === 'suspender' ? 'Suspender tenant?' : 'Reativar tenant?'"></h3>
             <p class="text-es-ink-dim text-sm mb-4" x-show="confirmAcao === 'suspender'">

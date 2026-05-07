@@ -623,6 +623,19 @@ button:active,
     transition-duration: .08s;
 }
 
+/* Estado :disabled — feedback visual padronizado em botões custom não-.btn */
+.app-primary-btn:disabled,
+.ui-secondary-btn:disabled,
+.grid-action-btn:disabled,
+.app-primary-btn[disabled],
+.ui-secondary-btn[disabled],
+.grid-action-btn[disabled] {
+    opacity:        0.55;
+    cursor:         not-allowed;
+    pointer-events: none;
+    transform:      none !important;
+}
+
 html:not(.theme-dark) .app-dropdown,
 html:not(.theme-dark) .app-command-panel {
     background: rgba(255, 255, 255, .92) !important;
