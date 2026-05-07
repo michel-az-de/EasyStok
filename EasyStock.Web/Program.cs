@@ -70,6 +70,7 @@ builder.Services.AddScoped<FornecedoresService>();
 builder.Services.AddScoped<ClientesService>();
 builder.Services.AddScoped<PedidosService>();
 builder.Services.AddScoped<CaixaService>();
+builder.Services.AddScoped<FinanceiroService>();
 builder.Services.AddScoped<LotesService>();
 builder.Services.AddScoped<ListasComprasService>();
 builder.Services.AddScoped<AnalyticsService>();

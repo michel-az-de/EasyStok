@@ -1,0 +1,108 @@
+@model EasyStock.Web.Models.ViewModels.Financeiro.CriarContaViewModel
+@{
+    var hoje = DateTime.Today.ToString("yyyy-MM-dd");
+    var amanha = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+}
+
+<div class="page-content max-w-3xl">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-semibold">Nova Conta a Receber</h1>
+        <a href="/contas-a-receber" class="btn btn-ghost">Voltar</a>
+    </div>
+
+    @if (Model.Categorias.Count == 0)
+    {
+        <div class="card bg-yellow-50 border-yellow-200 mb-4">
+            <p class="text-sm text-yellow-800">
+                Cadastre uma categoria de receita antes de lancar contas a receber.
+            </p>
+        </div>
+    }
+
+    <form method="post" action="/contas-a-receber/criar" class="card space-y-4" x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal' }">
+        @Html.AntiForgeryToken()
+
+        <div>
+            <label class="form-label">Descricao *</label>
+            <input type="text" name="descricao" required maxlength="200" class="form-input" placeholder="Ex: Servicos prestados em outubro" />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Categoria *</label>
+                <select name="categoriaFinanceiraId" required class="form-input">
+                    <option value="">Selecione...</option>
+                    @foreach (var c in Model.Categorias.Where(c => c.Ativa))
+                    {
+                        <option value="@c.Id">@c.Nome</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Centro de Custo</label>
+                <select name="centroCustoId" class="form-input">
+                    <option value="">— Nenhum —</option>
+                    @foreach (var c in Model.CentrosCusto.Where(c => c.Ativo))
+                    {
+                        <option value="@c.Id">@c.Codigo - @c.Nome</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Data emissao *</label>
+                <input type="date" name="dataEmissao" required value="@hoje" class="form-input" />
+            </div>
+            <div>
+                <label class="form-label">Valor total (R$) *</label>
+                <input type="number" name="valorTotal" required min="0.01" step="0.01" class="form-input" x-model.number="valor" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="form-label">N parcelas *</label>
+                <input type="number" name="numeroParcelas" required min="1" max="36" value="1" class="form-input" x-model.number="parcelas" />
+            </div>
+            <div>
+                <label class="form-label">1a vencimento *</label>
+                <input type="date" name="primeiraVencimento" required value="@amanha" class="form-input" x-model="primeira" />
+            </div>
+            <div>
+                <label class="form-label">Intervalo</label>
+                <select name="intervaloTipo" class="form-input" x-model="intervalo">
+                    <option value="mensal">Mensal</option>
+                    <option value="quinzenal">Quinzenal</option>
+                    <option value="semanal">Semanal</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 rounded p-3 text-sm" x-show="parcelas > 0 && valor > 0">
+            <div class="text-gray-600 mb-2">Preview:</div>
+            <template x-for="i in parcelas" :key="i">
+                <div class="flex justify-between border-b border-gray-200 py-1">
+                    <span x-text="`Parcela ${i}`"></span>
+                    <span x-text="`R$ ${(valor / parcelas).toFixed(2)}`"></span>
+                </div>
+            </template>
+        </div>
+
+        <div>
+            <label class="form-label">Observacoes</label>
+            <textarea name="observacoes" maxlength="4000" rows="3" class="form-input"></textarea>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <input type="checkbox" id="emitir" name="emitirAposCriar" value="true" />
+            <label for="emitir" class="text-sm">Emitir imediatamente (pular Rascunho)</label>
+        </div>
+
+        <div class="flex gap-2 pt-4 border-t">
+            <button type="submit" class="btn btn-primary">Criar conta</button>
+            <a href="/contas-a-receber" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </form>
+</div>
