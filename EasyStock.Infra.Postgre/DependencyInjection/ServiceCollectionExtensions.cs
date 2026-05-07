@@ -97,6 +97,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IOutboxEventoIntegracaoRepository, OutboxEventoIntegracaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao,
                 Integration.PublicadorEventoIntegracao>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventDispatcher,
+                Integration.IntegrationEventDispatcher>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();

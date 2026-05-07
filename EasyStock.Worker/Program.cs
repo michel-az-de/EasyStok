@@ -85,6 +85,11 @@ builder.Services
 // SlaMonitorService monitora tickets e gera EventoNotificacao — pertence ao Worker mesmo.
 builder.Services.AddHostedService<SlaMonitorService>();
 
+// Outbox de eventos de integração externa (F4.c) — consome
+// OutboxEventoIntegracao e despacha via handlers registrados.
+// Pode ser desligado via Integration:Outbox:Enabled=false (default true).
+builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
+
 // Health checks
 builder.Services.AddHealthChecks();
 
