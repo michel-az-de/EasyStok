@@ -36,63 +36,63 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             if (string.IsNullOrWhiteSpace(command.Motivo) || command.Motivo.Trim().Length < 3)
                 throw new UseCaseValidationException("Motivo do estorno e obrigatorio (minimo 3 caracteres).");
 
-            // Explícita transação garante que FOR UPDATE lock é mantido até CommitAsync
-            await using var tx = await unitOfWork.BeginTransactionAsync();
+            // ExecuteInTransactionAsync usa IExecutionStrategy do Npgsql (compativel
+            // com EnableRetryOnFailure). FOR UPDATE em GetByIdComLockAsync mantem
+            // o lock pessimistico ate o commit final.
+            return await unitOfWork.ExecuteInTransactionAsync(async ct =>
+            {
+                // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
+                var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)
+                    ?? throw new UseCaseValidationException("Movimentacao nao encontrada.");
 
-            // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
-            var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)
-                ?? throw new UseCaseValidationException("Movimentacao nao encontrada.");
+                if (original.EmpresaId != command.EmpresaId)
+                    throw new UseCaseValidationException("A movimentacao nao pertence a empresa informada.");
 
-            if (original.EmpresaId != command.EmpresaId)
-                throw new UseCaseValidationException("A movimentacao nao pertence a empresa informada.");
+                if (original.Tipo != TipoMovimentacaoEstoque.Saida)
+                    throw new UseCaseValidationException("Somente movimentacoes de saida podem ser estornadas.");
 
-            if (original.Tipo != TipoMovimentacaoEstoque.Saida)
-                throw new UseCaseValidationException("Somente movimentacoes de saida podem ser estornadas.");
+                // Re-validação dentro da transação (com lock) previne race condition de duplo estorno
+                if (original.EstornadaEm.HasValue)
+                    throw new MovimentacaoJaEstornadaException(original.Id);
 
-            // Re-validação dentro da transação (com lock) previne race condition de duplo estorno
-            if (original.EstornadaEm.HasValue)
-                throw new MovimentacaoJaEstornadaException(original.Id);
+                var agora = DateTime.UtcNow;
 
-            var agora = DateTime.UtcNow;
+                var itemEstoque = await itemEstoqueRepository.GetByIdAsync(original.ItemEstoqueId)
+                    ?? throw new UseCaseValidationException("Item de estoque da movimentacao nao encontrado.");
 
-            var itemEstoque = await itemEstoqueRepository.GetByIdAsync(original.ItemEstoqueId)
-                ?? throw new UseCaseValidationException("Item de estoque da movimentacao nao encontrado.");
+                // SEGURANÇA: Validar que itemEstoque pertence à empresa solicitada (multi-tenant isolation)
+                if (itemEstoque.EmpresaId != command.EmpresaId)
+                    throw new UseCaseValidationException("O item de estoque nao pertence a empresa informada.");
 
-            // SEGURANÇA: Validar que itemEstoque pertence à empresa solicitada (multi-tenant isolation)
-            if (itemEstoque.EmpresaId != command.EmpresaId)
-                throw new UseCaseValidationException("O item de estoque nao pertence a empresa informada.");
+                itemEstoque.RestaurarQuantidade(original.Quantidade, agora);
 
-            itemEstoque.RestaurarQuantidade(original.Quantidade, agora);
+                var auditoria = currentUser is null ? null : new AuditoriaContexto(
+                    UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                    Ip: currentUser.Ip,
+                    UserAgent: currentUser.UserAgent,
+                    DispositivoId: currentUser.DispositivoId);
 
-            var auditoria = currentUser is null ? null : new AuditoriaContexto(
-                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
-                Ip: currentUser.Ip,
-                UserAgent: currentUser.UserAgent,
-                DispositivoId: currentUser.DispositivoId);
+                var estorno = MovimentacaoEstoque.CriarEstorno(
+                    Guid.NewGuid(),
+                    original,
+                    agora,
+                    command.Motivo,
+                    agora,
+                    command.Motivo,
+                    auditoria);
 
-            var estorno = MovimentacaoEstoque.CriarEstorno(
-                Guid.NewGuid(),
-                original,
-                agora,
-                command.Motivo,
-                agora,
-                command.Motivo,
-                auditoria);
+                original.MarcarComoEstornada(agora);
 
-            original.MarcarComoEstornada(agora);
+                await movimentacaoRepository.InsertAsync(estorno);
+                await movimentacaoRepository.UpdateAsync(original);
+                await itemEstoqueRepository.UpdateAsync(itemEstoque);
+                await unitOfWork.CommitAsync();
 
-            await movimentacaoRepository.InsertAsync(estorno);
-            await movimentacaoRepository.UpdateAsync(original);
-            await itemEstoqueRepository.UpdateAsync(itemEstoque);
-            await unitOfWork.CommitAsync();
-            // Commit explícito do escopo transacional. Sem isso, o Dispose do
-            // tx faz rollback (semântica nova — anteriormente fazia auto-commit).
-            await tx.CommitAsync();
+                logger.LogWarning("AUDIT: Estorno registrado. EstornoId: {EstornoId}, OriginalId: {OriginalId}, EmpresaId: {EmpresaId}, Quantidade: {Quantidade}, UsuarioId: {UsuarioId}, Ip: {Ip}",
+                    estorno.Id, original.Id, command.EmpresaId, original.Quantidade.Value, estorno.UsuarioId, estorno.Ip);
 
-            logger.LogWarning("AUDIT: Estorno registrado. EstornoId: {EstornoId}, OriginalId: {OriginalId}, EmpresaId: {EmpresaId}, Quantidade: {Quantidade}, UsuarioId: {UsuarioId}, Ip: {Ip}",
-                estorno.Id, original.Id, command.EmpresaId, original.Quantidade.Value, estorno.UsuarioId, estorno.Ip);
-
-            return new EstornarSaidaResult(estorno.Id, original.Id, original.Quantidade.Value);
+                return new EstornarSaidaResult(estorno.Id, original.Id, original.Quantidade.Value);
+            });
         }
     }
 }

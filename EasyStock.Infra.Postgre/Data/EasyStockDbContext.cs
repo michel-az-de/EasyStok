@@ -184,14 +184,28 @@ namespace EasyStock.Infra.Postgre.Data
             CancellationToken ct = default)
         {
             // CreateExecutionStrategy reusa a politica do provedor (EnableRetryOnFailure
-            // do Npgsql). Sem isso, BeginTransactionAsync direto lanca
-            // InvalidOperationException quando retry esta ligado.
+            // do Npgsql). Sem isso, BeginTransactionAsync direto perde a capacidade
+            // de retry sob falha transitoria — exceção propaga ao caller.
             var strategy = Database.CreateExecutionStrategy();
             return strategy.ExecuteAsync(ct, async (token) =>
             {
                 await using var tx = await Database.BeginTransactionAsync(token);
                 await action(token);
                 await tx.CommitAsync(token);
+            });
+        }
+
+        public Task<T> ExecuteInTransactionAsync<T>(
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken ct = default)
+        {
+            var strategy = Database.CreateExecutionStrategy();
+            return strategy.ExecuteAsync(ct, async (token) =>
+            {
+                await using var tx = await Database.BeginTransactionAsync(token);
+                var result = await action(token);
+                await tx.CommitAsync(token);
+                return result;
             });
         }
 

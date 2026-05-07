@@ -78,6 +78,13 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient, ILogger<MongoUnitO
         await action(ct);
     }
 
+    public async Task<T> ExecuteInTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken ct = default)
+    {
+        return await action(ct);
+    }
+
     private sealed class NoopScope : IDbTransactionScope
     {
         public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;

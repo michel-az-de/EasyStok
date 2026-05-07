@@ -33,5 +33,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> action,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// Versão com valor de retorno. Mesmas regras de
+        /// <see cref="ExecuteInTransactionAsync(Func{CancellationToken, Task}, CancellationToken)"/>:
+        /// idempotente porque pode reexecutar em falha transitoria.
+        /// </summary>
+        Task<T> ExecuteInTransactionAsync<T>(
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken ct = default);
     }
 }

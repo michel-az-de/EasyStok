@@ -92,11 +92,14 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             // FifoAtivo=false → FIFO puro (por data de entrada).
             var fefo = configuracao?.FifoAtivo ?? true;
 
-            // Transação explícita — necessária para que o FOR UPDATE adquirido
-            // em GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantenha
-            // o lock até o CommitAsync. Sem isso, EF abre transação implícita
-            // só no SaveChanges e o lock libera ao fim de cada statement.
-            await using var tx = await unitOfWork.BeginTransactionAsync();
+            // ExecuteInTransactionAsync usa IExecutionStrategy do Npgsql (retry
+            // compativel com EnableRetryOnFailure). FOR UPDATE adquirido em
+            // GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantem o lock
+            // pessimistico ate o commit final do bloco — sem isso, EF abre
+            // transacao implicita so no SaveChanges e o lock libera ao fim do
+            // statement, abrindo race com requests concorrentes.
+            return await unitOfWork.ExecuteInTransactionAsync(async ct =>
+            {
 
             var agora = DateTime.UtcNow;
 
@@ -255,13 +258,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             await itemVendaRepository.InsertRangeAsync(itensVenda);
             await movimentacaoEstoqueRepository.InsertRangeAsync(movimentacoes);
             await unitOfWork.CommitAsync();
-            // Commit explícito do escopo transacional. Sem isso, o Dispose do
-            // tx faz rollback (semântica nova — anteriormente fazia auto-commit).
-            await tx.CommitAsync();
 
-            logger.LogWarning("AUDIT: Sa�da de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
+            logger.LogWarning("AUDIT: Saida de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
                 venda.Id, command.EmpresaId, venda.ValorTotal.Valor, itensResult.Count);
 
+            // Eventos publicam DENTRO da tx — caller (Outbox) ja persiste
+            // atomicamente; rollback da tx aborta o evento junto.
             if (publicadorEventos is not null)
             {
                 await publicadorEventos.PublicarAsync(new VendaRegistrada(
@@ -272,6 +274,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             }
 
             return new RegistrarSaidaEstoqueResult(venda.Id, itensResult, venda.ValorTotal.Valor);
+            });
         }
 
         private async Task<ItemEstoque> ObterItemDiretoAsync(Guid empresaId, Guid itemEstoqueId)
