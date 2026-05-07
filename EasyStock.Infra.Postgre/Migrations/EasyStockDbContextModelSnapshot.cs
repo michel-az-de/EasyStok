@@ -226,9 +226,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("FaturaId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Nivel")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -286,10 +283,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("CriadoPorId")
                         .HasDatabaseName("ix_admin_tickets_criado_por_id");
-
-                    b.HasIndex("FaturaId")
-                        .HasDatabaseName("ix_admin_tickets_fatura_id")
-                        .HasFilter("\"FaturaId\" IS NOT NULL");
 
                     b.HasIndex("OrigemTicketId")
                         .HasDatabaseName("ix_admin_tickets_origem_ticket_id");
@@ -847,9 +840,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("ExpiracaoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("FaturaId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("MetodoPagamento")
                         .HasColumnType("text");
 
@@ -886,11 +876,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("EmpresaId");
 
-                    b.HasIndex("FaturaId")
-                        .HasDatabaseName("ix_cobrancas_assinatura_fatura_id")
-                        .HasFilter("\"FaturaId\" IS NOT NULL");
-
-                    b.ToTable("CobrancasAssinatura", (string)null);
+                    b.ToTable("CobrancasAssinatura");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ConfiguracaoLoja", b =>
@@ -1118,9 +1104,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<bool>("FinanceiroHabilitado")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -1132,324 +1115,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique();
 
                     b.ToTable("empresas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Acrescimos")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ClienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DadosEmissor")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("dados_emissor");
-
-                    b.Property<string>("DadosFaturado")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("dados_faturado");
-
-                    b.Property<string>("DadosFiscais")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("dados_fiscais");
-
-                    b.Property<DateTime>("DataEmissao")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DataPagamentoTotal")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("DataVencimento")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Descontos")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Moeda")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasDefaultValue("BRL");
-
-                    b.Property<string>("Numero")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Observacoes")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Origem")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid?>("OrigemRefId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PdfStorageKey")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<decimal>("SubTotal")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<Guid?>("TicketRelacionadoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Total")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<uint>("Versao")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClienteId");
-
-                    b.HasIndex("TicketRelacionadoId")
-                        .HasDatabaseName("ix_faturas_ticket_relacionado")
-                        .HasFilter("\"TicketRelacionadoId\" IS NOT NULL");
-
-                    b.HasIndex("EmpresaId", "DataVencimento")
-                        .HasDatabaseName("ix_faturas_empresa_vencimento");
-
-                    b.HasIndex("EmpresaId", "Numero")
-                        .IsUnique()
-                        .HasDatabaseName("ux_faturas_empresa_numero");
-
-                    b.HasIndex("EmpresaId", "Status")
-                        .HasDatabaseName("ix_faturas_empresa_status");
-
-                    b.HasIndex("Origem", "OrigemRefId")
-                        .HasDatabaseName("ix_faturas_origem_ref");
-
-                    b.ToTable("faturas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaContador", b =>
-                {
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Ano")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("AtualizadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("UltimoNumero")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(0L);
-
-                    b.HasKey("EmpresaId", "Ano");
-
-                    b.ToTable("fatura_contador", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaEvento", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("FaturaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MetadadosJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTime>("OcorridoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Origem")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<Guid?>("UsuarioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("UsuarioNome")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("ValorAntes")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("ValorDepois")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FaturaId")
-                        .HasDatabaseName("ix_fatura_eventos_fatura_id");
-
-                    b.HasIndex("FaturaId", "OcorridoEm")
-                        .HasDatabaseName("ix_fatura_eventos_fatura_ocorrido");
-
-                    b.ToTable("fatura_eventos", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Descricao")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<Guid>("FaturaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Ordem")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("PrecoUnitario")
-                        .HasColumnType("decimal(14,2)");
-
-                    b.Property<Guid?>("ProdutoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantidade")
-                        .HasColumnType("decimal(14,3)");
-
-                    b.Property<decimal>("Subtotal")
-                        .HasColumnType("decimal(14,2)");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FaturaId")
-                        .HasDatabaseName("ix_fatura_itens_fatura_id");
-
-                    b.HasIndex("FaturaId", "Ordem")
-                        .HasDatabaseName("ix_fatura_itens_fatura_ordem");
-
-                    b.ToTable("fatura_itens", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaPagamento", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DadosGatewayJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<Guid>("FaturaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("GatewayProvedor")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("GatewayTransactionId")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("Metodo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("Observacao")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime?>("PagoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RegistradoPorNome")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<Guid?>("RegistradoPorUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<decimal>("Valor")
-                        .HasColumnType("decimal(14,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FaturaId")
-                        .HasDatabaseName("ix_fatura_pagamentos_fatura_id");
-
-                    b.HasIndex("FaturaId", "Status")
-                        .HasDatabaseName("ix_fatura_pagamentos_fatura_status");
-
-                    b.HasIndex("GatewayProvedor", "GatewayTransactionId")
-                        .HasDatabaseName("ix_fatura_pagamentos_gateway_tx")
-                        .HasFilter("\"GatewayTransactionId\" IS NOT NULL");
-
-                    b.ToTable("fatura_pagamentos", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.FechamentoCaixa", b =>
@@ -5184,52 +4849,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("venda_alteracoes", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.WebhookRecebido", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Erro")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("EventIdExterno")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime?>("ProcessadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Provedor")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("RawBodyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("RecebidoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("Sucesso")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecebidoEm")
-                        .HasDatabaseName("ix_webhook_recebidos_recebido_em");
-
-                    b.HasIndex("Provedor", "EventIdExterno")
-                        .IsUnique()
-                        .HasDatabaseName("ux_webhook_recebidos_provedor_eventid");
-
-                    b.ToTable("webhook_recebidos", (string)null);
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.AdminImpersonationLog", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Usuario", "AdminUsuario")
@@ -5267,11 +4886,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("EasyStock.Domain.Entities.Fatura", "Fatura")
-                        .WithMany()
-                        .HasForeignKey("FaturaId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("EasyStock.Domain.Entities.AdminTicket", "OrigemTicket")
                         .WithMany()
                         .HasForeignKey("OrigemTicketId")
@@ -5282,8 +4896,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("CriadoPor");
 
                     b.Navigation("Empresa");
-
-                    b.Navigation("Fatura");
 
                     b.Navigation("OrigemTicket");
                 });
@@ -5445,16 +5057,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStock.Domain.Entities.Fatura", "Fatura")
-                        .WithMany()
-                        .HasForeignKey("FaturaId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Assinatura");
 
                     b.Navigation("Empresa");
-
-                    b.Navigation("Fatura");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ConfiguracaoLoja", b =>
@@ -5477,64 +5082,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Cliente", "Cliente")
-                        .WithMany()
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
-                        .WithMany()
-                        .HasForeignKey("EmpresaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EasyStock.Domain.Entities.AdminTicket", "TicketRelacionado")
-                        .WithMany()
-                        .HasForeignKey("TicketRelacionadoId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Cliente");
-
-                    b.Navigation("Empresa");
-
-                    b.Navigation("TicketRelacionado");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaEvento", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Fatura", "Fatura")
-                        .WithMany("Eventos")
-                        .HasForeignKey("FaturaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Fatura");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaItem", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Fatura", "Fatura")
-                        .WithMany("Itens")
-                        .HasForeignKey("FaturaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Fatura");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.FaturaPagamento", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Fatura", "Fatura")
-                        .WithMany("Pagamentos")
-                        .HasForeignKey("FaturaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Fatura");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.FechamentoCaixa", b =>
@@ -6541,15 +6088,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("VariacoesProduto");
 
                     b.Navigation("Vendas");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
-                {
-                    b.Navigation("Eventos");
-
-                    b.Navigation("Itens");
-
-                    b.Navigation("Pagamentos");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ItemEstoque", b =>

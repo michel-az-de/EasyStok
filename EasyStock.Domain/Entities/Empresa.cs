@@ -18,14 +18,6 @@ namespace EasyStock.Domain.Entities
         [NotMapped]
         public bool IsSeedData { get; set; }
 
-        /// <summary>
-        /// Feature flag do modulo Financeiro (F1+). Default false para tenants
-        /// existentes (Casa da Baba nao deve ver menu Financeiro ate ser
-        /// explicitamente habilitado). Default true para tenants criados apos
-        /// a migration que introduziu a coluna.
-        /// </summary>
-        public bool FinanceiroHabilitado { get; set; } = false;
-
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;

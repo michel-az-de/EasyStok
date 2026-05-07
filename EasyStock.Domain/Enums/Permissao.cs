@@ -17,14 +17,6 @@ namespace EasyStock.Domain.Enums
         EncaminharTicketNivel,
         RevelarPiiCliente,
         GerarBugFix,
-        ConfigurarSla,
-
-        // Modulo Financeiro (F1+)
-        VisualizarFaturas,
-        EmitirFatura,
-        GerenciarFaturas,
-        CancelarFatura,
-        EstornarPagamento,
-        ReenviarFaturaCliente
+        ConfigurarSla
     }
 }
