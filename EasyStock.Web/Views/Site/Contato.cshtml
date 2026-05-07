@@ -1,9 +1,10 @@
 @model EasyStock.Web.Models.ViewModels.Site.ContatoViewModel
+@inject Microsoft.Extensions.Options.IOptions<EasyStock.Web.Services.MarketingOptions> MarketingOpts
 @{
     Layout = "_LayoutSite";
     ViewBag.Title = "Fale com a gente";
     ViewBag.Description = "Duvida, parceria, suporte: a gente responde em ate 1 dia util.";
-    var marketing = (EasyStock.Web.Services.MarketingOptions)ViewBag.Marketing;
+    var marketing = MarketingOpts.Value;
 }
 
 <section class="site-section" style="padding-top:64px">
@@ -17,38 +18,32 @@
         <form asp-controller="Site" asp-action="Contato" method="post" class="site-form" novalidate>
             @Html.AntiForgeryToken()
 
-            @if (!ViewData.ModelState.IsValid && ViewData.ModelState[""]?.Errors.Count > 0)
-            {
-                <div class="site-form-error">
-                    @foreach (var error in ViewData.ModelState[""].Errors)
-                    {
-                        <div>@error.ErrorMessage</div>
-                    }
-                </div>
-            }
+            <div asp-validation-summary="ModelOnly" class="site-form-error"></div>
 
             <div class="site-form-grid">
                 <div class="site-form-field">
-                    <label for="Nome">Como te chamamos?</label>
-                    <input asp-for="Nome" id="Nome" type="text" required maxlength="150" autocomplete="name" />
-                    <span asp-validation-for="Nome" class="site-form-error" style="display:@(ViewData.ModelState["Nome"]?.Errors.Count > 0 ? "block" : "none")"></span>
+                    <label asp-for="Nome">Como te chamamos?</label>
+                    <input asp-for="Nome" type="text" required maxlength="150" autocomplete="name" />
+                    <span asp-validation-for="Nome" class="site-form-error"></span>
                 </div>
                 <div class="site-form-field">
-                    <label for="Email">E-mail</label>
-                    <input asp-for="Email" id="Email" type="email" required maxlength="255" autocomplete="email" />
-                    <span asp-validation-for="Email" class="site-form-error" style="display:@(ViewData.ModelState["Email"]?.Errors.Count > 0 ? "block" : "none")"></span>
+                    <label asp-for="Email">E-mail</label>
+                    <input asp-for="Email" type="email" required maxlength="255" autocomplete="email" />
+                    <span asp-validation-for="Email" class="site-form-error"></span>
                 </div>
                 <div class="site-form-field">
-                    <label for="Telefone">Telefone (opcional)</label>
-                    <input asp-for="Telefone" id="Telefone" type="tel" maxlength="32" autocomplete="tel" />
+                    <label asp-for="Telefone">Telefone (opcional)</label>
+                    <input asp-for="Telefone" type="tel" maxlength="32" autocomplete="tel" />
+                    <span asp-validation-for="Telefone" class="site-form-error"></span>
                 </div>
                 <div class="site-form-field">
-                    <label for="Empresa">Empresa (opcional)</label>
-                    <input asp-for="Empresa" id="Empresa" type="text" maxlength="150" autocomplete="organization" />
+                    <label asp-for="Empresa">Empresa (opcional)</label>
+                    <input asp-for="Empresa" type="text" maxlength="150" autocomplete="organization" />
+                    <span asp-validation-for="Empresa" class="site-form-error"></span>
                 </div>
                 <div class="site-form-field" style="grid-column:1/-1">
-                    <label for="TipoNegocio">Tipo de negocio (opcional)</label>
-                    <select asp-for="TipoNegocio" id="TipoNegocio">
+                    <label asp-for="TipoNegocio">Tipo de negocio (opcional)</label>
+                    <select asp-for="TipoNegocio">
                         <option value="">Escolha...</option>
                         <option value="Marmitaria">Marmitaria</option>
                         <option value="Cafe">Cafe / cafeteria</option>
@@ -61,12 +56,13 @@
                     </select>
                 </div>
                 <div class="site-form-field" style="grid-column:1/-1">
-                    <label for="Mensagem">Mensagem</label>
-                    <textarea asp-for="Mensagem" id="Mensagem" required maxlength="2000" placeholder="Conta um pouco do seu cenario, da operacao, da duvida..."></textarea>
-                    <span asp-validation-for="Mensagem" class="site-form-error" style="display:@(ViewData.ModelState["Mensagem"]?.Errors.Count > 0 ? "block" : "none")"></span>
+                    <label asp-for="Mensagem">Mensagem</label>
+                    <textarea asp-for="Mensagem" required maxlength="2000" placeholder="Conta um pouco do seu cenario, da operacao, da duvida..."></textarea>
+                    <span asp-validation-for="Mensagem" class="site-form-error"></span>
                 </div>
             </div>
 
+            @* Honeypot: bots preenchem; humanos nao veem (CSS .site-honeypot esconde fora do viewport). *@
             <input asp-for="Website" type="text" tabindex="-1" autocomplete="off" class="site-honeypot" aria-hidden="true" />
             <input asp-for="UtmSource" type="hidden" />
             <input asp-for="UtmMedium" type="hidden" />
@@ -80,7 +76,7 @@
                 <input asp-for="ConsentimentoLgpd" type="checkbox" required />
                 <span>Concordo com a <a href="/privacidade" target="_blank" rel="noopener noreferrer">Politica de Privacidade</a> e autorizo o EasyStok a entrar em contato.</span>
             </label>
-            <span asp-validation-for="ConsentimentoLgpd" class="site-form-error" style="display:@(ViewData.ModelState["ConsentimentoLgpd"]?.Errors.Count > 0 ? "block" : "none")"></span>
+            <span asp-validation-for="ConsentimentoLgpd" class="site-form-error"></span>
 
             <div class="site-form-actions">
                 <button type="submit" class="btn btn-primary btn-lg">Enviar mensagem</button>

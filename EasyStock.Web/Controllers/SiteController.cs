@@ -2,7 +2,6 @@ using EasyStock.Web.Models.ViewModels.Site;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace EasyStock.Web.Controllers;
 
@@ -10,58 +9,60 @@ namespace EasyStock.Web.Controllers;
 /// Landing publica do EasyStok. Todas as actions sao anonimas, com layout
 /// proprio (_LayoutSite) — separado do app autenticado. Usuarios ja logados
 /// sao redirecionados pro dashboard pra nao verem pitch de venda novamente.
+///
+/// <para>
+/// Antiforgery: o EasyStock.Web ja registra <see cref="AutoValidateAntiforgeryTokenAttribute"/>
+/// como filtro global em Program.cs, entao todos os POST sao validados
+/// automaticamente sem precisar de [ValidateAntiForgeryToken] explicito.
+/// </para>
+///
+/// <para>
+/// MarketingOptions e injetado via @inject IOptions&lt;MarketingOptions&gt;
+/// no _LayoutSite, dispensando ViewBag.Marketing nas actions.
+/// </para>
 /// </summary>
 [AllowAnonymous]
 [Route("/")]
 public sealed class SiteController(
     LeadsApiService leadsApi,
-    SessionService session,
-    IOptions<MarketingOptions> marketingOpts) : Controller
+    SessionService session) : Controller
 {
-    private MarketingOptions Marketing => marketingOpts.Value;
-
     [HttpGet("")]
-    [HttpGet("home")]
     public IActionResult Index()
     {
+        // Usuario ja autenticado vai direto pro dashboard — landing e pitch de venda.
         if (session.IsLoggedIn())
             return RedirectToAction("Index", "Dashboard");
 
-        ViewBag.Marketing = Marketing;
         return View(new LandingViewModel());
     }
 
     [HttpGet("precos")]
-    public IActionResult Precos()
-    {
-        ViewBag.Marketing = Marketing;
-        return View();
-    }
+    public IActionResult Precos() => View();
 
     [HttpGet("app")]
-    public IActionResult App()
-    {
-        ViewBag.Marketing = Marketing;
-        return View();
-    }
+    public IActionResult App() => View();
 
     [HttpGet("contato")]
     public IActionResult Contato(string? origem = null, string? assunto = null)
     {
-        ViewBag.Marketing = Marketing;
+        // Sanitiza assunto para evitar payload arbitrario via querystring no textarea.
+        // Texto livre limitado a 80 chars + caracteres seguros.
+        var assuntoSanitizado = string.IsNullOrWhiteSpace(assunto)
+            ? null
+            : SanitizarAssunto(assunto);
+
         var vm = new ContatoViewModel
         {
-            Mensagem = string.IsNullOrWhiteSpace(assunto) ? string.Empty : $"[{assunto}] ",
-            UtmSource = origem
+            Mensagem = string.IsNullOrEmpty(assuntoSanitizado) ? string.Empty : $"[{assuntoSanitizado}] ",
+            UtmSource = string.IsNullOrWhiteSpace(origem) ? null : SanitizarAssunto(origem)
         };
         return View(vm);
     }
 
     [HttpPost("contato")]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Contato(ContatoViewModel vm)
     {
-        ViewBag.Marketing = Marketing;
         if (!ModelState.IsValid) return View(vm);
 
         var result = await leadsApi.EnviarFaleConoscoAsync(vm);
@@ -77,14 +78,14 @@ public sealed class SiteController(
     }
 
     [HttpGet("sucesso")]
-    public IActionResult Sucesso()
-    {
-        ViewBag.Marketing = Marketing;
-        return View();
-    }
+    public IActionResult Sucesso() => View();
 
+    /// <summary>
+    /// POST AJAX da newsletter (footer). Resposta JSON pra o JS exibir toast inline
+    /// sem reload. Anti-spam adicional do API (rate-limit por IP) ainda se aplica
+    /// porque o ApiClient encaminha o IP via X-Forwarded-For (TODO: P1).
+    /// </summary>
     [HttpPost("newsletter")]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> InscreverNewsletter(NewsletterViewModel vm)
     {
         if (!ModelState.IsValid)
@@ -98,16 +99,23 @@ public sealed class SiteController(
     }
 
     [HttpGet("termos")]
-    public IActionResult TermosDeUso()
-    {
-        ViewBag.Marketing = Marketing;
-        return View();
-    }
+    public IActionResult TermosDeUso() => View();
 
     [HttpGet("privacidade")]
-    public IActionResult PoliticaPrivacidade()
+    public IActionResult PoliticaPrivacidade() => View();
+
+    /// <summary>
+    /// Sanitiza texto vindo de querystring para uso em textarea/input pre-preenchido.
+    /// Limita tamanho, remove control chars e neutraliza tentativas obvias de
+    /// injecao (apesar do Razor escape proteger no render, melhor evitar payload
+    /// chegar na server-side validation).
+    /// </summary>
+    private static string SanitizarAssunto(string raw)
     {
-        ViewBag.Marketing = Marketing;
-        return View();
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        var trimmed = raw.Trim();
+        if (trimmed.Length > 80) trimmed = trimmed[..80];
+        var clean = new string(trimmed.Where(c => !char.IsControl(c) && c != '<' && c != '>' && c != '"').ToArray());
+        return clean;
     }
 }

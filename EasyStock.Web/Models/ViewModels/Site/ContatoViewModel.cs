@@ -23,7 +23,7 @@ public sealed class ContatoViewModel
     public string? TipoNegocio { get; set; }
 
     [Required(ErrorMessage = "Conta pra gente o que precisa.")]
-    [StringLength(2000, MinimumLength = 5, ErrorMessage = "Mensagem muito curta.")]
+    [StringLength(2000, MinimumLength = 10, ErrorMessage = "Mensagem muito curta — escreve pelo menos 10 caracteres.")]
     public string Mensagem { get; set; } = string.Empty;
 
     [Display(Name = "Concordo com a Politica de Privacidade")]
