@@ -231,6 +231,39 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // Rate limit pro signup de empresa nova. Particionado por IP pra
+            // travar criacao em massa de tenants falsos. 5/IP/hora chega pra
+            // demos pessoais e onboarding de cliente novo, com folga.
+            options.AddPolicy("signup", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromHours(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
+            // Rate limit pra checagens de disponibilidade (email/CNPJ) feitas
+            // inline durante signup. 30/IP/min cobre digitacao com debounce.
+            options.AddPolicy("disponibilidade", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
