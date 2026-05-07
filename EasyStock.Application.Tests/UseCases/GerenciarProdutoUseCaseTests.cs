@@ -69,7 +69,7 @@ public class GerenciarProdutoUseCaseTests
             Nome = "Produto Original",
             Status = StatusProduto.Ativo
         });
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,
@@ -162,7 +162,7 @@ public class GerenciarProdutoUseCaseTests
             Nome = "Produto",
             Status = StatusProduto.Ativo
         });
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,
