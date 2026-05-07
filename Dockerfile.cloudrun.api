@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Cloud Run optimized Dockerfile — API
 # - Escuta $PORT (Cloud Run define dinamicamente, normalmente 8080)
 # - Sem HEALTHCHECK (Cloud Run usa probe próprio)
@@ -14,11 +15,20 @@ COPY EasyStock.Infra.MongoDb/EasyStock.Infra.MongoDb.csproj   EasyStock.Infra.Mo
 COPY EasyStock.Infra.Async/EasyStock.Infra.Async.csproj       EasyStock.Infra.Async/
 COPY EasyStock.Api/EasyStock.Api.csproj                       EasyStock.Api/
 
-RUN dotnet restore EasyStock.Api/EasyStock.Api.csproj
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet restore EasyStock.Api/EasyStock.Api.csproj
 
-COPY . .
+COPY EasyStock.Domain/        EasyStock.Domain/
+COPY EasyStock.Application/   EasyStock.Application/
+COPY EasyStock.Infra.Postgre/ EasyStock.Infra.Postgre/
+COPY EasyStock.Infra.Sqlite/  EasyStock.Infra.Sqlite/
+COPY EasyStock.Infra.MongoDb/ EasyStock.Infra.MongoDb/
+COPY EasyStock.Infra.Async/   EasyStock.Infra.Async/
+COPY EasyStock.Api/           EasyStock.Api/
+
 WORKDIR /src/EasyStock.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app

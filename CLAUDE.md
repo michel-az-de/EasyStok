@@ -14,11 +14,13 @@ Porta de entrada para qualquer agente (Claude Code, Copilot, etc.) abrindo este 
 
 - **Stack**: .NET 9, PostgreSQL Azure, EF Core 9, Clean Architecture estrita.
 - **Solucao**: `EasyStok.sln` — 17 projetos. Pasta MAUI e `EasyStok.Mobile` (com K, sem ponto Maui).
-- **Branch principal**: `master`. **Deploy**: Azure App Service via push (`.github/workflows/deploy-azure.yml`). NAO Render.
+- **Branch principal**: `master`. **Deploy**: Render auto-deploya em merge de PR pra `master` (4 servicos: API, Web, Admin, Worker + Postgres Basic-256mb). Tem tambem workflows Azure/GCP legados em `.github/workflows/` mas nao sao o producao atual.
 - **Frontends do operador**: PWA em `EasyStock.Api/wwwroot/pwa/` (fonte da verdade) + copia empacotada em `EasyStok.Mobile/Resources/Raw/pwa/`. **Merge unidirecional `PWA -> MAUI` no MESMO commit + hash SHA-256 conferido** (ver `.knowledge/dual-frontend-policy.md`).
-- **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR + `git push origin master`. Sem perguntar. Co-Author `Claude Opus 4.7 <noreply@anthropic.com>`.
+- **Master e branch protegida** (a partir de 2026-05-07): pre-push hook em `scripts/git-hooks/pre-push` rejeita push direto. Ativar em cada clone com `git config core.hooksPath scripts/git-hooks`. Repo configurado com squash-merge only + delete branch on merge.
+- **Ao final de TODA demanda**: commits em branch `feat/<escopo>` ou `fix/<escopo>` (ou usar branch ja criada pelo worktree do Claude Code) + `git push -u origin <branch>` + `gh pr create --base master`. Co-Author `Claude Opus 4.7 <noreply@anthropic.com>` em todo commit. **NUNCA mergear sozinho** — devolver controle pro Felipe com URL do PR.
 - **`git status` mostrando arquivos alheios**: NAO usar `git add -A`/`git add .` — adicionar so os especificos da demanda.
-- **Apos push tocando PWA ou casa-da-baba-mobile/apk**: workflow `build-casa-da-baba-apk.yml` dispara — aguardar e baixar APK pra `C:\rep\EasyStok\builds\app-debug.apk`.
+- **Apos merge de PR tocando PWA ou casa-da-baba-mobile/apk**: workflow `build-casa-da-baba-apk.yml` dispara — aguardar e baixar APK pra `C:\rep\EasyStok\builds\app-debug.apk`.
+- **Economia de pipeline minutes do Render** (Hobby = 500 min/mes, $5/1000 min extra): build filters configurados por servico no Render UI; auto-deploy seletivo (Worker = manual); service previews OFF; spend limit = $10/mes. Nao quebrar segregacao copiando codigo entre projetos sem necessidade.
 - **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; defesa em camadas = Global Query Filter automatico (`EasyStockDbContext.ApplyTenantQueryFilters`) **+** checagem `entity.EmpresaId == command.EmpresaId` no use case; fail fast 400 se invalido.
 - **NAO criar `.md` de documentacao** salvo se Felipe pedir explicitamente.
 - **Estilo do Felipe**: PT-BR direto, sem floreio, sem virgula sobrando, sem travessoes. Resposta = acao + resultado.

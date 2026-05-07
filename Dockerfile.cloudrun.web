@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
@@ -8,14 +9,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && rm -rf /var/lib/apt/lists/*
 
 COPY EasyStock.Web/EasyStock.Web.csproj EasyStock.Web/
-COPY EasyStock.Web/package.json EasyStock.Web/
-RUN dotnet restore EasyStock.Web/EasyStock.Web.csproj
-RUN cd EasyStock.Web && npm install --no-audit --no-fund
+COPY EasyStock.Web/package.json         EasyStock.Web/
 
-COPY . .
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet restore EasyStock.Web/EasyStock.Web.csproj
+RUN --mount=type=cache,target=/root/.npm,id=npm \
+    cd EasyStock.Web && npm install --no-audit --no-fund --prefer-offline
+
+COPY EasyStock.Web/ EasyStock.Web/
+
 WORKDIR /src/EasyStock.Web
 RUN npm run css:build
-RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false /p:SkipTailwind=true
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false /p:SkipTailwind=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
