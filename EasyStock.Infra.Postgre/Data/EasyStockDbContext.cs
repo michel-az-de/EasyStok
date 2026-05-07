@@ -83,6 +83,14 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
+        // Modulo Financeiro (F1+)
+        public DbSet<Fatura> Faturas { get; set; } = null!;
+        public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
+        public DbSet<FaturaPagamento> FaturaPagamentos { get; set; } = null!;
+        public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
+        public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
+        public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
+
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
         public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;
@@ -118,32 +126,47 @@ namespace EasyStock.Infra.Postgre.Data
             }
         }
 
-        public async Task<IAsyncDisposable> BeginTransactionAsync(CancellationToken ct = default)
+        public async Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
         {
             var tx = await Database.BeginTransactionAsync(ct);
             return new TransactionScope(tx);
         }
 
-        private sealed class TransactionScope : IAsyncDisposable
+        /// <summary>
+        /// Escopo transacional com semântica explícita: rollback-by-default no
+        /// <c>Dispose</c> a menos que <see cref="CommitAsync"/> tenha sido chamado.
+        /// Anteriormente o <c>Dispose</c> fazia auto-commit, mascarando bugs onde
+        /// uma exceção pulava o commit explícito mas a transação persistia.
+        /// </summary>
+        private sealed class TransactionScope : IDbTransactionScope
         {
             private readonly Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction _tx;
             private bool _committed;
+            private bool _disposed;
 
             public TransactionScope(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx)
             {
                 _tx = tx;
             }
 
+            public async Task CommitAsync(CancellationToken ct = default)
+            {
+                if (_committed) return;
+                await _tx.CommitAsync(ct);
+                _committed = true;
+            }
+
             public async ValueTask DisposeAsync()
             {
+                if (_disposed) return;
+                _disposed = true;
                 try
                 {
-                    if (!_committed) await _tx.CommitAsync();
-                }
-                catch
-                {
-                    try { await _tx.RollbackAsync(); } catch { }
-                    throw;
+                    if (!_committed)
+                    {
+                        try { await _tx.RollbackAsync(); }
+                        catch { /* já estava rolled-back ou conexão fechada — best-effort */ }
+                    }
                 }
                 finally
                 {

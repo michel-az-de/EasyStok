@@ -255,6 +255,9 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             await itemVendaRepository.InsertRangeAsync(itensVenda);
             await movimentacaoEstoqueRepository.InsertRangeAsync(movimentacoes);
             await unitOfWork.CommitAsync();
+            // Commit explícito do escopo transacional. Sem isso, o Dispose do
+            // tx faz rollback (semântica nova — anteriormente fazia auto-commit).
+            await tx.CommitAsync();
 
             logger.LogWarning("AUDIT: Sa�da de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
                 venda.Id, command.EmpresaId, venda.ValorTotal.Valor, itensResult.Count);

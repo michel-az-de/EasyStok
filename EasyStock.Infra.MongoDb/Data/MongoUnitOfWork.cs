@@ -66,11 +66,12 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient, ILogger<MongoUnitO
         mongoClientException.Message.Contains("Transaction", StringComparison.OrdinalIgnoreCase);
 
     // Mongo já tem transação implícita via session — Begin é no-op aqui.
-    public Task<IAsyncDisposable> BeginTransactionAsync(CancellationToken ct = default)
-        => Task.FromResult<IAsyncDisposable>(new NoopScope());
+    public Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
+        => Task.FromResult<IDbTransactionScope>(new NoopScope());
 
-    private sealed class NoopScope : IAsyncDisposable
+    private sealed class NoopScope : IDbTransactionScope
     {
+        public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
     }

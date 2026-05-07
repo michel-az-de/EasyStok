@@ -85,6 +85,9 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             await movimentacaoRepository.UpdateAsync(original);
             await itemEstoqueRepository.UpdateAsync(itemEstoque);
             await unitOfWork.CommitAsync();
+            // Commit explícito do escopo transacional. Sem isso, o Dispose do
+            // tx faz rollback (semântica nova — anteriormente fazia auto-commit).
+            await tx.CommitAsync();
 
             logger.LogWarning("AUDIT: Estorno registrado. EstornoId: {EstornoId}, OriginalId: {OriginalId}, EmpresaId: {EmpresaId}, Quantidade: {Quantidade}, UsuarioId: {UsuarioId}, Ip: {Ip}",
                 estorno.Id, original.Id, command.EmpresaId, original.Quantidade.Value, estorno.UsuarioId, estorno.Ip);
