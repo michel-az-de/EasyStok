@@ -32,7 +32,7 @@ P0 antigos (`tech-debt.md`) RESOLVIDOS:
 - ✅ Webhook Pix valida valor pago vs cobrança
 - ✅ `DiagnosticoController` `[Authorize(Policy="Admin")]`
 
-P0 atuais: NF-e, rate limiting endpoints públicos, CI gate de qualidade.
+P0 atuais: NF-e, rate limiting em `/api/webhooks/pix` (auth/* já coberto — B-015 fechado em 2026-05-07), CI gate de qualidade.
 
 Qualidade por área (auditoria `audit-brutal.md` 2026-04-30 — sem mudança estrutural desde):
 

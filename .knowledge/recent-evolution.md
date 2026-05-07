@@ -23,7 +23,8 @@
 - **2026-04**: Webhook Pix com HMAC-SHA256 + replay protection (com validação de valor adicionada em maio).
 
 ### Direção atual
-- Foco P0 atual: NF-e (decidir emissor third-party), rate limiting endpoints públicos, CI gate de qualidade.
+- **2026-05-07**: B-015 fechado — policy `auth` (fixed-window 10/min/IP) já cobria login/register/refresh/forgot/reset; teste de regressao adicionado (`AuthRateLimitTests.cs`). Webhook Pix segue como item residual do P0 #2.
+- Foco P0 atual: NF-e (decidir emissor third-party), rate limiting em `/api/webhooks/pix`, CI gate de qualidade.
 - Helpdesk continua em maturação (próxima onda: SLA UI + reabertura + escalação).
 - Mobile MAUI saindo de F4 — próxima onda: bridge JS↔Native dentro do WebView.
 - Render NÃO é deploy alvo (referência antiga em memória ignorada). Hoje é Azure App Service via `deploy-azure.yml`. GCP é plano alternativo documentado.
