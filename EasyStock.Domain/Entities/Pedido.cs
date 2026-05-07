@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities
 {
@@ -62,7 +63,21 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public StatusPedido StatusEnum => StatusPedidoMapper.Parse(Status);
 
-        public decimal Total { get; set; }
+        /// <summary>
+        /// Total agregado do pedido (soma dos <see cref="PedidoItem.Subtotal"/>).
+        /// Tipado como <see cref="Dinheiro"/> (value object, BRL, 2 decimais,
+        /// imutável, não-negativo). Persistido em DB como <c>numeric(14,2)</c>
+        /// via EF value converter — schema inalterado.
+        ///
+        /// <para>
+        /// Implicit operator <c>Dinheiro → decimal</c> garante compat com logs
+        /// e DTOs que esperam decimal. Atribuição <c>pedido.Total = 100m</c>
+        /// não funciona mais — use <c>Dinheiro.FromDecimal(100m)</c> ou
+        /// <see cref="RecalcularTotal"/>.
+        /// </para>
+        /// </summary>
+        public Dinheiro Total { get; set; } = Dinheiro.Zero;
+
         public string? Observacoes { get; set; }
 
         /// <summary>"web" | "mobile" | "api". Útil pra filtrar origem.</summary>
@@ -107,7 +122,7 @@ namespace EasyStock.Domain.Entities
                 ClienteApt = cliente?.Apt,
                 ClienteTelefone = cliente?.Telefone,
                 Status = StatusPedidoMapper.Aguardando,
-                Total = 0m,
+                Total = Dinheiro.Zero,
                 Origem = origem,
                 CriadoEm = agora,
                 AlteradoEm = agora
@@ -118,7 +133,11 @@ namespace EasyStock.Domain.Entities
         {
             decimal soma = 0m;
             foreach (var i in Itens) soma += i.Subtotal;
-            Total = soma;
+            // Subtotais teoricamente nunca são negativos (Quantidade*PrecoUnitario
+            // de itens válidos). Se vier soma < 0 por bug em PedidoItem,
+            // FromDecimal lança ArgumentOutOfRangeException — sinaliza
+            // dado corrompido em vez de propagar silenciosamente.
+            Total = Dinheiro.FromDecimal(soma);
             AlteradoEm = DateTime.UtcNow;
         }
 

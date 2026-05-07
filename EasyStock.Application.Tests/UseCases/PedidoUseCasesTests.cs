@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -136,7 +137,7 @@ public class PedidoUseCasesTests
         capturado.ClienteTelefone.Should().Be(cliente.Telefone);
         capturado.ClienteApt.Should().Be(cliente.Apt);
         capturado.Itens.Should().HaveCount(2);
-        capturado.Total.Should().Be(40m); // 2*5 + 1*30
+        capturado.Total.Should().Be(Dinheiro.FromDecimal(40m)); // 2*5 + 1*30
         capturado.Status.Should().Be("aguardando");
         capturado.Eventos.Should().ContainSingle(e => e.Tipo == "criado");
 
@@ -162,7 +163,7 @@ public class PedidoUseCasesTests
         capturado.Should().NotBeNull();
         capturado!.ClienteId.Should().BeNull();
         capturado.ClienteNome.Should().Be("Walk-in");
-        capturado.Total.Should().Be(8m);
+        capturado.Total.Should().Be(Dinheiro.FromDecimal(8m));
         // Sem cliente, não toca métrica
         await _clienteRepo.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
     }
@@ -277,7 +278,7 @@ public class PedidoUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
-        pedido.Total = 100m;
+        pedido.Total = Dinheiro.FromDecimal(100m);
         _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         PedidoPagamento? pagCapturado = null;
@@ -306,7 +307,7 @@ public class PedidoUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
-        pedido.Total = 100m;
+        pedido.Total = Dinheiro.FromDecimal(100m);
         pedido.Pagamentos.Add(new PedidoPagamento { Valor = 30m, Metodo = "dinheiro" });
         _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
@@ -314,6 +315,6 @@ public class PedidoUseCasesTests
             new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "credito", 25m));
 
         pedido.TotalPago.Should().Be(55m); // 30 + 25
-        pedido.Total.Should().Be(100m);    // total não muda
+        pedido.Total.Should().Be(Dinheiro.FromDecimal(100m));    // total não muda
     }
 }

@@ -1,6 +1,8 @@
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {
@@ -20,7 +22,17 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.ClienteApt).HasMaxLength(32);
             b.Property(p => p.ClienteTelefone).HasMaxLength(32);
             b.Property(p => p.Status).IsRequired().HasMaxLength(20);
-            b.Property(p => p.Total).HasColumnType("numeric(14,2)");
+
+            // Total: Dinheiro VO persistido como decimal numeric(14,2).
+            // Schema do DB inalterado — só o tipo no Domain virou tipado.
+            // Materializa via Dinheiro.FromDecimal (lança em valor negativo,
+            // sinalizando dado corrompido em vez de carregar silenciosamente).
+            b.Property(p => p.Total)
+                .HasConversion(
+                    v => v.Valor,
+                    v => Dinheiro.FromDecimal(v))
+                .HasColumnType("numeric(14,2)");
+
             b.Property(p => p.Observacoes).HasColumnType("text");
             b.Property(p => p.Origem).HasMaxLength(20);
             b.Property(p => p.MobileOrderId).HasMaxLength(64);
