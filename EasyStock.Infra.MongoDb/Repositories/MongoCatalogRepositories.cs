@@ -104,6 +104,12 @@ public sealed class EmpresaRepository(MongoEasyStockContext context, MongoUnitOf
         EnqueueInsert(Collection, empresa);
         return Task.CompletedTask;
     }
+
+    public Task UpdateAsync(Empresa empresa)
+    {
+        EnqueueReplaceScoped(Collection, empresa.Id, empresa.Id, empresa);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

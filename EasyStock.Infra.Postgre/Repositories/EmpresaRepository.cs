@@ -25,5 +25,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task AddAsync(Empresa empresa) =>
             dbContext.Empresas.AddAsync(empresa).AsTask();
+
+        public Task UpdateAsync(Empresa empresa)
+        {
+            dbContext.Empresas.Update(empresa);
+            return Task.CompletedTask;
+        }
     }
 }
