@@ -1,9 +1,12 @@
-using System;
-using System.Collections.Generic;
 using EasyStock.Domain.Enums;
 
 namespace EasyStock.Domain.Entities
 {
+    /// <summary>
+    /// Ticket de suporte criado pelo operador ou automaticamente (ex: falha de pagamento).
+    /// Ciclo de vida: Aberto → Atribuido → EmAndamento → Resolvido/Fechado/Cancelado.
+    /// Suporta escalada entre niveis (N1/N2/N3) e rastreamento de SLA de resposta e resolucao.
+    /// </summary>
     public class AdminTicket
     {
         public Guid Id { get; set; }
@@ -14,6 +17,7 @@ namespace EasyStock.Domain.Entities
         public TicketCategoria Categoria { get; set; }
         public TicketPrioridade Prioridade { get; set; }
         public NivelAtendimento Nivel { get; set; } = NivelAtendimento.N1;
+        public CanalOrigem CanalOrigem { get; set; } = CanalOrigem.Admin;
         public Guid? CriadoPorId { get; set; }
         public Guid? AtendenteId { get; set; }
         public DateTime CriadoEm { get; set; }
@@ -65,7 +69,8 @@ namespace EasyStock.Domain.Entities
             DateTime? prazoResposta = null,
             DateTime? prazoResolucao = null,
             Guid? origemTicketId = null,
-            Guid? criadoPorId = null)
+            Guid? criadoPorId = null,
+            CanalOrigem canalOrigem = CanalOrigem.Admin)
         {
             var agora = DateTime.UtcNow;
             return new AdminTicket
@@ -78,6 +83,7 @@ namespace EasyStock.Domain.Entities
                 Categoria = categoria,
                 Prioridade = prioridade,
                 Nivel = nivel,
+                CanalOrigem = canalOrigem,
                 PrazoResposta = prazoResposta,
                 PrazoResolucao = prazoResolucao,
                 OrigemTicketId = origemTicketId,

@@ -1,0 +1,122 @@
+@page
+@model EasyStock.Admin.Pages.Faq.IndexModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "FAQ";
+}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+    <h1 class="text-es-ink text-xl font-semibold">FAQ — Base de Conhecimento</h1>
+    <div class="flex gap-2">
+        <a asp-page="/Faq/Edit" asp-route-id="" class="btn-primary text-sm">+ Novo item</a>
+        <a asp-page="/Faq/Categorias" class="btn-secondary text-sm">Categorias</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Erro))
+{
+    <div class="mb-4 rounded bg-red-100 px-4 py-2 text-red-800">@Model.Erro</div>
+}
+
+<form method="get" class="flex items-center gap-2 flex-wrap mb-6">
+    <input type="text" name="busca" value="@Model.Busca" placeholder="Buscar..." class="form-input max-w-xs" />
+    <select name="status" class="form-input max-w-[160px]">
+        <option value="">Todos status</option>
+        <option value="Rascunho" selected="@(Model.Status == "Rascunho")">Rascunho</option>
+        <option value="Publicado" selected="@(Model.Status == "Publicado")">Publicado</option>
+        <option value="Arquivado" selected="@(Model.Status == "Arquivado")">Arquivado</option>
+    </select>
+    <select name="categoriaId" class="form-input max-w-[200px]">
+        <option value="">Todas categorias</option>
+        @foreach (var cat in Model.Categorias)
+        {
+            var id = cat.GetProperty("id").GetGuid();
+            var nome = cat.GetProperty("nome").GetString();
+            <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
+        }
+    </select>
+    <button type="submit" class="btn-secondary text-sm">Filtrar</button>
+</form>
+
+<div class="rounded border border-es-border bg-es-surface overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-es-surface-2 text-es-ink-2 text-left">
+            <tr>
+                <th class="p-3">Titulo</th>
+                <th class="p-3">Categoria</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Visualizacoes</th>
+                <th class="p-3">Util / Nao util</th>
+                <th class="p-3">Atualizado</th>
+                <th class="p-3"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Itens.Any())
+            {
+                <tr><td colspan="7" class="p-4 text-center text-es-ink-2">Nenhum item de FAQ encontrado.</td></tr>
+            }
+            else
+            {
+                @foreach (var item in Model.Itens)
+                {
+                    var id = item.GetProperty("id").GetGuid();
+                    var status = item.GetProperty("status").GetString();
+                    var titulo = item.GetProperty("titulo").GetString();
+                    var catNome = item.GetProperty("categoriaNome").GetString();
+                    var vis = item.GetProperty("visualizacoes").GetInt32();
+                    var ok = item.GetProperty("utilCount").GetInt32();
+                    var nok = item.GetProperty("naoUtilCount").GetInt32();
+                    <tr class="border-t border-es-border">
+                        <td class="p-3 font-medium">@titulo</td>
+                        <td class="p-3">@catNome</td>
+                        <td class="p-3">
+                            <span class="rounded px-2 py-0.5 text-xs @(status == "Publicado" ? "bg-green-100 text-green-800" : status == "Arquivado" ? "bg-gray-200 text-gray-700" : "bg-yellow-100 text-yellow-800")">
+                                @status
+                            </span>
+                        </td>
+                        <td class="p-3">@vis</td>
+                        <td class="p-3">@ok / @nok</td>
+                        <td class="p-3">
+                            @{
+                                var atualizadoEm = item.TryGetProperty("publicadoEm", out var pe) && pe.ValueKind != JsonValueKind.Null
+                                    ? pe.GetDateTime() : (DateTime?)null;
+                            }
+                            @(atualizadoEm?.ToString("yyyy-MM-dd HH:mm") ?? "-")
+                        </td>
+                        <td class="p-3">
+                            <div class="flex gap-2">
+                                <a asp-page="/Faq/Edit" asp-route-id="@id" class="btn-link text-sm">Editar</a>
+                                @if (status == "Rascunho" || status == "Arquivado")
+                                {
+                                    <form method="post" asp-page-handler="Publicar" asp-route-id="@id" class="inline">
+                                        <button type="submit" class="btn-link text-sm text-green-700">Publicar</button>
+                                    </form>
+                                }
+                                @if (status == "Publicado")
+                                {
+                                    <form method="post" asp-page-handler="Arquivar" asp-route-id="@id" class="inline">
+                                        <button type="submit" class="btn-link text-sm text-gray-700">Arquivar</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <div class="mt-4 flex gap-2">
+        @for (int p = 1; p <= Model.TotalPages; p++)
+        {
+            <a class="@(p == Model.Page ? "btn-primary" : "btn-secondary") text-xs"
+               href="?page=@p&status=@Model.Status&categoriaId=@Model.CategoriaId&busca=@Model.Busca">
+                @p
+            </a>
+        }
+    </div>
+}

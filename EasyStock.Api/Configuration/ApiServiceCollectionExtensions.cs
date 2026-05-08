@@ -235,6 +235,37 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // FAQ publico — leitura anonima (busca, listar categorias, obter item).
+            // Generoso para nao quebrar SEO/scrapers legitimos.
+            options.AddPolicy("public-read", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 10
+                    });
+            });
+
+            // FAQ publico — feedback POST. Limite mais apertado.
+            options.AddPolicy("public-post", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
             // Rate limit pro signup de empresa nova. Particionado por IP pra
             // travar criacao em massa de tenants falsos. 5/IP/hora chega pra
             // demos pessoais e onboarding de cliente novo, com folga.

@@ -19,7 +19,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
         /// Quando informado, valida pertencimento a empresa do user e
         /// vincula a fatura ao ticket bidirecionalmente (F9).
         /// </summary>
-        Guid? FaturaId = null);
+        Guid? FaturaId = null,
+        CanalOrigem CanalOrigem = CanalOrigem.Pwa);
 
     public sealed record AbrirTicketClienteResult(
         Guid TicketId,
@@ -66,7 +67,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                 prioridade: prioridade,
                 prazoResposta: sla.PrazoResposta,
                 prazoResolucao: sla.PrazoResolucao,
-                criadoPorId: currentUser.UsuarioId);
+                criadoPorId: currentUser.UsuarioId,
+                canalOrigem: cmd.CanalOrigem);
             ticket.FaturaId = fatura?.Id;
 
             ticket.Mensagens.Add(AdminTicketMensagem.Criar(
@@ -85,6 +87,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     prioridade = ticket.Prioridade.ToString(),
                     nivel = ticket.Nivel.ToString(),
                     categoria = ticket.Categoria.ToString(),
+                    canalOrigem = ticket.CanalOrigem.ToString(),
                     faturaId = fatura?.Id
                 })));
 
@@ -109,6 +112,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     titulo = ticket.Titulo,
                     prioridade = ticket.Prioridade.ToString(),
                     categoria = ticket.Categoria.ToString(),
+                    canalOrigem = ticket.CanalOrigem.ToString(),
                     abertoPorCliente = true
                 }),
                 ct: ct);

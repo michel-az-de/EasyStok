@@ -97,6 +97,7 @@ builder.Services.AddScoped<RelatoriosService>();
 // 6b. Marketing options + Leads API service (landing publica)
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));
 builder.Services.AddScoped<LeadsApiService>();
+builder.Services.AddScoped<FaqApiService>();
 
 // 6c. Response compression — Brotli/Gzip pra Razor HTML, JSON do AJAX e estaticos.
 // CPU overhead marginal vs ganho de bandwidth (Render cobra acima do free tier).

@@ -28,7 +28,8 @@ namespace EasyStock.Api.Controllers
             if (!currentUser.TemPermissao(Permissao.VisualizarTickets))
                 return Forbid();
 
-            var cmd = new AbrirTicketClienteCommand(req.Titulo, req.Descricao, req.Categoria, req.FaturaId);
+            var canal = req.CanalOrigem ?? InferirCanalDoUserAgent();
+            var cmd = new AbrirTicketClienteCommand(req.Titulo, req.Descricao, req.Categoria, req.FaturaId, canal);
             var result = await abrirUseCase.ExecuteAsync(cmd);
 
             return DataCreated($"api/tickets/{result.TicketId}", result);
@@ -93,6 +94,15 @@ namespace EasyStock.Api.Controllers
                 return DataCreated($"/api/tickets/{id}/anexos/{anexo.Id}", new { anexo.Id, anexo.Url });
             }
             catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
+        }
+
+        private CanalOrigem InferirCanalDoUserAgent()
+        {
+            var ua = HttpContext.Request.Headers.UserAgent.ToString();
+            if (string.IsNullOrEmpty(ua)) return CanalOrigem.Pwa;
+            if (ua.Contains("EasyStokMobile", StringComparison.OrdinalIgnoreCase)) return CanalOrigem.Mobile;
+            if (ua.Contains("Mobile", StringComparison.OrdinalIgnoreCase)) return CanalOrigem.Pwa;
+            return CanalOrigem.Web;
         }
     }
 }
