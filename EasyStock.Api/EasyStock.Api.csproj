@@ -49,6 +49,7 @@
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Sqlite\EasyStock.Infra.Sqlite.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Async\EasyStock.Infra.Async.csproj" />
+    <ProjectReference Include="..\EasyStock.Infra.Integrations\EasyStock.Infra.Integrations.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Notifications\EasyStock.Infra.Notifications.csproj" />
   </ItemGroup>
 

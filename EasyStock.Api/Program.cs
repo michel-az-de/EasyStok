@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Builder;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Services;
 using EasyStock.Application.Validators;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.DependencyInjection;
 using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Notifications.DependencyInjection;
@@ -173,6 +175,10 @@ builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
+
+// ── Integrations: pipelines Polly por categoria + adapter Focus NFe (F2) ──────
+builder.Services.AddEasyStockIntegrationResilience();
+builder.Services.AddEasyStockFiscalIntegrations(builder.Configuration);
 
 // Registrar IEasyStockConfiguracoes para injeção em use cases
 builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfiguracoes>(sp =>

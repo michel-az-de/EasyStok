@@ -68,6 +68,14 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableFaturaVencimentoJob)
             services.AddHostedService<FaturaVencimentoJob>();
 
+        // F4 — NFC-e jobs (default disabled). Habilitar em appsettings quando
+        // a empresa estiver pronta para produção.
+        if (options.Nfce.ReprocessarContingenciaEnabled)
+            services.AddHostedService<ReprocessarContingenciaJob>();
+
+        if (options.Nfce.RenovacaoCertificadoEnabled)
+            services.AddHostedService<RenovacaoCertificadoA1Job>();
+
         return services;
     }
 }

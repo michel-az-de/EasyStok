@@ -48,6 +48,12 @@ using EasyStock.Application.UseCases.Faturas.CancelarFatura;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
 using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
+using EasyStock.Application.UseCases.Fiscal.CancelarNotaFiscal;
+using EasyStock.Application.UseCases.Fiscal.ConsultarNotaFiscal;
+using EasyStock.Application.UseCases.Fiscal.EmitirNotaFiscalConsumidor;
+using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
+using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
+using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
@@ -143,6 +149,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+
+        // Modulo Fiscal (F1-F4) — NFC-e / NFe
+        services.AddScoped<EmitirNotaFiscalConsumidorUseCase>();
+        services.AddScoped<CancelarNotaFiscalUseCase>();
+        services.AddScoped<InutilizarNumeracaoUseCase>();
+        services.AddScoped<ConsultarNotaFiscalUseCase>();
+        services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
+        services.AddScoped<ReprocessarContingenciaUseCase>();
 
         return services;
     }

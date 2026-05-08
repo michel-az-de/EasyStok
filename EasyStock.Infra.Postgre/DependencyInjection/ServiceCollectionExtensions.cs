@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
+using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
@@ -100,6 +101,12 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Integration.PublicadorEventoIntegracao>();
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventDispatcher,
                 Integration.IntegrationEventDispatcher>();
+
+            // Modulo Fiscal (F1) — NotaFiscal repos + numeração + gerador chave
+            services.AddScoped<INotaFiscalRepository, NotaFiscalRepository>();
+            services.AddScoped<INumeracaoNotaFiscalService, NumeracaoNotaFiscalService>();
+            services.AddScoped<IGeradorChaveAcesso, GeradorChaveAcesso>();
+            services.AddScoped<ICertificadoA1Repository, NotaFiscalCertificadoA1Repository>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();

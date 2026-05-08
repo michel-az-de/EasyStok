@@ -231,6 +231,45 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // NFC-e: 200 emissões/min por tenant (sliding window).
+            // Particionado por EmpresaId pra isolar tenants. Sandbox + Producao
+            // partilham o mesmo budget — basta rachar caso um tenant produza
+            // muito acima dos demais.
+            options.AddPolicy("nfce", context =>
+            {
+                var empresaIdClaim = context.User.FindFirst("empresa_id")?.Value
+                    ?? context.User.FindFirst("EmpresaId")?.Value
+                    ?? "anon";
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    empresaIdClaim,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 200,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 4,
+                        QueueProcessingOrder = QueueProcessingOrder.NewestFirst,
+                        QueueLimit = 50,
+                    });
+            });
+
+            // Webhook do Focus: 50 req/seg por IP. Focus normal não passa de
+            // 5/seg pra um cliente. Defesa contra burst de retries do Focus
+            // se nosso receptor estiver lento.
+            options.AddPolicy("webhook-focus-nfe", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetTokenBucketLimiter(
+                    partitionKey,
+                    _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = 50,
+                        ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+                        TokensPerPeriod = 50,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 50,
+                    });
+            });
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {

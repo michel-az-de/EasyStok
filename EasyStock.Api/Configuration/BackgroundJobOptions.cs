@@ -46,4 +46,32 @@ public sealed class BackgroundJobOptions
     /// (padrão), publica EventoNotificacao e o Worker despacha via Outbox.
     /// </summary>
     public bool UseLegacyEmailAlerts { get; set; } = false;
+
+    /// <summary>
+    /// NFC-e: configuração do job de retransmissão de notas em contingência.
+    /// </summary>
+    public NfceJobsOptions Nfce { get; set; } = new();
+}
+
+public sealed class NfceJobsOptions
+{
+    /// <summary>
+    /// Liga o <c>ReprocessarContingenciaJob</c>. Em ambientes onde o
+    /// gateway Focus ainda não está configurado, manter <c>false</c>.
+    /// </summary>
+    public bool ReprocessarContingenciaEnabled { get; set; } = false;
+
+    public TimeSpan ReprocessarContingenciaPeriod { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Quantidade máxima de notas processadas por rodada. Evita backlog
+    /// segurar o job mais que o intervalo.
+    /// </summary>
+    public int ReprocessarContingenciaBatchSize { get; set; } = 50;
+
+    /// <summary>
+    /// Liga o <c>RenovacaoCertificadoA1Job</c> que avisa o dono da empresa
+    /// 30/15/7/3 dias antes da expiração do certificado A1.
+    /// </summary>
+    public bool RenovacaoCertificadoEnabled { get; set; } = false;
 }
