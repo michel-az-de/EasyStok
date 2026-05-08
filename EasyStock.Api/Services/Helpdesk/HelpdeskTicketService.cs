@@ -36,6 +36,10 @@ public sealed class HelpdeskTicketService(
 
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
 
+        // Em contexto de webhook (anonimo) currentUser.UsuarioId retorna Guid.Empty;
+        // o FK p/ Usuarios falha. Normaliza para null quando nao autenticado.
+        var autorId = currentUser.UsuarioId == Guid.Empty ? (Guid?)null : currentUser.UsuarioId;
+
         var ticket = AdminTicket.Criar(
             empresaId: cmd.EmpresaId,
             titulo: cmd.Titulo,
@@ -45,12 +49,12 @@ public sealed class HelpdeskTicketService(
             nivel: cmd.Nivel,
             prazoResposta: sla.PrazoResposta,
             prazoResolucao: sla.PrazoResolucao,
-            criadoPorId: currentUser.UsuarioId);
+            criadoPorId: autorId);
         ticket.FaturaId = fatura?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
-            ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.Criado,
+            ticket.Id, autorId, TicketAcaoHistorico.Criado,
             metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
 
         // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
