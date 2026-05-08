@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Financeiro;
+using EasyStock.Domain.Financeiro.Events;
 using EasyStock.Domain.Integration;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -129,6 +131,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
+        // Modulo Financeiro AR/AP — lancamentos previstos/realizados do tenant
+        public DbSet<Lancamento> Lancamentos { get; set; } = null!;
+        public DbSet<LancamentoBaixa> LancamentoBaixas { get; set; } = null!;
+
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 
@@ -255,6 +261,11 @@ namespace EasyStock.Infra.Postgre.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Domain events nao sao entidades persistidas — sao publicados pelo UseCase
+            // apos commit. EF Core descobriria via convencao a partir das colecoes
+            // de eventos pendentes nos agregados, daria erro de PK obrigatoria.
+            modelBuilder.Ignore<LancamentoBaixadoEvent>();
 
             // Apply all IEntityTypeConfiguration implementations in this assembly
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

@@ -51,6 +51,7 @@ using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
+using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -143,6 +144,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+
+        // Modulo Financeiro AR/AP — Lancamentos
+        services.AddScoped<BaixarLancamentoUseCase>();
 
         return services;
     }
