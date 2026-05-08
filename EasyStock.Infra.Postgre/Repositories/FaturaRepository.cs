@@ -24,6 +24,16 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
             .Include(f => f.Eventos.OrderByDescending(e => e.OcorridoEm))
             .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Id == faturaId, ct);
 
+    public Task<FaturaPagamento?> ObterPagamentoPorClientIdempotencyKeyAsync(
+        Guid empresaId, string clientIdempotencyKey, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientIdempotencyKey)) return Task.FromResult<FaturaPagamento?>(null);
+        return db.FaturaPagamentos
+            .FirstOrDefaultAsync(p =>
+                p.EmpresaId == empresaId &&
+                p.ClientIdempotencyKey == clientIdempotencyKey, ct);
+    }
+
     public Task<Fatura?> GetByIdAdminAsync(Guid faturaId, CancellationToken ct = default) =>
         db.Faturas
             .Include(f => f.Empresa)
