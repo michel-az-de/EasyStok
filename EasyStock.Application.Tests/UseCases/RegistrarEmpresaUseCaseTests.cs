@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
 using EasyStock.Domain.Entities;
@@ -20,6 +21,7 @@ public class RegistrarEmpresaUseCaseTests
         IUnitOfWork unitOfWork)
     {
         var logger = Substitute.For<ILogger<RegistrarEmpresaUseCase>>();
+        var hasher = new FakePasswordHasher();
         return new RegistrarEmpresaUseCase(
             usuarioRepository,
             planoRepository,
@@ -29,6 +31,7 @@ public class RegistrarEmpresaUseCaseTests
             usuarioEmpresaRepository,
             usuarioPerfilRepository,
             unitOfWork,
+            hasher,
             logger);
     }
 

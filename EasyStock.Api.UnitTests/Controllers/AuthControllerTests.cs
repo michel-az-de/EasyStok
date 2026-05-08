@@ -35,7 +35,8 @@ public class AuthControllerTests
 
     public AuthControllerTests()
     {
-        _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, _autenticarLogger);
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, _autenticarLogger);
 
         _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("mocked-jwt-token");
         _mockJwtService.GerarRefreshToken().Returns("mocked-refresh-token");
@@ -61,14 +62,14 @@ public class AuthControllerTests
         var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
         var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
-        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, cadastrarLogger);
+        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, passwordHasher, cadastrarLogger);
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, esqueciSenhaLogger);
-        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, resetarSenhaLogger);
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, passwordHasher, resetarSenhaLogger);
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
-        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, alterarSenhaLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
         var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
 

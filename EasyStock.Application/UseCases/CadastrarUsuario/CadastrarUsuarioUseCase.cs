@@ -13,6 +13,7 @@ public sealed class CadastrarUsuarioUseCase(
     IEmailConfirmationTokenRepository emailTokenRepository,
     IEmailService? emailService,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     ILogger<CadastrarUsuarioUseCase> logger) : IUseCase<CadastrarUsuarioCommand, CadastrarUsuarioResult>
 {
     public async Task<CadastrarUsuarioResult> ExecuteAsync(CadastrarUsuarioCommand command)
@@ -28,7 +29,7 @@ public sealed class CadastrarUsuarioUseCase(
             throw new RegraDeDominioVioladaException("Email ja cadastrado.");
         }
 
-        var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.Senha);
+        var senhaHash = passwordHasher.Hash(command.Senha);
         var usuario = Usuario.Criar(command.Nome, command.Email, senhaHash);
 
         await usuarioRepository.AddAsync(usuario);

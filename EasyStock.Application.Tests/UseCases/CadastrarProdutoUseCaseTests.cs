@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
@@ -20,7 +21,7 @@ public class CadastrarProdutoUseCaseTests
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(
@@ -76,7 +77,7 @@ public class CadastrarProdutoUseCaseTests
             v.ProdutoId == result.ProdutoId &&
             v.Nome == "Grafite"));
 
-        await unitOfWork.Received(1).CommitAsync();
+        unitOfWork.CommitCount.Should().Be(1);
     }
 
     [Fact]
@@ -87,7 +88,7 @@ public class CadastrarProdutoUseCaseTests
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(
@@ -139,7 +140,7 @@ public class CadastrarProdutoUseCaseTests
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(
@@ -164,7 +165,7 @@ public class CadastrarProdutoUseCaseTests
 
         await produtoRepository.Received(1).InsertAsync(Arg.Is<Produto>(p =>
             p.SubcategoriaId == subcategoriaId));
-        await unitOfWork.Received(1).CommitAsync();
+        unitOfWork.CommitCount.Should().Be(1);
     }
 
     [Fact]
@@ -175,7 +176,7 @@ public class CadastrarProdutoUseCaseTests
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(
@@ -212,7 +213,7 @@ public class CadastrarProdutoUseCaseTests
         var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
         var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
 
         var useCase = new CadastrarProdutoUseCase(

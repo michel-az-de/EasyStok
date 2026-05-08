@@ -64,9 +64,17 @@ public interface IFaturaRepository
     /// <summary>
     /// Top inadimplentes — empresas com mais faturas <c>Vencida</c>. Retorna
     /// tuplas <c>(EmpresaId, EmpresaNome, QtdVencidas, ValorTotalVencido)</c>.
+    /// <para>
+    /// Quando <paramref name="empresaId"/> e informado e nao-vazio, restringe
+    /// a query aquela empresa — defesa em camadas conforme licao 12 do
+    /// <c>do-not-do.md</c>: agregacao com <c>IgnoreQueryFilters()</c> em
+    /// entidade tenant-aware DEVE aceitar filtro opcional. Hoje so o caminho
+    /// SuperAdmin invoca isso (controller forca empresaId pra admin operacional),
+    /// mas o repositorio nao deve assumir essa garantia.
+    /// </para>
     /// </summary>
     Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
-        int limit = 5, CancellationToken ct = default);
+        int limit = 5, Guid? empresaId = null, CancellationToken ct = default);
 }
 
 public sealed record TopInadimplenteResult(

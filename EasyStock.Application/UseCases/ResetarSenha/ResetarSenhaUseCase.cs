@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -12,6 +13,7 @@ public sealed class ResetarSenhaUseCase(
     IUsuarioRepository usuarioRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     ILogger<ResetarSenhaUseCase> logger) : IUseCase<ResetarSenhaCommand, ResetarSenhaResult>
 {
     public async Task<ResetarSenhaResult> ExecuteAsync(ResetarSenhaCommand command)
@@ -32,7 +34,7 @@ public sealed class ResetarSenhaUseCase(
             throw new RegraDeDominioVioladaException("Usuario invalido.");
         }
 
-        usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(command.NovaSenha);
+        usuario.SenhaHash = passwordHasher.Hash(command.NovaSenha);
         usuario.AlteradoEm = DateTime.UtcNow;
         usuario.ResetarTentativasFalha();
         await usuarioRepository.UpdateAsync(usuario);

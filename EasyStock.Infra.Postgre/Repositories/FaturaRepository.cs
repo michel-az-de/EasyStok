@@ -155,14 +155,18 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
     }
 
     public async Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
-        int limit = 5, CancellationToken ct = default)
+        int limit = 5, Guid? empresaId = null, CancellationToken ct = default)
     {
         if (limit < 1) limit = 5;
         if (limit > 50) limit = 50;
 
-        var rows = await db.Faturas
+        var q = db.Faturas
             .IgnoreQueryFilters()
-            .Where(f => f.Status == StatusFatura.Vencida)
+            .Where(f => f.Status == StatusFatura.Vencida);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        var rows = await q
             .GroupBy(f => f.EmpresaId)
             .Select(g => new
             {

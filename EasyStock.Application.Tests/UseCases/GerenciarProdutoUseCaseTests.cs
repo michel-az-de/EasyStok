@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Domain.Entities;
@@ -18,7 +19,7 @@ public class GerenciarProdutoUseCaseTests
     private readonly IProdutoEmbalagemRepository _embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
     private readonly IItemEstoqueRepository _itemEstoqueRepository = Substitute.For<IItemEstoqueRepository>();
     private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
-    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly FakeUnitOfWork _unitOfWork = new();
 
     private GerenciarProdutoUseCase CriarUseCase() => new(
         _produtoRepository,
@@ -94,7 +95,7 @@ public class GerenciarProdutoUseCaseTests
         await _caracteristicaRepository.Received(1).InsertAsync(Arg.Is<ProdutoCaracteristica>(c => c.Nome == "Material"));
         await _embalagemRepository.Received(1).InsertAsync(Arg.Is<ProdutoEmbalagem>(e => e.Nome == "Caixa" && e.Padrao));
 
-        await _unitOfWork.Received(1).CommitAsync();
+        _unitOfWork.CommitCount.Should().Be(1);
     }
 
     [Fact]

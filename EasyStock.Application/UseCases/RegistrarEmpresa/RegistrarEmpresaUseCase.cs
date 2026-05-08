@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -29,6 +30,7 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
         ILogger<RegistrarEmpresaUseCase> logger)
     {
         public async Task<RegistrarEmpresaResult> ExecuteAsync(RegistrarEmpresaCommand command)
@@ -75,7 +77,7 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
             assinatura.AtivarTrial(14);
             await assinaturaRepository.AddAsync(assinatura);
 
-            var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.SenhaAdmin);
+            var senhaHash = passwordHasher.Hash(command.SenhaAdmin);
             var usuario = Usuario.Criar(command.NomeAdmin.Trim(), command.EmailAdmin.Trim(), senhaHash);
 
             await usuarioRepository.AddAsync(usuario);
