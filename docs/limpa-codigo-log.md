@@ -67,3 +67,32 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 - Adapters stub (Stripe/MP) documentam corretamente seu estado provisório com guide de integração — não tocar.
 - `IgnoreQueryFilters()` em queries de métricas/background é intencional — não remover.
 - Block-scoped namespace ainda aparece esporadicamente em arquivos mais antigos ou de nova criação sem padrão imposto; converter para file-scoped ao encontrar.
+
+---
+
+## 2026-05-08 — Pós-cleanup billing (auditoria autônoma agendada)
+
+Rodada de auditoria sobre os commits `4f9c259` e `fb4f08e` (cleanup F10–F14 + F12/Mongo). Build OK (0 erros, 17 avisos pré-existentes em MAUI/test).
+
+### Fixes aplicados
+
+#### 1. `IEfiPixService.cs` — XML doc com método HTTP errado
+- Antes: `<summary>Emite uma cobranca Pix imediata via <c>POST /v2/cob/{txid}</c>`.
+- Depois: `<summary>... via <c>PUT /v2/cob/{txid}</c> (txid definido pelo cliente, idempotente)`.
+- Motivo: a implementação em `EfiPixService.EnviarCobrancaAsync` usa `HttpMethod.Put` (consistente com a API Efi para criação idempotente de cobrança com txid pré-definido). XML doc adicionado em `fb4f08e` referenciava POST por engano.
+
+#### 2. `FaturaTemplate.cs` — overload de método nunca chamada removida
+- Removida: `private static void ComposeEnderecoLinhas(QuestPDF.Infrastructure.IContainer _, Endereco? endereco) { /* sobrecarga indireta — ver abaixo */ }`
+- Motivo: ambos os call sites (`linhas 131` e `148`) passam `ColumnDescriptor` (variável `col` do lambda do QuestPDF), nunca `IContainer`. A overload com `IContainer` é genuinamente código morto — o comentário "sobrecarga indireta — ver abaixo" descrevia uma intenção que não se materializou em uso.
+- Build do projeto Infra.Async pós-remoção: 0 avisos, 0 erros.
+
+### Itens deixados intencionalmente
+
+- **Avisos `XC0045` em LoginPage/LojaPickerPage/TenantPickerPage do MAUI** (LoginCommand/LogoutCommand não encontrados nos ViewModels): defeito real de binding XAML, mas fora de escopo do cleanup billing. PWA é fonte da verdade do operador; investigar no MAUI requer contexto separado.
+- **Avisos `xUnit1031` em `EstoqueConcurrencyTests`**: blocking task ops em testes de concorrência podem ser intencionais (testar race conditions com sleep/Task.Wait determinístico). Não tocar sem alinhar com Felipe.
+- **Avisos `CA1422`/`CS0618` em `MainActivity.cs` e `ThemeService.cs`**: APIs Android obsoletas em Android 35+; refactor de plataforma fora do escopo de limpeza.
+
+### Padrões adicionais observados
+
+- XML docs adicionados na rodada anterior podem ter erros sutis (verbo HTTP, endpoint) — vale conferir a implementação ao adicionar doc novo, não só copiar de outros métodos.
+- Overloads "fantasma" de helpers privados (criadas durante experimentação e nunca chamadas) não são pegas pelo compilador C# como "unused private" quando há outra overload com mesmo nome — vale `Find Usages` em PDF templates / helpers privados.
