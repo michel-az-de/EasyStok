@@ -119,8 +119,9 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     }
 
     // ── Audit (Onda P4) ───────────────────────────────────────
-    // Mongo backend não está em produção (Postgre é o ativo). Implementação
-    // funcional: lê e grava em Mongo se o backend Mongo for ativado.
+    // Mongo backend descartado (ADR 0001) — runtime lança NotSupportedException.
+    // Código mantido fisicamente para histórico; lê/grava normalmente caso
+    // alguém revigore o branch Mongo no futuro.
     private IMongoCollection<FornecedorAlteracao> AlteracoesCollection =>
         Context.Database.GetCollection<FornecedorAlteracao>("fornecedor_alteracoes");
 
