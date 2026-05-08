@@ -73,6 +73,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableContaFinanceiraVencimentoJob)
             services.AddHostedService<ContaFinanceiraVencimentoJob>();
 
+        // ContaReceberPixReconciliacaoJob (CAP/CAR) — horario, consulta Efi
+        // pra fechar gaps de webhooks perdidos em parcelas CR com Pix ativo.
+        if (options.EnableContaReceberPixReconciliacaoJob)
+            services.AddHostedService<ContaReceberPixReconciliacaoJob>();
+
         return services;
     }
 }

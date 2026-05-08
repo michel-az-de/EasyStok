@@ -17,4 +17,22 @@ public class FinanceiroController(FinanceiroService svc, SessionService session)
         if (!result.Success && result.ErrorMessage is not null) Toast("error", result.ErrorMessage);
         return View(dashboard);
     }
+
+    [HttpGet("/financeiro/fluxo-caixa")]
+    public async Task<IActionResult> FluxoCaixa(string periodicidade = "Mensal", DateTime? inicio = null, DateTime? fim = null)
+    {
+        ViewBag.Title = "Fluxo de Caixa";
+        ViewBag.ActiveMenuItem = "Financeiro";
+        ViewBag.Periodicidade = periodicidade;
+
+        var iniDef = inicio ?? new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var fimDef = fim ?? iniDef.AddMonths(6).AddDays(-1);
+        ViewBag.Inicio = iniDef.ToString("yyyy-MM-dd");
+        ViewBag.Fim = fimDef.ToString("yyyy-MM-dd");
+
+        var result = await svc.ObterFluxoCaixaAsync(periodicidade, iniDef, fimDef);
+        var buckets = result.Success && result.Data is not null ? result.Data : new List<FluxoBucketApi>();
+        if (!result.Success && result.ErrorMessage is not null) Toast("error", result.ErrorMessage);
+        return View(buckets);
+    }
 }

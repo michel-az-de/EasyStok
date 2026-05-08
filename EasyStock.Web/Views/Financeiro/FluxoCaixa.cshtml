@@ -1,0 +1,117 @@
+@model List<EasyStock.Web.Services.FluxoBucketApi>
+@{
+    var periodicidade = (string?)ViewBag.Periodicidade ?? "Mensal";
+    var inicio = (string?)ViewBag.Inicio;
+    var fim = (string?)ViewBag.Fim;
+}
+
+<div class="page-content">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-semibold">Fluxo de Caixa</h1>
+            <p class="text-sm text-gray-500">Previsto x realizado por periodo (Pix Pagar e a Receber).</p>
+        </div>
+        <a href="/financeiro" class="btn btn-ghost">Voltar</a>
+    </div>
+
+    <form method="get" class="card mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+                <label class="form-label">Periodicidade</label>
+                <select name="periodicidade" class="form-input">
+                    <option value="Mensal" selected="@(periodicidade == "Mensal")">Mensal</option>
+                    <option value="Semanal" selected="@(periodicidade == "Semanal")">Semanal</option>
+                    <option value="Diario" selected="@(periodicidade == "Diario")">Diario</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Inicio</label>
+                <input type="date" name="inicio" value="@inicio" class="form-input" />
+            </div>
+            <div>
+                <label class="form-label">Fim</label>
+                <input type="date" name="fim" value="@fim" class="form-input" />
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="btn btn-secondary">Aplicar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card mb-4">
+        <canvas id="fluxoChart" height="100"></canvas>
+    </div>
+
+    <div class="card overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr class="text-left text-xs font-medium text-gray-500 uppercase">
+                    <th class="px-3 py-2">Periodo</th>
+                    <th class="px-3 py-2 text-right">Previsto receber</th>
+                    <th class="px-3 py-2 text-right">Previsto pagar</th>
+                    <th class="px-3 py-2 text-right">Realizado receber</th>
+                    <th class="px-3 py-2 text-right">Realizado pagar</th>
+                    <th class="px-3 py-2 text-right">Saldo previsto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="6" class="px-3 py-6 text-center text-gray-500">Sem dados pro periodo selecionado.</td></tr>
+                }
+                else
+                {
+                    foreach (var b in Model)
+                    {
+                        var saldo = b.PrevistoReceber - b.PrevistoPagar;
+                        <tr>
+                            <td class="px-3 py-2 text-sm">@b.Rotulo</td>
+                            <td class="px-3 py-2 text-right text-blue-700">@b.PrevistoReceber.ToString("C")</td>
+                            <td class="px-3 py-2 text-right text-orange-700">@b.PrevistoPagar.ToString("C")</td>
+                            <td class="px-3 py-2 text-right text-green-700">@b.RealizadoReceber.ToString("C")</td>
+                            <td class="px-3 py-2 text-right text-red-700">@b.RealizadoPagar.ToString("C")</td>
+                            <td class="px-3 py-2 text-right font-medium @(saldo >= 0 ? "text-green-700" : "text-red-700")">
+                                @saldo.ToString("C")
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const buckets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(b => new {
+            rotulo = b.Rotulo,
+            previstoReceber = b.PrevistoReceber,
+            previstoPagar = b.PrevistoPagar,
+            realizadoReceber = b.RealizadoReceber,
+            realizadoPagar = b.RealizadoPagar
+        })));
+        const labels = buckets.map(b => b.rotulo);
+
+        const canvas = document.getElementById('fluxoChart');
+        if (!canvas || buckets.length === 0) return;
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Previsto Receber', data: buckets.map(b => b.previstoReceber), backgroundColor: 'rgba(59, 130, 246, 0.6)' },
+                    { label: 'Previsto Pagar', data: buckets.map(b => b.previstoPagar), backgroundColor: 'rgba(249, 115, 22, 0.6)' },
+                    { label: 'Realizado Receber', data: buckets.map(b => b.realizadoReceber), backgroundColor: 'rgba(34, 197, 94, 0.8)' },
+                    { label: 'Realizado Pagar', data: buckets.map(b => b.realizadoPagar), backgroundColor: 'rgba(239, 68, 68, 0.8)' }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' }, title: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') } } }
+            }
+        });
+    })();
+</script>

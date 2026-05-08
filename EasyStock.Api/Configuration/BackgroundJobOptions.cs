@@ -53,4 +53,11 @@ public sealed class BackgroundJobOptions
     /// como vencidas e atualizando status agregado. Default true em producao.
     /// </summary>
     public bool EnableContaFinanceiraVencimentoJob { get; set; } = true;
+
+    /// <summary>
+    /// Quando <c>true</c>, registra o <c>ContaReceberPixReconciliacaoJob</c>
+    /// que roda hora em hora consultando Efi pra fechar gaps de webhook em
+    /// parcelas CR com Pix ativo. Default true em producao.
+    /// </summary>
+    public bool EnableContaReceberPixReconciliacaoJob { get; set; } = true;
 }

@@ -212,6 +212,26 @@ public class FinanceiroService(ApiClient api, SessionService session)
 
     public Task<ApiResult<DashboardFinanceiroApi>> ObterDashboardAsync() =>
         api.GetAsync<DashboardFinanceiroApi>($"financeiro/dashboard?empresaId={GetEmpresaId()}");
+
+    public Task<ApiResult<List<FluxoBucketApi>>> ObterFluxoCaixaAsync(
+        string periodicidade = "Mensal", DateTime? inicio = null, DateTime? fim = null)
+    {
+        var qs = $"financeiro/fluxo-caixa?empresaId={GetEmpresaId()}&periodicidade={periodicidade}";
+        if (inicio.HasValue) qs += $"&inicio={inicio.Value:yyyy-MM-dd}";
+        if (fim.HasValue) qs += $"&fim={fim.Value:yyyy-MM-dd}";
+        return api.GetAsync<List<FluxoBucketApi>>(qs);
+    }
+}
+
+public class FluxoBucketApi
+{
+    public DateTime InicioBucket { get; set; }
+    public DateTime FimBucket { get; set; }
+    public string Rotulo { get; set; } = "";
+    public decimal PrevistoPagar { get; set; }
+    public decimal PrevistoReceber { get; set; }
+    public decimal RealizadoPagar { get; set; }
+    public decimal RealizadoReceber { get; set; }
 }
 
 public class PixQrResultApi
