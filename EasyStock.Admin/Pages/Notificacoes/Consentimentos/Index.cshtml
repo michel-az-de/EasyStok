@@ -4,65 +4,69 @@
     ViewData["Title"] = "Consentimentos LGPD";
 }
 
-<div class="space-y-6">
-    <div>
-        <h1 class="text-2xl font-bold text-white">Consentimentos</h1>
-        <p class="text-slate-400 text-sm mt-1">Histórico de opt-in/out por usuário (read-only — auditoria LGPD)</p>
-    </div>
-
-    <form method="get" class="flex gap-3">
-        <input type="text" name="usuarioId" value="@Model.UsuarioId"
-               class="input-dark text-sm flex-1 font-mono" placeholder="UsuarioId (GUID)" />
-        <button type="submit" class="btn-secondary px-4 py-2 text-sm">Buscar</button>
-    </form>
-
-    @if (Model.Erro != null)
-    {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
-    }
-
-    @if (Model.Data.HasValue && Model.Data.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
-    {
-        <div class="card overflow-hidden">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase">
-                        <th class="px-4 py-3 text-left">Canal</th>
-                        <th class="px-4 py-3 text-left">Categoria</th>
-                        <th class="px-4 py-3 text-left">Opt-In</th>
-                        <th class="px-4 py-3 text-left">Atualizado em</th>
-                        <th class="px-4 py-3 text-left">IP</th>
-                        <th class="px-4 py-3 text-left">Motivo opt-out</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var c in Model.Data.Value.EnumerateArray())
-                    {
-                        var canal = c.TryGetProperty("canal", out var ca) ? ca.GetString() : "";
-                        var categoria = c.TryGetProperty("categoria", out var cat) ? cat.GetString() : "";
-                        var optIn = c.TryGetProperty("optIn", out var oi) && oi.GetBoolean();
-                        var atualizado = c.TryGetProperty("atualizadoEm", out var at) ? at.GetString() : "";
-                        var ip = c.TryGetProperty("ipOrigem", out var ip_) && ip_.ValueKind != System.Text.Json.JsonValueKind.Null ? ip_.GetString() : "-";
-                        var motivo = c.TryGetProperty("motivoOptOut", out var m) && m.ValueKind != System.Text.Json.JsonValueKind.Null ? m.GetString() : "-";
-
-                        <tr class="border-b border-slate-800">
-                            <td class="px-4 py-3 text-slate-300">@canal</td>
-                            <td class="px-4 py-3 text-slate-300">@categoria</td>
-                            <td class="px-4 py-3">
-                                @if (optIn) { <span class="badge-green">Opt-In</span> }
-                                else { <span class="badge-gray">Opt-Out</span> }
-                            </td>
-                            <td class="px-4 py-3 text-slate-400 text-xs">@atualizado</td>
-                            <td class="px-4 py-3 text-slate-500 text-xs font-mono">@ip</td>
-                            <td class="px-4 py-3 text-slate-500 text-xs">@motivo</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-    else if (Model.UsuarioId.HasValue)
-    {
-        <p class="text-slate-500 text-sm">Nenhum consentimento encontrado para este usuário.</p>
-    }
+<div style="margin-bottom:20px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+        <es-breadcrumb-item>Consentimentos</es-breadcrumb-item>
+    </es-breadcrumb>
+    <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Consentimentos LGPD</h2>
+    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Histórico de opt-in/out por usuário (read-only — auditoria LGPD)</p>
 </div>
+
+<es-card padding="md" card-class="mb-4">
+    <form method="get" style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;">
+        <es-input name="usuarioId" label="UsuarioId (GUID)" value="@Model.UsuarioId" placeholder="00000000-0000-..." />
+        <es-button type="submit" variant="primary" icon="search">Buscar</es-button>
+    </form>
+</es-card>
+
+@if (Model.Data.HasValue && Model.Data.Value.ValueKind == System.Text.Json.JsonValueKind.Array && Model.Data.Value.EnumerateArray().Any())
+{
+    <es-data-table>
+        <es-data-table-column label="Canal" />
+        <es-data-table-column label="Categoria" />
+        <es-data-table-column label="Estado" />
+        <es-data-table-column label="Atualizado em" align="right" />
+        <es-data-table-column label="IP" />
+        <es-data-table-column label="Motivo opt-out" />
+
+        @foreach (var c in Model.Data.Value.EnumerateArray())
+        {
+            var canal = c.TryGetProperty("canal", out var ca) ? ca.GetString() : "";
+            var categoria = c.TryGetProperty("categoria", out var cat) ? cat.GetString() : "";
+            var optIn = c.TryGetProperty("optIn", out var oi) && oi.GetBoolean();
+            var atualizado = c.TryGetProperty("atualizadoEm", out var at) ? at.GetString() : "";
+            var ip = c.TryGetProperty("ipOrigem", out var ip_) && ip_.ValueKind != System.Text.Json.JsonValueKind.Null ? ip_.GetString() : "—";
+            var motivo = c.TryGetProperty("motivoOptOut", out var m) && m.ValueKind != System.Text.Json.JsonValueKind.Null ? m.GetString() : "—";
+            DateTime.TryParse(atualizado, out var atualizadoDt);
+
+            <tr>
+                <td data-label="Canal" style="color:var(--text-secondary);">@canal</td>
+                <td data-label="Categoria" style="color:var(--text-secondary);">@categoria</td>
+                <td data-label="Estado">
+                    <es-badge variant="@(optIn ? "ok" : "neutral")" with-dot="true">@(optIn ? "OPT-IN" : "OPT-OUT")</es-badge>
+                </td>
+                <td data-label="Atualizado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@atualizadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                <td data-label="IP" style="font-family:var(--font-mono); color:var(--text-muted); font-size:11px;">@ip</td>
+                <td data-label="Motivo" style="color:var(--text-muted); font-size:12px;">@motivo</td>
+            </tr>
+        }
+    </es-data-table>
+}
+else if (Model.UsuarioId.HasValue)
+{
+    <es-card>
+        <es-empty-state icon="shield"
+                        title="Nenhum consentimento encontrado"
+                        description="Este usuário ainda não tem registros de opt-in/out." />
+    </es-card>
+}
+else
+{
+    <es-card>
+        <es-empty-state icon="shield"
+                        title="Informe um UsuarioId"
+                        description="Cole o GUID do usuário no campo acima para ver o histórico de consentimentos." />
+    </es-card>
+}

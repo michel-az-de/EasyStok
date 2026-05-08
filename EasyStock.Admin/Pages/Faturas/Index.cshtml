@@ -3,169 +3,149 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Faturas";
+    var orderBy = Request.Query["orderBy"].FirstOrDefault();
+    var dir = Request.Query["dir"].FirstOrDefault();
 
     string FmtCurrency(decimal v) => v.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
-    string StatusBadge(string s) => (s ?? "").ToLowerInvariant().Replace(" ", "") switch
+    string StatusVariant(string s) => (s ?? "").ToLowerInvariant().Replace(" ", "") switch
     {
-        "rascunho" => "badge-normal",
-        "emitida" => "badge-aberto",
-        "parcialmentepaga" => "badge-alta",
-        "paga" => "badge-resolvido",
-        "vencida" => "badge-critica",
-        "cancelada" => "badge-fechado",
-        _ => "badge-normal"
+        "rascunho" => "neutral",
+        "emitida" => "info",
+        "parcialmentepaga" => "warn",
+        "paga" => "ok",
+        "vencida" => "crit",
+        "cancelada" => "neutral",
+        _ => "neutral"
     };
     string StatusLabel(string s) => (s ?? "") switch
     {
-        "ParcialmentePaga" => "Parcial",
-        _ => s ?? ""
+        "ParcialmentePaga" => "PARCIAL",
+        _ => (s ?? "").ToUpper()
     };
+
+    var qsExport = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
+    if (!string.IsNullOrWhiteSpace(Model.Origem)) qsExport.Add($"origem={Uri.EscapeDataString(Model.Origem)}");
+    if (Model.EmpresaId.HasValue) qsExport.Add($"empresaId={Model.EmpresaId.Value}");
+    if (Model.VencimentoDe.HasValue) qsExport.Add($"vencimentoDe={Model.VencimentoDe.Value:yyyy-MM-dd}");
+    if (Model.VencimentoAte.HasValue) qsExport.Add($"vencimentoAte={Model.VencimentoAte.Value:yyyy-MM-dd}");
+    if (Model.ValorMin.HasValue) qsExport.Add($"valorMin={Model.ValorMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+    if (Model.ValorMax.HasValue) qsExport.Add($"valorMax={Model.ValorMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+    if (!string.IsNullOrWhiteSpace(Model.Busca)) qsExport.Add($"busca={Uri.EscapeDataString(Model.Busca.Trim())}");
+    var exportQs = qsExport.Count > 0 ? "?" + string.Join("&", qsExport) : "";
+    var exportHref = "/Faturas?handler=ExportCsv" + (exportQs.StartsWith("?") ? "&" + exportQs.Substring(1) : exportQs);
 }
 
-<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
-    <h1 class="text-es-ink text-xl font-semibold">Faturas</h1>
-    <div class="flex gap-2">
-        <a href="/Faturas/Dashboard" class="btn-secondary text-sm">📊 Dashboard</a>
-        @{
-            var qsExport = new List<string>();
-            if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
-            if (!string.IsNullOrWhiteSpace(Model.Origem)) qsExport.Add($"origem={Uri.EscapeDataString(Model.Origem)}");
-            if (Model.EmpresaId.HasValue) qsExport.Add($"empresaId={Model.EmpresaId.Value}");
-            if (Model.VencimentoDe.HasValue) qsExport.Add($"vencimentoDe={Model.VencimentoDe.Value:yyyy-MM-dd}");
-            if (Model.VencimentoAte.HasValue) qsExport.Add($"vencimentoAte={Model.VencimentoAte.Value:yyyy-MM-dd}");
-            if (Model.ValorMin.HasValue) qsExport.Add($"valorMin={Model.ValorMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            if (Model.ValorMax.HasValue) qsExport.Add($"valorMax={Model.ValorMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            if (!string.IsNullOrWhiteSpace(Model.Busca)) qsExport.Add($"busca={Uri.EscapeDataString(Model.Busca.Trim())}");
-            var exportQs = qsExport.Count > 0 ? "?" + string.Join("&", qsExport) : "";
-        }
-        <a href="/Faturas?handler=ExportCsv@(exportQs.StartsWith("?") ? "&" + exportQs.Substring(1) : exportQs)" class="btn-secondary text-sm" title="Exporta com os filtros aplicados">📊 CSV</a>
-        <a href="/Faturas/Emitir" class="btn-primary text-sm">+ Emitir avulsa</a>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Faturas</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
+            <strong style="color:var(--text-primary);">@Model.Total</strong> fatura(s)
+        </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <es-button variant="ghost" href="/Faturas/Dashboard" icon="trending-up">Dashboard</es-button>
+        <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
+        <es-button variant="primary" href="/Faturas/Emitir" icon="plus">Emitir avulsa</es-button>
     </div>
 </div>
 
-<div class="card mb-4">
-    <form method="get" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <div class="col-span-2 lg:col-span-2">
-            <label class="form-label">Busca</label>
-            <input type="text" name="busca" value="@Model.Busca" placeholder="Numero, observacao..." class="form-input" />
-        </div>
-        <div>
-            <label class="form-label">Status</label>
-            <select name="status" class="form-input">
-                <option value="">Todos</option>
-                <option value="Rascunho"           selected="@(Model.Status == "Rascunho")">Rascunho</option>
-                <option value="Emitida"            selected="@(Model.Status == "Emitida")">Emitida</option>
-                <option value="ParcialmentePaga"   selected="@(Model.Status == "ParcialmentePaga")">Parcial</option>
-                <option value="Paga"               selected="@(Model.Status == "Paga")">Paga</option>
-                <option value="Vencida"            selected="@(Model.Status == "Vencida")">Vencida</option>
-                <option value="Cancelada"          selected="@(Model.Status == "Cancelada")">Cancelada</option>
-            </select>
-        </div>
-        <div>
-            <label class="form-label">Origem</label>
-            <select name="origem" class="form-input">
-                <option value="">Todas</option>
-                <option value="Assinatura" selected="@(Model.Origem == "Assinatura")">Assinatura</option>
-                <option value="Pedido"     selected="@(Model.Origem == "Pedido")">Pedido</option>
-                <option value="Avulsa"     selected="@(Model.Origem == "Avulsa")">Avulsa</option>
-            </select>
-        </div>
-        <div>
-            <label class="form-label">Vencimento de</label>
-            <input type="date" name="vencimentoDe" value="@(Model.VencimentoDe?.ToString("yyyy-MM-dd"))" class="form-input" />
-        </div>
-        <div>
-            <label class="form-label">Vencimento ate</label>
-            <input type="date" name="vencimentoAte" value="@(Model.VencimentoAte?.ToString("yyyy-MM-dd"))" class="form-input" />
-        </div>
-        <div>
-            <label class="form-label">Valor min</label>
-            <input type="number" step="0.01" name="valorMin" value="@(Model.ValorMin?.ToString(System.Globalization.CultureInfo.InvariantCulture))" class="form-input" />
-        </div>
-        <div>
-            <label class="form-label">Valor max</label>
-            <input type="number" step="0.01" name="valorMax" value="@(Model.ValorMax?.ToString(System.Globalization.CultureInfo.InvariantCulture))" class="form-input" />
-        </div>
-        <div class="col-span-2 lg:col-span-2 flex items-end gap-2">
-            <button type="submit" class="btn-primary">Filtrar</button>
-            <a href="/Faturas" class="btn-secondary">Limpar</a>
+<es-card padding="md" card-class="mb-4">
+    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">
+        <es-input name="busca" label="Busca" value="@Model.Busca" placeholder="Número, observação..." prefix-icon="search" field-class="md:col-span-2" />
+        <es-select name="status" label="Status">
+            <option value="">Todos</option>
+            <option value="Rascunho" selected="@(Model.Status == "Rascunho")">Rascunho</option>
+            <option value="Emitida" selected="@(Model.Status == "Emitida")">Emitida</option>
+            <option value="ParcialmentePaga" selected="@(Model.Status == "ParcialmentePaga")">Parcial</option>
+            <option value="Paga" selected="@(Model.Status == "Paga")">Paga</option>
+            <option value="Vencida" selected="@(Model.Status == "Vencida")">Vencida</option>
+            <option value="Cancelada" selected="@(Model.Status == "Cancelada")">Cancelada</option>
+        </es-select>
+        <es-select name="origem" label="Origem">
+            <option value="">Todas</option>
+            <option value="Assinatura" selected="@(Model.Origem == "Assinatura")">Assinatura</option>
+            <option value="Pedido" selected="@(Model.Origem == "Pedido")">Pedido</option>
+            <option value="Avulsa" selected="@(Model.Origem == "Avulsa")">Avulsa</option>
+        </es-select>
+        <es-input name="vencimentoDe" type="date" label="Vencimento de" value="@(Model.VencimentoDe?.ToString("yyyy-MM-dd"))" />
+        <es-input name="vencimentoAte" type="date" label="Vencimento até" value="@(Model.VencimentoAte?.ToString("yyyy-MM-dd"))" />
+        <es-input name="valorMin" type="number" step="0.01" label="Valor mín" value="@(Model.ValorMin?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
+        <es-input name="valorMax" type="number" step="0.01" label="Valor máx" value="@(Model.ValorMax?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
+        <div style="display:flex; gap:8px;">
+            <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
+            <es-button variant="ghost" href="/Faturas">Limpar</es-button>
         </div>
     </form>
-</div>
+</es-card>
 
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
-}
+<es-filter-bar>
+    @if (!string.IsNullOrEmpty(Model.Status)) { <es-filter-chip label="Status" remove-param="status">@Model.Status</es-filter-chip> }
+    @if (!string.IsNullOrEmpty(Model.Origem)) { <es-filter-chip label="Origem" remove-param="origem">@Model.Origem</es-filter-chip> }
+    @if (!string.IsNullOrEmpty(Model.Busca)) { <es-filter-chip label="Busca" remove-param="busca">@Model.Busca</es-filter-chip> }
+    @if (Model.VencimentoDe.HasValue) { <es-filter-chip label="Venc. de" remove-param="vencimentoDe">@Model.VencimentoDe.Value.ToString("dd/MM/yyyy")</es-filter-chip> }
+    @if (Model.VencimentoAte.HasValue) { <es-filter-chip label="Venc. até" remove-param="vencimentoAte">@Model.VencimentoAte.Value.ToString("dd/MM/yyyy")</es-filter-chip> }
+    @if (Model.ValorMin.HasValue) { <es-filter-chip label="Min" remove-param="valorMin">R$ @Model.ValorMin.Value.ToString("N2")</es-filter-chip> }
+    @if (Model.ValorMax.HasValue) { <es-filter-chip label="Máx" remove-param="valorMax">R$ @Model.ValorMax.Value.ToString("N2")</es-filter-chip> }
+</es-filter-bar>
 
-<div class="card p-0 overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="table-admin">
-            <thead>
-                <tr>
-                    <th>Numero</th>
-                    <th>Empresa</th>
-                    <th>Faturado</th>
-                    <th>Origem</th>
-                    <th>Status</th>
-                    <th class="text-right">Total</th>
-                    <th class="text-right">Pago</th>
-                    <th class="text-right">Pendente</th>
-                    <th>Emissao</th>
-                    <th>Vencimento</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var f in Model.Faturas)
-                {
-                    var id = f.TryGetProperty("id", out var idp) ? idp.GetString() : "";
-                    var numero = f.TryGetProperty("numero", out var n) ? n.GetString() : "";
-                    var empresaNome = f.TryGetProperty("empresaNome", out var en) && en.ValueKind != JsonValueKind.Null ? en.GetString() : "—";
-                    var faturadoNome = f.TryGetProperty("faturadoNome", out var fn) && fn.ValueKind != JsonValueKind.Null ? fn.GetString() : "—";
-                    var origem = f.TryGetProperty("origem", out var o) ? o.GetString() ?? "" : "";
-                    var status = f.TryGetProperty("status", out var s) ? s.GetString() ?? "" : "";
-                    var total = f.TryGetProperty("total", out var t) ? t.GetDecimal() : 0m;
-                    var totalPago = f.TryGetProperty("totalPago", out var tp) ? tp.GetDecimal() : 0m;
-                    var pendente = f.TryGetProperty("pendente", out var pp) ? pp.GetDecimal() : 0m;
-                    var emissao = f.TryGetProperty("dataEmissao", out var de) ? de.GetString() : null;
-                    var venc = f.TryGetProperty("dataVencimento", out var dv) ? dv.GetString() : null;
-                    DateTime.TryParse(emissao, out var emissaoDt);
-                    DateTime.TryParse(venc, out var vencDt);
-                    <tr class="ticket-row cursor-pointer" tabindex="0"
-                        onclick="window.location.href='/Faturas/Detail/@id'"
-                        onkeydown="if(event.key==='Enter') window.location.href='/Faturas/Detail/@id'">
-                        <td class="text-es-ink font-medium font-mono text-sm">@numero</td>
-                        <td class="text-es-ink-dim text-sm">@empresaNome</td>
-                        <td class="text-es-ink-dim text-sm">@faturadoNome</td>
-                        <td class="text-es-ink-dim text-xs"><span class="status-badge badge-normal">@origem</span></td>
-                        <td><span class="status-badge @StatusBadge(status)">@StatusLabel(status)</span></td>
-                        <td class="text-es-ink text-right font-semibold">@FmtCurrency(total)</td>
-                        <td class="text-es-ink-dim text-right">@FmtCurrency(totalPago)</td>
-                        <td class="@(pendente > 0 ? "text-red-400" : "text-es-ink-dim") text-right">@FmtCurrency(pendente)</td>
-                        <td class="text-es-ink-dim text-sm">@emissaoDt.ToLocalTime().ToString("dd/MM/yy")</td>
-                        <td class="text-es-ink-dim text-sm">@vencDt.ToLocalTime().ToString("dd/MM/yy")</td>
-                    </tr>
-                }
-                @if (!Model.Faturas.Any())
-                {
-                    <tr><td colspan="10" class="text-center text-es-ink-mute py-8">Nenhuma fatura encontrada com os filtros atuais.</td></tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
+<es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Faturas.Any())">
+    <es-data-table-column key="numero" label="Número" sortable="true" />
+    <es-data-table-column label="Empresa" />
+    <es-data-table-column label="Faturado" />
+    <es-data-table-column label="Origem" />
+    <es-data-table-column label="Status" />
+    <es-data-table-column key="total" label="Total" align="right" sortable="true" />
+    <es-data-table-column label="Pago" align="right" />
+    <es-data-table-column label="Pendente" align="right" />
+    <es-data-table-column key="dataEmissao" label="Emissão" align="right" sortable="true" />
+    <es-data-table-column key="dataVencimento" label="Vencimento" align="right" sortable="true" />
+
+    @foreach (var f in Model.Faturas)
+    {
+        var id = f.TryGetProperty("id", out var idp) ? idp.GetString() : "";
+        var numero = f.TryGetProperty("numero", out var n) ? n.GetString() : "";
+        var empresaNome = f.TryGetProperty("empresaNome", out var en) && en.ValueKind != JsonValueKind.Null ? en.GetString() : "—";
+        var faturadoNome = f.TryGetProperty("faturadoNome", out var fn) && fn.ValueKind != JsonValueKind.Null ? fn.GetString() : "—";
+        var origem = f.TryGetProperty("origem", out var o) ? o.GetString() ?? "" : "";
+        var status = f.TryGetProperty("status", out var s) ? s.GetString() ?? "" : "";
+        var total = f.TryGetProperty("total", out var t) ? t.GetDecimal() : 0m;
+        var totalPago = f.TryGetProperty("totalPago", out var tp) ? tp.GetDecimal() : 0m;
+        var pendente = f.TryGetProperty("pendente", out var pp) ? pp.GetDecimal() : 0m;
+        var emissao = f.TryGetProperty("dataEmissao", out var de) ? de.GetString() : null;
+        var venc = f.TryGetProperty("dataVencimento", out var dv) ? dv.GetString() : null;
+        DateTime.TryParse(emissao, out var emissaoDt);
+        DateTime.TryParse(venc, out var vencDt);
+
+        <tr style="cursor:pointer;" tabindex="0"
+            onclick="window.location.href='/Faturas/Detail/@id'"
+            onkeydown="if(event.key==='Enter') window.location.href='/Faturas/Detail/@id'">
+            <td data-label="Número" style="font-family:var(--font-mono); font-size:13px; font-weight:500; color:var(--text-primary);">@numero</td>
+            <td data-label="Empresa" style="color:var(--text-secondary); font-size:13px;">@empresaNome</td>
+            <td data-label="Faturado" style="color:var(--text-muted); font-size:13px;">@faturadoNome</td>
+            <td data-label="Origem"><es-badge variant="neutral">@origem</es-badge></td>
+            <td data-label="Status"><es-badge variant="@StatusVariant(status)">@StatusLabel(status)</es-badge></td>
+            <td data-label="Total" class="es-data-table-td-numeric" style="font-weight:600; color:var(--text-primary);">@FmtCurrency(total)</td>
+            <td data-label="Pago" class="es-data-table-td-numeric" style="color:var(--text-muted);">@FmtCurrency(totalPago)</td>
+            <td data-label="Pendente" class="es-data-table-td-numeric" style="color:@(pendente > 0 ? "var(--crit-600)" : "var(--text-muted)"); font-weight:@(pendente > 0 ? "600" : "400");">@FmtCurrency(pendente)</td>
+            <td data-label="Emissão" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@emissaoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+            <td data-label="Vencimento" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@vencDt.ToLocalTime().ToString("dd/MM/yy")</td>
+        </tr>
+    }
+
+    <es-data-table-empty>
+        <es-empty-state icon="receipt"
+                        title="Nenhuma fatura encontrada"
+                        description="Ajuste os filtros ou emita uma fatura avulsa.">
+            <es-button variant="primary" icon="plus" href="/Faturas/Emitir">Emitir avulsa</es-button>
+        </es-empty-state>
+    </es-data-table-empty>
+</es-data-table>
 
 @if (Model.TotalPages > 1)
 {
-    <div class="flex items-center justify-center gap-2 mt-6">
-        @if (Model.Page > 1)
-        {
-            <a href="?page=@(Model.Page-1)&status=@Model.Status&origem=@Model.Origem&busca=@Model.Busca" class="btn-secondary text-sm">← Anterior</a>
-        }
-        <span class="text-es-ink-mute text-sm">@Model.Page / @Model.TotalPages — @Model.Total fatura(s)</span>
-        @if (Model.Page < Model.TotalPages)
-        {
-            <a href="?page=@(Model.Page+1)&status=@Model.Status&origem=@Model.Origem&busca=@Model.Busca" class="btn-secondary text-sm">Proximo →</a>
-        }
-    </div>
+    <es-pagination page="@Model.Page" page-size="@(Math.Max(1, Model.Total / Model.TotalPages))" total="@Model.Total" />
 }

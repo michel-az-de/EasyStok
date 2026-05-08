@@ -4,109 +4,93 @@
     ViewData["Title"] = Model.Id.HasValue ? "Editar Template" : "Novo Template";
 }
 
-<div class="space-y-6 max-w-4xl">
-    <div class="flex items-center gap-3">
-        <a href="/Notificacoes/Templates" class="text-slate-400 hover:text-white">&larr;</a>
-        <h1 class="text-2xl font-bold text-white">@ViewData["Title"]</h1>
-        @if (Model.Id.HasValue)
-        {
-            <span class="badge-yellow text-xs">Nova versão será criada ao salvar</span>
-        }
-    </div>
-
-    @if (Model.Erro != null)
-    {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
-    }
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="space-y-4">
-            <form method="post">
-                @if (!Model.Id.HasValue)
-                {
-                    <div class="card p-4 space-y-4">
-                        <h2 class="text-white font-semibold">Identificação</h2>
-                        <div>
-                            <label class="label-dark">Código</label>
-                            <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
-                        </div>
-                        <div>
-                            <label class="label-dark">Nome</label>
-                            <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Email" />
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="label-dark">Canal</label>
-                                <select asp-for="Canal" class="input-dark w-full">
-                                    <option value="Email">Email</option>
-                                    <option value="Sms">SMS</option>
-                                    <option value="WhatsApp">WhatsApp</option>
-                                    <option value="InApp">In-App</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="label-dark">Tipo de Evento</label>
-                                <select asp-for="TipoEvento" class="input-dark w-full">
-                                    <option value="ProdutoVencendo">Produto Vencendo</option>
-                                    <option value="ProdutoVencido">Produto Vencido</option>
-                                    <option value="AssinaturaExpirando">Assinatura Expirando</option>
-                                    <option value="ResetSenha">Reset de Senha</option>
-                                    <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-                                    <option value="BroadcastSuperAdmin">Broadcast</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                <div class="card p-4 space-y-4">
-                    <h2 class="text-white font-semibold">Conteúdo</h2>
-                    <div>
-                        <label class="label-dark">Assunto</label>
-                        <input asp-for="AssuntoTemplate" class="input-dark w-full"
-                               placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
-                        <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
-                    </div>
-                    <div>
-                        <label class="label-dark">Corpo (HTML)</label>
-                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs"
-                                  rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
-                    </div>
-                </div>
-
-                <div class="flex gap-3">
-                    <button type="submit" class="btn-primary px-6 py-2">Salvar</button>
-                    @if (Model.Id.HasValue)
-                    {
-                        <button type="submit" asp-page-handler="Preview" class="btn-secondary px-6 py-2">Preview</button>
-                    }
-                    <a href="/Notificacoes/Templates" class="btn-ghost px-6 py-2">Cancelar</a>
-                </div>
-            </form>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Notificacoes/Templates">Templates</es-breadcrumb-item>
+            <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+            <h2 style="margin:0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">@ViewData["Title"]</h2>
+            @if (Model.Id.HasValue)
+            {
+                <es-badge variant="warn">Nova versão ao salvar</es-badge>
+            }
         </div>
-
-        @if (Model.PreviewResult.HasValue)
-        {
-            <div class="space-y-4">
-                <h2 class="text-white font-semibold">Preview</h2>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-1">ASSUNTO</p>
-                    <p class="text-white font-medium">
-                        @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
-                    </p>
-                </div>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-2">CORPO</p>
-                    @* sandbox sem nenhuma flag bloqueia scripts/forms/popups dentro do iframe.
-                       Se um template HTML contiver <script>, ele será renderizado mas inerte —
-                       evita execução acidental de JS injetado em variáveis. *@
-                    <iframe class="w-full h-80 bg-white rounded"
-                            sandbox=""
-                            title="Preview do corpo do template"
-                            srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
-                    </iframe>
-                </div>
-            </div>
-        }
     </div>
+    <es-button variant="ghost" href="/Notificacoes/Templates" icon="arrow-left">Voltar</es-button>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px;">
+    <form method="post" style="display:flex; flex-direction:column; gap:16px;">
+        @if (!Model.Id.HasValue)
+        {
+            <es-card title="Identificação">
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <es-input asp-for="Codigo" label="Código" required="true"
+                              placeholder="produto_vencendo_email_v1"
+                              input-class="font-mono"
+                              helper="Snake case com versão. Único no sistema." />
+                    <es-input asp-for="Nome" label="Nome" required="true" placeholder="Produto Vencendo — Email" />
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <es-select asp-for="Canal" label="Canal">
+                            <option value="Email">Email</option>
+                            <option value="Sms">SMS</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="InApp">In-App</option>
+                        </es-select>
+                        <es-select asp-for="TipoEvento" label="Tipo de evento">
+                            <option value="ProdutoVencendo">Produto Vencendo</option>
+                            <option value="ProdutoVencido">Produto Vencido</option>
+                            <option value="AssinaturaExpirando">Assinatura Expirando</option>
+                            <option value="ResetSenha">Reset de Senha</option>
+                            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
+                            <option value="BroadcastSuperAdmin">Broadcast</option>
+                        </es-select>
+                    </div>
+                </div>
+            </es-card>
+        }
+
+        <es-card title="Conteúdo" description="Use {{ variavel }} para variáveis Scriban">
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <es-input asp-for="AssuntoTemplate" label="Assunto"
+                          placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias"
+                          input-class="font-mono" />
+                <es-textarea asp-for="CorpoTemplate" label="Corpo (HTML)"
+                             rows="12"
+                             input-class="font-mono"
+                             placeholder="&lt;p&gt;Olá! O produto &lt;strong&gt;{{ nomeProduto }}&lt;/strong&gt; vence em {{ diasRestantes }} dias.&lt;/p&gt;" />
+            </div>
+        </es-card>
+
+        <div style="display:flex; gap:8px;">
+            <es-button type="submit" variant="primary" icon="check">Salvar</es-button>
+            @if (Model.Id.HasValue)
+            {
+                <es-button type="submit" variant="secondary" icon="eye" formaction="?handler=Preview">Preview</es-button>
+            }
+            <es-button variant="ghost" href="/Notificacoes/Templates">Cancelar</es-button>
+        </div>
+    </form>
+
+    @if (Model.PreviewResult.HasValue)
+    {
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <es-card title="Preview" description="Renderização com dados de exemplo">
+                <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.10em; color:var(--text-muted); margin-bottom:6px;">ASSUNTO</div>
+                <p style="color:var(--text-primary); font-weight:500; margin:0 0 14px;">
+                    @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
+                </p>
+                <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.10em; color:var(--text-muted); margin-bottom:6px;">CORPO</div>
+                @* sandbox sem flags bloqueia scripts dentro do iframe *@
+                <iframe style="width:100%; height:320px; background:white; border-radius:var(--r-md); border:1px solid var(--border-soft);"
+                        sandbox=""
+                        title="Preview do corpo do template"
+                        srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
+                </iframe>
+            </es-card>
+        </div>
+    }
 </div>

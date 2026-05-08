@@ -3,138 +3,119 @@
 @{
     ViewData["Title"] = "Emitir fatura avulsa";
     var amanha = DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd");
+    var hojeDateMin = DateTime.UtcNow.ToString("yyyy-MM-dd");
 }
 
-<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
-    <div class="flex items-center gap-3">
-        <a href="/Faturas" class="btn-secondary text-sm">← Voltar</a>
-        <h1 class="text-es-ink text-xl font-semibold">Emitir fatura avulsa</h1>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
+            <es-breadcrumb-item>Emitir avulsa</es-breadcrumb-item>
+        </es-breadcrumb>
+        <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Emitir fatura avulsa</h2>
+        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configure cliente, itens e vencimento. Número gerado automaticamente.</p>
     </div>
+    <es-button variant="ghost" href="/Faturas" icon="arrow-left">Voltar</es-button>
 </div>
 
-@if (TempData["Erro"] is string erroT)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erroT</div>
-}
-
-<form method="post" class="space-y-4"
-      x-data="emitirFatura()" x-init="if (itens.length === 0) addItem()">
+<form method="post" x-data="emitirFatura()" x-init="if (itens.length === 0) addItem()" style="display:flex; flex-direction:column; gap:16px;">
     @Html.AntiForgeryToken()
 
-    <!-- Empresa + Faturado -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="card">
-            <h2 class="text-es-ink font-semibold mb-3">Empresa (tenant)</h2>
-            <div>
-                <label class="form-label">Empresa ID *</label>
-                <input type="text" name="empresaId" class="form-input font-mono text-sm" required
-                       placeholder="00000000-0000-0000-0000-000000000000"
-                       pattern="[0-9a-fA-F\-]{36}" />
-                <small class="text-es-ink-mute text-xs">
-                    GUID da empresa cliente. Pegue em <a href="/Tenants" class="text-es-accent hover:underline">Clientes</a>.
-                </small>
-            </div>
-        </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
+        <es-card title="Empresa (tenant)" description="GUID da empresa cliente">
+            <es-input name="empresaId"
+                      label="Empresa ID"
+                      required="true"
+                      placeholder="00000000-0000-0000-0000-000000000000"
+                      pattern="[0-9a-fA-F\-]{36}"
+                      input-class="font-mono"
+                      helper="Cole o GUID da página /Tenants." />
+        </es-card>
 
-        <div class="card">
-            <h2 class="text-es-ink font-semibold mb-3">Dados do faturado</h2>
-            <div class="space-y-3">
-                <div>
-                    <label class="form-label">Nome *</label>
-                    <input type="text" name="faturadoNome" class="form-input" required minlength="2" maxlength="200" />
+        <es-card title="Dados do faturado" description="Quem aparece na fatura como destinatário">
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <es-input name="faturadoNome" label="Nome" required="true" minlength="2" maxlength="200" />
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <es-input name="faturadoDocumento" label="CNPJ/CPF" label-optional="true" maxlength="20" />
+                    <es-input name="faturadoTelefone" label="Telefone" label-optional="true" maxlength="20" />
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="form-label">CNPJ/CPF</label>
-                        <input type="text" name="faturadoDocumento" class="form-input" maxlength="20" />
-                    </div>
-                    <div>
-                        <label class="form-label">Telefone</label>
-                        <input type="text" name="faturadoTelefone" class="form-input" maxlength="20" />
-                    </div>
-                </div>
-                <div>
-                    <label class="form-label">Email</label>
-                    <input type="email" name="faturadoEmail" class="form-input" maxlength="200" />
-                </div>
+                <es-input name="faturadoEmail" type="email" label="Email" label-optional="true" maxlength="200" />
             </div>
-        </div>
+        </es-card>
     </div>
 
-    <!-- Itens dinamicos -->
-    <div class="card">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="text-es-ink font-semibold">Itens</h2>
-            <button type="button" @@click="addItem()" class="btn-secondary text-sm">+ Adicionar item</button>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="table-admin">
+    <es-card padding="none">
+        <es-card-header-actions>
+            <es-button variant="ghost" size="sm" icon="plus" x-on:click="addItem()">Adicionar item</es-button>
+        </es-card-header-actions>
+
+        <header class="es-card-header">
+            <div>
+                <h3 class="es-card-title">Itens</h3>
+                <div class="es-card-desc">Itens "Desconto" entram como negativo · "Taxa" como acréscimo</div>
+            </div>
+        </header>
+
+        <div class="es-data-table-scroll">
+            <table class="es-data-table">
                 <thead>
                     <tr>
-                        <th style="width:50%">Descricao</th>
-                        <th style="width:12%" class="text-right">Qtd</th>
-                        <th style="width:15%" class="text-right">Preco unit</th>
-                        <th style="width:15%">Tipo</th>
-                        <th style="width:8%"></th>
+                        <th scope="col" style="width:50%;">Descrição</th>
+                        <th scope="col" class="es-data-table-td-numeric" style="width:12%;">Qtd</th>
+                        <th scope="col" class="es-data-table-td-numeric" style="width:15%;">Preço unit</th>
+                        <th scope="col" style="width:15%;">Tipo</th>
+                        <th scope="col" class="es-data-table-td-actions" style="width:8%;"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="(item, idx) in itens" :key="idx">
                         <tr>
-                            <td><input type="text" name="itemDescricao" x-model="item.descricao" class="form-input" required minlength="2" maxlength="300" /></td>
-                            <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="form-input text-right" required /></td>
-                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="form-input text-right" required /></td>
+                            <td><input type="text" name="itemDescricao" x-model="item.descricao" class="es-form-input" required minlength="2" maxlength="300" /></td>
+                            <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="es-form-input" style="text-align:right;" required /></td>
+                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" required /></td>
                             <td>
-                                <select name="itemTipo" x-model="item.tipo" class="form-input">
-                                    <option value="Servico">Servico</option>
+                                <select name="itemTipo" x-model="item.tipo" class="es-form-select">
+                                    <option value="Servico">Serviço</option>
                                     <option value="Produto">Produto</option>
-                                    <option value="Recorrencia">Recorrencia</option>
+                                    <option value="Recorrencia">Recorrência</option>
                                     <option value="Taxa">Taxa</option>
                                     <option value="Desconto">Desconto</option>
                                 </select>
                             </td>
-                            <td>
-                                <button type="button" @@click="removeItem(idx)" class="btn-danger text-xs"
-                                        :disabled="itens.length <= 1">✕</button>
+                            <td class="es-data-table-td-actions">
+                                <button type="button" class="btn btn-danger btn-xs btn-icon" @@click="removeItem(idx)" :disabled="itens.length <= 1" aria-label="Remover item">
+                                    <es-icon name="x" size="12" />
+                                </button>
                             </td>
                         </tr>
                     </template>
                 </tbody>
                 <tfoot>
-                    <tr>
-                        <td colspan="3" class="text-right font-semibold text-es-ink">Subtotal estimado</td>
-                        <td colspan="2" class="font-mono font-semibold text-es-accent" x-text="formatCurrency(subtotal)"></td>
+                    <tr style="background:var(--surface-sunken);">
+                        <td colspan="3" style="text-align:right; font-weight:600; color:var(--text-primary); padding:12px 14px;">Subtotal estimado</td>
+                        <td colspan="2" style="font-family:var(--font-mono); font-weight:700; color:var(--orange-500); padding:12px 14px;" x-text="formatCurrency(subtotal)"></td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-        <p class="text-es-ink-mute text-xs mt-3">
-            Itens do tipo <strong>Desconto</strong> sao tratados como negativos no calculo de total. Itens
-            <strong>Taxa</strong> entram como acrescimo. Numero da fatura sera gerado automaticamente
-            (formato YYYY-NNNNNN, sequencial por empresa+ano).
-        </p>
+    </es-card>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+        <es-card title="Vencimento">
+            <es-input name="dataVencimento" type="date" label="Data de vencimento"
+                      value="@amanha" required="true" />
+        </es-card>
+        <es-card title="Observações" description="Notas internas ou instruções ao cliente">
+            <es-textarea name="observacoes" label="Observações" label-optional="true"
+                         rows="3" maxlength="4000"
+                         placeholder="Notas internas, instruções, etc." />
+        </es-card>
     </div>
 
-    <!-- Vencimento + observacoes -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="card">
-            <div>
-                <label class="form-label">Data de vencimento *</label>
-                <input type="date" name="dataVencimento" value="@amanha" class="form-input" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" />
-            </div>
-        </div>
-        <div class="card">
-            <div>
-                <label class="form-label">Observacoes</label>
-                <textarea name="observacoes" rows="3" class="form-input" maxlength="4000"
-                          placeholder="Notas internas, instrucoes ao cliente, etc."></textarea>
-            </div>
-        </div>
-    </div>
-
-    <div class="flex justify-end gap-2">
-        <a href="/Faturas" class="btn-secondary">Cancelar</a>
-        <button type="submit" class="btn-primary">Emitir fatura</button>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <es-button variant="ghost" href="/Faturas">Cancelar</es-button>
+        <es-button type="submit" variant="primary" icon="check">Emitir fatura</es-button>
     </div>
 </form>
 

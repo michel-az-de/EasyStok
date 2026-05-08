@@ -2,19 +2,6 @@
 @model EasyStock.Admin.Pages.IndexModel
 @{
     ViewData["Title"] = "Dashboard";
-}
-
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-6">
-        Erro ao carregar dados: @Model.Erro
-    </div>
-}
-
-@{
-    // Cultura do thread é pt-BR (Program.cs) → ToString() default usa vírgula decimal,
-    // o que quebra JSON inline (vira "1500,50" em vez de "1500.50" → syntax error).
-    // Force InvariantCulture nos números pra emitir JSON-safe.
     var inv = System.Globalization.CultureInfo.InvariantCulture;
 }
 
@@ -43,100 +30,126 @@
     };
 </script>
 
-<div>
-
-    @* Card grande de seed — aparece quando o tenant count chega em 0. CTA leva
-       direto pra tab Operações do /Diagnostico onde o painel completo de seed
-       (com 3 botões + console de debug + diagnóstico de flags) está disponível.
-       Sai automaticamente quando dash.totalTenants > 0. *@
-    <div x-show="dash.totalTenants === 0" x-cloak
-         class="card mb-6 flex flex-wrap items-center gap-4"
-         style="background:linear-gradient(135deg,rgba(232,88,20,0.08),rgba(247,242,232,0.04));border:1px solid rgba(232,88,20,0.2)">
-        <div class="text-5xl">🌱</div>
-        <div class="flex-1 min-w-[260px]">
-            <h3 class="text-es-ink font-bold text-base">Banco vazio — nada pra testar</h3>
-            <p class="text-es-ink-mute text-sm mt-0.5">
-                Ainda não há tenants. Popule o ambiente com um seed de cenários de teste do Admin
-                (4 tenants variados, tickets, notas internas, audit logs).
-            </p>
-        </div>
-        <a href="/Diagnostico?tab=operacoes" class="btn-primary text-sm whitespace-nowrap">
-            🚀 Popular ambiente
-        </a>
+<!-- Header com indicador de polling -->
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <h2 style="margin:0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Visão geral</h2>
+        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Métricas em tempo real · atualiza a cada 60s</p>
     </div>
-
-    <!-- Indicador de atualização -->
-    <div class="flex items-center justify-end mb-3 gap-2 text-xs text-es-ink-mute">
-        <span class="w-1.5 h-1.5 rounded-full bg-es-basil animate-pulse"></span>
+    <div style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:12px;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:999px; background:var(--ok-600); animation:dash-pulse 2s infinite;"></span>
         <span x-text="dashSecsAgo > 0 ? 'Atualizado há ' + dashSecsAgo + 's' : 'Atualizando…'"></span>
     </div>
+</div>
 
-    <!-- Métricas principais -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
-            <div class="text-3xl font-bold text-es-ink" x-text="dash.tenantsAtivos">@Model.TenantsAtivos</div>
-            <div class="text-es-ink-mute text-xs mt-1">de <span x-text="dash.totalTenants">@Model.TotalTenants</span> total</div>
-        </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
-            <div class="text-3xl font-bold text-es-gold" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
-            <div class="text-es-ink-mute text-xs mt-1">+<span x-text="dash.tenantsNovos">@Model.TenantsNovos</span> novos (30d)</div>
-        </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
-            <div class="text-3xl font-bold text-es-basil" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
-            <div class="text-red-400 text-xs mt-1 font-medium"><span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos</div>
-        </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
-            <div class="text-3xl font-bold text-es-accent">R$ <span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0})">@Model.ReceitaMensal.ToString("N0")</span></div>
-            <div class="text-es-ink-mute text-xs mt-1">mensal (assinaturas ativas)</div>
-        </div>
+<!-- Card de seed quando ambiente está vazio -->
+<div x-show="dash.totalTenants === 0" x-cloak
+     class="es-card card-interactive"
+     style="background:linear-gradient(135deg, rgba(232,88,20,.10), rgba(232,88,20,.02)); border-color:rgba(232,88,20,.30); padding: 22px; margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:18px;">
+    <span style="display:inline-grid; place-items:center; width:56px; height:56px; border-radius:var(--r-lg); background:rgba(232,88,20,.20);">
+        <es-icon name="zap" size="28" />
+    </span>
+    <div style="flex:1; min-width:240px;">
+        <h3 style="margin:0 0 4px; color:var(--text-primary); font-weight:700; font-size:15px;">Banco vazio — nada pra testar</h3>
+        <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.5;">
+            Ainda não há tenants. Popule o ambiente com cenários de teste (4 tenants variados, tickets, notas internas e audit logs).
+        </p>
     </div>
+    <es-button variant="primary" icon="zap" href="/Diagnostico?tab=operacoes">Popular ambiente</es-button>
+</div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
-            <div class="text-2xl font-bold text-es-ink" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
+<!-- Métricas principais (4 cards com drill-down) -->
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:20px;">
+
+    <a href="/Tenants?status=Ativa" class="es-stat-card is-link card-interactive">
+        <div class="es-stat-label">Tenants ativos</div>
+        <div class="es-stat-value" x-text="dash.tenantsAtivos">@Model.TenantsAtivos</div>
+        <div class="es-stat-meta">
+            <span>de <strong style="color:var(--text-primary);" x-text="dash.totalTenants">@Model.TotalTenants</strong> total</span>
         </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
-            <div class="text-2xl font-bold text-es-ink" x-text="dash.logins24h">@Model.Logins24h</div>
+    </a>
+
+    <a href="/Tenants?status=Suspensa" class="es-stat-card is-link card-interactive">
+        <div class="es-stat-label">Suspensos</div>
+        <div class="es-stat-value" :style="dash.tenantsSuspensos > 0 ? 'color: var(--warn-600);' : ''" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
+        <div class="es-stat-meta">
+            <span>+<strong style="color:var(--text-primary);" x-text="dash.tenantsNovos">@Model.TenantsNovos</strong> novos (30d)</span>
         </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
-            <div class="text-2xl font-bold text-es-gold" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</div>
+    </a>
+
+    <a href="/Tickets?prioridade=Critica" class="es-stat-card is-link card-interactive">
+        <div class="es-stat-label">Tickets abertos</div>
+        <div class="es-stat-value" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
+        <div class="es-stat-meta">
+            <span class="es-stat-delta es-stat-delta-down" x-show="dash.ticketsCriticos > 0" x-cloak>
+                <es-icon name="alert-triangle" size="10" />
+                <span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos
+            </span>
+            <span x-show="!dash.ticketsCriticos">sem críticos</span>
         </div>
-        <div class="card">
-            <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
-            <div class="text-2xl font-bold text-es-basil" x-text="dash.tenantsNovos">@Model.TenantsNovos</div>
-            <div class="text-es-ink-mute text-xs mt-1">últimos 30 dias</div>
+    </a>
+
+    <div class="es-stat-card">
+        <div class="es-stat-label">Receita estimada</div>
+        <div class="es-stat-value" style="color:var(--orange-500);">
+            R$ <span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })">@Model.ReceitaMensal.ToString("N0")</span>
+        </div>
+        <div class="es-stat-meta">
+            <span>mensal · assinaturas ativas</span>
         </div>
     </div>
 </div>
 
-<!-- Tabelas -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Métricas secundárias -->
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:32px;">
+    <div class="es-stat-card">
+        <div class="es-stat-label">Usuários ativos</div>
+        <div class="es-stat-value es-stat-value-sm" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
+    </div>
+    <div class="es-stat-card">
+        <div class="es-stat-label">Logins (24h)</div>
+        <div class="es-stat-value es-stat-value-sm" x-text="dash.logins24h">@Model.Logins24h</div>
+    </div>
+    <div class="es-stat-card">
+        <div class="es-stat-label">Em atendimento</div>
+        <div class="es-stat-value es-stat-value-sm" :style="dash.ticketsEmAtendimento > 0 ? 'color: var(--warn-600);' : ''" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</div>
+    </div>
+    <div class="es-stat-card">
+        <div class="es-stat-label">Tenants novos</div>
+        <div class="es-stat-value es-stat-value-sm" x-text="dash.tenantsNovos">@Model.TenantsNovos</div>
+        <div class="es-stat-meta"><span>últimos 30 dias</span></div>
+    </div>
+</div>
 
-    <!-- Últimos tickets críticos -->
-    <div class="card p-0 overflow-hidden">
-        <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.10)">
-            <h2 class="text-es-ink font-semibold text-sm">Tickets Críticos</h2>
-            <a href="/Tickets?prioridade=Critica" class="text-es-accent hover:text-es-cream text-xs">Ver todos →</a>
-        </div>
+<!-- Tabelas lado a lado -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px;">
+
+    <es-card padding="none">
+        <es-card-header-actions>
+            <es-button variant="ghost" size="xs" href="/Tickets?prioridade=Critica" icon-trailing="arrow-right">Ver todos</es-button>
+        </es-card-header-actions>
+
+        <header class="es-card-header">
+            <div>
+                <h3 class="es-card-title">Tickets críticos</h3>
+                <div class="es-card-desc">Alta prioridade — ação imediata</div>
+            </div>
+        </header>
+
         @if (!Model.UltimosTicketsCriticos.Any())
         {
-            <div class="px-4 py-8 text-center text-es-ink-mute text-sm">Nenhum ticket crítico 🎉</div>
+            <div style="padding:32px;">
+                <es-empty-state icon="check-circle" title="Nenhum ticket crítico" description="A fila está em dia." />
+            </div>
         }
         else
         {
-            <table class="table-admin">
+            <table class="es-data-table">
                 <thead>
                     <tr>
-                        <th>Título</th>
-                        <th>Empresa</th>
-                        <th>Status</th>
+                        <th scope="col">Título</th>
+                        <th scope="col">Empresa</th>
+                        <th scope="col">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -146,35 +159,51 @@
                         var titulo = t.TryGetProperty("titulo", out var tp) ? tp.GetString() : "";
                         var empresa = t.TryGetProperty("empresaNome", out var ep) ? ep.GetString() : "";
                         var status = t.TryGetProperty("status", out var sp) ? sp.GetString() : "";
+                        var stVar = status?.ToLower().Replace(" ", "") switch
+                        {
+                            "aberto" => "info",
+                            "ematendimento" => "accent",
+                            "aguardandocliente" => "warn",
+                            "resolvido" => "ok",
+                            _ => "neutral"
+                        };
                         <tr>
-                            <td><a href="/Tickets/Detail/@id" class="text-es-accent hover:text-es-cream">@titulo</a></td>
-                            <td class="text-es-ink-dim">@empresa</td>
-                            <td><span class="status-badge badge-@(status?.ToLower().Replace(" ", ""))">@status</span></td>
+                            <td><a href="/Tickets/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@titulo</a></td>
+                            <td style="color:var(--text-muted); font-size:13px;">@empresa</td>
+                            <td><es-badge variant="@stVar">@status</es-badge></td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
-    </div>
+    </es-card>
 
-    <!-- Tenants recentes -->
-    <div class="card p-0 overflow-hidden">
-        <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.10)">
-            <h2 class="text-es-ink font-semibold text-sm">Tenants Recentes</h2>
-            <a href="/Tenants" class="text-es-accent hover:text-es-cream text-xs">Ver todos →</a>
-        </div>
+    <es-card padding="none">
+        <es-card-header-actions>
+            <es-button variant="ghost" size="xs" href="/Tenants" icon-trailing="arrow-right">Ver todos</es-button>
+        </es-card-header-actions>
+
+        <header class="es-card-header">
+            <div>
+                <h3 class="es-card-title">Tenants recentes</h3>
+                <div class="es-card-desc">Últimos 30 dias</div>
+            </div>
+        </header>
+
         @if (!Model.TenantsRecentes.Any())
         {
-            <div class="px-4 py-8 text-center text-es-ink-mute text-sm">Nenhum tenant novo nos últimos 30 dias</div>
+            <div style="padding:32px;">
+                <es-empty-state icon="building-2" title="Nenhum tenant novo" description="Sem cadastros nos últimos 30 dias." />
+            </div>
         }
         else
         {
-            <table class="table-admin">
+            <table class="es-data-table">
                 <thead>
                     <tr>
-                        <th>Nome</th>
-                        <th>Documento</th>
-                        <th>Criado em</th>
+                        <th scope="col">Nome</th>
+                        <th scope="col">Documento</th>
+                        <th scope="col" class="es-data-table-td-numeric">Criado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,14 +215,17 @@
                         var criado = t.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : "";
                         DateTime.TryParse(criado, out var criadoDt);
                         <tr>
-                            <td><a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream">@nome</a></td>
-                            <td class="text-es-ink-dim">@(doc ?? "—")</td>
-                            <td class="text-es-ink-dim">@criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                            <td><a href="/Tenants/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@nome</a></td>
+                            <td style="color:var(--text-muted); font-family:var(--font-mono); font-size:11px;">@(doc ?? "—")</td>
+                            <td class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
-    </div>
-
+    </es-card>
 </div>
+
+<style>
+    @@keyframes dash-pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+</style>

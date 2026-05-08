@@ -43,9 +43,17 @@
     bool podeCancelar = Model.Status is "Rascunho" or "Emitida" or "ParcialmentePaga" or "Vencida";
 }
 
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:8px; flex-wrap:wrap;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
+        <es-breadcrumb-item>@Model.Numero</es-breadcrumb-item>
+    </es-breadcrumb>
+    <es-button variant="ghost" size="sm" href="/Faturas" icon="arrow-left">Voltar</es-button>
+</div>
+
 <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
     <div class="flex items-center gap-3">
-        <a href="/Faturas" class="btn-secondary text-sm">← Voltar</a>
         <h1 class="text-es-ink text-xl font-semibold">
             Fatura <span class="font-mono">@Model.Numero</span>
             <span class="status-badge @StatusBadge(Model.Status) ml-2">@Model.Status</span>

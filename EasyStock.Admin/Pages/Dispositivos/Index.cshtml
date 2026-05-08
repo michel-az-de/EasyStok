@@ -4,195 +4,147 @@
     ViewData["Title"] = "Dispositivos";
 }
 
-<div x-data="dispositivosPage()" x-init="init()" class="space-y-6">
+<div x-data="dispositivosPage()" x-init="init()" style="display:flex; flex-direction:column; gap:20px;">
 
-    <div class="flex items-center justify-between gap-4">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
         <div>
-            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Dispositivos</h2>
-            <p class="text-es-ink-mute text-sm">PWAs pareados, saúde, comandos remotos e atualização OTA.</p>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item>Dispositivos</es-breadcrumb-item>
+            </es-breadcrumb>
+            <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Dispositivos</h2>
+            <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">PWAs pareados, saúde, comandos remotos e atualização OTA.</p>
         </div>
-
-        <div class="flex items-center gap-2">
-            <span class="text-xs text-es-ink-mute">Versão do bundle:</span>
-            <span class="text-xs font-mono px-2 py-1 rounded bg-es-surface-2 text-es-ink"
-                  x-text="serverPwaVersion || '…'"></span>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px; color:var(--text-muted);">Bundle:</span>
+            <code style="font-family:var(--font-mono); font-size:11px; padding:4px 8px; border-radius:var(--r-sm); background:var(--surface-sunken); color:var(--text-primary);"
+                  x-text="serverPwaVersion || '…'"></code>
         </div>
     </div>
 
-    <!-- Sem empresa selecionada -->
     <template x-if="!empresaId">
-        <div class="rounded-xl p-6"
-             style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
-            <p class="text-es-ink-dim text-sm">
-                Para listar dispositivos, abra o detalhe de um cliente em
-                <a href="/Tenants" class="text-es-accent hover:underline">/Tenants</a>
-                ou informe o ID na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>.
-            </p>
-        </div>
+        <es-card>
+            <es-empty-state icon="building-2"
+                            title="Selecione uma empresa"
+                            description="Para listar dispositivos, abra o detalhe de um cliente em /Tenants ou informe ?empresaId=&lt;guid&gt; na URL.">
+                <es-button variant="primary" href="/Tenants" icon="building-2">Ir para clientes</es-button>
+            </es-empty-state>
+        </es-card>
     </template>
 
-    <!-- Com empresa -->
     <template x-if="empresaId">
-        <div class="space-y-6">
+        <div style="display:flex; flex-direction:column; gap:16px;">
 
             <!-- Toolbar -->
-            <div class="flex flex-wrap items-center gap-3 rounded-xl p-4"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="flex-1 min-w-[200px]">
-                    <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Empresa</div>
-                    <div class="text-es-ink font-mono text-xs truncate" x-text="empresaId"></div>
+            <es-card padding="md">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+                    <div style="flex:1; min-width:200px;">
+                        <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.10em; color:var(--text-muted);">Empresa</div>
+                        <code style="font-size:12px; color:var(--text-primary); font-family:var(--font-mono); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="empresaId"></code>
+                    </div>
+                    <es-button variant="primary" icon="plus" x-on:click="abrirNovoCodigo()">Novo código de pareamento</es-button>
+                    <button type="button" class="btn btn-secondary btn-md" :disabled="loading || !devices.length" @@click="broadcastPwaUpdate()">
+                        <es-icon name="download" size="16" />
+                        Forçar atualização (todos)
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @@click="recarregar()" aria-label="Atualizar">
+                        <span x-show="!loading"><es-icon name="arrow-up-down" size="16" /></span>
+                        <span x-show="loading">…</span>
+                    </button>
                 </div>
-                <button type="button" @@click="abrirNovoCodigo()"
-                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-es-accent text-es-ink hover:opacity-90 transition">
-                    + Novo código de pareamento
-                </button>
-                <button type="button" @@click="broadcastPwaUpdate()"
-                        :disabled="loading || !devices.length"
-                        class="px-4 py-2 rounded-lg text-sm font-semibold border border-es-accent text-es-accent hover:bg-es-accent/10 disabled:opacity-40 transition">
-                    Forçar atualização do PWA (todos)
-                </button>
-                <button type="button" @@click="recarregar()"
-                        :disabled="loading"
-                        class="px-3 py-2 rounded-lg text-sm border border-es-line text-es-ink-dim hover:bg-es-surface-2 transition">
-                    <span x-show="!loading">⟳ atualizar</span>
-                    <span x-show="loading">…</span>
-                </button>
-            </div>
+            </es-card>
 
-            <!-- Lista -->
-            <div class="rounded-xl overflow-hidden"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="grid grid-cols-12 gap-2 px-4 py-3 text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold"
-                     style="border-bottom:1px solid rgba(247,242,232,.08)">
-                    <div class="col-span-3">Device</div>
-                    <div class="col-span-2">Saúde</div>
-                    <div class="col-span-2">Última atividade</div>
-                    <div class="col-span-2">Loja</div>
-                    <div class="col-span-3 text-right">Ações</div>
+            <!-- Lista de devices -->
+            <es-card padding="none">
+                <div style="display:grid; grid-template-columns:3fr 2fr 2fr 2fr 3fr; gap:8px; padding:12px 16px; font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
+                    <div>Device</div>
+                    <div>Saúde</div>
+                    <div>Última atividade</div>
+                    <div>Loja</div>
+                    <div style="text-align:right;">Ações</div>
                 </div>
 
                 <template x-if="!devices.length && !loading">
-                    <div class="px-4 py-10 text-center text-es-ink-mute text-sm">
-                        Nenhum dispositivo pareado nesta empresa.
+                    <div style="padding:40px 16px;">
+                        <es-empty-state icon="smartphone" title="Nenhum dispositivo pareado" description="Gere um código de pareamento para conectar o primeiro PWA." />
                     </div>
                 </template>
 
                 <template x-for="d in devices" :key="d.id">
-                    <div class="grid grid-cols-12 gap-2 px-4 py-3 items-center"
-                         style="border-bottom:1px solid rgba(247,242,232,.05)">
-                        <div class="col-span-3">
-                            <div class="text-es-ink text-sm font-medium truncate" x-text="d.label || '(sem rótulo)'"></div>
-                            <div class="text-es-ink-mute text-[11px] font-mono truncate" x-text="d.id"></div>
+                    <div style="display:grid; grid-template-columns:3fr 2fr 2fr 2fr 3fr; gap:8px; padding:12px 16px; align-items:center; border-bottom:1px solid var(--border-soft);">
+                        <div>
+                            <div style="font-size:13px; font-weight:500; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="d.label || '(sem rótulo)'"></div>
+                            <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="d.id"></div>
                         </div>
-                        <div class="col-span-2">
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
-                                  :class="badgeClass(d.health?.status)">
-                                <span class="w-1.5 h-1.5 rounded-full"
-                                      :class="dotClass(d.health?.status)"></span>
+                        <div>
+                            <span class="badge" :class="badgeClass(d.health?.status)">
+                                <span class="dot"></span>
                                 <span x-text="d.health?.statusLabel || statusFor(d)"></span>
                             </span>
                         </div>
-                        <div class="col-span-2 text-es-ink-dim text-xs" x-text="formatLastSeen(d.lastSeenAt)"></div>
-                        <div class="col-span-2 text-es-ink-dim text-xs font-mono truncate" x-text="(d.lojaId || '').slice(0,8)"></div>
-                        <div class="col-span-3 flex items-center justify-end gap-1.5 flex-wrap">
-                            <button @@click="cmd(d.id, 'pwa_update')" :disabled="d.revoked"
-                                    class="px-2 py-1 rounded text-[11px] border border-es-accent text-es-accent hover:bg-es-accent/10 disabled:opacity-30">
-                                Atualizar
-                            </button>
-                            <button @@click="cmd(d.id, 'reload')" :disabled="d.revoked"
-                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
-                                Reload
-                            </button>
-                            <button @@click="cmd(d.id, 'flush_now')" :disabled="d.revoked"
-                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
-                                Flush
-                            </button>
-                            <button @@click="enviarMsg(d.id)" :disabled="d.revoked"
-                                    class="px-2 py-1 rounded text-[11px] border border-es-line text-es-ink-dim hover:bg-es-surface-2 disabled:opacity-30">
-                                Msg
-                            </button>
-                            <button @@click="revogar(d.id)" :disabled="d.revoked"
-                                    class="px-2 py-1 rounded text-[11px] border border-red-500/40 text-red-400 hover:bg-red-500/10 disabled:opacity-30">
-                                Revogar
-                            </button>
+                        <div style="font-size:12px; color:var(--text-muted);" x-text="formatLastSeen(d.lastSeenAt)"></div>
+                        <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="(d.lojaId || '').slice(0,8)"></div>
+                        <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap;">
+                            <button class="btn btn-ghost btn-xs" :disabled="d.revoked" @@click="cmd(d.id, 'pwa_update')">Atualizar</button>
+                            <button class="btn btn-ghost btn-xs" :disabled="d.revoked" @@click="cmd(d.id, 'reload')">Reload</button>
+                            <button class="btn btn-ghost btn-xs" :disabled="d.revoked" @@click="cmd(d.id, 'flush_now')">Flush</button>
+                            <button class="btn btn-ghost btn-xs" :disabled="d.revoked" @@click="enviarMsg(d.id)">Msg</button>
+                            <button class="btn btn-danger btn-xs" :disabled="d.revoked" @@click="revogar(d.id)">Revogar</button>
                         </div>
                     </div>
                 </template>
-            </div>
+            </es-card>
 
-            <p x-show="erro" x-cloak class="text-red-400 text-sm" x-text="erro"></p>
+            <p x-show="erro" x-cloak style="color:var(--crit-600); font-size:13px;" x-text="erro"></p>
         </div>
     </template>
 
     <!-- Modal: gerar pair-code -->
-    <div x-show="modalCodigo.open" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-         @@click.self="modalCodigo.open = false"
-         @@keydown.escape.window="modalCodigo.open = false">
-        <div class="w-full max-w-md rounded-xl p-6"
-             style="background:#0b1530;border:1px solid rgba(247,242,232,.12)">
-            <h3 class="text-es-ink text-lg font-semibold mb-1">Novo código de pareamento</h3>
-            <p class="text-es-ink-mute text-xs mb-4">Mostre o código pro operador digitar no PWA. Válido por 10 min.</p>
+    <es-modal id="dispositivos-pair" title="Novo código de pareamento" description="Mostre o código pro operador digitar no PWA. Válido por 10 min." size="sm" persistent="true" show-close="false">
+        <template x-if="!modalCodigo.codigo">
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <es-input field-class="" name="lojaId" label="Loja (UUID)" placeholder="00000000-0000-..." required="true" />
+                <input type="hidden" id="dispositivos-pair-loja" />
+                <es-input name="label" label="Rótulo" label-optional="true" placeholder="Ex.: Tablet Caixa 1" />
+                <es-input name="defaultOperatorName" label="Operador padrão" label-optional="true" placeholder="Ex.: Maria" />
 
-            <template x-if="!modalCodigo.codigo">
-                <div class="space-y-3">
-                    <label class="block">
-                        <span class="text-xs text-es-ink-mute">Loja (UUID)</span>
-                        <input type="text" x-model="modalCodigo.lojaId"
-                               placeholder="00000000-0000-..."
-                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm font-mono outline-none">
-                    </label>
-                    <label class="block">
-                        <span class="text-xs text-es-ink-mute">Rótulo (opcional)</span>
-                        <input type="text" x-model="modalCodigo.label"
-                               placeholder="Ex: Tablet Caixa 1"
-                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm outline-none">
-                    </label>
-                    <label class="block">
-                        <span class="text-xs text-es-ink-mute">Operador padrão (opcional)</span>
-                        <input type="text" x-model="modalCodigo.defaultOperatorName"
-                               placeholder="Ex: Maria"
-                               class="w-full mt-1 px-3 py-2 rounded-lg bg-es-surface-2 text-es-ink text-sm outline-none">
-                    </label>
+                <div x-init="
+                    $watch('modalCodigo.lojaId', () => {});
+                    setTimeout(() => {
+                        const root = $el.closest('.es-modal-panel');
+                        const lojaInput = root.querySelector('input[name=lojaId]');
+                        const labelInput = root.querySelector('input[name=label]');
+                        const opInput = root.querySelector('input[name=defaultOperatorName]');
+                        if (lojaInput) lojaInput.addEventListener('input', e => modalCodigo.lojaId = e.target.value);
+                        if (labelInput) labelInput.addEventListener('input', e => modalCodigo.label = e.target.value);
+                        if (opInput) opInput.addEventListener('input', e => modalCodigo.defaultOperatorName = e.target.value);
+                    }, 30);
+                "></div>
 
-                    <div class="flex justify-end gap-2 pt-2">
-                        <button @@click="modalCodigo.open = false"
-                                class="px-4 py-2 rounded-lg text-sm border border-es-line text-es-ink-dim hover:bg-es-surface-2">
-                            Cancelar
-                        </button>
-                        <button @@click="gerarCodigo()" :disabled="modalCodigo.loading"
-                                class="px-4 py-2 rounded-lg text-sm font-semibold bg-es-accent text-es-ink hover:opacity-90 disabled:opacity-50">
-                            <span x-show="!modalCodigo.loading">Gerar código</span>
-                            <span x-show="modalCodigo.loading">…</span>
-                        </button>
-                    </div>
-                </div>
-            </template>
-
-            <template x-if="modalCodigo.codigo">
-                <div class="space-y-3 text-center">
-                    <div class="text-es-ink-mute text-xs uppercase tracking-widest">Código</div>
-                    <div class="text-5xl font-bold font-mono text-es-accent tracking-widest"
-                         x-text="modalCodigo.codigo"></div>
-                    <div class="text-es-ink-mute text-xs" x-text="'expira em ' + modalCodigo.expiraEm"></div>
-                    <button @@click="modalCodigo.open = false; recarregar();"
-                            class="mt-3 px-4 py-2 rounded-lg text-sm bg-es-accent text-es-ink hover:opacity-90">
-                        Pronto
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <es-button variant="ghost" x-on:click="modalCodigo.open = false; close()">Cancelar</es-button>
+                    <button type="button" class="btn btn-primary btn-md" :disabled="modalCodigo.loading" @@click="gerarCodigo()">
+                        <span x-show="!modalCodigo.loading">Gerar código</span>
+                        <span x-show="modalCodigo.loading">…</span>
                     </button>
                 </div>
-            </template>
+                <p x-show="modalCodigo.erro" x-cloak style="color:var(--crit-600); font-size:13px;" x-text="modalCodigo.erro"></p>
+            </div>
+        </template>
 
-            <p x-show="modalCodigo.erro" x-cloak class="mt-3 text-red-400 text-sm" x-text="modalCodigo.erro"></p>
-        </div>
-    </div>
+        <template x-if="modalCodigo.codigo">
+            <div style="text-align:center; display:flex; flex-direction:column; gap:12px;">
+                <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted);">Código</div>
+                <div style="font-family:var(--font-mono); font-weight:700; font-size:48px; color:var(--orange-500); letter-spacing:0.16em;" x-text="modalCodigo.codigo"></div>
+                <div style="font-size:12px; color:var(--text-muted);" x-text="'expira em ' + modalCodigo.expiraEm"></div>
+                <es-button variant="primary" icon="check" x-on:click="modalCodigo.open = false; close(); recarregar();">Pronto</es-button>
+            </div>
+        </template>
+    </es-modal>
 </div>
 
 @section Scripts {
 <script>
-// Página /Dispositivos: gestão de PWAs pareados.
-// Toda a interação com a API passa pelos proxies /api-proxy/mobile/* que já
-// injetam o Bearer token do AdminApiClient. SuperAdmin escolhe empresa via
-// query string ?empresaId=<guid> (ver Tenants/Detail no futuro pra deep-link).
 function dispositivosPage() {
     return {
         empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
@@ -211,7 +163,6 @@ function dispositivosPage() {
             this.fetchVersion();
             if (this.empresaId) {
                 await this.recarregar();
-                // Pull contínuo a cada 15s pra refletir last_seen sem F5.
                 setInterval(() => { this.recarregar(); }, 15000);
             }
         },
@@ -229,21 +180,17 @@ function dispositivosPage() {
             if (!this.empresaId) return;
             this.loading = true; this.erro = '';
             try {
-                // 1) lista de devices
                 const r1 = await fetch('/api-proxy/mobile/devices?empresaId=' + this.empresaId, { credentials: 'same-origin' });
                 if (r1.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!r1.ok) throw new Error('devices: HTTP ' + r1.status);
                 const list = await r1.json();
                 this.devices = Array.isArray(list) ? list : [];
 
-                // 2) saúde
                 const r2 = await fetch('/api-proxy/mobile/operacao/devices-health?empresaId=' + this.empresaId, { credentials: 'same-origin' });
                 if (r2.ok) {
                     const health = await r2.json();
                     this.healthByDevice = {};
-                    if (Array.isArray(health)) {
-                        health.forEach(h => { this.healthByDevice[h.id] = h; });
-                    }
+                    if (Array.isArray(health)) health.forEach(h => { this.healthByDevice[h.id] = h; });
                     this.devices.forEach(d => { d.health = this.healthByDevice[d.id]; });
                 }
             } catch (e) {
@@ -262,18 +209,10 @@ function dispositivosPage() {
 
         badgeClass(status) {
             return {
-                'bg-green-500/15 text-green-400': status === 'ok',
-                'bg-yellow-500/15 text-yellow-300': status === 'warn',
-                'bg-red-500/15 text-red-400': status === 'err',
-                'bg-es-surface-2 text-es-ink-mute': !status
-            };
-        },
-        dotClass(status) {
-            return {
-                'bg-green-400': status === 'ok',
-                'bg-yellow-400': status === 'warn',
-                'bg-red-400': status === 'err',
-                'bg-es-ink-mute': !status
+                'badge-ok': status === 'ok',
+                'badge-warn': status === 'warn',
+                'badge-crit': status === 'err',
+                'badge-neutral': !status
             };
         },
 
@@ -289,19 +228,18 @@ function dispositivosPage() {
             } catch { return iso; }
         },
 
-        // ── Comandos ──
         async cmd(id, type, payload) {
             if (!confirm('Enviar "' + type + '" pra ' + (id || '').slice(0, 12) + '...?')) return;
             try {
                 const body = { commandType: type, payloadJson: payload ? JSON.stringify(payload) : null };
                 const r = await fetch('/api-proxy/mobile/devices/' + encodeURIComponent(id) + '/commands', {
-                    method: 'POST',
-                    credentials: 'same-origin',
+                    method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
-                this.erro = ''; this.toast('Comando enfileirado.');
+                this.erro = '';
+                if (window.toast) window.toast.success('Comando enfileirado.');
             } catch (e) {
                 this.erro = 'Falha: ' + (e.message || e);
             }
@@ -321,6 +259,7 @@ function dispositivosPage() {
                 });
                 if (!r.ok && r.status !== 204) throw new Error('HTTP ' + r.status);
                 await this.recarregar();
+                if (window.toast) window.toast.warn('Device revogado.');
             } catch (e) {
                 this.erro = 'Falha: ' + (e.message || e);
             }
@@ -331,26 +270,26 @@ function dispositivosPage() {
             try {
                 const body = { empresaId: this.empresaId, lojaId: this.lojaId || null, commandType: 'pwa_update' };
                 const r = await fetch('/api-proxy/mobile/devices/broadcast', {
-                    method: 'POST',
-                    credentials: 'same-origin',
+                    method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                this.toast('Atualização enfileirada pra ' + (data.enqueued || 0) + ' device(s).');
+                if (window.toast) window.toast.success('Atualização enfileirada pra ' + (data.enqueued || 0) + ' device(s).');
             } catch (e) {
                 this.erro = 'Falha: ' + (e.message || e);
             }
         },
 
-        // ── Modal pair-code ──
         abrirNovoCodigo() {
             this.modalCodigo = {
                 open: true, loading: false, codigo: '', expiraEm: '', erro: '',
                 lojaId: this.lojaId || '', label: '', defaultOperatorName: ''
             };
+            window.dispatchEvent(new CustomEvent('open-modal-dispositivos-pair'));
         },
+
         async gerarCodigo() {
             this.modalCodigo.loading = true; this.modalCodigo.erro = '';
             try {
@@ -361,8 +300,7 @@ function dispositivosPage() {
                     defaultOperatorName: this.modalCodigo.defaultOperatorName || null
                 };
                 const r = await fetch('/api-proxy/mobile/devices/pair-codes', {
-                    method: 'POST',
-                    credentials: 'same-origin',
+                    method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
@@ -382,11 +320,6 @@ function dispositivosPage() {
             } finally {
                 this.modalCodigo.loading = false;
             }
-        },
-
-        toast(msg) {
-            // Fallback simples — _Layout já tem toast estrutural via TempData.
-            try { console.log('[toast]', msg); } catch {}
         }
     };
 }
