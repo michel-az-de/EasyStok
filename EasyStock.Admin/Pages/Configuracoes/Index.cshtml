@@ -2,8 +2,6 @@
 @model EasyStock.Admin.Pages.Configuracoes.IndexModel
 @{
     ViewData["Title"] = "Configurações do Sistema";
-    var sucesso = TempData["Sucesso"] as string;
-    var erro = TempData["Erro"] as string;
     var manutencaoAtiva = Model.Get("manutencao_ativa") == "true";
     var avisoGlobal = Model.Get("aviso_global");
     var avisoCor = Model.Get("aviso_cor", "gold");
@@ -12,149 +10,112 @@
     var versaoPwa = Model.Get("versao_minima_pwa", "1.0.0");
 }
 
-@if (!string.IsNullOrEmpty(sucesso))
-{
-    <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">@sucesso</div>
-}
-@if (!string.IsNullOrEmpty(erro))
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erro</div>
-}
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
-}
-
-<div class="grid grid-cols-1 gap-6 max-w-3xl">
-
-    <!-- Disponibilidade -->
-    <div class="card p-6" x-data="{ manutencaoAtiva: @(manutencaoAtiva.ToString().ToLower()), pendingManutencao: false }">
-        <h2 class="text-base font-semibold text-es-ink mb-4 flex items-center gap-2">
-            <span>🚦</span> Disponibilidade
-        </h2>
-        <form method="post" asp-page-handler="Disponibilidade" class="space-y-5" x-ref="formDisp">
-            @Html.AntiForgeryToken()
-
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-sm font-medium text-es-ink">Modo Manutenção</div>
-                    <div class="text-xs text-es-ink-mute">Bloqueia login de todos os tenants</div>
-                </div>
-                @* Pattern checkbox+hidden: o hidden value="false" só é enviado quando o checkbox NÃO está marcado.
-                   Ao ativar, exibe modal de confirmação antes de submeter. *@
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" name="manutencao_ativa" value="true"
-                           :checked="manutencaoAtiva"
-                           class="sr-only peer"
-                           @@change="
-                               if ($event.target.checked) {
-                                   $event.target.checked = false;
-                                   pendingManutencao = true;
-                               } else {
-                                   var h = $el.form.querySelector('input[type=hidden][name=manutencao_ativa]');
-                                   if (h) h.disabled = false;
-                                   manutencaoAtiva = false;
-                               }
-                           " />
-                    <input type="hidden" name="manutencao_ativa" value="false" :disabled="manutencaoAtiva" />
-                    <div class="w-11 h-6 bg-es-surface-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-red-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                </label>
-            </div>
-
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Aviso Global <span class="text-es-ink-mute">(vazio = oculto)</span></label>
-                <textarea name="aviso_global" rows="2" class="form-input w-full resize-none" placeholder="Texto do banner exibido no app...">@avisoGlobal</textarea>
-            </div>
-
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Cor do Aviso</label>
-                <div class="flex gap-3">
-                    @foreach (var (cor, label, hex) in new[] { ("gold", "Dourado", "#f0b84a"), ("red", "Vermelho", "#ef4444"), ("basil", "Verde", "#4fbf9f") })
-                    {
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="aviso_cor" value="@cor" @(avisoCor == cor ? "checked" : "") class="hidden peer" />
-                            <span class="w-5 h-5 rounded-full border-2 border-es-surface-2 peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-offset-es-card transition-all"
-                                  style="background:@hex; ring-color:@hex"></span>
-                            <span class="text-sm text-es-ink-dim">@label</span>
-                        </label>
-                    }
-                </div>
-            </div>
-
-            @if (!string.IsNullOrEmpty(avisoGlobal))
-            {
-                <div class="rounded-lg px-4 py-2 text-sm font-medium"
-                     style="background:@(avisoCor == "red" ? "rgba(239,68,68,0.15)" : avisoCor == "basil" ? "rgba(79,191,159,0.15)" : "rgba(240,184,74,0.15)");
-                            color:@(avisoCor == "red" ? "#ef4444" : avisoCor == "basil" ? "#4fbf9f" : "#f0b84a");
-                            border:1px solid @(avisoCor == "red" ? "rgba(239,68,68,0.3)" : avisoCor == "basil" ? "rgba(79,191,159,0.3)" : "rgba(240,184,74,0.3)")">
-                    Preview: @avisoGlobal
-                </div>
-            }
-
-            <button type="submit" class="btn-primary">Salvar Disponibilidade</button>
-        </form>
-
-        <!-- Modal confirmação Modo Manutenção -->
-        <div x-show="pendingManutencao" x-cloak class="modal-overlay" @@click.self="pendingManutencao = false">
-            <div class="modal-box max-w-md" @@click.stop>
-                <h3 class="text-es-ink font-semibold mb-3">⚠️ Ativar Modo Manutenção?</h3>
-                <p class="text-es-ink-dim text-sm mb-5">
-                    O login de <strong>todos os tenants ativos</strong> será bloqueado enquanto o modo estiver ativo.
-                    Use apenas para manutenções planejadas.
-                </p>
-                <div class="flex gap-3 justify-end">
-                    <button type="button" @@click="pendingManutencao = false" class="btn-secondary">Cancelar</button>
-                    <button type="button" class="btn-danger"
-                            @@click="
-                                var cb = $refs.formDisp.querySelector('input[type=checkbox][name=manutencao_ativa]');
-                                var h  = $refs.formDisp.querySelector('input[type=hidden][name=manutencao_ativa]');
-                                if (cb) cb.checked = true;
-                                if (h)  h.disabled  = true;
-                                manutencaoAtiva = true;
-                                pendingManutencao = false;
-                                $refs.formDisp.submit();
-                            ">
-                        Confirmar Manutenção
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Onboarding -->
-    <div class="card p-6">
-        <h2 class="text-base font-semibold text-es-ink mb-4 flex items-center gap-2">
-            <span>🚀</span> Onboarding
-        </h2>
-        <form method="post" asp-page-handler="Onboarding" class="space-y-4">
-            @Html.AntiForgeryToken()
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Dias de Trial Padrão</label>
-                <input type="number" name="dias_trial_padrao" min="1" max="365" value="@diasTrial" class="form-input w-40" />
-                <div class="text-xs text-es-ink-mute mt-1">Dias concedidos ao criar nova assinatura trial</div>
-            </div>
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">E-mail de Suporte</label>
-                <input type="email" name="email_suporte" value="@emailSuporte" class="form-input w-full max-w-sm" />
-            </div>
-            <button type="submit" class="btn-primary">Salvar Onboarding</button>
-        </form>
-    </div>
-
-    <!-- PWA -->
-    <div class="card p-6">
-        <h2 class="text-base font-semibold text-es-ink mb-4 flex items-center gap-2">
-            <span>📱</span> PWA Mobile
-        </h2>
-        <form method="post" asp-page-handler="Pwa" class="space-y-4">
-            @Html.AntiForgeryToken()
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Versão Mínima do PWA</label>
-                <input type="text" name="versao_minima_pwa" value="@versaoPwa" class="form-input w-40" placeholder="1.0.0" />
-                <div class="text-xs text-es-ink-mute mt-1">PWA com versão inferior será forçado a atualizar</div>
-            </div>
-            <button type="submit" class="btn-primary">Salvar PWA</button>
-        </form>
-    </div>
-
+<div style="margin-bottom:20px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item>Configurações</es-breadcrumb-item>
+    </es-breadcrumb>
+    <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Configurações do sistema</h2>
+    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Disponibilidade, onboarding e parâmetros globais do produto</p>
 </div>
+
+<es-tabs default-tab="disponibilidade">
+
+    <es-tab key="disponibilidade" label="Disponibilidade" icon="alert-triangle">
+        <es-card title="Disponibilidade" description="Modo manutenção e banner de aviso global">
+            <form method="post" asp-page-handler="Disponibilidade" style="display:flex; flex-direction:column; gap:18px;">
+                @Html.AntiForgeryToken()
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px; background:var(--surface-sunken); border-radius:var(--r-md);">
+                    <div>
+                        <div style="font-weight:600; color:var(--text-primary);">Modo manutenção</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Bloqueia login de todos os tenants</div>
+                    </div>
+                    <label class="es-switch" style="margin:0;">
+                        @* Pattern checkbox+hidden — preserva semântica de POST com false explícito quando off. *@
+                        <input type="checkbox" name="manutencao_ativa" value="true" @(manutencaoAtiva ? "checked" : "")
+                               role="switch"
+                               onchange="var h=this.form.querySelector('input[type=hidden][name=manutencao_ativa]'); if(h){ h.disabled = this.checked; }" />
+                        <input type="hidden" name="manutencao_ativa" value="false" @(manutencaoAtiva ? "disabled" : "") />
+                    </label>
+                </div>
+
+                <es-textarea name="aviso_global" label="Aviso global" label-optional="true" rows="2"
+                             placeholder="Texto do banner exibido no app..."
+                             helper="Vazio = banner oculto.">@avisoGlobal</es-textarea>
+
+                <div>
+                    <label class="es-form-label">Cor do aviso</label>
+                    <div style="display:flex; gap:14px; padding-top:6px; flex-wrap:wrap;">
+                        @foreach (var (cor, label, hex) in new[] { ("gold", "Dourado", "#f0b84a"), ("red", "Vermelho", "#ef4444"), ("basil", "Verde", "#4fbf9f") })
+                        {
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="radio" name="aviso_cor" value="@cor" @(avisoCor == cor ? "checked" : "")
+                                       style="appearance:auto; accent-color:@hex; cursor:pointer;" />
+                                <span style="display:inline-block; width:16px; height:16px; border-radius:999px; background:@hex;"></span>
+                                <span style="font-size:13px; color:var(--text-secondary);">@label</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(avisoGlobal))
+                {
+                    <div style="border-radius:var(--r-md); padding:10px 14px; font-size:13px; font-weight:500;
+                                background:@(avisoCor == "red" ? "rgba(239,68,68,.15)" : avisoCor == "basil" ? "rgba(79,191,159,.15)" : "rgba(240,184,74,.15)");
+                                color:@(avisoCor == "red" ? "#ef4444" : avisoCor == "basil" ? "#4fbf9f" : "#f0b84a");
+                                border:1px solid @(avisoCor == "red" ? "rgba(239,68,68,.3)" : avisoCor == "basil" ? "rgba(79,191,159,.3)" : "rgba(240,184,74,.3)");">
+                        Preview: @avisoGlobal
+                    </div>
+                }
+
+                <div style="display:flex; justify-content:flex-end;">
+                    <es-button type="submit" variant="primary" icon="check">Salvar disponibilidade</es-button>
+                </div>
+            </form>
+        </es-card>
+    </es-tab>
+
+    <es-tab key="onboarding" label="Onboarding" icon="user">
+        <es-card title="Onboarding" description="Trial padrão e contato de suporte">
+            <form method="post" asp-page-handler="Onboarding" style="display:flex; flex-direction:column; gap:14px;">
+                @Html.AntiForgeryToken()
+                <es-input name="dias_trial_padrao" type="number" min="1" max="365" value="@diasTrial"
+                          label="Dias de trial padrão"
+                          helper="Dias concedidos ao criar nova assinatura trial." />
+                <es-input name="email_suporte" type="email" value="@emailSuporte"
+                          label="E-mail de suporte" />
+                <div style="display:flex; justify-content:flex-end;">
+                    <es-button type="submit" variant="primary" icon="check">Salvar onboarding</es-button>
+                </div>
+            </form>
+        </es-card>
+    </es-tab>
+
+    <es-tab key="pwa" label="PWA Mobile" icon="smartphone">
+        <es-card title="PWA Mobile" description="Versão mínima exigida do PWA">
+            <form method="post" asp-page-handler="Pwa" style="display:flex; flex-direction:column; gap:14px;">
+                @Html.AntiForgeryToken()
+                <es-input name="versao_minima_pwa" value="@versaoPwa" label="Versão mínima"
+                          placeholder="1.0.0"
+                          helper="PWA com versão inferior será forçado a atualizar."
+                          field-class="" />
+                <div style="display:flex; justify-content:flex-end;">
+                    <es-button type="submit" variant="primary" icon="check">Salvar PWA</es-button>
+                </div>
+            </form>
+        </es-card>
+    </es-tab>
+
+    <es-tab key="links" label="Links rápidos" icon="external-link">
+        <es-card title="Outras configurações">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px;">
+                <es-button variant="secondary" href="/Configuracoes/SlaMatriz" icon="shield" block="true">Matriz SLA</es-button>
+                <es-button variant="secondary" href="/Notificacoes/Canais" icon="bell" block="true">Canais de notificação</es-button>
+                <es-button variant="secondary" href="/Diagnostico" icon="stethoscope" block="true">Diagnóstico do sistema</es-button>
+                <es-button variant="secondary" href="/AuditLogs" icon="search" block="true">Audit logs</es-button>
+            </div>
+        </es-card>
+    </es-tab>
+
+</es-tabs>

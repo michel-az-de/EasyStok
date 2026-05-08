@@ -1,0 +1,146 @@
+@*
+    Toast region (Alpine store global).
+    Inclua UMA vez no _Layout, idealmente perto do </body>.
+    API:
+        window.toast.success({ title, desc?, action?: { label, onClick } });
+        window.toast.error('Mensagem simples');
+        window.toast.warn({ title: 'Atenção', desc: '...' });
+        window.toast.info('Info');
+
+    Compat: lê TempData["Sucesso"] / TempData["Erro"] e auto-empurra
+    no Alpine.start, preservando o comportamento atual.
+*@
+@{
+    var tempSucesso = TempData["Sucesso"] as string;
+    var tempErro = TempData["Erro"] as string;
+}
+
+<div id="toast-region"
+     class="toast-region"
+     role="region"
+     aria-label="Notificações"
+     aria-live="polite"
+     x-data
+     x-cloak>
+    <template x-for="t in $store.toasts.list" :key="t.id">
+        <div :class="['toast', 'toast-' + t.kind, t.entered ? 'is-entered' : '', t.leaving ? 'is-leaving' : '']"
+             :role="t.kind === 'error' ? 'alert' : 'status'"
+             x-init="$nextTick(() => t.entered = true)">
+            <span class="toast-icon" aria-hidden="true">
+                <template x-if="t.kind === 'success'">
+                    <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-check-circle"/></svg>
+                </template>
+                <template x-if="t.kind === 'error'">
+                    <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-x-circle"/></svg>
+                </template>
+                <template x-if="t.kind === 'warn'">
+                    <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-alert-triangle"/></svg>
+                </template>
+                <template x-if="t.kind === 'info'">
+                    <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-info"/></svg>
+                </template>
+            </span>
+            <div class="toast-body">
+                <div class="toast-title" x-text="t.title"></div>
+                <div class="toast-desc" x-show="t.desc" x-text="t.desc"></div>
+            </div>
+            <div style="display:flex; gap:4px; align-items:flex-start;">
+                <button type="button"
+                        x-show="t.action"
+                        @@click="t.action && t.action.onClick && t.action.onClick(); $store.toasts.dismiss(t.id)"
+                        class="toast-action"
+                        x-text="t.action ? t.action.label : ''"></button>
+                <button type="button"
+                        class="toast-close"
+                        aria-label="Fechar notificação"
+                        @@click="$store.toasts.dismiss(t.id)">
+                    <svg class="es-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-x"/></svg>
+                </button>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+    (function () {
+        const MAX_QUEUE = 5;
+        const DEFAULT_DURATION = 4000;
+
+        function initStore() {
+            if (!window.Alpine) return;
+            window.Alpine.store('toasts', {
+                _seq: 0,
+                list: [],
+                push(input) {
+                    const t = (typeof input === 'string') ? { title: input } : (input || {});
+                    const kind = t.kind || 'info';
+                    const id = ++this._seq;
+                    const duration = (t.duration === 0) ? 0 : (t.duration || DEFAULT_DURATION);
+                    const entry = {
+                        id,
+                        kind,
+                        title: t.title || '',
+                        desc: t.desc || '',
+                        action: t.action || null,
+                        entered: false,
+                        leaving: false
+                    };
+                    this.list.push(entry);
+                    // Cap da fila — descarta os mais antigos.
+                    while (this.list.length > MAX_QUEUE) {
+                        const dropped = this.list.shift();
+                        if (dropped && dropped._timer) clearTimeout(dropped._timer);
+                    }
+                    if (duration > 0) {
+                        entry._timer = setTimeout(() => this.dismiss(id), duration);
+                    }
+                    return id;
+                },
+                dismiss(id) {
+                    const idx = this.list.findIndex(t => t.id === id);
+                    if (idx === -1) return;
+                    const entry = this.list[idx];
+                    if (entry._timer) clearTimeout(entry._timer);
+                    entry.leaving = true;
+                    setTimeout(() => {
+                        const i = this.list.findIndex(t => t.id === id);
+                        if (i !== -1) this.list.splice(i, 1);
+                    }, 220);
+                },
+                clear() {
+                    this.list.forEach(t => { if (t._timer) clearTimeout(t._timer); });
+                    this.list = [];
+                }
+            });
+
+            // API global de conveniência.
+            window.toast = {
+                success: (input) => window.Alpine.store('toasts').push(_kind(input, 'success')),
+                error:   (input) => window.Alpine.store('toasts').push(_kind(input, 'error')),
+                warn:    (input) => window.Alpine.store('toasts').push(_kind(input, 'warn')),
+                info:    (input) => window.Alpine.store('toasts').push(_kind(input, 'info')),
+                dismiss: (id) => window.Alpine.store('toasts').dismiss(id),
+                clear:   () => window.Alpine.store('toasts').clear()
+            };
+
+            function _kind(input, kind) {
+                if (typeof input === 'string') return { title: input, kind };
+                return Object.assign({}, input, { kind });
+            }
+        }
+
+        document.addEventListener('alpine:init', initStore);
+
+        // Compat: TempData (retorna do servidor) → empurra ao montar.
+        document.addEventListener('alpine:initialized', function () {
+@if (!string.IsNullOrEmpty(tempSucesso))
+{
+            <text>window.toast.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(tempSucesso)));</text>
+}
+@if (!string.IsNullOrEmpty(tempErro))
+{
+            <text>window.toast.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(tempErro)));</text>
+}
+        });
+    })();
+</script>

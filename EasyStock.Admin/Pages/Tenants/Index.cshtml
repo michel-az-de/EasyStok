@@ -2,319 +2,193 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @model EasyStock.Admin.Pages.Tenants.IndexModel
 @{
-    ViewData["Title"] = "Tenants";
-    var afCriar = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
-    var sucesso = TempData["Sucesso"] as string;
-    var erro = TempData["Erro"] as string;
+    ViewData["Title"] = "Clientes";
+    var orderBy = Request.Query["orderBy"].FirstOrDefault();
+    var dir = Request.Query["dir"].FirstOrDefault();
 }
 
-<div x-data="tenantsPage()" @@keydown.window="onKey($event)" class="contents">
-
-@* Banner verde (sucesso) — toast inline padrão Admins *@
-@if (!string.IsNullOrEmpty(sucesso))
-{
-    <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">@sucesso</div>
-}
-@if (!string.IsNullOrEmpty(erro))
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erro</div>
-}
-
-@* Banner dourado — senha temporária do tenant recém-criado. Aparece só uma vez. *@
 @if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
 {
-    <div class="bg-es-gold/10 border border-es-gold/30 text-es-gold rounded-lg px-4 py-3 text-sm mb-4">
-        <div class="font-semibold mb-1">
+    <div style="background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.30); color:var(--warn-700); border-radius:var(--r-md); padding:12px 16px; font-size:13px; margin-bottom:16px;">
+        <div style="font-weight:600; margin-bottom:4px;">
             Senha temporária do admin de <strong>@Model.NovoTenantNome</strong> — anote agora, não será reexibida:
         </div>
-        <code class="font-mono text-base select-all">@Model.NovaSenhaTemporaria</code>
-        <div class="text-xs text-es-ink-mute mt-2">
-            Enviada também por e-mail para <span class="font-mono">@Model.NovoTenantAdminEmail</span> (se o serviço de e-mail estiver disponível).
+        <code style="font-family:var(--font-mono); font-size:14px; user-select:all;">@Model.NovaSenhaTemporaria</code>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">
+            Enviada também por e-mail para <span style="font-family:var(--font-mono);">@Model.NovoTenantAdminEmail</span> (se o serviço de e-mail estiver disponível).
         </div>
     </div>
 }
 
-<!-- Filtros + ação principal -->
-<div class="flex items-center gap-3 mb-6 flex-wrap">
-    <form method="get" class="flex items-center gap-3 flex-1 flex-wrap">
-        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome ou CNPJ…  ( / )"
-               x-ref="busca" class="form-input max-w-xs"
-               @@input="clearTimeout($data._debounce); $data._debounce = setTimeout(() => $el.form.submit(), 300)" />
-        <select name="status" class="form-input max-w-[180px]">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Clientes</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
+            <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
+        </div>
+    </div>
+</div>
+
+<es-card padding="md" card-class="mb-4" >
+    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">
+        <es-input name="search" label="Buscar" value="@Model.Search"
+                  placeholder="Nome ou CNPJ..." prefix-icon="search"
+                  field-class="md:col-span-2" />
+        <es-select name="status" label="Status">
             <option value="">Todos os status</option>
             <option value="Ativa" selected="@(Model.Status == "Ativa")">Ativa</option>
             <option value="Suspensa" selected="@(Model.Status == "Suspensa")">Suspensa</option>
             <option value="Cancelada" selected="@(Model.Status == "Cancelada")">Cancelada</option>
-        </select>
-        <button type="submit" class="btn-primary">Filtrar</button>
-        @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
-        {
-            <a href="/Tenants" class="btn-secondary">Limpar</a>
-        }
-    </form>
-    <div class="flex items-center gap-3">
-        <div class="text-es-ink-mute text-sm">@(Model.Total == 1 ? "1 resultado" : $"{Model.Total} resultados")</div>
-        <button type="button" @@click="modalCadastro = true"
-                title="Atalho: N"
-                class="btn-primary">+ Cadastrar cliente</button>
-    </div>
-</div>
-
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
-}
-
-<div class="card p-0 overflow-hidden" x-data="{ confirmId: null, confirmAcao: null }">
-    <div class="overflow-x-auto">
-        <table class="table-admin">
-            <thead>
-                <tr>
-                    <th class="min-w-[160px]">Nome</th>
-                    <th>Documento</th>
-                    <th class="whitespace-nowrap">Plano</th>
-                    <th>Status</th>
-                    <th>Usuários</th>
-                    <th>Lojas</th>
-                    <th>Criado em</th>
-                    <th class="text-right">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var t in Model.Tenants)
-                {
-                    var id = t.TryGetProperty("id", out var idP) ? idP.GetString() : "";
-                    var nome = t.TryGetProperty("nome", out var nP) ? nP.GetString() : "";
-                    var doc = t.TryGetProperty("documento", out var dP) ? dP.GetString() : "—";
-                    var plano = t.TryGetProperty("planoNome", out var plP) ? plP.GetString() : "—";
-                    var status = t.TryGetProperty("statusAssinatura", out var sP) ? sP.GetString() : "—";
-                    var usuarios = t.TryGetProperty("totalUsuarios", out var uP) ? uP.GetInt32() : 0;
-                    var lojas = t.TryGetProperty("totalLojas", out var lP) ? lP.GetInt32() : 0;
-                    var criado = t.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : "";
-                    DateTime.TryParse(criado, out var criadoDt);
-                    var statusClass = status?.ToLower() switch {
-                        "ativa" => "badge-ativa",
-                        "suspensa" => "badge-suspensa",
-                        "cancelada" => "badge-cancelada",
-                        _ => "badge-expirada"
-                    };
-                    <tr>
-                        <td class="font-medium text-es-ink whitespace-nowrap">@nome</td>
-                        <td class="text-es-ink-dim">@(doc ?? "—")</td>
-                        <td class="text-es-ink-dim whitespace-nowrap overflow-hidden text-ellipsis max-w-[160px]" title="@(plano ?? "—")">@(plano ?? "—")</td>
-                        <td><span class="status-badge @statusClass">@(status ?? "—")</span></td>
-                        <td class="text-es-ink-dim text-center">@usuarios</td>
-                        <td class="text-es-ink-dim text-center">@lojas</td>
-                        <td class="text-es-ink-dim">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
-                        <td class="text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                <a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream text-xs font-medium">Ver</a>
-                                @if (status == "Ativa")
-                                {
-                                    <span class="text-es-ink-mute/30 select-none">|</span>
-                                    <button type="button"
-                                            @@click="confirmId = '@id'; confirmAcao = 'suspender'"
-                                            class="text-es-gold hover:text-es-cream text-xs font-medium">
-                                        Suspender
-                                    </button>
-                                }
-                                else if (status == "Suspensa")
-                                {
-                                    <span class="text-es-ink-mute/30 select-none">|</span>
-                                    <button type="button"
-                                            @@click="confirmId = '@id'; confirmAcao = 'reativar'"
-                                            class="text-es-basil hover:text-es-cream text-xs font-medium">
-                                        Reativar
-                                    </button>
-                                }
-                                <span class="text-es-ink-mute/30 select-none">|</span>
-                                <form method="post" asp-page-handler="Impersonar">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@id" />
-                                    <button type="submit" class="text-es-ink-mute hover:text-es-ink text-xs font-medium">
-                                        Impersonar
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                }
-                @if (!Model.Tenants.Any())
-                {
-                    <tr>
-                        <td colspan="8" class="text-center text-es-ink-mute py-10">
-                            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
-                            {
-                                <div>Nenhum cliente encontrado para esse filtro. <a href="/Tenants" class="text-es-accent hover:underline">Limpar filtros</a></div>
-                            }
-                            else
-                            {
-                                <div class="space-y-2">
-                                    <div class="text-3xl">🏢</div>
-                                    <div class="font-semibold text-es-ink">Nenhum cliente cadastrado ainda.</div>
-                                    <div class="text-xs">
-                                        Use a página de <a href="/Diagnostico" class="text-es-accent hover:underline">Diagnóstico</a>
-                                        pra rodar o <strong>seed de demonstração</strong> com tenants/lojas/usuários de teste.
-                                    </div>
-                                </div>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Modal de confirmação -->
-    <div x-show="confirmId !== null" x-cloak class="modal-overlay"
-         @@click.self="confirmId = null"
-         @@keydown.escape.window="if (confirmId !== null) confirmId = null">
-        <div class="modal-box" @@click.stop>
-            <h3 class="text-es-ink font-semibold mb-4" x-text="confirmAcao === 'suspender' ? 'Suspender tenant?' : 'Reativar tenant?'"></h3>
-            <p class="text-es-ink-dim text-sm mb-4" x-show="confirmAcao === 'suspender'">
-                O acesso da empresa será bloqueado. Você pode reativar depois.
-            </p>
-            <form method="post" x-bind:action="confirmAcao === 'suspender' ? '?handler=Suspender' : '?handler=Reativar'">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" x-bind:value="confirmId" />
-                <div x-show="confirmAcao === 'suspender'" class="mb-4">
-                    <label class="form-label">Motivo</label>
-                    <input type="text" name="motivo" class="form-input" placeholder="Informe o motivo..." />
-                </div>
-                <div class="flex gap-3 justify-end">
-                    <button type="button" @@click="confirmId = null" class="btn-secondary">Cancelar</button>
-                    <button type="submit"
-                            x-bind:class="confirmAcao === 'suspender' ? 'btn-warning' : 'btn-primary'">
-                        <span x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Paginação -->
-@if (Model.TotalPages > 1)
-{
-    <div class="flex items-center justify-center gap-2 mt-6">
-        @if (Model.Page > 1)
-        {
-            <a href="?page=@(Model.Page - 1)&search=@Model.Search&status=@Model.Status"
-               class="btn-secondary text-sm">← Anterior</a>
-        }
-        <span class="text-es-ink-mute text-sm">@Model.Page / @Model.TotalPages</span>
-        @if (Model.Page < Model.TotalPages)
-        {
-            <a href="?page=@(Model.Page + 1)&search=@Model.Search&status=@Model.Status"
-               class="btn-secondary text-sm">Próximo →</a>
-        }
-    </div>
-}
-
-<!-- Modal Cadastrar Cliente -->
-<div x-show="modalCadastro" x-cloak class="modal-overlay"
-     @@click.self="modalCadastro = false" @@keydown.escape.window="modalCadastro = false"
-     role="dialog" aria-modal="true" aria-labelledby="modal-cadastro-title">
-    <div class="modal-box max-w-lg" @@click.stop>
-        <div class="flex items-start justify-between gap-3 mb-1">
-            <div>
-                <h2 id="modal-cadastro-title" class="text-es-ink font-semibold">Cadastrar cliente</h2>
-                <p class="text-es-ink-dim text-xs mt-1">
-                    Cria a empresa, o usuário admin inicial e ativa o trial de 14 dias.
-                </p>
-            </div>
-            <button type="button" @@click="modalCadastro = false" aria-label="Fechar"
-                    class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
-        </div>
-
-        <form method="post" asp-page-handler="Criar" @@submit="submittingCadastro = true" class="mt-4 space-y-3">
-            <input type="hidden" name="__RequestVerificationToken" value="@afCriar" />
-
-            <div>
-                <label class="form-label">Razão social ou nome</label>
-                <input type="text" name="nomeEmpresa" required minlength="2" maxlength="200"
-                       x-ref="nomeEmpresa"
-                       placeholder="Mercearia da Esquina LTDA"
-                       class="form-input w-full" />
-            </div>
-
-            <div>
-                <label class="form-label">CNPJ ou CPF <span class="text-es-ink-mute">(opcional)</span></label>
-                <input type="text" name="documento" data-mask="doc" maxlength="18"
-                       placeholder="00.000.000/0000-00 ou 000.000.000-00"
-                       class="form-input w-full font-mono" />
-                <p class="text-xs text-es-ink-mute mt-1">
-                    Deixe em branco se ainda não tiver — pode preencher depois.
-                </p>
-            </div>
-
-            <div class="border-t border-es-ink/10 pt-3">
-                <p class="text-es-ink-dim text-xs mb-2">Usuário admin inicial:</p>
-                <div class="space-y-3">
-                    <div>
-                        <label class="form-label">Nome do responsável</label>
-                        <input type="text" name="nomeAdmin" required minlength="2" maxlength="120"
-                               placeholder="Maria Silva" class="form-input w-full" />
-                    </div>
-                    <div>
-                        <label class="form-label">E-mail do responsável</label>
-                        <input type="email" name="emailAdmin" required maxlength="160"
-                               placeholder="maria@mercearia.com.br" class="form-input w-full font-mono" />
-                        <p class="text-xs text-es-ink-mute mt-1">Vai receber a senha temporária por aqui.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="border-t border-es-ink/10 pt-3">
-                <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
-                <textarea name="motivo" x-model="motivoCadastro" rows="2" minlength="10" maxlength="1000" required
-                          placeholder="Ex.: cliente abriu chamado #1234 sem conseguir se cadastrar pelo site"
-                          class="form-input w-full font-mono text-sm"></textarea>
-                <p class="text-xs mt-1" :class="motivoCadastro.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
-                    <span x-text="motivoCadastro.trim().length"></span> / 10 mínimo
-                </p>
-            </div>
-
-            <label class="flex items-center gap-2 text-xs text-es-ink-dim">
-                <input type="checkbox" name="enviarEmail" value="true" checked class="form-checkbox" />
-                Enviar a senha temporária por e-mail também
-            </label>
-
-            <div class="flex gap-3 justify-end pt-2">
-                <button type="button" @@click="modalCadastro = false" :disabled="submittingCadastro"
-                        class="btn-secondary">Cancelar</button>
-                <button type="submit" :disabled="motivoCadastro.trim().length < 10 || submittingCadastro"
-                        class="btn-primary">
-                    <span x-show="!submittingCadastro">Cadastrar cliente</span>
-                    <span x-show="submittingCadastro" x-cloak>Cadastrando…</span>
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-</div><!-- /x-data tenantsPage -->
-
-<script>
-function tenantsPage() {
-    return {
-        modalCadastro: false,
-        submittingCadastro: false,
-        motivoCadastro: '',
-        onKey(e) {
-            // Ignora atalhos quando o usuário está digitando em input/textarea/select.
-            const tag = (e.target?.tagName || '').toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-            if (e.key === '/') {
-                e.preventDefault();
-                this.$refs.busca?.focus();
-            } else if (e.key === 'n' || e.key === 'N') {
-                e.preventDefault();
-                this.modalCadastro = true;
-                // Foca no primeiro campo após o modal montar.
-                setTimeout(() => this.$refs.nomeEmpresa?.focus(), 50);
+        </es-select>
+        <div style="display:flex; gap:8px;">
+            <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
+            {
+                <es-button variant="ghost" href="/Tenants">Limpar</es-button>
             }
+        </div>
+    </form>
+</es-card>
+
+<es-filter-bar>
+    @if (!string.IsNullOrEmpty(Model.Status))
+    {
+        <es-filter-chip label="Status" remove-param="status">@Model.Status</es-filter-chip>
+    }
+    @if (!string.IsNullOrEmpty(Model.Search))
+    {
+        <es-filter-chip label="Busca" remove-param="search">@Model.Search</es-filter-chip>
+    }
+</es-filter-bar>
+
+<div x-data="{ confirmId: null, confirmAcao: null, confirmNome: '' }">
+    <es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Tenants.Any())">
+        <es-data-table-column key="nome" label="Nome" sortable="true" />
+        <es-data-table-column key="documento" label="Documento" />
+        <es-data-table-column key="planoNome" label="Plano" />
+        <es-data-table-column label="Status" />
+        <es-data-table-column label="Usuários" align="right" />
+        <es-data-table-column label="Lojas" align="right" />
+        <es-data-table-column key="criadoEm" label="Criado em" align="right" sortable="true" />
+        <es-data-table-column label="" actions="true" width="240px" />
+
+        @foreach (var t in Model.Tenants)
+        {
+            var id = t.TryGetProperty("id", out var idP) ? idP.GetString() : "";
+            var nome = t.TryGetProperty("nome", out var nP) ? nP.GetString() : "";
+            var doc = t.TryGetProperty("documento", out var dP) ? dP.GetString() : "—";
+            var plano = t.TryGetProperty("planoNome", out var plP) ? plP.GetString() : "—";
+            var status = t.TryGetProperty("statusAssinatura", out var sP) ? sP.GetString() : "—";
+            var usuarios = t.TryGetProperty("totalUsuarios", out var uP) ? uP.GetInt32() : 0;
+            var lojas = t.TryGetProperty("totalLojas", out var lP) ? lP.GetInt32() : 0;
+            var criado = t.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : "";
+            DateTime.TryParse(criado, out var criadoDt);
+            var statusVariant = status?.ToLower() switch {
+                "ativa" => "ok",
+                "suspensa" => "warn",
+                "cancelada" => "crit",
+                _ => "neutral"
+            };
+            var initial = !string.IsNullOrEmpty(nome) ? nome.Substring(0, 1).ToUpper() : "?";
+
+            <tr>
+                <td data-label="Nome">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span class="es-avatar es-avatar-sm" aria-hidden="true">@initial</span>
+                        <a href="/Tenants/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@nome</a>
+                    </div>
+                </td>
+                <td data-label="Documento" style="color:var(--text-muted); font-family:var(--font-mono); font-size:12px;">@(doc ?? "—")</td>
+                <td data-label="Plano" style="color:var(--text-secondary); font-size:13px;">@(plano ?? "—")</td>
+                <td data-label="Status">
+                    <es-badge variant="@statusVariant" with-dot="true">@(status ?? "—")</es-badge>
+                </td>
+                <td data-label="Usuários" class="es-data-table-td-numeric" style="font-weight:500;">@usuarios</td>
+                <td data-label="Lojas" class="es-data-table-td-numeric" style="font-weight:500;">@lojas</td>
+                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+                <td class="es-data-table-td-actions">
+                    <div class="es-row-actions">
+                        <es-button variant="ghost" size="xs" href="/Tenants/Detail/@id" icon="eye">Ver</es-button>
+                        @if (status == "Ativa")
+                        {
+                            <es-button variant="ghost" size="xs" icon="alert-triangle"
+                                       x-on:click="confirmId = '@id'; confirmAcao = 'suspender'; confirmNome = '@System.Text.Json.JsonEncodedText.Encode(nome ?? "")'; $dispatch('open-modal-tenant-confirm')">
+                                Suspender
+                            </es-button>
+                        }
+                        else if (status == "Suspensa")
+                        {
+                            <es-button variant="ghost" size="xs" icon="check"
+                                       x-on:click="confirmId = '@id'; confirmAcao = 'reativar'; confirmNome = '@System.Text.Json.JsonEncodedText.Encode(nome ?? "")'; $dispatch('open-modal-tenant-confirm')">
+                                Reativar
+                            </es-button>
+                        }
+                        <form method="post" asp-page-handler="Impersonar" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@id" />
+                            <es-button type="submit" variant="ghost" size="xs" icon="external-link" icon-only="true" aria-label="Impersonar @nome" />
+                        </form>
+                    </div>
+                </td>
+            </tr>
         }
-    };
-}
-</script>
+
+        <es-data-table-empty>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
+            {
+                <es-empty-state icon="search"
+                                title="Nenhum cliente encontrado"
+                                description="Tente outros termos de busca ou ajuste os filtros.">
+                    <es-button variant="ghost" href="/Tenants">Limpar filtros</es-button>
+                </es-empty-state>
+            }
+            else
+            {
+                <es-empty-state icon="building-2"
+                                title="Nenhum cliente cadastrado"
+                                description="Use o Diagnóstico para criar dados de demonstração.">
+                    <es-button variant="primary" href="/Diagnostico" icon="stethoscope">Ir ao Diagnóstico</es-button>
+                </es-empty-state>
+            }
+        </es-data-table-empty>
+    </es-data-table>
+
+    @if (Model.TotalPages > 1)
+    {
+        <es-pagination page="@Model.Page" page-size="@(Model.Total / Math.Max(1, Model.TotalPages))" total="@Model.Total" />
+    }
+
+    <!-- Modal de confirmação suspender/reativar -->
+    <es-modal id="tenant-confirm" size="sm">
+        <div x-show="confirmAcao === 'suspender'">
+            <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Suspender cliente?</h2>
+            <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+                <strong x-text="confirmNome"></strong> não conseguirá usar o sistema até a reativação. Esta ação é auditada.
+            </p>
+        </div>
+        <div x-show="confirmAcao === 'reativar'">
+            <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Reativar cliente?</h2>
+            <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+                <strong x-text="confirmNome"></strong> voltará a ter acesso normal ao sistema.
+            </p>
+        </div>
+        <form method="post" x-bind:action="confirmAcao === 'suspender' ? '?handler=Suspender' : '?handler=Reativar'">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" x-bind:value="confirmId" />
+            <div x-show="confirmAcao === 'suspender'" style="margin-bottom:14px;">
+                <es-input name="motivo" label="Motivo da suspensão" placeholder="Ex.: inadimplência, fraude, solicitação..." required="true" />
+            </div>
+            <es-modal-footer>
+                <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
+                <button type="submit"
+                        class="btn"
+                        :class="confirmAcao === 'suspender' ? 'btn-danger btn-md' : 'btn-primary btn-md'">
+                    <span x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
+                </button>
+            </es-modal-footer>
+        </form>
+    </es-modal>
+</div>

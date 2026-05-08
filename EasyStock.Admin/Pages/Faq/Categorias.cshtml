@@ -1,82 +1,67 @@
 @page
 @model EasyStock.Admin.Pages.Faq.CategoriasModel
 @{
-    ViewData["Title"] = "FAQ - Categorias";
+    ViewData["Title"] = "FAQ — Categorias";
 }
 
-<div class="flex items-center justify-between mb-4">
-    <h1 class="text-es-ink text-xl font-semibold">FAQ - Categorias</h1>
-    <a asp-page="/Faq/Index" class="btn-secondary text-sm">Voltar para itens</a>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Faq">FAQ</es-breadcrumb-item>
+            <es-breadcrumb-item>Categorias</es-breadcrumb-item>
+        </es-breadcrumb>
+    </div>
+    <es-button variant="ghost" href="/Faq" icon="arrow-left">Voltar para itens</es-button>
 </div>
 
-@if (!string.IsNullOrEmpty(Model.Erro))
-{
-    <div class="mb-4 rounded bg-red-100 px-4 py-2 text-red-800">@Model.Erro</div>
-}
-
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <section>
-        <h2 class="text-base font-semibold mb-2">Categorias existentes</h2>
-        <div class="rounded border border-es-border bg-es-surface overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-es-surface-2 text-es-ink-2 text-left">
-                    <tr>
-                        <th class="p-3">Nome</th>
-                        <th class="p-3">Slug</th>
-                        <th class="p-3">Ordem</th>
-                        <th class="p-3">Publica</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!Model.Categorias.Any())
-                    {
-                        <tr><td colspan="4" class="p-4 text-center text-es-ink-2">Nenhuma categoria.</td></tr>
-                    }
-                    else
-                    {
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
+    <es-card title="Categorias existentes" description="@(Model.Categorias.Count() + " categoria(s)")">
+        @if (!Model.Categorias.Any())
+        {
+            <es-empty-state icon="bookmark" title="Nenhuma categoria" description="Crie sua primeira no formulário ao lado." />
+        }
+        else
+        {
+            <div class="es-data-table-scroll">
+                <table class="es-data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nome</th>
+                            <th scope="col">Slug</th>
+                            <th scope="col" class="es-data-table-td-numeric">Ordem</th>
+                            <th scope="col">Pública</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         @foreach (var cat in Model.Categorias)
                         {
-                            <tr class="border-t border-es-border">
-                                <td class="p-3 font-medium">@cat.GetProperty("nome").GetString()</td>
-                                <td class="p-3 font-mono text-xs">@cat.GetProperty("slug").GetString()</td>
-                                <td class="p-3">@cat.GetProperty("ordem").GetInt32()</td>
-                                <td class="p-3">@(cat.GetProperty("publica").GetBoolean() ? "Sim" : "Nao")</td>
+                            var publica = cat.GetProperty("publica").GetBoolean();
+                            <tr>
+                                <td data-label="Nome" style="font-weight:500;">@cat.GetProperty("nome").GetString()</td>
+                                <td data-label="Slug" style="font-family:var(--font-mono); font-size:12px; color:var(--text-muted);">@cat.GetProperty("slug").GetString()</td>
+                                <td data-label="Ordem" class="es-data-table-td-numeric">@cat.GetProperty("ordem").GetInt32()</td>
+                                <td data-label="Pública">
+                                    <es-badge variant="@(publica ? "ok" : "neutral")">@(publica ? "SIM" : "NÃO")</es-badge>
+                                </td>
                             </tr>
                         }
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
+                    </tbody>
+                </table>
+            </div>
+        }
+    </es-card>
 
-    <section>
-        <h2 class="text-base font-semibold mb-2">Nova categoria</h2>
-        <form method="post" asp-page-handler="Criar" class="space-y-3">
-            <div>
-                <label class="block text-sm mb-1">Nome *</label>
-                <input asp-for="Nome" class="form-input w-full" maxlength="80" required />
+    <es-card title="Nova categoria" description="Slug é usado em URLs públicas; sem espaços nem acentos.">
+        <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;">
+            <es-input asp-for="Nome" label="Nome" required="true" maxlength="80" />
+            <es-input asp-for="Slug" label="Slug" required="true" maxlength="80" placeholder="ex.: cadastros" />
+            <es-input asp-for="Descricao" label="Descrição" label-optional="true" maxlength="500" />
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+                <es-input asp-for="Icone" label="Ícone" label-optional="true" maxlength="60" placeholder="emoji ou nome" />
+                <es-input asp-for="Ordem" type="number" label="Ordem" />
             </div>
-            <div>
-                <label class="block text-sm mb-1">Slug *</label>
-                <input asp-for="Slug" class="form-input w-full" maxlength="80" required
-                       placeholder="ex: cadastros" />
-            </div>
-            <div>
-                <label class="block text-sm mb-1">Descricao</label>
-                <input asp-for="Descricao" class="form-input w-full" maxlength="500" />
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-sm mb-1">Icone</label>
-                    <input asp-for="Icone" class="form-input w-full" maxlength="60"
-                           placeholder="emoji ou nome de icone" />
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">Ordem</label>
-                    <input asp-for="Ordem" type="number" class="form-input w-full" />
-                </div>
-            </div>
-            <button type="submit" class="btn-primary">Criar categoria</button>
+            <es-button type="submit" variant="primary" icon="plus" block="true">Criar categoria</es-button>
         </form>
-    </section>
+    </es-card>
 </div>
