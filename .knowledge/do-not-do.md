@@ -62,3 +62,13 @@
   public sealed record Foo(int Bar);
   ```
   Funciona pra positional records em C# 11+ e propaga pra IntelliSense + XML doc.
+
+## 14. Não confiar em `MemberRenamer = _ => ""` como bloqueio em Scriban; `Template.RenderAsync` ignora `CancellationToken`-via-parametro
+- **O que aconteceu:** `ScribanSandbox` usava `MemberRenamer = _ => string.Empty` esperando bloquear acesso a `obj.GetType().Assembly...`. `MemberRenamer` é só pra **renomear** membros (snake_case ↔ CamelCase) — não filtra acesso. O bloqueio real aconteceu por acidente (membro renomeado pra "" virou inacessível por nome) e quebra com qualquer template que use propriedade .NET legitima. Ao mesmo tempo o `ScribanRenderer` aplicava `cts.CancelAfter(500ms)` esperando que `template.RenderAsync(context)` cancelasse — o método **não recebe CT como parâmetro**; o timeout era fake e loop infinito travava o worker até GC.
+- **Como evitar:**
+  - Bloqueio de membros perigosos: usar `TemplateContext.MemberFilter` (delegate `MemberInfo -> bool`). Falsa = bloqueia. Lista bloquear: `Type`, `Assembly`, `MemberInfo` e derivados, `Delegate`, `IServiceProvider`.
+  - Cancelamento de render: setar `context.CancellationToken = ct` e ler `ScriptAbortException` no catch. `RenderAsync(TemplateContext)` honra esse CT (testado: dispara `ScriptAbortException` em `<input>(linha,col) : error : The operation was cancelled`).
+  - Limites adicionais que custam pouco e poupam DoS: `LoopLimit` (já tinha 500), `RecursiveLimit`, `ObjectRecursionLimit`, `LimitToString`, `RegexTimeOut` (defesa ReDoS pra `regex.match`).
+  - `include`/`import` já são bloqueados por `TemplateLoader = null` (default). Não precisa remover dos builtins.
+  - Auto-escape HTML não existe nativo: aplicar `WebUtility.HtmlEncode` em strings antes de injetar quando canal renderiza HTML (Email, InApp). Numeros/booleanos passam direto.
+  - Cache de `Template` parseado por hash do source (singleton renderer + ConcurrentDictionary com cap). Reparse a cada render é O(template-size) caro.
