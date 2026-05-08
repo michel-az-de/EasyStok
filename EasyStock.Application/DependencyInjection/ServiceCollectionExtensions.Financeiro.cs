@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Financeiro.CentrosCusto;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Dashboard;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -62,6 +63,10 @@ public static partial class ServiceCollectionExtensions
         // Dashboard (Onda 5)
         services.AddScoped<ObterDashboardFinanceiroUseCase>();
         services.AddScoped<ObterFluxoCaixaUseCase>();
+
+        // Integracao automatica Pedido/Compra (Onda 6 / P1)
+        services.AddScoped<GerarContaReceberDePedidoUseCase>();
+        services.AddScoped<GerarContaPagarDePedidoFornecedorUseCase>();
 
         return services;
     }
