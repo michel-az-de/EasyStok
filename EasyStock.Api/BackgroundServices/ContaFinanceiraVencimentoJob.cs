@@ -1,6 +1,9 @@
+using System.Text.Json;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -97,70 +100,205 @@ public sealed class ContaFinanceiraVencimentoJob(
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var notificador = scope.ServiceProvider.GetService<INotificadorService>();
         var hoje = DateTime.UtcNow.Date;
 
-        // ── ContaPagar parcelas ───────────────────────────────────────────
+        // Cohorts D-3 e D-1 (parcelas vencendo)
+        var d3Inicio = hoje.AddDays(2);
+        var d3Fim = hoje.AddDays(3);
+        var d1Inicio = hoje;
+        var d1Fim = hoje.AddDays(1);
+
+        var processadasD3 = 0;
+        var processadasD1 = 0;
+        var processadasVencidas = 0;
+        var contasAtualizadas = new HashSet<(Guid contaId, TipoLadoFinanceiro lado)>();
+
+        // ── ContaPagar — D-3 ─────────────────────────────────────────────
+        var parcelasD3Pagar = await db.ParcelasPagar
+            .IgnoreQueryFilters()
+            .Include(p => p.ContaPagar)
+            .Where(p =>
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
+                p.NotificadaD3Em == null)
+            .Take(500)
+            .ToListAsync(ct);
+        foreach (var p in parcelasD3Pagar)
+        {
+            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d3", ct);
+            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
+            processadasD3++;
+        }
+
+        // ── ContaReceber — D-3 ───────────────────────────────────────────
+        var parcelasD3Receber = await db.ParcelasReceber
+            .IgnoreQueryFilters()
+            .Include(p => p.ContaReceber)
+            .Where(p =>
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
+                p.NotificadaD3Em == null)
+            .Take(500)
+            .ToListAsync(ct);
+        foreach (var p in parcelasD3Receber)
+        {
+            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d3", ct);
+            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
+            processadasD3++;
+        }
+
+        // ── D-1 ─────────────────────────────────────────────────────────
+        var parcelasD1Pagar = await db.ParcelasPagar
+            .IgnoreQueryFilters()
+            .Include(p => p.ContaPagar)
+            .Where(p =>
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
+                p.NotificadaD1Em == null)
+            .Take(500)
+            .ToListAsync(ct);
+        foreach (var p in parcelasD1Pagar)
+        {
+            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d1", ct);
+            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
+            processadasD1++;
+        }
+        var parcelasD1Receber = await db.ParcelasReceber
+            .IgnoreQueryFilters()
+            .Include(p => p.ContaReceber)
+            .Where(p =>
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
+                p.NotificadaD1Em == null)
+            .Take(500)
+            .ToListAsync(ct);
+        foreach (var p in parcelasD1Receber)
+        {
+            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d1", ct);
+            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
+            processadasD1++;
+        }
+
+        // ── D+0 (vencidas) — marcar status e notificar ─────────────────
         var parcelasPagar = await db.ParcelasPagar
             .IgnoreQueryFilters()
+            .Include(p => p.ContaPagar)
             .Where(p =>
-                (p.Status == StatusParcela.Pendente ||
-                 p.Status == StatusParcela.ParcialmentePaga) &&
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date < hoje)
             .Take(2000)
             .ToListAsync(ct);
-
-        var contasPagarAtualizadas = new HashSet<Guid>();
         foreach (var p in parcelasPagar)
         {
             p.MarcarVencidaSeAplicavel(hoje);
             if (p.NotificadaVencidaEm is null)
+            {
+                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
-            contasPagarAtualizadas.Add(p.ContaPagarId);
+                processadasVencidas++;
+            }
+            contasAtualizadas.Add((p.ContaPagarId, TipoLadoFinanceiro.Pagar));
         }
-
-        // Atualiza status agregado das contas afetadas
-        foreach (var contaId in contasPagarAtualizadas)
-        {
-            var conta = await db.ContasPagar
-                .IgnoreQueryFilters()
-                .Include(c => c.Parcelas)
-                .FirstOrDefaultAsync(c => c.Id == contaId, ct);
-            conta?.AtualizarStatusPorParcelas();
-        }
-
-        // ── ContaReceber parcelas ─────────────────────────────────────────
         var parcelasReceber = await db.ParcelasReceber
             .IgnoreQueryFilters()
+            .Include(p => p.ContaReceber)
             .Where(p =>
-                (p.Status == StatusParcela.Pendente ||
-                 p.Status == StatusParcela.ParcialmentePaga) &&
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date < hoje)
             .Take(2000)
             .ToListAsync(ct);
-
-        var contasReceberAtualizadas = new HashSet<Guid>();
         foreach (var p in parcelasReceber)
         {
             p.MarcarVencidaSeAplicavel(hoje);
             if (p.NotificadaVencidaEm is null)
+            {
+                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
-            contasReceberAtualizadas.Add(p.ContaReceberId);
+                processadasVencidas++;
+            }
+            contasAtualizadas.Add((p.ContaReceberId, TipoLadoFinanceiro.Receber));
         }
 
-        foreach (var contaId in contasReceberAtualizadas)
+        // Atualiza status agregado das contas afetadas
+        foreach (var (contaId, lado) in contasAtualizadas)
         {
-            var conta = await db.ContasReceber
-                .IgnoreQueryFilters()
-                .Include(c => c.Parcelas)
-                .FirstOrDefaultAsync(c => c.Id == contaId, ct);
-            conta?.AtualizarStatusPorParcelas();
+            if (lado == TipoLadoFinanceiro.Pagar)
+            {
+                var conta = await db.ContasPagar.IgnoreQueryFilters()
+                    .Include(c => c.Parcelas).FirstOrDefaultAsync(c => c.Id == contaId, ct);
+                conta?.AtualizarStatusPorParcelas();
+            }
+            else
+            {
+                var conta = await db.ContasReceber.IgnoreQueryFilters()
+                    .Include(c => c.Parcelas).FirstOrDefaultAsync(c => c.Id == contaId, ct);
+                conta?.AtualizarStatusPorParcelas();
+            }
         }
 
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "ContaFinanceiraVencimentoJob: {QtdPagar} parcelas a pagar e {QtdReceber} parcelas a receber marcadas vencidas. Contas afetadas: CP={ContasPagar} CR={ContasReceber}",
-            parcelasPagar.Count, parcelasReceber.Count,
-            contasPagarAtualizadas.Count, contasReceberAtualizadas.Count);
+            "ContaFinanceiraVencimentoJob: D-3={D3} D-1={D1} Vencidas={Vencidas}. Contas afetadas={Contas}",
+            processadasD3, processadasD1, processadasVencidas, contasAtualizadas.Count);
+    }
+
+    private async Task PublicarNotificacaoAsync(
+        INotificadorService? notificador,
+        TipoEventoNotificacao tipo,
+        ParcelaPagar parcela,
+        string variante,
+        CancellationToken ct)
+    {
+        if (notificador is null) return;
+        try
+        {
+            await notificador.PublicarEventoAsync(
+                tipo, parcela.EmpresaId, usuarioDestinoId: null,
+                payloadJson: JsonSerializer.Serialize(new
+                {
+                    parcelaId = parcela.Id,
+                    contaId = parcela.ContaPagarId,
+                    numero = parcela.Numero,
+                    valor = parcela.Saldo,
+                    vencimento = parcela.DataVencimento,
+                    descricao = parcela.ContaPagar?.Descricao,
+                    variante
+                }), ct: ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+        }
+    }
+
+    private async Task PublicarNotificacaoAsync(
+        INotificadorService? notificador,
+        TipoEventoNotificacao tipo,
+        ParcelaReceber parcela,
+        string variante,
+        CancellationToken ct)
+    {
+        if (notificador is null) return;
+        try
+        {
+            await notificador.PublicarEventoAsync(
+                tipo, parcela.EmpresaId, usuarioDestinoId: null,
+                payloadJson: JsonSerializer.Serialize(new
+                {
+                    parcelaId = parcela.Id,
+                    contaId = parcela.ContaReceberId,
+                    numero = parcela.Numero,
+                    valor = parcela.Saldo,
+                    vencimento = parcela.DataVencimento,
+                    descricao = parcela.ContaReceber?.Descricao,
+                    variante
+                }), ct: ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+        }
     }
 }
