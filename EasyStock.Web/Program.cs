@@ -90,6 +90,7 @@ builder.Services.AddScoped<OperacaoMobileService>();
 // 6b. Marketing options + Leads API service (landing publica)
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));
 builder.Services.AddScoped<LeadsApiService>();
+builder.Services.AddScoped<FaqApiService>();
 
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>

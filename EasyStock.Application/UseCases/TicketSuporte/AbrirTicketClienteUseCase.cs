@@ -19,7 +19,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
         string Titulo,
         string Descricao,
         TicketCategoria Categoria,
-        Guid? FaturaId = null);
+        Guid? FaturaId = null,
+        CanalOrigem CanalOrigem = CanalOrigem.Pwa);
 
     public sealed record AbrirTicketClienteResult(
         Guid TicketId,
@@ -58,6 +59,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                 Status = TicketStatus.Aberto,
                 Prioridade = TicketPrioridade.Normal,
                 Categoria = cmd.Categoria,
+                CanalOrigem = cmd.CanalOrigem,
                 CriadoPorId = currentUser.UsuarioId,
                 FaturaId = fatura?.Id,
                 CriadoEm = DateTime.UtcNow,

@@ -62,6 +62,39 @@ namespace EasyStock.Infra.Postgre.Data
         /// </summary>
         public bool IsSuperAdmin => _currentUser is { IsAuthenticated: true, Nivel: NivelAcesso.SuperAdmin };
 
+        /// <summary>
+        /// Bypass explicito do RLS no banco. Usado pelo
+        /// <c>SetTenantOnConnectionInterceptor</c> para emitir
+        /// <c>SET app.bypass_rls = 'on'</c> em cenarios cross-tenant
+        /// conhecidos (seeds, jobs, migrations). NAO usar em request-path.
+        /// </summary>
+        public bool BypassRowLevelSecurity { get; set; }
+
+        /// <summary>
+        /// Habilita <see cref="BypassRowLevelSecurity"/> apenas dentro do escopo
+        /// <c>using</c> e restaura o valor anterior no <c>Dispose</c>. Preferir
+        /// este metodo em vez de setar a propriedade diretamente em codigo de
+        /// request — garante que o bypass nao vaze apos o bloco.
+        /// </summary>
+        public IDisposable UseRowLevelSecurityBypass()
+        {
+            var previous = BypassRowLevelSecurity;
+            BypassRowLevelSecurity = true;
+            return new RowLevelSecurityBypassScope(this, previous);
+        }
+
+        private sealed class RowLevelSecurityBypassScope(EasyStockDbContext context, bool previous) : IDisposable
+        {
+            private bool _disposed;
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                context.BypassRowLevelSecurity = previous;
+            }
+        }
+
 
         // Domain DbSets
         public DbSet<Empresa> Empresas { get; set; } = null!;
@@ -102,6 +135,13 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
         public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
         public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
+
+        // FAQ — base global publica (sem multi-tenant)
+        public DbSet<FaqCategoria> FaqCategorias { get; set; } = null!;
+        public DbSet<FaqItem> FaqItens { get; set; } = null!;
+        public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
+        public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
+
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;

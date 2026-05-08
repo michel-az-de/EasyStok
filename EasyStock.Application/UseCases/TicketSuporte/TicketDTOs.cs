@@ -11,7 +11,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
         string Titulo,
         string Descricao,
         TicketCategoria Categoria,
-        Guid? FaturaId = null);
+        Guid? FaturaId = null,
+        CanalOrigem? CanalOrigem = null);
 
     public sealed record ResponderRequest(string Resposta);
 

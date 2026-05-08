@@ -33,7 +33,8 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockCoreUseCases()
             .AddEasyStockAnalyticsUseCases()
             .AddEasyStockNotificationsUseCases()
-            .AddEasyStockPublicUseCases();
+            .AddEasyStockPublicUseCases()
+            .AddEasyStockHelpdeskUseCases();
 
         return services;
     }
