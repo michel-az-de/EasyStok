@@ -67,3 +67,29 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 - Adapters stub (Stripe/MP) documentam corretamente seu estado provisório com guide de integração — não tocar.
 - `IgnoreQueryFilters()` em queries de métricas/background é intencional — não remover.
 - Block-scoped namespace ainda aparece esporadicamente em arquivos mais antigos ou de nova criação sem padrão imposto; converter para file-scoped ao encontrar.
+
+---
+
+## 2026-05-07 (rodada 3) — Pos commit fb4f08e (fully-qualified names + record sealed)
+
+### Escopo
+Janela "30min" da tarefa agendada nao tinha commits novos; varredura focou em residuos pos-`fb4f08e` (cleanup billing F12 + Mongo) que nao foram capturados na rodada anterior.
+
+### Fixes aplicados
+
+#### 1. `IEfiPixService.cs` — `record` -> `sealed record`
+- `EfiCobrancaResult` declarado como `public record` enquanto `EfiCobrancaStatusResult` e `EfiEstornoResult` ja eram `public sealed record`.
+- Padronizado para `public sealed record` (records de DTO em ports nao tem hierarquia).
+
+#### 2. `ServiceCollectionExtensions.cs` (Infra.Async) — usings + FQN
+- Removido `using EasyStock.Infra.Async;` (namespace ancestral do arquivo, redundante por regra de lookup do C#).
+- Adicionados `using Microsoft.Extensions.Caching.Memory;` e `using Microsoft.Extensions.Logging;` para eliminar fully-qualified names dentro das factories `AddTransient<IEfiPixService>` e `AddTransient<IEfiBoletoService>`:
+  - `Microsoft.Extensions.Caching.Memory.IMemoryCache` -> `IMemoryCache`
+  - `Microsoft.Extensions.Logging.ILogger<T>` -> `ILogger<T>`
+  - `System.Net.Http.HttpClient` -> `HttpClient` (System.Net.Http ja em ImplicitUsings).
+- Mesmo padrao do fix em `MercadoPagoSignatureValidator` no commit anterior (fb4f08e).
+
+### Padroes observados
+- Factories `AddTransient<T>(sp => ...)` com DI manual sao foco de FQN residual: typar via `using` em vez de soletrar. Procurar mesmo padrao em demais `AddX<T>(sp => ...)` ao longo do projeto.
+- `using` de namespace ancestral (`EasyStock.Infra.Async` em arquivo `EasyStock.Infra.Async.DependencyInjection.*`) nao quebra o build mas polui — varrer demais `DependencyInjection/` em rodadas futuras.
+- Records de DTO/result em ports devem ser sempre `sealed` por convencao — proxima rodada checar `Application/Ports/Output/*` em massa.
