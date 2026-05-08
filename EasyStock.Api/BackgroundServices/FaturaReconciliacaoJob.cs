@@ -187,6 +187,7 @@ public sealed class FaturaReconciliacaoJob(
                                 metodo: pag.Metodo,
                                 valor: pag.Valor,
                                 gatewayProvedor: pag.GatewayProvedor,
+                                empresaId: fatura.EmpresaId,
                                 gatewayTransactionId: pag.GatewayTransactionId,
                                 dadosGatewayJson: pag.DadosGatewayJson,
                                 observacao: "Confirmado via reconciliacao (webhook perdido).");

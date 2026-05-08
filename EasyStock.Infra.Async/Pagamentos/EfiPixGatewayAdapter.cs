@@ -22,14 +22,24 @@ public sealed class EfiPixGatewayAdapter(IEfiPixService pixService) : IPagamento
     public bool SuportaMetodo(string metodo) =>
         string.Equals(metodo, "pix", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default)
+    public async Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(fatura);
         if (!SuportaMetodo(metodo))
             throw new NotSupportedException($"EfiPix nao suporta metodo '{metodo}'.");
 
-        // Txid Efi: aceita 26-35 chars alfanum. Usamos o Guid sem hifens, 32 chars.
-        var txid = fatura.Id.ToString("N");
+        // Txid Efi: aceita 26-35 chars alfanum. Quando o orchestrator (Onda P0)
+        // injeta idempotencyKey (SHA-256 hex 64 chars), derivamos os primeiros 32
+        // chars como txid — assim duas tentativas com mesma key reusam a mesma
+        // cobranca Efi (que ja deduplica por txid). Sem key (legado), usa Guid
+        // sem hifens (32 chars) por fatura.
+        var txid = !string.IsNullOrWhiteSpace(idempotencyKey) && idempotencyKey.Length >= 32
+            ? idempotencyKey[..32].ToLowerInvariant()
+            : fatura.Id.ToString("N");
         var descricao = $"Fatura {fatura.Numero}";
 
         var efi = await pixService.CriarCobrancaAsync(txid, fatura.Total, descricao, ct);
