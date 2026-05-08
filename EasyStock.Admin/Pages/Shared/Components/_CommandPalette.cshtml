@@ -1,0 +1,408 @@
+@*
+    Command Palette (⌘K) v2 — usado uma vez no _Layout.
+    - Índice estático com todas as rotas do admin + ações rápidas
+    - Fuzzy match local imediato (sem network)
+    - Busca server-side (clientes/lojas/usuários) em /api-proxy/buscar-global
+      mantida via debounce 200ms quando q.length >= 2
+    - Histórico em localStorage.easystok-cmdk-history (últimos 10)
+    - Navegação por setas, Enter abre, Esc fecha
+*@
+<div id="cmdk-root"
+     x-data="cmdkPalette()"
+     x-init="init()"
+     x-show="open"
+     x-cloak
+     class="cmdk-overlay"
+     role="dialog"
+     aria-modal="true"
+     aria-label="Buscar e executar ações"
+     @@click.self="close()"
+     @@keydown.escape.window="if (open) close()"
+     @@keydown.arrow-down.prevent="if (open) move(1)"
+     @@keydown.arrow-up.prevent="if (open) move(-1)"
+     @@keydown.enter.prevent="if (open) choose()">
+    <div class="cmdk-panel" :class="entered ? 'is-entered' : ''" x-init="$nextTick(() => entered = true)">
+
+        <div class="cmdk-input-row">
+            <span style="color: var(--text-muted); flex: none;">
+                <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-search"/></svg>
+            </span>
+            <input id="cmdk-input"
+                   type="text"
+                   class="cmdk-input"
+                   x-model="q"
+                   @@input="onInput()"
+                   placeholder="Buscar páginas, ações, clientes, lojas, usuários..."
+                   autocomplete="off"
+                   spellcheck="false"
+                   aria-label="Buscar" />
+            <kbd class="cmdk-item-kbd">Esc</kbd>
+        </div>
+
+        <div class="cmdk-results" role="listbox" aria-label="Resultados da busca">
+
+            <!-- Loading remote -->
+            <template x-if="loadingRemote && q.length >= 2">
+                <div class="cmdk-empty" style="padding: 12px 20px;">
+                    <span class="skeleton skeleton-text" style="display:inline-block; width: 80px;"></span>
+                </div>
+            </template>
+
+            <!-- Erro de busca remota -->
+            <template x-if="erro">
+                <div class="cmdk-empty" style="color: var(--crit-600);" x-text="erro"></div>
+            </template>
+
+            <!-- Estado vazio: histórico + recentes + sugestões -->
+            <template x-if="!q && groups.length === 0">
+                <div>
+                    <template x-if="historico.length > 0">
+                        <div>
+                            <div class="cmdk-group-title">
+                                <svg class="es-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><use href="/icons/sprite.svg#icon-clock"/></svg>
+                                Recentes
+                            </div>
+                            <template x-for="(item, idx) in historico" :key="'h-' + item.id">
+                                <a :href="item.url || '#'"
+                                   :class="['cmdk-item', flatList[sel] && flatList[sel]._key === ('h-' + item.id) ? 'is-selected' : '']"
+                                   @@mouseenter="sel = flatList.findIndex(x => x._key === ('h-' + item.id))"
+                                   @@click.prevent="chooseItem(item)">
+                                    <span style="color: var(--text-muted);">
+                                        <svg class="es-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use :href="'/icons/sprite.svg#icon-' + (item.icon || 'corner-down-left')"/></svg>
+                                    </span>
+                                    <div class="cmdk-item-title">
+                                        <div class="cmdk-item-title-text" x-text="item.title"></div>
+                                        <div class="cmdk-item-meta" x-text="item.group || ''"></div>
+                                    </div>
+                                    <span class="cmdk-item-kbd">↵</span>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template x-if="historico.length === 0">
+                        <div class="cmdk-empty">
+                            Comece digitando para buscar páginas, ações ou registros.<br/>
+                            <span style="font-size: 11px; opacity: 0.7;">
+                                Pressione <kbd class="cmdk-item-kbd">?</kbd> em qualquer página para ver atalhos do teclado.
+                            </span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Resultados agrupados -->
+            <template x-for="grupo in groups" :key="grupo.titulo">
+                <div>
+                    <div class="cmdk-group-title" x-text="grupo.titulo"></div>
+                    <template x-for="item in grupo.items" :key="grupo.titulo + ':' + item._key">
+                        <a :href="item.url || '#'"
+                           :class="['cmdk-item', flatList[sel] && flatList[sel]._key === item._key ? 'is-selected' : '']"
+                           @@mouseenter="sel = flatList.findIndex(x => x._key === item._key)"
+                           @@click.prevent="chooseItem(item)">
+                            <span style="color: var(--text-muted);">
+                                <svg class="es-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use :href="'/icons/sprite.svg#icon-' + (item.icon || 'corner-down-left')"/></svg>
+                            </span>
+                            <div class="cmdk-item-title">
+                                <div class="cmdk-item-title-text" x-text="item.title"></div>
+                                <div class="cmdk-item-meta" x-show="item.meta" x-text="item.meta || ''"></div>
+                            </div>
+                            <span class="cmdk-item-kbd" x-show="flatList[sel] && flatList[sel]._key === item._key">↵</span>
+                        </a>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Sem resultados -->
+            <template x-if="q.length >= 1 && groups.length === 0 && !loadingRemote">
+                <div class="cmdk-empty">
+                    Sem resultados para "<span style="color: var(--text-primary);" x-text="q"></span>".<br/>
+                    <span style="font-size: 11px; opacity: 0.7;">Tente um nome, CNPJ ou parte do email.</span>
+                </div>
+            </template>
+        </div>
+
+        <div class="cmdk-footer">
+            <span>↑↓ navegar · ↵ abrir · Esc fechar</span>
+            <span x-show="flatList.length > 0" x-cloak>
+                <strong style="color: var(--text-primary);" x-text="flatList.length"></strong>
+                <span x-text="flatList.length === 1 ? ' resultado' : ' resultados'"></span>
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const HISTORY_KEY = 'easystok-cmdk-history';
+        const HISTORY_MAX = 10;
+
+        // ── Índice estático: rotas + ações rápidas ──────────────────────
+        const STATIC_INDEX = [
+            // Painéis principais
+            { id: 'nav-dashboard',        group: 'Vai para',     title: 'Dashboard',                       keywords: 'home inicio painel principal', url: '/',                              icon: 'layout-dashboard' },
+
+            // Clientes / Suporte
+            { id: 'nav-tenants',          group: 'Vai para',     title: 'Clientes',                        keywords: 'tenant cliente empresa', url: '/Tenants',                              icon: 'building-2' },
+            { id: 'nav-tickets',          group: 'Vai para',     title: 'Tickets de suporte',              keywords: 'suporte chamado atendimento', url: '/Tickets',                       icon: 'ticket' },
+            { id: 'nav-tickets-dash',     group: 'Vai para',     title: 'Painel de Tickets',               keywords: 'metricas suporte sla', url: '/Tickets/Dashboard',                       icon: 'trending-up' },
+
+            // Financeiro
+            { id: 'nav-planos',           group: 'Vai para',     title: 'Planos',                          keywords: 'plano assinatura subscription', url: '/Planos',                         icon: 'list-checks' },
+            { id: 'nav-cupons',           group: 'Vai para',     title: 'Cupons de desconto',              keywords: 'cupom desconto promocao', url: '/Cupons',                                icon: 'tag' },
+            { id: 'nav-faturas',          group: 'Vai para',     title: 'Faturas',                         keywords: 'fatura nfe pagamento', url: '/Faturas',                                  icon: 'receipt' },
+            { id: 'nav-faturas-dash',     group: 'Vai para',     title: 'Painel financeiro',               keywords: 'mrr receita faturamento', url: '/Faturas/Dashboard',                     icon: 'trending-up' },
+
+            // Comunicação
+            { id: 'nav-notif-templates',  group: 'Vai para',     title: 'Templates de notificação',        keywords: 'email sms push template', url: '/Notificacoes/Templates',                icon: 'bell' },
+            { id: 'nav-notif-broadcast',  group: 'Vai para',     title: 'Broadcast',                       keywords: 'envio massa anuncio comunicado', url: '/Notificacoes/Broadcast',         icon: 'bell' },
+            { id: 'nav-notif-envios',     group: 'Vai para',     title: 'Histórico de envios',             keywords: 'envios log notificacao', url: '/Notificacoes/Envios',                    icon: 'bell' },
+            { id: 'nav-notif-rotinas',    group: 'Vai para',     title: 'Rotinas',                         keywords: 'cron agenda automacao', url: '/Notificacoes/Rotinas',                     icon: 'clock' },
+            { id: 'nav-notif-canais',     group: 'Vai para',     title: 'Canais de notificação',           keywords: 'email sms push canal', url: '/Notificacoes/Canais',                       icon: 'bell' },
+            { id: 'nav-notif-consent',    group: 'Vai para',     title: 'Consentimentos LGPD',             keywords: 'lgpd optin optout privacidade', url: '/Notificacoes/Consentimentos',     icon: 'shield' },
+
+            // Conteúdo
+            { id: 'nav-faq',              group: 'Vai para',     title: 'FAQ',                             keywords: 'ajuda perguntas duvidas conteudo', url: '/Faq',                          icon: 'bookmark' },
+            { id: 'nav-faq-cat',          group: 'Vai para',     title: 'Categorias do FAQ',               keywords: 'faq categoria taxonomia', url: '/Faq/Categorias',                          icon: 'bookmark' },
+
+            // Governança
+            { id: 'nav-admins',           group: 'Vai para',     title: 'Admins',                          keywords: 'usuarios administradores equipe', url: '/Admins',                         icon: 'users' },
+            { id: 'nav-config',           group: 'Vai para',     title: 'Configurações',                   keywords: 'settings preferencias parametros', url: '/Configuracoes',                  icon: 'settings' },
+            { id: 'nav-sla',              group: 'Vai para',     title: 'Matriz SLA',                      keywords: 'sla prioridade resposta', url: '/Configuracoes/SlaMatriz',                  icon: 'shield' },
+            { id: 'nav-audit',            group: 'Vai para',     title: 'Audit Logs',                      keywords: 'auditoria log atividade rastro', url: '/AuditLogs',                       icon: 'search' },
+            { id: 'nav-diag',             group: 'Vai para',     title: 'Diagnóstico',                     keywords: 'health saude status sistema', url: '/Diagnostico',                          icon: 'stethoscope' },
+            { id: 'nav-disp',             group: 'Vai para',     title: 'Dispositivos',                    keywords: 'mobile app celular', url: '/Dispositivos',                                  icon: 'smartphone' },
+            { id: 'nav-oper',             group: 'Vai para',     title: 'Operação',                        keywords: 'jobs queue throughput performance', url: '/Operacao',                     icon: 'trending-up' },
+
+            // Ações rápidas
+            { id: 'act-new-cupom',        group: 'Ações rápidas', title: 'Novo cupom',                      keywords: 'criar cupom desconto', url: '/Cupons',                                  icon: 'plus' },
+            { id: 'act-emit-fatura',      group: 'Ações rápidas', title: 'Emitir fatura',                   keywords: 'criar fatura nova manual', url: '/Faturas/Emitir',                       icon: 'plus' },
+            { id: 'act-broadcast',        group: 'Ações rápidas', title: 'Novo broadcast',                  keywords: 'enviar mensagem em massa', url: '/Notificacoes/Broadcast',                icon: 'plus' },
+            { id: 'act-toggle-theme',     group: 'Ações rápidas', title: 'Alternar tema (claro/escuro)',    keywords: 'dark light theme tema modo', action: 'toggle-theme',                      icon: 'sun' },
+            { id: 'act-logout',           group: 'Ações rápidas', title: 'Sair (logout)',                   keywords: 'logout sair encerrar sessao', action: 'logout',                          icon: 'log-out' }
+        ];
+
+        // ── Fuzzy match (subsequence + bonus de início de palavra) ──
+        function fuzzyScore(needle, haystack) {
+            const n = (needle || '').toLowerCase();
+            const h = (haystack || '').toLowerCase();
+            if (!n) return 0;
+            if (h.indexOf(n) === 0) return 100; // prefixo exato
+            if (h.indexOf(n) >= 0) return 60;   // substring
+            // subsequence
+            let score = 0, ni = 0, hi = 0;
+            while (ni < n.length && hi < h.length) {
+                if (n[ni] === h[hi]) {
+                    score += (hi === 0 || h[hi - 1] === ' ' || h[hi - 1] === '-') ? 3 : 1;
+                    ni++;
+                }
+                hi++;
+            }
+            return ni === n.length ? Math.max(1, score - h.length * 0.01) : 0;
+        }
+
+        function scoreItem(needle, item) {
+            const t = fuzzyScore(needle, item.title) * 2;
+            const k = fuzzyScore(needle, item.keywords || '');
+            return Math.max(t, k);
+        }
+
+        // ── Alpine factory ──
+        window.cmdkPalette = function () {
+            return {
+                open: false,
+                entered: false,
+                q: '',
+                sel: 0,
+                erro: '',
+                loadingRemote: false,
+                _debounceHandle: null,
+                historico: [],
+                _remote: { clientes: [], lojas: [], usuarios: [] },
+
+                init() {
+                    window.addEventListener('open-cmdk', () => this.show());
+                    this._loadHistory();
+                },
+
+                _loadHistory() {
+                    try {
+                        const raw = localStorage.getItem(HISTORY_KEY);
+                        this.historico = raw ? JSON.parse(raw).slice(0, HISTORY_MAX) : [];
+                    } catch { this.historico = []; }
+                },
+
+                _pushHistory(item) {
+                    if (!item) return;
+                    const lite = {
+                        id: item.id || item._key,
+                        title: item.title,
+                        url: item.url,
+                        icon: item.icon,
+                        group: item.group,
+                        action: item.action || null
+                    };
+                    let list = this.historico.filter(h => h.id !== lite.id);
+                    list.unshift(lite);
+                    list = list.slice(0, HISTORY_MAX);
+                    this.historico = list;
+                    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch {}
+                },
+
+                show() {
+                    this.open = true;
+                    this.entered = false;
+                    this.q = '';
+                    this.sel = 0;
+                    this.erro = '';
+                    this._remote = { clientes: [], lojas: [], usuarios: [] };
+                    this._loadHistory();
+                    setTimeout(() => {
+                        this.entered = true;
+                        document.getElementById('cmdk-input')?.focus();
+                    }, 30);
+                },
+
+                close() {
+                    this.entered = false;
+                    setTimeout(() => { this.open = false; }, 150);
+                },
+
+                onInput() {
+                    this.sel = 0;
+                    clearTimeout(this._debounceHandle);
+                    if (this.q.trim().length < 2) {
+                        this._remote = { clientes: [], lojas: [], usuarios: [] };
+                        return;
+                    }
+                    this._debounceHandle = setTimeout(() => this._fetchRemote(), 200);
+                },
+
+                async _fetchRemote() {
+                    const termo = this.q.trim();
+                    if (termo.length < 2) return;
+                    this.loadingRemote = true; this.erro = '';
+                    try {
+                        const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(termo) + '&limit=8',
+                            { credentials: 'same-origin', cache: 'no-store' });
+                        if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        const d = await r.json();
+                        const data = d.data || d;
+                        this._remote = {
+                            clientes: data.clientes || [],
+                            lojas: data.lojas || [],
+                            usuarios: data.usuarios || []
+                        };
+                    } catch (e) {
+                        this.erro = 'Falha de rede ao buscar registros.';
+                    } finally {
+                        this.loadingRemote = false;
+                    }
+                },
+
+                // Constrói os grupos de resultados.
+                get groups() {
+                    const q = this.q.trim();
+                    if (!q) return [];
+
+                    const out = [];
+
+                    // Grupo "Vai para" — fuzzy match local
+                    const navItems = STATIC_INDEX
+                        .filter(it => it.group === 'Vai para')
+                        .map(it => ({ it, score: scoreItem(q, it) }))
+                        .filter(x => x.score > 0)
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, 6)
+                        .map(x => Object.assign({ _key: x.it.id }, x.it));
+
+                    // Grupo "Ações rápidas"
+                    const actItems = STATIC_INDEX
+                        .filter(it => it.group === 'Ações rápidas')
+                        .map(it => ({ it, score: scoreItem(q, it) }))
+                        .filter(x => x.score > 0)
+                        .sort((a, b) => b.score - a.score)
+                        .map(x => Object.assign({ _key: x.it.id }, x.it));
+
+                    if (navItems.length) out.push({ titulo: 'Vai para', items: navItems });
+                    if (actItems.length) out.push({ titulo: 'Ações rápidas', items: actItems });
+
+                    // Resultados remotos
+                    const remoteMap = (arr, group, icon) => arr.map(r => ({
+                        _key: group + ':' + (r.id || r.url || r.nome),
+                        id: r.id,
+                        title: r.nome || r.title || r.email || '(sem nome)',
+                        url: r.url || '#',
+                        icon: icon,
+                        group: group,
+                        meta: this._buildRemoteMeta(r, group)
+                    }));
+
+                    if (this._remote.clientes.length) {
+                        out.push({ titulo: 'Clientes', items: remoteMap(this._remote.clientes, 'Cliente', 'building-2') });
+                    }
+                    if (this._remote.lojas.length) {
+                        out.push({ titulo: 'Lojas', items: remoteMap(this._remote.lojas, 'Loja', 'store') });
+                    }
+                    if (this._remote.usuarios.length) {
+                        out.push({ titulo: 'Usuários', items: remoteMap(this._remote.usuarios, 'Usuário', 'user') });
+                    }
+
+                    return out;
+                },
+
+                _buildRemoteMeta(r, group) {
+                    if (group === 'Cliente') return r.documento || (r.id ? String(r.id).slice(0, 8) : '');
+                    if (group === 'Loja') return (r.empresaNome || '') + (r.ativa === false ? ' · inativa' : '');
+                    if (group === 'Usuário') return (r.emailMascarado || '') + ' · ' + (r.empresaNome || '') + (r.ativo === false ? ' · inativo' : '');
+                    return '';
+                },
+
+                get flatList() {
+                    if (!this.q.trim()) {
+                        return this.historico.map(h => Object.assign({ _key: 'h-' + h.id }, h));
+                    }
+                    const flat = [];
+                    this.groups.forEach(g => g.items.forEach(it => flat.push(it)));
+                    return flat;
+                },
+
+                move(delta) {
+                    const n = this.flatList.length;
+                    if (n === 0) return;
+                    this.sel = (this.sel + delta + n) % n;
+                    // Scroll into view
+                    setTimeout(() => {
+                        const items = document.querySelectorAll('#cmdk-root .cmdk-item');
+                        items[this.sel]?.scrollIntoView({ block: 'nearest' });
+                    }, 0);
+                },
+
+                choose() {
+                    const item = this.flatList[this.sel];
+                    if (item) this.chooseItem(item);
+                },
+
+                chooseItem(item) {
+                    if (!item) return;
+                    this._pushHistory(item);
+                    if (item.action === 'toggle-theme') {
+                        if (typeof window.toggleTheme === 'function') window.toggleTheme();
+                        this.close();
+                        return;
+                    }
+                    if (item.action === 'logout') {
+                        // Submete o form de logout existente.
+                        const f = document.querySelector('form[action="/Auth/Logout"]');
+                        if (f) { f.submit(); return; }
+                        window.location.href = '/Auth/Logout';
+                        return;
+                    }
+                    if (item.url && item.url !== '#') {
+                        window.location.href = item.url;
+                    }
+                }
+            };
+        };
+    })();
+</script>

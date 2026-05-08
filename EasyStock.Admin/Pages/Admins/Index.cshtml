@@ -3,142 +3,117 @@
 @{
     ViewData["Title"] = "Gestão de Admins";
     var novaSenha = TempData["NovaSenha"] as string;
-    var resetAdminId = TempData["ResetAdminId"] as string;
-    var sucesso = TempData["Sucesso"] as string;
-    var erro = TempData["Erro"] as string;
     var loggedEmail = HttpContext.Session.GetString("admin_email");
+    var orderBy = Request.Query["orderBy"].FirstOrDefault();
+    var dir = Request.Query["dir"].FirstOrDefault();
 }
 
-<div x-data="{ modalNovo: false }" class="contents">
-<div class="flex items-center justify-between mb-6">
-    <div class="text-es-ink-mute text-sm">@Model.Admins.Count() admin(s)</div>
-    <button type="button" @@click="modalNovo = true"
-            class="btn-primary">+ Novo Admin</button>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Admins</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="margin-top:4px; color: var(--text-muted); font-size: 13px;">
+            <strong style="color: var(--text-primary);">@Model.Admins.Count()</strong> administrador(es) ativos
+        </div>
+    </div>
+    <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-admin')">Novo admin</es-button>
 </div>
 
-@if (!string.IsNullOrEmpty(sucesso))
-{
-    <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">@sucesso</div>
-}
-@if (!string.IsNullOrEmpty(erro))
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erro</div>
-}
 @if (!string.IsNullOrEmpty(novaSenha))
 {
-    <div class="bg-es-gold/10 border border-es-gold/30 text-es-gold rounded-lg px-4 py-3 text-sm mb-4">
-        <div class="font-semibold mb-1">Senha temporária gerada — anote agora, não será exibida novamente:</div>
-        <code class="font-mono text-base select-all">@novaSenha</code>
+    <div style="background:rgba(240,184,74,.10); border:1px solid rgba(240,184,74,.30); border-left:3px solid var(--warn-600); border-radius:var(--r-md); padding:14px 18px; margin-bottom:16px;">
+        <div style="font-weight:600; color:var(--text-primary); margin-bottom:4px;">
+            <es-icon name="alert-triangle" size="16" /> Senha temporária — anote agora, não será exibida novamente:
+        </div>
+        <code style="font-family:var(--font-mono); font-size:15px; user-select:all; color:var(--warn-600);">@novaSenha</code>
     </div>
 }
 
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
-}
+<es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Admins.Any())">
+    <es-data-table-column key="nome" label="Nome" sortable="true" />
+    <es-data-table-column key="email" label="Email" sortable="true" />
+    <es-data-table-column label="Status" />
+    <es-data-table-column label="Último acesso" align="right" />
+    <es-data-table-column label="Criado em" align="right" />
+    <es-data-table-column label="" actions="true" width="220px" />
 
-<div class="card p-0 overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="table-admin">
-            <thead>
-                <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Último Acesso</th>
-                    <th>Criado em</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var a in Model.Admins)
-                {
-                    var id         = a.TryGetProperty("id", out var idP) ? idP.GetString() : "";
-                    var nome       = a.TryGetProperty("nome", out var nP) ? nP.GetString() : "—";
-                    var email      = a.TryGetProperty("email", out var eP) ? eP.GetString() : "—";
-                    var ativo      = a.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
-                    var ultimoAcesso = a.TryGetProperty("ultimoAcessoEm", out var uP) && uP.ValueKind != System.Text.Json.JsonValueKind.Null ? uP.GetString() : null;
-                    var criadoEm   = a.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : null;
-                    DateTime.TryParse(criadoEm, out var criadoDt);
-                    DateTime.TryParse(ultimoAcesso, out var ultimoAcessoDt);
-                    var isMe = email == loggedEmail;
-                    <tr>
-                        <td class="font-medium text-es-ink">@nome</td>
-                        <td class="text-es-ink-dim text-sm">@email @if (isMe) { <span class="text-es-accent text-xs">(você)</span> }</td>
-                        <td>
-                            @if (ativo)
-                            {
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">● Ativo</span>
-                            }
-                            else
-                            {
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">● Inativo</span>
-                            }
-                        </td>
-                        <td class="text-es-ink-mute text-xs">@(ultimoAcesso != null ? ultimoAcessoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
-                        <td class="text-es-ink-mute text-xs">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                @if (!isMe)
-                                {
-                                    <form method="post" asp-page-handler="Toggle" class="inline">
-                                        <input type="hidden" name="id" value="@id" />
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn-secondary text-xs py-1 px-2">
-                                            @(ativo ? "Desativar" : "Ativar")
-                                        </button>
-                                    </form>
-                                }
-                                <form method="post" asp-page-handler="ResetSenha" class="inline">
-                                    <input type="hidden" name="id" value="@id" />
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs py-1 px-2 rounded border border-es-gold/30 text-es-gold hover:bg-es-gold/10 transition-colors">
-                                        Reset Senha
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                }
-                @if (!Model.Admins.Any())
-                {
-                    <tr><td colspan="6" class="text-center text-es-ink-mute py-8">Nenhum admin encontrado.</td></tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
+    @foreach (var a in Model.Admins)
+    {
+        var id = a.TryGetProperty("id", out var idP) ? idP.GetString() : "";
+        var nome = a.TryGetProperty("nome", out var nP) ? nP.GetString() : "—";
+        var email = a.TryGetProperty("email", out var eP) ? eP.GetString() : "—";
+        var ativo = a.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
+        var ultimoAcesso = a.TryGetProperty("ultimoAcessoEm", out var uP) && uP.ValueKind != System.Text.Json.JsonValueKind.Null ? uP.GetString() : null;
+        var criadoEm = a.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : null;
+        DateTime.TryParse(criadoEm, out var criadoDt);
+        DateTime.TryParse(ultimoAcesso, out var ultimoAcessoDt);
+        var isMe = email == loggedEmail;
+        var initial = !string.IsNullOrEmpty(nome) ? nome.Substring(0, 1).ToUpper() : "A";
+
+        <tr>
+            <td data-label="Nome">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="es-avatar es-avatar-sm">@initial</span>
+                    <strong style="color:var(--text-primary);">@nome</strong>
+                </div>
+            </td>
+            <td data-label="Email">
+                <span style="color:var(--text-secondary); font-size:13px;">@email</span>
+                @if (isMe) { <es-badge variant="accent">você</es-badge> }
+            </td>
+            <td data-label="Status">
+                <es-badge variant="@(ativo ? "ok" : "crit")" with-dot="true">@(ativo ? "ATIVO" : "INATIVO")</es-badge>
+            </td>
+            <td data-label="Último acesso" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">
+                @(ultimoAcesso != null ? ultimoAcessoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")
+            </td>
+            <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">
+                @criadoDt.ToLocalTime().ToString("dd/MM/yy")
+            </td>
+            <td class="es-data-table-td-actions">
+                <div class="es-row-actions">
+                    @if (!isMe)
+                    {
+                        <form method="post" asp-page-handler="Toggle" style="display:inline;">
+                            <input type="hidden" name="id" value="@id" />
+                            @Html.AntiForgeryToken()
+                            <es-button type="submit" variant="ghost" size="xs">@(ativo ? "Desativar" : "Ativar")</es-button>
+                        </form>
+                    }
+                    <form method="post" asp-page-handler="ResetSenha" style="display:inline;"
+                          onsubmit="return confirm('Resetar senha de @email?')">
+                        <input type="hidden" name="id" value="@id" />
+                        @Html.AntiForgeryToken()
+                        <es-button type="submit" variant="ghost" size="xs" icon="alert-triangle">Reset senha</es-button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+    }
+
+    <es-data-table-empty>
+        <es-empty-state icon="users"
+                        title="Nenhum administrador"
+                        description="Cadastre admins para acessar este painel.">
+            <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-admin')">Novo admin</es-button>
+        </es-empty-state>
+    </es-data-table-empty>
+</es-data-table>
 
 <!-- Modal Novo Admin -->
-<div x-show="modalNovo" x-cloak @@keydown.escape.window="modalNovo = false" @@click.self="modalNovo = false"
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-     role="dialog" aria-modal="true" aria-labelledby="modal-novo-title">
-    <div class="card w-full max-w-md p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h2 id="modal-novo-title" class="text-lg font-semibold text-es-ink">Novo Admin</h2>
-            <button type="button" @@click="modalNovo = false" aria-label="Fechar"
-                    class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
-        </div>
-        <form method="post" asp-page-handler="Criar" class="space-y-4">
-            @Html.AntiForgeryToken()
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Nome</label>
-                <input type="text" name="nome" required class="form-input w-full" placeholder="Nome completo" />
-            </div>
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Email</label>
-                <input type="email" name="email" required class="form-input w-full" placeholder="admin@easystock.com.br" />
-            </div>
-            <div>
-                <label class="block text-sm text-es-ink-dim mb-1">Senha inicial</label>
-                <input type="password" name="senha" required minlength="8" class="form-input w-full" placeholder="Mínimo 8 caracteres" />
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button type="submit" class="btn-primary flex-1">Criar Admin</button>
-                <button type="button" @@click="modalNovo = false" class="btn-secondary flex-1">Cancelar</button>
-            </div>
-        </form>
-    </div>
-</div>
-</div><!-- /x-data -->
+<es-modal id="novo-admin" title="Novo administrador" description="O usuário receberá acesso completo ao painel admin." size="sm">
+    <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;">
+        @Html.AntiForgeryToken()
+        <es-input name="nome" label="Nome" required="true" placeholder="Nome completo" />
+        <es-input name="email" type="email" label="Email" required="true" placeholder="admin@easystock.com.br" />
+        <es-input name="senha" type="password" label="Senha inicial" required="true" minlength="8"
+                  helper="Mínimo 8 caracteres. Use uma senha forte." />
 
+        <es-modal-footer>
+            <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
+            <es-button type="submit" variant="primary" icon="check">Criar admin</es-button>
+        </es-modal-footer>
+    </form>
+</es-modal>
