@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Fiscal;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Integration;
@@ -137,6 +138,15 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Modulo Integration (F4+) — outbox transacional de eventos externos
         public DbSet<OutboxEventoIntegracao> OutboxEventosIntegracao { get; set; } = null!;
+
+        // Modulo Fiscal (F1) — NFC-e (modelo 65) + NFe (modelo 55)
+        public DbSet<NotaFiscal> NotasFiscais { get; set; } = null!;
+        public DbSet<NotaFiscalItem> NotasFiscaisItens { get; set; } = null!;
+        public DbSet<NotaFiscalPagamento> NotasFiscaisPagamentos { get; set; } = null!;
+        public DbSet<NotaFiscalEvento> NotasFiscaisEventos { get; set; } = null!;
+        public DbSet<NotaFiscalContador> NotasFiscaisContadores { get; set; } = null!;
+        public DbSet<NotaFiscalCertificadoA1> NotasFiscaisCertificadosA1 { get; set; } = null!;
+        public DbSet<NotaFiscalInutilizacao> NotasFiscaisInutilizacoes { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
