@@ -264,11 +264,9 @@
 
     <!-- Ação rápida (desktop only) -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
-        <button @@click="open = !open"
-                class="app-primary-btn flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            <es-icon name="plus" class="w-4 h-4"></es-icon>
+        <es-button variant="navy" size="sm" icon="plus" class="app-primary-btn" @@click="open = !open">
             <span class="hidden sm:inline">Ação rápida</span>
-        </button>
+        </es-button>
         <div x-show="open" x-cloak @@click.outside="open = false"
              class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
             <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Estoque</div>

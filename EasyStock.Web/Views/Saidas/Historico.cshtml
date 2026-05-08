@@ -193,7 +193,7 @@
                             {
                                 <form asp-action="Estornar" asp-route-id="@s.Id" method="post"
                                       x-data="{ open: false, motivo: '' }"
-                                      @@submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); alert('Informe o motivo do estorno (mín. 3 caracteres).'); }">
+                                      @@submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); window.showToast && window.showToast('Informe o motivo do estorno (mínimo 3 caracteres).', 'warning'); }">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="motivo" :value="motivo" />
                                     <button type="button" @@click="open = true; setTimeout(() => $refs.motivoInput?.focus(), 50)"

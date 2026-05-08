@@ -34,6 +34,12 @@
             <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3 px-1">Ações rápidas</p>
 
             <div class="grid grid-cols-3 gap-2.5">
+                <button type="button" @@click="moreOpen = false; window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: (code) => { window.location.href = '/busca?q=' + encodeURIComponent(code); } } }))"
+                   class="quick-action-item flex flex-col items-center gap-2 p-3.5 rounded-2xl bg-orange-50 text-orange-700 active:scale-95 transition-transform">
+                    <es-icon name="scan-line" class="w-6 h-6"></es-icon>
+                    <span class="text-xs font-semibold leading-tight text-center">Ler codigo</span>
+                </button>
+
                 <a href="/entradas/nova" @@click="moreOpen = false"
                    class="quick-action-item flex flex-col items-center gap-2 p-3.5 rounded-2xl bg-emerald-50 text-emerald-700 active:scale-95 transition-transform">
                     <es-icon name="arrow-down-to-line" class="w-6 h-6"></es-icon>

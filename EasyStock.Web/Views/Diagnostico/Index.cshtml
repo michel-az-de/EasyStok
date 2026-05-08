@@ -1278,10 +1278,14 @@ function diagApp() {
         },
 
         expurgarLogs() {
+            // Admin-only: prompt nativo aceitavel para entrada numerica simples nesta tela.
             const dias = prompt('Quantos dias de logs manter? (1-30, padrão 3)', '3');
             if (dias === null) return;
-            const n = parseInt(dias) || 3;
-            if (n < 1 || n > 30) { window.showToast && window.showToast('Valor deve ser entre 1 e 30.', 'warning'); return; }
+            const n = parseInt(dias, 10);
+            if (!Number.isFinite(n) || n < 1 || n > 30) {
+                window.showToast && window.showToast('Valor deve ser entre 1 e 30.', 'warning');
+                return;
+            }
             const self = this;
             window.easyConfirm({
                 titulo: 'Expurgar logs antigos?',

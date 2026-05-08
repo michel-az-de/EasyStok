@@ -17,7 +17,7 @@
            @@keydown.escape.window="open=false">
         <div class="drawer-header">
             <h3 :id="$id('drawer-title')" class="text-base font-semibold m-0">@title</h3>
-            <button type="button" class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="open=false">✕</button>
+            <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="open=false"></es-button>
         </div>
         <div class="drawer-body">@Html.Raw(bodyHtml)</div>
         @if (!string.IsNullOrEmpty(footerHtml))

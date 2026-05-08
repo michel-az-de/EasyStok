@@ -47,7 +47,7 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🏭" },
+            { "EmptyIconName", "truck" },
             { "EmptyTitle", "Nenhum fornecedor cadastrado" },
             { "EmptyDescription", "Adicione seu primeiro fornecedor para organizar suas compras." },
             { "EmptyCta", "+ Novo Fornecedor" },

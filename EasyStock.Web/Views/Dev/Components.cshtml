@@ -171,6 +171,30 @@
         </div>
     </section>
 
+    <!-- Fase 4 / 5: dispatchers -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 4/5 - Confirm, Cheatsheet, Scanner</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Disparadores globais via <code>window.easyConfirm()</code>, <code>cheatsheet:toggle</code> e <code>barcode:open</code>.</p>
+        <div class="flex flex-wrap gap-2">
+            <es-button variant="danger" icon="trash-2"
+                       onclick="window.easyConfirm({ titulo: 'Excluir item?', mensagem: 'Esta acao nao pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700' }, () => window.showToast('Item excluido (simulado)', 'success'))">
+                easyConfirm
+            </es-button>
+            <es-button variant="ghost" icon="help-circle"
+                       onclick="window.dispatchEvent(new CustomEvent('cheatsheet:toggle'))">
+                Abrir cheatsheet
+            </es-button>
+            <es-button variant="navy" icon="scan-line"
+                       onclick="window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: (code) => window.showToast('Lido: ' + code, 'success') } }))">
+                Abrir scanner
+            </es-button>
+            <form data-confirm='{"titulo":"Form com data-confirm?","mensagem":"Forms com atributo data-confirm sao interceptados automaticamente pelo confirm.js.","textoBotao":"OK","classBotao":"bg-indigo-600 hover:bg-indigo-700"}'
+                  onsubmit="event.preventDefault(); window.showToast('Form submetido (simulado)', 'success')">
+                <es-button variant="primary" type="submit" icon="check">Form data-confirm</es-button>
+            </form>
+        </div>
+    </section>
+
     <!-- Fase 1: Side-by-side light/dark de primitivos -->
     <section>
         <h2 class="text-lg font-semibold mb-3">Fase 1 - Side-by-side (light + dark)</h2>
