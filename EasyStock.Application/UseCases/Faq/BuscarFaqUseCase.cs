@@ -8,6 +8,11 @@ namespace EasyStock.Application.UseCases.Faq
         int Page = 1,
         int PageSize = 10);
 
+    /// <summary>
+    /// Pesquisa itens de FAQ publicados. Suporta texto livre (FTS Postgres) e
+    /// filtro por categoria. Paginacao com pageSize clampado a 50.
+    /// Base global: sem filtro de tenant.
+    /// </summary>
     public sealed class BuscarFaqUseCase(IFaqRepository faqRepo)
     {
         public async Task<BuscarFaqResultado> ExecuteAsync(BuscarFaqQuery query, CancellationToken ct = default)

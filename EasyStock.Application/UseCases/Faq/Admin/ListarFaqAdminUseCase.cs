@@ -10,6 +10,11 @@ namespace EasyStock.Application.UseCases.Faq.Admin
         int Page = 1,
         int PageSize = 20);
 
+    /// <summary>
+    /// Lista todos os itens de FAQ com filtros de status, categoria e busca livre.
+    /// Diferente do <see cref="BuscarFaqUseCase"/> (publico), este retorna
+    /// Rascunho e Arquivado alem de Publicado. Paginavel, pageSize padrao 20.
+    /// </summary>
     public sealed class ListarFaqAdminUseCase(IFaqAdminRepository repo)
     {
         public async Task<BuscarFaqResultado> ExecuteAsync(ListarFaqAdminQuery query, CancellationToken ct = default)

@@ -2,6 +2,11 @@ using EasyStock.Application.Ports.Output.Persistence;
 
 namespace EasyStock.Application.UseCases.Faq
 {
+    /// <summary>
+    /// Lista categorias de FAQ publicas com contagem de itens publicados.
+    /// Base global (sem tenant). Usada pelo header/menu do site e pela
+    /// pagina de busca.
+    /// </summary>
     public sealed class ListarCategoriasFaqUseCase(IFaqRepository faqRepo)
     {
         public async Task<IReadOnlyList<FaqCategoriaDto>> ExecuteAsync(CancellationToken ct = default)

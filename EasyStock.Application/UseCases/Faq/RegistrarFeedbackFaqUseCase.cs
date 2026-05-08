@@ -10,6 +10,11 @@ namespace EasyStock.Application.UseCases.Faq
         string? Comentario,
         string? Ip);
 
+    /// <summary>
+    /// Registra feedback util/nao-util em um item de FAQ publicado.
+    /// O IP e anonimizado (mesmo hash do <see cref="ObterFaqItemUseCase"/>).
+    /// Rejeita feedback em itens nao publicados com 400.
+    /// </summary>
     public sealed class RegistrarFeedbackFaqUseCase(
         IFaqRepository faqRepo,
         IFaqAdminRepository adminRepo,

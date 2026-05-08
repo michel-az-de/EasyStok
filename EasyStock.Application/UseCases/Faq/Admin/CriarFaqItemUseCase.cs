@@ -16,6 +16,11 @@ namespace EasyStock.Application.UseCases.Faq.Admin
 
     public sealed record CriarFaqItemResult(Guid ItemId, string Slug);
 
+    /// <summary>
+    /// Cria um novo item de FAQ em modo Rascunho. O slug e normalizado
+    /// (trim + lowercase) e validado como unico dentro da categoria.
+    /// Para publicar, usar <see cref="PublicarFaqItemUseCase"/>.
+    /// </summary>
     public sealed class CriarFaqItemUseCase(IFaqAdminRepository repo, IUnitOfWork uow)
     {
         public async Task<CriarFaqItemResult> ExecuteAsync(CriarFaqItemCommand cmd, CancellationToken ct = default)

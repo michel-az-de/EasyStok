@@ -11,6 +11,10 @@ namespace EasyStock.Application.UseCases.Faq.Admin
         string[]? Tags,
         int Ordem);
 
+    /// <summary>
+    /// Atualiza conteudo, resumo, tags e ordem de um item de FAQ.
+    /// Nao altera slug nem status — use casos dedicados para isso.
+    /// </summary>
     public sealed class AtualizarFaqItemUseCase(IFaqAdminRepository repo, IUnitOfWork uow)
     {
         public async Task ExecuteAsync(AtualizarFaqItemCommand cmd, CancellationToken ct = default)
