@@ -1,5 +1,10 @@
 namespace EasyStock.Domain.Enums.Fiscal;
 
+/// <summary>
+/// Tabela tPag do XML da NF-e/NFC-e (Ato Cotepe 28/2019 + atualizações).
+/// Valores numéricos são os códigos SEFAZ — não alterar sem atualizar
+/// a tabela de referência do layout vigente.
+/// </summary>
 public enum FormaPagamentoFiscal : byte
 {
     Dinheiro = 1,

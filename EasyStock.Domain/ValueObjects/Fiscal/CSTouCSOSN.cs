@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-
 namespace EasyStock.Domain.ValueObjects.Fiscal;
 
 /// <summary>
@@ -58,6 +55,8 @@ public sealed record CSTouCSOSN
         };
     }
 
+    // CSOSN começa com 1xx (100-102), 2xx (201-202), 4xx (400, 500) ou 5xx (500).
+    // CST ICMS de 3 dígitos (ex: "010") começa com 0 — não colide.
     private static bool PareceCsosn(string s) => s.Length >= 3 && s[0] is '1' or '2' or '4' or '5';
 
     public override string ToString() => Valor;

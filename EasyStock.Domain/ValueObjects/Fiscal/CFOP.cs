@@ -1,8 +1,10 @@
-using System;
-using System.Linq;
-
 namespace EasyStock.Domain.ValueObjects.Fiscal;
 
+/// <summary>
+/// CFOP de saída (Código Fiscal de Operações e Prestações). Aceita apenas
+/// CFOPs de saída (5xxx intra-estado, 6xxx inter-estado, 7xxx exportação).
+/// Strips de non-digits no parse para aceitar "5.102" e "5102".
+/// </summary>
 public sealed record CFOP
 {
     public string Valor { get; }

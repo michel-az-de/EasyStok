@@ -1,9 +1,13 @@
-using System;
 using EasyStock.Domain.Enums.Fiscal;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities.Fiscal;
 
+/// <summary>
+/// Representa uma forma de pagamento registrada na NFC-e/NFe conforme
+/// tag detPag/detalhe. Uma nota pode ter múltiplos pagamentos (split).
+/// Troco é calculado pelo emitente e informado explicitamente.
+/// </summary>
 public sealed class NotaFiscalPagamento
 {
     public Guid Id { get; private set; }

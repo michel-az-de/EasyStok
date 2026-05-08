@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using EasyStock.Domain.Enums.Fiscal;
 
 namespace EasyStock.Domain.ValueObjects.Fiscal;

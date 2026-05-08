@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using EasyStock.Domain.Enums.Fiscal;
 using EasyStock.Domain.Exceptions.Fiscal;
 using EasyStock.Domain.Sales;

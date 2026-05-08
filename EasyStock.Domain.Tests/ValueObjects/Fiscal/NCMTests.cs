@@ -1,4 +1,3 @@
-using System;
 using EasyStock.Domain.ValueObjects.Fiscal;
 using FluentAssertions;
 

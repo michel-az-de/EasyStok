@@ -1,4 +1,3 @@
-using System;
 using EasyStock.Domain.Enums.Fiscal;
 
 namespace EasyStock.Domain.Entities.Fiscal;

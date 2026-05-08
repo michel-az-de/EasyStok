@@ -1,5 +1,10 @@
 namespace EasyStock.Domain.Enums.Fiscal;
 
+/// <summary>
+/// Campo orig do grupo ICMS da NF-e/NFC-e. Indica a origem da mercadoria
+/// conforme tabela A do Convênio SINIEF s/n de 1970. Afeta o cálculo do
+/// diferencial de alíquota e benefícios fiscais.
+/// </summary>
 public enum OrigemMercadoria : byte
 {
     Nacional = 0,

@@ -1,8 +1,10 @@
-using System;
-using System.Linq;
-
 namespace EasyStock.Domain.ValueObjects.Fiscal;
 
+/// <summary>
+/// Nomenclatura Comum do Mercosul (NCM): 8 dígitos numéricos obrigatórios
+/// na NF-e/NFC-e conforme tabela TIPI. Strips de separadores no parse
+/// (ex: "1905.90.20" → "19059020").
+/// </summary>
 public sealed record NCM
 {
     public string Valor { get; }
