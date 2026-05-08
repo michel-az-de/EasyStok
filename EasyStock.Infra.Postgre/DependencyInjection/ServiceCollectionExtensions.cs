@@ -88,6 +88,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
             services.AddScoped<IFaturaRepository, FaturaRepository>();
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
+            services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
