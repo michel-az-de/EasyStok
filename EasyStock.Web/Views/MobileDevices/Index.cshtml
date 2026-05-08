@@ -134,7 +134,7 @@
                             {
                                 <span class="text-slate-200">·</span>
                                 <form method="post" action="/dispositivos/@d.Id/revogar" class="inline ml-1"
-                                      onsubmit="return confirm('Revogar este dispositivo? O app correspondente vai parar de funcionar.');">
+                                      data-confirm='{"titulo":"Revogar dispositivo?","mensagem":"O app deste dispositivo vai parar de funcionar imediatamente. Voce pode reaprovar gerando um novo codigo.","textoBotao":"Revogar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-medium">
                                         Revogar

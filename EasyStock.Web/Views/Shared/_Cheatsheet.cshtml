@@ -1,0 +1,89 @@
+@*
+    Cheatsheet de atalhos de teclado. Aberto via tecla '?' ou via window.dispatchEvent('cheatsheet:toggle').
+    Le os atalhos do registry global EasyKeys.list() em runtime.
+*@
+<div id="es-cheatsheet-modal"
+     x-data="cheatsheet()"
+     x-init="init()"
+     :data-open="open ? 'true' : 'false'"
+     class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+     x-show="open" x-cloak
+     x-transition.opacity
+     @@click.self="close()"
+     role="dialog" aria-modal="true" aria-labelledby="es-cheatsheet-title">
+    <div class="absolute inset-0 bg-black/40" @@click="close()"></div>
+    <div class="relative w-full max-w-lg rounded-2xl shadow-2xl"
+         style="background: var(--bg-surface); border: 1px solid var(--border-soft);">
+        <div class="flex items-center justify-between px-5 py-4"
+             style="border-bottom: 1px solid var(--border-soft);">
+            <h2 id="es-cheatsheet-title" class="text-base font-semibold" style="color: var(--text-primary);">Atalhos de teclado</h2>
+            <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="close()"></es-button>
+        </div>
+        <div class="px-5 py-4 max-h-[70vh] overflow-y-auto" style="color: var(--text-primary);">
+            <template x-for="grupo in grupos" :key="grupo.nome">
+                <section class="mb-5">
+                    <h3 class="text-xs font-mono uppercase tracking-widest mb-2" style="color: var(--text-muted);" x-text="grupo.nome"></h3>
+                    <ul class="space-y-1">
+                        <template x-for="b in grupo.itens" :key="b.id">
+                            <li class="flex items-center justify-between gap-3 py-1.5"
+                                style="border-bottom: 1px solid var(--border-soft);">
+                                <span class="text-sm" x-text="b.description || b.id"></span>
+                                <span class="inline-flex items-center gap-1" x-html="renderKeys(b.keys)"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </section>
+            </template>
+            <p x-show="grupos.length === 0" class="text-sm" style="color: var(--text-muted);">Nenhum atalho registrado.</p>
+        </div>
+        <div class="px-5 py-3 text-xs flex items-center gap-3"
+             style="border-top: 1px solid var(--border-soft); color: var(--text-muted);">
+            <span><es-kbd>?</es-kbd> abrir</span>
+            <span><es-kbd>Esc</es-kbd> fechar</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    function cheatsheet() {
+        return {
+            open: false,
+            grupos: [],
+
+            init() {
+                window.addEventListener('cheatsheet:toggle', () => this.toggle());
+                window.addEventListener('cheatsheet:close', () => this.close());
+            },
+            toggle() {
+                if (this.open) { this.close(); return; }
+                this.refresh();
+                this.open = true;
+            },
+            close() {
+                this.open = false;
+            },
+            refresh() {
+                const list = (window.EasyKeys && window.EasyKeys.list && window.EasyKeys.list()) || [];
+                const map = new Map();
+                for (const b of list) {
+                    const g = b.group || 'Geral';
+                    if (!map.has(g)) map.set(g, []);
+                    map.get(g).push(b);
+                }
+                this.grupos = Array.from(map.entries()).map(([nome, itens]) => ({ nome, itens }));
+            },
+            renderKeys(combo) {
+                if (!combo) return '';
+                // 'g p' -> [g, p], 'mod+k' -> [mod, k]
+                return combo.split(' ').map(part =>
+                    part.split('+').map(t =>
+                        '<kbd class="es-kbd">' + escapeHtml(t === 'mod' ? (navigator.platform.match(/Mac|iPhone|iPod|iPad/i) ? '⌘' : 'Ctrl') : t) + '</kbd>'
+                    ).join('<span class="text-[var(--text-muted)] mx-0.5">+</span>')
+                ).join('<span class="text-[var(--text-muted)] mx-1">depois</span>');
+            }
+        };
+    }
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+</script>

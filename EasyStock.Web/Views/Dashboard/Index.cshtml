@@ -239,8 +239,12 @@
     @if (Model.GraficoLabels.Any())
     {
     <script>
-        const ctx = document.getElementById('grafico-receita');
-        if (ctx) {
+        (function () {
+            const ctx = document.getElementById('grafico-receita');
+            if (!ctx) return;
+            const css = getComputedStyle(document.documentElement);
+            const navy = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
+            const ink  = css.getPropertyValue('--text-muted').trim() || 'rgb(112, 120, 146)';
             new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -248,8 +252,8 @@
                     datasets: [{
                         label: 'Receita',
                         data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados)),
-                        borderColor: '#1E48A8',
-                        backgroundColor: 'rgba(30, 72, 168,0.1)',
+                        borderColor: navy,
+                        backgroundColor: 'rgba(30, 72, 168, 0.1)',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0
@@ -268,12 +272,12 @@
                     },
                     scales: {
                         x: {
-                            ticks: { color: '#64748B' },
+                            ticks: { color: ink },
                             grid: { display: false }
                         },
                         y: {
                             ticks: {
-                                color: '#64748B',
+                                color: ink,
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')
                             },
                             grid: { color: 'rgba(148, 163, 184, 0.18)' }
@@ -281,7 +285,7 @@
                     }
                 }
             });
-        }
+        })();
     </script>
     }
 }

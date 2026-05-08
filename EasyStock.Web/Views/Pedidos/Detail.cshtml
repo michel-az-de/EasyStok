@@ -55,7 +55,7 @@
                 </form>
             }
             <form asp-action="Cancelar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
-                  onsubmit="return confirm('Cancelar pedido?');">
+                  data-confirm='{"titulo":"Cancelar pedido?","mensagem":"O pedido sera marcado como cancelado e nao pode ser revertido.","textoBotao":"Cancelar pedido","classBotao":"bg-red-600 hover:bg-red-700"}'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
                     Cancelar
@@ -141,7 +141,7 @@
                                 <td class="text-right">
                                     @if (p.Status != "entregue" && p.Status != "cancelado")
                                     {
-                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" onsubmit="return confirm('Remover item?');">
+                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do pedido?","mensagem":"O item sera removido do pedido. Estoque sera ajustado.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                                         </form>
@@ -180,7 +180,7 @@
                                 <div class="text-xs text-slate-500">@pg.PagoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm") @(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : "· por " + pg.RegistradoPorNome) @(string.IsNullOrEmpty(pg.Referencia) ? "" : "· ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
-                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" onsubmit="return confirm('Remover pagamento?');">
+                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento sera estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                             </form>

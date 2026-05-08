@@ -29,9 +29,8 @@
                             class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
                         Cancelar
                     </button>
-                    <form :action="formAction" :method="method" x-ref="confirmForm">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" :disabled="loading"
+                    <template x-if="callbackId">
+                        <button type="button" :disabled="loading" @@click="confirmar()"
                                 class="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50"
                                 :class="classBotao">
                             <span x-show="!loading" x-text="textoBotao"></span>
@@ -39,7 +38,20 @@
                                 <span class="spinner"></span> Aguarde...
                             </span>
                         </button>
-                    </form>
+                    </template>
+                    <template x-if="!callbackId">
+                        <form :action="formAction" :method="method" x-ref="confirmForm">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" :disabled="loading"
+                                    class="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50"
+                                    :class="classBotao">
+                                <span x-show="!loading" x-text="textoBotao"></span>
+                                <span x-show="loading" class="inline-flex items-center gap-1.5">
+                                    <span class="spinner"></span> Aguarde...
+                                </span>
+                            </button>
+                        </form>
+                    </template>
                 </div>
             </div>
         </div>
@@ -57,6 +69,7 @@
             classBotao: 'bg-red-600 hover:bg-red-700',
             formAction: '',
             method: 'POST',
+            callbackId: null,
 
             abrir(detail) {
                 this.titulo = detail.titulo || 'Confirmar acao';
@@ -65,10 +78,27 @@
                 this.classBotao = detail.classBotao || 'bg-red-600 hover:bg-red-700';
                 this.formAction = detail.formAction || '';
                 this.method = detail.method || 'POST';
+                this.callbackId = detail.callbackId || null;
                 this.loading = false;
                 this.open = true;
             },
+            confirmar() {
+                if (!this.callbackId) return;
+                this.loading = true;
+                const store = window.__easyConfirmCallbacks || {};
+                const cb = store[this.callbackId];
+                delete store[this.callbackId];
+                this.open = false;
+                this.callbackId = null;
+                if (typeof cb === 'function') {
+                    try { cb(); } catch (e) { console.error('[easyConfirm]', e); }
+                }
+            },
             fechar() {
+                if (this.callbackId && window.__easyConfirmCallbacks) {
+                    delete window.__easyConfirmCallbacks[this.callbackId];
+                }
+                this.callbackId = null;
                 this.open = false;
             }
         };

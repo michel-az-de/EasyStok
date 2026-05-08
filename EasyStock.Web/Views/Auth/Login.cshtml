@@ -34,14 +34,10 @@
                 <div>
                     <div class="inline-flex items-center gap-3 mb-6">
                         <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg">
-                            <svg width="36" height="36" viewBox="0 0 64 64" fill="none" aria-label="EasyStock">
-                                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
-                                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
-                                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
-                            </svg>
+                            <partial name="_LogoEasyStock" model='new { Size = 36, ShowText = false }' />
                         </span>
-                        <span class="text-3xl font-extrabold tracking-tight text-white" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
-                            <span>Easy</span><span style="color:#F26B25">Stok</span>
+                        <span class="es-logo-word es-logo-word--inverted text-3xl">
+                            <span class="es-logo-easy">Easy</span><span class="es-logo-stok">Stok</span>
                         </span>
                     </div>
                     <p class="text-sm uppercase tracking-[0.35em] text-white/65 mb-4">Operação em tempo real</p>
@@ -65,14 +61,10 @@
                     <div class="text-center mb-8 lg:text-left">
                         <div class="inline-flex items-center gap-3 mb-3 lg:hidden">
                             <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg">
-                                <svg width="36" height="36" viewBox="0 0 64 64" fill="none" aria-label="EasyStock">
-                                    <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
-                                    <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
-                                    <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
-                                </svg>
+                                <partial name="_LogoEasyStock" model='new { Size = 36, ShowText = false }' />
                             </span>
-                            <span class="text-3xl font-extrabold tracking-tight auth-title" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
-                                <span>Easy</span><span style="color:#F26B25">Stok</span>
+                            <span class="es-logo-word es-logo-word--auth auth-title">
+                                <span class="es-logo-easy">Easy</span><span class="es-logo-stok">Stok</span>
                             </span>
                         </div>
                         <p class="auth-subtitle text-sm mt-2">Acesse sua conta para continuar a operação</p>

@@ -129,7 +129,7 @@
                             }
                             else
                             {
-                                <form asp-action="Unlink" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" onsubmit="return confirm('Desfazer link com ERP?');">
+                                <form asp-action="Unlink" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Desfazer link com ERP?","mensagem":"Este cliente voltara a ser tratado como mobile-only.","textoBotao":"Desfazer","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
                                 </form>

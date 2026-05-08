@@ -8,7 +8,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Redefinir senha — EasyStock</title>
+    <title>Redefinir senha - EasyStock</title>
     <!-- tailwind: build local em ~/css/tailwind.dist.css -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
@@ -19,15 +19,8 @@
 <body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
     <div class="w-full max-w-sm mx-auto px-4">
         <div class="text-center mb-8">
-            <div class="inline-flex items-center gap-2 mb-2">
-                <svg width="40" height="40" viewBox="0 0 64 64" fill="none" aria-label="EasyStock">
-                    <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
-                    <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
-                    <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
-                </svg>
-                <span class="text-3xl font-extrabold tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;color:#0A1530;"><span>Easy</span><span style="color:#E85814">Stok</span></span>
-            </div>
-            <p class="text-slate-500 text-sm">Redefinição de senha</p>
+            <partial name="_LogoEasyStock" model='new { Size = 40, Variant = "auth" }' />
+            <p class="text-slate-500 text-sm mt-3">Redefinição de senha</p>
         </div>
 
         <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">

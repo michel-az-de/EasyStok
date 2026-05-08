@@ -39,6 +39,9 @@ builder.Services.AddHttpContextAccessor();
 // 4. Register SessionService first (used by TokenRefreshHandler)
 builder.Services.AddScoped<SessionService>();
 
+// 4b. Design system: Lucide icon resolver (cache de SVGs em memoria, singleton)
+builder.Services.AddSingleton<LucideIconResolver>();
+
 // 5. HttpClient with TokenRefreshHandler
 builder.Services.AddScoped<TokenRefreshHandler>();
 builder.Services.AddHttpClient<ApiClient>(client =>

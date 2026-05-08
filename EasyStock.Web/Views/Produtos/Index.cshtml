@@ -250,48 +250,18 @@
         {
             var from = (Model.Paginacao.Page - 1) * Model.Paginacao.Limit + 1;
             var to = Math.Min(Model.Paginacao.Page * Model.Paginacao.Limit, Model.Paginacao.Total);
-            var pgStart = Math.Max(1, Model.Paginacao.Page - 2);
-            var pgEnd = Math.Min(Model.Paginacao.Pages, Model.Paginacao.Page + 2);
             <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                 <span class="text-sm text-slate-500">
-                    Mostrando @from–@to de @Model.Paginacao.Total produto@(Model.Paginacao.Total == 1 ? "" : "s")
+                    Mostrando @from-@to de @Model.Paginacao.Total produto@(Model.Paginacao.Total == 1 ? "" : "s")
                 </span>
-                <div class="flex items-center gap-1">
-                    @if (Model.Paginacao.HasPrevious)
-                    {
-                        <a href="?page=@(Model.Paginacao.Page - 1)&search=@Model.Search&categoria=@Model.Categoria&status=@Model.Status"
-                           class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">←</a>
-                    }
-                    @if (pgStart > 1)
-                    {
-                        <a href="?page=1&search=@Model.Search&categoria=@Model.Categoria&status=@Model.Status"
-                           class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">1</a>
-                        if (pgStart > 2) { <span class="px-1 text-slate-400 text-sm">…</span> }
-                    }
-                    @for (int pg = pgStart; pg <= pgEnd; pg++)
-                    {
-                        <a href="?page=@pg&search=@Model.Search&categoria=@Model.Categoria&status=@Model.Status"
-                           class="px-2.5 py-1.5 text-sm border rounded-lg transition-colors @(pg == Model.Paginacao.Page ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-300 hover:bg-slate-50")">@pg</a>
-                    }
-                    @if (pgEnd < Model.Paginacao.Pages)
-                    {
-                        if (pgEnd < Model.Paginacao.Pages - 1) { <span class="px-1 text-slate-400 text-sm">…</span> }
-                        <a href="?page=@Model.Paginacao.Pages&search=@Model.Search&categoria=@Model.Categoria&status=@Model.Status"
-                           class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">@Model.Paginacao.Pages</a>
-                    }
-                    @if (Model.Paginacao.HasNext)
-                    {
-                        <a href="?page=@(Model.Paginacao.Page + 1)&search=@Model.Search&categoria=@Model.Categoria&status=@Model.Status"
-                           class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">→</a>
-                    }
-                </div>
+                <partial name="_Pagination" model='new { Page = (int)Model.Paginacao.Page, TotalPages = (int)Model.Paginacao.Pages }' />
             </div>
         }
     }
     else
     {
         <div class="text-center py-12 text-slate-400">
-            <div class="text-5xl mb-3">📦</div>
+            <es-icon name="package" class="mx-auto mb-3" style="width:48px; height:48px; color: var(--text-muted);"></es-icon>
             <p class="font-semibold text-slate-600">Nenhum produto encontrado</p>
             <p class="text-sm mt-1">Tente ajustar os filtros ou <a href="/produtos/novo" class="text-indigo-600 hover:underline">cadastre um novo produto</a>.</p>
         </div>

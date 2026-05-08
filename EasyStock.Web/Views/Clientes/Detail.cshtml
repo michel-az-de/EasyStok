@@ -19,7 +19,7 @@
         @if (c.Ativo)
         {
             <form asp-action="Excluir" asp-controller="Clientes" asp-route-id="@c.Id" method="post"
-                  onsubmit="return confirm('Desativar cliente?');">
+                  data-confirm='{"titulo":"Desativar cliente?","mensagem":"O cliente sera desativado mas seu historico permanece. Voce pode reativar a qualquer momento.","textoBotao":"Desativar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
                     Desativar
@@ -113,7 +113,7 @@
                                 <div class="text-xs text-slate-500">@e.Bairro @(string.IsNullOrEmpty(e.Cidade) ? "" : "— ") @e.Cidade @(string.IsNullOrEmpty(e.Estado) ? "" : "/" + e.Estado) @e.Cep</div>
                                 @if (!string.IsNullOrEmpty(e.Referencia)) { <div class="text-xs text-slate-400 mt-1">@e.Referencia</div> }
                             </div>
-                            <form asp-action="RemoveEndereco" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-enderecoId="@e.Id" method="post" onsubmit="return confirm('Remover endereço?');">
+                            <form asp-action="RemoveEndereco" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-enderecoId="@e.Id" method="post" data-confirm='{"titulo":"Remover endereco?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                             </form>
@@ -155,7 +155,7 @@
                                 </div>
                                 <div class="text-xs text-slate-500">@(t.Tipo ?? "—") @(string.IsNullOrEmpty(t.Observacao) ? "" : "· " + t.Observacao)</div>
                             </div>
-                            <form asp-action="RemoveTelefone" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-telefoneId="@t.Id" method="post" onsubmit="return confirm('Remover telefone?');">
+                            <form asp-action="RemoveTelefone" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-telefoneId="@t.Id" method="post" data-confirm='{"titulo":"Remover telefone?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                             </form>
@@ -194,7 +194,7 @@
                                     @if (d.ValidoAte.HasValue) { <text> · válido até @d.ValidoAte.Value.ToLocalTime():dd/MM/yyyy</text> }
                                 </div>
                             </div>
-                            <form asp-action="RemoveDocumento" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-documentoId="@d.Id" method="post" onsubmit="return confirm('Remover documento?');">
+                            <form asp-action="RemoveDocumento" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-documentoId="@d.Id" method="post" data-confirm='{"titulo":"Remover documento?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                             </form>
