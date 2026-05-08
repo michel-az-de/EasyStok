@@ -4,6 +4,51 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 
 ---
 
+## 2026-05-07 — Cleanup fb4f08e: polish billing F12 + Mongo (segunda passagem)
+
+### Arquivos analisados (4 arquivos .cs do commit fb4f08e)
+
+| Arquivo | Status |
+|---|---|
+| `IEfiPixService.cs` | **Fix aplicado** — XML doc adicionado em `CriarCobrancaAsync` |
+| `ServiceCollectionExtensions.cs` (Infra.Async) | **Fix aplicado** — variável redundante removida |
+| `MercadoPagoSignatureValidator.cs` | **Fix aplicado** — referências fully-qualified removidas |
+| `MongoIdentityRepositories.cs` | **Fix aplicado** — comentário stale corrigido |
+
+### Fixes aplicados
+
+#### 1. `IEfiPixService.cs` — XML doc completado
+- `CriarCobrancaAsync` não tinha `<summary>` enquanto `ConsultarCobrancaAsync` e `EstornarAsync` já tinham.
+- Doc adicionado descrevendo o endpoint `POST /v2/cob/{txid}` e o retorno (QR code + copia-e-cola).
+
+#### 2. `ServiceCollectionExtensions.cs` — variável redundante removida
+- `efiClientIdBoleto` relia `configuration["Efi:ClientId"]` sendo que `efiClientId` já havia lido o mesmo valor.
+- O bloco Boleto passou a reutilizar `efiClientId` (lido na linha 63).
+
+#### 3. `MercadoPagoSignatureValidator.cs` — usings corrigidos
+- Faltava `using System.Text.Json`; o código usava `System.Text.Json.JsonDocument` e `System.Text.Json.JsonValueKind` fully-qualified.
+- Padrão já adotado em `EfiPixService.cs`, `EfiPixWebhookProcessor.cs` etc.
+
+#### 4. `MongoIdentityRepositories.cs` — comentário stale corrigido
+- `FornecedorRepository` tinha comentário "stub / retorna lista vazia / ignora write" (Onda P4 inicial).
+- Corrigido para descrever o estado real: código lê e grava via `EnqueueInsert`/`Find`.
+
+### Verificações desta rodada (nenhuma alteração necessária)
+
+| Arquivo | Resultado |
+|---|---|
+| `MetricasFinanceirasUseCase.cs` | Limpo após fix `191f685` — comentários de multi-tenant e janela 365d são intencionais |
+| `AssinaturaEmpresaRepository.cs` (Postgre) | Limpo — `IgnoreQueryFilters()` intencional em métricas; JOIN explícito documentado |
+| `IAssinaturaEmpresaRepository.cs` | Limpo — fixes do round anterior mantidos |
+| `ResetTokenRepository` (em MongoIdentityRepositories) | Referência fully-qualified `TokenHashHelper` deixada intencional (uso único, evita poluir usings) |
+
+### Padrões observados
+
+- Segunda passagem de cleanup ocorre quando a primeira rodada marca arquivo como "Limpo" mas usando deixa escorrer algum detalhe (falta de XML doc em método novo, variável renomeada mas não atualizada nos pares).
+- Arquivos com múltiplas classes (ex: MongoIdentityRepositories, 738 linhas) acumulam mais facilmente comentários stale em classes menos usadas — monitorar com atenção.
+
+---
+
 ## 2026-05-07 — Commits billing F10–F14 (dashboard financeiro, cache, adapters, webhook, auto-ticket)
 
 ### Arquivos analisados (24 arquivos .cs dos commits 74a2b08..5b88609)
