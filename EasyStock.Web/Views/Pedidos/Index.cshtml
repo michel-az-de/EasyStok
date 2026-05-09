@@ -393,6 +393,14 @@
                     </span>
                 </legend>
 
+                @if (Model.Categorias.Count == 0)
+                {
+                    <div class="rounded-lg p-3 mb-3 text-sm border bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-200">
+                        <strong>Atenção:</strong> nenhuma categoria cadastrada. Você só conseguirá adicionar produtos que já existem na base.
+                        <a href="/produtos" class="underline font-medium">Cadastre uma categoria em Produtos</a> pra liberar o cadastro inline de produto novo.
+                    </div>
+                }
+
                 <template x-if="form.itens.length === 0">
                     <div class="ped-itens-empty">
                         <div class="text-2xl mb-1">🛒</div>
@@ -546,6 +554,7 @@ function novoPedidoModal() {
         telefone = c.Telefone
     })));
     const categoriaPadrao = @Html.Raw(Json.Serialize(Model.Categorias.FirstOrDefault()?.Id.ToString() ?? ""));
+    const categoriasIds = @Html.Raw(Json.Serialize(Model.Categorias.Select(c => c.Id.ToString()).ToArray()));
 
     let _itemUid = 0;
     const novoItem = () => ({
@@ -773,6 +782,13 @@ function novoPedidoModal() {
         abrirCadastroProduto(it) {
             const nome = (it.busca || '').trim();
             if (!nome) return;
+            // Prevenção: API exige CategoriaId. Se a empresa não tem nenhuma cadastrada,
+            // bloqueia o caminho e orienta — em vez de deixar quebrar com 400 no submit.
+            if (categoriasIds.length === 0) {
+                this.erroMsg = 'Cadastre uma categoria em Produtos antes de criar produtos novos pelo modal.';
+                it.dropdownOpen = false;
+                return;
+            }
             it.nome = nome;
             it.novoCadastro = true;
             it.produtoId = null;
@@ -812,32 +828,56 @@ function novoPedidoModal() {
         },
         itensValidos() {
             if (this.form.itens.length === 0) return false;
-            return this.form.itens.every(it => {
-                if (!it.nome || !it.nome.trim()) {
-                    // Item ainda não consolidado (busca digitada mas não selecionado nem cadastrado)
-                    return false;
-                }
-                if (it.novoCadastro && !it.categoriaId) return false;
-                return it.quantidade > 0 && it.precoUnitario >= 0;
-            });
+            return this.form.itens.every(it => this._itemValido(it) === true);
+        },
+        // Retorna true ou string com motivo do erro (pra _preflight()).
+        _itemValido(it) {
+            // Item precisa estar consolidado: ou tem produtoId (selecionado) ou está em modo novoCadastro.
+            if (!it.produtoId && !it.novoCadastro) return 'Selecione ou cadastre um produto para cada linha.';
+            if (!it.nome || !it.nome.trim()) return 'Item sem nome.';
+            if (it.novoCadastro) {
+                if (!it.categoriaId) return 'Selecione a categoria do produto novo "' + it.nome + '".';
+                if (!categoriasIds.includes(String(it.categoriaId))) return 'Categoria do produto "' + it.nome + '" não existe.';
+            }
+            const q = Number(it.quantidade);
+            if (!(q > 0)) return 'Quantidade do item "' + it.nome + '" precisa ser maior que zero.';
+            const p = Number(it.precoUnitario);
+            if (!(p >= 0)) return 'Preço do item "' + it.nome + '" inválido.';
+            return true;
         },
         podeEnviar() { return this.clienteValido() && this.itensValidos(); },
+
+        // Pré-flight rigoroso: roda todas as validações e retorna a primeira mensagem
+        // de erro acionável. Ponto único de prevenção antes de bater na API.
+        _preflight() {
+            // Cliente
+            if (!this.form.clienteId && !this.clienteNovo.ativo && this.form.modo !== 'avulso') {
+                return 'Selecione um cliente, cadastre um novo ou marque venda avulsa.';
+            }
+            if (this.clienteNovo.ativo) {
+                const nome = (this.clienteNovo.nome || '').trim();
+                if (!nome) return 'Informe o nome do cliente novo.';
+                if (nome.length > 150) return 'Nome do cliente excede 150 caracteres.';
+            }
+            if (this.form.modo === 'avulso' && !(this.form.nomeAdHoc || '').trim()) {
+                return 'Informe pelo menos uma identificação para a venda avulsa.';
+            }
+            // Itens
+            if (this.form.itens.length === 0) return 'Adicione pelo menos 1 item ao pedido.';
+            for (const it of this.form.itens) {
+                const v = this._itemValido(it);
+                if (v !== true) return v;
+            }
+            return null; // tudo OK
+        },
 
         // ── Submit: orquestração com etapas animadas + console group ──────
         async submit() {
             if (this.loading) return;
-            if (!this.podeEnviar()) {
-                if (!this.clienteValido()) {
-                    this.erroMsg = 'Selecione um cliente, cadastre um novo ou marque venda avulsa.';
-                } else if (this.form.itens.length === 0) {
-                    this.erroMsg = 'Adicione pelo menos 1 item ao pedido.';
-                } else if (this.form.itens.some(i => i.novoCadastro && !i.categoriaId)) {
-                    this.erroMsg = 'Selecione a categoria dos produtos novos.';
-                } else if (this.form.itens.some(i => !i.nome || !i.nome.trim())) {
-                    this.erroMsg = 'Selecione ou cadastre um produto para cada linha.';
-                } else {
-                    this.erroMsg = 'Verifique quantidade e preço de cada item.';
-                }
+            const motivo = this._preflight();
+            if (motivo) {
+                this.erroMsg = motivo;
+                console.warn('[Pedidos] Pré-flight bloqueou submit:', motivo);
                 return;
             }
 
