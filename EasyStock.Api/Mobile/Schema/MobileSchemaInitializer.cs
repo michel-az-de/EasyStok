@@ -39,19 +39,38 @@ public static class MobileSchemaInitializer
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
 
-        foreach (var path in files)
+        // ExecuteSqlRawAsync faz string.Format internamente — quebra com FormatException
+        // se o SQL contiver chaves literais (jsonb defaults, blocos DO $$, etc). Usamos
+        // DbCommand direto pra passar o SQL exatamente como esta no arquivo.
+        var connection = db.Database.GetDbConnection();
+        var openedHere = connection.State != System.Data.ConnectionState.Open;
+        if (openedHere)
+            await connection.OpenAsync(ct);
+
+        try
         {
-            var sql = await File.ReadAllTextAsync(path, ct);
-            try
+            foreach (var path in files)
             {
-                await db.Database.ExecuteSqlRawAsync(sql, ct);
-                logger.LogInformation("Mobile schema aplicado: {File}", Path.GetFileName(path));
+                var sql = await File.ReadAllTextAsync(path, ct);
+                try
+                {
+                    await using var cmd = connection.CreateCommand();
+                    cmd.CommandText = sql;
+                    cmd.CommandTimeout = 120;
+                    await cmd.ExecuteNonQueryAsync(ct);
+                    logger.LogInformation("Mobile schema aplicado: {File}", Path.GetFileName(path));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Falha ao aplicar Mobile schema {File}", Path.GetFileName(path));
+                    throw;
+                }
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Falha ao aplicar Mobile schema {File}", Path.GetFileName(path));
-                throw;
-            }
+        }
+        finally
+        {
+            if (openedHere)
+                await connection.CloseAsync();
         }
     }
 }

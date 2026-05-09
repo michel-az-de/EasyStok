@@ -671,23 +671,34 @@ if (app.Environment.IsProduction()
         "que todos os APKs estiverem pareados via /dispositivos.");
 }
 
-// Fail-fast Efi: em Production, recusar subir sem WebhookSecret a menos que
-// AllowUnsigned=true esteja explicito (combinacao gritante registrada). Sem
-// isso, um deploy com secret vazio aceitaria webhook forjado se alguem virar
-// AllowUnsigned por engano.
+// Fail-fast Efi: em Production COM PIX REAL (Sandbox=false), recusar subir sem
+// WebhookSecret a menos que AllowUnsigned=true esteja explicito. Em Sandbox=true
+// (default no appsettings) o webhook nao processa dinheiro real — relaxamos pra
+// LogWarning. Sem isso, um deploy com secret vazio aceitaria webhook forjado se
+// alguem virar AllowUnsigned por engano em prod real.
 if (app.Environment.IsProduction())
 {
     var efiSecret = app.Configuration["Efi:WebhookSecret"];
     var efiAllowUnsigned = app.Configuration.GetValue<bool>("Efi:WebhookAllowUnsigned", false);
+    var efiSandbox = app.Configuration.GetValue<bool>("Efi:Sandbox", true);
+
     if (string.IsNullOrWhiteSpace(efiSecret) && !efiAllowUnsigned)
     {
-        throw new InvalidOperationException(
-            "Efi:WebhookSecret vazio em Production e Efi:WebhookAllowUnsigned=false. " +
-            "Configurar Efi__WebhookSecret no App Service ou setar explicitamente " +
-            "Efi__WebhookAllowUnsigned=true (NAO recomendado). Subir sem nenhum " +
-            "dos dois deixaria o webhook /api/webhooks/pix sem autenticacao.");
+        if (efiSandbox)
+        {
+            app.Logger.LogWarning(
+                "[Efi] WebhookSecret vazio em Sandbox — /api/webhooks/pix vai aceitar requests " +
+                "sem HMAC. OK em ambiente de teste; configure Efi__WebhookSecret antes de virar Sandbox=false.");
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Efi:WebhookSecret vazio em Production com Sandbox=false e Efi:WebhookAllowUnsigned=false. " +
+                "Configurar Efi__WebhookSecret antes de receber PIX real ou setar explicitamente " +
+                "Efi__WebhookAllowUnsigned=true (NAO recomendado).");
+        }
     }
-    if (efiAllowUnsigned)
+    else if (efiAllowUnsigned)
     {
         app.Logger.LogWarning(
             "Efi:WebhookAllowUnsigned=true em Production — /api/webhooks/pix aceita " +
