@@ -671,18 +671,29 @@ if (app.Environment.IsProduction()
         "que todos os APKs estiverem pareados via /dispositivos.");
 }
 
-// Fail-fast Efi: em Production COM PIX REAL (Sandbox=false), recusar subir sem
-// WebhookSecret a menos que AllowUnsigned=true esteja explicito. Em Sandbox=true
-// (default no appsettings) o webhook nao processa dinheiro real — relaxamos pra
-// LogWarning. Sem isso, um deploy com secret vazio aceitaria webhook forjado se
-// alguem virar AllowUnsigned por engano em prod real.
+// Fail-fast Efi: so exige WebhookSecret quando o modulo Efi esta EFETIVAMENTE
+// configurado (ClientId ou ClientSecret presentes). Sem credenciais Efi, o
+// webhook /api/webhooks/pix nem processa nada util — exigir secret bloquearia
+// ambientes que nao usam PIX (ex: Render de teste, dev). Quando Efi for
+// configurado e Sandbox=false, ai sim aborta sem secret.
 if (app.Environment.IsProduction())
 {
+    var efiClientId = app.Configuration["Efi:ClientId"];
+    var efiClientSecret = app.Configuration["Efi:ClientSecret"];
+    var efiConfigurado = !string.IsNullOrWhiteSpace(efiClientId)
+                        || !string.IsNullOrWhiteSpace(efiClientSecret);
+
     var efiSecret = app.Configuration["Efi:WebhookSecret"];
     var efiAllowUnsigned = app.Configuration.GetValue<bool>("Efi:WebhookAllowUnsigned", false);
     var efiSandbox = app.Configuration.GetValue<bool>("Efi:Sandbox", true);
 
-    if (string.IsNullOrWhiteSpace(efiSecret) && !efiAllowUnsigned)
+    if (!efiConfigurado)
+    {
+        app.Logger.LogInformation(
+            "[Efi] Modulo nao configurado (ClientId/ClientSecret vazios) — webhook PIX " +
+            "fica inerte. Setar Efi__ClientId/ClientSecret/WebhookSecret quando ativar PIX.");
+    }
+    else if (string.IsNullOrWhiteSpace(efiSecret) && !efiAllowUnsigned)
     {
         if (efiSandbox)
         {
