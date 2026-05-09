@@ -146,6 +146,111 @@
           x-transition:enter="transition duration-150 ease-out"
           x-transition:enter-start="opacity-0 scale-95"
           x-transition:enter-end="opacity-100 scale-100">
+
+        <!-- ============== FASE: PROCESSANDO ============== -->
+        <div x-show="fase === 'processando'" x-cloak class="ped-flow">
+            <header class="fm-header">
+                <div>
+                    <h2 class="fm-header__title">Processando seu pedido…</h2>
+                    <p class="fm-header__subtitle">Não feche esta janela.</p>
+                </div>
+            </header>
+            <div class="fm-body">
+                <ul class="ped-flow__steps">
+                    <template x-for="etapa in etapas" :key="etapa.id">
+                        <li class="ped-flow__step" :class="'ped-flow__step--' + etapa.status">
+                            <span class="ped-flow__icon" aria-hidden="true">
+                                <svg x-show="etapa.status === 'pending'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 4"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'running'" x-cloak class="ped-flow__spin" viewBox="0 0 24 24" width="20" height="20">
+                                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="20 40"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'done'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'error'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span class="ped-flow__label">
+                                <span class="ped-flow__title" x-text="etapa.label"></span>
+                                <span class="ped-flow__detail" x-show="etapa.detalhe" x-cloak x-text="etapa.detalhe"></span>
+                            </span>
+                        </li>
+                    </template>
+                </ul>
+
+                <div x-show="erroMsg" x-cloak class="fm-error mt-4" x-text="erroMsg" role="alert"></div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" x-show="erroMsg" x-cloak @@click="voltarParaFormulario()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Voltar e ajustar
+                </button>
+            </footer>
+        </div>
+
+        <!-- ============== FASE: RECIBO (sucesso) ============== -->
+        <div x-show="fase === 'concluido'" x-cloak class="ped-recibo">
+            <header class="fm-header ped-recibo__header">
+                <div>
+                    <div class="ped-recibo__check">
+                        <svg viewBox="0 0 24 24" width="36" height="36">
+                            <circle cx="12" cy="12" r="11" fill="#10b981" />
+                            <path d="M7 12.5l3.5 3.5L17 9" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h2 class="fm-header__title">Pedido criado</h2>
+                    <p class="fm-header__subtitle">
+                        Nº <span class="font-mono" x-text="reciboPedidoCurto"></span>
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="irParaPedido()">✕</button>
+            </header>
+            <div class="fm-body">
+                <div class="ped-recibo__bloco">
+                    <span class="ped-recibo__label">Cliente</span>
+                    <span class="ped-recibo__valor" x-text="clienteResumo || '(venda avulsa)'"></span>
+                </div>
+                <div class="ped-recibo__itens">
+                    <span class="ped-recibo__label">Itens</span>
+                    <ul>
+                        <template x-for="it in form.itens" :key="it.uid">
+                            <li>
+                                <span class="ped-recibo__item-nome" x-text="it.nome"></span>
+                                <span class="ped-recibo__item-detalhe">
+                                    <span x-text="it.quantidade"></span>
+                                    × <span x-text="formatBRL(it.precoUnitario)"></span>
+                                </span>
+                                <span class="ped-recibo__item-sub" x-text="formatBRL((it.quantidade || 0) * (it.precoUnitario || 0))"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+                <div class="ped-recibo__total">
+                    <span>Total</span>
+                    <span x-text="formatBRL(totalPedido)"></span>
+                </div>
+                <div class="ped-recibo__obs" x-show="form.observacoes" x-cloak>
+                    <span class="ped-recibo__label">Observações</span>
+                    <p x-text="form.observacoes"></p>
+                </div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="abrirOutroPedido()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Novo pedido
+                </button>
+                <button type="button" @@click="irParaPedido()"
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    Ver na esteira →
+                </button>
+            </footer>
+        </div>
+
+        <!-- ============== FASE: EDITANDO (form padrão) ============== -->
+        <div x-show="fase === 'editando'">
         <header class="fm-header">
             <div>
                 <h2 id="fm-pedido-title" class="fm-header__title">Novo pedido</h2>
@@ -424,12 +529,10 @@
             <button type="submit" :disabled="loading || !podeEnviar()"
                     :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Criar pedido</span>
-                <span x-show="loading" x-cloak class="flex items-center gap-2">
-                    <span class="spinner"></span> <span x-text="loadingMsg || 'Salvando…'"></span>
-                </span>
+                <span>Criar pedido</span>
             </button>
         </footer>
+        </div><!-- /fase editando -->
     </form>
 </div>
 
@@ -460,14 +563,16 @@ function novoPedidoModal() {
 
     return {
         open: false,
+        fase: 'editando',         // editando | processando | concluido
         loading: false,
-        loadingMsg: '',
         erroMsg: '',
         clienteBusca: '',
         comboboxOpen: false,
         comboboxIndex: 0,
         _previousFocus: null,
         clienteNovo: { ativo: false, nome: '', telefone: '', apt: '' },
+        etapas: [],
+        pedidoCriado: null,       // { id }
         form: {
             modo: 'auto',           // auto | avulso
             clienteId: '',
@@ -475,10 +580,74 @@ function novoPedidoModal() {
             observacoes: '', itens: []
         },
 
+        get reciboPedidoCurto() {
+            const id = this.pedidoCriado?.id || '';
+            return id ? id.toString().slice(0, 8).toUpperCase() : '—';
+        },
+
+        // Adiciona / atualiza etapas no painel de progresso
+        _etapaSet(id, label, status, detalhe) {
+            const idx = this.etapas.findIndex(e => e.id === id);
+            const dado = { id, label, status, detalhe: detalhe || '' };
+            if (idx >= 0) this.etapas.splice(idx, 1, dado);
+            else this.etapas.push(dado);
+        },
+        _etapaUpdate(id, status, detalhe) {
+            const e = this.etapas.find(x => x.id === id);
+            if (!e) return;
+            e.status = status;
+            if (detalhe !== undefined) e.detalhe = detalhe;
+        },
+        async _runEtapa(id, label, fn) {
+            this._etapaSet(id, label, 'running');
+            console.log('%c→ ' + label, 'color:#6366f1;font-weight:bold');
+            const t0 = performance.now();
+            try {
+                const result = await fn();
+                const dt = Math.round(performance.now() - t0);
+                this._etapaUpdate(id, 'done', dt + 'ms');
+                console.log('%c✓ ' + label + ' (' + dt + 'ms)', 'color:#10b981', result || '');
+                return result;
+            } catch (err) {
+                const dt = Math.round(performance.now() - t0);
+                this._etapaUpdate(id, 'error', err?.message || 'falhou');
+                console.error('✗ ' + label + ' (' + dt + 'ms)', err);
+                throw err;
+            }
+        },
+
+        voltarParaFormulario() {
+            this.fase = 'editando';
+            this.erroMsg = '';
+            this.etapas = [];
+        },
+        irParaPedido() {
+            if (this.pedidoCriado?.id) {
+                window.location.href = '/pedidos/' + this.pedidoCriado.id;
+            } else {
+                this.close();
+            }
+        },
+        abrirOutroPedido() {
+            // Reset completo do formulário, mantém modal aberto.
+            this.fase = 'editando';
+            this.etapas = [];
+            this.pedidoCriado = null;
+            this.erroMsg = '';
+            this.limparCliente();
+            this.form.observacoes = '';
+            this.form.itens = [];
+            this.form.modo = 'auto';
+        },
+
         init() {
             window.addEventListener('open-modal', (e) => {
                 if (e.detail !== 'novo-pedido') return;
                 this._previousFocus = document.activeElement;
+                this.fase = 'editando';
+                this.etapas = [];
+                this.pedidoCriado = null;
+                this.erroMsg = '';
                 this.open = true;
                 this.$nextTick(() => {
                     const el = this.$refs.panel.querySelector('input, select, textarea');
@@ -647,7 +816,7 @@ function novoPedidoModal() {
         },
         podeEnviar() { return this.clienteValido() && this.itensValidos(); },
 
-        // ── Submit: orquestração ──────────────────────────────────────────
+        // ── Submit: orquestração com etapas animadas + console group ──────
         async submit() {
             if (this.loading) return;
             if (!this.podeEnviar()) {
@@ -665,41 +834,73 @@ function novoPedidoModal() {
                 return;
             }
 
-            this.loading = true; this.erroMsg = '';
+            this.loading = true;
+            this.erroMsg = '';
+            this.etapas = [];
+            this.fase = 'processando';
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+            const novos = this.form.itens.filter(it => it.novoCadastro);
 
+            // Pré-popula etapas com status "pending" pra usuário ver o roteiro completo.
+            if (this.clienteNovo.ativo) {
+                this._etapaSet('cliente', 'Cadastrar cliente "' + this.clienteNovo.nome.trim() + '"', 'pending');
+            }
+            novos.forEach((it, k) => {
+                this._etapaSet('prod-' + it.uid,
+                    'Cadastrar produto "' + it.nome.trim() + '" + entrada de estoque',
+                    'pending');
+            });
+            this._etapaSet('pedido', 'Criar pedido e movimentar saída de estoque', 'pending');
+
+            console.group('%c[Pedidos] Criando pedido', 'color:#6366f1;font-weight:bold');
+            console.log('Cliente novo:', this.clienteNovo.ativo ? this.clienteNovo : (this.form.clienteId || '(avulso)'));
+            console.log('Itens:', this.form.itens.length, '| produtos novos:', novos.length);
+            if (this.form.itens.length) console.table(this.form.itens.map(i => ({
+                nome: i.nome, qtd: i.quantidade, preco: i.precoUnitario,
+                produtoId: i.produtoId || '(novo)', cadastrar: i.novoCadastro
+            })));
+
+            const t0 = performance.now();
             try {
-                // 1) Cadastrar cliente novo se necessário.
+                // 1) Cliente novo
                 if (this.clienteNovo.ativo) {
-                    this.loadingMsg = 'Cadastrando cliente…';
-                    const r = await this._postJson('/clientes/json', {
-                        nome: this.clienteNovo.nome.trim(),
-                        telefone: this.clienteNovo.telefone || null,
-                        apt: this.clienteNovo.apt || null
-                    }, token);
-                    if (!r.ok) { this.erroMsg = r.err || 'Erro ao cadastrar cliente.'; return; }
-                    this.form.clienteId = r.data.id;
+                    const r = await this._runEtapa('cliente',
+                        'Cadastrar cliente "' + this.clienteNovo.nome.trim() + '"',
+                        async () => {
+                            const res = await this._postJson('/clientes/json', {
+                                nome: this.clienteNovo.nome.trim(),
+                                telefone: this.clienteNovo.telefone || null,
+                                apt: this.clienteNovo.apt || null
+                            }, token);
+                            if (!res.ok) throw new Error(res.err);
+                            return { id: res.data.id };
+                        });
+                    this.form.clienteId = r.id;
                 }
 
-                // 2) Cadastrar produtos novos (cada um com entrada de estoque).
-                const novos = this.form.itens.filter(it => it.novoCadastro);
-                for (let k = 0; k < novos.length; k++) {
-                    const it = novos[k];
-                    this.loadingMsg = 'Cadastrando produto ' + (k + 1) + '/' + novos.length + '…';
-                    const r = await this._postJson('/produtos/quick.json', {
-                        nome: it.nome.trim(),
-                        categoriaId: it.categoriaId,
-                        precoReferencia: it.precoUnitario || null,
-                        custoReferencia: it.custoCadastro || null,
-                        qtdInicial: Math.max(1, Math.ceil(Number(it.quantidade) || 1))
-                    }, token);
-                    if (!r.ok) { this.erroMsg = r.err || ('Erro ao cadastrar produto "' + it.nome + '".'); return; }
-                    it.produtoId = r.data.id;
-                    it.novoCadastro = false; // consolidado
+                // 2) Produtos novos (cria + entrada de estoque)
+                for (const it of novos) {
+                    const r = await this._runEtapa('prod-' + it.uid,
+                        'Cadastrar produto "' + it.nome.trim() + '" + entrada de estoque',
+                        async () => {
+                            const res = await this._postJson('/produtos/quick.json', {
+                                nome: it.nome.trim(),
+                                categoriaId: it.categoriaId,
+                                precoReferencia: it.precoUnitario || null,
+                                custoReferencia: it.custoCadastro || null,
+                                qtdInicial: Math.max(1, Math.ceil(Number(it.quantidade) || 1))
+                            }, token);
+                            if (!res.ok) throw new Error(res.err);
+                            return { id: res.data.id, entradaOk: res.data.entradaOk };
+                        });
+                    it.produtoId = r.id;
+                    it.novoCadastro = false;
+                    if (r.entradaOk === false) {
+                        console.warn('Produto cadastrado mas entrada de estoque falhou:', it.nome);
+                    }
                 }
 
-                // 3) Criar o pedido com tudo linkado.
-                this.loadingMsg = 'Criando pedido…';
+                // 3) Pedido (consome do estoque e cria fluxo)
                 const usaAvulso = this.form.modo === 'avulso' && !this.form.clienteId;
                 const payload = {
                     clienteId: this.form.clienteId || null,
@@ -714,15 +915,40 @@ function novoPedidoModal() {
                         produtoId: it.produtoId || null
                     }))
                 };
-                const ped = await this._postJson('/pedidos/json', payload, token);
-                if (!ped.ok) { this.erroMsg = ped.err || 'Erro ao criar pedido.'; return; }
-                window.location.href = '/pedidos/' + ped.data.id;
-            } catch {
-                this.erroMsg = 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+                const pedido = await this._runEtapa('pedido',
+                    'Criar pedido e movimentar saída de estoque',
+                    async () => {
+                        const res = await this._postJson('/pedidos/json', payload, token);
+                        if (!res.ok) throw new Error(res.err);
+                        return { id: res.data.id };
+                    });
+
+                this.pedidoCriado = pedido;
+                const dt = Math.round(performance.now() - t0);
+                console.log('%c✓ Pedido criado em ' + dt + 'ms', 'color:#10b981;font-weight:bold', pedido);
+                console.groupEnd();
+
+                // Pequeno delay pra animação dos checks ficar visível antes do recibo.
+                await new Promise(r => setTimeout(r, 350));
+                this.fase = 'concluido';
+            } catch (err) {
+                console.groupEnd();
+                this.erroMsg = this._diagnostico(err);
             } finally {
                 this.loading = false;
-                this.loadingMsg = '';
             }
+        },
+
+        _diagnostico(err) {
+            const msg = err?.message || '';
+            if (!msg) return 'Algo deu errado. Verifique sua conexão e tente de novo.';
+            // Mensagens conhecidas viram orientações
+            if (/sess[aã]o|expir/i.test(msg)) return 'Sua sessão expirou. Recarregue a página e refaça.';
+            if (/timeout|sem conex|n[ãa]o foi poss[ií]vel conectar/i.test(msg)) return 'Sem conexão com o servidor. Tente de novo em instantes.';
+            if (/501|n[ãa]o suportada/i.test(msg)) return 'O servidor não conseguiu processar uma das etapas. Avise o suporte com o que está cadastrando.';
+            if (/categoria/i.test(msg)) return 'Categoria inválida ou não encontrada. Cadastre uma categoria primeiro em Produtos.';
+            if (/cnpj|cpf|documento/i.test(msg)) return 'Documento inválido — confira CPF/CNPJ.';
+            return msg;
         },
 
         async _postJson(url, body, token) {
