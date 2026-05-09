@@ -19,6 +19,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(t => t.SlaRespostaViolado).HasDefaultValue(false);
             builder.Property(t => t.SlaResolucaoViolado).HasDefaultValue(false);
 
+            builder.Property(t => t.ComentarioCsat).HasMaxLength(500);
+
+            // Garante NotaCsat coerente quando preenchida — DB-side defense em
+            // adicao a validacao no endpoint POST avaliacao.
+            builder.ToTable(t => t.HasCheckConstraint(
+                "ck_admin_tickets_nota_csat_range",
+                "\"NotaCsat\" IS NULL OR (\"NotaCsat\" BETWEEN 1 AND 5)"));
+
             builder.HasOne(t => t.Empresa)
                 .WithMany()
                 .HasForeignKey(t => t.EmpresaId)

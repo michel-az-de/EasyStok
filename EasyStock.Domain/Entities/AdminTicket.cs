@@ -29,6 +29,14 @@ namespace EasyStock.Domain.Entities
         public DateTime? UltimoAlerta50PctEm { get; set; }
         public DateTime? UltimoAlerta80PctEm { get; set; }
 
+        // CSAT — avaliacao do cliente apos fechamento.
+        // NotaCsat 1..5; preenchido via endpoint POST /api/helpdesk/tickets/{id}/avaliacao.
+        public int? NotaCsat { get; set; }
+        public string? ComentarioCsat { get; set; }
+        public DateTime? AvaliadoEm { get; set; }
+        // Carimbo do convite enviado (idempotencia: nao enviar segundo convite no mesmo ticket).
+        public DateTime? ConviteCsatEnviadoEm { get; set; }
+
         // Auto-relacionamento (bug-fix encaminhado para dev)
         public Guid? OrigemTicketId { get; set; }
 

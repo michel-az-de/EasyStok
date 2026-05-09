@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -17,7 +18,7 @@ namespace EasyStock.Api.Services.Helpdesk;
 public sealed class HelpdeskTicketService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    SlaResolver slaResolver,
+    ISlaResolver slaResolver,
     INotificadorService notificador)
 {
     public async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
@@ -159,6 +160,14 @@ public sealed class HelpdeskTicketService(
         if (cmd.NovoStatus == TicketStatus.Resolvido && ticket.ResolvidoEm is null)
             ticket.ResolvidoEm = DateTime.UtcNow;
 
+        // Convite CSAT no fechamento — uma vez por ticket. Carimbo idempotente
+        // evita reenvio caso ticket reabra (cliente respondeu) e feche de novo.
+        var enviarConviteCsat = cmd.NovoStatus == TicketStatus.Fechado
+            && ticket.ConviteCsatEnviadoEm is null
+            && ticket.CriadoPorId.HasValue;
+        if (enviarConviteCsat)
+            ticket.ConviteCsatEnviadoEm = DateTime.UtcNow;
+
         db.TicketHistoricos.Add(TicketHistorico.Criar(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.StatusAlterado,
             valorAntes: statusAntes.ToString(),
@@ -172,6 +181,21 @@ public sealed class HelpdeskTicketService(
             usuarioDestinoId: ticket.CriadoPorId,
             payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, statusAntes = statusAntes.ToString(), statusDepois = cmd.NovoStatus.ToString() }),
             ct: ct);
+
+        if (enviarConviteCsat)
+        {
+            await notificador.PublicarEventoAsync(
+                TipoEventoNotificacao.ConviteCsat,
+                ticket.EmpresaId,
+                usuarioDestinoId: ticket.CriadoPorId,
+                payloadJson: JsonSerializer.Serialize(new
+                {
+                    ticketId = ticket.Id,
+                    titulo = ticket.Titulo,
+                    avaliarUrl = $"/api/helpdesk/tickets/{ticket.Id}/avaliacao"
+                }),
+                ct: ct);
+        }
     }
 
     public async Task AlterarPrioridadeAsync(AlterarPrioridadeTicketCommand cmd, CancellationToken ct = default)
