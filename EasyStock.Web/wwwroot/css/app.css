@@ -3447,6 +3447,443 @@ html.theme-dark .ped-add-row {
     }
 }
 
+/* ============================================================
+   KDS — Kitchen Display System
+   ============================================================ */
+.kds-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: var(--bg-elevated, #ffffff);
+    border: 1px solid rgba(226, 232, 240, .85);
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+html.theme-dark .kds-toolbar {
+    background: rgba(15, 23, 42, .85);
+    border-color: rgba(71, 85, 105, .5);
+}
+
+.kds-badge-total {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    background: rgba(241, 245, 249, .9);
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+html.theme-dark .kds-badge-total {
+    background: rgba(15, 23, 42, .8);
+    color: #94a3b8;
+}
+
+.kds-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.kds-col {
+    background: var(--bg-elevated, #ffffff);
+    border: 1px solid rgba(226, 232, 240, .85);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 240px;
+}
+
+html.theme-dark .kds-col {
+    background: rgba(15, 23, 42, .85);
+    border-color: rgba(71, 85, 105, .5);
+}
+
+.kds-col__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(226, 232, 240, .85);
+}
+
+.kds-col__header h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    margin: 0;
+}
+
+.kds-col__count {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    min-width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(241, 245, 249, .9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+}
+
+.kds-col__header--aguardando {
+    background: linear-gradient(180deg, rgba(254, 243, 199, .55) 0%, rgba(254, 243, 199, .15) 100%);
+    border-bottom-color: rgba(252, 211, 77, .4);
+}
+.kds-col__header--aguardando .kds-col__count {
+    background: rgba(245, 158, 11, .15);
+    color: #92400e;
+}
+
+.kds-col__header--preparando {
+    background: linear-gradient(180deg, rgba(219, 234, 254, .55) 0%, rgba(219, 234, 254, .15) 100%);
+    border-bottom-color: rgba(96, 165, 250, .4);
+}
+.kds-col__header--preparando .kds-col__count {
+    background: rgba(59, 130, 246, .15);
+    color: #1e40af;
+}
+
+.kds-col__header--pronto {
+    background: linear-gradient(180deg, rgba(237, 233, 254, .55) 0%, rgba(237, 233, 254, .15) 100%);
+    border-bottom-color: rgba(167, 139, 250, .4);
+}
+.kds-col__header--pronto .kds-col__count {
+    background: rgba(139, 92, 246, .15);
+    color: #6b21a8;
+}
+
+html.theme-dark .kds-col__header--aguardando {
+    background: linear-gradient(180deg, rgba(120, 53, 15, .25) 0%, rgba(120, 53, 15, .05) 100%);
+}
+html.theme-dark .kds-col__header--preparando {
+    background: linear-gradient(180deg, rgba(30, 64, 175, .25) 0%, rgba(30, 64, 175, .05) 100%);
+}
+html.theme-dark .kds-col__header--pronto {
+    background: linear-gradient(180deg, rgba(91, 33, 182, .25) 0%, rgba(91, 33, 182, .05) 100%);
+}
+
+.kds-col__body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.kds-col__empty {
+    text-align: center;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 13px;
+    padding: 24px 12px;
+    background: rgba(248, 250, 252, .5);
+    border: 1px dashed rgba(226, 232, 240, .85);
+    border-radius: 10px;
+}
+
+html.theme-dark .kds-col__empty {
+    background: rgba(15, 23, 42, .5);
+    border-color: rgba(71, 85, 105, .55);
+}
+
+/* Card */
+.kds-card {
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, .85);
+    border-left-width: 4px;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+    transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+}
+
+html.theme-dark .kds-card {
+    background: rgba(30, 41, 59, .92);
+    border-color: rgba(71, 85, 105, .55);
+}
+
+.kds-card:hover {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .12);
+    transform: translateY(-1px);
+}
+
+.kds-card--verde   { border-left-color: #10b981; }
+.kds-card--laranja { border-left-color: #f59e0b; }
+.kds-card--vermelho { border-left-color: #ef4444; animation: kdsPulse 2s ease-in-out infinite; }
+.kds-card--violeta { border-left-color: #8b5cf6; }
+
+@keyframes kdsPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .3); }
+    50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, .12); }
+}
+
+.kds-card--saindo {
+    opacity: .5;
+    transform: scale(.98);
+}
+
+.kds-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.kds-card__cliente {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    line-height: 1.2;
+}
+
+.kds-card__meta {
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+    margin-top: 2px;
+}
+
+.kds-card__tempo {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.kds-card__tempo-valor {
+    font-size: 18px;
+    font-weight: 700;
+    font-feature-settings: "tnum";
+    color: var(--text-primary, #0f172a);
+    line-height: 1;
+}
+
+.kds-card--vermelho .kds-card__tempo-valor { color: #b91c1c; }
+.kds-card--laranja  .kds-card__tempo-valor { color: #b45309; }
+
+.kds-card__tempo-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-secondary, #94a3b8);
+    margin-top: 2px;
+}
+
+.kds-card__itens {
+    margin: 8px 0;
+    padding: 6px 0;
+    border-top: 1px dashed rgba(226, 232, 240, .8);
+    border-bottom: 1px dashed rgba(226, 232, 240, .8);
+}
+
+html.theme-dark .kds-card__itens {
+    border-color: rgba(71, 85, 105, .5);
+}
+
+.kds-card__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.kds-card__link {
+    font-size: 12px;
+    color: var(--text-link, #1E48A8);
+    text-decoration: none;
+}
+
+.kds-card__link:hover {
+    text-decoration: underline;
+}
+
+.kds-btn {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s ease, transform .08s ease;
+}
+
+.kds-btn:active {
+    transform: scale(.97);
+}
+
+.kds-btn--primary {
+    background: #1E48A8;
+    color: #ffffff;
+}
+.kds-btn--primary:hover { background: #163880; }
+
+.kds-btn--success {
+    background: #10b981;
+    color: #ffffff;
+}
+.kds-btn--success:hover { background: #059669; }
+
+.kds-btn--neutral {
+    background: rgba(15, 23, 42, .85);
+    color: #ffffff;
+}
+.kds-btn--neutral:hover { background: rgba(15, 23, 42, .95); }
+
+.kds-empty {
+    text-align: center;
+    padding: 80px 20px;
+    background: var(--bg-elevated, #ffffff);
+    border: 1px solid rgba(226, 232, 240, .85);
+    border-radius: 14px;
+}
+
+html.theme-dark .kds-empty {
+    background: rgba(15, 23, 42, .85);
+    border-color: rgba(71, 85, 105, .5);
+}
+
+@media (max-width: 1023px) {
+    .kds-board { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 1280px) {
+    .kds-card__cliente { font-size: 18px; }
+    .kds-card__tempo-valor { font-size: 22px; }
+}
+
+/* ============================================================
+   Listas de Compras — agrupamento por categoria + check items
+   ============================================================ */
+.lc-grupo {
+    margin-bottom: 16px;
+}
+
+.lc-grupo:last-child {
+    margin-bottom: 0;
+}
+
+.lc-grupo__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(226, 232, 240, .85);
+}
+
+html.theme-dark .lc-grupo__header {
+    border-bottom-color: rgba(71, 85, 105, .5);
+}
+
+.lc-grupo__nome {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-secondary, #64748b);
+}
+
+.lc-grupo__count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary, #94a3b8);
+    font-feature-settings: "tnum";
+}
+
+.lc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    transition: opacity .12s ease;
+}
+
+.lc-item--done > div {
+    color: #94a3b8;
+    text-decoration: line-through;
+}
+
+.lc-checkbox {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 2px solid rgba(203, 213, 225, .9);
+    background: transparent;
+    color: transparent;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .12s ease;
+}
+
+.lc-checkbox:hover {
+    border-color: #1E48A8;
+}
+
+.lc-checkbox--checked {
+    background: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+}
+
+html.theme-dark .lc-checkbox {
+    border-color: rgba(71, 85, 105, .7);
+}
+
+/* Caixa — resumo do fechamento (destaque do saldo final) */
+.caixa-fechar-resumo {
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(254, 243, 199, .55) 0%, rgba(254, 243, 199, .15) 100%);
+    border: 1px solid rgba(252, 211, 77, .5);
+    border-radius: 12px;
+}
+
+html.theme-dark .caixa-fechar-resumo {
+    background: linear-gradient(135deg, rgba(120, 53, 15, .35) 0%, rgba(120, 53, 15, .1) 100%);
+    border-color: rgba(252, 211, 77, .4);
+}
+
+.caixa-fechar-resumo__item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed rgba(252, 211, 77, .5);
+}
+
+.caixa-fechar-resumo__valor {
+    font-size: 28px;
+    font-weight: 700;
+    color: #92400e;
+    font-feature-settings: "tnum";
+}
+
+html.theme-dark .caixa-fechar-resumo__valor {
+    color: #fbbf24;
+}
+
+.caixa-fechar-resumo__split {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    font-size: 13px;
+}
+
+@media (max-width: 540px) {
+    .caixa-fechar-resumo__split { grid-template-columns: 1fr; gap: 6px; }
+}
+
 /* Quick fill buttons (pendente / total) */
 .ped-quick-btn {
     padding: 4px 10px;

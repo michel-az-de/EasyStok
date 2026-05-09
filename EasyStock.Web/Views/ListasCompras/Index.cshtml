@@ -7,10 +7,10 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Listas de compras</h1>
-        <p>Liste o que falta comprar e marque conforme passa pelo mercado</p>
+        <p>Liste o que falta comprar e vá marcando conforme passa pelo mercado</p>
     </div>
     <button type="button" x-data @@click="$dispatch('open-modal', 'nova-lista')"
-            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Nova Lista</button>
+            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Nova lista</button>
 </div>
 
 <div class="ws mb-6">
@@ -29,9 +29,9 @@
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIcon", "🛒" },
-            { "EmptyTitle", "Nenhuma lista" },
-            { "EmptyDescription", "Crie uma lista pra organizar as compras do dia." },
-            { "EmptyCta", "+ Nova Lista" },
+            { "EmptyTitle", "Nenhuma lista de compras ainda" },
+            { "EmptyDescription", "Crie uma lista para organizar as compras antes de ir ao mercado e não esquecer nada." },
+            { "EmptyCta", "Criar primeira lista" },
             { "EmptyCtaModal", "nova-lista" }
         })
     }
@@ -57,21 +57,82 @@
     }
 </div>
 
-<!-- Modal nova lista -->
-<div x-data="{ open: false, nome: '', obs: '' }" @@open-modal.window="if ($event.detail === 'nova-lista') open = true"
+<!-- Modal: nova lista de compras -->
+<div x-data="novaListaModal()"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-     @@click.self="open = false" @@keydown.escape.window="open = false">
-    <form asp-action="Criar" asp-controller="ListasCompras" method="post" class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+     x-transition:enter="transition duration-150 ease-out"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     @@keydown.escape.window="close()"
+     @@click.self="close()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="fm-lista-title">
+    <form x-ref="panel" class="fm-panel" style="max-width: 480px"
+          asp-action="Criar" asp-controller="ListasCompras" method="post"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
         @Html.AntiForgeryToken()
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Nova lista de compras</h2>
-        <div class="space-y-3">
-            <input type="text" name="nome" x-model="nome" placeholder="Nome (ex: Compras de quarta)" required class="ui-field w-full text-sm" />
-            <textarea name="observacoes" x-model="obs" placeholder="Observações (opcional)" rows="2" class="ui-textarea w-full text-sm"></textarea>
+        <header class="fm-header">
+            <div>
+                <h2 id="fm-lista-title" class="fm-header__title">Nova lista de compras</h2>
+                <p class="fm-header__subtitle">Dê um nome à lista. Você adiciona os itens depois, conforme lembra ou consulta o estoque.</p>
+            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+        </header>
+        <div class="fm-body">
+            <fieldset class="fm-section">
+                <div class="fm-grid">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="lista-nome">
+                            Nome da lista<span class="fm-field__required" aria-hidden="true">*</span>
+                        </label>
+                        <input id="lista-nome" type="text" name="nome" required maxlength="80"
+                               placeholder="Ex: Compras de quarta, Reposição mercado..."
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="lista-obs">Observações</label>
+                        <textarea id="lista-obs" name="observacoes" rows="2"
+                                  placeholder="Ex: lembrar do açougue, pegar nota..."
+                                  class="ui-textarea w-full text-sm"></textarea>
+                    </div>
+                </div>
+            </fieldset>
         </div>
-        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
-            <button type="button" @@click="open = false" class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Criar</button>
-        </div>
+        <footer class="fm-footer">
+            <button type="button" @@click="close()"
+                    class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                Cancelar
+            </button>
+            <button type="submit"
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                Criar lista
+            </button>
+        </footer>
     </form>
 </div>
+
+@section Scripts {
+<script>
+function novaListaModal() {
+    return {
+        open: false,
+        _previousFocus: null,
+        init() {
+            window.addEventListener('open-modal', (e) => {
+                if (e.detail !== 'nova-lista') return;
+                this._previousFocus = document.activeElement;
+                this.open = true;
+                this.$nextTick(() => this.$refs.panel?.querySelector('input[name=nome]')?.focus());
+            });
+            this.$watch('open', (v) => {
+                document.body.style.overflow = v ? 'hidden' : '';
+                if (!v && this._previousFocus) this._previousFocus.focus?.();
+            });
+        },
+        close() { this.open = false; }
+    };
+}
+</script>
+}

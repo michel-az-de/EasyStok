@@ -1,0 +1,316 @@
+@model KdsViewModel
+@{
+    ViewBag.Title = "KDS — Cozinha";
+    Layout = "_Layout";
+
+    string corPorTempo(DateTime criadoUtc)
+    {
+        var min = (DateTime.UtcNow - criadoUtc).TotalMinutes;
+        if (min >= 30) return "kds-card--vermelho";   // crítico
+        if (min >= 15) return "kds-card--laranja";    // atenção
+        return "kds-card--verde";                       // tranquilo
+    }
+
+    string tempoLabel(DateTime criadoUtc)
+    {
+        var diff = DateTime.UtcNow - criadoUtc;
+        if (diff.TotalMinutes < 1) return "agora";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min";
+        return $"{(int)diff.TotalHours}h{diff.Minutes:D2}";
+    }
+}
+
+<div class="kds-toolbar">
+    <div class="flex items-center gap-3">
+        <h1 class="text-xl font-bold text-slate-900">KDS — Cozinha</h1>
+        <span class="kds-badge-total">
+            <span x-data x-text="document.querySelectorAll('.kds-card').length || @Model.TotalAbertos"></span>
+            pedidos abertos
+        </span>
+    </div>
+    <div class="flex items-center gap-2" x-data="kdsAutoRefresh()">
+        <span class="text-xs text-slate-500" x-text="ultimaAtualizacao"></span>
+        <button type="button" @@click="atualizar()" :disabled="loading"
+                class="ui-secondary-btn px-3 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 inline-flex items-center gap-2">
+            <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Atualizar
+        </button>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" x-model="autoOn" class="rounded border-slate-300" />
+            Auto-atualizar (15s)
+        </label>
+        <button type="button" @@click="telaCheia()"
+                class="ui-secondary-btn px-3 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+            🖥 Tela cheia
+        </button>
+    </div>
+</div>
+
+@if (Model.TotalAbertos == 0)
+{
+    <div class="kds-empty">
+        <div class="text-6xl mb-3">✨</div>
+        <h2 class="text-2xl font-bold text-slate-700 mb-2">Tudo em dia!</h2>
+        <p class="text-slate-500">Nenhum pedido aguardando preparo. Bom trabalho.</p>
+        <a href="/pedidos" class="mt-4 inline-block text-indigo-600 hover:underline text-sm">Ver todos os pedidos →</a>
+    </div>
+}
+else
+{
+    <div class="kds-board">
+        <!-- Coluna: Aguardando -->
+        <section class="kds-col">
+            <header class="kds-col__header kds-col__header--aguardando">
+                <h2>📥 Aguardando</h2>
+                <span class="kds-col__count">@Model.Aguardando.Count</span>
+            </header>
+            <div class="kds-col__body">
+                @if (!Model.Aguardando.Any())
+                {
+                    <div class="kds-col__empty">Nenhum pedido aguardando</div>
+                }
+                else
+                {
+                    @foreach (var p in Model.Aguardando)
+                    {
+                        <article class="kds-card @corPorTempo(p.CriadoEm)" data-pedido-id="@p.Id">
+                            <header class="kds-card__head">
+                                <div>
+                                    <div class="kds-card__cliente">@(p.ClienteNome ?? "Avulso")</div>
+                                    <div class="kds-card__meta">
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt)) { <span>@p.ClienteApt</span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt) && !string.IsNullOrEmpty(p.ClienteTelefone)) { <span> · </span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <span>@p.ClienteTelefone</span> }
+                                    </div>
+                                </div>
+                                <div class="kds-card__tempo">
+                                    <div class="kds-card__tempo-valor">@tempoLabel(p.CriadoEm)</div>
+                                    <div class="kds-card__tempo-label">esperando</div>
+                                </div>
+                            </header>
+                            <div class="kds-card__itens">
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                            </div>
+                            <footer class="kds-card__actions">
+                                <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>
+                                <button type="button" class="kds-btn kds-btn--primary"
+                                        data-action="avancar" data-status="preparando" data-id="@p.Id">
+                                    ▶ Iniciar preparo
+                                </button>
+                            </footer>
+                        </article>
+                    }
+                }
+            </div>
+        </section>
+
+        <!-- Coluna: Preparando -->
+        <section class="kds-col">
+            <header class="kds-col__header kds-col__header--preparando">
+                <h2>🔥 Em preparo</h2>
+                <span class="kds-col__count">@Model.Preparando.Count</span>
+            </header>
+            <div class="kds-col__body">
+                @if (!Model.Preparando.Any())
+                {
+                    <div class="kds-col__empty">Nenhum pedido em preparo</div>
+                }
+                else
+                {
+                    @foreach (var p in Model.Preparando)
+                    {
+                        <article class="kds-card @corPorTempo(p.CriadoEm)" data-pedido-id="@p.Id">
+                            <header class="kds-card__head">
+                                <div>
+                                    <div class="kds-card__cliente">@(p.ClienteNome ?? "Avulso")</div>
+                                    <div class="kds-card__meta">
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt)) { <span>@p.ClienteApt</span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt) && !string.IsNullOrEmpty(p.ClienteTelefone)) { <span> · </span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <span>@p.ClienteTelefone</span> }
+                                    </div>
+                                </div>
+                                <div class="kds-card__tempo">
+                                    <div class="kds-card__tempo-valor">@tempoLabel(p.CriadoEm)</div>
+                                    <div class="kds-card__tempo-label">desde criação</div>
+                                </div>
+                            </header>
+                            <div class="kds-card__itens">
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                            </div>
+                            <footer class="kds-card__actions">
+                                <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>
+                                <button type="button" class="kds-btn kds-btn--success"
+                                        data-action="avancar" data-status="pronto" data-id="@p.Id">
+                                    ✓ Marcar pronto
+                                </button>
+                            </footer>
+                        </article>
+                    }
+                }
+            </div>
+        </section>
+
+        <!-- Coluna: Pronto (aguardando entrega) -->
+        <section class="kds-col">
+            <header class="kds-col__header kds-col__header--pronto">
+                <h2>🛎 Pronto p/ entregar</h2>
+                <span class="kds-col__count">@Model.Pronto.Count</span>
+            </header>
+            <div class="kds-col__body">
+                @if (!Model.Pronto.Any())
+                {
+                    <div class="kds-col__empty">Nada pronto no momento</div>
+                }
+                else
+                {
+                    @foreach (var p in Model.Pronto)
+                    {
+                        <article class="kds-card kds-card--violeta" data-pedido-id="@p.Id">
+                            <header class="kds-card__head">
+                                <div>
+                                    <div class="kds-card__cliente">@(p.ClienteNome ?? "Avulso")</div>
+                                    <div class="kds-card__meta">
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt)) { <span>@p.ClienteApt</span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteApt) && !string.IsNullOrEmpty(p.ClienteTelefone)) { <span> · </span> }
+                                        @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <span>@p.ClienteTelefone</span> }
+                                    </div>
+                                </div>
+                                <div class="kds-card__tempo">
+                                    <div class="kds-card__tempo-valor">@tempoLabel(p.CriadoEm)</div>
+                                    <div class="kds-card__tempo-label">aguardando entrega</div>
+                                </div>
+                            </header>
+                            <div class="kds-card__itens">
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                            </div>
+                            <footer class="kds-card__actions">
+                                <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>
+                                <button type="button" class="kds-btn kds-btn--neutral"
+                                        data-action="avancar" data-status="entregue" data-id="@p.Id">
+                                    📦 Marcar entregue
+                                </button>
+                            </footer>
+                        </article>
+                    }
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+<script>
+function kdsAutoRefresh() {
+    return {
+        autoOn: true,
+        loading: false,
+        ultimaAtualizacao: 'Atualizado agora',
+        _interval: null,
+
+        init() {
+            this.$watch('autoOn', (v) => {
+                if (v) this.startTimer();
+                else this.stopTimer();
+            });
+            this.startTimer();
+
+            // Listener centralizado para os botões "Avançar"
+            document.body.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-action="avancar"]');
+                if (!btn) return;
+                e.preventDefault();
+                this.avancar(btn.dataset.id, btn.dataset.status, btn);
+            });
+        },
+
+        startTimer() {
+            this.stopTimer();
+            this._interval = setInterval(() => this.atualizar(true), 15000);
+        },
+        stopTimer() {
+            if (this._interval) { clearInterval(this._interval); this._interval = null; }
+        },
+
+        async atualizar(silencioso = false) {
+            if (this.loading) return;
+            this.loading = true;
+            try {
+                const r = await fetch('/kds/json', {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (r.ok) {
+                    // Reload only if counts changed — preserva foco e estado.
+                    const data = await r.json();
+                    const totalServidor =
+                        (data.aguardando?.length || 0) +
+                        (data.preparando?.length || 0) +
+                        (data.pronto?.length || 0);
+                    const totalLocal = document.querySelectorAll('.kds-card').length;
+                    if (totalServidor !== totalLocal) {
+                        window.location.reload();
+                        return;
+                    }
+                    this.ultimaAtualizacao = 'Atualizado ' + this._formatTime(new Date());
+                }
+            } catch {
+                this.ultimaAtualizacao = 'Falha ao atualizar — vamos tentar de novo';
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async avancar(id, status, btn) {
+            if (!id || !status) return;
+            const card = btn.closest('.kds-card');
+            btn.disabled = true;
+            btn.textContent = 'Atualizando…';
+            if (card) card.classList.add('kds-card--saindo');
+            try {
+                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const fd = new FormData();
+                fd.append('status', status);
+                const r = await fetch('/kds/' + id + '/avancar', {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': token },
+                    body: fd
+                });
+                if (r.ok) {
+                    // Anima a saída do card e recarrega após 200ms para refletir nova fila
+                    setTimeout(() => window.location.reload(), 200);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.status === 'preparando' ? '▶ Iniciar preparo'
+                                    : btn.dataset.status === 'pronto'    ? '✓ Marcar pronto'
+                                                                          : '📦 Marcar entregue';
+                    if (card) card.classList.remove('kds-card--saindo');
+                    if (window.toast) window.toast('error', 'Não foi possível atualizar o pedido. Tente novamente.');
+                    else alert('Não foi possível atualizar o pedido.');
+                }
+            } catch {
+                btn.disabled = false;
+                if (card) card.classList.remove('kds-card--saindo');
+            }
+        },
+
+        telaCheia() {
+            const el = document.documentElement;
+            if (!document.fullscreenElement) {
+                el.requestFullscreen?.();
+            } else {
+                document.exitFullscreen?.();
+            }
+        },
+
+        _formatTime(d) {
+            return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0') + ':' + d.getSeconds().toString().padStart(2, '0');
+        }
+    };
+}
+</script>
+}
