@@ -1,12 +1,13 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
-using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.Pagamentos;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using EasyStock.Infra.Async.Pdf;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async.DependencyInjection;
 
@@ -68,12 +69,12 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://pix-h.api.efipay.com.br" : "https://pix.api.efipay.com.br";
             services.AddTransient<IEfiPixService>(sp =>
             {
-                var http = new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
                 return new EfiPixService(
                     http,
-                    sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+                    sp.GetRequiredService<IMemoryCache>(),
                     configuration,
-                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfiPixService>>());
+                    sp.GetRequiredService<ILogger<EfiPixService>>());
             });
         }
         else
@@ -89,12 +90,12 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
             services.AddTransient<IEfiBoletoService>(sp =>
             {
-                var http = new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
                 return new EfiBoletoService(
                     http,
-                    sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+                    sp.GetRequiredService<IMemoryCache>(),
                     configuration,
-                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfiBoletoService>>());
+                    sp.GetRequiredService<ILogger<EfiBoletoService>>());
             });
         }
         else
