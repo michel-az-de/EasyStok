@@ -220,19 +220,34 @@ var app = builder.Build();
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 // Em produção com múltiplas réplicas, desabilitar via RunMigrationsOnStartup=false
 // e rodar migrations em init-container ou job separado antes do deploy.
+// No Render/Cloud Run o entrypoint do container ja roda o EF bundle ANTES do app
+// subir — esse bloco aqui e' rede de seguranca e idempotente (no-op se schema
+// ja esta atualizado).
 var runMigrationsOnStartup = builder.Configuration.GetValue("RunMigrationsOnStartup", defaultValue: !app.Environment.IsProduction());
+var migrationsFailFast = builder.Configuration.GetValue("MigrationsFailFast", defaultValue: false);
+
+app.Logger.LogInformation(
+    "[Migrations] Estado lido: Environment={Environment} | Database__Provider={ProviderConfig} | resolvedProvider={Resolved} | RunMigrationsOnStartup={Run} | MigrationsFailFast={FailFast}",
+    app.Environment.EnvironmentName, databaseProvider, resolvedProvider, runMigrationsOnStartup, migrationsFailFast);
+
 if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
+    var migrationsHouveErro = false;
     try
     {
+        List<string> appliedMigrations;
         List<string> pendingMigrations;
         using (var checkScope = app.Services.CreateScope())
         {
             var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
             pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
         }
 
-        app.Logger.LogInformation("{Count} migrations pendentes.", pendingMigrations.Count);
+        app.Logger.LogInformation(
+            "[Migrations] {AppliedCount} aplicadas, {PendingCount} pendentes. Pendentes: {Pendentes}",
+            appliedMigrations.Count, pendingMigrations.Count,
+            pendingMigrations.Count == 0 ? "(nenhuma)" : string.Join(", ", pendingMigrations));
 
         // Migrations conhecidas que historicamente colidem com schema mobile pré-existente
         // (porque criam tabelas que mobile schema raw também cria com IF NOT EXISTS).
@@ -246,20 +261,26 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 
         foreach (var migrationId in pendingMigrations)
         {
+            var swMigration = System.Diagnostics.Stopwatch.StartNew();
+            app.Logger.LogInformation("[Migrations] >>> Aplicando {MigrationId}...", migrationId);
             try
             {
                 using var migScope = app.Services.CreateScope();
                 var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
                 var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
                 await migrator.MigrateAsync(migrationId);
-                app.Logger.LogInformation("Migration {MigrationId} aplicada.", migrationId);
+                swMigration.Stop();
+                app.Logger.LogInformation(
+                    "[Migrations] <<< {MigrationId} aplicada em {ElapsedMs}ms.",
+                    migrationId, swMigration.ElapsedMilliseconds);
             }
             catch (Npgsql.PostgresException ex) when (
                 ex.SqlState is "42701" or "42P07" &&
                 migrationsComColisaoConhecida.Contains(migrationId))
             {
+                swMigration.Stop();
                 app.Logger.LogWarning(
-                    "Migration {MigrationId}: schema já existe ({SqlState}), registrando como aplicada.",
+                    "[Migrations] {MigrationId}: schema ja existe ({SqlState}), registrando como aplicada.",
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -267,16 +288,43 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                 await regDb.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
             }
+            catch (Exception ex)
+            {
+                migrationsHouveErro = true;
+                infraState.MigrationsApplied = false;
+                infraState.MigrationError = $"{migrationId}: {ex.GetType().Name}: {ex.Message}";
+                app.Logger.LogError(ex,
+                    "[Migrations] !!! FALHA na migration {MigrationId} (SqlState={SqlState}). Stack acima.",
+                    migrationId,
+                    (ex as Npgsql.PostgresException)?.SqlState ?? "(n/a)");
+                // Continua tentando as proximas pra logar TODAS as falhas. So depois decide se aborta.
+            }
         }
 
-        infraState.MigrationsApplied = true;
-        app.Logger.LogInformation("Migrations aplicadas com sucesso.");
+        if (migrationsHouveErro)
+        {
+            app.Logger.LogError(
+                "[Migrations] !!! Houve erros aplicando migrations. MigrationsFailFast={FailFast}.",
+                migrationsFailFast);
+            if (migrationsFailFast)
+                throw new InvalidOperationException(
+                    "Migrations falharam e MigrationsFailFast=true. Abortando startup. Veja erros acima.");
+        }
+        else
+        {
+            infraState.MigrationsApplied = true;
+            app.Logger.LogInformation(
+                "[Migrations] === Aplicadas com sucesso ({Count} novas). ===",
+                pendingMigrations.Count);
+        }
     }
     catch (Exception ex)
     {
         infraState.MigrationsApplied = false;
-        infraState.MigrationError = ex.Message;
-        app.Logger.LogError(ex, "Erro durante migrations. A aplicacao continuara mas pode estar incompleta.");
+        infraState.MigrationError ??= ex.Message;
+        app.Logger.LogError(ex, "[Migrations] !!! Erro fatal no bloco de migrations.");
+        if (migrationsFailFast)
+            throw;
     }
 
     // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
