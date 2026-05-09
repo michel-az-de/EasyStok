@@ -320,8 +320,14 @@ namespace EasyStock.Infra.Postgre.Data
                 return true;
 
             // Admin tooling — auditoria/feature flags cross-tenant.
+            // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
+            // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
+            // fallback; sem necessidade de filter — em background sem JWT o filter
+            // global zeraria a leitura no fallback nao-PG e o numerador retornaria
+            // contador zerado, gerando reset silencioso de numeracao por race.
             return clrType == typeof(AdminImpersonationLog)
-                || clrType == typeof(TenantFeatureFlag);
+                || clrType == typeof(TenantFeatureFlag)
+                || clrType == typeof(FaturaContador);
         }
     }
 }

@@ -119,8 +119,8 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     }
 
     // ── Audit (Onda P4) ───────────────────────────────────────
-    // Mongo backend não está em produção (Postgre é o ativo). Stub
-    // mantém o contrato sem custo: retorna lista vazia e ignora write.
+    // Mongo backend não está em produção (Postgre é o ativo). Implementação
+    // funcional: lê e grava em Mongo se o backend Mongo for ativado.
     private IMongoCollection<FornecedorAlteracao> AlteracoesCollection =>
         Context.Database.GetCollection<FornecedorAlteracao>("fornecedor_alteracoes");
 

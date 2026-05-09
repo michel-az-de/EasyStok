@@ -89,6 +89,14 @@ public sealed class FaturaSaasFactory(IConfiguration configuration)
             Tipo: TipoItemFatura.Recorrencia
         );
 
+        // Observacao: DataFim e null durante trial — anotar isso de forma legivel
+        // (ao inves de "Plano vigente ate ." com data vazia).
+        var observacao = assinatura.DataFim.HasValue
+            ? $"Plano vigente ate {assinatura.DataFim.Value:yyyy-MM-dd}."
+            : assinatura.TrialFim.HasValue
+                ? $"Periodo de avaliacao ate {assinatura.TrialFim.Value:yyyy-MM-dd}."
+                : "Plano vigente.";
+
         return new EmitirFaturaCommand(
             EmpresaId: empresa.Id,
             DadosFaturado: BuildFaturado(empresa),
@@ -98,7 +106,7 @@ public sealed class FaturaSaasFactory(IConfiguration configuration)
             Itens: new[] { item },
             ClienteId: null,
             OrigemRefId: assinatura.Id,
-            Observacoes: $"Plano vigente ate {assinatura.DataFim:yyyy-MM-dd}.",
+            Observacoes: observacao,
             DataEmissao: emissao,
             IdempotentePorOrigem: true,
             OrigemRegistro: "saas-job"
