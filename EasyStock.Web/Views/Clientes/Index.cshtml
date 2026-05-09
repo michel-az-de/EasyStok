@@ -7,7 +7,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Clientes</h1>
-        <p>Cadastro central — campos primários + endereços, telefones e documentos extras</p>
+        <p>Gerencie seus clientes e o histórico de pedidos</p>
     </div>
     <div class="flex gap-3">
         <a href="/clientes-mobile"
@@ -52,9 +52,9 @@
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIcon", "👤" },
-            { "EmptyTitle", "Nenhum cliente cadastrado" },
-            { "EmptyDescription", "Adicione seu primeiro cliente para começar a registrar pedidos." },
-            { "EmptyCta", "+ Novo Cliente" },
+            { "EmptyTitle", "Nenhum cliente cadastrado ainda" },
+            { "EmptyDescription", "Cadastre o primeiro cliente para começar a registrar pedidos e acompanhar o histórico de compras." },
+            { "EmptyCta", "Cadastrar primeiro cliente" },
             { "EmptyCtaModal", "novo-cliente" }
         })
     }
@@ -111,95 +111,134 @@
     }
 </div>
 
-<!-- Modal novo cliente -->
-<div x-data="criarClienteModal()" @@open-modal.window="if ($event.detail === 'novo-cliente') open = true"
+<!-- Modal: novo cliente -->
+<div x-data="formModal({
+        id: 'novo-cliente',
+        endpoint: '/clientes/json',
+        redirect: '/clientes/{id}',
+        requireField: 'nome',
+        requireMessage: 'Informe o nome do cliente.',
+        initialForm: { nome: '', apt: '', endereco: '', telefone: '', email: '', documento: '', observacoes: '' }
+     })"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-     @@click.self="open = false" @@keydown.escape.window="open = false">
-    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 overflow-y-auto max-h-[92vh]">
-        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Cliente</h2>
-        <p class="text-sm text-slate-500 mb-4">Cadastre nome + dados primários. Endereços, telefones e documentos extras podem ser adicionados na tela de detalhe.</p>
+     x-transition:enter="transition duration-150 ease-out"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition duration-100 ease-in"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @@keydown.window="handleKeydown($event)"
+     @@click.self="close()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="fm-cliente-title">
+    <form x-ref="panel" class="fm-panel"
+          @@submit.prevent="submit()"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
+        <header class="fm-header">
+            <div>
+                <h2 id="fm-cliente-title" class="fm-header__title">Novo cliente</h2>
+                <p class="fm-header__subtitle">Só o essencial agora. Endereços e documentos extras você adiciona depois na tela do cliente.</p>
+            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+        </header>
 
-        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
+        <div class="fm-body">
+            <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
+            @Html.AntiForgeryToken()
 
-        @Html.AntiForgeryToken()
-        <div class="grid grid-cols-2 gap-3">
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-                <input type="text" x-model="form.nome" required @@input="erroMsg = ''" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Apt</label>
-                <input type="text" x-model="form.apt" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input type="text" x-model="form.telefone" x-mask:phone class="ui-field w-full text-sm" inputmode="numeric" autocomplete="tel" />
-            </div>
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
-                <input type="text" x-model="form.endereco" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
-                <input type="email" x-model="form.email" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
-                <input type="text" x-model="form.documento" x-mask:doc class="ui-field w-full text-sm" inputmode="numeric" />
-            </div>
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Identificação</legend>
+                <div class="fm-grid">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-nome">
+                            Nome completo<span class="fm-field__required" aria-hidden="true">*</span>
+                        </label>
+                        <input id="cli-nome" type="text" x-model="form.nome" required
+                               placeholder="Ex: Ana Beatriz Costa"
+                               @@input="erroMsg = ''"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-doc">CPF ou CNPJ</label>
+                        <input id="cli-doc" type="text" x-model="form.documento" x-mask:doc
+                               inputmode="numeric" placeholder="000.000.000-00"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">Para emissão de nota fiscal</span>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Contato e localização</legend>
+                <div class="fm-grid">
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="cli-tel">Telefone / WhatsApp</label>
+                        <input id="cli-tel" type="text" x-model="form.telefone" x-mask:phone
+                               inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="cli-email">E-mail</label>
+                        <input id="cli-email" type="email" x-model="form.email"
+                               placeholder="cliente@email.com"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-end">Endereço</label>
+                        <input id="cli-end" type="text" x-model="form.endereco"
+                               placeholder="Rua, número, bairro"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-apt">Apartamento / Unidade</label>
+                        <input id="cli-apt" type="text" x-model="form.apt"
+                               placeholder="Ex: 304B, Bloco 2"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">Se entregar em condomínio</span>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="fm-advanced">
+                <button type="button" class="fm-advanced__toggle"
+                        :aria-expanded="advancedOpen ? 'true' : 'false'"
+                        aria-controls="cli-advanced"
+                        @@click="advancedOpen = !advancedOpen">
+                    <span class="fm-advanced__chevron" aria-hidden="true">›</span>
+                    <span x-text="advancedOpen ? 'Ocultar observações' : 'Adicionar observações'"></span>
+                </button>
+                <div id="cli-advanced" x-show="advancedOpen" x-cloak
+                     x-transition:enter="transition duration-100 ease-out"
+                     x-transition:enter-start="opacity-0 -translate-y-1"
+                     x-transition:enter-end="opacity-100 translate-y-0">
+                    <div class="fm-grid">
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="cli-obs">Observações</label>
+                            <textarea id="cli-obs" x-model="form.observacoes" rows="3"
+                                      placeholder="Preferências, restrições, alergias..."
+                                      class="ui-textarea w-full text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
-            <button type="button" @@click="open = false"
+        <footer class="fm-footer">
+            <span class="fm-footer__hint">Pressione Enter para salvar</span>
+            <button type="button" @@click="close()"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </button>
-            <button type="button" @@click="submitForm()" :disabled="loading || !form.nome.trim()"
-                    :class="{ 'opacity-50 cursor-not-allowed': loading || !form.nome.trim() }"
+            <button type="submit" :disabled="loading || isInvalid()"
+                    :class="{ 'opacity-50 cursor-not-allowed': loading || isInvalid() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Criar Cliente</span>
-                <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
+                <span x-show="!loading">Cadastrar cliente</span>
+                <span x-show="loading" x-cloak class="flex items-center gap-2">
+                    <span class="spinner"></span> Salvando…
+                </span>
             </button>
-        </div>
-    </div>
+        </footer>
+    </form>
 </div>
-
-@section Scripts {
-<script>
-function criarClienteModal() {
-    return {
-        open: false,
-        loading: false,
-        erroMsg: '',
-        form: { nome: '', apt: '', endereco: '', telefone: '', email: '', documento: '', observacoes: '' },
-        async submitForm() {
-            if (!this.form.nome.trim()) { this.erroMsg = 'Nome é obrigatório.'; return; }
-            this.loading = true; this.erroMsg = '';
-            try {
-                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
-                const res = await fetch('/clientes/json', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
-                    body: JSON.stringify(this.form)
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                    window.location.href = '/clientes/' + data.id;
-                } else {
-                    this.erroMsg = data.errorMessage || 'Erro ao criar cliente.';
-                }
-            } catch {
-                this.erroMsg = 'Não foi possível conectar ao servidor.';
-            } finally {
-                this.loading = false;
-            }
-        }
-    };
-}
-</script>
-}
