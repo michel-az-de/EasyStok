@@ -256,7 +256,7 @@
             </div>
             <span class="text-xs text-slate-400 font-semibold hidden sm:block">Etapa 1 de 4</span>
             <div class="flex items-center gap-2">
-                <button type="button" :disabled="!nome || autoFilling" @@click="confirmarAutoFill()"
+                <button type="button" :disabled="autoFilling" @@click="confirmarAutoFill()"
                         class="px-4 py-2.5 border border-violet-200 text-violet-600 hover:bg-violet-50 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
                     <span x-show="!autoFilling" class="inline-flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1594,6 +1594,12 @@
                 // ── Auto-fill ──
                 autoFilling: false,
                 confirmarAutoFill() {
+                    if (!this.nome || !this.nome.trim()) {
+                        window.showToast('Informe o nome do produto antes de preencher automaticamente.', 'error', 3000);
+                        const inputNome = document.querySelector('input[name="Nome"]');
+                        if (inputNome) inputNome.focus();
+                        return;
+                    }
                     const temDados = this.descricao || this.sku;
                     if (temDados) {
                         if (!confirm('⚡ Preencher automaticamente\n\nSKU será gerado e a descrição será criada com IA usando nome e categoria.\n\nCampos já preenchidos podem ser alterados. Deseja continuar?')) return;

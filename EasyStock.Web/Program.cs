@@ -51,7 +51,9 @@ builder.Services.AddHttpClient<ApiClient>(client =>
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 }).AddHttpMessageHandler<TokenRefreshHandler>();
 
-// 5b. HttpClient for diagnostics (no TokenRefreshHandler - works without auth)
+// 5b. HttpClient for diagnostics — agora exige auth (controllers da API DiagnosticoController/InfraController/LogsController
+// estao com [Authorize(Policy="Admin")] no nivel da classe). Sem o handler, todas as chamadas voltam 401
+// e a aba Endpoints / o card principal renderizam vazio mesmo pro SuperAdmin logado.
 builder.Services.AddHttpClient<DiagnosticoWebService>(client =>
 {
     var baseUrl = config["ApiSettings:BaseUrl"]!;
@@ -59,7 +61,7 @@ builder.Services.AddHttpClient<DiagnosticoWebService>(client =>
     if (!baseUrl.EndsWith('/')) baseUrl += "/";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(10);
-});
+}).AddHttpMessageHandler<TokenRefreshHandler>();
 
 // 6. Domain services
 builder.Services.AddScoped<ProdutosService>();
@@ -168,6 +170,7 @@ app.UseSession();           // BEFORE Authentication
 app.UseAuthentication();
 app.UseMiddleware<SessionRestoreMiddleware>(); // Restaura sessão do _rt cookie após deploys
 app.UseAuthorization();
+app.UseMiddleware<LojaRequiredMiddleware>(); // Bloqueia navegacao sem LojaId selecionada
 
 // Roteamento — landing publica e raiz; Dashboard e o resto via path explicito.
 // Quando os dois dominios forem ativados (easystok.com.br + app.easystok.com.br),

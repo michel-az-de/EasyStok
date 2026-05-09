@@ -135,7 +135,10 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
             return RedirectToAction(nameof(SelecionarLoja));
         }
 
-        return SafeRedirect(returnUrl);
+        // 0 lojas (ou falha ao listar): manda pro wizard/aviso. Sem isso o usuario
+        // cairia direto no Dashboard sem LojaId, conseguindo navegar e tentar criar
+        // recursos numa loja inexistente.
+        return RedirectToAction(nameof(SelecionarLoja));
     }
 
     [Authorize]
