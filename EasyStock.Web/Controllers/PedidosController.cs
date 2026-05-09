@@ -17,6 +17,7 @@ public class CriarPedidoWebRequest
 public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
+    ProdutosService produtosSvc,
     SessionService session) : BaseController(session)
 {
     [HttpGet("/pedidos")]
@@ -32,6 +33,10 @@ public class PedidosController(
 
         var cli = await clientesSvc.ListarAsync(status: "ativo");
         if (cli.Success && cli.Data is not null) vm.Clientes = cli.Data;
+
+        // Categorias para o cadastro rápido de produto inline no modal Novo pedido.
+        var cats = await produtosSvc.ListarCategoriasAsync();
+        if (cats.Success && cats.Data is not null) vm.Categorias = cats.Data;
 
         return View(vm);
     }

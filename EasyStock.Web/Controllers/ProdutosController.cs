@@ -1,5 +1,6 @@
 using EasyStock.Web.Constants;
 using EasyStock.Web.Models.Api;
+using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Produtos;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -7,7 +8,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class ProdutosController(ProdutosService svc, SessionService session) : BaseController(session)
+public class CriarProdutoQuickRequest
+{
+    public string Nome { get; set; } = "";
+    public Guid CategoriaId { get; set; }
+    public decimal? PrecoReferencia { get; set; }
+    public decimal? CustoReferencia { get; set; }
+    public int? QtdInicial { get; set; }
+    public string? Marca { get; set; }
+}
+
+public class ProdutosController(ProdutosService svc, EntradasService entradasSvc, SessionService session) : BaseController(session)
 {
     private const int PageSize = 20;
 
@@ -469,6 +480,69 @@ public class ProdutosController(ProdutosService svc, SessionService session) : B
         var result = await svc.ListarMarcasAsync(q);
         if (!result.Success) return Json(Array.Empty<string>());
         return Json(result.Data ?? []);
+    }
+
+    /// <summary>
+    /// Quick-create de produto a partir do modal "Novo pedido". Aceita só nome + categoria
+    /// e (opcional) preço/custo/qtd inicial. Se qtd > 0, registra entrada de estoque pra
+    /// preservar a trilha de auditoria (movimentação tem origem rastreável).
+    /// </summary>
+    [HttpPost("/produtos/quick.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickCriar([FromBody] CriarProdutoQuickRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Nome))
+            return BadRequest(new { success = false, errorMessage = "Nome do produto é obrigatório." });
+        if (req.CategoriaId == Guid.Empty)
+            return BadRequest(new { success = false, errorMessage = "Selecione uma categoria para o produto." });
+
+        var vm = new ProdutoFormViewModel
+        {
+            Nome = req.Nome.Trim(),
+            CategoriaId = req.CategoriaId,
+            Marca = string.IsNullOrWhiteSpace(req.Marca) ? null : req.Marca.Trim(),
+            PrecoReferencia = req.PrecoReferencia,
+            CustoReferencia = req.CustoReferencia
+        };
+
+        var created = await svc.CriarAsync(vm);
+        if (!created.Success || created.Data is null || created.Data.ProdutoId == Guid.Empty)
+            return BadRequest(new { success = false, errorMessage = created.ErrorMessage ?? "Erro ao criar produto." });
+
+        var produtoId = created.Data.ProdutoId;
+        bool entradaOk = true;
+        string? entradaErro = null;
+
+        // Entrada de estoque para auditoria — só se qtd inicial foi informada.
+        // Custo: usa custoReferencia, senão precoReferencia, senão 0.01 (mínimo aceito pelo VM).
+        if (req.QtdInicial.HasValue && req.QtdInicial.Value > 0)
+        {
+            var custo = req.CustoReferencia
+                        ?? req.PrecoReferencia
+                        ?? 0.01m;
+
+            var entradaVm = new EntradaFormViewModel
+            {
+                ProdutoId = produtoId.ToString(),
+                Qty = req.QtdInicial.Value,
+                Custo = custo,
+                Preco = req.PrecoReferencia,
+                Data = DateOnly.FromDateTime(DateTime.Today),
+                Observacoes = "Entrada inicial — produto cadastrado pelo modal Novo pedido."
+            };
+            var entrada = await entradasSvc.CriarEntradaAsync(entradaVm);
+            entradaOk = entrada.Success;
+            if (!entradaOk) entradaErro = entrada.ErrorMessage;
+        }
+
+        return Ok(new
+        {
+            success = true,
+            id = produtoId,
+            nome = vm.Nome,
+            entradaOk,
+            entradaErro
+        });
     }
 
     [HttpGet("/produtos/buscar")]
