@@ -12,12 +12,24 @@
         "cancelado"  => "bg-slate-100 text-slate-500 line-through",
         _            => "bg-slate-100 text-slate-600"
     };
+
+    string tempoRelativo(DateTime utc)
+    {
+        var diff = DateTime.UtcNow - utc;
+        if (diff.TotalMinutes < 1) return "agora";
+        if (diff.TotalMinutes < 60) return $"há {(int)diff.TotalMinutes} min";
+        if (diff.TotalHours < 24)   return $"há {(int)diff.TotalHours}h";
+        return $"há {(int)diff.TotalDays}d";
+    }
+
+    bool pedidoAtrasado(string? status, DateTime criadoUtc) =>
+        status == "aguardando" && (DateTime.UtcNow - criadoUtc).TotalHours >= 2;
 }
 
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Pedidos</h1>
-        <p>Encomendas em curso — vinculadas a clientes do cadastro central</p>
+        <p>Acompanhe encomendas em andamento, pagamentos e entregas</p>
     </div>
     <div class="flex gap-3">
         <a href="/pedidos-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
@@ -26,7 +38,7 @@
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-pedido')"
                 class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-            + Novo Pedido
+            + Novo pedido
         </button>
     </div>
 </div>
@@ -59,9 +71,9 @@
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIcon", "📋" },
-            { "EmptyTitle", "Nenhum pedido" },
-            { "EmptyDescription", "Crie seu primeiro pedido vinculando a um cliente cadastrado." },
-            { "EmptyCta", "+ Novo Pedido" },
+            { "EmptyTitle", "Nenhum pedido por aqui" },
+            { "EmptyDescription", "Crie o primeiro pedido para começar a registrar vendas, controlar pagamentos e acompanhar entregas." },
+            { "EmptyCta", "Criar primeiro pedido" },
             { "EmptyCtaModal", "novo-pedido" }
         })
     }
@@ -75,7 +87,8 @@
             <tbody>
                 @foreach (var p in Model.Items)
                 {
-                    <tr>
+                    var atrasado = pedidoAtrasado(p.Status, p.CriadoEm);
+                    <tr class="@(atrasado ? "bg-amber-50/40" : "")">
                         <td>
                             <div class="font-medium text-slate-900">@(p.ClienteNome ?? "—")</div>
                             @if (!string.IsNullOrEmpty(p.ClienteApt) || !string.IsNullOrEmpty(p.ClienteTelefone))
@@ -84,16 +97,25 @@
                             }
                         </td>
                         <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+                            <div class="flex flex-col gap-1">
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status) w-fit">@p.Status</span>
+                                @if (atrasado)
+                                {
+                                    <span class="text-[10px] font-medium text-amber-700">⏱ aguardando há tempos</span>
+                                }
+                            </div>
                         </td>
                         <td class="text-slate-600 text-sm">@p.ItensCount</td>
                         <td class="text-slate-600">@p.Total.ToString("C")</td>
                         <td>
                             @if (p.Quitado)   { <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">quitado</span> }
                             else if (p.TotalPago > 0) { <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded">@(p.TotalPago.ToString("C")) / @(p.Total.ToString("C"))</span> }
-                            else              { <span class="text-xs text-slate-400">—</span> }
+                            else              { <span class="text-xs text-slate-400">em aberto</span> }
                         </td>
-                        <td class="text-xs text-slate-500">@p.CriadoEm.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                        <td class="text-xs text-slate-500">
+                            <div>@p.CriadoEm.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                            <div class="text-[10px] text-slate-400">@tempoRelativo(p.CriadoEm)</div>
+                        </td>
                         <td>
                             <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id"
                                class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
@@ -106,88 +128,343 @@
     }
 </div>
 
-<!-- Modal novo pedido -->
-<div x-data="novoPedidoModal()" @@open-modal.window="if ($event.detail === 'novo-pedido') open = true"
+<!-- Modal: novo pedido -->
+<div x-data="novoPedidoModal()"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-     @@click.self="open = false" @@keydown.escape.window="open = false">
-    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[92vh]">
-        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Pedido</h2>
-        <p class="text-sm text-slate-500 mb-4">Vincule a um cliente cadastrado ou cadastre dados ad-hoc.</p>
-
-        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
-
-        @Html.AntiForgeryToken()
-        <div class="space-y-4">
+     x-transition:enter="transition duration-150 ease-out"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition duration-100 ease-in"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @@keydown.window="handleKeydown($event)"
+     @@click.self="close()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="fm-pedido-title">
+    <form x-ref="panel" class="fm-panel" style="max-width: 820px"
+          @@submit.prevent="submit()"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
+        <header class="fm-header">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
-                <select x-model="form.clienteId" class="ui-select w-full text-sm">
-                    <option value="">— ad-hoc (preencher abaixo) —</option>
-                    @foreach (var c in Model.Clientes)
-                    {
-                        <option value="@c.Id">@c.Nome @(string.IsNullOrEmpty(c.Apt) ? "" : "(" + c.Apt + ")")</option>
-                    }
-                </select>
+                <h2 id="fm-pedido-title" class="fm-header__title">Novo pedido</h2>
+                <p class="fm-header__subtitle">Vincule a um cliente cadastrado ou registre direto sem cadastro.</p>
             </div>
-            <div class="grid grid-cols-3 gap-3" x-show="!form.clienteId">
-                <input type="text" x-model="form.nomeAdHoc"     placeholder="Nome (ad-hoc)" class="ui-field text-sm" />
-                <input type="text" x-model="form.aptAdHoc"      placeholder="Apt"          class="ui-field text-sm" />
-                <input type="text" x-model="form.telefoneAdHoc" placeholder="Telefone"     class="ui-field text-sm" />
-            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+        </header>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Itens</label>
-                <template x-for="(it, i) in form.itens" :key="i">
-                    <div class="grid grid-cols-12 gap-2 mb-2">
-                        <input type="text"   x-model="it.nome"          placeholder="Nome"  class="ui-field text-sm col-span-5" />
-                        <input type="number" x-model.number="it.quantidade" step="0.01" min="0.01" placeholder="Qtd" class="ui-field text-sm col-span-2" />
-                        <input type="number" x-model.number="it.precoUnitario" step="0.01" min="0" placeholder="Preço" class="ui-field text-sm col-span-3" />
-                        <button type="button" @@click="form.itens.splice(i, 1)" class="col-span-2 text-xs text-red-600 hover:text-red-700">Remover</button>
+        <div class="fm-body">
+            <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
+            @Html.AntiForgeryToken()
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Cliente</legend>
+                <div class="ped-tabs" role="tablist">
+                    <button type="button" role="tab" class="ped-tab"
+                            :class="{ 'ped-tab--active': clienteMode === 'cadastrado' }"
+                            :aria-selected="clienteMode === 'cadastrado'"
+                            @@click="clienteMode = 'cadastrado'">
+                        👤 Cliente cadastrado
+                    </button>
+                    <button type="button" role="tab" class="ped-tab"
+                            :class="{ 'ped-tab--active': clienteMode === 'avulso' }"
+                            :aria-selected="clienteMode === 'avulso'"
+                            @@click="clienteMode = 'avulso'">
+                        ⚡ Venda avulsa
+                    </button>
+                </div>
+
+                <!-- Combobox de cliente cadastrado -->
+                <div x-show="clienteMode === 'cadastrado'" class="ped-combobox" @@click.outside="comboboxOpen = false">
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-cli-busca">Buscar cliente</label>
+                        <div class="ped-combobox__input-wrap">
+                            <input id="ped-cli-busca" type="text" autocomplete="off"
+                                   class="ui-field w-full text-sm"
+                                   placeholder="Digite o nome, apartamento ou telefone..."
+                                   x-model="clienteBusca"
+                                   @@focus="comboboxOpen = true"
+                                   @@input="comboboxOpen = true; form.clienteId = ''"
+                                   @@keydown.arrow-down.prevent="comboboxNavega(1)"
+                                   @@keydown.arrow-up.prevent="comboboxNavega(-1)"
+                                   @@keydown.enter.prevent="comboboxSelecionaIndice()" />
+                            <button type="button" x-show="form.clienteId" x-cloak
+                                    @@click="limparCliente()"
+                                    class="ped-combobox__clear" aria-label="Limpar seleção">✕</button>
+                        </div>
+                        <span class="fm-field__hint" x-show="!form.clienteId && clienteBusca.length === 0">
+                            @Model.Clientes.Count clientes cadastrados
+                        </span>
+                        <span class="fm-field__hint text-emerald-600" x-show="form.clienteId" x-cloak>
+                            ✓ Cliente selecionado
+                        </span>
+                    </div>
+                    <ul x-show="comboboxOpen && clientesFiltrados.length > 0" x-cloak
+                        class="ped-combobox__list" role="listbox">
+                        <template x-for="(cli, i) in clientesFiltrados" :key="cli.id">
+                            <li class="ped-combobox__option"
+                                :class="{ 'ped-combobox__option--active': i === comboboxIndex }"
+                                @@mouseenter="comboboxIndex = i"
+                                @@click="selecionaCliente(cli)" role="option">
+                                <div class="font-medium text-slate-900" x-text="cli.nome"></div>
+                                <div class="text-xs text-slate-500">
+                                    <span x-show="cli.apt" x-text="cli.apt"></span>
+                                    <span x-show="cli.apt && cli.telefone"> · </span>
+                                    <span x-show="cli.telefone" x-text="cli.telefone"></span>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
+                    <div x-show="comboboxOpen && clienteBusca.length > 0 && clientesFiltrados.length === 0" x-cloak
+                         class="ped-combobox__empty">
+                        Nenhum cliente encontrado.
+                        <button type="button" class="text-indigo-600 hover:underline ml-1"
+                                @@click="clienteMode = 'avulso'; form.nomeAdHoc = clienteBusca">
+                            Registrar como venda avulsa
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Venda avulsa -->
+                <div x-show="clienteMode === 'avulso'" x-cloak class="fm-grid">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="ped-nome-adhoc">Nome do comprador</label>
+                        <input id="ped-nome-adhoc" type="text" x-model="form.nomeAdHoc"
+                               placeholder="Ex: Cliente da mesa 4, ou Apt 302"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">Nome livre — não cria cadastro permanente</span>
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-apt-adhoc">Apt / Mesa</label>
+                        <input id="ped-apt-adhoc" type="text" x-model="form.aptAdHoc"
+                               placeholder="Ex: 304B" class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-tel-adhoc">Telefone</label>
+                        <input id="ped-tel-adhoc" type="text" x-model="form.telefoneAdHoc"
+                               x-mask:phone inputmode="numeric"
+                               placeholder="(11) 99999-9999" class="ui-field w-full text-sm" />
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">
+                    <span>Itens do pedido</span>
+                    <span x-show="form.itens.length > 0" x-cloak class="ped-itens-count">
+                        <span x-text="form.itens.length"></span> <span x-text="form.itens.length === 1 ? 'item' : 'itens'"></span>
+                    </span>
+                </legend>
+
+                <template x-if="form.itens.length === 0">
+                    <div class="ped-itens-empty">
+                        <div class="text-2xl mb-1">🛒</div>
+                        <p class="text-sm font-medium text-slate-600">Nenhum item adicionado</p>
+                        <p class="text-xs text-slate-500 mt-1">Adicione pelo menos 1 item para criar o pedido</p>
                     </div>
                 </template>
-                <button type="button" @@click="form.itens.push({nome:'',quantidade:1,precoUnitario:0})"
-                        class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
-            </div>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
-            </div>
+                <ul class="ped-itens-list" x-show="form.itens.length > 0" x-cloak>
+                    <template x-for="(it, i) in form.itens" :key="i">
+                        <li class="ped-item">
+                            <div class="ped-item__nome">
+                                <input type="text" x-model="it.nome" placeholder="Nome do item"
+                                       class="ui-field text-sm w-full" required />
+                            </div>
+                            <div class="ped-item__qtd">
+                                <input type="number" x-model.number="it.quantidade"
+                                       step="0.01" min="0.01" placeholder="Qtd"
+                                       class="ui-field text-sm w-full text-right" required />
+                            </div>
+                            <div class="ped-item__preco">
+                                <span class="ped-item__preco-prefix">R$</span>
+                                <input type="number" x-model.number="it.precoUnitario"
+                                       step="0.01" min="0" placeholder="0,00"
+                                       class="ui-field text-sm w-full text-right" required />
+                            </div>
+                            <div class="ped-item__subtotal" x-text="formatBRL((it.quantidade || 0) * (it.precoUnitario || 0))"></div>
+                            <button type="button" class="ped-item__remove" aria-label="Remover item"
+                                    @@click="form.itens.splice(i, 1)">✕</button>
+                        </li>
+                    </template>
+                </ul>
+
+                <button type="button" class="ped-add-item"
+                        @@click="adicionarItem()">
+                    + Adicionar item
+                </button>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Observações</legend>
+                <div class="fm-field fm-col-2">
+                    <textarea x-model="form.observacoes" rows="2"
+                              placeholder="Endereço de entrega, preferências, instruções especiais..."
+                              class="ui-textarea w-full text-sm"></textarea>
+                </div>
+            </fieldset>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
-            <button type="button" @@click="open = false"
+        <footer class="fm-footer">
+            <div class="ped-total">
+                <span class="ped-total__label">Total</span>
+                <span class="ped-total__value" x-text="formatBRL(totalPedido)"></span>
+            </div>
+            <button type="button" @@click="close()"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </button>
-            <button type="button" @@click="submitForm()" :disabled="loading"
+            <button type="submit" :disabled="loading || !podeEnviar()"
+                    :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Criar Pedido</span>
-                <span x-show="loading" x-cloak>Salvando...</span>
+                <span x-show="!loading">Criar pedido</span>
+                <span x-show="loading" x-cloak class="flex items-center gap-2">
+                    <span class="spinner"></span> Salvando…
+                </span>
             </button>
-        </div>
-    </div>
+        </footer>
+    </form>
 </div>
 
 @section Scripts {
 <script>
 function novoPedidoModal() {
+    const clientes = @Html.Raw(Json.Serialize(Model.Clientes.Select(c => new {
+        id = c.Id,
+        nome = c.Nome,
+        apt = c.Apt,
+        telefone = c.Telefone
+    })));
+
     return {
-        open: false, loading: false, erroMsg: '',
-        form: { clienteId: '', nomeAdHoc:'', aptAdHoc:'', telefoneAdHoc:'',
-                observacoes: '', itens: [] },
-        async submitForm() {
-            if (!this.form.clienteId && !this.form.nomeAdHoc.trim()) {
-                this.erroMsg = 'Informe um cliente OU um nome ad-hoc.'; return;
+        open: false,
+        loading: false,
+        erroMsg: '',
+        clienteMode: 'cadastrado',
+        clienteBusca: '',
+        comboboxOpen: false,
+        comboboxIndex: 0,
+        _previousFocus: null,
+        form: {
+            clienteId: '', nomeAdHoc: '', aptAdHoc: '', telefoneAdHoc: '',
+            observacoes: '', itens: []
+        },
+
+        init() {
+            window.addEventListener('open-modal', (e) => {
+                if (e.detail !== 'novo-pedido') return;
+                this._previousFocus = document.activeElement;
+                this.open = true;
+                this.$nextTick(() => {
+                    const el = this.$refs.panel.querySelector('input, select, textarea');
+                    if (el) el.focus();
+                });
+            });
+            this.$watch('open', (v) => {
+                document.body.style.overflow = v ? 'hidden' : '';
+                if (!v) {
+                    this.erroMsg = '';
+                    if (this._previousFocus) this._previousFocus.focus?.();
+                }
+            });
+        },
+
+        close() { this.open = false; },
+
+        handleKeydown(e) {
+            if (e.key === 'Escape') {
+                if (this.comboboxOpen) { this.comboboxOpen = false; return; }
+                this.close();
+            }
+        },
+
+        get clientesFiltrados() {
+            const q = (this.clienteBusca || '').toLowerCase().trim();
+            if (!q) return clientes.slice(0, 8);
+            return clientes.filter(c =>
+                (c.nome || '').toLowerCase().includes(q) ||
+                (c.apt || '').toLowerCase().includes(q) ||
+                (c.telefone || '').includes(q)
+            ).slice(0, 8);
+        },
+
+        comboboxNavega(delta) {
+            this.comboboxOpen = true;
+            const max = this.clientesFiltrados.length - 1;
+            if (max < 0) return;
+            this.comboboxIndex = Math.max(0, Math.min(max, this.comboboxIndex + delta));
+        },
+
+        comboboxSelecionaIndice() {
+            const cli = this.clientesFiltrados[this.comboboxIndex];
+            if (cli) this.selecionaCliente(cli);
+        },
+
+        selecionaCliente(cli) {
+            this.form.clienteId = cli.id;
+            this.clienteBusca = cli.nome + (cli.apt ? ' (' + cli.apt + ')' : '');
+            this.comboboxOpen = false;
+        },
+
+        limparCliente() {
+            this.form.clienteId = '';
+            this.clienteBusca = '';
+            this.comboboxIndex = 0;
+        },
+
+        adicionarItem() {
+            this.form.itens.push({ nome: '', quantidade: 1, precoUnitario: 0 });
+            this.$nextTick(() => {
+                const items = this.$refs.panel.querySelectorAll('.ped-item input[type=text]');
+                const last = items[items.length - 1];
+                if (last) last.focus();
+            });
+        },
+
+        get totalPedido() {
+            return this.form.itens.reduce((acc, it) =>
+                acc + (Number(it.quantidade) || 0) * (Number(it.precoUnitario) || 0), 0);
+        },
+
+        formatBRL(v) {
+            return (Number(v) || 0).toLocaleString('pt-BR', {
+                style: 'currency', currency: 'BRL'
+            });
+        },
+
+        podeEnviar() {
+            const clienteOk = this.clienteMode === 'cadastrado'
+                ? !!this.form.clienteId
+                : !!(this.form.nomeAdHoc && this.form.nomeAdHoc.trim());
+            const itensOk = this.form.itens.length > 0
+                && this.form.itens.every(i => i.nome && i.nome.trim() && i.quantidade > 0 && i.precoUnitario >= 0);
+            return clienteOk && itensOk;
+        },
+
+        async submit() {
+            if (this.loading) return;
+            if (!this.podeEnviar()) {
+                if (this.clienteMode === 'cadastrado' && !this.form.clienteId) {
+                    this.erroMsg = 'Selecione um cliente cadastrado ou troque para venda avulsa.';
+                } else if (this.clienteMode === 'avulso' && !this.form.nomeAdHoc.trim()) {
+                    this.erroMsg = 'Informe ao menos o nome do comprador.';
+                } else if (this.form.itens.length === 0) {
+                    this.erroMsg = 'Adicione pelo menos 1 item ao pedido.';
+                } else {
+                    this.erroMsg = 'Verifique nome, quantidade e preço de cada item.';
+                }
+                return;
             }
             this.loading = true; this.erroMsg = '';
             try {
                 const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const usaCadastro = this.clienteMode === 'cadastrado';
                 const payload = {
-                    clienteId: this.form.clienteId || null,
-                    nomeAdHoc: this.form.clienteId ? null : this.form.nomeAdHoc,
-                    aptAdHoc: this.form.clienteId ? null : this.form.aptAdHoc,
-                    telefoneAdHoc: this.form.clienteId ? null : this.form.telefoneAdHoc,
+                    clienteId: usaCadastro ? this.form.clienteId : null,
+                    nomeAdHoc: usaCadastro ? null : this.form.nomeAdHoc,
+                    aptAdHoc: usaCadastro ? null : this.form.aptAdHoc,
+                    telefoneAdHoc: usaCadastro ? null : this.form.telefoneAdHoc,
                     observacoes: this.form.observacoes,
                     itens: this.form.itens.filter(i => i.nome && i.quantidade > 0)
                 };
@@ -196,11 +473,26 @@ function novoPedidoModal() {
                     headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
-                if (res.ok && data.success) window.location.href = '/pedidos/' + data.id;
-                else this.erroMsg = data.errorMessage || 'Erro ao criar pedido.';
-            } catch { this.erroMsg = 'Não foi possível conectar ao servidor.'; }
-            finally { this.loading = false; }
+                const raw = await res.text();
+                let data = null;
+                try { data = raw ? JSON.parse(raw) : null; } catch { /* não-JSON */ }
+                if (res.ok && data && data.success) {
+                    window.location.href = '/pedidos/' + data.id;
+                    return;
+                }
+                this.erroMsg = (data && data.errorMessage) || friendlyHttp(res.status);
+            } catch {
+                this.erroMsg = 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+            } finally {
+                this.loading = false;
+            }
+
+            function friendlyHttp(s) {
+                if (s === 400 || s === 403) return 'Sua sessão expirou. Recarregue a página.';
+                if (s === 401) return 'Você precisa entrar de novo.';
+                if (s >= 500) return 'Tivemos um problema no servidor. Tente em alguns instantes.';
+                return 'Não foi possível criar o pedido (erro ' + s + ').';
+            }
         }
     };
 }

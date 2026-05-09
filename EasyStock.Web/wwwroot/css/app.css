@@ -2959,3 +2959,517 @@ html.theme-dark .fm-footer {
     .fm-footer { flex-wrap: wrap; }
     .fm-footer__hint { width: 100%; margin: 0 0 4px; }
 }
+
+/* ============================================================
+   Modal de Pedido — específicos (combobox, item rows, totais)
+   ============================================================ */
+.ped-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    margin-bottom: 14px;
+    background: rgba(241, 245, 249, .9);
+    border-radius: 10px;
+}
+
+html.theme-dark .ped-tabs {
+    background: rgba(15, 23, 42, .8);
+}
+
+.ped-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+}
+
+.ped-tab:hover {
+    color: var(--text-primary, #0f172a);
+}
+
+.ped-tab--active {
+    background: #ffffff;
+    color: #1E48A8;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+}
+
+html.theme-dark .ped-tab--active {
+    background: rgba(30, 72, 168, .25);
+    color: #BCC8E5;
+}
+
+.ped-combobox {
+    position: relative;
+}
+
+.ped-combobox__input-wrap {
+    position: relative;
+}
+
+.ped-combobox__clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(226, 232, 240, .8);
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.ped-combobox__clear:hover {
+    background: rgba(203, 213, 225, .9);
+    color: var(--text-primary, #0f172a);
+}
+
+.ped-combobox__list {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, .9);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+}
+
+html.theme-dark .ped-combobox__list {
+    background: rgba(15, 23, 42, .98);
+    border-color: rgba(71, 85, 105, .55);
+    box-shadow: 0 12px 28px rgba(2, 6, 23, .55);
+}
+
+.ped-combobox__option {
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .1s ease;
+}
+
+.ped-combobox__option--active,
+.ped-combobox__option:hover {
+    background: rgba(237, 241, 249, .9);
+}
+
+html.theme-dark .ped-combobox__option--active,
+html.theme-dark .ped-combobox__option:hover {
+    background: rgba(30, 72, 168, .25);
+}
+
+.ped-combobox__empty {
+    padding: 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary, #64748b);
+    background: rgba(248, 250, 252, .6);
+    border-radius: 10px;
+    margin-top: 6px;
+}
+
+html.theme-dark .ped-combobox__empty {
+    background: rgba(15, 23, 42, .6);
+}
+
+/* Itens */
+.ped-itens-count {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(237, 241, 249, .9);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1E48A8;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+html.theme-dark .ped-itens-count {
+    background: rgba(30, 72, 168, .35);
+    color: #BCC8E5;
+}
+
+.ped-itens-empty {
+    padding: 24px 16px;
+    text-align: center;
+    background: rgba(248, 250, 252, .6);
+    border: 1px dashed rgba(203, 213, 225, .8);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+html.theme-dark .ped-itens-empty {
+    background: rgba(15, 23, 42, .5);
+    border-color: rgba(71, 85, 105, .55);
+}
+
+.ped-itens-list {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ped-item {
+    display: grid;
+    grid-template-columns: 1fr 80px 110px 100px 32px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    background: rgba(248, 250, 252, .6);
+    border: 1px solid rgba(226, 232, 240, .7);
+    border-radius: 10px;
+}
+
+html.theme-dark .ped-item {
+    background: rgba(15, 23, 42, .5);
+    border-color: rgba(71, 85, 105, .45);
+}
+
+.ped-item__preco {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.ped-item__preco-prefix {
+    position: absolute;
+    left: 8px;
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ped-item__preco input {
+    padding-left: 28px !important;
+}
+
+.ped-item__subtotal {
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #0f172a);
+}
+
+.ped-item__remove {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b91c1c;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.ped-item__remove:hover {
+    background: rgba(254, 226, 226, .8);
+}
+
+html.theme-dark .ped-item__remove:hover {
+    background: rgba(127, 29, 29, .35);
+}
+
+.ped-add-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    border: 1px dashed rgba(199, 210, 234, .9);
+    border-radius: 8px;
+    background: transparent;
+    color: #1E48A8;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+}
+
+.ped-add-item:hover {
+    background: rgba(237, 241, 249, .9);
+    border-color: #1E48A8;
+}
+
+html.theme-dark .ped-add-item {
+    border-color: rgba(71, 85, 105, .6);
+    color: #BCC8E5;
+}
+
+html.theme-dark .ped-add-item:hover {
+    background: rgba(30, 72, 168, .25);
+}
+
+/* Total no footer */
+.ped-total {
+    margin-right: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.ped-total__label {
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+}
+
+.ped-total__value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    font-feature-settings: "tnum";
+}
+
+@media (max-width: 640px) {
+    .ped-item {
+        grid-template-columns: 1fr 1fr 32px;
+        grid-template-areas:
+            "nome nome remove"
+            "qtd preco preco"
+            "subtotal subtotal subtotal";
+    }
+    .ped-item__nome { grid-area: nome; }
+    .ped-item__qtd { grid-area: qtd; }
+    .ped-item__preco { grid-area: preco; }
+    .ped-item__remove { grid-area: remove; }
+    .ped-item__subtotal { grid-area: subtotal; padding-top: 4px; border-top: 1px dashed rgba(226, 232, 240, .8); }
+}
+
+/* ============================================================
+   Pedido Detail — timeline, progress bar, inline forms
+   ============================================================ */
+.ped-timeline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    background: var(--bg-elevated, #ffffff);
+    border: 1px solid rgba(226, 232, 240, .85);
+    border-radius: 14px;
+}
+
+html.theme-dark .ped-timeline {
+    background: rgba(15, 23, 42, .85);
+    border-color: rgba(71, 85, 105, .5);
+}
+
+.ped-timeline__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.ped-timeline__dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(241, 245, 249, .9);
+    color: var(--text-secondary, #64748b);
+    border: 2px solid rgba(226, 232, 240, .9);
+    transition: all .2s ease;
+}
+
+.ped-timeline__step--done .ped-timeline__dot {
+    background: #10B981;
+    color: #ffffff;
+    border-color: #10B981;
+}
+
+.ped-timeline__step--current .ped-timeline__dot {
+    background: #1E48A8;
+    color: #ffffff;
+    border-color: #1E48A8;
+    box-shadow: 0 0 0 4px rgba(30, 72, 168, .15);
+}
+
+.ped-timeline__label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.ped-timeline__step--done .ped-timeline__label,
+.ped-timeline__step--current .ped-timeline__label {
+    color: var(--text-primary, #0f172a);
+}
+
+.ped-timeline__connector {
+    flex: 1;
+    height: 2px;
+    background: rgba(226, 232, 240, .9);
+    border-radius: 1px;
+    margin-bottom: 16px;
+    min-width: 12px;
+}
+
+.ped-timeline__connector--done {
+    background: #10B981;
+}
+
+html.theme-dark .ped-timeline__dot {
+    background: rgba(15, 23, 42, .9);
+    border-color: rgba(71, 85, 105, .55);
+}
+
+html.theme-dark .ped-timeline__connector {
+    background: rgba(71, 85, 105, .5);
+}
+
+/* Banner cancelado */
+.ped-cancel-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(254, 226, 226, .7);
+    border: 1px solid rgba(252, 165, 165, .8);
+    border-radius: 12px;
+    color: #991b1b;
+}
+
+html.theme-dark .ped-cancel-banner {
+    background: rgba(127, 29, 29, .25);
+    border-color: rgba(220, 38, 38, .45);
+    color: #fecaca;
+}
+
+/* Progress bar */
+.ped-progress {
+    height: 8px;
+    background: rgba(241, 245, 249, .9);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+html.theme-dark .ped-progress {
+    background: rgba(15, 23, 42, .8);
+}
+
+.ped-progress__bar {
+    height: 100%;
+    background: linear-gradient(90deg, #F59E0B 0%, #FB923C 100%);
+    border-radius: 999px;
+    transition: width .3s ease;
+}
+
+.ped-progress__bar--done {
+    background: linear-gradient(90deg, #10B981 0%, #059669 100%);
+}
+
+/* Inline add row (item / pagamento) */
+.ped-add-row {
+    margin-top: 12px;
+    padding: 14px;
+    background: rgba(248, 250, 252, .7);
+    border: 1px solid rgba(226, 232, 240, .8);
+    border-radius: 12px;
+}
+
+html.theme-dark .ped-add-row {
+    background: rgba(15, 23, 42, .55);
+    border-color: rgba(71, 85, 105, .5);
+}
+
+.ped-add-row__title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 10px;
+}
+
+.ped-add-row__grid {
+    display: grid;
+    grid-template-columns: 1fr 90px 110px 100px auto;
+    grid-template-areas: "nome qtd preco un btn";
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .ped-add-row__grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "nome nome"
+            "qtd preco"
+            "un un"
+            "btn btn";
+    }
+}
+
+/* Pagamento grid */
+.ped-pag-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr 1fr auto;
+    grid-template-areas: "metodo valor ref obs btn";
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .ped-pag-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "metodo valor"
+            "ref ref"
+            "obs obs"
+            "btn btn";
+    }
+}
+
+/* Quick fill buttons (pendente / total) */
+.ped-quick-btn {
+    padding: 4px 10px;
+    background: rgba(237, 241, 249, .9);
+    border: 1px solid rgba(199, 210, 234, .9);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #1E48A8;
+    cursor: pointer;
+    transition: background .12s ease;
+}
+
+.ped-quick-btn:hover {
+    background: rgba(199, 210, 234, .9);
+}
+
+html.theme-dark .ped-quick-btn {
+    background: rgba(30, 72, 168, .25);
+    border-color: rgba(71, 85, 105, .55);
+    color: #BCC8E5;
+}
+
+html.theme-dark .ped-quick-btn:hover {
+    background: rgba(30, 72, 168, .4);
+}
