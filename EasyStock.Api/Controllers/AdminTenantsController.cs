@@ -2,6 +2,8 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Constants;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -29,8 +31,64 @@ public class AdminTenantsController(
     IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser,
     IConfiguration configuration,
-    AdminAuditService audit) : EasyStockControllerBase
+    AdminAuditService audit,
+    CriarTenantPorAdminUseCase criarTenantUseCase,
+    ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
+    private const int MotivoMinimo = 10;
+    // ─────────────────── Cadastro manual de tenant pelo back-office ───────────────────
+
+    /// <summary>
+    /// Cadastra um cliente (tenant) manualmente pelo operador SuperAdmin. Use case típico:
+    /// cliente acionou suporte sem conta, ou admin original saiu da empresa e precisamos
+    /// recriar acesso. Cria empresa + usuário admin inicial (Starter + trial 14d) com
+    /// senha temporária retornada 1x — o operador exibe pro cliente e/ou envia por email.
+    /// Justificativa (≥10 chars) obrigatória → AdminAuditLog.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CriarManual([FromBody] CriarTenantManualRequest req)
+    {
+        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
+
+        try
+        {
+            var resultado = await criarTenantUseCase.ExecuteAsync(new CriarTenantPorAdminCommand(
+                NomeEmpresa: req!.NomeEmpresa ?? string.Empty,
+                Documento: req.Documento,
+                NomeAdmin: req.NomeAdmin ?? string.Empty,
+                EmailAdmin: req.EmailAdmin ?? string.Empty,
+                EnviarEmail: req.EnviarEmail ?? true));
+
+            await audit.LogAsync(
+                "AdminCriouTenantManual",
+                $"EmpresaId={resultado.TenantId}, Nome={resultado.NomeEmpresa}, AdminEmail={MascararEmail(resultado.EmailAdmin)}, EmailEnviado={resultado.EmailEnviado}",
+                tenantId: resultado.TenantId,
+                motivo: motivo,
+                entidadeAfetadaId: resultado.TenantId);
+
+            // Senha temporária no payload — UI deve exibir 1x e pedir pro operador anotar.
+            // Não logar em loggers — vaza em arquivos. Audit log já omite (só guarda metadados).
+            return DataCreated($"/api/admin/tenants/{resultado.TenantId}", new
+            {
+                tenantId = resultado.TenantId,
+                usuarioId = resultado.UsuarioId,
+                nomeEmpresa = resultado.NomeEmpresa,
+                nomeAdmin = resultado.NomeAdmin,
+                emailAdmin = resultado.EmailAdmin,
+                senhaTemporaria = resultado.SenhaTemporaria,
+                emailEnviado = resultado.EmailEnviado,
+                emailErro = resultado.EmailErro,
+                trialFim = resultado.TrialFim
+            });
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao cadastrar tenant manualmente");
+            return Problem(detail: ex.Message, statusCode: 500, title: "Erro ao cadastrar cliente.");
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetTenants(
         [FromQuery] int page = 1,
@@ -244,9 +302,41 @@ public class AdminTenantsController(
 
         return DataOk(new { cupomCodigo = cupom.Codigo, descontoAplicado = cupom.Valor });
     }
+
+    private static bool ValidarMotivo(string? motivo, out string motivoNormalizado, out string? erro)
+    {
+        motivoNormalizado = (motivo ?? string.Empty).Trim();
+        if (motivoNormalizado.Length < MotivoMinimo)
+        {
+            erro = $"Justificativa obrigatória (mínimo {MotivoMinimo} caracteres) — fica registrada no audit log.";
+            return false;
+        }
+        if (motivoNormalizado.Length > 1000)
+        {
+            erro = "Justificativa muito longa (máx 1000 caracteres).";
+            return false;
+        }
+        erro = null;
+        return true;
+    }
+
+    private static string MascararEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return "(vazio)";
+        var at = email.IndexOf('@');
+        if (at <= 0 || at == email.Length - 1) return "***";
+        return email[0] + "***@" + email[(at + 1)..];
+    }
 }
 
 public record PatchTenantStatusRequest(string Status, string? Motivo);
 public record PatchTenantPlanoRequest(Guid PlanoId);
 public record GrantTrialRequest(int DiasTrial);
 public record AplicarCupomRequest(string Codigo);
+public record CriarTenantManualRequest(
+    string Motivo,
+    string? NomeEmpresa,
+    string? Documento,
+    string? NomeAdmin,
+    string? EmailAdmin,
+    bool? EnviarEmail);

@@ -13,6 +13,14 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     public string? Erro { get; private set; }
     public string? Mensagem { get; private set; }
 
+    /// <summary>
+    /// Senha temporária do usuário recém-criado (cadastro de tenant ou novo usuário no tenant).
+    /// Sobrevive a 1 redirect via TempData. Banner exibe e some no próximo navigate.
+    /// </summary>
+    public string? NovaSenhaTemporaria => TempData["NovaSenhaTemporaria"] as string;
+    public string? NovoUsuarioNome => TempData["NovoUsuarioNome"] as string;
+    public string? NovoUsuarioEmail => TempData["NovoUsuarioEmail"] as string;
+
     private T Get<T>(string key, T def = default!) where T : struct
     {
         if (TenantData.ValueKind == JsonValueKind.Undefined || !TenantData.TryGetProperty(key, out var v))
@@ -223,6 +231,60 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     // ─────────────────────── Ações sobre usuário do tenant (P0) ───────────────────────
     // Endpoints que cobrem 80% dos chamados de suporte: reset senha, forçar logout, ver sessões.
     // Todos exigem `motivo` (≥10 chars) auditado no AdminAuditLog.
+
+    /// <summary>
+    /// Cria um novo usuário dentro do tenant atual. Senha é gerada server-side e
+    /// retorna 1 vez via TempData → banner dourado na próxima carga da página.
+    /// </summary>
+    public async Task<IActionResult> OnPostCriarUsuarioAsync(
+        string motivo,
+        string nome,
+        string email,
+        string nivel,
+        bool enviarEmail = true)
+    {
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10) { SetErro("Justificativa obrigatória (mínimo 10 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        if (string.IsNullOrWhiteSpace(nome) || nome.Trim().Length < 2) { SetErro("Nome é obrigatório (mín. 2 caracteres)."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        if (string.IsNullOrWhiteSpace(email)) { SetErro("E-mail é obrigatório."); return RedirectToPage(new { Id, tab = "usuarios" }); }
+        var nivelT = (nivel ?? "Operador").Trim();
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>("api/admin/usuarios-tenant", new
+            {
+                motivo = motivoT,
+                tenantId = Id,
+                nome = nome.Trim(),
+                email = email.Trim(),
+                nivel = nivelT,
+                enviarEmail
+            });
+
+            var nomeFinal = resp.TryGetProperty("nome", out var np) ? np.GetString() : nome.Trim();
+            var emailFinal = resp.TryGetProperty("email", out var ep) ? ep.GetString() : email.Trim();
+            var senha = resp.TryGetProperty("senhaTemporaria", out var sp) ? sp.GetString() : null;
+            var emailEnviado = resp.TryGetProperty("emailEnviado", out var eep) && eep.GetBoolean();
+
+            if (!string.IsNullOrEmpty(senha))
+            {
+                TempData["NovaSenhaTemporaria"] = senha;
+                TempData["NovoUsuarioNome"] = nomeFinal;
+                TempData["NovoUsuarioEmail"] = emailFinal;
+            }
+
+            SetSucesso(emailEnviado
+                ? $"{nomeFinal} adicionado ao cliente. Senha temporária enviada para {emailFinal}."
+                : $"{nomeFinal} adicionado ao cliente. Anote a senha temporária — o e-mail NÃO foi enviado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao criar usuário no tenant {TenantId}", Id);
+            SetErro($"Falha ao criar usuário: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "usuarios" });
+    }
 
     public async Task<IActionResult> OnPostResetSenhaUsuarioAsync(Guid userId, string motivo)
     {

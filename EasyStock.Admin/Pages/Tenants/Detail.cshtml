@@ -22,6 +22,20 @@
     <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
 }
 
+@* Banner dourado — senha temporária do tenant ou usuário recém-criado. Some no próximo navigate. *@
+@if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
+{
+    <div class="bg-es-gold/10 border border-es-gold/30 text-es-gold rounded-lg px-4 py-3 text-sm mb-4">
+        <div class="font-semibold mb-1">
+            Senha temporária de <strong>@Model.NovoUsuarioNome</strong> — anote agora, não será reexibida:
+        </div>
+        <code class="font-mono text-base select-all">@Model.NovaSenhaTemporaria</code>
+        <div class="text-xs text-es-ink-mute mt-2">
+            E-mail de destino: <span class="font-mono">@Model.NovoUsuarioEmail</span>
+        </div>
+    </div>
+}
+
 <!-- Banner de alerta — populado por fetch ao carregar notas. -->
 <div x-data="alertaBanner('@Model.Id')" x-init="carregar()"
      x-show="alertasAtivos > 0" x-cloak
@@ -274,6 +288,7 @@ function alertaBanner(tenantId) {
     <!-- Usuários -->
     <div x-show="tab === 'usuarios'" x-cloak x-data="{
             sessoesUserId: null, sessoesData: null, sessoesLoading: false, sessoesErro: '',
+            modalNovoUsuario: false,
             async carregarSessoes(uid) {
                 this.sessoesUserId = uid;
                 this.sessoesData = null;
@@ -296,13 +311,22 @@ function alertaBanner(tenantId) {
                 }
             }
          }">
+        <div class="flex items-center justify-between mb-3">
+            <div class="text-es-ink-dim text-sm">@Model.Usuarios.Count() usuário(s) cadastrado(s) neste cliente</div>
+            <button type="button" @@click="modalNovoUsuario = true" class="btn-primary text-sm">
+                + Adicionar usuário
+            </button>
+        </div>
         <div class="card p-0 overflow-hidden">
             <table class="table-admin">
                 <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
                 <tbody>
                     @if (!Model.Usuarios.Any())
                     {
-                        <tr><td colspan="6" class="text-es-ink-mute text-center py-8 text-sm">Cliente sem usuários cadastrados.</td></tr>
+                        <tr><td colspan="6" class="text-es-ink-mute text-center py-8 text-sm">
+                            Cliente sem usuários cadastrados.
+                            <button type="button" @@click="modalNovoUsuario = true" class="text-es-accent hover:underline ml-1">Adicionar o primeiro →</button>
+                        </td></tr>
                     }
                     @foreach (var u in Model.Usuarios)
                     {
@@ -342,7 +366,7 @@ function alertaBanner(tenantId) {
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ResetSenhaUsuario&userId=@uid',
                                                 acao: 'Resetar senha de ' + @Html.Raw(unomeJs),
-                                                resumo: 'Uma nova senha temporária será gerada e enviada por email para ' + @Html.Raw(uemailJs) + '. Todas as sessões ativas serão revogadas.',
+                                                resumo: 'Uma senha temporária será gerada para ' + @Html.Raw(uemailJs) + '. As sessões ativas serão encerradas — o usuário vai precisar logar de novo.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Resetar senha (auditado)'
                                             })">
@@ -352,7 +376,7 @@ function alertaBanner(tenantId) {
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ForcarLogoutUsuario&userId=@uid',
                                                 acao: 'Forçar logout de ' + @Html.Raw(unomeJs),
-                                                resumo: 'Todas as sessões ativas (refresh tokens) deste usuário serão revogadas. Ele precisará logar novamente em todos os dispositivos.',
+                                                resumo: 'Todas as sessões ativas serão encerradas. O usuário vai precisar logar de novo em todos os dispositivos.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Forçar logout (auditado)'
                                             })">
@@ -446,6 +470,80 @@ function alertaBanner(tenantId) {
         </div>
 
         @{ var afEditar = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+
+        <!-- Modal Adicionar usuário ao tenant -->
+        <div x-show="modalNovoUsuario" x-cloak class="modal-overlay"
+             @@click.self="modalNovoUsuario = false" @@keydown.escape.window="modalNovoUsuario = false"
+             role="dialog" aria-modal="true" aria-labelledby="modal-novo-usuario-title">
+            <div class="modal-box max-w-md" x-data="{ motivoNovo: '', submitting: false }" @@click.stop>
+                <div class="flex items-start justify-between gap-3 mb-1">
+                    <div>
+                        <h3 id="modal-novo-usuario-title" class="text-es-ink font-semibold">Adicionar usuário ao cliente</h3>
+                        <p class="text-es-ink-dim text-xs mt-1">
+                            Cria o login no tenant. Senha temporária é gerada e enviada por e-mail.
+                        </p>
+                    </div>
+                    <button type="button" @@click="modalNovoUsuario = false" aria-label="Fechar"
+                            class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
+                </div>
+
+                <form method="post" asp-page-handler="CriarUsuario" @@submit="submitting = true" class="mt-4 space-y-3">
+                    <input type="hidden" name="__RequestVerificationToken" value="@afEditar" />
+
+                    <div>
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" required minlength="2" maxlength="120"
+                               placeholder="João Pereira" class="form-input w-full" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">E-mail</label>
+                        <input type="email" name="email" required maxlength="160"
+                               placeholder="joao@empresa.com.br" class="form-input w-full font-mono" />
+                        <p class="text-xs text-es-ink-mute mt-1">Tem que ser único no sistema todo.</p>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Nível de acesso</label>
+                        <select name="nivel" class="form-input w-full">
+                            <option value="Operador" selected>Operador (default)</option>
+                            <option value="Gerente">Gerente</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Visualizador">Visualizador (somente leitura)</option>
+                        </select>
+                        <p class="text-xs text-es-ink-mute mt-1">
+                            Admin pode tudo. Gerente vê relatórios. Operador opera caixa. Visualizador só lê.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                        <textarea name="motivo" x-model="motivoNovo" rows="2" minlength="10" maxlength="1000" required
+                                  placeholder="Ex.: cliente abriu chamado #1234, admin original saiu da empresa"
+                                  class="form-input w-full font-mono text-sm"></textarea>
+                        <p class="text-xs mt-1" :class="motivoNovo.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                            <span x-text="motivoNovo.trim().length"></span> / 10 mínimo
+                        </p>
+                    </div>
+
+                    <label class="flex items-center gap-2 text-xs text-es-ink-dim">
+                        <input type="checkbox" name="enviarEmail" value="true" checked class="form-checkbox" />
+                        Enviar a senha temporária por e-mail também
+                    </label>
+
+                    <div class="flex gap-3 justify-end pt-2">
+                        <button type="button" @@click="modalNovoUsuario = false" :disabled="submitting"
+                                class="btn-secondary text-sm">Cancelar</button>
+                        <button type="submit" :disabled="motivoNovo.trim().length < 10 || submitting"
+                                class="btn-primary text-sm">
+                            <span x-show="!submitting">Adicionar usuário (auditado)</span>
+                            <span x-show="submitting" x-cloak>Adicionando…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Modal Editar usuário (com diff before/after) -->
         <div x-data="editarUsuarioModal()" x-init="init()"
              x-show="open" x-cloak class="modal-overlay"
