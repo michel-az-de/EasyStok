@@ -610,8 +610,11 @@ function novoPedidoModal() {
                 return result;
             } catch (err) {
                 const dt = Math.round(performance.now() - t0);
-                this._etapaUpdate(id, 'error', err?.message || 'falhou');
+                // Detalhe inline mostra mensagem real (truncada) — usuário ve o erro ao lado da etapa.
+                const detalhe = (err?.message || 'falhou').slice(0, 140);
+                this._etapaUpdate(id, 'error', detalhe);
                 console.error('✗ ' + label + ' (' + dt + 'ms)', err);
+                if (!err.etapaLabel) err.etapaLabel = label;
                 throw err;
             }
         },
@@ -663,7 +666,11 @@ function novoPedidoModal() {
             });
         },
 
-        close() { this.open = false; },
+        close() {
+            // Bloqueia fechar enquanto está processando (evita perder trilha de criação)
+            if (this.fase === 'processando' && this.loading) return;
+            this.open = false;
+        },
 
         handleKeydown(e) {
             if (e.key === 'Escape') {
@@ -933,45 +940,70 @@ function novoPedidoModal() {
                 this.fase = 'concluido';
             } catch (err) {
                 console.groupEnd();
-                this.erroMsg = this._diagnostico(err);
+                this.erroMsg = this._formatarErro(err, err?.etapaLabel);
             } finally {
                 this.loading = false;
             }
         },
 
-        _diagnostico(err) {
+        // Sugestão acionável complementar — NUNCA substitui a mensagem do servidor.
+        _diagnosticoDica(err) {
             const msg = err?.message || '';
-            if (!msg) return 'Algo deu errado. Verifique sua conexão e tente de novo.';
-            // Mensagens conhecidas viram orientações
-            if (/sess[aã]o|expir/i.test(msg)) return 'Sua sessão expirou. Recarregue a página e refaça.';
-            if (/timeout|sem conex|n[ãa]o foi poss[ií]vel conectar/i.test(msg)) return 'Sem conexão com o servidor. Tente de novo em instantes.';
-            if (/501|n[ãa]o suportada/i.test(msg)) return 'O servidor não conseguiu processar uma das etapas. Avise o suporte com o que está cadastrando.';
-            if (/categoria/i.test(msg)) return 'Categoria inválida ou não encontrada. Cadastre uma categoria primeiro em Produtos.';
-            if (/cnpj|cpf|documento/i.test(msg)) return 'Documento inválido — confira CPF/CNPJ.';
-            return msg;
+            if (/sess[aã]o|expir|401|403/i.test(msg)) return 'Recarregue a página e faça login de novo.';
+            if (/timeout|sem conex/i.test(msg)) return 'Verifique sua internet e tente de novo.';
+            if (/501|n[ãa]o suportada/i.test(msg)) return 'Avise o suporte com este texto e o que estava cadastrando.';
+            if (/categoria/i.test(msg)) return 'Cadastre uma categoria primeiro em Produtos antes de criar produtos novos pelo modal.';
+            if (/estoque insuficiente/i.test(msg)) return 'Reponha o estoque ou ajuste a quantidade do item.';
+            if (/cliente.*duplicado|cnpj.*duplicado|cpf.*duplicado/i.test(msg)) return 'Já existe um cadastro com esses dados — busque o cliente em vez de cadastrar.';
+            return null;
+        },
+        _formatarErro(err, etapaLabel) {
+            const baseMsg = err?.message || 'Falha desconhecida.';
+            const dica = this._diagnosticoDica(err);
+            const prefixo = etapaLabel ? '[' + etapaLabel + '] ' : '';
+            return dica ? (prefixo + baseMsg + ' — ' + dica) : (prefixo + baseMsg);
         },
 
         async _postJson(url, body, token) {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
-                body: JSON.stringify(body)
-            });
+            console.log('%cPOST ' + url, 'color:#64748b', body);
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(body)
+                });
+            } catch (netErr) {
+                console.error('Falha de rede em ' + url, netErr);
+                return { ok: false, err: 'Sem conexão com o servidor.', status: 0, raw: null };
+            }
             const raw = await res.text();
             let data = null;
             try { data = raw ? JSON.parse(raw) : null; } catch { /* não-JSON */ }
-            if (res.ok && data && data.success) return { ok: true, data };
-            const err = (data && data.errorMessage) || this._friendlyHttp(res.status);
-            return { ok: false, err };
-        },
-        _friendlyHttp(s) {
-            if (s === 400 || s === 403) return 'Sua sessão expirou. Recarregue a página.';
-            if (s === 401) return 'Você precisa entrar de novo.';
-            if (s >= 500) return 'Tivemos um problema no servidor. Tente em alguns instantes.';
-            return 'Falha (erro ' + s + ').';
+            if (res.ok && data && data.success) {
+                console.log('%c← ' + res.status + ' ' + url, 'color:#10b981', data);
+                return { ok: true, data, status: res.status };
+            }
+            // Coleta TODAS as fontes possíveis de mensagem antes de cair em fallback.
+            const serverMsg = (data && (
+                data.errorMessage ||
+                data.error?.detail ||
+                data.error?.message ||
+                data.message ||
+                data.title
+            )) || (raw && raw.length < 300 ? raw : null);
+
+            const err = serverMsg || ('HTTP ' + res.status + ' em ' + url + ' (sem mensagem do servidor)');
+            console.error('← ' + res.status + ' ' + url, {
+                status: res.status,
+                bodyParsed: data,
+                bodyRaw: raw,
+                requestPayload: body
+            });
+            return { ok: false, err, status: res.status, raw, data };
         }
     };
 }
