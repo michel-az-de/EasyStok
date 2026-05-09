@@ -3334,6 +3334,28 @@ html.theme-dark .ped-prod-cadastro__title {
    Fluxo do submit: etapas animadas + recibo de sucesso
    ============================================================ */
 
+/* Cada fase é um wrapper x-show dentro do .fm-panel. Precisa replicar
+   o flex-column do panel pra que o .fm-body interno mantenha
+   overflow-y: auto e o conteúdo grande role em vez de estourar a tela. */
+.ped-fase {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+}
+
+.ped-fase > .fm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.ped-fase > .fm-header,
+.ped-fase > .fm-footer {
+    flex-shrink: 0;
+}
+
 .ped-flow__steps {
     list-style: none;
     margin: 0;

@@ -149,4 +149,47 @@ public class PedidosController(
         Toast("success", "Pagamento removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
+
+    /// <summary>
+    /// Ultimo pedido NAO cancelado do cliente — usado pelo modal Novo pedido pro
+    /// atalho "Repetir ultimo". Retorna {found:false} quando o cliente nao tem
+    /// historico ou todos os pedidos estao cancelados.
+    /// </summary>
+    [HttpGet("/pedidos/cliente/{clienteId}/ultimo")]
+    public async Task<IActionResult> UltimoDoCliente(Guid clienteId)
+    {
+        if (clienteId == Guid.Empty)
+            return Json(new { found = false });
+
+        var lista = await svc.ListarAsync(clienteId: clienteId);
+        if (!lista.Success || lista.Data is null || lista.Data.Count == 0)
+            return Json(new { found = false });
+
+        var ultimo = lista.Data
+            .Where(p => !string.Equals(p.Status, "cancelado", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(p => p.CriadoEm)
+            .FirstOrDefault();
+        if (ultimo is null)
+            return Json(new { found = false });
+
+        var detalhe = await svc.ObterAsync(ultimo.Id);
+        if (!detalhe.Success || detalhe.Data is null)
+            return Json(new { found = false });
+
+        return Json(new
+        {
+            found = true,
+            pedidoId = ultimo.Id,
+            criadoEm = ultimo.CriadoEm,
+            total = ultimo.Total,
+            itensCount = ultimo.ItensCount,
+            itens = detalhe.Data.Itens.Select(i => new
+            {
+                nome = i.Nome,
+                quantidade = i.Quantidade,
+                precoUnitario = i.PrecoUnitario,
+                produtoId = i.ProdutoId
+            })
+        });
+    }
 }

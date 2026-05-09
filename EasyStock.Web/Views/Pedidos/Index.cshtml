@@ -148,7 +148,7 @@
           x-transition:enter-end="opacity-100 scale-100">
 
         <!-- ============== FASE: PROCESSANDO ============== -->
-        <div x-show="fase === 'processando'" x-cloak class="ped-flow">
+        <div x-show="fase === 'processando'" x-cloak class="ped-flow ped-fase">
             <header class="fm-header">
                 <div>
                     <h2 class="fm-header__title">Processando seu pedido…</h2>
@@ -192,7 +192,7 @@
         </div>
 
         <!-- ============== FASE: RECIBO (sucesso) ============== -->
-        <div x-show="fase === 'concluido'" x-cloak class="ped-recibo">
+        <div x-show="fase === 'concluido'" x-cloak class="ped-recibo ped-fase">
             <header class="fm-header ped-recibo__header">
                 <div>
                     <div class="ped-recibo__check">
@@ -209,6 +209,23 @@
                 <button type="button" class="fm-close" aria-label="Fechar" @@click="irParaPedido()">✕</button>
             </header>
             <div class="fm-body">
+                <!-- Avisos: falhas parciais que NAO bloquearam o pedido (cliente/produto que
+                     viraram avulso). Pedido ja esta criado — operador so precisa saber pra
+                     corrigir depois. -->
+                <div x-show="avisos.length > 0" x-cloak
+                     class="rounded-lg p-3 mb-3 text-sm border bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-200">
+                    <div class="font-medium mb-1 flex items-center gap-2">
+                        <span>⚠</span>
+                        <span>Pedido criado com <span x-text="avisos.length"></span>
+                              <span x-text="avisos.length === 1 ? 'aviso' : 'avisos'"></span></span>
+                    </div>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        <template x-for="(av, idx) in avisos" :key="idx">
+                            <li x-text="av"></li>
+                        </template>
+                    </ul>
+                </div>
+
                 <div class="ped-recibo__bloco">
                     <span class="ped-recibo__label">Cliente</span>
                     <span class="ped-recibo__valor" x-text="clienteResumo || '(venda avulsa)'"></span>
@@ -250,7 +267,7 @@
         </div>
 
         <!-- ============== FASE: EDITANDO (form padrão) ============== -->
-        <div x-show="fase === 'editando'">
+        <div x-show="fase === 'editando'" class="ped-fase">
         <header class="fm-header">
             <div>
                 <h2 id="fm-pedido-title" class="fm-header__title">Novo pedido</h2>
@@ -281,6 +298,30 @@
                                 @@click="limparCliente()">trocar</button>
                     </div>
                 </template>
+
+                <!-- Chip "Repetir ultimo pedido": foodservice e altamente repetitivo, cliente
+                     recorrente quer "o de sempre". So aparece com cliente cadastrado selecionado
+                     e com a lista de itens vazia (evita clobbering acidental). -->
+                <template x-if="form.clienteId && ultimoPedido && form.itens.length === 0">
+                    <button type="button" @@click="repetirUltimoPedido()"
+                            class="mt-2 w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-sm transition-colors">
+                        <span class="text-base">🔁</span>
+                        <span class="flex-1 text-left">
+                            <span class="font-medium">Repetir último pedido</span>
+                            <span class="text-xs text-indigo-600/80 ml-1">
+                                · <span x-text="ultimoPedido.itensCount"></span>
+                                <span x-text="ultimoPedido.itensCount === 1 ? 'item' : 'itens'"></span>
+                                · <span x-text="formatBRL(ultimoPedido.total)"></span>
+                                · <span x-text="tempoRelativo(ultimoPedido.criadoEm)"></span>
+                            </span>
+                        </span>
+                        <span class="text-xs font-medium">clonar →</span>
+                    </button>
+                </template>
+                <p x-show="ultimoPedidoCarregando && form.clienteId && form.itens.length === 0" x-cloak
+                   class="mt-2 text-xs text-slate-400">
+                    buscando último pedido do cliente…
+                </p>
 
                 <!-- Combobox de busca (mostrado se nada selecionado/cadastrando) -->
                 <div x-show="!form.clienteId && !clienteNovo.ativo && form.modo !== 'avulso'"
@@ -581,7 +622,10 @@ function novoPedidoModal() {
         _previousFocus: null,
         clienteNovo: { ativo: false, nome: '', telefone: '', apt: '' },
         etapas: [],
+        avisos: [],               // strings — falhas parciais que NAO bloquearam o pedido
         pedidoCriado: null,       // { id }
+        ultimoPedido: null,       // {found, pedidoId, criadoEm, total, itensCount, itens[]}
+        ultimoPedidoCarregando: false,
         form: {
             modo: 'auto',           // auto | avulso
             clienteId: '',
@@ -632,6 +676,7 @@ function novoPedidoModal() {
             this.fase = 'editando';
             this.erroMsg = '';
             this.etapas = [];
+            this.avisos = [];
         },
         irParaPedido() {
             if (this.pedidoCriado?.id) {
@@ -644,6 +689,7 @@ function novoPedidoModal() {
             // Reset completo do formulário, mantém modal aberto.
             this.fase = 'editando';
             this.etapas = [];
+            this.avisos = [];
             this.pedidoCriado = null;
             this.erroMsg = '';
             this.limparCliente();
@@ -658,6 +704,7 @@ function novoPedidoModal() {
                 this._previousFocus = document.activeElement;
                 this.fase = 'editando';
                 this.etapas = [];
+                this.avisos = [];
                 this.pedidoCriado = null;
                 this.erroMsg = '';
                 this.open = true;
@@ -716,6 +763,7 @@ function novoPedidoModal() {
             this.form.clienteId = cli.id;
             this.clienteBusca = cli.nome;
             this.comboboxOpen = false;
+            this._carregarUltimoPedido(cli.id);
         },
         abrirCadastroCliente() {
             this.clienteNovo = {
@@ -725,6 +773,7 @@ function novoPedidoModal() {
                 apt: ''
             };
             this.comboboxOpen = false;
+            this.ultimoPedido = null; // cliente novo nao tem historico
         },
         limparCliente() {
             this.form.clienteId = '';
@@ -733,6 +782,56 @@ function novoPedidoModal() {
             this.clienteNovo = { ativo: false, nome: '', telefone: '', apt: '' };
             this.form.nomeAdHoc = ''; this.form.aptAdHoc = ''; this.form.telefoneAdHoc = '';
             this.comboboxIndex = 0;
+            this.ultimoPedido = null;
+            this.ultimoPedidoCarregando = false;
+        },
+
+        // Busca o ultimo pedido NAO cancelado do cliente pra oferecer "Repetir".
+        // Foodservice e altamente repetitivo — cliente recorrente quer "o de sempre".
+        async _carregarUltimoPedido(clienteId) {
+            if (!clienteId) { this.ultimoPedido = null; return; }
+            this.ultimoPedido = null;
+            this.ultimoPedidoCarregando = true;
+            try {
+                const r = await fetch('/pedidos/cliente/' + encodeURIComponent(clienteId) + '/ultimo');
+                if (!r.ok) return;
+                const d = await r.json();
+                this.ultimoPedido = (d && d.found) ? d : null;
+            } catch (err) {
+                console.warn('[Pedidos] Falha ao buscar ultimo pedido do cliente:', err);
+            } finally {
+                this.ultimoPedidoCarregando = false;
+            }
+        },
+
+        // Clona itens do ultimo pedido pro formulario atual. Substitui itens
+        // existentes — chip so aparece quando lista de itens esta vazia.
+        repetirUltimoPedido() {
+            if (!this.ultimoPedido || !this.ultimoPedido.itens) return;
+            this.form.itens = this.ultimoPedido.itens.map(it => {
+                const item = novoItem();
+                item.produtoId = it.produtoId || null;
+                item.busca = it.nome || '';
+                item.nome = it.nome || '';
+                item.quantidade = Number(it.quantidade) || 1;
+                item.precoUnitario = Number(it.precoUnitario) || 0;
+                return item;
+            });
+            // Some o chip — operador ja repetiu.
+            this.ultimoPedido = null;
+        },
+
+        // Helper local de tempo relativo pro chip de "ultimo pedido".
+        tempoRelativo(iso) {
+            if (!iso) return '';
+            const dt = new Date(iso);
+            if (isNaN(dt.getTime())) return '';
+            const diff = (Date.now() - dt.getTime()) / 1000;
+            if (diff < 60) return 'agora';
+            if (diff < 3600) return 'há ' + Math.floor(diff / 60) + ' min';
+            if (diff < 86400) return 'há ' + Math.floor(diff / 3600) + 'h';
+            if (diff < 86400 * 7) return 'há ' + Math.floor(diff / 86400) + 'd';
+            return dt.toLocaleDateString('pt-BR');
         },
         get clienteResumo() {
             if (this.form.clienteId) {
@@ -884,6 +983,7 @@ function novoPedidoModal() {
             this.loading = true;
             this.erroMsg = '';
             this.etapas = [];
+            this.avisos = [];
             this.fase = 'processando';
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
             const novos = this.form.itens.filter(it => it.novoCadastro);
@@ -892,7 +992,7 @@ function novoPedidoModal() {
             if (this.clienteNovo.ativo) {
                 this._etapaSet('cliente', 'Cadastrar cliente "' + this.clienteNovo.nome.trim() + '"', 'pending');
             }
-            novos.forEach((it, k) => {
+            novos.forEach((it) => {
                 this._etapaSet('prod-' + it.uid,
                     'Cadastrar produto "' + it.nome.trim() + '" + entrada de estoque',
                     'pending');
@@ -909,45 +1009,73 @@ function novoPedidoModal() {
 
             const t0 = performance.now();
             try {
-                // 1) Cliente novo
+                // 1) Cliente novo — falha NAO trava: cai pra venda avulsa com os dados digitados.
                 if (this.clienteNovo.ativo) {
-                    const r = await this._runEtapa('cliente',
-                        'Cadastrar cliente "' + this.clienteNovo.nome.trim() + '"',
-                        async () => {
-                            const res = await this._postJson('/clientes/json', {
-                                nome: this.clienteNovo.nome.trim(),
-                                telefone: this.clienteNovo.telefone || null,
-                                apt: this.clienteNovo.apt || null
-                            }, token);
-                            if (!res.ok) throw new Error(res.err);
-                            return { id: res.data.id };
-                        });
-                    this.form.clienteId = r.id;
-                }
-
-                // 2) Produtos novos (cria + entrada de estoque)
-                for (const it of novos) {
-                    const r = await this._runEtapa('prod-' + it.uid,
-                        'Cadastrar produto "' + it.nome.trim() + '" + entrada de estoque',
-                        async () => {
-                            const res = await this._postJson('/produtos/quick.json', {
-                                nome: it.nome.trim(),
-                                categoriaId: it.categoriaId,
-                                precoReferencia: it.precoUnitario || null,
-                                custoReferencia: it.custoCadastro || null,
-                                qtdInicial: Math.max(1, Math.ceil(Number(it.quantidade) || 1))
-                            }, token);
-                            if (!res.ok) throw new Error(res.err);
-                            return { id: res.data.id, entradaOk: res.data.entradaOk };
-                        });
-                    it.produtoId = r.id;
-                    it.novoCadastro = false;
-                    if (r.entradaOk === false) {
-                        console.warn('Produto cadastrado mas entrada de estoque falhou:', it.nome);
+                    const nomeCli = this.clienteNovo.nome.trim();
+                    const aptCli = this.clienteNovo.apt || '';
+                    const telCli = this.clienteNovo.telefone || '';
+                    try {
+                        const r = await this._runEtapa('cliente',
+                            'Cadastrar cliente "' + nomeCli + '"',
+                            async () => {
+                                const res = await this._postJson('/clientes/json', {
+                                    nome: nomeCli,
+                                    telefone: telCli || null,
+                                    apt: aptCli || null
+                                }, token);
+                                if (!res.ok) throw new Error(res.err);
+                                return { id: res.data.id };
+                            });
+                        this.form.clienteId = r.id;
+                    } catch (err) {
+                        const aviso = 'Cliente "' + nomeCli + '" não cadastrado: ' + (err?.message || 'erro desconhecido') + '. Pedido segue como venda avulsa — registre o cliente depois em Clientes.';
+                        console.warn('[Pedidos]', aviso);
+                        this.avisos.push(aviso);
+                        this._etapaUpdate('cliente', 'done', '⚠ falhou — segue como venda avulsa');
+                        this.clienteNovo.ativo = false;
+                        this.form.clienteId = '';
+                        this.form.modo = 'avulso';
+                        this.form.nomeAdHoc = nomeCli;
+                        this.form.aptAdHoc = aptCli;
+                        this.form.telefoneAdHoc = telCli;
                     }
                 }
 
-                // 3) Pedido (consome do estoque e cria fluxo)
+                // 2) Produtos novos — falha NAO trava: item entra no pedido como descricao livre.
+                for (const it of novos) {
+                    const nomeProd = it.nome.trim();
+                    try {
+                        const r = await this._runEtapa('prod-' + it.uid,
+                            'Cadastrar produto "' + nomeProd + '" + entrada de estoque',
+                            async () => {
+                                const res = await this._postJson('/produtos/quick.json', {
+                                    nome: nomeProd,
+                                    categoriaId: it.categoriaId,
+                                    precoReferencia: it.precoUnitario || null,
+                                    custoReferencia: it.custoCadastro || null,
+                                    qtdInicial: Math.max(1, Math.ceil(Number(it.quantidade) || 1))
+                                }, token);
+                                if (!res.ok) throw new Error(res.err);
+                                return { id: res.data.id, entradaOk: res.data.entradaOk };
+                            });
+                        it.produtoId = r.id;
+                        it.novoCadastro = false;
+                        if (r.entradaOk === false) {
+                            const aviso = 'Produto "' + nomeProd + '" criado mas entrada de estoque inicial falhou. Lance entrada manual em Estoque.';
+                            console.warn('[Pedidos]', aviso);
+                            this.avisos.push(aviso);
+                        }
+                    } catch (err) {
+                        const aviso = 'Produto "' + nomeProd + '" não cadastrado: ' + (err?.message || 'erro desconhecido') + '. Item entrou no pedido como descrição livre — registre o produto depois em Produtos.';
+                        console.warn('[Pedidos]', aviso);
+                        this.avisos.push(aviso);
+                        this._etapaUpdate('prod-' + it.uid, 'done', '⚠ falhou — item segue como avulso');
+                        it.produtoId = null;
+                        it.novoCadastro = false;
+                    }
+                }
+
+                // 3) Pedido — UNICA etapa fatal. Se falhar, abortamos.
                 const usaAvulso = this.form.modo === 'avulso' && !this.form.clienteId;
                 const payload = {
                     clienteId: this.form.clienteId || null,
@@ -973,7 +1101,17 @@ function novoPedidoModal() {
                 this.pedidoCriado = pedido;
                 const dt = Math.round(performance.now() - t0);
                 console.log('%c✓ Pedido criado em ' + dt + 'ms', 'color:#10b981;font-weight:bold', pedido);
+                if (this.avisos.length > 0) {
+                    console.warn('[Pedidos] Avisos parciais (' + this.avisos.length + '):', this.avisos);
+                }
                 console.groupEnd();
+
+                // Persiste avisos pra exibir no Detail (toasts) caso o operador navegue pra la.
+                if (this.avisos.length > 0 && pedido?.id) {
+                    try {
+                        sessionStorage.setItem('pedido-avisos-' + pedido.id, JSON.stringify(this.avisos));
+                    } catch { /* sessionStorage indisponivel em incognito */ }
+                }
 
                 // Pequeno delay pra animação dos checks ficar visível antes do recibo.
                 await new Promise(r => setTimeout(r, 350));

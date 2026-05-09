@@ -462,6 +462,33 @@ else
             close() { this.open = false; }
         };
     }
+
+    // Avisos do modal Novo Pedido: falhas parciais (cliente/produto que viraram avulso)
+    // foram persistidas em sessionStorage por id de pedido. Exibimos como toasts amarelos
+    // ao chegar no detalhe e limpamos a chave.
+    (function exibirAvisosPersistidos() {
+        try {
+            const pedidoId = '@p.Id';
+            const key = 'pedido-avisos-' + pedidoId;
+            const raw = sessionStorage.getItem(key);
+            if (!raw) return;
+            const avisos = JSON.parse(raw);
+            sessionStorage.removeItem(key);
+            if (!Array.isArray(avisos) || avisos.length === 0) return;
+            // Mostra cada aviso como toast com pequeno stagger pra serem legíveis.
+            avisos.forEach((msg, i) => {
+                setTimeout(() => {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast(msg, 'warning');
+                    } else {
+                        console.warn('[Pedido] aviso:', msg);
+                    }
+                }, 400 * i);
+            });
+        } catch (err) {
+            console.warn('[Pedido] Falha ao ler avisos persistidos:', err);
+        }
+    })();
     </script>
     }
 }
