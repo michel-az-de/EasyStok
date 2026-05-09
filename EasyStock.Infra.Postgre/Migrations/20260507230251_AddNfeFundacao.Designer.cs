@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260507230251_AddNfeFundacao")]
+    partial class AddNfeFundacao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -207,20 +210,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("AtendenteId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("AvaliadoEm")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Categoria")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
-
-                    b.Property<string>("ComentarioCsat")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime?>("ConviteCsatEnviadoEm")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
@@ -245,9 +238,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)")
                         .HasDefaultValue("N1");
-
-                    b.Property<int?>("NotaCsat")
-                        .HasColumnType("integer");
 
                     b.Property<Guid?>("OrigemTicketId")
                         .HasColumnType("uuid");
@@ -324,10 +314,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("EmpresaId", "Status", "Prioridade")
                         .HasDatabaseName("ix_admin_tickets_empresa_status_prioridade");
 
-                    b.ToTable("admin_tickets", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_admin_tickets_nota_csat_range", "\"NotaCsat\" IS NULL OR (\"NotaCsat\" BETWEEN 1 AND 5)");
-                        });
+                    b.ToTable("admin_tickets", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AdminTicketMensagem", b =>
@@ -1142,26 +1129,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
-
-                    b.Property<string>("NomeFantasia")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<bool>("OnboardingCompleto")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime?>("OnboardingCompletoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Segmento")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("Telefone")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
