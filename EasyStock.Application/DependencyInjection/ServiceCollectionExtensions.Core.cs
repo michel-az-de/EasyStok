@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
+using EasyStock.Application.UseCases.ListarPedidosCliente;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
@@ -76,6 +77,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverItemPedidoUseCase>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
+        services.AddScoped<ListarPedidosUseCase>();
 
         // Onda P3 — Caixa
         services.AddScoped<AbrirCaixaUseCase>();
