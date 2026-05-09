@@ -298,10 +298,10 @@
 
                 <ul class="ped-itens-list" x-show="form.itens.length > 0" x-cloak>
                     <template x-for="(it, i) in form.itens" :key="it.uid">
-                        <li class="ped-item flex-col" style="align-items: stretch;">
-                            <!-- Linha 1: busca + qtd + preço + remover -->
-                            <div class="flex w-full items-center gap-2">
-                                <div class="ped-item__nome relative" style="flex:1;">
+                        <li class="ped-item-row">
+                            <!-- Linha do item: usa grid .ped-item original -->
+                            <div class="ped-item">
+                                <div class="ped-item__nome ped-prod-cell">
                                     <!-- Busca de produto (quando ainda não vinculado) -->
                                     <input type="text"
                                            x-show="!it.produtoId && !it.novoCadastro"
@@ -313,35 +313,28 @@
                                            class="ui-field text-sm w-full" />
                                     <!-- Nome consolidado (após selecionar/cadastrar) -->
                                     <div x-show="it.produtoId || it.novoCadastro" x-cloak
-                                         class="text-sm font-medium text-slate-900 px-2 py-2">
+                                         class="ped-prod-consolidated">
                                         <span x-text="it.nome"></span>
-                                        <span x-show="it.novoCadastro" x-cloak
-                                              class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-medium">
-                                            novo
-                                        </span>
-                                        <span x-show="it.produtoId && !it.novoCadastro" x-cloak
-                                              class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
-                                            cadastrado
-                                        </span>
+                                        <span x-show="it.novoCadastro" x-cloak class="ped-prod-badge ped-prod-badge--new">novo</span>
+                                        <span x-show="it.produtoId && !it.novoCadastro" x-cloak class="ped-prod-badge ped-prod-badge--ok">cadastrado</span>
                                     </div>
                                     <!-- Dropdown de resultados -->
                                     <ul x-show="it.dropdownOpen && !it.produtoId && !it.novoCadastro && (it.busca || '').trim().length > 0"
                                         x-cloak
-                                        class="ped-combobox__list absolute z-10 mt-1 w-full max-h-56 overflow-auto"
-                                        style="position:absolute;">
+                                        class="ped-combobox__list ped-prod-dropdown">
                                         <template x-for="p in it.resultados" :key="p.id">
                                             <li class="ped-combobox__option"
                                                 @@mousedown.prevent="selecionarProduto(it, p)">
-                                                <div class="font-medium text-slate-900" x-text="p.nome"></div>
+                                                <div class="font-medium" x-text="p.nome"></div>
                                                 <div class="text-xs text-slate-500">
                                                     <span x-show="p.precoReferencia" x-text="formatBRL(p.precoReferencia)"></span>
                                                     <span x-show="p.sku"> · <span x-text="p.sku"></span></span>
                                                 </div>
                                             </li>
                                         </template>
-                                        <li class="ped-combobox__option border-t border-slate-200"
+                                        <li class="ped-combobox__option ped-prod-dropdown__create"
                                             @@mousedown.prevent="abrirCadastroProduto(it)">
-                                            <div class="text-indigo-600 font-medium">
+                                            <div class="ped-prod-dropdown__create-title">
                                                 + Cadastrar "<span x-text="(it.busca || '').trim()"></span>" como novo produto
                                             </div>
                                             <div class="text-xs text-slate-500">Registrado na base com entrada de estoque.</div>
@@ -364,15 +357,14 @@
                                         @@click="form.itens.splice(i, 1)">✕</button>
                             </div>
 
-                            <!-- Linha 2 (expand): cadastro inline do produto novo -->
-                            <div x-show="it.novoCadastro" x-cloak
-                                 class="mt-2 p-3 rounded-lg bg-indigo-50/50 border border-indigo-200">
-                                <div class="text-xs text-indigo-900 mb-2 font-medium">
+                            <!-- Bloco de cadastro inline (irmão da linha, fora do grid) -->
+                            <div x-show="it.novoCadastro" x-cloak class="ped-prod-cadastro">
+                                <div class="ped-prod-cadastro__title">
                                     Cadastro mínimo · enriquece depois em Produtos
                                 </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="text-[11px] uppercase tracking-wide text-slate-600">Categoria</label>
+                                <div class="ped-prod-cadastro__grid">
+                                    <div class="ped-prod-cadastro__field">
+                                        <label>Categoria</label>
                                         <select x-model="it.categoriaId" class="ui-field text-sm w-full" required>
                                             <option value="">Selecione…</option>
                                             @foreach (var c in Model.Categorias)
@@ -381,15 +373,15 @@
                                             }
                                         </select>
                                     </div>
-                                    <div>
-                                        <label class="text-[11px] uppercase tracking-wide text-slate-600">Custo (opcional)</label>
+                                    <div class="ped-prod-cadastro__field">
+                                        <label>Custo (opcional)</label>
                                         <input type="number" step="0.01" min="0" x-model.number="it.custoCadastro"
                                                placeholder="R$" class="ui-field text-sm w-full" />
                                     </div>
-                                    <div class="col-span-2 text-xs text-slate-600">
-                                        Será criada uma entrada de estoque com a quantidade do pedido (ajustada como saída em seguida) para preservar a auditoria.
-                                    </div>
                                 </div>
+                                <p class="ped-prod-cadastro__hint">
+                                    Será criada uma entrada de estoque com a quantidade do pedido (a saída do pedido sai dela em seguida) para preservar a auditoria.
+                                </p>
                             </div>
                         </li>
                     </template>

@@ -3190,6 +3190,146 @@ html.theme-dark .ped-item__remove:hover {
     background: rgba(127, 29, 29, .35);
 }
 
+/* Linha do item do pedido (wrapper) — agrupa a linha + bloco de cadastro inline */
+.ped-item-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Célula de produto: relativa para o dropdown absoluto, sem encolher os outros campos */
+.ped-prod-cell {
+    position: relative;
+    min-width: 0;
+}
+
+.ped-prod-consolidated {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #0f172a);
+    min-height: 36px;
+}
+
+html.theme-dark .ped-prod-consolidated {
+    color: #e2e8f0;
+}
+
+.ped-prod-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: lowercase;
+}
+
+.ped-prod-badge--new {
+    background: rgba(199, 210, 254, .9);
+    color: #3730a3;
+}
+
+.ped-prod-badge--ok {
+    background: rgba(167, 243, 208, .85);
+    color: #065f46;
+}
+
+html.theme-dark .ped-prod-badge--new {
+    background: rgba(67, 56, 202, .35);
+    color: #c7d2fe;
+}
+
+html.theme-dark .ped-prod-badge--ok {
+    background: rgba(6, 95, 70, .4);
+    color: #a7f3d0;
+}
+
+.ped-prod-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    z-index: 30;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.ped-prod-dropdown__create {
+    border-top: 1px solid rgba(226, 232, 240, .9);
+}
+
+html.theme-dark .ped-prod-dropdown__create {
+    border-top-color: rgba(71, 85, 105, .6);
+}
+
+.ped-prod-dropdown__create-title {
+    color: #1E48A8;
+    font-weight: 600;
+}
+
+html.theme-dark .ped-prod-dropdown__create-title {
+    color: #93c5fd;
+}
+
+/* Bloco de cadastro inline (categoria + custo) */
+.ped-prod-cadastro {
+    margin-left: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(199, 210, 254, .9);
+    background: rgba(238, 242, 255, .55);
+}
+
+html.theme-dark .ped-prod-cadastro {
+    border-color: rgba(67, 56, 202, .45);
+    background: rgba(30, 41, 80, .35);
+}
+
+.ped-prod-cadastro__title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #3730a3;
+    margin-bottom: 8px;
+}
+
+html.theme-dark .ped-prod-cadastro__title {
+    color: #c7d2fe;
+}
+
+.ped-prod-cadastro__grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 10px;
+}
+
+.ped-prod-cadastro__field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 4px;
+}
+
+.ped-prod-cadastro__hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+}
+
+@media (max-width: 640px) {
+    .ped-prod-cadastro__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .ped-add-item {
     display: inline-flex;
     align-items: center;
