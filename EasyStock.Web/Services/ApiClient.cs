@@ -273,12 +273,13 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                 ApiResult<T>.Fail("NOT_FOUND", "Recurso não encontrado.", status),
             HttpStatusCode.TooManyRequests =>
                 ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status),
-            HttpStatusCode.InternalServerError =>
-                ApiResult<T>.Fail("SERVER_ERROR", "Erro no servidor. Tente novamente.", status),
+            HttpStatusCode.InternalServerError => await ParseBodyError<T>(response, status),
             HttpStatusCode.BadRequest => await ParseBodyError<T>(response, status),
             HttpStatusCode.Conflict => await ParseBodyError<T>(response, status),
             HttpStatusCode.UnprocessableEntity => await ParseBodyError<T>(response, status),
-            _ => ApiResult<T>.Fail("HTTP_ERROR", $"Erro HTTP {status}.", status)
+            // Demais 4xx/5xx: tenta extrair detail do envelope ApiError. Se vier vazio,
+            // ParseBodyError já cai no FallbackMessageForStatus.
+            _ => await ParseBodyError<T>(response, status)
         };
     }
 
@@ -363,6 +364,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         409 => "Conflito de dados. Esse registro já existe ou está em uso.",
         422 => "Não foi possível processar — algum dado está inconsistente.",
         500 => "Erro interno no servidor. Tente novamente em alguns instantes.",
+        501 => "Operação não suportada nesta versão. Avise o suporte com o que estava fazendo.",
         503 => "Serviço temporariamente indisponível. Tente novamente em instantes.",
         _   => $"Erro HTTP {status}. Tente novamente — se persistir, contate o suporte."
     };

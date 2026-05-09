@@ -106,15 +106,26 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
         // Saída rápida a partir da listagem de estoque é sempre de um lote específico
         // (o que o usuário clicou). ItemEstoqueId força a API a consumir esse lote
         // em vez de cair na rota FIFO/FEFO por ProdutoId.
+        var natureza = (req.Natureza ?? "venda").Trim().ToLowerInvariant();
+
+        // Validacoes amigaveis no Web — evita rodada API/erro genérico.
+        if (natureza == "venda" && (!req.Valor.HasValue || req.Valor.Value <= 0))
+            return BadRequest(new { success = false, errorMessage = "Para Venda, informe o valor unitário." });
+
+        var motivoNorm = string.IsNullOrWhiteSpace(req.Motivo) ? null : req.Motivo.Trim();
+        if ((natureza == "perda" || natureza == "prejuizo") && motivoNorm is null)
+            return BadRequest(new { success = false, errorMessage = "Informe o motivo da saída para auditoria." });
+
         var saidaVm = new SaidaFormViewModel
         {
             ItemEstoqueId = req.EstoqueId,
             ProdutoId = item.ProdutoId,
             VarId = item.VarId,
-            Natureza = req.Natureza ?? "venda",
+            Natureza = natureza,
             Qty = req.Qty,
             Valor = req.Valor,
-            DtVenda = data
+            DtVenda = data,
+            Descricao = motivoNorm
         };
 
         var result = await saidasSvc.CriarAsync(saidaVm);
