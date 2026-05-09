@@ -26,6 +26,12 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public bool FinanceiroHabilitado { get; set; } = false;
 
+        public string? NomeFantasia { get; set; }
+        public string? Telefone { get; set; }
+        public string? Segmento { get; set; }
+        public bool OnboardingCompleto { get; set; } = false;
+        public DateTime? OnboardingCompletoEm { get; set; }
+
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;
@@ -37,6 +43,14 @@ namespace EasyStock.Domain.Entities
                 CriadoEm = agora,
                 AlteradoEm = agora
             };
+        }
+
+        public void MarcarOnboardingCompleto()
+        {
+            if (OnboardingCompleto) return;
+            OnboardingCompleto = true;
+            OnboardingCompletoEm = DateTime.UtcNow;
+            AlteradoEm = DateTime.UtcNow;
         }
 
         public ICollection<Categoria> Categorias { get; set; } = new List<Categoria>();

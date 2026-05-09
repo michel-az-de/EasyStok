@@ -1,0 +1,86 @@
+@model EasyStock.Web.Models.ViewModels.Onboarding.OnboardingViewModel
+@{
+    ViewBag.Title = "Configurar conta";
+}
+
+<div class="max-w-2xl mx-auto py-8" x-data="{ step: 1 }">
+    <header class="mb-6 text-center">
+        <h1 class="text-2xl font-bold mb-1">Configure sua conta</h1>
+        <p class="text-sm" style="color: var(--text-secondary);">Em 3 passos rapidos voce esta pronto pra usar.</p>
+        <ol class="flex justify-center gap-2 mt-4 text-xs">
+            <li :class="step >= 1 ? 'font-bold' : ''">1. Empresa</li>
+            <li>·</li>
+            <li :class="step >= 2 ? 'font-bold' : ''">2. Loja</li>
+            <li>·</li>
+            <li :class="step >= 3 ? 'font-bold' : ''">3. Finalizar</li>
+        </ol>
+    </header>
+
+    <form asp-controller="Onboarding" asp-action="Index" method="post" class="space-y-4 p-6 rounded-lg border" style="background: var(--surface-1, #fff); border-color: var(--border-soft, #e7e5e4);">
+        <div asp-validation-summary="All" class="text-sm" style="color: var(--text-danger, #b91c1c);"></div>
+
+        <div x-show="step === 1" x-transition>
+            <h2 class="font-semibold mb-3">Sobre a empresa</h2>
+            <div class="space-y-3">
+                <div>
+                    <label asp-for="NomeFantasia" class="block text-sm mb-1"></label>
+                    <input asp-for="NomeFantasia" class="w-full px-3 py-2 border rounded" placeholder="Ex: Restaurante do Jose" />
+                </div>
+                <div>
+                    <label asp-for="Telefone" class="block text-sm mb-1"></label>
+                    <input asp-for="Telefone" class="w-full px-3 py-2 border rounded" placeholder="(11) 99999-0000" />
+                    <p class="text-xs mt-1" style="color: var(--text-secondary);">Usado pra notificacoes WhatsApp/SMS quando ativadas.</p>
+                </div>
+                <div>
+                    <label asp-for="Segmento" class="block text-sm mb-1"></label>
+                    <select asp-for="Segmento" class="w-full px-3 py-2 border rounded">
+                        <option value="restaurante">Restaurante / Foodservice</option>
+                        <option value="varejo">Varejo</option>
+                        <option value="distribuidora">Distribuidora</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-5 flex justify-end">
+                <button type="button" @@click="step = 2" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Proximo</button>
+            </div>
+        </div>
+
+        <div x-show="step === 2" x-transition>
+            <h2 class="font-semibold mb-3">Sua primeira loja</h2>
+            <div class="space-y-3">
+                <div>
+                    <label asp-for="LojaNome" class="block text-sm mb-1"></label>
+                    <input asp-for="LojaNome" class="w-full px-3 py-2 border rounded" placeholder="Ex: Matriz, Filial Centro..." required />
+                    <span asp-validation-for="LojaNome" class="text-xs" style="color: var(--text-danger);"></span>
+                </div>
+                <div>
+                    <label asp-for="LojaEndereco" class="block text-sm mb-1"></label>
+                    <input asp-for="LojaEndereco" class="w-full px-3 py-2 border rounded" placeholder="Rua, numero, bairro, cidade" />
+                </div>
+                <div>
+                    <label asp-for="LojaTelefone" class="block text-sm mb-1"></label>
+                    <input asp-for="LojaTelefone" class="w-full px-3 py-2 border rounded" placeholder="(11) 0000-0000" />
+                </div>
+            </div>
+            <div class="mt-5 flex justify-between">
+                <button type="button" @@click="step = 1" class="px-4 py-2 rounded border">Voltar</button>
+                <button type="button" @@click="step = 3" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Proximo</button>
+            </div>
+        </div>
+
+        <div x-show="step === 3" x-transition>
+            <h2 class="font-semibold mb-3">Pronto pra comecar?</h2>
+            <p class="text-sm mb-4">Voce tem <strong>14 dias de trial</strong> com acesso a tudo. Sem cartao de credito.</p>
+            <ul class="text-sm list-disc pl-5 space-y-1 mb-5" style="color: var(--text-secondary);">
+                <li>Catalogo, estoque e movimentacao multi-loja.</li>
+                <li>Pedidos, vendas e caixa integrados.</li>
+                <li>Relatorios em tempo real.</li>
+            </ul>
+            <div class="flex justify-between">
+                <button type="button" @@click="step = 2" class="px-4 py-2 rounded border">Voltar</button>
+                <button type="submit" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Concluir e entrar</button>
+            </div>
+        </div>
+    </form>
+</div>

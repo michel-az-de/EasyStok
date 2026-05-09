@@ -132,6 +132,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarFaturasUseCase>();
         services.AddScoped<CancelarAssinaturaUseCase>();
         services.AddScoped<AlterarPlanoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.PagarAgora.PagarAgoraUseCase>();
 
         // Modulo Financeiro (F1+) — Faturas
         services.AddScoped<EmitirFaturaUseCase>();
