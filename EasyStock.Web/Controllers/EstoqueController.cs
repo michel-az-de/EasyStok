@@ -1,4 +1,5 @@
 using System.Text;
+using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Estoque;
 using EasyStock.Web.Models.ViewModels.Saidas;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -7,7 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, SessionService session) : BaseController(session)
+public class EstoqueController(
+    EstoqueService svc,
+    SaidasService saidasSvc,
+    EntradasService entradasSvc,
+    SessionService session,
+    ILogger<EstoqueController> log) : BaseController(session)
 {
     [HttpGet("/estoque")]
     public async Task<IActionResult> Index(int page = 1, string? search = null, string? status = null, string? categoria = null)
@@ -97,9 +103,6 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
 
         var item = itemResult.Data;
 
-        if (req.Qty > item.Qty)
-            return BadRequest(new { success = false, errorMessage = $"Estoque insuficiente. Disponível: {item.Qty}." });
-
         if (!DateOnly.TryParse(req.Data, out var data))
             data = DateOnly.FromDateTime(DateTime.Today);
 
@@ -115,6 +118,41 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
         var motivoNorm = string.IsNullOrWhiteSpace(req.Motivo) ? null : req.Motivo.Trim();
         if ((natureza == "perda" || natureza == "prejuizo") && motivoNorm is null)
             return BadRequest(new { success = false, errorMessage = "Informe o motivo da saída para auditoria." });
+
+        // Politica "operacao nao trava": se estoque insuficiente, repoe automaticamente
+        // o lote clicado com a diferenca, mantem trilha de auditoria com observacao
+        // padronizada e segue com a saida. Operador corrige depois — ver req do Felipe.
+        bool ajusteAutomatico = false;
+        int qtyAjuste = 0;
+        if (req.Qty > item.Qty)
+        {
+            qtyAjuste = req.Qty - item.Qty;
+            var custoUnitario = item.CustoUnitario?.Valor > 0 ? item.CustoUnitario.Valor : 0.01m;
+            var reposicaoVm = new ReposicaoFormViewModel
+            {
+                ItemEstoqueId = req.EstoqueId,
+                ProdutoId = item.ProdutoId,
+                Qty = qtyAjuste,
+                Custo = custoUnitario,
+                Data = data,
+                Validade = item.Validade,
+                Observacoes = $"Ajuste automatico: saida solicitou {req.Qty}un mas estoque tinha {item.Qty}un. Operador deve revisar."
+            };
+            var ajusteResult = await entradasSvc.ReposicaoAsync(reposicaoVm);
+            if (!ajusteResult.Success)
+            {
+                log.LogWarning("Ajuste automatico FALHOU em /estoque/saida. itemId={ItemId} produtoId={ProdutoId} solicitado={Solicitado} disponivel={Disponivel} erro={Erro}",
+                    req.EstoqueId, item.ProdutoId, req.Qty, item.Qty, ajusteResult.ErrorMessage);
+                return BadRequest(new
+                {
+                    success = false,
+                    errorMessage = $"Estoque insuficiente ({item.Qty}un disponiveis) e nao foi possivel ajustar automaticamente: {ajusteResult.ErrorMessage ?? "erro desconhecido"}."
+                });
+            }
+            ajusteAutomatico = true;
+            log.LogWarning("Ajuste automatico aplicado em /estoque/saida. itemId={ItemId} produtoId={ProdutoId} reposicao={Ajuste}un (de {Disponivel} para {Total}). Saida natureza={Natureza} qty={Qty}.",
+                req.EstoqueId, item.ProdutoId, qtyAjuste, item.Qty, req.Qty, natureza, req.Qty);
+        }
 
         var saidaVm = new SaidaFormViewModel
         {
@@ -132,7 +170,15 @@ public class EstoqueController(EstoqueService svc, SaidasService saidasSvc, Sess
         if (!result.Success)
             return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao registrar saída." });
 
-        return Ok(new { success = true });
+        return Ok(new
+        {
+            success = true,
+            ajusteAutomatico,
+            qtyAjuste,
+            mensagemAjuste = ajusteAutomatico
+                ? $"Estoque tinha {item.Qty}un, foram repostas {qtyAjuste}un automaticamente. Revise o cadastro depois."
+                : null
+        });
     }
 
     [HttpGet("/estoque/produto-detalhe/{id}")]

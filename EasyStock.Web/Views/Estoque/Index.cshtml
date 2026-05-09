@@ -120,15 +120,17 @@
                     <div class="flex items-center gap-2">
                         <button type="button" @@click="qty = Math.max(1, qty - 1)"
                                 class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">−</button>
-                        <input type="number" x-model.number="qty" min="1" :max="qtyDisponivel"
+                        <input type="number" x-model.number="qty" min="1"
                                class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                        <button type="button" @@click="qty = Math.min(qtyDisponivel, qty + 1)"
+                        <button type="button" @@click="qty = qty + 1"
                                 class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">+</button>
                     </div>
                     <p class="text-xs mt-1"
-                       :class="qty > qtyDisponivel ? 'text-red-600 font-medium' : 'text-slate-500 dark:text-slate-400'">
+                       :class="qty > qtyDisponivel ? 'text-amber-600 font-medium' : 'text-slate-500 dark:text-slate-400'">
                         <span x-show="qty <= qtyDisponivel">Disponível: <span x-text="qtyDisponivel"></span></span>
-                        <span x-show="qty > qtyDisponivel" x-cloak>Excede o estoque (disponível: <span x-text="qtyDisponivel"></span>).</span>
+                        <span x-show="qty > qtyDisponivel" x-cloak>
+                            ⚠ Excede estoque atual (<span x-text="qtyDisponivel"></span>un). Sistema vai repor <span x-text="qty - qtyDisponivel"></span>un automaticamente — revise depois.
+                        </span>
                     </p>
                 </div>
 
@@ -387,7 +389,9 @@
                 },
 
                 podeEnviar() {
-                    if (!this.qty || this.qty < 1 || this.qty > this.qtyDisponivel) return false;
+                    // Excesso vs estoque NAO bloqueia mais — servidor faz reposicao automatica
+                    // mantendo a operacao fluindo (regra do Felipe).
+                    if (!this.qty || this.qty < 1) return false;
                     if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) return false;
                     if ((this.natureza === 'perda' || this.natureza === 'prejuizo') && !this.motivo.trim()) return false;
                     return true;
@@ -396,8 +400,8 @@
                 async confirmarSaida() {
                     if (this.loading) return;
                     if (!this.podeEnviar()) {
-                        if (this.qty < 1 || this.qty > this.qtyDisponivel) {
-                            this.erroMsg = 'Quantidade inválida (disponível: ' + this.qtyDisponivel + ').';
+                        if (!this.qty || this.qty < 1) {
+                            this.erroMsg = 'Quantidade deve ser maior ou igual a 1.';
                         } else if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) {
                             this.erroMsg = 'Informe o valor unitário da venda.';
                         } else {
@@ -425,9 +429,20 @@
                             })
                         });
                         if (r.ok) {
-                            window.showToast('Saída registrada com sucesso!', 'success');
+                            let msg = 'Saída registrada com sucesso!';
+                            let type = 'success';
+                            let delay = 800;
+                            try {
+                                const d = await r.json();
+                                if (d && d.ajusteAutomatico) {
+                                    msg = d.mensagemAjuste || 'Saída registrada com ajuste automático de estoque. Revise o cadastro depois.';
+                                    type = 'warning';
+                                    delay = 1800;
+                                }
+                            } catch { /* corpo vazio ou não-JSON */ }
+                            window.showToast(msg, type);
                             this.open = false;
-                            setTimeout(() => location.reload(), 800);
+                            setTimeout(() => location.reload(), delay);
                         } else {
                             const raw = await r.text();
                             let d = null;
