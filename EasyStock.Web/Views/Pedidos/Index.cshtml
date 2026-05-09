@@ -725,6 +725,13 @@ function novoPedidoModal() {
         close() {
             // Bloqueia fechar enquanto está processando (evita perder trilha de criação)
             if (this.fase === 'processando' && this.loading) return;
+            // Se um pedido foi criado e o operador fechou o modal sem clicar
+            // "Ver na esteira", força reload da lista pra ela aparecer (a tabela
+            // foi server-rendered antes da criação, fica desatualizada senão).
+            if (this.fase === 'concluido' && this.pedidoCriado?.id) {
+                window.location.href = '/pedidos?novo=' + this.pedidoCriado.id;
+                return;
+            }
             this.open = false;
         },
 
@@ -1095,7 +1102,15 @@ function novoPedidoModal() {
                     async () => {
                         const res = await this._postJson('/pedidos/json', payload, token);
                         if (!res.ok) throw new Error(res.err);
-                        return { id: res.data.id };
+                        // Defesa: API pode retornar success:true sem id valido (bug de
+                        // serializacao). Se isso acontecer, o pedido NAO foi criado de
+                        // forma rastreavel — falha alto, nao engole.
+                        const id = res.data?.id;
+                        if (!id || typeof id !== 'string' || id.length < 30) {
+                            console.error('Resposta inesperada do servidor — sem id valido:', res);
+                            throw new Error('Servidor retornou sucesso sem id do pedido. O pedido pode nao ter sido salvo. Recarregue a lista de pedidos pra confirmar.');
+                        }
+                        return { id };
                     });
 
                 this.pedidoCriado = pedido;
@@ -1119,8 +1134,16 @@ function novoPedidoModal() {
             } catch (err) {
                 console.groupEnd();
                 this.erroMsg = this._formatarErro(err, err?.etapaLabel);
+                console.error('[Pedidos] Submit falhou:', err);
             } finally {
                 this.loading = false;
+                // Defesa final: se chegamos no finally sem ir pra 'concluido' nem ter
+                // erroMsg, alguma coisa fugiu do controle. Loga e força um erro visível
+                // pro operador — nada de modal silenciosamente fechando.
+                if (this.fase === 'processando' && !this.pedidoCriado && !this.erroMsg) {
+                    this.erroMsg = 'Não conseguimos confirmar o pedido. Recarregue a página de Pedidos antes de tentar de novo (pra evitar pedido duplicado se já tiver entrado).';
+                    console.error('[Pedidos] Submit terminou em estado indefinido — sem pedido nem erro.');
+                }
             }
         },
 
