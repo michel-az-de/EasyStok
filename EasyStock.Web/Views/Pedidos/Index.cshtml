@@ -142,6 +142,7 @@
      class="fm-overlay"
      role="dialog" aria-modal="true" aria-labelledby="fm-pedido-title">
     <form x-ref="panel" class="fm-panel" style="max-width: 820px"
+          autocomplete="off" novalidate
           @@submit.prevent="submit()"
           x-transition:enter="transition duration-150 ease-out"
           x-transition:enter-start="opacity-0 scale-95"
@@ -575,7 +576,8 @@
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </button>
-            <button type="submit" :disabled="loading || !podeEnviar()"
+            <button type="button" @@click="submit()"
+                    :disabled="loading || !podeEnviar()"
                     :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                 <span>Criar pedido</span>
@@ -979,6 +981,8 @@ function novoPedidoModal() {
 
         // ── Submit: orquestração com etapas animadas + console group ──────
         async submit() {
+            console.log('%c[Pedidos] submit() chamado', 'color:#6366f1;font-weight:bold',
+                'fase=' + this.fase, 'loading=' + this.loading);
             if (this.loading) return;
             const motivo = this._preflight();
             if (motivo) {
