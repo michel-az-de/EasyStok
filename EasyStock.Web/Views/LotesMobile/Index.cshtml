@@ -28,9 +28,9 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🏷️" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhum lote do app" },
-            { "EmptyDescription", "Lotes criados no app vão aparecer aqui pra revisão." }
+            { "EmptyDescription", "Lotes criados no app aparecem aqui para revisão." }
         })
     }
     else
@@ -84,10 +84,15 @@
                         }
                         else
                         {
-                            <form asp-action="Unlink" asp-controller="LotesMobile" asp-route-id="@m.Id" method="post" onsubmit="return confirm('Desfazer link?');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
-                            </form>
+                            <button type="button"
+                                    @@click="$dispatch('confirm-action', {
+                                        titulo: 'Desfazer link com o ERP?',
+                                        mensagem: 'O lote do app volta pra lista de pendentes e some dos lotes do ERP.',
+                                        textoBotao: 'Desfazer link',
+                                        classBotao: 'bg-red-600 hover:bg-red-700',
+                                        formAction: '@Url.Action("Unlink", "LotesMobile", new { id = m.Id })'
+                                    })"
+                                    class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
                         }
                     </td>
                 </tr>

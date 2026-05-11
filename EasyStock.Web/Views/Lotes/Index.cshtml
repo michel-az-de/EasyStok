@@ -4,15 +4,28 @@
     Layout = "_Layout";
 }
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Lotes de produção</h1>
-        <p>Cada turno gera 1 lote com itens + etiquetas individuais</p>
+        <p>
+            @Model.Items.Count @(Model.Items.Count == 1 ? "lote listado" : "lotes listados") · cada turno gera 1 lote com itens + etiquetas
+        </p>
     </div>
-    <div class="flex gap-3">
-        <a href="/lotes-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">📱 Lotes do app</a>
+    <div class="flex gap-3 flex-wrap">
+        <a href="/lotes-mobile"
+           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Lotes do app
+        </a>
         <button type="button" x-data @@click="$dispatch('open-modal', 'novo-lote')"
-                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Novo Lote</button>
+                class="app-primary-btn inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Novo lote
+        </button>
     </div>
 </div>
 
@@ -35,10 +48,10 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🏷️" },
-            { "EmptyTitle", "Nenhum lote" },
-            { "EmptyDescription", "Crie seu primeiro lote pra começar a produzir e gerar etiquetas." },
-            { "EmptyCta", "+ Novo Lote" },
+            { "EmptyIllustration", "box" },
+            { "EmptyTitle", "Nenhum lote ainda" },
+            { "EmptyDescription", "Crie seu primeiro lote para começar a produzir e gerar etiquetas." },
+            { "EmptyCta", "Novo lote" },
             { "EmptyCtaModal", "novo-lote" }
         })
     }
@@ -50,24 +63,41 @@
             <tbody>
             @foreach (var l in Model.Items)
             {
-                string statusClass = l.Status switch {
-                    "em_producao" => "bg-blue-100 text-blue-700",
-                    "finalizado"  => "bg-green-100 text-green-700",
-                    "expirado"    => "bg-red-100 text-red-700",
-                    _             => "bg-slate-100 text-slate-600"
+                string pillClass = l.Status switch {
+                    "em_producao" => "bg-blue-50 text-blue-700 ring-blue-200",
+                    "finalizado"  => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                    "expirado"    => "bg-red-50 text-red-700 ring-red-200",
+                    _             => "bg-slate-50 text-slate-600 ring-slate-200"
+                };
+                string dotClass = l.Status switch {
+                    "em_producao" => "bg-blue-500",
+                    "finalizado"  => "bg-emerald-500",
+                    "expirado"    => "bg-red-500",
+                    _             => "bg-slate-400"
+                };
+                string statusLabel = l.Status switch {
+                    "em_producao" => "Em produção",
+                    "finalizado"  => "Finalizado",
+                    "expirado"    => "Expirado",
+                    _             => l.Status ?? "—"
                 };
                 <tr>
                     <td class="font-mono text-sm">@l.Codigo</td>
-                    <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @statusClass">@l.Status</span></td>
+                    <td>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 @pillClass">
+                            <span class="w-1.5 h-1.5 rounded-full @dotClass"></span>
+                            @statusLabel
+                        </span>
+                    </td>
                     <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().ToString("dd/MM HH:mm")</td>
                     <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
-                    <td class="text-slate-600 text-sm">@l.ItensCount item(s) · @l.TotalUnidades un</td>
-                    <td class="text-sm text-slate-600">
+                    <td class="text-slate-600 text-sm tabular-nums">@l.ItensCount item(s) · @l.TotalUnidades un</td>
+                    <td class="text-sm text-slate-600 tabular-nums">
                         @if (l.TotalUnidades > 0) { <span>@l.EtiquetasConferidas/@l.TotalUnidades</span> }
                         else { <span class="text-slate-400">—</span> }
                         @if (l.EtiquetasDivergentes > 0) { <span class="text-xs text-red-600">· @l.EtiquetasDivergentes div</span> }
                     </td>
-                    <td><a asp-action="Detail" asp-controller="Lotes" asp-route-id="@l.Id" class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a></td>
+                    <td class="text-right"><a asp-action="Detail" asp-controller="Lotes" asp-route-id="@l.Id" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a></td>
                 </tr>
             }
             </tbody>

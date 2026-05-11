@@ -186,10 +186,10 @@ else
 {
     <div class="ws">
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "✓" },
+            { "EmptyIllustration", "chart" },
             { "EmptyTitle", "Nenhum pedido em aberto" },
             { "EmptyDescription", "Todos os pedidos foram concluídos. Crie um novo pedido quando precisar." },
-            { "EmptyCta", "+ Novo Pedido" },
+            { "EmptyCta", "Novo pedido" },
             { "EmptyCtaModal", "novo-pedido" }
         })
     </div>
