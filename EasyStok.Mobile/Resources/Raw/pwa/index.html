@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.json?v=20260506a">
+<link rel="manifest" href="manifest.json?v=20260511a">
 <meta name="theme-color" content="#111827">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -235,6 +235,15 @@ body {
   color: var(--gold);
 }
 .sync-chip.pending .dot { background: var(--gold); box-shadow: 0 0 8px rgba(214, 161, 51, 0.6); }
+.sync-chip.offline {
+  border-color: rgba(231, 104, 69, 0.34);
+  background: rgba(231, 104, 69, 0.10);
+  color: var(--accent);
+}
+.sync-chip.offline .dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(231, 104, 69, 0.45);
+}
 
 /* Content — padding-bottom inclui altura do nav + safe-area.
    Nav tem ~64px + 20px de padding vertical + safe-area. Deixar ~140px
@@ -254,6 +263,16 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 :where(button, a, input, select, textarea, summary):focus-visible {
@@ -870,7 +889,12 @@ button:disabled {
     linear-gradient(180deg, rgba(255,255,255,0.055), transparent 110px),
     var(--bg-elev);
   box-shadow: 0 18px 48px rgba(0,0,0,0.34);
+  max-height: min(58vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
+.more-menu::-webkit-scrollbar { display: none; }
 .more-menu.show { display: block; animation: slideUp 0.18s ease-out; }
 .more-menu-head {
   display: flex;
@@ -2138,6 +2162,22 @@ button:disabled {
 .product-tile.add-tile .punit {
   font-family: 'Fraunces', serif;
   font-style: italic;
+}
+.prod-empty-state {
+  padding: 18px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  color: var(--ink-dim);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.prod-empty-state strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  margin-bottom: 4px;
 }
 .prod-screen-summary {
   position: sticky;
@@ -5212,6 +5252,10 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border-color: rgba(207,87,56,0.28);
   color: #c24e32;
 }
+[data-theme="light"] .prod-empty-state {
+  background: #fff;
+  border-color: #dbe2ec;
+}
 [data-theme="light"] .stock-badge {
   background: rgba(22,143,122,0.10);
   color: #168f7a;
@@ -6624,7 +6668,7 @@ body.ux-calm [data-screen="producao"] .section-label {
     <div class="header-row1">
       <img class="brand-logo hidden" id="brandLogo" alt="Logo da loja">
       <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
-      <button class="sync-chip pending" id="syncChip" onclick="syncNow()">
+      <button class="sync-chip pending" id="syncChip" type="button" onclick="syncNow()" aria-live="polite">
         <span class="dot"></span>
         <span id="syncText">Tudo sincronizado</span>
       </button>
@@ -6642,7 +6686,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <path d="M21 21l-4.3-4.3"/>
         </svg>
       </button>
-      <button class="icon-btn" id="ajustesBtn" onclick="openAjustes()" title="Ajustes">
+      <button class="icon-btn" id="ajustesBtn" onclick="openAjustes()" title="Ajustes" aria-label="Ajustes">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
     </div>
@@ -7157,7 +7201,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="modal-title">Novo <span class="accent">produto</span></div>
       <div class="modal-sub">fica disponível na hora</div>
       <label class="modal-label">Nome</label>
-      <div class="input-box"><input id="newProdName" placeholder="ex: Nhoque de batata"></div>
+      <div class="input-box"><input id="newProdName" placeholder="ex: Nhoque de batata" oninput="updateProductSaveState()"></div>
       <label class="modal-label">Categoria</label>
       <div class="cat-pills" id="catPills">
         <button class="cat-pill active" data-cat="massa">Massa</button>
@@ -7208,7 +7252,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductModal()">Cancelar</button>
-        <button class="cta-btn primary" onclick="saveNewProduct()">Criar e usar</button>
+        <button class="cta-btn primary" id="saveProductBtn" onclick="saveNewProduct()" disabled>Criar e usar</button>
       </div>
     </div>
   </div>
@@ -7221,7 +7265,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="modal-sub">Nome é obrigatório. Resto é opcional.</div>
 
       <label class="modal-label">Nome</label>
-      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda Silva"></div>
+      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda Silva" oninput="updateClientSaveState()"></div>
 
       <label class="modal-label">Endereço (opcional)</label>
       <div class="input-box"><input id="newClientAddr" placeholder="ex: Apto 506, Rua Tal 123, ou referência"></div>
@@ -7235,7 +7279,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeClientModal()">Cancelar</button>
-        <button class="cta-btn primary" id="saveClientBtn" onclick="saveNewClient()">Criar e usar</button>
+        <button class="cta-btn primary" id="saveClientBtn" onclick="saveNewClient()" disabled>Criar e usar</button>
       </div>
     </div>
   </div>
@@ -7297,17 +7341,17 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <label class="modal-label">Descrição</label>
-      <div class="input-box"><input id="cashDesc" placeholder="ex: farinha 5kg na padaria"></div>
+      <div class="input-box"><input id="cashDesc" placeholder="ex: farinha 5kg na padaria" oninput="updateCashSaveState()"></div>
 
       <label class="modal-label">Valor</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="cashAmount" type="text" inputmode="decimal" placeholder="45,00" autocomplete="off"></div>
+        <div class="input-box"><input id="cashAmount" type="text" inputmode="decimal" placeholder="45,00" autocomplete="off" oninput="updateCashSaveState()"></div>
       </div>
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeCashModal()">Cancelar</button>
-        <button class="cta-btn primary" onclick="saveCashEntry()">Lançar</button>
+        <button class="cta-btn primary" id="cashSaveBtn" onclick="saveCashEntry()" disabled>Lançar</button>
       </div>
     </div>
   </div>
@@ -7839,7 +7883,7 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
-  <div class="more-menu" id="moreMenu" aria-label="Mais paginas">
+  <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais paginas">
     <div class="more-menu-head">
       <span>Mais ferramentas</span>
       <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
@@ -7859,8 +7903,8 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Bottom nav -->
-  <div class="nav">
-    <button class="nav-btn active" data-nav="home" onclick="go('home')">
+  <div class="nav" role="navigation" aria-label="Navegação principal">
+    <button class="nav-btn active" data-nav="home" onclick="go('home')" aria-current="page">
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></span>
       <span class="label">Hoje</span>
     </button>
@@ -9169,8 +9213,11 @@ function updateFab(screen) {
 function onFabClick() { if (typeof _currentFabAction === 'function') _currentFabAction(); }
 
 function closeMoreMenu() {
-  document.getElementById('moreMenu')?.classList.remove('show');
+  const menu = document.getElementById('moreMenu');
+  menu?.classList.remove('show');
+  menu?.setAttribute('aria-hidden', 'true');
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.remove('active');
+  if (typeof updateNavA11y === 'function') updateNavA11y();
 }
 
 function toggleMoreMenu() {
@@ -9179,9 +9226,21 @@ function toggleMoreMenu() {
   if (typeof applyUxDensity === 'function') applyUxDensity();
   const willOpen = !menu.classList.contains('show');
   menu.classList.toggle('show', willOpen);
+  menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
+  if (typeof updateNavA11y === 'function') updateNavA11y();
 }
+
+document.addEventListener('click', function (ev) {
+  const menu = document.getElementById('moreMenu');
+  if (!menu || !menu.classList.contains('show')) return;
+  if (menu.contains(ev.target) || ev.target.closest('.nav-btn[data-nav="more"]')) return;
+  closeMoreMenu();
+});
+document.addEventListener('keydown', function (ev) {
+  if (ev.key === 'Escape') closeMoreMenu();
+});
 
 let currentScreen = 'home';
 let screenHistory = ['home'];
@@ -9201,12 +9260,17 @@ function go(screen, opts) {
   closeMoreMenu();
   if (!opts.preserveHistory) syncScreenHistory(screen);
   currentScreen = screen;
-  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
+  document.querySelectorAll('.screen').forEach(s => {
+    const active = s.dataset.screen === screen;
+    s.classList.toggle('active', active);
+    s.setAttribute('aria-hidden', active ? 'false' : 'true');
+  });
   const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte', 'kds'];
   document.querySelectorAll('.nav-btn').forEach(n => {
     const nav = n.dataset.nav;
     n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
   });
+  if (typeof updateNavA11y === 'function') updateNavA11y();
   document.getElementById('content').scrollTop = 0;
   if (screen === 'home')         renderHome();
   if (screen === 'pedidos') {
@@ -9228,6 +9292,15 @@ function go(screen, opts) {
   if (screen === 'kds')          { try { startKdsScreen(); } catch (e) { console.error('startKdsScreen', e); } }
   else                           { try { stopKdsScreen(); } catch (e) {} }
   if (typeof updateFab === 'function') updateFab(screen);
+}
+
+function updateNavA11y() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const isActive = btn.classList.contains('active');
+    if (isActive) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
+    btn.setAttribute('aria-pressed', String(isActive));
+  });
 }
 
 // Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
@@ -9252,6 +9325,11 @@ function updatePedidosTabBadge() {
 // SYNC
 // =========================
 function syncNow() {
+  if (navigator.onLine === false) {
+    updateSync();
+    showToast('Sem internet. Suas ações ficam salvas e sincronizam quando voltar.');
+    return;
+  }
   pendingSync = 0;
   try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {}
   updateSync();
@@ -9260,6 +9338,17 @@ function syncNow() {
 function updateSync() {
   const chip = document.getElementById('syncChip');
   const txt = document.getElementById('syncText');
+  const offline = navigator.onLine === false;
+  if (chip) chip.classList.toggle('offline', offline);
+  if (offline) {
+    chip.classList.add('pending');
+    txt.textContent = pendingSync > 0
+      ? pendingSync + (pendingSync === 1 ? ' pendente offline' : ' pendentes offline')
+      : 'Offline';
+    if (typeof renderTrustBadges === 'function') renderTrustBadges();
+    if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    return;
+  }
   if (pendingSync > 0) {
     chip.classList.add('pending');
     txt.textContent = pendingSync + (pendingSync === 1 ? ' item pra sincronizar' : ' itens pra sincronizar');
@@ -9270,6 +9359,8 @@ function updateSync() {
   if (typeof renderTrustBadges === 'function') renderTrustBadges();
   if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
 }
+window.addEventListener('online', updateSync);
+window.addEventListener('offline', updateSync);
 
 // =========================
 // UTILS
@@ -10732,11 +10823,13 @@ function renderProductGrid() {
   let anyCounted = false;
   let totalUnits = 0;
   let totalSkus = 0;
+  let anyActive = false;
 
   CATEGORIES.forEach(cat => {
     // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
     const items = products.filter(p => p.category === cat.key && !p.archived);
     if (items.length === 0) return;
+    anyActive = true;
 
     const header = document.createElement('div');
     header.className = 'grid-section';
@@ -10783,6 +10876,19 @@ function renderProductGrid() {
       grid.appendChild(tile);
     });
   });
+
+  if (!anyActive) {
+    const empty = document.createElement('div');
+    empty.className = 'prod-empty-state';
+    empty.innerHTML = '<strong>Nenhum produto ativo</strong>Cadastre o primeiro produto para liberar produção, pedidos e estoque.';
+    grid.appendChild(empty);
+  }
+  const addTile = document.createElement('button');
+  addTile.type = 'button';
+  addTile.className = 'product-tile add-tile';
+  addTile.onclick = () => openProductModal('massa');
+  addTile.innerHTML = '<span class="add-icon">+</span><span class="pname">Cadastrar produto</span><span class="punit">massa, molho ou extra</span>';
+  grid.appendChild(addTile);
 
   const summary = document.getElementById('prodScreenSummary');
   const summaryMain = document.getElementById('prodScreenSummaryMain');
@@ -16889,15 +16995,17 @@ function onClientDocInput(ev) {
   const cls = classifyDocument(inp.value);
   inp.value = cls.formatted;
   const hint = document.getElementById('newClientDocHint');
-  if (!hint) return;
+  if (!hint) { updateClientSaveState(); return; }
   if (cls.digits.length === 0) {
     hint.textContent = '';
     hint.className = 'doc-hint';
+    updateClientSaveState();
     return;
   }
   if (cls.partial) {
     hint.textContent = 'Continue digitando…';
     hint.className = 'doc-hint partial';
+    updateClientSaveState();
     return;
   }
   if (cls.valid) {
@@ -16907,6 +17015,16 @@ function onClientDocInput(ev) {
     hint.textContent = '⚠ ' + (cls.type === 'cpf' ? 'CPF' : 'CNPJ') + ' inválido';
     hint.className = 'doc-hint invalid';
   }
+  updateClientSaveState();
+}
+
+function updateClientSaveState() {
+  const btn = document.getElementById('saveClientBtn');
+  if (!btn) return;
+  const name = document.getElementById('newClientName')?.value?.trim() || '';
+  const docRaw = document.getElementById('newClientDoc')?.value?.trim() || '';
+  const docOk = !docRaw || classifyDocument(docRaw).valid;
+  btn.disabled = !name || !docOk;
 }
 
 function clientReference(c) {
@@ -17059,6 +17177,7 @@ function openClientModal(prefillOrEditId) {
       hint.className = 'doc-hint';
     }
   }
+  updateClientSaveState();
   document.getElementById('newClientModal').classList.add('show');
   setTimeout(() => document.getElementById((editId || prefill) ? 'newClientAddr' : 'newClientName').focus(), 300);
 }
@@ -17394,6 +17513,13 @@ function saveOrder() {
 // =========================
 let productModalCallback = null; // se presente, ao salvar adiciona direto no pedido
 
+function updateProductSaveState() {
+  const btn = document.getElementById('saveProductBtn');
+  if (!btn) return;
+  const name = document.getElementById('newProdName')?.value?.trim() || '';
+  btn.disabled = !name;
+}
+
 function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   document.getElementById('newProdName').value = prefillName;
   document.getElementById('newProdUnit').value = '';
@@ -17403,11 +17529,18 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   selectedCat = cat;
   selectedEmoji = '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
-  document.querySelectorAll('#emojiGrid .emoji-pick').forEach((e, i) => e.classList.toggle('active', i === 0));
+  document.querySelectorAll('#emojiGrid .emoji-pick').forEach((e, i) => {
+    const active = i === 0;
+    e.classList.toggle('active', active);
+    e.setAttribute('aria-checked', String(active));
+  });
   productModalCallback = fromOrder;
+  const saveBtn = document.getElementById('saveProductBtn');
+  if (saveBtn) saveBtn.textContent = fromOrder ? 'Criar e adicionar' : 'Criar e usar';
   document.getElementById('newProductModal').classList.add('show');
   setTimeout(() => document.getElementById(prefillName ? 'newProdUnit' : 'newProdName').focus(), 300);
   updateMarginPreview();
+  updateProductSaveState();
 }
 function closeProductModal() {
   document.getElementById('newProductModal').classList.remove('show');
@@ -17464,7 +17597,7 @@ function updateMarginPreview() {
 }
 function saveNewProduct() {
   const name = document.getElementById('newProdName').value.trim();
-  if (!name) { document.getElementById('newProdName').focus(); return; }
+  if (!name) { showToast('Nome do produto é obrigatório'); document.getElementById('newProdName').focus(); return; }
   const unit = document.getElementById('newProdUnit').value.trim();
   const priceStr = document.getElementById('newProdPrice').value.trim();
   const priceParsed = priceStr ? parseMoneyInput(priceStr) : NaN;
@@ -17548,13 +17681,18 @@ function openProductModalForEdit(productId) {
     x.classList.toggle('active', x.dataset.cat === selectedCat);
   });
   document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => {
-    x.classList.toggle('active', x.textContent === selectedEmoji);
+    const active = x.textContent === selectedEmoji;
+    x.classList.toggle('active', active);
+    x.setAttribute('aria-checked', String(active));
   });
   // Muda titulo do modal
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
+  const saveBtn = document.getElementById('saveProductBtn');
+  if (saveBtn) saveBtn.textContent = 'Salvar alterações';
   document.getElementById('newProductModal').classList.add('show');
   updateMarginPreview();
+  updateProductSaveState();
 }
 
 // Long-press num tile de produto (tela de Producao) abre esse menu pra
@@ -17655,7 +17793,11 @@ document.querySelectorAll('#catPills .cat-pill').forEach(pill => {
 document.querySelectorAll('#emojiGrid .emoji-pick').forEach(em => {
   em.addEventListener('click', () => {
     selectedEmoji = em.textContent;
-    document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => x.classList.toggle('active', x === em));
+    document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => {
+      const active = x === em;
+      x.classList.toggle('active', active);
+      x.setAttribute('aria-checked', String(active));
+    });
   });
 });
 
@@ -17688,7 +17830,10 @@ function openCashModal(editId) {
     p.classList.remove('active', 'expense', 'income');
     if (p.dataset.type === type) p.classList.add('active', type);
   });
+  const saveBtn = document.getElementById('cashSaveBtn');
+  if (saveBtn) saveBtn.textContent = editId ? 'Salvar alteração' : 'Lançar';
   document.getElementById('cashEntryModal').classList.add('show');
+  updateCashSaveState();
   setTimeout(() => document.getElementById('cashDesc').focus(), 300);
 }
 function closeCashModal() {
@@ -17715,6 +17860,14 @@ function parseMoneyInput(raw) {
   }
   const n = parseFloat(s);
   return isNaN(n) ? NaN : n;
+}
+
+function updateCashSaveState() {
+  const btn = document.getElementById('cashSaveBtn');
+  if (!btn) return;
+  const desc = document.getElementById('cashDesc')?.value?.trim() || '';
+  const amount = parseMoneyInput(document.getElementById('cashAmount')?.value || '');
+  btn.disabled = !desc || isNaN(amount) || amount <= 0;
 }
 
 function saveCashEntry() {
@@ -18129,6 +18282,8 @@ updateSync();
 renderOperatorBadge();
 renderBrandName();
 updateDemoModeBanner();
+document.querySelectorAll('.screen').forEach(s => s.setAttribute('aria-hidden', s.classList.contains('active') ? 'false' : 'true'));
+updateNavA11y();
 window.CDB_OPERATOR = operatorName;
 
 // F4: pivô de versionamento de schema. Se ausente, marca como '2' (atual).
@@ -18594,7 +18749,7 @@ if ('serviceWorker' in navigator) {
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260506a').then(reg => {
+    navigator.serviceWorker.register('sw.js?v=20260511a').then(reg => {
       // Quando um SW novo entra em "installing", aguarda terminar e manda
       // SKIP_WAITING — assim ele assume controle sem o operador precisar
       // fechar/reabrir o app.
