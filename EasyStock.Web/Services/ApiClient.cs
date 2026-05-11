@@ -278,7 +278,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             HttpStatusCode.Conflict => await ParseBodyError<T>(response, status),
             HttpStatusCode.UnprocessableEntity => await ParseBodyError<T>(response, status),
             // Demais 4xx/5xx: tenta extrair detail do envelope ApiError. Se vier vazio,
-            // ParseBodyError já cai no FallbackMessageForStatus.
+            // ParseBodyError já cai em UserFacingErrors.FallbackForStatus.
             _ => await ParseBodyError<T>(response, status)
         };
     }
@@ -292,7 +292,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             // Corpo vazio: 400/409/422 sem JSON. Não vale a pena dizer "Erro na requisição"
             // genérico — orientamos pelo status.
             if (string.IsNullOrWhiteSpace(json))
-                return ApiResult<T>.Fail("API_ERROR", FallbackMessageForStatus(status), status);
+                return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status);
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -320,7 +320,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                         }
                     }
                 }
-                var joined = messages.Count > 0 ? string.Join(" ", messages) : FallbackMessageForStatus(status);
+                var joined = messages.Count > 0 ? string.Join(" ", messages) : UserFacingErrors.FallbackForStatus(status);
                 return ApiResult<T>.Fail("VALIDATION_ERROR", joined, status);
             }
 
@@ -334,75 +334,16 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         catch (Exception ex)
         {
             log.LogDebug(ex, "Could not parse error body from HTTP {Status} response on path handling", status);
-            return ApiResult<T>.Fail("API_ERROR", FallbackMessageForStatus(status), status);
+            return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status);
         }
     }
 
     private static string? TryString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    private static string ResolveMessage(string code, string? message, int status)
-    {
-        // Se a API devolveu mensagem útil, prevalece — backend conhece melhor o contexto.
-        if (!string.IsNullOrWhiteSpace(message) &&
-            !message.Equals("Erro na requisicao.", StringComparison.OrdinalIgnoreCase) &&
-            !message.Equals("Erro na requisição.", StringComparison.OrdinalIgnoreCase) &&
-            !message.Equals("Bad Request", StringComparison.OrdinalIgnoreCase))
-            return message;
+    private static string ResolveMessage(string code, string? message, int status) =>
+        UserFacingErrors.Sanitize(code, message, status);
 
-        // Caso contrário tenta mapear pelo código conhecido.
-        if (KnownErrorMessages.TryGetValue(code, out var known))
-            return known;
-
-        return FallbackMessageForStatus(status);
-    }
-
-    private static string FallbackMessageForStatus(int status) => status switch
-    {
-        400 => "Dados inválidos no formulário. Revise os campos e tente novamente.",
-        404 => "Recurso não encontrado.",
-        409 => "Conflito de dados. Esse registro já existe ou está em uso.",
-        422 => "Não foi possível processar — algum dado está inconsistente.",
-        500 => "Erro interno no servidor. Tente novamente em alguns instantes.",
-        501 => "Operação não suportada nesta versão. Avise o suporte com o que estava fazendo.",
-        503 => "Serviço temporariamente indisponível. Tente novamente em instantes.",
-        _   => $"Erro HTTP {status}. Tente novamente — se persistir, contate o suporte."
-    };
-
-    // Códigos conhecidos do backend → mensagens amigáveis.
-    // Quando o backend devolve só o código (sem mensagem), traduzimos aqui pra evitar
-    // toasts crípticos. A lista cresce conforme novos códigos aparecerem nos handlers da API.
-    private static readonly Dictionary<string, string> KnownErrorMessages = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["CATEGORIA_INVALIDA"] = "Categoria inválida ou não encontrada.",
-        ["CATEGORIA_DUPLICADA"] = "Já existe uma categoria com esse nome.",
-        ["CATEGORIA_EM_USO"] = "Esta categoria está em uso por produtos e não pode ser excluída.",
-        ["CNPJ_DUPLICADO"] = "Este CNPJ já está cadastrado.",
-        ["CPF_DUPLICADO"] = "Este CPF já está cadastrado.",
-        ["EMAIL_DUPLICADO"] = "Este e-mail já está em uso.",
-        ["EMAIL_INVALIDO"] = "E-mail inválido.",
-        ["DOCUMENTO_INVALIDO"] = "Documento (CPF/CNPJ) inválido.",
-        ["SKU_DUPLICADO"] = "Já existe um produto com esse SKU.",
-        ["PRODUTO_NAO_ENCONTRADO"] = "Produto não encontrado.",
-        ["ESTOQUE_INSUFICIENTE"] = "Estoque insuficiente para esta operação.",
-        ["FORNECEDOR_DUPLICADO"] = "Já existe um fornecedor com esse documento.",
-        ["CLIENTE_DUPLICADO"] = "Já existe um cliente com esse documento.",
-        ["CAIXA_JA_ABERTO"] = "O caixa do dia já está aberto.",
-        ["CAIXA_NAO_ABERTO"] = "É necessário abrir o caixa antes de registrar movimentos.",
-        ["CAIXA_FECHADO"] = "O caixa do dia já foi fechado.",
-        ["EMPRESA_INVALIDA"] = "Loja não identificada. Selecione uma loja e tente novamente.",
-        ["LOJA_NAO_SELECIONADA"] = "Selecione uma loja antes de continuar.",
-        ["LOJA_DUPLICADA"] = "Já existe uma loja com esse nome.",
-        ["VALIDATION_ERROR"] = "Há campos inválidos no formulário. Revise e tente novamente.",
-        ["NOT_FOUND"] = "Recurso não encontrado.",
-        ["PERMISSAO_INSUFICIENTE"] = "Você não tem permissão para esta ação.",
-        ["AUTH_TOKEN_EXPIRED"] = "Sessão expirada. Faça login novamente.",
-        ["LIMITE_PLANO"] = "Limite do seu plano atingido.",
-        ["LIMITE_IA"] = "Cota de IA esgotada.",
-        ["TIMEOUT"] = "O servidor demorou para responder. Tente novamente.",
-        ["NETWORK_ERROR"] = "Não foi possível conectar ao servidor. Verifique sua conexão.",
-        ["SERVER_ERROR"] = "Erro interno no servidor. Tente novamente em instantes."
-    };
     private async Task<ApiResult<T>> ParseLimitError<T>(HttpResponseMessage response, int status)
     {
         try
