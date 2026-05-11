@@ -323,7 +323,16 @@ public static class ApiServiceCollectionExtensions
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())
+                {
                     tracing.AddConsoleExporter();
+                }
+                else
+                {
+                    // Em prod, amostra 10% das traces pra reduzir custo de egress
+                    // OTLP e backend (Honeycomb/Tempo cobram por span). Health checks
+                    // e polling endpoints ja sao filtrados pelo Serilog request logging.
+                    tracing.SetSampler(new TraceIdRatioBasedSampler(0.1));
+                }
             })
             .WithMetrics(metrics =>
             {

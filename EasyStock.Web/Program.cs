@@ -1,10 +1,12 @@
 ﻿using System.Globalization;
+using System.IO.Compression;
 using System.Net.Http.Headers;
 using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Middleware;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -93,6 +95,23 @@ builder.Services.AddScoped<OperacaoMobileService>();
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));
 builder.Services.AddScoped<LeadsApiService>();
 
+// 6c. Response compression — Brotli/Gzip pra Razor HTML, JSON do AJAX e estaticos.
+// CPU overhead marginal vs ganho de bandwidth (Render cobra acima do free tier).
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+
 // 7. MVC + Antiforgery automático
 builder.Services.AddControllersWithViews(o =>
 {
@@ -150,6 +169,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStatusCodePagesWithReExecute("/error/{0}");
 
+// ResponseCompression precisa rodar antes de StaticFiles pra comprimir CSS/JS/SVG.
+app.UseResponseCompression();
 app.UseHttpsRedirection();
 
 // Security headers

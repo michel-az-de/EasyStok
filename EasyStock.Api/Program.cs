@@ -27,6 +27,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 // Handler global para exceções não tratadas que derrubam o processo
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -79,6 +81,24 @@ builder.Services.AddControllers()
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
+
+// Response compression — Brotli/Gzip para JSON e estaticos (PWA). Reduz bandwidth
+// significativamente em listagens grandes (catalogos, mobile sync). Render cobra
+// bandwidth acima do free tier; CPU overhead e' marginal.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
@@ -459,6 +479,9 @@ Log.Information("""
     app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
+// ResponseCompression precisa rodar cedo, antes de StaticFiles e do request logging,
+// pra ter chance de capturar o output dos middlewares seguintes.
+app.UseResponseCompression();
 app.UseMiddleware<EasyStock.Api.Middleware.SecurityHeadersMiddleware>();
 
 // Correlation ID propagation
