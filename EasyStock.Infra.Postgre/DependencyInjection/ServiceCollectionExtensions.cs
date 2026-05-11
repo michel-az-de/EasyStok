@@ -29,6 +29,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
             services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddSingleton<SetTenantOnConnectionInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
@@ -40,7 +41,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
                 })
-                .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
+                .AddInterceptors(
+                    sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                    sp.GetRequiredService<SetTenantOnConnectionInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
