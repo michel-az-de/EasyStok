@@ -19,7 +19,9 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
+            integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F"
+            crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -30,10 +32,6 @@
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/form-validation.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
-    <style>
-        /* Previne flash de dropdowns antes do Alpine.js inicializar */
-        .app-dropdown { display: none; }
-    </style>
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);color:var(--text-primary);">
@@ -62,7 +60,9 @@
     @* Bottom nav: outside flex wrapper so it sits above everything *@
     @await Html.PartialAsync("_BottomNav")
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
+            integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
+            crossorigin="anonymous"></script>
     <script src="~/js/nav-progress.js" asp-append-version="true"></script>
     <script src="~/js/toast.js" asp-append-version="true"></script>
     <script src="~/js/api.js" asp-append-version="true"></script>
