@@ -16,27 +16,27 @@
     <form method="get" class="flex gap-3 flex-wrap items-center">
         <select name="canal" class="form-input text-sm">
             <option value="">Todos os canais</option>
-            <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
-            <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
-            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
-            <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
+            <option value="Email" selected="@(Model.Canal == "Email" ? "selected" : null)">Email</option>
+            <option value="Sms" selected="@(Model.Canal == "Sms" ? "selected" : null)">SMS</option>
+            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp" ? "selected" : null)">WhatsApp</option>
+            <option value="InApp" selected="@(Model.Canal == "InApp" ? "selected" : null)">In-App</option>
         </select>
         <select name="tipoEvento" class="form-input text-sm">
             <option value="">Todos os eventos</option>
-            <option value="ProdutoVencendo">Produto Vencendo</option>
-            <option value="ProdutoVencido">Produto Vencido</option>
-            <option value="AssinaturaExpirando">Assinatura Expirando</option>
-            <option value="AssinaturaExpirada">Assinatura Expirada</option>
-            <option value="TarefaPendente">Tarefa Pendente</option>
-            <option value="ResetSenha">Reset de Senha</option>
-            <option value="ConfirmacaoEmail">Confirmação de Email</option>
-            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-            <option value="BroadcastSuperAdmin">Broadcast</option>
+            <option value="ProdutoVencendo" selected="@(Model.TipoEvento == "ProdutoVencendo" ? "selected" : null)">Produto Vencendo</option>
+            <option value="ProdutoVencido" selected="@(Model.TipoEvento == "ProdutoVencido" ? "selected" : null)">Produto Vencido</option>
+            <option value="AssinaturaExpirando" selected="@(Model.TipoEvento == "AssinaturaExpirando" ? "selected" : null)">Assinatura Expirando</option>
+            <option value="AssinaturaExpirada" selected="@(Model.TipoEvento == "AssinaturaExpirada" ? "selected" : null)">Assinatura Expirada</option>
+            <option value="TarefaPendente" selected="@(Model.TipoEvento == "TarefaPendente" ? "selected" : null)">Tarefa Pendente</option>
+            <option value="ResetSenha" selected="@(Model.TipoEvento == "ResetSenha" ? "selected" : null)">Reset de Senha</option>
+            <option value="ConfirmacaoEmail" selected="@(Model.TipoEvento == "ConfirmacaoEmail" ? "selected" : null)">Confirmação de Email</option>
+            <option value="AlertaEstoqueCritico" selected="@(Model.TipoEvento == "AlertaEstoqueCritico" ? "selected" : null)">Alerta Estoque</option>
+            <option value="BroadcastSuperAdmin" selected="@(Model.TipoEvento == "BroadcastSuperAdmin" ? "selected" : null)">Broadcast</option>
         </select>
         <select name="ativo" class="form-input text-sm">
             <option value="">Todos</option>
-            <option value="true">Ativos</option>
-            <option value="false">Inativos</option>
+            <option value="true" selected="@(Model.Ativo == true ? "selected" : null)">Ativos</option>
+            <option value="false" selected="@(Model.Ativo == false ? "selected" : null)">Inativos</option>
         </select>
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
 
