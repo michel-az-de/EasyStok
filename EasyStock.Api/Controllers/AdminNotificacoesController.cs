@@ -23,6 +23,7 @@ public sealed class AdminNotificacoesController(
     AtualizarTemplateUseCase atualizarTemplate,
     AprovarTemplateUseCase aprovarTemplate,
     PreviewTemplateUseCase previewTemplate,
+    PreviewTemplateRawUseCase previewTemplateRaw,
     CriarRotinaUseCase criarRotina,
     AtualizarRotinaUseCase atualizarRotina,
     AtivarRotinaUseCase ativarRotina,
@@ -93,6 +94,17 @@ public sealed class AdminNotificacoesController(
     {
         var result = await previewTemplate.ExecuteAsync(
             new PreviewTemplateCommand(req.TemplateId, req.Variaveis ?? new Dictionary<string, object?>()));
+        return DataOk(result);
+    }
+
+    [HttpPost("templates/preview-raw")]
+    public async Task<IActionResult> PreviewTemplateRaw([FromBody] PreviewTemplateRawRequest req)
+    {
+        var result = await previewTemplateRaw.ExecuteAsync(
+            new PreviewTemplateRawCommand(
+                req.AssuntoTemplate ?? "",
+                req.CorpoTemplate ?? "",
+                req.Variaveis ?? new Dictionary<string, object?>()));
         return DataOk(result);
     }
 
@@ -243,6 +255,11 @@ public sealed class AdminNotificacoesController(
 
     public record PreviewTemplateRequest(
         Guid TemplateId,
+        IDictionary<string, object?>? Variaveis = null);
+
+    public record PreviewTemplateRawRequest(
+        string? AssuntoTemplate,
+        string? CorpoTemplate,
         IDictionary<string, object?>? Variaveis = null);
 
     public record CriarRotinaRequest(
