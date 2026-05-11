@@ -39,6 +39,21 @@ public abstract class BaseController(SessionService session) : Controller
         return false;
     }
 
+    /// <summary>
+    /// Igual a <see cref="HasError"/>, mas expõe code+HTTP+mensagem crua no toast.
+    /// Use em operações de escrita (POST/PATCH/DELETE) onde "redirect silencioso"
+    /// dá a impressão de "clicou e nada aconteceu". O end-user precisa saber se
+    /// foi 401 (sessão), 403 (empresa), 404 (recurso) ou 400 (validação).
+    /// </summary>
+    protected bool HasErrorVerbose<T>(ApiResult<T> result, string acao)
+    {
+        if (result.Success) return false;
+        var code = result.ErrorCode ?? "?";
+        var msg = result.ErrorMessage ?? "Erro ao processar requisição.";
+        Toast("error", $"{acao} falhou ({code} · HTTP {result.HttpStatus}): {msg}");
+        return true;
+    }
+
     protected IActionResult? RedirectIfLimitReached<T>(ApiResult<T> result)
     {
         if (result.Success) return null;
