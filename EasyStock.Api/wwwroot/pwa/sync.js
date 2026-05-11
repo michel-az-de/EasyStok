@@ -66,7 +66,22 @@
     try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
   }
   function saveQueue(q) {
-    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+    try {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    } catch (e) {
+      // QuotaExceededError: localStorage cheio (~5MB). Não descarta a fila —
+      // avisar o operador para conectar à rede e sincronizar antes de continuar.
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        console.error('[sync] localStorage quota excedido — fila nao salva, conecte e sincronize!');
+        try {
+          if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+            window.cdbApp.showToast('Memória local cheia. Conecte à internet para sincronizar.', 'error');
+          }
+          // Força flush imediato se online — drena fila antes de acumular mais.
+          if (navigator.onLine) setTimeout(flush, 500);
+        } catch (_) {}
+      }
+    }
   }
 
   // Snapshot do estado anterior pra calcular delta
@@ -185,11 +200,13 @@
       const result = await resp.json().catch(() => ({}));
       if (result.acceptedIds && Array.isArray(result.acceptedIds)) {
         const accepted = new Set(result.acceptedIds);
-        const remaining = queue.filter(m => !accepted.has(m.id));
+        // Recarrega a fila do localStorage em vez de usar o snapshot inicial:
+        // mutações enfileiradas DURANTE a fetch não são perdidas.
+        const currentQueue = loadQueue();
+        const remaining = currentQueue.filter(m => !accepted.has(m.id));
         saveQueue(remaining);
-      } else {
-        saveQueue([]);
       }
+      // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
 
       // Onda 5: trata conflicts. Server retorna rejected[] com reason
       // começando com "conflict:" quando outro device sincronizou primeiro.
@@ -197,8 +214,9 @@
       if (result.rejected && Array.isArray(result.rejected) && result.rejected.length > 0) {
         const conflicts = result.rejected.filter(r => r.reason && r.reason.indexOf('conflict:') === 0);
         if (conflicts.length > 0) {
-          // Remove os conflitados da fila (não vão ser aceitos mesmo)
-          const conflictIds = new Set(conflicts.map(c => c.id));
+          // Remove os conflitados da fila (não vão ser aceitos mesmo).
+          // Server retorna { mutationId, reason } — usar mutationId, não id.
+          const conflictIds = new Set(conflicts.map(c => c.mutationId));
           const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
           saveQueue(remaining);
           // Notifica o app pra exibir UX e logar
@@ -1106,6 +1124,40 @@
     return await resp.json().catch(() => ({}));
   }
 
+  // ---- Bootstrap push: enfileira o state ATUAL inteiro como upserts ----
+  // Diferente do fluxo normal (cdbOnPersist computa diff vs lastSnapshot),
+  // esta funcao re-envia todos os registros locais como if-new. Necessario
+  // no primeiro pareamento de um device que ja tem dados acumulados offline
+  // — sem isto o servidor so receberia mutations dos proximos saves e o
+  // historico ficaria orfao no localStorage.
+  //
+  // Idempotente no servidor: SyncController faz upsert por (Id, EmpresaId).
+  // Mutations ja na fila NAO sao removidas — bootstrap adiciona por cima.
+  function pushAll() {
+    if (!window.cdbApp || typeof window.cdbApp.getState !== 'function') {
+      throw new Error('cdbApp.getState indisponivel');
+    }
+    const s = window.cdbApp.getState();
+    const muts = [];
+    const stripProd = (p) => { const { count, photo, ...r } = p; return r; };
+    (s.products || []).forEach(p => { if (p && p.id) muts.push({ type: 'product.upsert', payload: stripProd(p) }); });
+    (s.clients || []).forEach(c => { if (c && c.id) muts.push({ type: 'client.upsert', payload: c }); });
+    (s.orders || []).forEach(o => { if (o && o.id) muts.push({ type: 'order.upsert', payload: o }); });
+    (s.batches || []).forEach(b => { if (b && b.id) muts.push({ type: 'batch.upsert', payload: b }); });
+    (s.cashEntries || []).forEach(c => { if (c && c.id) muts.push({ type: 'cashEntry.upsert', payload: c }); });
+    if (muts.length === 0) return { enqueued: 0, queueSize: loadQueue().length };
+    enqueue(muts);
+    return { enqueued: muts.length, queueSize: loadQueue().length };
+  }
+
+  // Combina pushAll + flush. Retorna Promise com { enqueued, queueSizeBefore,
+  // queueSizeAfter }. Usado pelo botao "Sincronizar tudo agora" do Diagnostico.
+  async function pushAllAndFlush() {
+    const before = pushAll();
+    await flush();
+    return { enqueued: before.enqueued, queueSizeBefore: before.queueSize, queueSizeAfter: loadQueue().length };
+  }
+
   // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
   setTimeout(pingVersion, 700);
 
@@ -1129,6 +1181,7 @@
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
+    pushAll, pushAllAndFlush,
     // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
     forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
     installedPwaVersion: getInstalledPwaVersion,

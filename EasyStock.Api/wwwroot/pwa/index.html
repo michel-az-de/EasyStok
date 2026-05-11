@@ -13513,6 +13513,40 @@ async function diagBackupNow() {
   }
 }
 
+// Bootstrap pós-pareamento: enfileira todo o state como upserts e dispara
+// flush. Idempotente no servidor (last-write-wins por (Id, EmpresaId)).
+// Pré-condição operacional: device deve estar pareado E backup local
+// recente — confirmação dupla aqui pra evitar acidente.
+async function diagPushAll() {
+  if (!window.cdbSync || typeof window.cdbSync.pushAllAndFlush !== 'function') {
+    showToast('Sync indisponivel'); return;
+  }
+  const p = window.cdbSync.getPairing && window.cdbSync.getPairing();
+  if (!p) {
+    alert('Device não está pareado.\n\nFaça o pareamento primeiro pelo botão "Parear dispositivo".');
+    return;
+  }
+  const lastLocal = window.cdbSync.lastLocalBackupAt ? window.cdbSync.lastLocalBackupAt() : 0;
+  const ageMin = lastLocal ? Math.round((Date.now() - lastLocal) / 60000) : null;
+  const warn = !lastLocal || ageMin > 60;
+  const msg = (warn
+      ? '⚠ ATENÇÃO: backup local ' + (lastLocal ? ('com ' + ageMin + ' min — recomendado fazer um novo ANTES.') : 'NÃO foi feito nesta sessão.')
+      : '✓ Backup local foi feito há ' + ageMin + ' min.')
+    + '\n\nVai enfileirar TODOS os produtos, clientes, pedidos, lotes e caixa pra subir ao servidor.'
+    + '\n\nO app continua funcional durante o processo.\n\nProsseguir?';
+  if (!confirm(msg)) return;
+  showToast('Enfileirando tudo…');
+  try {
+    const r = await window.cdbSync.pushAllAndFlush();
+    const msg2 = 'Push: ' + r.enqueued + ' itens enfileirados. Fila: ' + r.queueSizeBefore + '→' + r.queueSizeAfter + '.';
+    showToast(msg2);
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'diagPushAll'); } catch (_) {}
+  }
+}
+
 // Onda 6: troca de loja sem re-parear. Empresa fixa.
 async function switchLojaPrompt() {
   if (!window.cdbSync || typeof window.cdbSync.listLojasDisponiveis !== 'function') {
@@ -13756,6 +13790,9 @@ function openDiagnostics() {
               : '')
           + (p
               ? '<button class="diag-action" onclick="diagBackupNow()">Backup agora</button>'
+              : '')
+          + (p
+              ? '<button class="diag-action" onclick="diagPushAll()">Sincronizar tudo agora</button>'
               : '')
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
