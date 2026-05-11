@@ -597,9 +597,14 @@
     </script>
 
     <!-- Avatar / usuário -->
-    <div x-data="{ open: false }" class="relative">
+    <div x-data="{ open: false, logoutAsk: false }" class="relative">
         <button @@click="open = !open"
-                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors max-w-[220px]">
+                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg transition-colors max-w-[220px]"
+                style="color: var(--text-primary);"
+                :aria-expanded="open"
+                aria-label="Menu do usuário"
+                onmouseover="this.style.background='var(--ink-100)'"
+                onmouseout="this.style.background=''">
             <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
                 @iniciais
             </div>
@@ -625,16 +630,55 @@
                 </svg>
                 Usuários
             </a>
-            <div class="border-t border-slate-100 my-1"></div>
-            <form asp-controller="Auth" asp-action="Logout" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sair
-                </button>
-            </form>
+            <div style="border-top: 1px solid var(--border-soft); margin: 4px 0;"></div>
+            <button type="button"
+                    @@click="open = false; logoutAsk = true; $nextTick(() => document.getElementById('logoutCancelBtn')?.focus())"
+                    class="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                    style="color: var(--crit-600);"
+                    onmouseover="this.style.background='var(--crit-50)'"
+                    onmouseout="this.style.background=''">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sair
+            </button>
         </div>
+
+        <!-- Modal de confirmação de logout -->
+        <template x-teleport="body">
+            <div x-show="logoutAsk" x-cloak
+                 class="auth-prem-modal-backdrop"
+                 role="alertdialog"
+                 aria-labelledby="logoutTitle"
+                 aria-describedby="logoutText"
+                 @@keydown.escape.window="logoutAsk = false"
+                 @@click.self="logoutAsk = false">
+                <div class="auth-prem-modal" @@click.stop>
+                    <div class="auth-prem-modal-icon" aria-hidden="true">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </div>
+                    <h2 id="logoutTitle" class="auth-prem-modal-title">Sair da conta?</h2>
+                    <p id="logoutText" class="auth-prem-modal-text">
+                        Você precisará entrar novamente para continuar. Suas alterações estão salvas.
+                    </p>
+                    <div class="auth-prem-modal-actions">
+                        <button type="button"
+                                id="logoutCancelBtn"
+                                @@click="logoutAsk = false"
+                                class="auth-prem-modal-btn auth-prem-modal-btn--ghost">
+                            Cancelar
+                        </button>
+                        <form asp-controller="Auth" asp-action="Logout" method="post" style="flex: 1; display: flex;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="auth-prem-modal-btn auth-prem-modal-btn--danger" style="width: 100%;">
+                                Sair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </header>
