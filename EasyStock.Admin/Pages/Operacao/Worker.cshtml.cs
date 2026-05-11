@@ -23,7 +23,7 @@ public class WorkerModel(AdminApiClient api, AdminSessionService session, ILogge
     {
         try
         {
-            Data = await api.GetRawAsync("api/admin/worker-status");
+            Data = Unwrap(await api.GetRawAsync("api/admin/worker-status"));
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
@@ -38,14 +38,23 @@ public class WorkerModel(AdminApiClient api, AdminSessionService session, ILogge
     {
         try
         {
-            var data = await api.GetRawAsync("api/admin/worker-status");
+            var data = Unwrap(await api.GetRawAsync("api/admin/worker-status"));
             return new JsonResult(data);
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha no refresh do dashboard do Worker");
-            return new JsonResult(new { error = ex.Message }) { StatusCode = 502 };
+            return new JsonResult(new { error = "Falha ao consultar a API." }) { StatusCode = 502 };
         }
     }
+
+    // GetRawAsync devolve o envelope { data, meta } cru. O Razor + Alpine esperam
+    // o objeto interno (saude, heartbeats, notifications, ...). Sem desempacotar,
+    // a hidratacao server-side fica { data, meta } e os cards x-if="d?.saude"
+    // ficam invisiveis ate o primeiro refresh (30s depois) — flash inverso.
+    private static JsonElement Unwrap(JsonElement raw) =>
+        raw.ValueKind == JsonValueKind.Object && raw.TryGetProperty("data", out var inner)
+            ? inner
+            : raw;
 }

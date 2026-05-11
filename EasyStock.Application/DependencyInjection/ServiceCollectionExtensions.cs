@@ -39,9 +39,10 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockHelpdeskUseCases()
             .AddEasyStockPublicUseCases();
 
-        // Heartbeat default = no-op. O Worker SUBSTITUI por PostgresHeartbeatRecorder
-        // via services.AddScoped depois desta chamada (último registro vence). API mantém
-        // no-op — não escreve heartbeats mesmo que rode hosted services in-process.
+        // Heartbeat default = no-op (TryAdd só registra se ninguém já tiver). O Worker
+        // registra PostgresHeartbeatRecorder ANTES desta chamada — assim o TryAdd vê
+        // que já existe e mantém a impl real. A API não pré-registra nada, então fica
+        // com o no-op mesmo quando hospeda hosted services in-process.
         services.TryAddScoped<IHeartbeatRecorder, NoOpHeartbeatRecorder>();
 
         return services;
