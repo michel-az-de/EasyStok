@@ -18,7 +18,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-2xl font-bold text-slate-900">@c.Nome</h1>
                 <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
-                            @(c.Ativo ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                            @(c.Ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
                     <span class="w-1.5 h-1.5 rounded-full @(c.Ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
                     @(c.Ativo ? "Ativo" : "Inativo")
                 </span>
@@ -51,7 +51,7 @@
             {
                 <form asp-action="Reativar" asp-controller="Clientes" asp-route-id="@c.Id" method="post">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="px-3.5 py-2 bg-white border border-emerald-300 text-emerald-700 text-sm font-semibold rounded-lg hover:bg-emerald-50 transition-colors">
+                    <button type="submit" class="px-3.5 py-2 bg-white border border-emerald-300 text-emerald-800 text-sm font-semibold rounded-lg hover:bg-emerald-50 transition-colors">
                         Reativar
                     </button>
                 </form>
@@ -90,13 +90,13 @@
             <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
-                    <div><label class="block text-xs text-slate-500 mb-1">Nome *</label><input type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Unidade</label><input type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Endereço</label><input type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">E-mail</label><input type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Observações</label><textarea name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
+                    <div><label for="cli-edit-nome" class="block text-xs text-slate-500 mb-1">Nome *</label><input id="cli-edit-nome" type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-apt" class="block text-xs text-slate-500 mb-1">Unidade</label><input id="cli-edit-apt" type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-endereco" class="block text-xs text-slate-500 mb-1">Endereço</label><input id="cli-edit-endereco" type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-telefone" class="block text-xs text-slate-500 mb-1">Telefone</label><input id="cli-edit-telefone" type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-email" class="block text-xs text-slate-500 mb-1">E-mail</label><input id="cli-edit-email" type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-documento" class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input id="cli-edit-documento" type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-observacoes" class="block text-xs text-slate-500 mb-1">Observações</label><textarea id="cli-edit-observacoes" name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
                     <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar alterações</button>
                 </div>
             </form>
