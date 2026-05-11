@@ -35,6 +35,11 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel vm, string? returnUrl = null)
     {
+        // Preserva returnUrl em qualquer re-render da view (validacao falhou,
+        // api fora, credenciais erradas) — sem isso o deep link e perdido apos
+        // o primeiro POST com erro.
+        ViewBag.ReturnUrl = returnUrl;
+
         if (!ModelState.IsValid) return View(vm);
 
         var result = await api.PostAsync<JsonElement>("auth/login", new { email = vm.Email, senha = vm.Senha });
