@@ -275,7 +275,7 @@
 
                 <form asp-action="AddDocumento" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask); else $refs.docValor.value = $refs.docValor.value.replace(/\D/g,'')">
+                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask)">
                         <option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="rg">RG</option>
                         <option value="cnh">CNH</option><option value="passaporte">Passaporte</option><option value="outro">Outro</option>
                     </select>

@@ -128,7 +128,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     {
         var result = await svc.AddEnderecoAsync(id, tipo, logradouro, numero, complemento,
             bairro, cidade, estado, cep, pais, referencia, padrao);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Adicionar endereço")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Endereço adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -138,7 +138,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveEndereco(string id, string enderecoId)
     {
         var result = await svc.RemoveEnderecoAsync(id, enderecoId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Remover endereço")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Endereço removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -151,7 +151,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string numero, string? tipo, bool whatsapp = false, bool principal = false, string? observacao = null)
     {
         var result = await svc.AddTelefoneAsync(id, numero, tipo, whatsapp, principal, observacao);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Adicionar telefone")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Telefone adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -161,7 +161,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveTelefone(string id, string telefoneId)
     {
         var result = await svc.RemoveTelefoneAsync(id, telefoneId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Remover telefone")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Telefone removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -174,7 +174,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string tipo, string valor, string? emissor, DateTime? emitidoEm, DateTime? validoAte, bool principal = false)
     {
         var result = await svc.AddDocumentoAsync(id, tipo, valor, emissor, emitidoEm, validoAte, principal);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Adicionar documento")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Documento adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -184,8 +184,20 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveDocumento(string id, string documentoId)
     {
         var result = await svc.RemoveDocumentoAsync(id, documentoId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasSubError(result, "Remover documento")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Documento removido.");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    // Toast com código + status do erro: facilita diagnóstico de falhas em sub-recursos
+    // (401 sessão, 403 empresa, 404 cliente, 400 validação) que antes apareciam como
+    // mensagem genérica e davam impressão de "salvou mas nada apareceu".
+    private bool HasSubError<T>(EasyStock.Web.Models.Api.ApiResult<T> result, string acao)
+    {
+        if (result.Success) return false;
+        var code = result.ErrorCode ?? "?";
+        var msg = result.ErrorMessage ?? "Erro ao processar requisição.";
+        Toast("error", $"{acao} falhou ({code} · HTTP {result.HttpStatus}): {msg}");
+        return true;
     }
 }
