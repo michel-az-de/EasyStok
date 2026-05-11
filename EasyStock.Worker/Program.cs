@@ -6,6 +6,7 @@ using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Heartbeats;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using OpenTelemetry.Metrics;
@@ -48,6 +49,13 @@ if (string.IsNullOrWhiteSpace(connStr))
 // Worker que nao usam IgnoreQueryFilters() retornam 0 rows (SLA monitor, notificacoes).
 builder.Services.AddScoped<EasyStock.Application.Ports.Output.ICurrentUserAccessor,
     WorkerCurrentUserAccessor>();
+
+// Heartbeat: Worker grava em worker_heartbeats (UPSERT por servico) pra alimentar
+// o dashboard Admin/Operacao/Worker. Registrado ANTES de AddEasyStockApplication()
+// (que usa TryAddScoped pro NoOp default) — assim o Worker grava de verdade e a API
+// fica com NoOp mesmo quando ela tambem hospeda parte do pipeline (Mode=Hosted).
+builder.Services.AddScoped<EasyStock.Application.Ports.Output.IHeartbeatRecorder,
+    PostgresHeartbeatRecorder>();
 
 builder.Services
     .AddEasyStockPostgreInfrastructure(connStr, builder.Configuration)

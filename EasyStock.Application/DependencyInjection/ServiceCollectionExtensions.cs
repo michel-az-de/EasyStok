@@ -1,4 +1,7 @@
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -35,6 +38,11 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockNotificationsUseCases()
             .AddEasyStockHelpdeskUseCases()
             .AddEasyStockPublicUseCases();
+
+        // Heartbeat default = no-op. O Worker SUBSTITUI por PostgresHeartbeatRecorder
+        // via services.AddScoped depois desta chamada (último registro vence). API mantém
+        // no-op — não escreve heartbeats mesmo que rode hosted services in-process.
+        services.TryAddScoped<IHeartbeatRecorder, NoOpHeartbeatRecorder>();
 
         return services;
     }

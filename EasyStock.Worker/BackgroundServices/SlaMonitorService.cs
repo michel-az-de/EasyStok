@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Notifications;
@@ -39,13 +41,32 @@ public sealed class SlaMonitorService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var sw = Stopwatch.StartNew();
+            int processados = 0;
+            string status = "OK";
+            string? detalhe = null;
+
             try
             {
-                await ExecutarTickAsync(stoppingToken);
+                processados = await ExecutarTickAsync(stoppingToken);
+                if (processados < 0)
+                {
+                    status = "Skip";
+                    detalhe = "advisory lock detido por outra replica";
+                    processados = 0;
+                }
             }
             catch (Exception ex)
             {
+                status = "Erro";
+                detalhe = ex.GetType().Name + ": " + ex.Message;
                 logger.LogError(ex, "Erro durante tick do SlaMonitorService");
+            }
+            finally
+            {
+                sw.Stop();
+                await GravarHeartbeatAsync("SlaMonitor", status, detalhe,
+                    processados, (int)sw.ElapsedMilliseconds, stoppingToken);
             }
 
             try { await Task.Delay(TimeSpan.FromSeconds(intervaloSegundos), stoppingToken); }
@@ -53,13 +74,32 @@ public sealed class SlaMonitorService(
         }
     }
 
-    private async Task ExecutarTickAsync(CancellationToken ct)
+    private async Task GravarHeartbeatAsync(
+        string servico, string status, string? detalhe,
+        int? itensProcessados, int? duracaoMs, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var recorder = scope.ServiceProvider.GetRequiredService<IHeartbeatRecorder>();
+            await recorder.RecordAsync(servico, status, detalhe, itensProcessados, duracaoMs, ct);
+        }
+        catch (Exception ex)
+        {
+            // Heartbeat eh best-effort — nao quebrar o servico se falhar.
+            logger.LogWarning(ex, "Falha ao gravar heartbeat do SlaMonitor");
+        }
+    }
+
+    /// <returns>Quantidade de tickets avaliados; -1 quando o advisory lock estava detido por outra replica.</returns>
+    private async Task<int> ExecutarTickAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
         var advisoryLock = sp.GetRequiredService<PostgresAdvisoryLock>();
 
-        await advisoryLock.TentarExecutarAsync(LockId, async token =>
+        int candidatosCount = 0;
+        var locked = await advisoryLock.TentarExecutarAsync(LockId, async token =>
         {
             ct = token;
             var db = sp.GetRequiredService<EasyStockDbContext>();
@@ -83,6 +123,7 @@ public sealed class SlaMonitorService(
                     t.UltimoAlerta50PctEm, t.UltimoAlerta80PctEm))
                 .ToListAsync(token);
 
+            candidatosCount = candidatos.Count;
             foreach (var snap in candidatos)
             {
                 await ProcessarTicketAsync(snap, agora, db, notificador, token);
@@ -90,6 +131,8 @@ public sealed class SlaMonitorService(
 
             await db.CommitAsync();
         }, ct);
+
+        return locked ? candidatosCount : -1;
     }
 
     private async Task ProcessarTicketAsync(

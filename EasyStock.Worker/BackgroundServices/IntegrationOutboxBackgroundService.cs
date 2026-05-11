@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -60,22 +62,38 @@ public sealed class IntegrationOutboxBackgroundService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var sw = Stopwatch.StartNew();
+            int processados = 0;
+            string status = "OK";
+            string? detalhe = null;
+            bool cancelado = false;
+
             try
             {
-                int processados = await RodarRodadaAsync(batchSize, stoppingToken);
-
-                // Se processou batch cheio, há mais — rodar imediatamente sem esperar.
-                if (processados >= batchSize) continue;
+                processados = await RodarRodadaAsync(batchSize, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                break;
+                cancelado = true;
             }
             catch (Exception ex)
             {
+                status = "Erro";
+                detalhe = ex.GetType().Name + ": " + ex.Message;
                 logger.LogError(ex,
                     "IntegrationOutboxBackgroundService: erro na rodada — continuando próximo tick.");
             }
+            finally
+            {
+                sw.Stop();
+                await GravarHeartbeatAsync("IntegrationOutbox", status, detalhe,
+                    processados, (int)sw.ElapsedMilliseconds, stoppingToken);
+            }
+
+            if (cancelado) break;
+
+            // Se processou batch cheio, há mais — rodar imediatamente sem esperar.
+            if (status == "OK" && processados >= batchSize) continue;
 
             try { await Task.Delay(pollingInterval, stoppingToken); }
             catch (OperationCanceledException) { break; }
@@ -89,5 +107,21 @@ public sealed class IntegrationOutboxBackgroundService(
         using var scope = serviceProvider.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IIntegrationEventDispatcher>();
         return await dispatcher.ExecutarRodadaAsync(batchSize, ct);
+    }
+
+    private async Task GravarHeartbeatAsync(
+        string servico, string status, string? detalhe,
+        int? itensProcessados, int? duracaoMs, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var recorder = scope.ServiceProvider.GetRequiredService<IHeartbeatRecorder>();
+            await recorder.RecordAsync(servico, status, detalhe, itensProcessados, duracaoMs, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao gravar heartbeat do IntegrationOutbox");
+        }
     }
 }

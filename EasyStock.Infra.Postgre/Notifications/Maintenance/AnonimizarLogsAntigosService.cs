@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -56,6 +58,10 @@ public sealed class AnonimizarLogsAntigosService(
 
     private async Task ExecutarAnonimizacaoAsync(int retencaoDias, CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
+        int totalAnonimizado = 0;
+        string status = "OK";
+        string? detalhe = null;
         var limiteAnonimizacao = DateTime.UtcNow.AddDays(-retencaoDias);
 
         try
@@ -80,13 +86,39 @@ public sealed class AnonimizarLogsAntigosService(
                     .SetProperty(l => l.ErroDetalhado, (string?)null),
                     ct);
 
+            totalAnonimizado = totalOutbox + totalLogs;
+            detalhe = $"outbox={totalOutbox} logs={totalLogs}";
             logger.LogInformation(
                 "Anonimização: {TotalOutbox} mensagens outbox e {TotalLogs} logs de envio anonimizados (>{Dias}d)",
                 totalOutbox, totalLogs, retencaoDias);
         }
         catch (Exception ex)
         {
+            status = "Erro";
+            detalhe = ex.GetType().Name + ": " + ex.Message;
             logger.LogError(ex, "Erro durante anonimização de logs antigos");
+        }
+        finally
+        {
+            sw.Stop();
+            await GravarHeartbeatAsync("AnonimizarLogs", status, detalhe,
+                totalAnonimizado, (int)sw.ElapsedMilliseconds, ct);
+        }
+    }
+
+    private async Task GravarHeartbeatAsync(
+        string servico, string status, string? detalhe,
+        int? itensProcessados, int? duracaoMs, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var recorder = scope.ServiceProvider.GetRequiredService<IHeartbeatRecorder>();
+            await recorder.RecordAsync(servico, status, detalhe, itensProcessados, duracaoMs, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao gravar heartbeat de AnonimizarLogs");
         }
     }
 }

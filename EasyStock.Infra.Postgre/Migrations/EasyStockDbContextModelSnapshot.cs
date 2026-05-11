@@ -5730,6 +5730,53 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("outbox_evento_integracao", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.WorkerHeartbeat", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detalhe")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("DuracaoMs")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ItensProcessados")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Servico")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UltimoTickEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UltimoTickEm")
+                        .HasDatabaseName("ix_worker_heartbeats_ultimo_tick");
+
+                    b.HasIndex("Servico")
+                        .IsUnique()
+                        .HasDatabaseName("ux_worker_heartbeats_servico");
+
+                    b.ToTable("worker_heartbeats", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.AdminImpersonationLog", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Usuario", "AdminUsuario")

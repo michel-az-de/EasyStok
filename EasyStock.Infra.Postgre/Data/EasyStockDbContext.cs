@@ -145,6 +145,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<NfeItem> NfeItens { get; set; } = null!;
         public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
 
+        // Worker observability (heartbeat por hosted service)
+        public DbSet<WorkerHeartbeat> WorkerHeartbeats { get; set; } = null!;
+
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
         public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;

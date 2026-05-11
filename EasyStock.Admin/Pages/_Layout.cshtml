@@ -119,9 +119,13 @@
                 <span class="text-base">🔔</span>
                 <span class="text-sm font-medium">Notificações</span>
             </a>
-            <a href="/Operacao" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Operacao") == true ? "active" : "")">
+            <a href="/Operacao" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/Operacao/Index" ? "active" : "")">
                 <span class="text-base">📈</span>
                 <span class="text-sm font-medium">Operação</span>
+            </a>
+            <a href="/Operacao/Worker" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/Operacao/Worker" ? "active" : "")">
+                <span class="text-base">⚙️</span>
+                <span class="text-sm font-medium">Worker</span>
             </a>
             <a href="/Dispositivos" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Dispositivos") == true ? "active" : "")">
                 <span class="text-base">📱</span>

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,10 @@ public sealed class AvaliadorLoopHostedService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var sw = Stopwatch.StartNew();
+            string status = "OK";
+            string? detalhe = null;
+
             try
             {
                 using var scope = serviceProvider.CreateScope();
@@ -32,7 +38,15 @@ public sealed class AvaliadorLoopHostedService(
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
+                status = "Erro";
+                detalhe = ex.GetType().Name + ": " + ex.Message;
                 logger.LogError(ex, "Erro no AvaliadorLoopHostedService — continuando próxima rodada.");
+            }
+            finally
+            {
+                sw.Stop();
+                await GravarHeartbeatAsync("Avaliador", status, detalhe,
+                    null, (int)sw.ElapsedMilliseconds, stoppingToken);
             }
 
             try
@@ -42,6 +56,22 @@ public sealed class AvaliadorLoopHostedService(
                     stoppingToken);
             }
             catch (OperationCanceledException) { break; }
+        }
+    }
+
+    private async Task GravarHeartbeatAsync(
+        string servico, string status, string? detalhe,
+        int? itensProcessados, int? duracaoMs, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var recorder = scope.ServiceProvider.GetRequiredService<IHeartbeatRecorder>();
+            await recorder.RecordAsync(servico, status, detalhe, itensProcessados, duracaoMs, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao gravar heartbeat do Avaliador");
         }
     }
 }

@@ -1,5 +1,7 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -16,16 +18,26 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
 {
     // maxCount=1: qualquer nº de NOTIFYs = 1 wakeup pendente (anti-flood)
     private readonly SemaphoreSlim _signal = new(0, 1);
+    private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PostgresOutboxSignaler> _logger;
     private CancellationTokenSource? _cts;
     private Task? _listenLoop;
     private volatile bool _disposed;
 
+    // Throttle de heartbeat — grava no máximo 1x/min (signaler nao tem "tick" tradicional;
+    // serve como liveness do LISTEN persistente).
+    private DateTime _ultimoHeartbeat = DateTime.MinValue;
+    private static readonly TimeSpan HeartbeatThrottle = TimeSpan.FromSeconds(60);
+
     private const int FallbackPollingMs = 10_000;
 
-    public PostgresOutboxSignaler(IConfiguration configuration, ILogger<PostgresOutboxSignaler> logger)
+    public PostgresOutboxSignaler(
+        IServiceProvider serviceProvider,
+        IConfiguration configuration,
+        ILogger<PostgresOutboxSignaler> logger)
     {
+        _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
     }
@@ -65,6 +77,8 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
         if (string.IsNullOrWhiteSpace(connStr))
         {
             _logger.LogWarning("PostgresOutboxSignaler: ConnectionString não configurada — usando apenas polling fallback.");
+            await RegistrarHeartbeatAsync("Skip",
+                "ConnectionString ausente — modo polling fallback", stoppingToken);
             await FallbackPollingLoopAsync(stoppingToken);
             return;
         }
@@ -86,17 +100,21 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
                     await cmd.ExecuteNonQueryAsync(stoppingToken);
 
                 _logger.LogInformation("PostgresOutboxSignaler: LISTEN ativo em 'notif_outbox'.");
+                await RegistrarHeartbeatAsync("OK", "LISTEN ativo em 'notif_outbox'", stoppingToken);
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     await conn.WaitAsync(TimeSpan.FromMilliseconds(FallbackPollingMs), stoppingToken);
                     Signal(); // ao retornar do timeout, sinaliza wakeup periódico (fallback)
+                    await RegistrarHeartbeatAsync("OK", "LISTEN ativo", stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PostgresOutboxSignaler: erro na conexão LISTEN — reconectando em 5s.");
+                await RegistrarHeartbeatAsync("Erro",
+                    ex.GetType().Name + ": " + ex.Message, stoppingToken);
                 try { await Task.Delay(5_000, stoppingToken); } catch (OperationCanceledException) { break; }
             }
         }
@@ -107,7 +125,30 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
         while (!ct.IsCancellationRequested)
         {
             Signal();
+            await RegistrarHeartbeatAsync("OK", "polling fallback (sem LISTEN)", ct);
             try { await Task.Delay(FallbackPollingMs, ct); } catch (OperationCanceledException) { break; }
+        }
+    }
+
+    /// <summary>
+    /// Grava heartbeat respeitando throttle de <see cref="HeartbeatThrottle"/>.
+    /// Erros sao sempre gravados (sem throttle) pra alertar imediato.
+    /// </summary>
+    private async Task RegistrarHeartbeatAsync(string status, string? detalhe, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        if (status == "OK" && now - _ultimoHeartbeat < HeartbeatThrottle) return;
+        _ultimoHeartbeat = now;
+
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var recorder = scope.ServiceProvider.GetRequiredService<IHeartbeatRecorder>();
+            await recorder.RecordAsync("OutboxSignaler", status, detalhe, null, null, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao gravar heartbeat do OutboxSignaler");
         }
     }
 
