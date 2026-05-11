@@ -13,8 +13,9 @@
   },
   "plugins": {
     "CapacitorUpdater": {
-      "autoUpdate": false,
-      "updateUrl": "https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/api/updates",
+      "autoUpdate": true,
+      "updateUrl": "https://easystok-web.onrender.com/downloads/apk/manifest",
+      "statsUrl": "",
       "directUpdate": "never",
       "responseTimeout": 20,
       "appReadyTimeout": 30000,

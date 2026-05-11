@@ -130,3 +130,33 @@ public sealed class PreviewTemplateUseCase(
         return new PreviewTemplateResult(assunto, corpo);
     }
 }
+
+// ── Preview Raw (sem persistir, para editor ao vivo) ────────────────────────
+
+public sealed record PreviewTemplateRawCommand(
+    string AssuntoTemplate,
+    string CorpoTemplate,
+    IDictionary<string, object?> Variaveis) : ICommand;
+
+public sealed record PreviewTemplateRawResult(
+    string AssuntoRenderizado,
+    string CorpoRenderizado,
+    string? Erro);
+
+public sealed class PreviewTemplateRawUseCase(IRendererTemplate renderer)
+    : IUseCase<PreviewTemplateRawCommand, PreviewTemplateRawResult>
+{
+    public async Task<PreviewTemplateRawResult> ExecuteAsync(PreviewTemplateRawCommand command)
+    {
+        try
+        {
+            var assunto = await renderer.RenderizarAsync(command.AssuntoTemplate ?? "", command.Variaveis);
+            var corpo = await renderer.RenderizarAsync(command.CorpoTemplate ?? "", command.Variaveis);
+            return new PreviewTemplateRawResult(assunto, corpo, null);
+        }
+        catch (Exception ex)
+        {
+            return new PreviewTemplateRawResult("", "", ex.Message);
+        }
+    }
+}

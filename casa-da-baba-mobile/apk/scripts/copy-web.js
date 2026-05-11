@@ -88,9 +88,21 @@ function main() {
   copy(SRC, DST);
 
   // config.js: define window.CDB_CONFIG.apiBaseUrl antes do sync.js carregar.
+  // Opcionalmente injeta forcedPairingCode/forcedPairingLabel (lido de env vars
+  // PAIRING_CODE/PAIRING_LABEL) — usado pelo workflow build-casadababa-release
+  // pra que o APK pareie sozinho no primeiro boot, sem operador digitar codigo.
+  // Em build normal (sem env vars) o objeto fica vazio nesse campo e o sync.js
+  // ignora — comportamento idêntico ao da PWA producao.
   const configPath = path.join(DST, 'config.js');
-  const cfg = `window.CDB_CONFIG = { apiBaseUrl: ${JSON.stringify(apiBaseUrl)} };\n`;
-  fs.writeFileSync(configPath, cfg, 'utf8');
+  const cfg = {
+    apiBaseUrl: apiBaseUrl
+  };
+  if (process.env.PAIRING_CODE) {
+    cfg.forcedPairingCode = String(process.env.PAIRING_CODE).trim();
+    cfg.forcedPairingLabel = String(process.env.PAIRING_LABEL || 'Casa da Baba (auto-pair)');
+    console.log('[copy-web] forcedPairingCode injetado (length=' + cfg.forcedPairingCode.length + ')');
+  }
+  fs.writeFileSync(configPath, 'window.CDB_CONFIG = ' + JSON.stringify(cfg) + ';\n', 'utf8');
   console.log('[copy-web] Gerou', configPath, `(apiBaseUrl=${apiBaseUrl || '""'})`);
 
   injectConfigBeforeSyncJs(path.join(DST, 'index.html'));

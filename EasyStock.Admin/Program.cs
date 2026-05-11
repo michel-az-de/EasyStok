@@ -738,4 +738,31 @@ app.MapGet("/api-proxy/mobile/version", async (
     }
 });
 
+// Proxy /api-proxy/notificacoes/templates/preview-raw — usado pelo editor de
+// templates (Notificacoes/Templates/Edit) para render Scriban ao vivo sem
+// precisar salvar. Aceita { assuntoTemplate, corpoTemplate, variaveis } e
+// devolve { assuntoRenderizado, corpoRenderizado, erro? }.
+app.MapPost("/api-proxy/notificacoes/templates/preview-raw", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        using var doc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
+        var body = doc.RootElement.Clone();
+        var data = await api.PostAsync<System.Text.Json.JsonElement>(
+            "api/admin/notificacoes/templates/preview-raw", body);
+        return Results.Ok(new { data });
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy templates/preview-raw falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.Run();

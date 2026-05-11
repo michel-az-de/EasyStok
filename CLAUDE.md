@@ -14,7 +14,7 @@ Porta de entrada para qualquer agente (Claude Code, Copilot, etc.) abrindo este 
 
 - **Stack**: .NET 9, PostgreSQL Azure, EF Core 9, Clean Architecture estrita.
 - **Solucao**: `EasyStok.sln` — 17 projetos. Pasta MAUI e `EasyStok.Mobile` (com K, sem ponto Maui).
-- **Branch principal**: `master`. **Deploy**: Azure App Service via push (`.github/workflows/deploy-azure.yml`). NAO Render.
+- **Branch principal**: `master`. **Deploy**: Render (`.github/workflows/deploy-render.yml` + `render.yaml`). Azure App Service foi descomissionado. Push em master roda CI; promote a producao exige aprovacao no GitHub Environment `production`.
 - **Frontends do operador**: PWA em `EasyStock.Api/wwwroot/pwa/` (fonte da verdade) + copia empacotada em `EasyStok.Mobile/Resources/Raw/pwa/`. **Merge unidirecional `PWA -> MAUI` no MESMO commit + hash SHA-256 conferido** (ver `.knowledge/dual-frontend-policy.md`).
 - **Branch isolada por demanda — OBRIGATORIO**: NUNCA codar direto em `master` nem em branch alheia. **Antes de qualquer change**, crie uma branch dedicada a partir de `origin/master` com nome `tipo/escopo-curto` (ex: `fix/topbar-dropdowns`, `feat/onboarding-pix`). Se o working dir ja tem changes alheios pendentes (`git status` nao-vazio), use **worktree** (`git worktree add -b <branch> .claude/worktrees/<nome> origin/master`) — nao stash, nao mexa no estado de outra demanda.
 - **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR + `git push -u origin <sua-branch>` + `gh pr create --base master --head <sua-branch>` com test plan no body. **NAO mergear** — o PR fica aberto para o agente revisor decidir. Co-Author `Claude Opus 4.7 <noreply@anthropic.com>`.
@@ -33,6 +33,6 @@ Porta de entrada para qualquer agente (Claude Code, Copilot, etc.) abrindo este 
 | Pedido / Estoque / Caixa / Compras | `.knowledge/domain-glossary.md` + `.knowledge/current-state.md` |
 | PWA ou MAUI | `.knowledge/dual-frontend-policy.md` (SEMPRE, antes de qualquer change) |
 | "estado do projeto" | `.knowledge/current-state.md` + `.knowledge/recent-evolution.md` |
-| deploy | `.knowledge/current-state.md` (Infra) + `.knowledge/gcp-deploy.md` se for migracao |
+| deploy | `.knowledge/current-state.md` (Infra) + `render.yaml` + `.github/workflows/deploy-render.yml` |
 | auditoria pessimista | `.knowledge/audit-brutal.md` (nao regenere — usa muitos tokens) |
 | "o que falta" | `.knowledge/tech-debt.md` + `.knowledge/stability-roadmap.md` |
