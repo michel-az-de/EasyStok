@@ -157,12 +157,33 @@ namespace EasyStock.Application.Ports.Output.Persistence
         string? NomeLoja,
         Guid? ReferenciaId);
 
+    /// <summary>
+    /// Resumo do dia em curso: vendas (pedidos entregues), pedidos pendentes,
+    /// status do caixa e Pix recebidos. Usado pelo dashboard primario do lojista
+    /// para responder "como vai o negocio HOJE".
+    /// </summary>
+    public sealed record ResumoDia(
+        int PedidosEntreguesHoje,
+        decimal FaturamentoHoje,
+        decimal TicketMedioHoje,
+        int PedidosPendentes,
+        decimal ValorPedidosPendentes,
+        bool CaixaAbertaHoje,
+        bool CaixaFechadaHoje,
+        decimal SaldoCaixaAtual,
+        int PixRecebidosHoje,
+        decimal ValorPixHoje,
+        bool OnboardingCompleto);
+
     // Interface
 
     public interface IAnalyticsRepository
     {
         /// <summary>Resumo geral do dashboard.</summary>
         Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null);
+
+        /// <summary>Resumo do dia em curso: vendas, pedidos pendentes, caixa e Pix.</summary>
+        Task<ResumoDia> GetResumoDiaAsync(Guid empresaId, Guid? lojaId = null);
 
         /// <summary>Receita agrupada por mês nos últimos N meses.</summary>
         Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null);

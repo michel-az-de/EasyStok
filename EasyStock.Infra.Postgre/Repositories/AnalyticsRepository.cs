@@ -47,6 +47,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         private static readonly TimeSpan ComparacaoTtl = TimeSpan.FromMinutes(5);
+        // Resumo do dia muda quase em tempo real (cada pedido entregue altera faturamento).
+        // TTL curto para nao mostrar dado defasado, mas o suficiente pra amortizar F5 frequente.
+        private static readonly TimeSpan ResumoDiaTtl = TimeSpan.FromSeconds(30);
 
         // ── Delegation — Dashboard ───────────────────────────────────────────
 
@@ -480,6 +483,140 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (score, classificacao,
                 Math.Round(dimStock, 1), Math.Round(dimSales, 1),
                 Math.Round(dimExpiry, 1), Math.Round(dimIdle, 1), Math.Round(dimReplen, 1));
+        }
+
+        // ── Resumo do dia (Pulso de hoje) ────────────────────────────────────
+
+        public async Task<ResumoDia> GetResumoDiaAsync(Guid empresaId, Guid? lojaId = null)
+        {
+            var hojeIni = DateTime.UtcNow.Date;
+            var hojeFim = hojeIni.AddDays(1);
+
+            // Cache key inclui a data — invalida naturalmente ao virar o dia.
+            var cacheKey = $"analytics:resumo-dia:{empresaId}:{lojaId?.ToString() ?? "all"}:{hojeIni:yyyy-MM-dd}";
+            var cached = await GetCachedAsync<ResumoDia>(cacheKey);
+            if (cached is not null) return cached;
+
+            // ── Onboarding ───────────────────────────────────────────────
+            // Empresa.OnboardingCompleto controla banner "Termine o setup" no dashboard.
+            var onboardingCompleto = await dbContext.Empresas.AsNoTracking()
+                .Where(e => e.Id == empresaId)
+                .Select(e => (bool?)e.OnboardingCompleto)
+                .FirstOrDefaultAsync() ?? true;
+
+            // ── Caixa: ultimo evento abertura/fechamento (resolve cross-day) ─
+            // Se o operador abriu ontem 23h e nao fechou, ainda esta aberto.
+            // Saldo acumula desde a ultima abertura (pode atravessar o dia).
+            var ultimoEventoCaixa = await dbContext.MovimentosCaixa.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId
+                         && (lojaId == null || m.LojaId == lojaId)
+                         && m.EstornadoEm == null
+                         && (m.Tipo == "abertura" || m.Tipo == "fechamento"))
+                .OrderByDescending(m => m.DataMovimento)
+                .Select(m => new { m.Tipo, m.DataMovimento })
+                .FirstOrDefaultAsync();
+
+            DateTime? aberturaEm = null;
+            bool caixaAberta = false;
+            bool caixaFechada = false;
+
+            if (ultimoEventoCaixa != null)
+            {
+                if (ultimoEventoCaixa.Tipo == "abertura")
+                {
+                    caixaAberta = true;
+                    aberturaEm = ultimoEventoCaixa.DataMovimento;
+                }
+                else if (ultimoEventoCaixa.DataMovimento >= hojeIni)
+                {
+                    caixaFechada = true;
+                }
+                // Senao: ultimo evento foi fechamento de outro dia => "sem caixa hoje"
+            }
+
+            // Saldo: desde a abertura (cross-day) se aberta, OU desde hoje 0h
+            var saldoInicio = aberturaEm ?? hojeIni;
+
+            var movsSaldo = await dbContext.MovimentosCaixa.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId
+                         && (lojaId == null || m.LojaId == lojaId)
+                         && m.DataMovimento >= saldoInicio && m.DataMovimento < hojeFim
+                         && m.EstornadoEm == null)
+                .Select(m => new { m.Tipo, m.Valor })
+                .ToListAsync();
+
+            decimal saldoCaixa = 0m;
+            foreach (var m in movsSaldo)
+            {
+                saldoCaixa += m.Tipo switch
+                {
+                    "abertura" => +m.Valor,
+                    "entrada"  => +m.Valor,
+                    "saida"    => -m.Valor,
+                    _ => 0m
+                };
+            }
+
+            // ── Pedidos ────────────────────────────────────────────────────
+            // Entregues hoje (= vendas consolidadas do dia)
+            var entreguesHoje = await dbContext.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId
+                         && (lojaId == null || p.LojaId == lojaId)
+                         && p.EntreguEm != null
+                         && p.EntreguEm >= hojeIni && p.EntreguEm < hojeFim)
+                .Select(p => p.Total)
+                .ToListAsync();
+            var pedidosEntreguesHoje = entreguesHoje.Count;
+            var faturamentoHoje = entreguesHoje.Sum(t => (decimal)t);
+            var ticketMedioHoje = pedidosEntreguesHoje == 0
+                ? 0m
+                : Math.Round(faturamentoHoje / pedidosEntreguesHoje, 2);
+
+            // Pendentes (qualquer status pre-entrega)
+            var pendentes = await dbContext.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId
+                         && (lojaId == null || p.LojaId == lojaId)
+                         && p.Status != "entregue" && p.Status != "cancelado")
+                .Select(p => p.Total)
+                .ToListAsync();
+            var pedidosPendentes = pendentes.Count;
+            var valorPedidosPendentes = pendentes.Sum(t => (decimal)t);
+
+            // ── Pagamentos: somam ao saldo + Pix do dia ─────────────────
+            // PedidoPagamento nao e DbSet — acessa via navigation Pedido.Pagamentos.
+            var pagamentosNoSaldo = await dbContext.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId
+                         && (lojaId == null || p.LojaId == lojaId))
+                .SelectMany(p => p.Pagamentos)
+                .Where(pp => pp.PagoEm >= saldoInicio && pp.PagoEm < hojeFim)
+                .Select(pp => new { pp.PagoEm, pp.Metodo, pp.Valor })
+                .ToListAsync();
+            saldoCaixa += pagamentosNoSaldo.Sum(p => p.Valor);
+
+            // Pix recebidos hoje — SO PedidoPagamento (decisao explicita pra evitar
+            // double-count com MovimentoCaixa.Metodo=pix). Considera apenas hoje
+            // (nao cross-day): "Pix de hoje" e metrica de dia, nao de caixa.
+            var pixHoje = pagamentosNoSaldo
+                .Where(p => p.Metodo == "pix" && p.PagoEm >= hojeIni && p.PagoEm < hojeFim)
+                .ToList();
+            var pixCount = pixHoje.Count;
+            var pixValor = pixHoje.Sum(p => p.Valor);
+
+            var resumo = new ResumoDia(
+                pedidosEntreguesHoje,
+                faturamentoHoje,
+                ticketMedioHoje,
+                pedidosPendentes,
+                valorPedidosPendentes,
+                caixaAberta,
+                caixaFechada,
+                saldoCaixa,
+                pixCount,
+                pixValor,
+                onboardingCompleto);
+
+            await SetCachedAsync(cacheKey, resumo, ResumoDiaTtl);
+            return resumo;
         }
     }
 }

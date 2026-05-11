@@ -1,41 +1,128 @@
-﻿@model DashboardViewModel
+@model DashboardViewModel
 @using System.Globalization
 @{
     var ptBR = new CultureInfo("pt-BR");
     var hora = DateTime.Now.Hour;
     var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
+
+    // Estado do caixa em 3 cenarios — define label/valor/sub/cor em um bloco
+    // pra view ficar limpa.
+    string caixaLabel, caixaValor, caixaSub, caixaCor;
+    if (Model.CaixaAbertaHoje)
+    {
+        caixaLabel = "Caixa aberto";
+        caixaValor = Model.SaldoCaixaAtual.ToString("C", ptBR);
+        caixaSub = "no caixa agora";
+        caixaCor = "text-emerald-700";
+    }
+    else if (Model.CaixaFechadaHoje)
+    {
+        caixaLabel = "Caixa fechado";
+        caixaValor = Model.SaldoCaixaAtual.ToString("C", ptBR);
+        caixaSub = "total do dia";
+        caixaCor = "text-slate-700";
+    }
+    else
+    {
+        caixaLabel = "Sem caixa hoje";
+        caixaValor = "—";
+        caixaSub = "comece o dia abrindo o caixa";
+        caixaCor = "text-amber-600";
+    }
 }
 
 <div class="pg-hd mb-6">
     <h1>@saudacao@(string.IsNullOrEmpty(primeiroNome) ? "!" : $", {primeiroNome}!")</h1>
-    <p>Resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
+    <p>@System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(DateTime.Now.ToString("dddd, dd 'de' MMMM", ptBR))</p>
 </div>
 
-<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="ws dashboard-kpi-card" title="Produtos distintos com ao menos uma unidade em estoque">
-        <div class="kpi-lbl">SKUs em estoque</div>
-        <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
-        <div class="text-xs text-slate-400 mt-1">produtos distintos</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Soma das quantidades de todas as unidades em estoque (todos os lotes)">
-        <div class="kpi-lbl">Itens em estoque</div>
-        <div class="kpi-val dashboard-kpi-value text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
-        <div class="text-xs text-slate-400 mt-1">unidades totais</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Valor de venda estimado de todo o estoque atual">
-        <div class="kpi-lbl">Valor em estoque</div>
-        <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
-        <div class="text-xs text-slate-400 mt-1">preço de venda</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Receita gerada com saídas nos últimos 30 dias">
-        <div class="kpi-lbl">Receita estimada</div>
-        <div class="kpi-val dashboard-kpi-value text-emerald-800">@Model.ReceitaMes.ToString("C", ptBR)</div>
-        <div class="text-xs text-slate-400 mt-1">últimos 30 dias</div>
-    </div>
+@* Banner sutil de onboarding pendente. Aparece quando Empresa.OnboardingCompleto=false.
+   Posicionado depois da saudação pra não roubar a entrada visual da página. *@
+@if (!Model.OnboardingCompleto)
+{
+    <a href="/onboarding"
+       class="flex items-center justify-between gap-3 px-4 py-3 mb-6 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors group">
+        <div class="flex items-center gap-3">
+            <span class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center">
+                <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </span>
+            <div>
+                <div class="text-sm font-semibold text-amber-900">Setup pendente</div>
+                <div class="text-xs text-amber-700">Termine o cadastro da sua loja pra liberar todas as funcionalidades.</div>
+            </div>
+        </div>
+        <span class="text-xs font-semibold text-amber-700 group-hover:text-amber-900 whitespace-nowrap">Continuar →</span>
+    </a>
+}
+
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO 1 — "Hoje": Faturamento, Caixa, Pix, Pedidos pendentes.
+   Responde a pergunta "como tá indo o dia AGORA". Vem antes de tudo.
+   ──────────────────────────────────────────────────────────────────────── *@
+<div class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-bold text-slate-800">Hoje</h2>
+    <span class="text-xs text-slate-400">atualizado @DateTime.Now.ToString("HH:mm", ptBR)</span>
 </div>
 
-<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    @* Faturamento do dia: pedidos entregues hoje, soma do total + ticket medio. *@
+    <div class="ws dashboard-kpi-card" title="Soma dos pedidos entregues hoje">
+        <div class="kpi-lbl">Faturamento</div>
+        <div class="kpi-val dashboard-kpi-value text-emerald-700">@Model.FaturamentoHoje.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-500 mt-1">
+            @Model.PedidosEntreguesHoje pedido@(Model.PedidosEntreguesHoje != 1 ? "s" : "")
+            @if (Model.PedidosEntreguesHoje > 0)
+            {
+                <span> · ticket @Model.TicketMedioHoje.ToString("C", ptBR)</span>
+            }
+        </div>
+    </div>
+
+    @* Caixa: 3 cenarios (aberto / fechado / nao abriu). Card inteiro vira link. *@
+    <a href="/caixa" class="ws dashboard-kpi-card block hover:border-indigo-300 transition-colors cursor-pointer">
+        <div class="kpi-lbl">@caixaLabel</div>
+        <div class="kpi-val dashboard-kpi-value @caixaCor">@caixaValor</div>
+        <div class="text-xs text-slate-500 mt-1">@caixaSub</div>
+    </a>
+
+    @* Pix: pagamentos de pedido com metodo=pix no dia (decisao explicita pra evitar double-count). *@
+    <div class="ws dashboard-kpi-card" title="Pagamentos via Pix recebidos hoje (somente pedidos)">
+        <div class="kpi-lbl">Pix recebido</div>
+        <div class="kpi-val dashboard-kpi-value text-emerald-700">@Model.ValorPixHoje.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-500 mt-1">
+            @Model.PixRecebidosHoje recebimento@(Model.PixRecebidosHoje != 1 ? "s" : "") hoje
+        </div>
+    </div>
+
+    @* Pedidos pendentes: status != entregue && != cancelado. Card clicavel. *@
+    <a href="/pedidos" class="ws dashboard-kpi-card block hover:border-blue-300 transition-colors cursor-pointer" title="Pedidos aguardando, em preparo ou prontos para entrega">
+        <div class="kpi-lbl">Pedidos pendentes</div>
+        <div class="kpi-val dashboard-kpi-value @(Model.PedidosPendentes > 0 ? "text-blue-600" : "text-slate-400")">@Model.PedidosPendentes</div>
+        <div class="text-xs text-slate-500 mt-1">
+            @if (Model.PedidosPendentes > 0)
+            {
+                <text>@Model.ValorPedidosPendentes.ToString("C", ptBR) em aberto</text>
+            }
+            else
+            {
+                <text>nada pra entregar</text>
+            }
+        </div>
+    </a>
+</div>
+
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO 2 — "Estoque pede atenção": alertas de inventario acionaveis.
+   ──────────────────────────────────────────────────────────────────────── *@
+<div class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-bold text-slate-800">Estoque pede atenção</h2>
+    <a href="/estoque" class="text-xs text-indigo-600 hover:underline">Ver estoque →</a>
+</div>
+
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <a href="/estoque?status=critico" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
         <div class="dashboard-attention-icon dashboard-attention-icon--critical">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +142,7 @@
         </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-amber-600">@Model.ProximosVencimento</div>
-            <div class="kpi-lbl">Próx. ao vencimento</div>
+            <div class="kpi-lbl">Vencendo (até 30d)</div>
         </div>
     </a>
     <a href="/estoque?status=parado" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
@@ -66,7 +153,7 @@
         </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-blue-600">@Model.ProdutosParados</div>
-            <div class="kpi-lbl">Parados +30 dias</div>
+            <div class="kpi-lbl">Parados (30d+)</div>
         </div>
     </a>
     <a href="/entradas/reposicao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
@@ -77,11 +164,46 @@
         </div>
         <div>
             <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-emerald-600">@Model.SugestoesReposicao</div>
-            <div class="kpi-lbl">Sugestões de reposição</div>
+            <div class="kpi-lbl">Repor agora</div>
         </div>
     </a>
 </div>
 
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO 3 — "Saúde do estoque": SKUs, unidades, valor. Inventory ainda
+   importa mas vira contexto, nao destaque (saiu do topo da pagina).
+   ──────────────────────────────────────────────────────────────────────── *@
+<div class="flex items-baseline justify-between mb-3">
+    <h2 class="text-lg font-bold text-slate-800">Saúde do estoque</h2>
+    <a href="/analytics/movimentacoes" class="text-xs text-indigo-600 hover:underline">Análise completa →</a>
+</div>
+
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="ws dashboard-kpi-card" title="Produtos distintos com ao menos uma unidade em estoque">
+        <div class="kpi-lbl">Produtos no catálogo</div>
+        <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
+        <div class="text-xs text-slate-400 mt-1">com estoque</div>
+    </div>
+    <div class="ws dashboard-kpi-card" title="Soma das quantidades de todas as unidades em estoque">
+        <div class="kpi-lbl">Unidades disponíveis</div>
+        <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.QuantidadeTotalEmEstoque</div>
+        <div class="text-xs text-slate-400 mt-1">no total</div>
+    </div>
+    <div class="ws dashboard-kpi-card" title="Valor de venda estimado de todo o estoque atual">
+        <div class="kpi-lbl">Valor a vender</div>
+        <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-400 mt-1">preço de venda</div>
+    </div>
+    <div class="ws dashboard-kpi-card" title="Receita dos últimos 30 dias">
+        <div class="kpi-lbl">Receita 30 dias</div>
+        <div class="kpi-val dashboard-kpi-value text-emerald-800">@Model.ReceitaMes.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-400 mt-1">acumulado</div>
+    </div>
+</div>
+
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO IA — Visivel so se a empresa tiver IA configurada.
+   ──────────────────────────────────────────────────────────────────────── *@
 @if (Model.IaConfigurada)
 {
     <div class="ws mb-6">
@@ -116,10 +238,13 @@
     </div>
 }
 
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO 4 — Movimentacoes recentes + Grafico de receita.
+   ──────────────────────────────────────────────────────────────────────── *@
 <div class="grid grid-cols-1 gap-6 mb-6">
     <div class="ws">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="font-bold text-slate-800">Movimentações recentes</h2>
+            <h2 class="font-bold text-slate-800">Últimas movimentações</h2>
             <a href="/analytics/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
         </div>
         @if (Model.MovimentacoesRecentes.Any())
@@ -139,8 +264,7 @@
                         @foreach (var m in Model.MovimentacoesRecentes)
                         {
                             var tipoParam = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
-                            <tr class="cursor-pointer hover:bg-slate-50"
-                                data-row-href="/analytics/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam">
+                            <tr class="cursor-pointer hover:bg-slate-50" onclick="location.href='/analytics/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam'">
                                 <td>
                                     @{
                                         var badgeClass = m.Tipo switch
@@ -217,24 +341,28 @@
     </div>
 </div>
 
+@* ────────────────────────────────────────────────────────────────────────
+   BLOCO 5 — Acoes rapidas: primeiras 2 (Pedidos/Caixa) sao as que o dono
+   usa todo dia. Depois fluxo de estoque, depois extras.
+   ──────────────────────────────────────────────────────────────────────── *@
 <div class="ws">
     <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
     <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
         @{
             var acoes = new[]
             {
+                // clipboard-list (pedidos) — acao #1 em foodservice
+                new { IconPath = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4", Label = "Pedidos", Href = "/pedidos" },
+                // cash (caixa) — acao #2
+                new { IconPath = "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", Label = "Caixa", Href = "/caixa" },
                 // arrow-down (entrada)
                 new { IconPath = "M19 14l-7 7m0 0l-7-7m7 7V3", Label = "Nova entrada", Href = "/entradas/nova" },
-                // arrow-up (saída)
+                // arrow-up (saida)
                 new { IconPath = "M5 10l7-7m0 0l7 7m-7-7v18", Label = "Registrar saída", Href = "/saidas/nova" },
-                // refresh (repor)
-                new { IconPath = "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15", Label = "Repor estoque", Href = "/entradas/reposicao" },
                 // package (estoque)
                 new { IconPath = "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4", Label = "Ver estoque", Href = "/estoque" },
                 // sparkles (IA)
                 new { IconPath = "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z", Label = "Gerar anúncio", Href = "/anuncios" },
-                // chart bar (movimentações)
-                new { IconPath = "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", Label = "Movimentações", Href = "/analytics/movimentacoes" },
             };
         }
         @foreach (var acao in acoes)

@@ -3,6 +3,7 @@ using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Analytics.AlertasDias;
 using EasyStock.Application.UseCases.Analytics.Alertas;
 using EasyStock.Application.UseCases.Analytics.Dashboard;
+using EasyStock.Application.UseCases.Analytics.Dia;
 using EasyStock.Application.UseCases.Analytics.Margem;
 using EasyStock.Application.UseCases.Analytics.Movimentacoes;
 using EasyStock.Application.UseCases.Analytics.Parados;
@@ -28,6 +29,7 @@ namespace EasyStock.Api.Controllers;
 [EnableRateLimiting("geral")]
 public class AnalyticsController(
     GetDashboardUseCase getDashboardUseCase,
+    ObterResumoDiaUseCase obterResumoDiaUseCase,
     CalcularProjecoesUseCase calcProjecoesUseCase,
     CalcularReposicaoUseCase calcReposicaoUseCase,
     CalcularSazonalidadeUseCase calcSazonalidadeUseCase,
@@ -53,6 +55,19 @@ public class AnalyticsController(
             return error!;
 
         var result = await getDashboardUseCase.ExecuteAsync(new GetDashboardCommand(resolvedEmpresaId, periodo));
+        return DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Resumo do dia em curso", Description = "Vendas, pedidos pendentes, status do caixa e Pix recebidos no dia. Usado pelo dashboard primario.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("dia")]
+    public async Task<IActionResult> Dia([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await obterResumoDiaUseCase.ExecuteAsync(new ObterResumoDiaCommand(resolvedEmpresaId, lojaId));
         return DataOk(result);
     }
 
