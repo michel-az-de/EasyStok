@@ -56,6 +56,11 @@ public sealed class SlaMonitorService(
                     processados = 0;
                 }
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Shutdown limpo — nao gravar heartbeat "Erro" enganoso (deploy/restart).
+                break;
+            }
             catch (Exception ex)
             {
                 status = "Erro";
@@ -65,8 +70,11 @@ public sealed class SlaMonitorService(
             finally
             {
                 sw.Stop();
-                await GravarHeartbeatAsync("SlaMonitor", status, detalhe,
-                    processados, (int)sw.ElapsedMilliseconds, stoppingToken);
+                if (!stoppingToken.IsCancellationRequested)
+                {
+                    await GravarHeartbeatAsync("SlaMonitor", status, detalhe,
+                        processados, (int)sw.ElapsedMilliseconds, stoppingToken);
+                }
             }
 
             try { await Task.Delay(TimeSpan.FromSeconds(intervaloSegundos), stoppingToken); }

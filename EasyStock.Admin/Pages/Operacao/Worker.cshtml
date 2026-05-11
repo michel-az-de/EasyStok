@@ -12,7 +12,9 @@
         {
             return "null";
         }
-        return Model.Data.GetRawText();
+        // Escapa "</" pra "<\/" pra evitar que uma mensagem de exception contendo
+        // "</script>" feche o bloco <script> e vire XSS. JSON parser aceita <\/ como </.
+        return Model.Data.GetRawText().Replace("</", "<\\/");
     }
 }
 
@@ -225,6 +227,10 @@
                 _intervalId: null,
 
                 async init() {
+                    // Unwrap do envelope { data, meta } do hidratado server-side — mesma
+                    // logica do refresh() abaixo. Sem isso this.d fica = { data, meta } e os
+                    // templates buscam this.d.heartbeats que eh undefined ate o 1o refresh.
+                    if (this.d && this.d.data) this.d = this.d.data;
                     // Se o servidor nao hidratou (erro), tenta carregar.
                     if (!this.d) await this.refresh();
                     this._intervalId = setInterval(() => this.refresh(), 30000);

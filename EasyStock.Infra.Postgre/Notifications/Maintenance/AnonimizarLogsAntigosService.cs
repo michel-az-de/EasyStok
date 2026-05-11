@@ -92,6 +92,12 @@ public sealed class AnonimizarLogsAntigosService(
                 "Anonimização: {TotalOutbox} mensagens outbox e {TotalLogs} logs de envio anonimizados (>{Dias}d)",
                 totalOutbox, totalLogs, retencaoDias);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Shutdown limpo — propaga pro caller (ExecuteAsync) sem gravar heartbeat
+            // de erro enganoso.
+            throw;
+        }
         catch (Exception ex)
         {
             status = "Erro";
@@ -101,8 +107,11 @@ public sealed class AnonimizarLogsAntigosService(
         finally
         {
             sw.Stop();
-            await GravarHeartbeatAsync("AnonimizarLogs", status, detalhe,
-                totalAnonimizado, (int)sw.ElapsedMilliseconds, ct);
+            if (!ct.IsCancellationRequested)
+            {
+                await GravarHeartbeatAsync("AnonimizarLogs", status, detalhe,
+                    totalAnonimizado, (int)sw.ElapsedMilliseconds, ct);
+            }
         }
     }
 
