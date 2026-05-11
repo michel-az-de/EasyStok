@@ -243,7 +243,7 @@
                     </div>
                 }
 
-                <form asp-action="Login" asp-controller="Auth" method="post" x-ref="form" @@submit.prevent="handleSubmit($event)">
+                <form asp-action="Login" asp-controller="Auth" method="post" x-ref="form" @@submit.prevent="handleSubmit">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="returnUrl" value="@returnUrl" />
 
@@ -341,8 +341,8 @@
             </section>
         </div>
 
-        <!-- Overlay de transicao: aparece apos ~700ms quando a rede ta lenta.
-             Texto neutro porque nao temos confirmacao do servidor ainda. -->
+        <!-- Overlay aparece apos 800ms se a rede tardar. Texto neutro porque
+             nao temos confirmacao do servidor — nao prometer sucesso antes da hora. -->
         <div class="login-success-overlay" :class="successing ? 'login-success-overlay--show' : ''" x-cloak aria-hidden="true">
             <div class="login-success-spinner" aria-hidden="true"></div>
             <div class="login-success-text">
@@ -412,13 +412,12 @@
                 },
 
                 onPasswordKey(e) {
-                    // Detecta caps lock — funciona pra teclas alfabeticas
                     if (e.getModifierState) {
                         this.capsOn = e.getModifierState('CapsLock');
                     }
                 },
 
-                handleSubmit(e) {
+                handleSubmit() {
                     if (this.loading) return;
                     const form = this.$refs.form;
                     if (!form.checkValidity()) {
