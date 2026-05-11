@@ -1,0 +1,134 @@
+# Blueprint Render — EasyStock Worker (Background Worker)
+#
+# Este blueprint provisiona somente o Worker. Os services api / web / admin que ja
+# existem em https://dashboard.render.com seguem configurados via dashboard.
+# Quando quiser migrar tudo pra blueprint, basta adicionar `- type: web` blocos
+# aqui no mesmo arquivo.
+#
+# Passos pra criar pela primeira vez:
+#   1. New > Blueprint > apontar este repositorio + branch master
+#   2. Render le este YAML e cria "easystok-worker" como Background Worker
+#   3. Setar as env vars marcadas com `sync: false` no dashboard (segredos)
+#   4. Trigger deploy
+#
+# Atualizacoes seguintes: push em master => autoDeploy
+
+services:
+  - type: worker
+    name: easystok-worker
+    runtime: docker
+    # Plan standard: 1GB RAM / 1 CPU. ~US$ 25/mes (starter eh ~US$ 7/mes mas 512MB
+    # corre risco de OOM com 7 hosted services em picos). Pra subir staging primeiro,
+    # trocar pra "starter" e monitorar memoria; se passar de 400MB sob carga, vir pra standard.
+    plan: standard
+    region: oregon # alinhe com a regiao dos outros services (oregon | ohio | frankfurt | singapore)
+    branch: master
+    autoDeploy: true
+    rootDir: .
+    dockerfilePath: ./EasyStock.Worker/Dockerfile
+    dockerContext: .
+
+    envVars:
+      # ---------- Runtime ----------
+      - key: DOTNET_ENVIRONMENT
+        value: Production
+
+      # ---------- PostgreSQL ----------
+      # Connection string completa. Mesma usada pelo API (Azure PostgreSQL).
+      # Formato: Host=...;Port=5432;Database=...;Username=...;Password=...;SslMode=Require;Trust Server Certificate=true
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+
+      # 7 hosted services + dispatcher batch=50 + AnonimizarLogs concorrente.
+      # Pool=20 evita esgotamento sob carga; Azure PostgreSQL Standard B1ms aceita ~50 conns.
+      - key: Postgres__Pool__Max
+        value: "20"
+      - key: Postgres__Pool__Min
+        value: "0"
+
+      # ---------- Worker — comportamento ----------
+      # API eh quem roda migrations (Worker nao tem codigo de migration).
+      # Intervalo do SlaMonitorService. Min 60. Padrao 300 (5 min).
+      - key: Worker__SlaMonitorIntervalSeconds
+        value: "300"
+
+      # ---------- Notifications pipeline ----------
+      # Default ja eh Hosted+Postgres no codigo, mas explicito ajuda debug.
+      #
+      # PRODUCAO: depois que o Worker estabilizar, setar
+      # Notifications__Hosting__Mode=Disabled no env da API (no Render Dashboard
+      # do service da API) pra evitar duplo-processamento e dobrar DB load.
+      # Advisory lock por shard impede execucao paralela, mas o overhead de
+      # tentar adquirir lock em cada tick (4 shards x cada 10s) eh real.
+      - key: Notifications__Hosting__Mode
+        value: Hosted
+      - key: Notifications__Hosting__Signaler
+        value: Postgres
+      - key: Notifications__Hosting__ShardCount
+        value: "4"
+      - key: Notifications__Hosting__DispatcherBatchSize
+        value: "50"
+      - key: Notifications__Hosting__AvaliadorIntervalSeconds
+        value: "60"
+      - key: Notifications__Hosting__ColetorIntervalSeconds
+        value: "300"
+      - key: Notifications__Hosting__RetencaoLogsDias
+        value: "90"
+      - key: Notifications__Hosting__AnonimizarHoraUtc
+        value: "3"
+
+      # Providers de canais. "stub" = no-op (loga e ignora). Troque pra "twilio"
+      # / "zenvia" / "meta" e setar as credenciais correspondentes quando ativar.
+      - key: Notifications__Sms__Provider
+        value: stub
+      - key: Notifications__WhatsApp__Provider
+        value: stub
+
+      # ---------- SMTP (Email) ----------
+      # Se NAO setar a secao Smtp, Worker usa ConsoleEmailService (so loga).
+      # Pra ativar email real, setar TUDO abaixo. EnableSsl=true pra Office365/Gmail.
+      - key: Smtp__Host
+        sync: false
+      - key: Smtp__Port
+        sync: false
+      - key: Smtp__Username
+        sync: false
+      - key: Smtp__Password
+        sync: false
+      - key: Smtp__FromEmail
+        sync: false
+      - key: Smtp__FromName
+        value: EasyStock
+      - key: Smtp__EnableSsl
+        value: "true"
+
+      # ---------- Integration Outbox (F4.c) ----------
+      - key: Integration__Outbox__Enabled
+        value: "true"
+      - key: Integration__Outbox__PollingIntervalSeconds
+        value: "30"
+      - key: Integration__Outbox__BatchSize
+        value: "50"
+
+      # ---------- OpenTelemetry (opcional) ----------
+      # Setar OTEL_EXPORTER_OTLP_ENDPOINT pra ativar exporter OTLP.
+      # Exemplos:
+      #   Grafana Cloud OTLP:   https://otlp-gateway-prod-<region>.grafana.net/otlp
+      #   Honeycomb:            https://api.honeycomb.io
+      #   Datadog Agent local:  http://localhost:4317
+      # Sem endpoint, os Meters ficam in-memory (sem warning de export falho).
+      # OTEL_EXPORTER_OTLP_HEADERS deve conter o token (ex: "Authorization=Bearer xxx").
+      # OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf eh mais universal que gRPC default
+      # (gRPC pode esbarrar em firewall corporativo; http/protobuf passa em qualquer rede HTTPS).
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf
+      - key: OTEL_SERVICE_NAME
+        value: easystok-worker
+      # OTEL_RESOURCE_ATTRIBUTES: definir no Dashboard pra distinguir prod/staging.
+      # Formato: "deployment.environment=production,service.namespace=easystok"
+      - key: OTEL_RESOURCE_ATTRIBUTES
+        sync: false

@@ -138,9 +138,9 @@ builder.Services.AddSingleton(infraState);
 switch (resolvedProvider)
 {
     case "mongodb":
-        // MongoDB foi descontinuado como provedor transacional (B2 do plano de a��o).
+        // MongoDB foi descontinuado como provedor transacional (B2 do plano de ação).
         // Paridade incompleta com Postgres (sem Venda, ItemVenda, MovimentacaoEstoque,
-        // Caixa, Lote, Pedido) gerava risco de bug silencioso. Postgres � o �nico
+        // Caixa, Lote, Pedido) gerava risco de bug silencioso. Postgres é o único
         // provedor transacional suportado. Rever ADR 0001-mongo-discarded.
         throw new NotSupportedException(
             "MongoDB foi descontinuado como provedor transacional. " +
@@ -179,9 +179,13 @@ builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfigu
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EasyStockConfiguracoes>>().Value);
 
 // ── Notifications: infra (canal adapters + Scriban) + hosting (orchestrators/options) ──
-// Hosting fica como "Disabled" por default na API — ative trocando "Notifications:Hosting:Mode"
-// para "Hosted" se quiser rodar o pipeline in-process (modo sem Worker).
-// AddPostgresOutboxSignaler é no-op se Mode=Disabled ou Signaler!=Postgres (ver impl).
+// ATENCAO: o default de NotificationsHostingOptions.Mode eh "Hosted" (ver
+// NotificationsHostingOptions.cs:36). Logo a API roda o pipeline in-process por
+// padrao. Em producao com EasyStock.Worker no Render, setar
+// Notifications__Hosting__Mode=Disabled no env da API pra dedicar o pipeline
+// ao Worker e evitar duplo-processamento (advisory lock por shard impede dupla
+// execucao, mas dobra o overhead de tentativa de lock no DB).
+// AddPostgresOutboxSignaler eh no-op se Mode=Disabled ou Signaler!=Postgres.
 builder.Services.AddNotificationsInfra(builder.Configuration);
 builder.Services
     .AddNotificationsHosting(builder.Configuration)

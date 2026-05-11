@@ -16,3 +16,13 @@ EasyStock.*.Tests/
 EasyStock.ArchitectureTests/
 EasyStock.Benchmarks/
 **/Properties/launchSettings.json
+.claude/
+builds/
+casa-da-baba-mobile/
+*.log
+*.apk
+pull-resp.json
+swa-resp.html
+health.txt
+git_*.log
+.knowledge/

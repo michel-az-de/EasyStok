@@ -25,4 +25,7 @@ RUN dotnet publish "EasyStock.Worker.csproj" -c $BUILD_CONFIGURATION -o /app/pub
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+ENV DOTNET_ENVIRONMENT=Production \
+    DOTNET_PRINT_TELEMETRY_MESSAGE=false \
+    DOTNET_RUNNING_IN_CONTAINER=true
 ENTRYPOINT ["dotnet", "EasyStock.Worker.dll"]
