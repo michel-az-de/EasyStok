@@ -26,6 +26,7 @@ public static class NotificationsHostingServiceCollectionExtensions
         // Singleton sempre — custo zero quando Mode=Disabled (so guarda dictionary vazio) e simplifica
         // o registro pra hosts que so precisam do health check (API com pipeline em Worker separado).
         services.TryAddSingleton<INotificationsLoopHeartbeat, NotificationsLoopHeartbeat>();
+        services.TryAddSingleton(TimeProvider.System);
 
         // Retro-compat: se a seção legada "Worker" existir, copia chaves equivalentes.
         var legacyWorker = configuration.GetSection("Worker");

@@ -9,13 +9,20 @@ namespace EasyStock.Infra.Notifications.Hosting;
 /// Coletor) bateram heartbeat dentro de uma janela proporcional ao intervalo
 /// configurado de cada loop. Disabled quando <see cref="NotificationsHostingOptions.Mode"/>
 /// = <see cref="NotificationsHostingMode.Disabled"/> — retorna Healthy com motivo.
-/// Janela = 5x intervalo (3x do PR3 era apertado pra ciclos longos do orchestrator).
+/// Janela = 5x intervalo configurado, com floor de 60s pro dispatcher pra acomodar
+/// wakeup por signaler.
 /// </summary>
 public sealed class NotificationsHostingHealthCheck(
     IOptions<NotificationsHostingOptions> options,
-    INotificationsLoopHeartbeat heartbeat) : IHealthCheck
+    INotificationsLoopHeartbeat heartbeat,
+    TimeProvider time) : IHealthCheck
 {
     private static readonly TimeSpan DispatcherWindowFloor = TimeSpan.FromSeconds(60);
+
+    public NotificationsHostingHealthCheck(
+        IOptions<NotificationsHostingOptions> options,
+        INotificationsLoopHeartbeat heartbeat)
+        : this(options, heartbeat, TimeProvider.System) { }
 
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -25,7 +32,7 @@ public sealed class NotificationsHostingHealthCheck(
             return Task.FromResult(HealthCheckResult.Healthy(
                 "Notifications hosting disabled neste host (pipeline roda em outro processo)."));
 
-        var now = DateTimeOffset.UtcNow;
+        var now = time.GetUtcNow();
         var data = new Dictionary<string, object>(StringComparer.Ordinal);
         var problems = new List<string>();
 
