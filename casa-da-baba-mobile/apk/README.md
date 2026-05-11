@@ -9,30 +9,35 @@ fim).
 
 - ✅ Projeto Capacitor configurado (`package.json`, `capacitor.config.json`).
 - ✅ Platform Android adicionada (`android/` gerado).
-- ✅ Script de build automático em CI (GitHub Actions).
-- ⚠️  Build local no ambiente Windows corporativo (Avanade) falha com
-    `java.io.IOException: Unable to establish loopback connection` — é um
-    bloqueio de sockets Unix-domain do Windows feito por antivírus/firewall
-    corporativo. Não há solução via código; o build tem que rodar **em outra
-    máquina** ou em CI (GitHub Actions já configurado).
+- ✅ **Build via WSL funciona** na máquina Avanade — ver [BUILD-WSL.md](BUILD-WSL.md).
+- ⚠️  Build nativo Windows corporativo (Avanade) falha com
+    `java.io.IOException: Unable to establish loopback connection` — firewall
+    corporativo bloqueia sockets Unix-domain do Gradle. **Solução: WSL** (abaixo).
+- ⚠️  GitHub Actions suspenso por billing — não usar até destravar.
 
-## Três formas de gerar APK, em ordem de facilidade
+## Formas de gerar APK
 
-### 1) GitHub Actions (recomendado — não precisa instalar nada)
+### 1) WSL — Windows Subsystem for Linux (recomendado na máquina Avanade)
 
-O workflow `.github/workflows/build-casa-da-baba-apk.yml` roda sozinho em
-cada push que toca `casa-da-baba-mobile/apk/**` ou `EasyStock.Api/wwwroot/pwa/**`.
-Também pode ser disparado manualmente:
+**Ver guia completo: [BUILD-WSL.md](BUILD-WSL.md)**
 
-1. Push pra `master` ou `main`.
-2. Vá em **Actions** no GitHub → **Build Casa da Baba APK** → **Run workflow**.
-3. (Opcional) Informe `apiBaseUrl` se o APK vai apontar para um backend
-   remoto (ex.: `https://easystock.exemplo.com`). Vazio = mesmo host.
-4. Baixe o APK em **Artifacts** → `casa-da-baba-debug-apk`.
+Resumo rápido (depois do setup inicial):
+```powershell
+# No PowerShell, pasta apk/:
+node scripts/copy-web.js "https://easystok-api.onrender.com"
+wsl bash /mnt/c/rep/EasyStok/casa-da-baba-mobile/apk/build-wsl.sh
+# APK em: \\wsl$\Ubuntu\home\<user>\apk-build\android\app\build\outputs\apk\debug\app-debug.apk
+```
 
-Envie o APK pro celular (e-mail, USB, Telegram pra você mesmo) e instale.
+### 2) GitHub Actions (quando billing for destravado)
 
-### 2) Build local (Windows pessoal / Linux / Mac sem firewall corporativo)
+Workflow `.github/workflows/build-casadababa-release.yml` — disparo manual:
+1. **Actions** → **Build Casa da Baba APK (release + auto-pair)** → **Run workflow**.
+2. Informe `apiBaseUrl` (padrão: `https://easystok-api.onrender.com`).
+3. (Opcional) `pairingCode` de 6 dígitos do Admin → Dispositivos.
+4. Baixe o APK em **Artifacts**.
+
+### 3) Build local (máquina pessoal / Linux / Mac sem firewall corporativo)
 
 Requisitos:
 - **JDK 21** (ou 17; 21 recomendado)

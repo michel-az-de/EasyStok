@@ -47,7 +47,8 @@ public class MobileOrdersController(
             o.Id, o.ClientId, o.ClientSnapshotName, o.ClientSnapshotRef,
             o.Notes, o.Total, o.Status, o.CreatedAt, o.UpdatedAt,
             o.EmpresaId, o.LojaId, o.ErpPedidoId, o.ErpVendaId,
-            o.LastDeviceId, o.LastOperatorName
+            o.LastDeviceId, o.LastOperatorName,
+            o.ScheduledDeliveryAt
         )).ToArray());
     }
 
@@ -124,7 +125,9 @@ public class MobileOrdersController(
                 MobileOrderId: mobile.Id,
                 Itens: itens,
                 CriadoPorUserId: ResolveUserId(),
-                CriadoPorNome: mobile.LastOperatorName
+                CriadoPorNome: mobile.LastOperatorName,
+                // F5 — propaga agendamento do mobile pro ERP.
+                AgendadoParaEm: mobile.ScheduledDeliveryAt
             ));
             erpPedidoId = result.Id;
         }
@@ -284,7 +287,9 @@ public record MobileOrderSummary(
     Guid? ErpPedidoId,
     Guid? ErpVendaId,
     string? LastDeviceId,
-    string? LastOperatorName
+    string? LastOperatorName,
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    DateTime? ScheduledDeliveryAt = null
 );
 
 public record LinkPedidoRequest(Guid? ErpPedidoId);

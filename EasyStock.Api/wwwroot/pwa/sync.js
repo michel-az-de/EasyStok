@@ -198,8 +198,10 @@
       }
 
       const result = await resp.json().catch(() => ({}));
+      let acceptedCount = 0;
       if (result.acceptedIds && Array.isArray(result.acceptedIds)) {
         const accepted = new Set(result.acceptedIds);
+        acceptedCount = accepted.size;
         // Recarrega a fila do localStorage em vez de usar o snapshot inicial:
         // mutações enfileiradas DURANTE a fetch não são perdidas.
         const currentQueue = loadQueue();
@@ -207,6 +209,12 @@
         saveQueue(remaining);
       }
       // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
+      // F4 — feedback visual: avisa o app pra mostrar toast com qtd sincronizada.
+      if (acceptedCount > 0) {
+        try {
+          window.dispatchEvent(new CustomEvent('cdb-sync-success', { detail: { count: acceptedCount } }));
+        } catch (_) {}
+      }
 
       // Onda 5: trata conflicts. Server retorna rejected[] com reason
       // começando com "conflict:" quando outro device sincronizou primeiro.

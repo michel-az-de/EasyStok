@@ -53,7 +53,9 @@ public record OrderDto(
     System.Text.Json.JsonElement? History = null,
     string? ConfirmedBy = null,
     long? ConfirmedAt = null,
-    long? FactAt = null
+    long? FactAt = null,
+    // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
+    long? ScheduledDeliveryAt = null
 );
 
 public record BatchItemDto(

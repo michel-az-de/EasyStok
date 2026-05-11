@@ -245,6 +245,44 @@ body {
   box-shadow: 0 0 8px rgba(231, 104, 69, 0.45);
 }
 
+/* F4 — banner offline persistente. Aparece SOBRE o topbar quando navigator
+   .onLine===false. Felipe falou que não via nada se sync acontecia: agora
+   é gritante. Some sozinho ao voltar a rede. */
+#offlineBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: none;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, rgba(231, 104, 69, 0.96), rgba(231, 104, 69, 0.86));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  animation: offlineBannerSlideIn 0.25s ease-out;
+}
+#offlineBanner.show { display: block; }
+#offlineBanner .ob-emoji { margin-right: 6px; }
+#offlineBanner .ob-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  font-size: 12px;
+}
+@keyframes offlineBannerSlideIn {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #offlineBanner { animation: none; }
+}
+
 /* Content — padding-bottom inclui altura do nav + safe-area.
    Nav tem ~64px + 20px de padding vertical + safe-area. Deixar ~140px
    + safe-area garante que o último card sempre respira acima do nav. */
@@ -4525,6 +4563,89 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .retroactive-fields .hint { font-size: 11px; color: var(--ink-mute); margin-top: 6px; }
 
+/* F5 — Pedido agendado (data/hora futura). Mesma estrutura do retroativo,
+   cor azul pra distinguir (futuro vs passado). */
+.schedule-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-dim);
+  cursor: pointer; padding: 6px 10px;
+  border: 1px dashed var(--line); border-radius: 8px;
+  background: transparent; font-family: inherit;
+  margin-bottom: 12px; margin-left: 6px;
+}
+.schedule-toggle.active {
+  background: rgba(74, 144, 226, 0.10); color: #4a90e2;
+  border-color: rgba(74, 144, 226, 0.4); border-style: solid;
+}
+.schedule-fields {
+  display: none;
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px;
+  margin-bottom: 12px;
+}
+.schedule-fields.show { display: block; }
+.schedule-fields label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.schedule-fields input {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink); font-size: 14px;
+  font-family: inherit;
+}
+.schedule-fields .hint { font-size: 11px; color: var(--ink-mute); margin-top: 6px; }
+
+/* Badge azul de pedido agendado (cards de pedido + KDS). */
+.scheduled-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(74, 144, 226, 0.14); color: #4a90e2;
+  border: 1px solid rgba(74, 144, 226, 0.32);
+}
+.scheduled-badge.atrasado {
+  background: rgba(231, 104, 69, 0.14); color: var(--accent);
+  border-color: rgba(231, 104, 69, 0.4);
+}
+
+/* F6 — Resumo de demanda na tela Producao. Agrega items dos pedidos abertos
+   pra que o operador veja quanto precisa produzir sem entrar em cada pedido. */
+.prod-demand {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+.prod-demand .pd-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.prod-demand .pd-title {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+}
+.prod-demand .pd-count {
+  font-size: 11px; color: var(--ink-mute);
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+}
+.prod-demand .pd-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.prod-demand .pd-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: 8px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  color: var(--ink); cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.12s ease;
+}
+.prod-demand .pd-chip:active { transform: scale(0.96); }
+.prod-demand .pd-chip:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.prod-demand .pd-chip .pd-qty {
+  font-weight: 800; color: var(--accent);
+  margin-right: 2px;
+}
+.prod-demand .pd-chip .pd-emoji { font-size: 13px; }
+
 /* ========== Print: etiqueta 58mm térmica ========== */
 .print-area {
   display: none;
@@ -6781,6 +6902,14 @@ body.ux-calm [data-screen="producao"] .section-label {
 </head>
 <body>
 
+<!-- F4 — banner offline. Mostrado por updateSync() quando navigator.onLine===false.
+     Posição fixed top, sobrepõe o topbar. Some sozinho ao voltar a rede. -->
+<div id="offlineBanner" role="status" aria-live="polite">
+  <span class="ob-emoji">📡</span>
+  <span>Sem conexão — operando localmente</span>
+  <span class="ob-count" id="offlineBannerCount" hidden>0 na fila</span>
+</div>
+
 <!-- Splash animation: visivel ate o JS rodar e remover a classe no DOMContentLoaded
      + ~600ms de animacao suave. Logo Casa da Baba (gold) num fundo gradiente
      escuro/claro que alinha com o tema. NAO depende de plugin nativo nem de
@@ -6996,6 +7125,16 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button type="button" data-pcat="molho" onclick="setProductionCategory('molho')">Molhos</button>
         <button type="button" data-pcat="extra" onclick="setProductionCategory('extra')">Extras</button>
       </div>
+      <!-- F6 — Resumo de demanda em tempo real. Agrega items de pedidos abertos
+           (aguardando + preparando) pra mostrar quanto produzir. Atualiza via SSE
+           quando outro device sincroniza. Tocar num produto pré-seleciona quantidade. -->
+      <div class="prod-demand" id="prodDemand" hidden>
+        <div class="pd-head">
+          <span class="pd-title">📋 Demanda dos pedidos abertos</span>
+          <span class="pd-count" id="prodDemandCount">0 pedidos</span>
+        </div>
+        <div class="pd-chips" id="prodDemandChips"></div>
+      </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
           <span class="ps-kicker">Selecionado</span>
@@ -7080,10 +7219,18 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
           🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
         </button>
+        <button class="schedule-toggle" id="scheduleToggle" onclick="toggleAgendamento()">
+          📅 <span id="scheduleToggleLabel">Agendar para depois? (entrega futura)</span>
+        </button>
         <div class="retroactive-fields" id="retroFields">
           <label>Quando aconteceu?</label>
           <input type="datetime-local" id="retroDatetime" />
           <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
+        </div>
+        <div class="schedule-fields" id="scheduleFields">
+          <label>Entregar em</label>
+          <input type="datetime-local" id="scheduleDatetime" />
+          <div class="hint">Pedido entra na esteira como <b>aguardando</b>; aparece com badge <b>📅</b> e ordenado pela data agendada.</div>
         </div>
 
         <div class="cta-row">
@@ -9511,8 +9658,22 @@ function syncNow() {
 function updateSync() {
   const chip = document.getElementById('syncChip');
   const txt = document.getElementById('syncText');
+  const banner = document.getElementById('offlineBanner');
+  const bannerCount = document.getElementById('offlineBannerCount');
   const offline = navigator.onLine === false;
   if (chip) chip.classList.toggle('offline', offline);
+  // F4 — banner offline visivel quando sem rede; some sozinho ao voltar.
+  if (banner) {
+    banner.classList.toggle('show', offline);
+    if (bannerCount) {
+      if (offline && pendingSync > 0) {
+        bannerCount.textContent = pendingSync + (pendingSync === 1 ? ' na fila' : ' na fila');
+        bannerCount.hidden = false;
+      } else {
+        bannerCount.hidden = true;
+      }
+    }
+  }
   if (offline) {
     chip.classList.add('pending');
     txt.textContent = pendingSync > 0
@@ -9535,6 +9696,17 @@ function updateSync() {
 window.addEventListener('online', updateSync);
 window.addEventListener('offline', updateSync);
 
+// F4 — feedback visual proativo de sync. sync.js dispara cdb-sync-success
+// com {count} sempre que mutações foram aceitas pelo servidor.
+// Felipe não via NADA quando o app sincronizava — agora vê toast claro.
+window.addEventListener('cdb-sync-success', function (ev) {
+  const n = (ev.detail && ev.detail.count) || 0;
+  if (n <= 0) return;
+  pendingSync = Math.max(0, pendingSync - n);
+  updateSync();
+  showToast('✓ ' + n + (n === 1 ? ' item sincronizado' : ' itens sincronizados'));
+});
+
 // =========================
 // UTILS
 // =========================
@@ -9556,6 +9728,29 @@ function isToday(ts) {
   const d = new Date(ts);
   const now = new Date();
   return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+// F5 — Badge "📅 ter 14:00" pra pedidos agendados. Vermelho/atrasado se a data
+// agendada já passou e o pedido continua aberto. Usa Intl pra formato pt-BR
+// curto (3 letras do dia da semana minusculas).
+function renderScheduledBadge(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const isLate = ms < Date.now();
+  const today = isToday(ms);
+  // Formato: "hoje 14:00" se hoje, senão "ter 14:00"
+  const horario = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  let label;
+  if (today) {
+    label = 'hoje ' + horario;
+  } else {
+    const dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    const dia = d.getDate() + ' ' + dias[d.getDay()];
+    label = dia + ' ' + horario;
+  }
+  const cls = isLate ? 'scheduled-badge atrasado' : 'scheduled-badge';
+  const titulo = isLate ? 'Atrasado: agendado para ' : 'Agendado: ';
+  return `<span class="${cls}" title="${titulo}${d.toLocaleString('pt-BR')}">📅 ${label}</span>`;
 }
 
 // =========================
@@ -10958,6 +11153,63 @@ function setProductionCategory(cat) {
   });
   renderProductGrid();
 }
+
+// F6 — Resumo de demanda dos pedidos abertos. Agrega items por productId e
+// renderiza chips clicáveis. Tap pré-popula a quantidade do produto no grid
+// (operador só revisa e toca "Registrar produção"). Update em tempo real via
+// SSE: outro device sincroniza → cdb-mutations-applied → re-render.
+function aggregateProductionDemand() {
+  const open = orders.filter(o => o.status === 'aguardando' || o.status === 'preparando');
+  const byProduct = new Map();
+  open.forEach(o => {
+    (o.items || []).forEach(i => {
+      const key = i.productId || ('adhoc:' + (i.name || ''));
+      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', qty: 0 };
+      prev.qty += Number(i.qty) || 0;
+      byProduct.set(key, prev);
+    });
+  });
+  return { items: Array.from(byProduct.values()).sort((a,b) => b.qty - a.qty), pedidos: open.length };
+}
+
+function renderProductionDemand() {
+  const wrap = document.getElementById('prodDemand');
+  if (!wrap) return;
+  const { items, pedidos } = aggregateProductionDemand();
+  if (pedidos === 0 || items.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  document.getElementById('prodDemandCount').textContent =
+    pedidos + (pedidos === 1 ? ' pedido' : ' pedidos');
+  document.getElementById('prodDemandChips').innerHTML = items.map(i => {
+    // Só permite tap se o produto existe no catálogo (productId resolve)
+    const inCatalog = i.productId && products.some(p => p.id === i.productId);
+    const dataAttr = inCatalog ? `data-pid="${escapeHtml(i.productId)}" data-qty="${i.qty}"` : 'aria-disabled="true"';
+    const onclick = inCatalog ? `onclick="prefillFromDemand('${i.productId}', ${i.qty})"` : '';
+    const emoji = i.emoji ? `<span class="pd-emoji">${escapeHtml(i.emoji)}</span>` : '';
+    const title = inCatalog ? `Tocar pra pré-selecionar ${i.qty} no catálogo` : 'Item não está no catálogo de produção';
+    return `<button type="button" class="pd-chip" ${dataAttr} ${onclick} title="${title}" style="${inCatalog ? '' : 'opacity:0.5;cursor:default'}">
+      <span class="pd-qty">${i.qty}×</span>${emoji}<span>${escapeHtml(i.name)}</span>
+    </button>`;
+  }).join('');
+}
+
+function prefillFromDemand(productId, qty) {
+  const p = products.find(x => x.id === productId);
+  if (!p) { showToast('Produto não está no catálogo'); return; }
+  p.count = Math.max(p.count || 0, Number(qty) || 0);
+  renderProductGrid();
+  haptic();
+  showToast(`✓ Pré-selecionado ${p.count}× ${p.name}`);
+}
+
+// Re-render quando o sync trouxer mutations de outros devices.
+window.addEventListener('cdb-mutations-applied', function () {
+  // Só faz sentido se a tela Producao está visível.
+  if (document.querySelector('[data-screen="producao"].active')) renderProductionDemand();
+});
 
 function attachTileHandlers(tile, p) {
   // Tap curto: +1. Press 500ms: prompt de qty exata. Press 1500ms: abre
@@ -12581,10 +12833,13 @@ function renderKanban() {
     return;
   }
 
-  // Por coluna, ordenar por createdAt asc (mais antigo primeiro — fila natural)
+  // Por coluna, ordenar por scheduledDeliveryAt (se houver) ou createdAt asc.
+  // F5 — pedidos agendados aparecem na ordem da entrega, não da criação.
   const byStatus = { aguardando: [], preparando: [], pronto: [] };
   openItems.forEach(o => { byStatus[o.status].push(o); });
-  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) => a.createdAt - b.createdAt));
+  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) =>
+    (a.scheduledDeliveryAt || a.createdAt) - (b.scheduledDeliveryAt || b.createdAt)
+  ));
 
   const overview = `
     <div class="kanban-overview" aria-label="Resumo da esteira">
@@ -12636,6 +12891,7 @@ function renderKanbanCard(o, col) {
       <div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
+        ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
       ${notes}
@@ -14461,6 +14717,39 @@ function toggleRetroactive() {
 function resetRetroToggle() { setRetroActive(false); }
 
 // ================================================================
+// F5 — AGENDAMENTO (data/hora futura) — espelho do retroativo
+// ================================================================
+const SCHED_LABEL_OFF = '📅 Agendar para depois? (entrega futura)';
+const SCHED_LABEL_ON  = '📅 Agendamento ATIVO — clique para desativar';
+
+function setAgendaActive(active) {
+  const fields = document.getElementById('scheduleFields');
+  const toggle = document.getElementById('scheduleToggle');
+  const label  = document.getElementById('scheduleToggleLabel');
+  if (!fields || !toggle) return;
+  fields.classList.toggle('show', active);
+  toggle.classList.toggle('active', active);
+  if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
+  if (active) {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt && !dt.value) {
+      // default 1h adiante pra forçar operador a confirmar quando
+      const future = new Date(Date.now() + 60*60*1000);
+      const off = future.getTimezoneOffset() * 60000;
+      dt.value = new Date(future - off).toISOString().slice(0,16);
+    }
+  } else {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt) dt.value = '';
+  }
+}
+function toggleAgendamento() {
+  const fields = document.getElementById('scheduleFields');
+  setAgendaActive(fields ? !fields.classList.contains('show') : true);
+}
+function resetAgendaToggle() { setAgendaActive(false); }
+
+// ================================================================
 // CONFERÊNCIA — antes de marcar entregue, abre modal de revisão
 // ================================================================
 // CONFERÊNCIA — modal de 3 blocos (identificação / itens / decisão)
@@ -15435,6 +15724,7 @@ function goProducaoTab(tab) {
   document.querySelectorAll('#producaoTabs .screen-tab').forEach(b => b.classList.toggle('active', b.dataset.ptab === producaoTab));
   document.querySelectorAll('[data-screen="producao"] .producao-tab-section').forEach(s => s.classList.toggle('active', s.dataset.ptab === producaoTab));
   if (producaoTab === 'lotes') renderProducaoBatches();
+  if (producaoTab === 'catalogo') renderProductionDemand(); // F6
 }
 function setBatchFilter(next) {
   batchFilter = next || 'open';
@@ -17663,6 +17953,24 @@ function saveOrder() {
     retroAtMs = t;
   }
 
+  // F5 — Agendamento: data/hora FUTURA. Pedido entra como 'aguardando' normal,
+  // mas com scheduledDeliveryAt preenchido — UI ordena/badge no card e KDS.
+  // Mutuamente exclusivo com retroativo (faz sentido um OU outro).
+  const scheduleFields = document.getElementById('scheduleFields');
+  const isScheduled = scheduleFields && scheduleFields.classList.contains('show');
+  let scheduledAtMs = null;
+  if (isScheduled && isRetro) {
+    showToast('Não dá pra agendar e cadastrar retroativo ao mesmo tempo'); return;
+  }
+  if (isScheduled) {
+    const dtRaw = (document.getElementById('scheduleDatetime')?.value || '').trim();
+    if (!dtRaw) { showToast('Data de entrega em branco'); return; }
+    const t = new Date(dtRaw).getTime();
+    if (!isFinite(t) || isNaN(t)) { showToast('Data de entrega inválida'); return; }
+    if (t <= Date.now()) { showToast('Data agendada precisa ser no futuro'); return; }
+    scheduledAtMs = t;
+  }
+
   const nowMs = Date.now();
   const order = {
     id: 'o-' + nowMs,
@@ -17677,6 +17985,7 @@ function saveOrder() {
     lastOperatorName: operatorName || null,
     history: [],
     factAt: retroAtMs || null,
+    scheduledDeliveryAt: scheduledAtMs || null,
     confirmedBy: retroAtMs ? (operatorName || null) : null,
     confirmedAt: retroAtMs ? nowMs : null
   };
@@ -17704,6 +18013,7 @@ function saveOrder() {
   });
 
   if (isRetro) resetRetroToggle();
+  if (isScheduled) resetAgendaToggle();
 
   currentOrderItems = [];
   document.getElementById('orderNotes').value = '';
@@ -19150,12 +19460,15 @@ document.addEventListener('DOMContentLoaded', function () {
       grid.innerHTML = '<div class="kds-empty">Sem pedidos no momento.</div>';
       return;
     }
-    // Ordena: prontos no fim; ativos por idade asc (mais antigo primeiro).
+    // Ordena: prontos no fim; ativos por hora agendada (se houver) ou idade.
+    // F5 — pedidos agendados aparecem na ordem da entrega prometida.
     const ordered = kdsPedidos.slice().sort((a, b) => {
       const ap = a.status === 'pronto' ? 1 : 0;
       const bp = b.status === 'pronto' ? 1 : 0;
       if (ap !== bp) return ap - bp;
-      return a.criadoEm - b.criadoEm;
+      const aTime = a.scheduledDeliveryAt || a.criadoEm;
+      const bTime = b.scheduledDeliveryAt || b.criadoEm;
+      return aTime - bTime;
     });
     grid.innerHTML = ordered.map(renderCard).join('');
   }
@@ -19173,6 +19486,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '</li>'
     ).join('');
     const notes = p.notes ? '<div class="kds-card-notes">⚠️ ' + escapeHtmlKds(p.notes) + '</div>' : '';
+    const scheduled = p.scheduledDeliveryAt ? renderScheduledBadge(p.scheduledDeliveryAt) : '';
     const cliente = escapeHtmlKds(p.clienteNome || 'Pedido balcão');
     const ref = p.clienteRef ? '<div class="kds-card-ref">' + escapeHtmlKds(p.clienteRef) + '</div>' : '';
     const bumping = kdsBumping.has(p.id);
@@ -19195,6 +19509,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="kds-card-timer" data-criado="' + p.criadoEm + '">' + fmtAge(p.criadoEm) + '</div>' +
         '</div>' +
         '<ul class="kds-card-itens">' + itensHtml + '</ul>' +
+        (scheduled ? '<div style="margin: 6px 0;">' + scheduled + '</div>' : '') +
         notes +
         '<div class="kds-card-actions">' +
           '<button class="' + acaoCls + '" ' + dis + ' onclick="bumpKdsPedido(\'' + escapeHtmlKds(p.id) + '\', \'' + proximoStatus + '\')">' +

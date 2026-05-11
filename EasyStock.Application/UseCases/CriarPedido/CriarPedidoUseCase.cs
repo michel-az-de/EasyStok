@@ -30,7 +30,9 @@ public sealed record CriarPedidoCommand(
     [property: MaxLength(64)] string? MobileOrderId = null,
     IReadOnlyList<CriarPedidoItemInput>? Itens = null,
     Guid? CriadoPorUserId = null,
-    [property: MaxLength(120)] string? CriadoPorNome = null);
+    [property: MaxLength(120)] string? CriadoPorNome = null,
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    DateTime? AgendadoParaEm = null);
 
 /// <summary>
 /// Cria um novo pedido (encomenda) — Onda P2. Se <see cref="ClienteId"/>
@@ -85,6 +87,7 @@ public class CriarPedidoUseCase(
         }
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
+        pedido.AgendadoParaEm = cmd.AgendadoParaEm;
 
         // Adiciona itens.
         if (cmd.Itens != null)

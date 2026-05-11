@@ -291,6 +291,9 @@ public class SyncController(
         var factAt = dto.FactAt.HasValue
             ? DateTimeOffset.FromUnixTimeMilliseconds(dto.FactAt.Value).UtcDateTime
             : (DateTime?)null;
+        var scheduledDeliveryAt = dto.ScheduledDeliveryAt.HasValue
+            ? DateTimeOffset.FromUnixTimeMilliseconds(dto.ScheduledDeliveryAt.Value).UtcDateTime
+            : (DateTime?)null;
 
         if (existing == null)
         {
@@ -311,6 +314,7 @@ public class SyncController(
                 ConfirmedBy = dto.ConfirmedBy,
                 ConfirmedAt = confirmedAt,
                 FactAt = factAt,
+                ScheduledDeliveryAt = scheduledDeliveryAt,
                 EmpresaId = empresaId,
                 LojaId = lojaId
             };
@@ -349,6 +353,7 @@ public class SyncController(
             if (dto.ConfirmedBy is not null) existing.ConfirmedBy = dto.ConfirmedBy;
             if (confirmedAt.HasValue) existing.ConfirmedAt = confirmedAt;
             if (factAt.HasValue) existing.FactAt = factAt;
+            if (dto.ScheduledDeliveryAt.HasValue) existing.ScheduledDeliveryAt = scheduledDeliveryAt;
             // Substitui os itens (simplificação — em produção, faça diff item-a-item).
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)

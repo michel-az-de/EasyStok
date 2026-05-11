@@ -72,6 +72,14 @@ public class Order
     [Column("fact_at")]
     public DateTime? FactAt { get; set; }
 
+    /// <summary>
+    /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
+    /// Pedidos agendados aparecem ordenados por esta data e ganham badge no PWA/KDS.
+    /// MVP: sem alertas/recorrência — só ordenação visual.
+    /// </summary>
+    [Column("scheduled_delivery_at")]
+    public DateTime? ScheduledDeliveryAt { get; set; }
+
     /// <summary>Multi-tenant (Onda 1). Resolvido via device autenticado.</summary>
     [Column("empresa_id")]
     public Guid? EmpresaId { get; set; }

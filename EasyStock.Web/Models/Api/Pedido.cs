@@ -69,4 +69,10 @@ public record MobilePedidoSummary
     public string? LastDeviceId { get; init; }
     public string? LastOperatorName { get; init; }
     public bool Linked => ErpPedidoId.HasValue && ErpPedidoId.Value != Guid.Empty;
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    public DateTime? ScheduledDeliveryAt { get; init; }
+    public bool IsScheduled => ScheduledDeliveryAt.HasValue;
+    public bool IsAtrasado => ScheduledDeliveryAt.HasValue
+        && ScheduledDeliveryAt.Value < DateTime.UtcNow
+        && Status != "entregue" && Status != "cancelado";
 }

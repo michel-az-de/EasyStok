@@ -136,6 +136,10 @@ public class KdsController(
         Total: o.Total,
         CriadoEm: new DateTimeOffset(o.CreatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds(),
         AtualizadoEm: new DateTimeOffset(o.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds(),
+        // F5 — campo de agendamento (long? unix ms). PWA usa pra ordenar/badge.
+        ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
+            ? new DateTimeOffset(DateTime.SpecifyKind(o.ScheduledDeliveryAt.Value, DateTimeKind.Utc), TimeSpan.Zero).ToUnixTimeMilliseconds()
+            : (long?)null,
         Itens: o.Items.Select(i => new KdsOrderItemDto(
             ProdutoId: i.ProductId,
             Nome: i.Name,
@@ -157,7 +161,9 @@ public record KdsOrderDto(
     decimal Total,
     long CriadoEm,
     long AtualizadoEm,
-    KdsOrderItemDto[] Itens
+    KdsOrderItemDto[] Itens,
+    // F5 — agendamento (MVP). NULL = sem agendamento (caso padrão).
+    long? ScheduledDeliveryAt = null
 );
 
 public record KdsOrderItemDto(
