@@ -74,6 +74,8 @@
     <script src="~/js/form-modal.js" asp-append-version="true"></script>
     <script src="~/js/bulk.js" asp-append-version="true"></script>
     <script src="~/js/notifications.js" asp-append-version="true"></script>
+    <script src="~/js/command-palette.js" asp-append-version="true"></script>
+    <script src="~/js/row-nav.js" asp-append-version="true"></script>
     <script>
         // Topbar scroll state binding (depende de .app-main e .app-topbar no DOM).
         (function () {
@@ -93,5 +95,6 @@
     </script>
     @RenderSection("Scripts", required: false)
     <partial name="_ConfirmModal" />
+    <partial name="_CommandPalette" />
 </body>
 </html>

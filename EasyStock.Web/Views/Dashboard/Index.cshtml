@@ -139,7 +139,8 @@
                         @foreach (var m in Model.MovimentacoesRecentes)
                         {
                             var tipoParam = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
-                            <tr class="cursor-pointer hover:bg-slate-50" onclick="location.href='/analytics/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam'">
+                            <tr class="cursor-pointer hover:bg-slate-50"
+                                data-row-href="/analytics/movimentacoes?data=@m.Data.ToString("yyyy-MM-dd")&tipo=@tipoParam">
                                 <td>
                                     @{
                                         var badgeClass = m.Tipo switch
