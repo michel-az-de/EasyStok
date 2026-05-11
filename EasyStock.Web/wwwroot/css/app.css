@@ -3012,27 +3012,6 @@ html.theme-dark .ped-tab--active {
     position: relative;
 }
 
-.ped-combobox__clear {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: 6px;
-    background: rgba(226, 232, 240, .8);
-    color: var(--text-secondary, #64748b);
-    cursor: pointer;
-    font-size: 12px;
-    line-height: 1;
-}
-
-.ped-combobox__clear:hover {
-    background: rgba(203, 213, 225, .9);
-    color: var(--text-primary, #0f172a);
-}
-
 .ped-combobox__list {
     position: absolute;
     z-index: 10;
@@ -3071,20 +3050,6 @@ html.theme-dark .ped-combobox__list {
 html.theme-dark .ped-combobox__option--active,
 html.theme-dark .ped-combobox__option:hover {
     background: rgba(30, 72, 168, .25);
-}
-
-.ped-combobox__empty {
-    padding: 12px;
-    text-align: center;
-    font-size: 13px;
-    color: var(--text-secondary, #64748b);
-    background: rgba(248, 250, 252, .6);
-    border-radius: 10px;
-    margin-top: 6px;
-}
-
-html.theme-dark .ped-combobox__empty {
-    background: rgba(15, 23, 42, .6);
 }
 
 /* Itens */
