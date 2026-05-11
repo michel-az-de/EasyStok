@@ -1336,6 +1336,33 @@
   // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
   setTimeout(pingVersion, 700);
 
+  // Auto-pair on first boot via codigo embutido no APK (build customizado).
+  // No PWA padrao window.CDB_CONFIG.forcedPairingCode e undefined — bloco
+  // vira no-op. So o workflow build-casadababa-release.yml injeta o codigo
+  // em config.js no momento do build, e apenas no APK. Producao nao muda.
+  // Idempotente: se cdb-pairing ja existe (ex: APK que foi atualizado por
+  // cima de instalacao previamente pareada), pula.
+  setTimeout(async function autoPairFromForcedCode() {
+    try {
+      if (loadPairing()) return;
+      const cfg = window.CDB_CONFIG || {};
+      const code = cfg.forcedPairingCode;
+      if (!code) return;
+      if (!navigator.onLine) {
+        // Sem rede agora — tenta de novo daqui a 30s. Codigo expira em poucos
+        // minutos no server, mas vale insistir caso o WiFi do dispositivo so
+        // levantou apos o boot.
+        setTimeout(autoPairFromForcedCode, 30 * 1000);
+        return;
+      }
+      try { console.log('[auto-pair] tentando parear com codigo embutido (length=' + String(code).length + ')'); } catch (_) {}
+      await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
+      try { console.log('[auto-pair] pareado com sucesso'); } catch (_) {}
+    } catch (e) {
+      try { console.warn('[auto-pair] falhou:', e && e.message); } catch (_) {}
+    }
+  }, 2000);
+
   // Expõe utilitários pra debug + integração com Diagnóstico
   window.cdbSync = {
     flush, pull, stop,
