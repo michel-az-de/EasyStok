@@ -839,3 +839,23 @@
         to { transform: translateY(0); }
     }
 }
+
+/* ============================================================
+   Tier 1 — Refinos especificos pra viewports estreitas (≤480px)
+   ============================================================ */
+@media (max-width: 480px) {
+    /* Bottom nav padding excessivo em iPhone notched. Reduz buffer de
+       16px para 4px, mantendo o safe-area-inset. Ganho ~12px do espaco
+       util (~10% da viewport vertical em telas pequenas). */
+    .app-main {
+        padding-bottom: calc(var(--bottom-nav-h, 74.8px) + env(safe-area-inset-bottom) + 4px) !important;
+    }
+
+    /* Headers com h1 + status pill (Caixa) quebram com pill desalinhada
+       a direita em 375px. Stack vertical preserva legibilidade. */
+    .pg-hd h1.flex {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+    }
+}
