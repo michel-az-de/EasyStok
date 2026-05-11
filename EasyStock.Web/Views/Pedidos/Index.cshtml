@@ -465,7 +465,12 @@
                                            @@focus="it.dropdownOpen = true"
                                            @@blur="setTimeout(() => it.dropdownOpen = false, 150)"
                                            placeholder="Buscar produto pelo nome…"
-                                           class="ui-field text-sm w-full" />
+                                           :class="(it.busca || '').trim().length > 0 ? 'ui-field text-sm w-full ped-prod-input--pendente' : 'ui-field text-sm w-full'" />
+                                    <!-- Aviso quando há texto mas item não foi consolidado -->
+                                    <div x-show="!it.produtoId && !it.novoCadastro && (it.busca || '').trim().length > 0 && !it.dropdownOpen"
+                                         x-cloak class="ped-prod-pendente-hint">
+                                        ↑ selecione um resultado ou clique em "+ Cadastrar como novo produto"
+                                    </div>
                                     <!-- Nome consolidado (após selecionar/cadastrar) -->
                                     <div x-show="it.produtoId || it.novoCadastro" x-cloak
                                          class="ped-prod-consolidated">
@@ -704,11 +709,17 @@ function novoPedidoModal() {
             window.addEventListener('open-modal', (e) => {
                 if (e.detail !== 'novo-pedido') return;
                 this._previousFocus = document.activeElement;
+                // Reset completo: estado das fases + form. Antes restavam cliente/itens
+                // da sessao anterior quando o operador fechava (X) e abria de novo.
                 this.fase = 'editando';
                 this.etapas = [];
                 this.avisos = [];
                 this.pedidoCriado = null;
                 this.erroMsg = '';
+                this.limparCliente();
+                this.form.observacoes = '';
+                this.form.itens = [];
+                this.form.modo = 'auto';
                 this.open = true;
                 this.$nextTick(() => {
                     const el = this.$refs.panel.querySelector('input, select, textarea');

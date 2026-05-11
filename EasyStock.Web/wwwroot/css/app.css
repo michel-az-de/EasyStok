@@ -3258,12 +3258,20 @@ html.theme-dark .ped-prod-badge--ok {
     overflow-y: auto;
 }
 
+/* Opcao de cadastrar produto novo: sticky no fundo do dropdown pra nunca
+   sumir abaixo do fold quando ha muitos resultados de busca. */
 .ped-prod-dropdown__create {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-elevated, #ffffff);
     border-top: 1px solid rgba(226, 232, 240, .9);
+    box-shadow: 0 -4px 8px -4px rgba(15, 23, 42, .12);
 }
 
 html.theme-dark .ped-prod-dropdown__create {
+    background: rgba(15, 23, 42, .98);
     border-top-color: rgba(71, 85, 105, .6);
+    box-shadow: 0 -4px 8px -4px rgba(0, 0, 0, .4);
 }
 
 .ped-prod-dropdown__create-title {
@@ -3273,6 +3281,29 @@ html.theme-dark .ped-prod-dropdown__create {
 
 html.theme-dark .ped-prod-dropdown__create-title {
     color: #93c5fd;
+}
+
+/* Input em estado "pendente" (digitou mas nao selecionou/cadastrou):
+   borda amarela pra avisar que o item ainda nao esta consolidado. */
+.ped-prod-input--pendente {
+    border-color: rgba(245, 158, 11, .7) !important;
+    background: rgba(254, 243, 199, .25) !important;
+}
+
+html.theme-dark .ped-prod-input--pendente {
+    border-color: rgba(217, 119, 6, .65) !important;
+    background: rgba(120, 53, 15, .25) !important;
+}
+
+.ped-prod-pendente-hint {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #b45309;
+    font-weight: 500;
+}
+
+html.theme-dark .ped-prod-pendente-hint {
+    color: #fbbf24;
 }
 
 /* Bloco de cadastro inline (categoria + custo) */
