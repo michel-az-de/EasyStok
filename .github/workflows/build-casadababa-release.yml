@@ -1,0 +1,147 @@
+name: Build Casa da Baba APK (release + auto-pair)
+
+# Build manual dedicado pro APK Casa da Baba com:
+#   - assinatura release usando ANDROID_KEYSTORE_* (preserva localStorage em
+#     updates por cima de instalacao anterior assinada com a mesma chave)
+#   - codigo de pareamento embutido em window.CDB_CONFIG.forcedPairingCode
+#     (consumido pelo bloco auto-pair em sync.js no primeiro boot)
+#
+# NAO afeta a producao: a injecao de forcedPairingCode acontece SO no APK
+# (em casa-da-baba-mobile/apk/web/config.js), nao na PWA servida pelo Web.
+#
+# Pre-requisitos no repositorio (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_B64    base64 da .jks gerada via keytool
+#   ANDROID_KEYSTORE_PASS   senha do keystore
+#   ANDROID_KEY_ALIAS       alias da chave
+#   ANDROID_KEY_PASS        senha da chave
+#
+# Como gerar codigo de pareamento:
+#   1. Abre EasyStock Admin (https://easystok-admin.onrender.com) > Dispositivos
+#   2. Clica "Gerar codigo de pareamento" para a loja Casa da Baba
+#   3. Copia os 6 digitos
+#   4. Dispara este workflow imediatamente (codigo expira em poucos minutos)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pairingCode:
+        description: 'OPCIONAL: codigo de 6 digitos do Admin > Dispositivos. Se vazio, app abre na tela de pareamento e voce digita la.'
+        required: false
+        default: ''
+      apiBaseUrl:
+        description: 'URL da API EasyStok'
+        required: false
+        default: 'https://easystok-api.onrender.com'
+      appLabel:
+        description: 'Label que aparece no Admin > Dispositivos'
+        required: false
+        default: 'Casa da Baba (auto-pair)'
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 platforms;android-35 build-tools;34.0.0 platform-tools'
+
+      - name: Mask pairing code in logs
+        if: ${{ inputs.pairingCode != '' }}
+        run: |
+          echo "::add-mask::${{ inputs.pairingCode }}"
+
+      - name: Install Capacitor deps
+        working-directory: casa-da-baba-mobile/apk
+        run: npm install --no-audit --no-fund
+
+      - name: Copy PWA + inject API URL + forced pairing code
+        working-directory: casa-da-baba-mobile/apk
+        env:
+          PAIRING_CODE: ${{ inputs.pairingCode }}
+          PAIRING_LABEL: ${{ inputs.appLabel }}
+        run: node scripts/copy-web.js "${{ inputs.apiBaseUrl }}"
+
+      - name: Capacitor sync
+        working-directory: casa-da-baba-mobile/apk
+        run: npx cap sync android
+
+      - name: Validate keystore secrets present
+        run: |
+          set +x
+          missing=0
+          for var in ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASS ANDROID_KEY_ALIAS ANDROID_KEY_PASS; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Secret obrigatorio ausente: $var"
+              missing=1
+            fi
+          done
+          exit $missing
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          set +x
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        working-directory: casa-da-baba-mobile/apk/android
+        env:
+          BUILD_VERSION_CODE: ${{ github.run_number }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: |
+          set +x
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASS" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASS"
+
+      - name: Verify APK signature
+        run: |
+          set +x
+          APK="casa-da-baba-mobile/apk/android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK nao gerado em $APK"
+            exit 1
+          fi
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs "$APK" > /tmp/apk-certs.txt
+          head -20 /tmp/apk-certs.txt
+
+      - name: Stage APK with descriptive name
+        run: |
+          mkdir -p out
+          SHORT=$(echo "${{ github.sha }}" | cut -c1-8)
+          cp casa-da-baba-mobile/apk/android/app/build/outputs/apk/release/app-release.apk \
+             "out/casadababa-${SHORT}-build${{ github.run_number }}.apk"
+          ls -la out/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: casadababa-release-apk
+          path: out/casadababa-*.apk
+          retention-days: 14
+          if-no-files-found: error
