@@ -48,10 +48,11 @@
             <button type="button"
                     @@click="$dispatch('confirm-action', {
                         titulo: 'Finalizar lote @l.Codigo?',
-                        mensagem: 'Vai gerar @l.TotalUnidades etiqueta(s) e congelar alterações nesse lote. Itens não poderão mais ser editados.',
+                        mensagem: 'Vai gerar @l.TotalUnidades etiqueta(s) e <strong>congelar alterações</strong> nesse lote. Itens não poderão mais ser editados nem removidos depois.',
                         textoBotao: 'Finalizar e gerar etiquetas',
                         classBotao: 'bg-indigo-600 hover:bg-indigo-700',
-                        formAction: '@Url.Action("Finalizar", "Lotes", new { id = l.Id })'
+                        formAction: '@Url.Action("Finalizar", "Lotes", new { id = l.Id })',
+                        requireText: '@l.Codigo'
                     })"
                     class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg inline-flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

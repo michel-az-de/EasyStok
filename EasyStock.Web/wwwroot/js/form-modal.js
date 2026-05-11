@@ -52,6 +52,38 @@
         return apiMsg || ('Não foi possível concluir (erro ' + status + ').');
     }
 
+    function _ensureFieldErrorEl(field) {
+        if (!field.parentElement) return null;
+        var err = field.parentElement.querySelector(':scope > .field-error');
+        if (err) return err;
+        err = document.createElement('p');
+        err.className = 'field-error text-xs text-red-600 mt-1';
+        err.setAttribute('role', 'alert');
+        field.parentElement.appendChild(err);
+        return err;
+    }
+
+    function _setFieldError(field, message) {
+        field.classList.add('input-invalid', 'border-red-400');
+        field.setAttribute('aria-invalid', 'true');
+        var err = _ensureFieldErrorEl(field);
+        if (err) {
+            err.textContent = message || 'Valor inválido.';
+            err.style.display = '';
+        }
+    }
+
+    function _clearFieldError(field) {
+        field.classList.remove('input-invalid', 'border-red-400');
+        field.removeAttribute('aria-invalid');
+        if (!field.parentElement) return;
+        var err = field.parentElement.querySelector(':scope > .field-error');
+        if (err) {
+            err.textContent = '';
+            err.style.display = 'none';
+        }
+    }
+
     function trapFocus(panel, event) {
         if (event.key !== 'Tab' || !panel) return;
         var focusable = panel.querySelectorAll(
@@ -117,6 +149,37 @@
                     'input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
                 );
                 if (first) first.focus();
+                this._attachInlineValidation(panel);
+            },
+
+            _attachInlineValidation(panel) {
+                // Re-roda em cada abertura — se o conteudo do modal mudou, captura novos campos.
+                // Usa EasyValidate.checkField se disponivel (CPF/CNPJ/phone/email/required).
+                if (!window.EasyValidate || !window.EasyValidate.checkField) return;
+                var fields = panel.querySelectorAll('input, textarea, select');
+                fields.forEach(function (field) {
+                    if (field.dataset._fmInlineBound === '1') return;
+                    field.dataset._fmInlineBound = '1';
+
+                    field.addEventListener('blur', function () {
+                        // So valida se o usuario interagiu com o campo, evita "obrigatorio"
+                        // disparar antes de o usuario sequer ter digitado.
+                        if (!field.dataset.touched) return;
+                        var result = window.EasyValidate.checkField(field);
+                        if (result.valid) _clearFieldError(field);
+                        else _setFieldError(field, result.message);
+                    });
+
+                    field.addEventListener('input', function () {
+                        field.dataset.touched = '1';
+                        // Revalida em real-time so quando ja esta mostrando erro,
+                        // pra nao incomodar quem ainda esta digitando.
+                        if (field.classList.contains('input-invalid')) {
+                            var result = window.EasyValidate.checkField(field);
+                            if (result.valid) _clearFieldError(field);
+                        }
+                    });
+                });
             },
 
             isInvalid() {

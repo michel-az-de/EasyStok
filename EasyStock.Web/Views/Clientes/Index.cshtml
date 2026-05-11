@@ -178,6 +178,7 @@
                         <label class="fm-field__label" for="cli-doc">CPF ou CNPJ</label>
                         <input id="cli-doc" type="text" x-model="form.documento" x-mask:doc
                                inputmode="numeric" placeholder="000.000.000-00"
+                               data-validate-doc
                                class="ui-field w-full text-sm" />
                         <span class="fm-field__hint">Necessário para emitir NFC-e/NF-e</span>
                     </div>
@@ -191,6 +192,7 @@
                         <label class="fm-field__label" for="cli-tel">Telefone / WhatsApp</label>
                         <input id="cli-tel" type="text" x-model="form.telefone" x-mask:phone
                                inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
+                               data-validate-phone
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field">

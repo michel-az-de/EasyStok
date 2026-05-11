@@ -164,6 +164,7 @@
                         <label class="fm-field__label" for="forn-doc">CNPJ ou CPF</label>
                         <input id="forn-doc" type="text" x-model="form.documento" x-mask:doc
                                inputmode="numeric" placeholder="00.000.000/0000-00"
+                               data-validate-doc
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field">
@@ -192,6 +193,7 @@
                         <label class="fm-field__label" for="forn-tel">Telefone / WhatsApp</label>
                         <input id="forn-tel" type="text" x-model="form.telefone" x-mask:phone
                                inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
+                               data-validate-phone
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field">

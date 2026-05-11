@@ -136,10 +136,11 @@
                                 <button type="button"
                                         @@click="$dispatch('confirm-action', {
                                             titulo: 'Revogar este dispositivo?',
-                                            mensagem: 'O app correspondente vai parar de funcionar imediatamente. Para usar de novo, será preciso parear o dispositivo novamente.',
+                                            mensagem: 'O app correspondente vai parar de funcionar imediatamente. Para usar de novo, será preciso parear o dispositivo novamente. <strong>Esta ação não pode ser desfeita.</strong>',
                                             textoBotao: 'Revogar dispositivo',
                                             classBotao: 'bg-red-600 hover:bg-red-700',
-                                            formAction: '/dispositivos/@d.Id/revogar'
+                                            formAction: '/dispositivos/@d.Id/revogar',
+                                            requireText: 'revogar'
                                         })"
                                         class="text-xs text-red-600 hover:text-red-800 font-medium ml-1">
                                     Revogar

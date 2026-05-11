@@ -1,5 +1,9 @@
 @* Modal de confirmacao global para acoes destrutivas.
-   Uso: $dispatch('confirm-action', { titulo, mensagem, textoBotao, classBotao, formAction, method })
+   Uso basico:
+       $dispatch('confirm-action', { titulo, mensagem, textoBotao, classBotao, formAction, method })
+   Acoes irreversiveis (type-to-confirm):
+       $dispatch('confirm-action', { ..., requireText: 'NOME-EXATO' })
+       -> renderiza input e desabilita botao ate o texto digitado bater
 *@
 <div x-data="confirmModal()" x-cloak
      @@confirm-action.window="abrir($event.detail)"
@@ -24,6 +28,16 @@
                     </div>
                 </div>
 
+                <div x-show="requireText" x-cloak class="mb-4 pl-13">
+                    <label class="block text-xs text-slate-500 mb-1">
+                        Para confirmar, digite <strong class="font-mono text-slate-700" x-text="requireText"></strong>:
+                    </label>
+                    <input type="text" x-model="typedConfirm" x-ref="confirmInput"
+                           autocomplete="off" autocapitalize="off" spellcheck="false"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                           @@keydown.enter.prevent="if (canConfirm()) $refs.confirmForm.requestSubmit()" />
+                </div>
+
                 <div class="flex justify-end gap-3 mt-5">
                     <button type="button" @@click="fechar()"
                             class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
@@ -31,8 +45,8 @@
                     </button>
                     <form :action="formAction" :method="method" x-ref="confirmForm">
                         @Html.AntiForgeryToken()
-                        <button type="submit" :disabled="loading"
-                                class="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50"
+                        <button type="submit" :disabled="loading || !canConfirm()"
+                                class="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 :class="classBotao">
                             <span x-show="!loading" x-text="textoBotao"></span>
                             <span x-show="loading" class="inline-flex items-center gap-1.5">
@@ -57,6 +71,8 @@
             classBotao: 'bg-red-600 hover:bg-red-700',
             formAction: '',
             method: 'POST',
+            requireText: '',
+            typedConfirm: '',
 
             abrir(detail) {
                 this.titulo = detail.titulo || 'Confirmar acao';
@@ -65,11 +81,21 @@
                 this.classBotao = detail.classBotao || 'bg-red-600 hover:bg-red-700';
                 this.formAction = detail.formAction || '';
                 this.method = detail.method || 'POST';
+                this.requireText = detail.requireText || '';
+                this.typedConfirm = '';
                 this.loading = false;
                 this.open = true;
+                if (this.requireText) {
+                    this.$nextTick(() => { try { this.$refs.confirmInput && this.$refs.confirmInput.focus(); } catch(_) {} });
+                }
+            },
+            canConfirm() {
+                if (!this.requireText) return true;
+                return (this.typedConfirm || '').trim() === this.requireText;
             },
             fechar() {
                 this.open = false;
+                this.typedConfirm = '';
             }
         };
     }
