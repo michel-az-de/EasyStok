@@ -94,6 +94,17 @@
         }
     }
 
+    // Defere show() ate o proximo tick pra que TODOS os handlers sincronos
+    // do evento (capture + bubble, incluindo Alpine @submit.prevent /
+    // @click.prevent) tenham rodado. Se algum chamou preventDefault, o
+    // browser nao vai navegar e nao faz sentido mostrar a barra.
+    function showIfNotPrevented(e) {
+        setTimeout(function () {
+            if (e.defaultPrevented) return;
+            show();
+        }, 0);
+    }
+
     document.addEventListener('click', function (e) {
         // Modificadores → usuário quer nova aba/janela. Não interceptamos.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -107,24 +118,37 @@
                 dest.search === window.location.search &&
                 dest.hash !== window.location.hash) return;
         } catch (_) { /* segue */ }
-        show();
+        showIfNotPrevented(e);
     }, true);
 
     document.addEventListener('submit', function (e) {
         var form = e.target;
         if (!form || form.tagName !== 'FORM') return;
         if (form.hasAttribute('data-noprogress')) return;
-        // Forms internos de modais (AJAX) costumam usar @submit.prevent —
-        // se o submit chegar aqui, é submit nativo do browser.
-        show();
+        showIfNotPrevented(e);
     }, true);
 
+    // Reset duro da barra — usado quando a pagina e restaurada do bfcache
+    // com estado visual carry-over do clique-que-saiu-dela.
+    function resetBar() {
+        if (ticker) { clearTimeout(ticker); ticker = null; }
+        running = false;
+        progress = 0;
+        if (bar) {
+            bar.classList.remove('nav-progress--active', 'nav-progress--done');
+            var fill = bar.querySelector('.nav-progress__fill');
+            if (fill) fill.style.width = '0%';
+        }
+    }
+
     // Página antiga ainda carregando → completa quando a nova chegar.
-    window.addEventListener('pageshow', function () { done(); });
+    window.addEventListener('pageshow', function (e) {
+        // bfcache restore: a pagina volta com a barra travada em 85%.
+        if (e.persisted) { resetBar(); return; }
+        done();
+    });
     window.addEventListener('DOMContentLoaded', function () { done(); });
 
-    // bfcache: ao voltar, reset.
-    window.addEventListener('pagehide', function () {
-        if (running) done();
-    });
+    // Navegacao saindo: limpa estado antes de eventual entrada no bfcache.
+    window.addEventListener('pagehide', function () { resetBar(); });
 })();
