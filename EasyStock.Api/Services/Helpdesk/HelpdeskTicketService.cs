@@ -15,13 +15,16 @@ namespace EasyStock.Api.Services.Helpdesk;
 /// Cada operacao registra entrada em ticket_historico e (quando aplicavel)
 /// dispara evento via outbox de notificacoes.
 /// </summary>
-public sealed class HelpdeskTicketService(
+public class HelpdeskTicketService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
     ISlaResolver slaResolver,
     INotificadorService notificador)
 {
-    public async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
+    // virtual para permitir Substitute.For em testes (AutoTicketFalhaPagamentoTests).
+    // Sem essa marcacao a classe seria mockada apenas via interface — overhead nao
+    // justificado para um servico interno da camada Api.
+    public virtual async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
     {
         var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
             ?? throw new KeyNotFoundException("Empresa nao encontrada.");
