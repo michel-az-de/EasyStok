@@ -56,15 +56,31 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-            return BadRequest(new { success = false, errorMessage = string.Join(" ", errors) });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = string.Join(" ", errors) }
+            });
         }
 
         if (!ValidarProdutoId(vm))
-            return BadRequest(new { success = false, errorMessage = "Selecione um produto válido." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Selecione um produto válido." }
+            });
 
         var result = await svc.CriarEntradaAsync(vm);
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao registrar entrada." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao registrar entrada."
+                }
+            });
 
         return Ok(new { success = true });
     }

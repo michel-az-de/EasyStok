@@ -72,12 +72,24 @@ public class PedidosController(
     public async Task<IActionResult> CriarJson([FromBody] CriarPedidoWebRequest req)
     {
         if (req.ClienteId == null && string.IsNullOrWhiteSpace(req.NomeAdHoc))
-            return BadRequest(new { success = false, errorMessage = "Informe um cliente OU um nome ad-hoc." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Informe um cliente OU um nome ad-hoc." }
+            });
 
         var result = await svc.CriarAsync(req.ClienteId, req.NomeAdHoc, req.AptAdHoc, req.TelefoneAdHoc,
             req.Observacoes, req.Itens);
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar pedido." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar pedido."
+                }
+            });
 
         return Ok(new { success = true, id = result.Data?.Id });
     }

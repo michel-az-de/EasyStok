@@ -9,20 +9,47 @@
  *                       requireField: 'nome', requireMessage: 'Informe o nome.' })"
  */
 (function () {
-    function friendlyError(status) {
-        if (status === 400 || status === 403) {
-            return 'Sua sessão expirou. Recarregue a página e tente novamente.';
+    function friendlyError(status, data) {
+        var err = data && data.error;
+        var code = err && err.code;
+        var apiMsg = (err && err.message) || (data && data.errorMessage);
+
+        var byCode = {
+            VALIDATION_ERROR:        apiMsg || 'Revise os campos destacados e tente de novo.',
+            CLIENTE_DUPLICADO:       'Já existe um cliente com esse documento. Busque pelo CPF/CNPJ na lista.',
+            FORNECEDOR_DUPLICADO:    'Já existe um fornecedor com esse documento.',
+            CPF_DUPLICADO:           'Já existe um cadastro com esse CPF.',
+            CNPJ_DUPLICADO:          'Já existe um cadastro com esse CNPJ.',
+            EMAIL_DUPLICADO:         'Esse e-mail já está em uso.',
+            DOCUMENTO_INVALIDO:      'CPF ou CNPJ inválido. Confira os dígitos.',
+            EMAIL_INVALIDO:          'E-mail inválido. Confira o endereço.',
+            SKU_DUPLICADO:           'Já existe um produto com esse SKU.',
+            CATEGORIA_DUPLICADA:     'Já existe uma categoria com esse nome.',
+            LOJA_DUPLICADA:          'Já existe uma loja com esse nome.',
+            EMPRESA_INVALIDA:        'Loja não identificada. Selecione uma loja no topo e tente novamente.',
+            LOJA_NAO_SELECIONADA:    'Selecione uma loja antes de continuar.',
+            AUTH_TOKEN_EXPIRED:      'Sua sessão expirou. Vamos te levar ao login.',
+            PERMISSAO_INSUFICIENTE:  'Você não tem permissão para essa ação. Fale com um admin do seu time.',
+            NOT_FOUND:               'Não encontramos esse registro. Talvez tenha sido removido.',
+            CONCURRENCY_CONFLICT:    'Outra pessoa acabou de atualizar esse registro. Recarregue para ver as mudanças.',
+            BUSINESS_RULE_VIOLATION: apiMsg || 'Essa operação não é permitida agora.',
+            TIMEOUT:                 'O servidor demorou para responder. Tente de novo.',
+            NETWORK_ERROR:           'Sem conexão com o servidor. Verifique sua internet.'
+        };
+
+        if (code && byCode[code]) return byCode[code];
+        if (code && /^LIMITE_PLANO/.test(code)) {
+            return 'Você atingiu o limite do seu plano. Veja opções em Configurações › Plano.';
         }
-        if (status === 401) {
-            return 'Você precisa entrar de novo. Te levamos para o login em instantes.';
-        }
-        if (status === 409) {
-            return 'Já existe um registro com esses dados. Verifique e tente novamente.';
-        }
-        if (status >= 500) {
-            return 'Tivemos um problema no servidor. Tente novamente em alguns instantes.';
-        }
-        return 'Não foi possível concluir o cadastro (erro ' + status + '). Tente novamente em instantes.';
+
+        if (status === 401) return byCode.AUTH_TOKEN_EXPIRED;
+        if (status === 403) return byCode.PERMISSAO_INSUFICIENTE;
+        if (status === 404) return byCode.NOT_FOUND;
+        if (status === 409) return apiMsg || 'Esse registro conflita com um existente.';
+        if (status === 422) return byCode.VALIDATION_ERROR;
+        if (status === 429) return 'Muitas tentativas em pouco tempo. Aguarde alguns segundos.';
+        if (status >= 500) return apiMsg ? ('Tivemos um problema. ' + apiMsg) : 'Tivemos um problema do nosso lado. Tente de novo em instantes.';
+        return apiMsg || ('Não foi possível concluir (erro ' + status + ').');
     }
 
     function trapFocus(panel, event) {
@@ -132,7 +159,7 @@
                         this.close();
                         return;
                     }
-                    this.erroMsg = (data && data.errorMessage) || friendlyError(res.status);
+                    this.erroMsg = friendlyError(res.status, data);
                 } catch {
                     this.erroMsg = 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
                 } finally {
