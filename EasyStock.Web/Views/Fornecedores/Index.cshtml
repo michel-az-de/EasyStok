@@ -4,16 +4,21 @@
     Layout = "_Layout";
 }
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Fornecedores</h1>
-        <p>Gerencie seus fornecedores e pedidos de compra</p>
+        <p>
+            @Model.Items.Count @(Model.Items.Count == 1 ? "fornecedor listado" : "fornecedores listados") · gerencie cadastros e pedidos de compra
+        </p>
     </div>
-    <div class="flex gap-3">
+    <div class="flex gap-3 flex-wrap">
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-fornecedor')"
-                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-            + Novo Fornecedor
+                class="app-primary-btn inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Novo fornecedor
         </button>
     </div>
 </div>
@@ -22,7 +27,7 @@
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar fornecedores">
         <div class="supplier-search-group flex flex-1 min-w-48 gap-3">
-        <input type="search" name="search" value="@Model.Search" placeholder="Buscar fornecedor..."
+        <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome, e-mail, CNPJ/CPF ou categoria…"
                aria-label="Buscar fornecedor"
                class="ui-field flex-1 min-w-48" />
         <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
@@ -47,7 +52,7 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🏭" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhum fornecedor cadastrado ainda" },
             { "EmptyDescription", "Cadastre o primeiro fornecedor para começar a registrar pedidos de compra e acompanhar prazos de entrega." },
             { "EmptyCta", "Cadastrar primeiro fornecedor" },
@@ -83,13 +88,16 @@
                         <td class="text-slate-600">@(f.LeadTimeEstimadoDias?.ToString() ?? "—")</td>
                         <td class="text-slate-500 text-sm">@f.Categoria</td>
                         <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
+                            @{ var ativo = f.Status == "ativo"; }
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
+                                        @(ativo ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                                <span class="w-1.5 h-1.5 rounded-full @(ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
                                 @(string.IsNullOrWhiteSpace(f.Status) ? "—" : char.ToUpperInvariant(f.Status[0]) + f.Status[1..].ToLowerInvariant())
                             </span>
                         </td>
-                        <td>
+                        <td class="text-right">
                             <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@f.Id"
-                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                               class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a>
                         </td>
                     </tr>
                 }
@@ -131,7 +139,7 @@
         <header class="fm-header">
             <div>
                 <h2 id="fm-fornecedor-title" class="fm-header__title">Novo fornecedor</h2>
-                <p class="fm-header__subtitle">Cadastre o essencial agora — você completa o restante depois.</p>
+                <p class="fm-header__subtitle">Comece com o essencial. Condições comerciais e categorias você completa depois.</p>
             </div>
             <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
         </header>
@@ -156,6 +164,7 @@
                         <label class="fm-field__label" for="forn-doc">CNPJ ou CPF</label>
                         <input id="forn-doc" type="text" x-model="form.documento" x-mask:doc
                                inputmode="numeric" placeholder="00.000.000/0000-00"
+                               data-validate-doc
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field">
@@ -184,6 +193,7 @@
                         <label class="fm-field__label" for="forn-tel">Telefone / WhatsApp</label>
                         <input id="forn-tel" type="text" x-model="form.telefone" x-mask:phone
                                inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
+                               data-validate-phone
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field">
@@ -251,15 +261,17 @@
         </div>
 
         <footer class="fm-footer">
-            <span class="fm-footer__hint">Pressione Enter para salvar</span>
+            <span class="fm-footer__hint">
+                Pressione <kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-600">Enter</kbd> para salvar
+            </span>
             <button type="button" @@click="close()"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </button>
             <button type="submit" :disabled="loading || isInvalid()"
                     :class="{ 'opacity-50 cursor-not-allowed': loading || isInvalid() }"
-                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Cadastrar fornecedor</span>
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
+                <span x-show="!loading">Salvar fornecedor</span>
                 <span x-show="loading" x-cloak class="flex items-center gap-2">
                     <span class="spinner"></span> Salvando…
                 </span>

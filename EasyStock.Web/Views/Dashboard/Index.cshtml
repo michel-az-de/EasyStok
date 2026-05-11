@@ -4,13 +4,12 @@
     var ptBR = new CultureInfo("pt-BR");
     var hora = DateTime.Now.Hour;
     var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
-    var saudacaoIcon = hora < 12 ? "☀️" : hora < 18 ? "🌤️" : "🌙";
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
 }
 
 <div class="pg-hd mb-6">
-    <h1>@saudacaoIcon @saudacao, @primeiroNome!</h1>
-    <p>Aqui está um resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
+    <h1>@saudacao@(string.IsNullOrEmpty(primeiroNome) ? "!" : $", {primeiroNome}!")</h1>
+    <p>Resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
 </div>
 
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -93,7 +92,10 @@
         @if (Model.IaIlimitada)
         {
             <div class="flex items-center gap-3">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Ilimitado</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Ilimitado
+                </span>
                 <span class="text-sm text-slate-500">@Model.GeracoesIaUsadas geração(ões) realizadas</span>
             </div>
         }
@@ -171,11 +173,13 @@
         }
         else
         {
-            <div class="text-center py-8 text-slate-400">
-                <div class="text-4xl mb-2">📋</div>
-                <p class="text-sm font-semibold text-slate-500">Nenhuma movimentação ainda</p>
-                <p class="text-xs mt-1">Registre sua primeira <a href="/entradas/nova" class="text-indigo-600 hover:underline">entrada de estoque</a> para começar.</p>
-            </div>
+            @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                { "EmptyIllustration", "chart" },
+                { "EmptyTitle", "Nenhuma movimentação ainda" },
+                { "EmptyDescription", "Registre sua primeira entrada para começar a acompanhar o fluxo do estoque." },
+                { "EmptyCta", "Registrar entrada" },
+                { "EmptyCtaHref", "/entradas/nova" }
+            })
         }
     </div>
 
@@ -201,11 +205,13 @@
         }
         else
         {
-            <div class="flex flex-col items-center justify-center min-h-[240px] text-slate-400">
-                <div class="text-4xl mb-3">📈</div>
-                <p class="text-sm font-semibold text-slate-500">Sem dados de receita</p>
-                <p class="text-xs mt-1">Registre saídas para visualizar o gráfico.</p>
-            </div>
+            @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                { "EmptyIllustration", "chart" },
+                { "EmptyTitle", "Sem dados de receita ainda" },
+                { "EmptyDescription", "Registre saídas para visualizar o gráfico de receita do período." },
+                { "EmptyCta", "Registrar saída" },
+                { "EmptyCtaHref", "/saidas/nova" }
+            })
         }
     </div>
 </div>
@@ -216,19 +222,29 @@
         @{
             var acoes = new[]
             {
-                new { Icon = "📥", Label = "Nova entrada", Href = "/entradas/nova" },
-                new { Icon = "📤", Label = "Registrar Saída", Href = "/saidas/nova" },
-                new { Icon = "🔄", Label = "Repor estoque", Href = "/entradas/reposicao" },
-                new { Icon = "📦", Label = "Ver estoque", Href = "/estoque" },
-                new { Icon = "🤖", Label = "Gerar anúncio", Href = "/anuncios" },
-                new { Icon = "📊", Label = "Movimentações", Href = "/analytics/movimentacoes" },
+                // arrow-down (entrada)
+                new { IconPath = "M19 14l-7 7m0 0l-7-7m7 7V3", Label = "Nova entrada", Href = "/entradas/nova" },
+                // arrow-up (saída)
+                new { IconPath = "M5 10l7-7m0 0l7 7m-7-7v18", Label = "Registrar saída", Href = "/saidas/nova" },
+                // refresh (repor)
+                new { IconPath = "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15", Label = "Repor estoque", Href = "/entradas/reposicao" },
+                // package (estoque)
+                new { IconPath = "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4", Label = "Ver estoque", Href = "/estoque" },
+                // sparkles (IA)
+                new { IconPath = "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z", Label = "Gerar anúncio", Href = "/anuncios" },
+                // chart bar (movimentações)
+                new { IconPath = "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", Label = "Movimentações", Href = "/analytics/movimentacoes" },
             };
         }
         @foreach (var acao in acoes)
         {
             <a href="@acao.Href"
-               class="quick-action-card flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
-                <span class="quick-action-icon text-2xl">@acao.Icon</span>
+               class="quick-action-card flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center group">
+                <span class="quick-action-icon w-9 h-9 rounded-full bg-slate-50 group-hover:bg-indigo-100 text-slate-500 group-hover:text-indigo-600 flex items-center justify-center transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="@acao.IconPath" />
+                    </svg>
+                </span>
                 <span class="text-xs font-semibold text-slate-600">@acao.Label</span>
             </a>
         }

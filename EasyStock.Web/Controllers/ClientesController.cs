@@ -59,12 +59,25 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> CriarJson([FromBody] CriarClienteWebRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Nome))
-            return BadRequest(new { success = false, errorMessage = "Nome é obrigatório." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Informe o nome do cliente." }
+            });
 
         var result = await svc.CriarAsync(req.Nome, req.Apt, req.Endereco, req.Telefone,
             req.Email, req.Documento, req.Observacoes);
+
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar cliente." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar cliente."
+                }
+            });
 
         return Ok(new { success = true, id = result.Data?.Id });
     }

@@ -45,7 +45,15 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
     {
         var result = await svc.CriarAsync(req.CodigoCustom, req.OperadorNome, req.Observacoes, req.Itens);
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar lote." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar lote."
+                }
+            });
         return Ok(new { success = true, id = result.Data?.Id });
     }
 

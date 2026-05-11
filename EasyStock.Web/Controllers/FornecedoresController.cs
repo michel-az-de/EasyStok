@@ -108,11 +108,19 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (req is null)
         {
             logger.LogWarning("CriarJson: corpo nulo ou inválido (modelbinder retornou null)");
-            return BadRequest(new { success = false, errorMessage = "Corpo da requisição inválido." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Corpo da requisição inválido." }
+            });
         }
 
         if (string.IsNullOrWhiteSpace(req.Nome))
-            return BadRequest(new { success = false, errorMessage = "Nome é obrigatório." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Informe o nome do fornecedor." }
+            });
 
         var result = await svc.CriarAsync(
             req.Nome, req.Documento, req.Contato, req.Email, req.Telefone,
@@ -122,7 +130,15 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (!result.Success)
         {
             logger.LogWarning("CriarJson falhou: {Code} — {Msg}", result.ErrorCode, result.ErrorMessage);
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar fornecedor." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar fornecedor."
+                }
+            });
         }
 
         return Ok(new { success = true, id = result.Data?.Id });

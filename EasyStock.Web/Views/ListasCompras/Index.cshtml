@@ -28,7 +28,7 @@
     @if (!Model.Listas.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🛒" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhuma lista de compras ainda" },
             { "EmptyDescription", "Crie uma lista para organizar as compras antes de ir ao mercado e não esquecer nada." },
             { "EmptyCta", "Criar primeira lista" },
