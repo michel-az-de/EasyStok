@@ -157,12 +157,12 @@
         var email = document.getElementById('reg-email');
         var emailMsg = document.getElementById('reg-email-msg');
         if (email) email.addEventListener('blur', debounce(function () {
-            check('/api/empresas/email-disponivel?email=', email, emailMsg, 'Email disponivel.', 'Email ja cadastrado.');
+            check('/api/empresas/email-disponivel?email=', email, emailMsg, 'E-mail disponível.', 'E-mail já cadastrado.');
         }, 200));
         var doc = document.getElementById('reg-doc');
         var docMsg = document.getElementById('reg-doc-msg');
         if (doc) doc.addEventListener('blur', debounce(function () {
-            check('/api/empresas/cnpj-disponivel?doc=', doc, docMsg, 'CNPJ/CPF disponivel.', 'CNPJ/CPF ja em uso.');
+            check('/api/empresas/cnpj-disponivel?doc=', doc, docMsg, 'CNPJ/CPF disponível.', 'CNPJ/CPF já em uso.');
         }, 200));
     })();
     </script>

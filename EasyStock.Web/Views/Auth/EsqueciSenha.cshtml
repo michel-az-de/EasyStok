@@ -44,7 +44,7 @@
             }
             else
             {
-                <p class="text-slate-500 text-sm mb-6">Informe seu e-mail e enviaremos as instruções de redefinição.</p>
+                <p class="text-slate-500 text-sm mb-6">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p>
 
                 @if (!ViewData.ModelState.IsValid)
                 {
@@ -69,7 +69,7 @@
                             :disabled="loading"
                             :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
                             class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
-                        <span x-show="!loading">Enviar instruções</span>
+                        <span x-show="!loading">Enviar link de redefinição</span>
                         <span x-show="loading" x-cloak class="flex items-center gap-2">
                             <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
