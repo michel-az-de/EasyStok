@@ -6,7 +6,7 @@
 
     string statusBadgeClass(string? s) => s switch
     {
-        "aguardando" => "bg-amber-100 text-amber-700",
+        "aguardando" => "bg-amber-100 text-amber-800",
         "preparando" => "bg-blue-100 text-blue-700",
         "pronto"     => "bg-violet-100 text-violet-700",
         "entregue"   => "bg-green-100 text-green-700",
@@ -125,7 +125,7 @@ else
                 }
                 else if (p.TotalPago > 0)
                 {
-                    <span class="text-xs font-medium px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Parcial</span>
+                    <span class="text-xs font-medium px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">Parcial</span>
                 }
                 else
                 {
@@ -143,7 +143,7 @@ else
                 </div>
                 <div>
                     <span class="text-slate-500">Falta</span>
-                    <span class="font-semibold ml-1 @(p.Pendente > 0 ? "text-amber-700" : "text-green-700")">@p.Pendente.ToString("C")</span>
+                    <span class="font-semibold ml-1 @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.ToString("C")</span>
                 </div>
             </div>
         </div>

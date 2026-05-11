@@ -103,7 +103,9 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
+                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }"
+                        data-row-href="/produtos/@p.Id"
+                        class="cursor-pointer hover:bg-slate-50 transition-colors">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)

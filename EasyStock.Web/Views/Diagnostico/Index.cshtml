@@ -81,7 +81,7 @@
             <div class="flex items-center gap-3">
                 <span class="material-icons-round text-3xl opacity-90">@overallIcon</span>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight">Central de Operacoes</h1>
+                    <h1 class="text-xl font-bold tracking-tight">Saúde do sistema</h1>
                     <p class="text-sm opacity-90">
                         @overallText
                         @if (apiOk && Model is not null)
@@ -111,6 +111,15 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
+    <!-- ── Banner contextual ──────────────────────────────────────────── -->
+    <div class="mb-6 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3 text-sm text-blue-900">
+        <span class="material-icons-round text-blue-600 text-base flex-shrink-0 mt-0.5">info</span>
+        <div>
+            <strong class="font-semibold">Esta página é para admins e suporte.</strong>
+            Se tudo aqui está verde, suas operações estão rodando bem — você não precisa olhar.
+        </div>
+    </div>
+
     <!-- ── TABS ──────────────────────────────────────────────────────── -->
     <div class="flex gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
         <button @@click="activeTab='overview'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
@@ -138,7 +147,7 @@
             {
                 <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold" title="Estado crítico/degradado detectado">!</span>
             }
-            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800"
                 x-text="patterns.length"></span>
         </button>
     </div>
@@ -933,7 +942,7 @@
                                 <span class="text-[10px] text-slate-400 mr-1">Marcar como:</span>
                                 <template x-for="ackOpt in [
                                     { status: 'visto', label: 'Visto', icon: 'visibility', cls: 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100' },
-                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100' },
                                     { status: 'resolvido', label: 'Resolvido', icon: 'task_alt', cls: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' }
                                 ]" :key="ackOpt.status">
                                     <button @@click="ackAlerta(p, ackOpt.status)"

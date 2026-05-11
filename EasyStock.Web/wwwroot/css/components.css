@@ -133,6 +133,11 @@
 button:focus-visible {
   outline-color: var(--orange-500);
 }
+/* Em dark mode, navy-500 fica abafado sobre sidebar/surfaces navy-900.
+   Trocamos pro laranja que tem 5.2:1 sobre navy-900 (passa WCAG AA). */
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--orange-500);
+}
 
 /* ---------- Skeleton loader (T1.2) ---------- */
 .skeleton {
@@ -573,3 +578,35 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .nav-progress, .nav-progress__fill { transition: none; }
 }
+
+/* ============================================================
+   Tier 1 — Dark mode overrides para status pills com Tailwind
+   ============================================================
+   Os pills do pente fino usam classes Tailwind (bg-X-50, ring-X-200,
+   text-X-700/800) que sao otimizadas pra fundo claro. Em dark mode
+   ficam como patches estridentes sobre navy-900. Estas regras trocam
+   pra translucents tonais que respeitam o fundo escuro, e elevam o
+   texto pro tom -300 pra contrast over alpha bg.
+   So afetam quando [data-theme=dark]; modo claro preserva original. */
+[data-theme="dark"] .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12) !important; }
+[data-theme="dark"] .bg-amber-50   { background-color: rgba(245, 158, 11, 0.12) !important; }
+[data-theme="dark"] .bg-blue-50    { background-color: rgba(59, 130, 246, 0.12) !important; }
+[data-theme="dark"] .bg-violet-50  { background-color: rgba(139, 92, 246, 0.12) !important; }
+[data-theme="dark"] .bg-red-50     { background-color: rgba(239, 68, 68, 0.12) !important; }
+[data-theme="dark"] .bg-indigo-50  { background-color: rgba(99, 102, 241, 0.12) !important; }
+[data-theme="dark"] .bg-slate-50   { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+[data-theme="dark"] .ring-emerald-200 { --tw-ring-color: rgba(16, 185, 129, 0.35) !important; }
+[data-theme="dark"] .ring-amber-200   { --tw-ring-color: rgba(245, 158, 11, 0.35) !important; }
+[data-theme="dark"] .ring-blue-200    { --tw-ring-color: rgba(59, 130, 246, 0.35) !important; }
+[data-theme="dark"] .ring-violet-200  { --tw-ring-color: rgba(139, 92, 246, 0.35) !important; }
+[data-theme="dark"] .ring-red-200     { --tw-ring-color: rgba(239, 68, 68, 0.35) !important; }
+[data-theme="dark"] .ring-indigo-200  { --tw-ring-color: rgba(99, 102, 241, 0.35) !important; }
+[data-theme="dark"] .ring-slate-200   { --tw-ring-color: rgba(255, 255, 255, 0.15) !important; }
+
+[data-theme="dark"] .text-emerald-800 { color: rgb(110, 231, 183) !important; }
+[data-theme="dark"] .text-amber-800   { color: rgb(252, 211, 77) !important; }
+[data-theme="dark"] .text-blue-700    { color: rgb(147, 197, 253) !important; }
+[data-theme="dark"] .text-violet-700  { color: rgb(196, 181, 253) !important; }
+[data-theme="dark"] .text-red-700     { color: rgb(252, 165, 165) !important; }
+[data-theme="dark"] .text-indigo-700  { color: rgb(165, 180, 252) !important; }
