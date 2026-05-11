@@ -67,7 +67,7 @@
             Dashboard
         </a>
 
-        <div class="nav-sep"></div>
+        <div class="nav-section">Cadastros</div>
 
         <a href="/produtos" class="ni @(activeItem == "Produtos" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,11 +75,17 @@
             </svg>
             Produtos
         </a>
-        <a href="/estoque" class="ni @(activeItem == "Estoque" ? "active" : "")">
+        <a href="/categorias" class="ni @(activeItem == "Categorias" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
-            Estoque
+            Categorias
+        </a>
+        <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            Lotes
         </a>
         <a href="/fornecedores" class="ni @(activeItem is "Fornecedores" or "PedidosAbertos" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,45 +99,15 @@
             </svg>
             Clientes
         </a>
-        <a href="/pedidos" class="ni @(activeItem is "Pedidos" or "PedidosMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            Pedidos
-        </a>
-        <a href="/kds" class="ni @(activeItem == "Kds" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            KDS — Cozinha
-        </a>
-        <a href="/caixa" class="ni @(activeItem is "Caixa" or "CaixaMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            Caixa
-        </a>
-        <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-            </svg>
-            Lotes
-        </a>
-        <a href="/listas-compras" class="ni @(activeItem == "ListasCompras" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Compras
-        </a>
-        <a href="/categorias" class="ni @(activeItem == "Categorias" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            Categorias
-        </a>
 
-        <div class="nav-sep"></div>
+        <div class="nav-section">Operação</div>
 
+        <a href="/estoque" class="ni @(activeItem == "Estoque" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Estoque
+        </a>
         <a href="/entradas/historico" class="ni @(activeItem is "Entradas" or "EntradasNova" or "EntradasHistorico" or "EntradasReposicao" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -144,8 +120,48 @@
             </svg>
             Saídas
         </a>
+        <a href="/pedidos" class="ni @(activeItem is "Pedidos" or "PedidosMobile" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            Pedidos
+        </a>
+        <a href="/caixa" class="ni @(activeItem is "Caixa" or "CaixaMobile" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Caixa
+        </a>
+        <a href="/listas-compras" class="ni @(activeItem == "ListasCompras" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Compras
+        </a>
 
-        <div class="nav-sep"></div>
+        <div class="nav-section">Atendimento</div>
+
+        <a href="/kds" class="ni @(activeItem == "Kds" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+            KDS — Cozinha
+        </a>
+        <a href="/dispositivos" class="ni @(activeItem is "Dispositivos" or "ProdutosMobile" or "Operacao" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Dispositivos
+        </a>
+        <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
+           title="Abre a tela do KDS em nova aba para tablet ou TV. Requer dispositivo pareado.">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Abrir KDS em tela cheia <span class="ml-auto text-[9px] uppercase tracking-wider text-orange-400 font-bold">alpha</span>
+        </a>
+
+        <div class="nav-section">Inteligência</div>
 
         <a href="/analytics" class="ni @(activeItem is "Analytics" or "Movimentacoes" or "Inteligencia" or "InteligenciaLojas" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,23 +176,7 @@
             Anúncios com IA
         </a>
 
-        <div class="nav-sep"></div>
-
-        <a href="/dispositivos" class="ni @(activeItem is "Dispositivos" or "ProdutosMobile" or "Operacao" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Dispositivos
-        </a>
-        <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
-           title="Abre o KDS num tablet/TV em nova aba. Precisa de device pareado nesse navegador.">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            KDS Cozinha <span class="ml-auto text-[9px] uppercase tracking-wider text-orange-400 font-bold">alpha</span>
-        </a>
-
-        <div class="nav-sep"></div>
+        <div class="nav-section">Configuração</div>
 
         <a href="/usuarios" class="ni @(activeItem == "Usuarios" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,24 +191,22 @@
             </svg>
             Configurações
         </a>
+        <a href="/diagnostico" class="ni @(activeItem == "Diagnostico" ? "active" : "")"
+           title="Verificar saúde do sistema, integrações e logs">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Saúde do sistema
+        </a>
 
     </nav>
     <div class="sidebar-scroll-hint" aria-hidden="true"></div>
     </div>
 
     <!-- Footer -->
-    <div class="px-4 py-3 border-t border-white/5 flex items-center justify-between">
-        <div>
-            <div class="text-[11px] text-slate-600 font-semibold">EasyStock @(ViewBag.AppVersion as string ?? "v1.0")</div>
-            <div class="text-[10px] text-slate-700">Gestão inteligente de estoque</div>
-        </div>
-        <a href="/diagnostico" title="Diagnóstico"
-           class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-white/5 transition-colors @(activeItem == "Diagnostico" ? "text-orange-400" : "text-slate-500")">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span class="text-[9px] leading-none">Diagnóstico</span>
-        </a>
+    <div class="px-4 py-3 border-t border-white/5">
+        <div class="text-[11px] text-slate-600 font-semibold">EasyStock @(ViewBag.AppVersion as string ?? "v1.0")</div>
+        <div class="text-[10px] text-slate-700">Gestão inteligente de estoque</div>
     </div>
 </aside>
 

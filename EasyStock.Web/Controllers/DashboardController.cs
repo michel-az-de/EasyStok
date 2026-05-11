@@ -18,8 +18,6 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
 
         var vm = new DashboardViewModel();
 
-        // Load all dashboard data in parallel — best-effort, show empty state on failure.
-        // Usa await direto em cada task iniciada para evitar .Result bloqueando thread.
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
@@ -38,6 +36,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.QuantidadeTotalEmEstoque = d.QuantidadeTotalEmEstoque;
             vm.ValorEstoque = d.ValorTotalEstoque;
             vm.ReceitaMes = d.ReceitaEstimadaPeriodo;
+            vm.MediaVendasDiaria = d.MediaVendasDiaria;
             vm.EstoqueCritico = d.AlertasEstoqueBaixo;
             vm.ProximosVencimento = d.AlertasVencimento;
             vm.ProdutosParados = d.AlertasItensParados;
@@ -66,6 +65,16 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
             vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
             vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
+
+            if (ordenado.Count >= 2)
+            {
+                vm.ReceitaMesAtual = ordenado[^1].ReceitaBruta;
+                vm.ReceitaMesAnterior = ordenado[^2].ReceitaBruta;
+            }
+            else if (ordenado.Count == 1)
+            {
+                vm.ReceitaMesAtual = ordenado[0].ReceitaBruta;
+            }
         }
 
         if (iaUsoResult.Success && iaUsoResult.Data is { } ia)
@@ -79,4 +88,3 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         return View(vm);
     }
 }
-
