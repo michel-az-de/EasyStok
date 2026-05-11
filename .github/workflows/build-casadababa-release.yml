@@ -25,8 +25,9 @@ on:
   workflow_dispatch:
     inputs:
       pairingCode:
-        description: 'Codigo de 6 digitos do Admin > Dispositivos (CDB)'
-        required: true
+        description: 'OPCIONAL: codigo de 6 digitos do Admin > Dispositivos. Se vazio, app abre na tela de pareamento e voce digita la.'
+        required: false
+        default: ''
       apiBaseUrl:
         description: 'URL da API EasyStok'
         required: false
