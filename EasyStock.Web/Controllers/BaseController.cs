@@ -33,7 +33,7 @@ public abstract class BaseController(SessionService session) : Controller
     {
         if (!result.Success)
         {
-            Toast("error", result.ErrorMessage ?? "Ocorreu um erro inesperado.");
+            Toast("error", UserFacingErrors.Sanitize(result.ErrorCode, result.ErrorMessage, result.HttpStatus));
             return true;
         }
         return false;
