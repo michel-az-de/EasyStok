@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.json?v=20260511a">
+<link rel="manifest" href="manifest.json?v=20260511b">
 <meta name="theme-color" content="#111827">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1956,6 +1956,34 @@ button:disabled {
   gap: 9px;
   margin-top: 4px;
 }
+.prod-filter {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 2px -22px 10px;
+  padding: 2px 22px 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.prod-filter::-webkit-scrollbar { display: none; }
+.prod-filter button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.prod-filter button.active {
+  background: var(--gold);
+  border-color: rgba(240,184,74,0.48);
+  color: #1c1408;
+}
 .grid-section {
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -2058,6 +2086,24 @@ button:disabled {
   flex-direction: column;
   align-items: flex-start;
   gap: 5px;
+}
+.product-tile .prod-tap-hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink-mute);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.product-tile.counted .prod-tap-hint {
+  color: var(--basil);
+  border-color: rgba(79,191,159,0.26);
+  background: rgba(79,191,159,0.08);
 }
 .product-tile .pcount {
   position: absolute;
@@ -2363,6 +2409,12 @@ button:disabled {
 .sug-item .sr { font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
 .sug-item.create .sn { color: var(--accent); }
 .sug-item.create .sr { color: rgba(214, 80, 51, 0.7); }
+.sug-item.needs-price {
+  border-color: rgba(240,184,74,0.30);
+  background: rgba(240,184,74,0.08);
+}
+.sug-item.needs-price .sn { color: var(--gold); }
+.sug-item.needs-price .sr { color: var(--ink-dim); }
 
 /* Recents label */
 .recents-label {
@@ -2462,6 +2514,13 @@ button:disabled {
   color: var(--ink-mute);
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
+}
+.item-row .item-subtotal {
+  color: var(--gold);
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 .item-row .qty-stepper {
   display: flex;
@@ -5199,6 +5258,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 [data-theme="light"] .prod-metrics span {
   color: #718096;
 }
+[data-theme="light"] .prod-filter button {
+  background: #fff;
+  border-color: #dbe2ec;
+  color: #526071;
+}
+[data-theme="light"] .prod-filter button.active {
+  background: linear-gradient(135deg, #d69f34, #b78122);
+  color: #fff;
+}
 [data-theme="light"] .prod-screen-summary {
   background: #fff;
   border-color: rgba(183,129,34,0.26);
@@ -5501,6 +5569,96 @@ select:focus-visible {
 .confer-tabs {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 8px 20px rgba(0,0,0,0.10);
 }
+.order-draft-summary {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(240,184,74,0.12), transparent 52%),
+    var(--bg-elev);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.14);
+}
+.order-draft-summary .ods-k {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.order-draft-summary .ods-title {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.order-draft-summary .ods-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-mute);
+  font-size: 11px;
+}
+.order-draft-summary .ods-total {
+  color: var(--gold);
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.order-draft-summary.ready {
+  border-color: rgba(79,191,159,0.30);
+  background:
+    linear-gradient(135deg, rgba(79,191,159,0.12), transparent 52%),
+    var(--bg-elev);
+}
+.order-draft-summary.ready .ods-k { color: var(--basil); }
+.kanban-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.kanban-overview button {
+  min-width: 0;
+  min-height: 54px;
+  padding: 9px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.035);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.kanban-overview button strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.kanban-overview button span {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kanban-overview button[data-kjump="aguardando"] strong { color: #cf8a3a; }
+.kanban-overview button[data-kjump="preparando"] strong { color: #60a5fa; }
+.kanban-overview button[data-kjump="pronto"] strong { color: #4ade80; }
 .screen-tab.active,
 .confer-tab.active {
   font-weight: 850;
@@ -6832,6 +6990,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="screen-tab" data-ptab="lotes" onclick="goProducaoTab('lotes')">Lotes</button>
       </div>
       <section class="producao-tab-section active" data-ptab="catalogo">
+      <div class="prod-filter" id="prodCategoryFilter" aria-label="Filtro de produtos">
+        <button type="button" class="active" data-pcat="all" onclick="setProductionCategory('all')">Todos</button>
+        <button type="button" data-pcat="massa" onclick="setProductionCategory('massa')">Massas</button>
+        <button type="button" data-pcat="molho" onclick="setProductionCategory('molho')">Molhos</button>
+        <button type="button" data-pcat="extra" onclick="setProductionCategory('extra')">Extras</button>
+      </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
           <span class="ps-kicker">Selecionado</span>
@@ -6874,6 +7038,14 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <!-- Aba "Novo" — formulario de criacao de pedido -->
       <section class="pedidos-tab-section" data-tab="novo" style="display:none">
+        <div class="order-draft-summary" id="orderDraftSummary" aria-live="polite">
+          <div>
+            <span class="ods-k">Pedido em montagem</span>
+            <span class="ods-title" id="odsTitle">Escolha o cliente</span>
+            <span class="ods-sub" id="odsSub">0 itens</span>
+          </div>
+          <div class="ods-total" id="odsTotal">R$ 0</div>
+        </div>
         <div class="section-label">Cliente</div>
         <div id="clientPicker">
           <div class="search-box">
@@ -9309,6 +9481,7 @@ function goPedidosTab(tab) {
     b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
     s.style.display = s.dataset.tab === tab ? '' : 'none');
+  if (tab === 'novo') renderOrderDraftSummary();
   // Atualiza FAB pra refletir aba ativa (esconde em "novo")
   if (typeof updateFab === 'function') updateFab('pedidos');
 }
@@ -10776,6 +10949,15 @@ const CATEGORIES = [
   { key: 'molho', label: 'Molhos' },
   { key: 'extra', label: 'Extras' }
 ];
+let productionCategoryFilter = 'all';
+
+function setProductionCategory(cat) {
+  productionCategoryFilter = cat || 'all';
+  document.querySelectorAll('#prodCategoryFilter [data-pcat]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.pcat === productionCategoryFilter);
+  });
+  renderProductGrid();
+}
 
 function attachTileHandlers(tile, p) {
   // Tap curto: +1. Press 500ms: prompt de qty exata. Press 1500ms: abre
@@ -10783,7 +10965,7 @@ function attachTileHandlers(tile, p) {
   // dataset.held — quando o pointerup dispara depois, o click handler
   // checa esse flag e não incrementa.
   tile.addEventListener('click', (e) => {
-    if (e.target.closest('.camera-btn')) return;
+    if (e.target.closest('button')) return;
     if (tile.dataset.held === '1') { tile.dataset.held = '0'; return; }
     p.count++;
     renderProductGrid();
@@ -10825,7 +11007,11 @@ function renderProductGrid() {
   let totalSkus = 0;
   let anyActive = false;
 
-  CATEGORIES.forEach(cat => {
+  const visibleCategories = productionCategoryFilter === 'all'
+    ? CATEGORIES
+    : CATEGORIES.filter(cat => cat.key === productionCategoryFilter);
+
+  visibleCategories.forEach(cat => {
     // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
     const items = products.filter(p => p.category === cat.key && !p.archived);
     if (items.length === 0) return;
@@ -10855,6 +11041,7 @@ function renderProductGrid() {
             <div class="punit">
               ${escapeHtml(p.unit || '')}
               <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
+              <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
             </div>
           </div>
         </div>
@@ -12390,7 +12577,7 @@ function renderKanban() {
   );
 
   if (openItems.length === 0) {
-    root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div>';
+    root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn" onclick="goPedidosTab(\'novo\')">Criar pedido</button>';
     return;
   }
 
@@ -12399,13 +12586,18 @@ function renderKanban() {
   openItems.forEach(o => { byStatus[o.status].push(o); });
   Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) => a.createdAt - b.createdAt));
 
-  root.innerHTML = KANBAN_COLS.map(col => {
+  const overview = `
+    <div class="kanban-overview" aria-label="Resumo da esteira">
+      ${KANBAN_COLS.map(col => `<button type="button" data-kjump="${col.key}" onclick="jumpKanban('${col.key}')"><strong>${byStatus[col.key].length}</strong><span>${col.label}</span></button>`).join('')}
+    </div>`;
+
+  root.innerHTML = overview + KANBAN_COLS.map(col => {
     const list = byStatus[col.key];
     const body = list.length === 0
       ? '<div class="kanban-col-empty">— vazio —</div>'
       : list.map(o => renderKanbanCard(o, col)).join('');
     return `
-      <div class="kanban-col col-${col.key}">
+      <div class="kanban-col col-${col.key}" id="kanban-col-${col.key}">
         <div class="kanban-col-header">
           <span>${col.label}</span>
           <span class="count">${list.length}</span>
@@ -12414,6 +12606,11 @@ function renderKanban() {
       </div>
     `;
   }).join('');
+}
+
+function jumpKanban(status) {
+  const el = document.getElementById('kanban-col-' + status);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderKanbanCard(o, col) {
@@ -17065,6 +17262,7 @@ function selectClient(c) {
   document.getElementById('clientSuggestions').innerHTML = '';
   renderSelectedClient();
   updateSaveOrderBtn();
+  renderOrderDraftSummary();
 }
 
 function renderSelectedClient() {
@@ -17103,6 +17301,7 @@ function clearClient() {
   document.getElementById('clientPicker').style.display = 'block';
   document.getElementById('clientSelected').style.display = 'none';
   updateSaveOrderBtn();
+  renderOrderDraftSummary();
 }
 
 function searchClient() {
@@ -17271,22 +17470,36 @@ function searchItem() {
 }
 function renderItemPickerList(q) {
   const list = document.getElementById('itemPickerList');
-  const matches = products.filter(p => !q || p.name.toLowerCase().includes(q));
+  const matches = products
+    .filter(p => !p.archived && (!q || p.name.toLowerCase().includes(q)))
+    .sort((a, b) => {
+      const pa = Number(a.price) > 0 ? 0 : 1;
+      const pb = Number(b.price) > 0 ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    });
   list.innerHTML = '';
   matches.forEach(p => {
     const item = document.createElement('button');
-    item.className = 'sug-item';
+    const hasPrice = Number(p.price) > 0;
+    item.className = 'sug-item' + (hasPrice ? '' : ' needs-price');
     const priceLabel = p.price ? money(p.price).replace(',00','') : '';
     const stockLabel = p.stock > 0
       ? `${p.stock} disp.`
       : (p.stock === 0 ? 'em falta' : `faltam ${Math.abs(p.stock)}`);
     const stockClass = p.stock <= 0 ? 'sr-warn' : '';
-    item.innerHTML = `<div class="sn">${p.emoji} ${escapeHtml(p.name)}</div><div class="sr">${escapeHtml(p.unit || '')}${priceLabel ? ' · ' + priceLabel : ''} · <span class="${stockClass}">${stockLabel}</span></div>`;
-    item.onclick = () => addItemToOrder(p);
+    item.innerHTML = `<div class="sn">${p.emoji} ${escapeHtml(p.name)}</div><div class="sr">${escapeHtml(p.unit || '')}${priceLabel ? ' · ' + priceLabel : ' · sem preço'} · <span class="${stockClass}">${stockLabel}</span></div>`;
+    item.onclick = () => {
+      if (!hasPrice) { closeItemPicker(); openProductModalForEdit(p.id); return; }
+      addItemToOrder(p);
+    };
     list.appendChild(item);
   });
+  if (!matches.length && !q) {
+    list.innerHTML = '<div class="gs-empty"><strong>Nenhum produto ativo</strong>Cadastre produtos no catálogo para montar pedidos.</div>';
+  }
   if (q) {
-    const exact = products.some(p => p.name.toLowerCase() === q);
+    const exact = products.some(p => !p.archived && p.name.toLowerCase() === q);
     if (!exact) {
       const create = document.createElement('button');
       create.className = 'sug-item create';
@@ -17333,6 +17546,7 @@ function renderOrderItems() {
   if (currentOrderItems.length === 0) {
     counter.textContent = '';
     totalWrap.style.display = 'none';
+    renderOrderDraftSummary();
     return;
   }
   let total = 0;
@@ -17346,6 +17560,7 @@ function renderOrderItems() {
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
       </div>
+      <div class="item-subtotal">${money(it.qty * it.unitPrice).replace(',00','')}</div>
       <div class="qty-stepper" role="group" aria-label="Ajustar quantidade de ${escapeHtml(it.name)}">
         <button onclick="changeItemQty(${idx}, -1)" aria-label="Diminuir quantidade">−</button>
         <div class="q" aria-live="polite">${it.qty}</div>
@@ -17358,6 +17573,7 @@ function renderOrderItems() {
   counter.textContent = currentOrderItems.reduce((s,i) => s + i.qty, 0) + ' un';
   totalWrap.style.display = 'flex';
   document.getElementById('orderTotal').textContent = money(total);
+  renderOrderDraftSummary();
 }
 
 function changeItemQty(idx, delta) {
@@ -17383,8 +17599,33 @@ function updateSaveOrderBtn() {
   const notes = document.getElementById('orderNotes').value.trim();
   // Pra salvar: precisa ter cliente + (pelo menos 1 item OU observação preenchida)
   btn.disabled = !selectedClient || (currentOrderItems.length === 0 && !notes);
+  const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  btn.textContent = btn.disabled
+    ? 'Salvar pedido'
+    : 'Salvar ' + (total > 0 ? money(total) : 'pedido');
+  renderOrderDraftSummary();
 }
 document.getElementById('orderNotes').addEventListener('input', updateSaveOrderBtn);
+
+function renderOrderDraftSummary() {
+  const wrap = document.getElementById('orderDraftSummary');
+  if (!wrap) return;
+  const title = document.getElementById('odsTitle');
+  const sub = document.getElementById('odsSub');
+  const totalEl = document.getElementById('odsTotal');
+  const qty = currentOrderItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+  const total = currentOrderItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
+  const hasClient = !!selectedClient;
+  const hasItems = qty > 0;
+  wrap.classList.toggle('ready', hasClient && hasItems);
+  title.textContent = hasClient
+    ? (selectedClient === 'avulso' ? 'Cliente avulso' : selectedClient.name)
+    : 'Escolha o cliente';
+  sub.textContent = hasItems
+    ? qty + ' un. em ' + currentOrderItems.length + ' produto' + (currentOrderItems.length === 1 ? '' : 's')
+    : (hasClient ? 'Adicione itens ao pedido' : '0 itens');
+  totalEl.textContent = money(total).replace(',00','');
+}
 
 function saveOrder() {
   if (!selectedClient) return;
@@ -18276,6 +18517,7 @@ function showUndoToast(msg, undoFn, opts) {
 renderProductGrid();
 renderRecents();
 renderOrderItems();
+renderOrderDraftSummary();
 renderHome();
 renderOrdersFeed();
 updateSync();
@@ -18749,7 +18991,7 @@ if ('serviceWorker' in navigator) {
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=20260511a').then(reg => {
+    navigator.serviceWorker.register('sw.js?v=20260511b').then(reg => {
       // Quando um SW novo entra em "installing", aguarda terminar e manda
       // SKIP_WAITING — assim ele assume controle sem o operador precisar
       // fechar/reabrir o app.
