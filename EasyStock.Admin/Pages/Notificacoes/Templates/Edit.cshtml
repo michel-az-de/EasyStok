@@ -63,15 +63,36 @@
                     <h2 class="text-white font-semibold">Conteúdo</h2>
                     <div>
                         <label class="label-dark">Assunto</label>
-                        <input asp-for="AssuntoTemplate" class="input-dark w-full"
+                        <input asp-for="AssuntoTemplate" class="input-dark w-full" id="campo-assunto"
                                placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
                         <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
                     </div>
                     <div>
                         <label class="label-dark">Corpo (HTML)</label>
-                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs"
+                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs" id="campo-corpo"
                                   rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
                     </div>
+
+                    @if (Model.VariaveisDisponiveis.Count > 0)
+                    {
+                        <div>
+                            <label class="label-dark">Variáveis disponíveis para @Model.TipoEvento</label>
+                            <p class="text-slate-500 text-xs mb-2">Clique para inserir no campo focado (assunto ou corpo).</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach (var v in Model.VariaveisDisponiveis)
+                                {
+                                    <button type="button"
+                                            class="px-2 py-1 rounded bg-slate-800 hover:bg-amber-900/40 border border-slate-700 hover:border-amber-500 text-amber-400 font-mono text-xs transition-colors"
+                                            title="@v.Tipo — @v.Descricao @(string.IsNullOrEmpty(v.Exemplo) ? "" : $"(ex: {v.Exemplo})")"
+                                            onclick="inserirVariavel('@v.Nome')">{{ @v.Nome }}</button>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(Model.TipoEvento))
+                    {
+                        <p class="text-slate-500 text-xs">Nenhuma variável catalogada para <code class="text-amber-400">@Model.TipoEvento</code>. Você pode usar qualquer nome Scriban — verifique no preview.</p>
+                    }
                 </div>
 
                 <div class="flex gap-3">
@@ -84,6 +105,27 @@
                 </div>
             </form>
         </div>
+
+        <script>
+            let _campoFocado = null;
+            document.addEventListener('focusin', (e) => {
+                if (e.target.id === 'campo-assunto' || e.target.id === 'campo-corpo') {
+                    _campoFocado = e.target;
+                }
+            });
+            function inserirVariavel(nome) {
+                const alvo = _campoFocado || document.getElementById('campo-corpo');
+                if (!alvo) return;
+                const texto = '{{ ' + nome + ' }}';
+                const inicio = alvo.selectionStart ?? alvo.value.length;
+                const fim = alvo.selectionEnd ?? alvo.value.length;
+                alvo.value = alvo.value.slice(0, inicio) + texto + alvo.value.slice(fim);
+                alvo.focus();
+                const pos = inicio + texto.length;
+                alvo.setSelectionRange(pos, pos);
+                alvo.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        </script>
 
         @if (Model.PreviewResult.HasValue)
         {

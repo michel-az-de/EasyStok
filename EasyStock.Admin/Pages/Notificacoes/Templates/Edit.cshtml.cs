@@ -19,7 +19,10 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
 
     public JsonElement? TemplateAtual { get; private set; }
     public JsonElement? PreviewResult { get; private set; }
+    public List<VariavelOpcao> VariaveisDisponiveis { get; private set; } = new();
     public string? Erro { get; private set; }
+
+    public sealed record VariavelOpcao(string Nome, string Tipo, string Descricao, string Exemplo);
 
     public async Task OnGetAsync()
     {
@@ -44,6 +47,31 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 logger.LogError(ex, "Erro ao carregar template {Id}", Id);
                 Erro = "Erro ao carregar template.";
             }
+        }
+        await CarregarVariaveisAsync();
+    }
+
+    private async Task CarregarVariaveisAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TipoEvento)) return;
+        try
+        {
+            var result = await api.GetRawAsync($"api/admin/notificacoes/variaveis-catalogo?tipoEvento={TipoEvento}");
+            var data = result.GetProperty("data");
+            if (data.ValueKind != JsonValueKind.Array) return;
+            foreach (var v in data.EnumerateArray())
+            {
+                VariaveisDisponiveis.Add(new VariavelOpcao(
+                    v.GetProperty("nomeVariavel").GetString() ?? "",
+                    v.TryGetProperty("tipo", out var tp) ? tp.GetString() ?? "" : "",
+                    v.TryGetProperty("descricao", out var ds) ? ds.GetString() ?? "" : "",
+                    v.TryGetProperty("exemplo", out var ex) ? ex.GetString() ?? "" : ""));
+            }
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao carregar variáveis disponíveis para TipoEvento {TipoEvento}", TipoEvento);
         }
     }
 

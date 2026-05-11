@@ -17,6 +17,7 @@ public sealed class AdminNotificacoesController(
     IConfiguracaoCanalRepository canalRepo,
     IBloqueioNotificacaoRepository bloqueioRepo,
     IConsentimentoRepository consentimentoRepo,
+    IVariavelTemplateCatalogoRepository variaveisRepo,
     ICurrentUserAccessor currentUser,
     CriarTemplateUseCase criarTemplate,
     AtualizarTemplateUseCase atualizarTemplate,
@@ -93,6 +94,15 @@ public sealed class AdminNotificacoesController(
         var result = await previewTemplate.ExecuteAsync(
             new PreviewTemplateCommand(req.TemplateId, req.Variaveis ?? new Dictionary<string, object?>()));
         return DataOk(result);
+    }
+
+    [HttpGet("variaveis-catalogo")]
+    public async Task<IActionResult> ListarVariaveis([FromQuery] string tipoEvento)
+    {
+        if (!Enum.TryParse<TipoEventoNotificacao>(tipoEvento, out var tipo))
+            return DataBadRequest("tipoEvento inválido.");
+        var items = await variaveisRepo.ListarPorTipoEventoAsync(tipo);
+        return DataOk(items);
     }
 
     // ── Rotinas ────────────────────────────────────────────────────────────────

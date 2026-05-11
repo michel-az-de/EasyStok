@@ -13,7 +13,7 @@
         <a href="/Notificacoes/Templates/Edit" class="btn-primary px-4 py-2 text-sm">+ Novo Template</a>
     </div>
 
-    <form method="get" class="flex gap-3 flex-wrap">
+    <form method="get" class="flex gap-3 flex-wrap items-center">
         <select name="canal" class="input-dark text-sm">
             <option value="">Todos os canais</option>
             <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
@@ -39,6 +39,10 @@
             <option value="false">Inativos</option>
         </select>
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
+
+        <input type="text" id="busca-textual" placeholder="Buscar nesta página (código ou nome)..."
+               class="input-dark text-sm flex-1 min-w-[16rem]"
+               @@input="$dispatch('busca', $event.target.value)" x-data />
     </form>
 
     @if (Model.Erro != null)
@@ -71,8 +75,11 @@
                         var versao = t.TryGetProperty("versao", out var v) ? v.GetInt32() : 0;
                         var ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
                         var aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
+                        var atualizadoEm = t.TryGetProperty("atualizadoEm", out var aem) ? aem.GetString() : null;
+                        var atualizadoPor = t.TryGetProperty("atualizadoPor", out var apr) ? apr.GetString() : null;
 
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors">
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors busca-linha"
+                            data-codigo="@(codigo?.ToLowerInvariant())" data-nome="@(nome?.ToLowerInvariant())">
                             <td class="px-4 py-3">
                                 <div class="font-mono text-amber-400 text-xs">@codigo</div>
                                 <div class="text-white">@nome</div>
@@ -93,15 +100,31 @@
                                 {
                                     <span class="badge-gray">Inativo</span>
                                 }
+                                @if (aprovado && !string.IsNullOrWhiteSpace(atualizadoEm))
+                                {
+                                    <div class="text-xs text-slate-500 mt-1" title="@atualizadoEm — @atualizadoPor"
+                                         x-data x-init="$el.textContent = 'aprovado há ' + tempoDecorrido('@atualizadoEm') + (('@atualizadoPor') ? ' · ' + '@atualizadoPor' : '')"></div>
+                                }
+                                else if (!aprovado && !string.IsNullOrWhiteSpace(atualizadoEm))
+                                {
+                                    <div class="text-xs text-slate-500 mt-1" title="@atualizadoEm"
+                                         x-data x-init="$el.textContent = 'editado há ' + tempoDecorrido('@atualizadoEm')"></div>
+                                }
                             </td>
-                            <td class="px-4 py-3 flex gap-2">
+                            <td class="px-4 py-3 flex gap-2 items-center">
                                 <a href="/Notificacoes/Templates/Edit?id=@id" class="text-blue-400 hover:text-blue-300 text-xs">Editar</a>
                                 @if (ativo && !aprovado)
                                 {
-                                    <form method="post" asp-page-handler="Aprovar" class="inline">
-                                        <input type="hidden" name="id" value="@id" />
-                                        <button type="submit" class="text-green-400 hover:text-green-300 text-xs">Aprovar</button>
-                                    </form>
+                                    <button type="button"
+                                            @@click="$dispatch('open-justificar', {
+                                                endpoint: '?handler=Aprovar',
+                                                acao: 'Aprovar template',
+                                                resumo: 'O template @nome (@codigo v@versao) ficará disponível para envio.',
+                                                variant: 'primary',
+                                                confirmLabel: 'Aprovar (auditado)',
+                                                extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@id&quot; />'
+                                            })"
+                                            class="text-green-400 hover:text-green-300 text-xs">Aprovar</button>
                                 }
                             </td>
                         </tr>
@@ -122,3 +145,32 @@
         </div>
     }
 </div>
+
+@await Html.PartialAsync("_ModalJustificativa")
+
+<script>
+function tempoDecorrido(iso) {
+    if (!iso) return '';
+    const diff = Date.now() - new Date(iso).getTime();
+    if (isNaN(diff) || diff < 0) return '';
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return s + 's';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + ' min';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h';
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + 'd';
+    return Math.floor(d / 30) + ' mês(es)';
+}
+
+window.addEventListener('busca', (e) => {
+    const termo = (e.detail || '').toString().trim().toLowerCase();
+    document.querySelectorAll('.busca-linha').forEach(row => {
+        if (!termo) { row.style.display = ''; return; }
+        const codigo = row.getAttribute('data-codigo') || '';
+        const nome = row.getAttribute('data-nome') || '';
+        row.style.display = (codigo.includes(termo) || nome.includes(termo)) ? '' : 'none';
+    });
+});
+</script>

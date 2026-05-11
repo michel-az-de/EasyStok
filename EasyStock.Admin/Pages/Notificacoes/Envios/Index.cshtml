@@ -68,8 +68,8 @@
                         var outboxId = log.TryGetProperty("outboxMensagemId", out var oid) ? oid.GetString() : "";
                         var erro = log.TryGetProperty("erroDetalhado", out var er) && er.ValueKind != System.Text.Json.JsonValueKind.Null ? er.GetString() : null;
 
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40" title="@erro">
-                            <td class="px-4 py-3 font-mono text-slate-500 text-xs">@(outboxId?.Substring(0, 8))…</td>
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                            <td class="px-4 py-3 font-mono text-slate-500 text-xs" title="@outboxId">@(outboxId is { Length: >= 8 } ? outboxId[..8] + "…" : outboxId)</td>
                             <td class="px-4 py-3 text-slate-300">@canal</td>
                             <td class="px-4 py-3 text-slate-400">@tentativa</td>
                             <td class="px-4 py-3 text-slate-400 font-mono text-xs">@provider</td>
