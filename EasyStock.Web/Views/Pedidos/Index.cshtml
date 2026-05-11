@@ -767,8 +767,8 @@ function novoPedidoModal() {
         },
         comboboxNavega(delta) {
             this.comboboxOpen = true;
-            const max = this.clientesFiltrados.length; // +1 = "cadastrar novo"
-            if (max < 0) return;
+            // max = índice da opção "Cadastrar novo" (= length, pois é a última da lista)
+            const max = this.clientesFiltrados.length;
             this.comboboxIndex = Math.max(0, Math.min(max, this.comboboxIndex + delta));
         },
         comboboxEnter() {

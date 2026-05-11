@@ -4,6 +4,46 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 
 ---
 
+## 2026-05-11 — Commit 5bc4648: fix(pedidos) reset no reabrir + cadastrar produto sempre visível
+
+### Arquivos analisados (2 arquivos do commit 5bc4648)
+
+| Arquivo | Status |
+|---|---|
+| `EasyStock.Web/Views/Pedidos/Index.cshtml` | **Fix aplicado** — guarda morta removida + comentário corrigido |
+| `EasyStock.Web/wwwroot/css/app.css` | **Fix aplicado** — 2 blocos de CSS morto removidos |
+
+### Fixes aplicados
+
+#### 1. `Index.cshtml` — guarda morta em `comboboxNavega` removida
+
+- `if (max < 0) return;` nunca podia ser verdadeiro: `clientesFiltrados.length` é sempre `>= 0`.
+- Comentário `// +1 = "cadastrar novo"` era enganoso — o `+1` nunca estava no código. Corrigido para explicar que `max === length` = índice da opção "Cadastrar novo" (última da lista, 0-indexado).
+
+#### 2. `app.css` — `.ped-combobox__clear` e `.ped-combobox__empty` removidos
+
+- `.ped-combobox__clear` (+ `:hover`): botão "X" para limpar o combobox de cliente. A UI usa um `<button>` com classes Tailwind inline para essa função; a classe CSS nunca foi aplicada a nenhum elemento.
+- `.ped-combobox__empty`: estado "sem resultados" do combobox. O template atual não renderiza esse elemento — lista desaparece ou mostra apenas "Cadastrar novo".
+- Confirmado ausência em `EasyStock.Web/**`, `EasyStock.Api/wwwroot/pwa/**` e `EasyStok.Mobile/Resources/Raw/pwa/**`.
+
+### Verificações desta rodada (nenhuma alteração necessária)
+
+| Arquivo / Elemento | Resultado |
+|---|---|
+| `.ped-tab`, `.ped-tabs` (CSS) | Usados em `Views/Caixa/Index.cshtml` — não remover |
+| `console.log/group/table` no submit | Intencional — logging de diagnóstico do operador |
+| `tempoRelativo` definido 2× (C# + JS) | Funções distintas: C# = server-side Razor, JS = Alpine.js client-side |
+| `_preflight` duplica lógica de `clienteValido` | Intencional — `podeEnviar` controla estado do botão, `_preflight` gera mensagem detalhada |
+| CSS novo: `.ped-prod-dropdown__create` sticky | Correto — resolve bug de visibilidade do botão "+ Cadastrar como novo produto" |
+| CSS novo: `.ped-prod-input--pendente` + `.ped-prod-pendente-hint` | Correto — feedback visual de item não consolidado |
+
+### Padrões observados
+
+- Guardar `length` de array em `max` sem adicionarmos o +1 que o comentário mencionava é um padrão desleixado que sobrevive em loops de keyboard-nav — varrer outros comboboxes se forem criados no projeto.
+- CSS utility classes (clear button, empty state) são pré-criadas junto com o componente mas removidas do template quando o design muda, ficando como dead CSS. Monitorar esse padrão em novos componentes Alpine.
+
+---
+
 ## 2026-05-07 — Cleanup fb4f08e: polish billing F12 + Mongo (segunda passagem)
 
 ### Arquivos analisados (4 arquivos .cs do commit fb4f08e)
