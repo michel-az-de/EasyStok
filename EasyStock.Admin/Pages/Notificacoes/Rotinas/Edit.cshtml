@@ -21,18 +21,18 @@
         {
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Código</label>
-                    <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_cron" />
+                    <label class="form-label">Código</label>
+                    <input asp-for="Codigo" class="form-input w-full font-mono" placeholder="produto_vencendo_cron" />
                 </div>
                 <div>
-                    <label class="label-dark">Nome</label>
-                    <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Diário" />
+                    <label class="form-label">Nome</label>
+                    <input asp-for="Nome" class="form-input w-full" placeholder="Produto Vencendo — Diário" />
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Tipo de Evento</label>
-                    <select asp-for="TipoEvento" class="input-dark w-full" @@change="tipoEvento = $event.target.value">
+                    <label class="form-label">Tipo de Evento</label>
+                    <select asp-for="TipoEvento" class="form-input w-full" @@change="tipoEvento = $event.target.value">
                         <option value="ProdutoVencendo">Produto Vencendo</option>
                         <option value="AssinaturaExpirando">Assinatura Expirando</option>
                         <option value="AlertaEstoqueCritico">Alerta Estoque</option>
@@ -40,8 +40,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="label-dark">Trigger</label>
-                    <select asp-for="TriggerTipo" class="input-dark w-full" @@change="trigger = $event.target.value">
+                    <label class="form-label">Trigger</label>
+                    <select asp-for="TriggerTipo" class="form-input w-full" @@change="trigger = $event.target.value">
                         <option value="Cron">Cron</option>
                         <option value="Evento">Evento (imediato)</option>
                     </select>
@@ -49,8 +49,8 @@
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Código do Template</label>
-                    <select asp-for="TemplateCodigo" class="input-dark w-full font-mono">
+                    <label class="form-label">Código do Template</label>
+                    <select asp-for="TemplateCodigo" class="form-input w-full font-mono">
                         <option value="">— selecione um template —</option>
                         @foreach (var tpl in Model.TemplatesDisponiveis)
                         {
@@ -64,8 +64,8 @@
                     <p class="text-slate-500 text-xs mt-1">Filtrado pelo Tipo de Evento selecionado.</p>
                 </div>
                 <div>
-                    <label class="label-dark">Categoria</label>
-                    <select asp-for="Categoria" class="input-dark w-full">
+                    <label class="form-label">Categoria</label>
+                    <select asp-for="Categoria" class="form-input w-full">
                         <option value="Transacional">Transacional</option>
                         <option value="Operacional">Operacional</option>
                         <option value="Marketing">Marketing</option>
@@ -75,8 +75,8 @@
         }
 
         <div x-show="trigger === 'Cron'" x-transition>
-            <label class="label-dark">Expressão Cron</label>
-            <input asp-for="CronExpression" class="input-dark w-full font-mono" placeholder="0 8 * * *" />
+            <label class="form-label">Expressão Cron</label>
+            <input asp-for="CronExpression" class="form-input w-full font-mono" placeholder="0 8 * * *" />
             <details class="text-slate-500 text-xs mt-1 cursor-pointer">
                 <summary class="hover:text-slate-300">Formato padrão de 5 campos — clique para ver exemplos</summary>
                 <ul class="mt-2 space-y-1 pl-2">
@@ -95,8 +95,8 @@
         </div>
 
         <div>
-            <label class="label-dark">Parâmetros (JSON)</label>
-            <textarea asp-for="ParametrosJson" class="input-dark w-full font-mono text-xs" rows="4"
+            <label class="form-label">Parâmetros (JSON)</label>
+            <textarea asp-for="ParametrosJson" class="form-input w-full font-mono text-xs" rows="4"
                       placeholder='{"diasAntes": [7, 3, 1]}'></textarea>
         </div>
 

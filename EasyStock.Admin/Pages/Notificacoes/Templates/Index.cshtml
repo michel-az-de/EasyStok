@@ -14,14 +14,14 @@
     </div>
 
     <form method="get" class="flex gap-3 flex-wrap items-center">
-        <select name="canal" class="input-dark text-sm">
+        <select name="canal" class="form-input text-sm">
             <option value="">Todos os canais</option>
             <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
             <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
             <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
             <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
         </select>
-        <select name="tipoEvento" class="input-dark text-sm">
+        <select name="tipoEvento" class="form-input text-sm">
             <option value="">Todos os eventos</option>
             <option value="ProdutoVencendo">Produto Vencendo</option>
             <option value="ProdutoVencido">Produto Vencido</option>
@@ -33,7 +33,7 @@
             <option value="AlertaEstoqueCritico">Alerta Estoque</option>
             <option value="BroadcastSuperAdmin">Broadcast</option>
         </select>
-        <select name="ativo" class="input-dark text-sm">
+        <select name="ativo" class="form-input text-sm">
             <option value="">Todos</option>
             <option value="true">Ativos</option>
             <option value="false">Inativos</option>
@@ -41,7 +41,7 @@
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
 
         <input type="text" id="busca-textual" placeholder="Buscar nesta página (código ou nome)..."
-               class="input-dark text-sm flex-1 min-w-[16rem]"
+               class="form-input text-sm flex-1 min-w-[16rem]"
                @@input="$dispatch('busca', $event.target.value)" x-data />
     </form>
 
@@ -86,7 +86,7 @@
                             </td>
                             <td class="px-4 py-3 text-slate-300">@canal</td>
                             <td class="px-4 py-3 text-slate-300 text-xs">@evento</td>
-                            <td class="px-4 py-3 text-slate-400">v@versao</td>
+                            <td class="px-4 py-3 text-slate-400">v@(versao)</td>
                             <td class="px-4 py-3">
                                 @if (ativo && aprovado)
                                 {
@@ -119,7 +119,7 @@
                                             @@click="$dispatch('open-justificar', {
                                                 endpoint: '?handler=Aprovar',
                                                 acao: 'Aprovar template',
-                                                resumo: 'O template @nome (@codigo v@versao) ficará disponível para envio.',
+                                                resumo: 'O template @nome (@codigo v@(versao)) ficará disponível para envio.',
                                                 variant: 'primary',
                                                 confirmLabel: 'Aprovar (auditado)',
                                                 extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@id&quot; />'

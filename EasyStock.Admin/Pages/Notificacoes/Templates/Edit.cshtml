@@ -27,17 +27,17 @@
                     <div class="card p-4 space-y-4">
                         <h2 class="text-white font-semibold">Identificação</h2>
                         <div>
-                            <label class="label-dark">Código</label>
-                            <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
+                            <label class="form-label">Código</label>
+                            <input asp-for="Codigo" class="form-input w-full font-mono" placeholder="produto_vencendo_email_v1" />
                         </div>
                         <div>
-                            <label class="label-dark">Nome</label>
-                            <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Email" />
+                            <label class="form-label">Nome</label>
+                            <input asp-for="Nome" class="form-input w-full" placeholder="Produto Vencendo — Email" />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="label-dark">Canal</label>
-                                <select asp-for="Canal" class="input-dark w-full">
+                                <label class="form-label">Canal</label>
+                                <select asp-for="Canal" class="form-input w-full">
                                     <option value="Email">Email</option>
                                     <option value="Sms">SMS</option>
                                     <option value="WhatsApp">WhatsApp</option>
@@ -45,8 +45,8 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="label-dark">Tipo de Evento</label>
-                                <select asp-for="TipoEvento" class="input-dark w-full">
+                                <label class="form-label">Tipo de Evento</label>
+                                <select asp-for="TipoEvento" class="form-input w-full">
                                     <option value="ProdutoVencendo">Produto Vencendo</option>
                                     <option value="ProdutoVencido">Produto Vencido</option>
                                     <option value="AssinaturaExpirando">Assinatura Expirando</option>
@@ -61,22 +61,30 @@
 
                 <div class="card p-4 space-y-4">
                     <h2 class="text-white font-semibold">Conteúdo</h2>
+                    @if (Model.Id.HasValue)
+                    {
+                        <div class="flex flex-wrap gap-4 text-xs text-slate-400 pb-3 border-b border-slate-700">
+                            <span><span class="text-slate-500">Código</span> <code class="text-amber-400 ml-1">@Model.Codigo</code></span>
+                            <span><span class="text-slate-500">Canal</span> <span class="text-white ml-1">@Model.Canal</span></span>
+                            <span><span class="text-slate-500">Evento</span> <span class="text-white ml-1">@Model.TipoEvento</span></span>
+                        </div>
+                    }
                     <div>
-                        <label class="label-dark">Assunto</label>
-                        <input asp-for="AssuntoTemplate" class="input-dark w-full" id="campo-assunto"
+                        <label class="form-label">Assunto</label>
+                        <input asp-for="AssuntoTemplate" class="form-input w-full" id="campo-assunto"
                                placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
                         <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
                     </div>
                     <div>
-                        <label class="label-dark">Corpo (HTML)</label>
-                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs" id="campo-corpo"
+                        <label class="form-label">Corpo (HTML)</label>
+                        <textarea asp-for="CorpoTemplate" class="form-input w-full font-mono text-xs" id="campo-corpo"
                                   rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
                     </div>
 
                     @if (Model.VariaveisDisponiveis.Count > 0)
                     {
                         <div>
-                            <label class="label-dark">Variáveis disponíveis para @Model.TipoEvento</label>
+                            <label class="form-label">Variáveis disponíveis para @Model.TipoEvento</label>
                             <p class="text-slate-500 text-xs mb-2">Clique para inserir no campo focado (assunto ou corpo).</p>
                             <div class="flex flex-wrap gap-2">
                                 @foreach (var v in Model.VariaveisDisponiveis)

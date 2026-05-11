@@ -15,22 +15,22 @@
     </div>
 
     <form method="get" class="flex gap-3 flex-wrap">
-        <select name="status" class="input-dark text-sm">
+        <select name="status" class="form-input text-sm">
             <option value="">Todos os status</option>
             <option value="Pendente" selected="@(Model.Status == "Pendente")">Pendente</option>
             <option value="Enviado" selected="@(Model.Status == "Enviado")">Enviado</option>
             <option value="Falhado" selected="@(Model.Status == "Falhado")">Falhado</option>
             <option value="Suprimido" selected="@(Model.Status == "Suprimido")">Suprimido</option>
         </select>
-        <select name="canal" class="input-dark text-sm">
+        <select name="canal" class="form-input text-sm">
             <option value="">Todos os canais</option>
             <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
             <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
             <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
             <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
         </select>
-        <input type="date" name="de" value="@Model.De" class="input-dark text-sm" />
-        <input type="date" name="ate" value="@Model.Ate" class="input-dark text-sm" />
+        <input type="date" name="de" value="@Model.De" class="form-input text-sm" />
+        <input type="date" name="ate" value="@Model.Ate" class="form-input text-sm" />
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
     </form>
 
