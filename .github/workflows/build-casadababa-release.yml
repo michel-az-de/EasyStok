@@ -63,6 +63,11 @@ jobs:
         run: |
           echo "::add-mask::${{ inputs.pairingCode }}"
 
+      - name: Rewrite CACHE_VERSION
+        shell: pwsh
+        run: ./scripts/rewrite-cache-version.ps1 -Sha "${{ github.sha }}"
+
+
       - name: Install Capacitor deps
         working-directory: casa-da-baba-mobile/apk
         run: npm install --no-audit --no-fund

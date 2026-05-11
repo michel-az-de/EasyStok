@@ -1,0 +1,170 @@
+# EasyStok — Render Blueprint
+#
+# Cobre os 4 serviços de produção (api / web / admin / worker) + Preview Envs
+# por PR. Render é canal único; Azure foi descomissionado.
+#
+# Como aplicar:
+#   1. Render Dashboard → New → Blueprint → conectar este repositório.
+#   2. Criar o envVarGroup `easystok-secrets` no dashboard com as chaves
+#      listadas em `envVarGroups` (Postgres, JWT, Redis, EFI Pix etc.).
+#   3. Para Preview Envs, criar grupo `easystok-secrets-preview` com DB efêmero.
+#
+# Zero-downtime: Render mantém versão antiga até /health do novo container
+# retornar 200; healthCheckPath garante rollback automático se quebrar.
+
+previewsEnabled: true
+previewsExpireAfterDays: 7
+
+services:
+  # ── API ──────────────────────────────────────────────────────────────────
+  - type: web
+    name: easystok-api
+    runtime: docker
+    region: oregon
+    plan: standard
+    branch: master
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: easystok-secrets
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: BUILD_SHA
+        value: master  # CI sobrescreve via deploy hook payload
+    previews:
+      generation: automatic
+      envVars:
+        - fromGroup: easystok-secrets-preview
+        - key: ASPNETCORE_ENVIRONMENT
+          value: Preview
+
+  # ── Web (PWA + Portal + /downloads/apk) ──────────────────────────────────
+  - type: web
+    name: easystok-web
+    runtime: docker
+    region: oregon
+    plan: standard
+    branch: master
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile.Web
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: easystok-secrets
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8081
+      - key: ApiSettings__BaseUrl
+        fromService:
+          name: easystok-api
+          type: web
+          property: hostport
+    previews:
+      generation: automatic
+      envVars:
+        - fromGroup: easystok-secrets-preview
+        - key: ASPNETCORE_ENVIRONMENT
+          value: Preview
+        - key: ApiSettings__BaseUrl
+          fromService:
+            name: easystok-api
+            type: web
+            property: hostport
+
+  # ── Admin ────────────────────────────────────────────────────────────────
+  - type: web
+    name: easystok-admin
+    runtime: docker
+    region: oregon
+    plan: standard
+    branch: master
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile.cloudrun.admin
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: easystok-secrets
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+    previews:
+      generation: automatic
+      envVars:
+        - fromGroup: easystok-secrets-preview
+        - key: ASPNETCORE_ENVIRONMENT
+          value: Preview
+
+  # ── Worker (background jobs) ─────────────────────────────────────────────
+  - type: worker
+    name: easystok-worker
+    runtime: docker
+    region: oregon
+    plan: standard
+    branch: master
+    autoDeploy: true
+    dockerfilePath: ./EasyStock.Worker/Dockerfile
+    dockerContext: .
+    envVars:
+      - fromGroup: easystok-secrets
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+    previews:
+      generation: automatic
+      envVars:
+        - fromGroup: easystok-secrets-preview
+        - key: ASPNETCORE_ENVIRONMENT
+          value: Preview
+
+# ── Grupos de variáveis ────────────────────────────────────────────────────
+# Os valores são preenchidos no dashboard Render. NUNCA commitar segredos.
+envVarGroups:
+  - name: easystok-secrets
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__Issuer
+        sync: false
+      - key: Jwt__Audience
+        sync: false
+      - key: Redis__ConnectionString
+        sync: false
+      - key: EFI_PIX_CLIENT_ID
+        sync: false
+      - key: EFI_PIX_CLIENT_SECRET
+        sync: false
+      - key: EFI_PIX_KEY
+        sync: false
+      - key: Mobile__RequireApiKey
+        value: "true"
+      - key: Mobile__MinSupportedSchemaVersion
+        value: "2"
+      - key: Mobile__Apk__Url
+        value: "https://easystok-web.onrender.com/downloads/apk"
+
+  # Preview envs: DB efêmero, segredos isolados, sem acesso a prod.
+  - name: easystok-secrets-preview
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__Issuer
+        value: "easystok-preview"
+      - key: Jwt__Audience
+        value: "easystok-preview"
+      - key: Redis__ConnectionString
+        sync: false
+      - key: Mobile__RequireApiKey
+        value: "false"
+      - key: Mobile__MinSupportedSchemaVersion
+        value: "2"
+      - key: Mobile__Apk__Url
+        value: ""
