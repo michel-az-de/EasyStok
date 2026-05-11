@@ -549,3 +549,27 @@ button:focus-visible {
 }
 /* Fallback CSS-only para main content */
 .app-main > * { animation: anim-fadeInUp 240ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
+
+/* ---------- Nav progress (top-of-page loading bar) ---------- */
+.nav-progress {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+}
+.nav-progress--active { opacity: 1; }
+.nav-progress--done { opacity: 0; transition: opacity 320ms ease-in 60ms; }
+.nav-progress__fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--navy-700, #1E48A8) 0%, var(--accent, #E85814) 100%);
+  box-shadow: 0 0 8px 0 rgba(30, 72, 168, 0.45);
+  transition: width 240ms cubic-bezier(.4, 0, .2, 1);
+  border-radius: 0 2px 2px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress, .nav-progress__fill { transition: none; }
+}
