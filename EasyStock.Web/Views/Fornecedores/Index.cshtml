@@ -90,7 +90,7 @@
                         <td>
                             @{ var ativo = f.Status == "ativo"; }
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
-                                        @(ativo ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                                        @(ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
                                 <span class="w-1.5 h-1.5 rounded-full @(ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
                                 @(string.IsNullOrWhiteSpace(f.Status) ? "—" : char.ToUpperInvariant(f.Status[0]) + f.Status[1..].ToLowerInvariant())
                             </span>

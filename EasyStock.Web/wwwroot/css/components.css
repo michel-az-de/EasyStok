@@ -133,6 +133,11 @@
 button:focus-visible {
   outline-color: var(--orange-500);
 }
+/* Em dark mode, navy-500 fica abafado sobre sidebar/surfaces navy-900.
+   Trocamos pro laranja que tem 5.2:1 sobre navy-900 (passa WCAG AA). */
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--orange-500);
+}
 
 /* ---------- Skeleton loader (T1.2) ---------- */
 .skeleton {

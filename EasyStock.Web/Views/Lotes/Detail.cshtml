@@ -6,7 +6,7 @@
 
     string statusPill = l.Status switch {
         "em_producao" => "bg-blue-50 text-blue-700 ring-blue-200",
-        "finalizado"  => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+        "finalizado"  => "bg-emerald-50 text-emerald-800 ring-emerald-200",
         "expirado"    => "bg-red-50 text-red-700 ring-red-200",
         _             => "bg-slate-50 text-slate-600 ring-slate-200"
     };
@@ -24,16 +24,16 @@
     };
 
     string etqStatusClass(string s) => s switch {
-        "conferida"  => "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+        "conferida"  => "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200",
         "divergente" => "bg-red-50 text-red-700 ring-1 ring-red-200",
         "consumida"  => "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
-        _            => "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+        _            => "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
     };
 }
 
 <div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Lotes" class="text-slate-400 hover:text-slate-600">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a asp-action="Index" asp-controller="Lotes" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para lotes">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
     </a>
@@ -169,7 +169,7 @@
                             }
                             @if (!string.IsNullOrEmpty(e.ObservacaoConferencia))
                             {
-                                <div class="text-[10px] text-amber-700 mt-1">⚠ @e.ObservacaoConferencia</div>
+                                <div class="text-[10px] text-amber-800 mt-1">⚠ @e.ObservacaoConferencia</div>
                             }
                         </div>
                     }
