@@ -907,6 +907,37 @@
     }
   }
 
+  // F5: heartbeat enviado junto com pingVersion. Mantem visivel no dashboard de
+  // logs qual fracao da frota esta em qual CACHE_VERSION/schema, e o tamanho da
+  // fila local. Nao bloqueia o boot; falha silenciosa.
+  function sendHeartbeat(versionPayload) {
+    if (!navigator.onLine) return;
+    try {
+      const installed = (function () {
+        try { return localStorage.getItem('cdb-pwa-installed-version') || null; } catch (_) { return null; }
+      })();
+      const lastSync = (function () {
+        try { return parseInt(localStorage.getItem(LAST_FULL_SYNC_KEY) || '0', 10) || 0; } catch (_) { return 0; }
+      })();
+      const body = {
+        deviceId,
+        cacheVersion: installed
+          || (versionPayload && versionPayload.Ota && versionPayload.Ota.PwaCacheVersion)
+          || null,
+        schemaVersion: (versionPayload && versionPayload.MobileSchemaVersion) || 0,
+        queueSize: loadQueue().length,
+        lastSyncAt: lastSync,
+        online: !!navigator.onLine
+      };
+      fetch(API_BASE_URL + API_PREFIX + '/diagnostics/heartbeat', {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body),
+        keepalive: true
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   async function pingVersion() {
     if (!navigator.onLine) return null;
     try {
@@ -932,6 +963,8 @@
       // update do SW + reload assim que o novo SW assumir controle. Falha
       // silenciosa: app continua funcionando offline com o bundle atual.
       try { await maybeApplyPwaUpdate(data); } catch (e) {}
+      // F5: heartbeat best-effort — alimenta dashboard de versao lag por device.
+      try { sendHeartbeat(data); } catch (e) {}
       return data;
     } catch (e) {
       // Sem rede / timeout / DNS / TLS — silencioso. PWA continua offline.
@@ -952,6 +985,93 @@
   const PWA_INSTALLED_VERSION_KEY = 'cdb-pwa-installed-version';
   let _pwaUpdating = false;
 
+  // ---- F4: Drenagem segura pré-update + lock persistente + schema gate ----
+  //
+  // Antes de aplicar SKIP_WAITING + reload garantimos:
+  //   1. fila cdb-sync-queue drenada (nao perde venda em curso)
+  //   2. backup remoto pre-update feito (defesa contra corrupcao de storage)
+  //   3. nenhuma operacao critica em andamento (caixa aberto / venda em curso)
+  //
+  // cdb-update-in-progress mora no localStorage — sobrevive a reload e impede
+  // que um segundo ciclo dispare se o reload do controllerchange demorar.
+  const UPDATE_LOCK_KEY = 'cdb-update-in-progress';
+  const UPDATE_LOCK_TTL_MS = 5 * 60 * 1000;
+  // Schema minimo do servidor que esta versao do PWA requer. Bate com
+  // MobileVersionController.mobileSchemaVersion. Bump quando o PWA passar a
+  // depender de mutations/comandos novos.
+  const PWA_REQUIRED_API_VERSION = 2;
+
+  function acquireUpdateLock() {
+    try {
+      const raw = localStorage.getItem(UPDATE_LOCK_KEY);
+      if (raw) {
+        const ts = parseInt(raw, 10) || 0;
+        if (Date.now() - ts < UPDATE_LOCK_TTL_MS) return false;
+      }
+      localStorage.setItem(UPDATE_LOCK_KEY, String(Date.now()));
+      return true;
+    } catch (e) { return true; }
+  }
+
+  function releaseUpdateLock() {
+    try { localStorage.removeItem(UPDATE_LOCK_KEY); } catch (e) {}
+  }
+
+  function isCriticalOperationActive() {
+    try {
+      if (localStorage.getItem('cdb-caixa-aberto') === '1') return true;
+      if (localStorage.getItem('cdb-venda-em-curso') === '1') return true;
+    } catch (e) {}
+    return false;
+  }
+
+  // Loop ate fila vazia ou tentativas esgotadas. flush() ja tem seu proprio
+  // guard (flushing flag); aqui so esperamos entre tentativas e re-checamos
+  // o tamanho da fila persistida.
+  async function drainQueueWithBackoff(maxAttempts, perAttemptMs) {
+    maxAttempts = maxAttempts || 3;
+    perAttemptMs = perAttemptMs || 5000;
+    for (let i = 0; i < maxAttempts; i++) {
+      if (loadQueue().length === 0) return true;
+      try { await flush(); } catch (e) { /* flush eh defensivo */ }
+      await new Promise(r => setTimeout(r, perAttemptMs));
+      if (loadQueue().length === 0) return true;
+    }
+    return loadQueue().length === 0;
+  }
+
+  // Telemetria best-effort do ciclo de update. Em F5 vira POST formal pra
+  // /api/mobile/diagnostics/update — por ora envia como erro generico pro
+  // endpoint ja existente, com payload estruturado, sem bloquear o update.
+  async function logUpdateApplied(info) {
+    try {
+      if (!getApiKey() || !navigator.onLine) return;
+      const body = {
+        deviceId,
+        category: 'pwa.update.applied',
+        oldVersion: getInstalledPwaVersion() || null,
+        newVersion: (function () {
+          try {
+            const sv = JSON.parse(localStorage.getItem('cdb-server-version') || 'null');
+            return sv && sv.Ota && sv.Ota.PwaCacheVersion ? sv.Ota.PwaCacheVersion : null;
+          } catch (_) { return null; }
+        })(),
+        queueSize: loadQueue().length,
+        drainedOk: !!(info && info.drainedOk),
+        backupOk: !!(info && info.backupOk),
+        force: !!(info && info.force),
+        at: Date.now()
+      };
+      // Endpoint existente aceita payload livre; em F5 viramos pra rota dedicada.
+      fetch(API_BASE_URL + API_PREFIX + '/diagnostics/errors', {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ message: 'pwa.update', context: body }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
   function getInstalledPwaVersion() {
     try { return localStorage.getItem(PWA_INSTALLED_VERSION_KEY) || null; } catch (e) { return null; }
   }
@@ -963,6 +1083,17 @@
   async function maybeApplyPwaUpdate(versionPayload) {
     if (_pwaUpdating) return;
     if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistration) return;
+
+    // F4 Gate: se a API estiver em schema menor do que este PWA requer, NAO
+    // atualiza ainda. Render publica os 3 services em momentos diferentes;
+    // sem este gate, o PWA novo pode aterrissar antes do API novo e chamar
+    // endpoints que ainda nao existem.
+    const apiSchema = versionPayload && versionPayload.MobileSchemaVersion;
+    if (typeof apiSchema === 'number' && apiSchema < PWA_REQUIRED_API_VERSION) {
+      try { console.warn('[OTA] api schema', apiSchema, '< PWA requer', PWA_REQUIRED_API_VERSION, '— adiando update'); } catch (_) {}
+      return;
+    }
+
     const remote = versionPayload && versionPayload.Ota && versionPayload.Ota.PwaCacheVersion;
     if (!remote || typeof remote !== 'string') return;
 
@@ -987,8 +1118,50 @@
   async function triggerPwaUpdate(opts) {
     opts = opts || {};
     if (_pwaUpdating) return;
+
+    // F4: operacao critica em andamento? Adia 5min (a nao ser que force).
+    if (!opts.force && isCriticalOperationActive()) {
+      try { console.log('[OTA] caixa/venda em andamento — adiando update por 5min'); } catch (_) {}
+      setTimeout(() => triggerPwaUpdate(opts), 5 * 60 * 1000);
+      return;
+    }
+
+    // F4: lock persistente em localStorage — sobrevive a reload e impede
+    // re-entry quando o controllerchange demora pra acontecer.
+    if (!acquireUpdateLock()) {
+      try { console.log('[OTA] update lock ja segurado — ignorando trigger'); } catch (_) {}
+      return;
+    }
+
     _pwaUpdating = true;
+    let drainedOk = false;
+    let backupOk = false;
     try {
+      // F4: 1) drena a fila antes de aplicar (anti-perda de venda).
+      drainedOk = await drainQueueWithBackoff(3, 5000);
+      if (!drainedOk && !opts.force) {
+        try { console.warn('[OTA] fila com pendencias — postergando update 5min'); } catch (_) {}
+        releaseUpdateLock();
+        _pwaUpdating = false;
+        setTimeout(() => triggerPwaUpdate(opts), 5 * 60 * 1000);
+        return;
+      }
+
+      // F4: 2) backup remoto pre-update (defesa em profundidade).
+      try {
+        if (getApiKey() && navigator.onLine) {
+          await uploadBackup('pre-update');
+          backupOk = true;
+        }
+      } catch (e) {
+        try { console.warn('[OTA] backup pre-update falhou:', e && e.message); } catch (_) {}
+        // Nao abortamos por causa de backup falho: servidor ja retem ate 7d
+        // e o snapshot anterior continua valido. Apenas logamos.
+      }
+
+      // F4: 3) telemetria do ciclo (best-effort).
+      try { logUpdateApplied({ drainedOk, backupOk, force: !!opts.force }); } catch (_) {}
+
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
         if (opts.force) location.reload();
@@ -1033,9 +1206,11 @@
         setTimeout(() => { try { location.reload(); } catch (e) {} }, 1500);
       }
     } finally {
-      // Libera o lock depois de um pequeno tempo — evita reentry mas nao trava
-      // pra sempre se o reload nao acontecer.
-      setTimeout(() => { _pwaUpdating = false; }, 5000);
+      // Libera os locks depois de um pequeno tempo — evita reentry mas nao trava
+      // pra sempre se o reload nao acontecer. Tambem libera o lock persistente
+      // (cdb-update-in-progress) caso a pagina nao recarregue (ex: registration
+      // ja era nula). Em fluxo normal o reload limpa tudo via TTL.
+      setTimeout(() => { _pwaUpdating = false; releaseUpdateLock(); }, 5000);
     }
   }
 

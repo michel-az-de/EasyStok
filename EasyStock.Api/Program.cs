@@ -23,6 +23,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
@@ -660,6 +661,28 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
 {
     ResponseWriter = WriteHealthCheckJsonResponse
 });
+
+// /health/version — endpoint do schema gate do PWA.
+// Retorna a versao do contrato Mobile e SHA do build para que o cliente
+// decida se pode aplicar update OTA (sync.js > maybeApplyPwaUpdate gate).
+// Mantido separado do /api/mobile/version (que carrega features e OTA info)
+// para que probes leves de health/version nao precisem subir a stack toda.
+app.MapGet("/health/version", () =>
+{
+    var asm = Assembly.GetExecutingAssembly();
+    var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+               ?? asm.GetName().Version?.ToString()
+               ?? "unknown";
+    return Results.Ok(new
+    {
+        apiVersion = info,
+        mobileSchemaVersion = 2,
+        buildSha = Environment.GetEnvironmentVariable("BUILD_SHA") ?? "master",
+        serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+    });
+})
+.AllowAnonymous()
+.ExcludeFromDescription();
 
 // Aviso de seguranca em Production: o default agora e RequireApiKey=true
 // (appsettings.Production.json). Se algum operador setou Mobile__RequireApiKey=false

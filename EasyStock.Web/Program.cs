@@ -5,6 +5,7 @@ using EasyStock.Web.Middleware;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -164,7 +165,13 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStaticFiles();
+// .apk precisa do MIME correto para o Chrome/Edge baixar como arquivo
+// (e não tentar abrir como octet-stream genérico). Aplicado aqui pra
+// /downloads/easystok-*.apk servidos diretamente pelo middleware estático.
+var contentTypes = new FileExtensionContentTypeProvider();
+contentTypes.Mappings[".apk"] = "application/vnd.android.package-archive";
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
+
 app.UseRouting();
 app.UseSession();           // BEFORE Authentication
 app.UseAuthentication();
