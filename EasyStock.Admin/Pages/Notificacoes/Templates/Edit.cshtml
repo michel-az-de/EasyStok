@@ -1,17 +1,47 @@
 @page "{id:guid?}"
+@using EasyStock.Admin.Pages.Notificacoes
 @model EasyStock.Admin.Pages.Notificacoes.Templates.EditModel
 @{
     ViewData["Title"] = Model.Id.HasValue ? "Editar Template" : "Novo Template";
+    var ehNovo = !Model.Id.HasValue;
+    var catalogoJson = System.Text.Json.JsonSerializer.Serialize(
+        NotificacoesVariaveisCatalogo.PorEvento.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.Select(v => new { v.Nome, v.Descricao, v.Exemplo })));
 }
 
-<div class="space-y-6 max-w-4xl">
-    <div class="flex items-center gap-3">
-        <a href="/Notificacoes/Templates" class="text-slate-400 hover:text-white">&larr;</a>
-        <h1 class="text-2xl font-bold text-white">@ViewData["Title"]</h1>
-        @if (Model.Id.HasValue)
-        {
-            <span class="badge-yellow text-xs">Nova versão será criada ao salvar</span>
-        }
+<partial name="../_Subnav" />
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <a href="/Notificacoes/Templates" class="text-es-ink-mute hover:text-es-ink text-xl">&larr;</a>
+            <div>
+                <h1 class="text-2xl font-bold text-es-ink">@ViewData["Title"]</h1>
+                @if (Model.Id.HasValue)
+                {
+                    <p class="text-es-ink-mute text-xs mt-1">
+                        <span class="font-mono">@Model.Codigo</span> · v@(Model.Versao)
+                        @if (Model.AtualizadoEm.HasValue)
+                        {
+                            <span> · atualizado em @Model.AtualizadoEm.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.AtualizadoPor))
+                        {
+                            <span> por <span class="font-mono">@Model.AtualizadoPor</span></span>
+                        }
+                    </p>
+                }
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            @if (Model.Id.HasValue)
+            {
+                if (Model.Ativo && Model.Aprovado) { <span class="badge-green">Ativo</span> }
+                else if (Model.Aprovado) { <span class="badge-blue">Aprovado</span> }
+                else { <span class="badge-yellow">Aguardando aprovacao</span> }
+            }
+        </div>
     </div>
 
     @if (Model.Erro != null)
@@ -19,94 +49,365 @@
         <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
     }
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="space-y-4">
-            <form method="post">
-                @if (!Model.Id.HasValue)
-                {
-                    <div class="card p-4 space-y-4">
-                        <h2 class="text-white font-semibold">Identificação</h2>
-                        <div>
-                            <label class="label-dark">Código</label>
-                            <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
-                        </div>
-                        <div>
-                            <label class="label-dark">Nome</label>
-                            <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Email" />
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="label-dark">Canal</label>
-                                <select asp-for="Canal" class="input-dark w-full">
-                                    <option value="Email">Email</option>
-                                    <option value="Sms">SMS</option>
-                                    <option value="WhatsApp">WhatsApp</option>
-                                    <option value="InApp">In-App</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="label-dark">Tipo de Evento</label>
-                                <select asp-for="TipoEvento" class="input-dark w-full">
-                                    <option value="ProdutoVencendo">Produto Vencendo</option>
-                                    <option value="ProdutoVencido">Produto Vencido</option>
-                                    <option value="AssinaturaExpirando">Assinatura Expirando</option>
-                                    <option value="ResetSenha">Reset de Senha</option>
-                                    <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-                                    <option value="BroadcastSuperAdmin">Broadcast</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                <div class="card p-4 space-y-4">
-                    <h2 class="text-white font-semibold">Conteúdo</h2>
-                    <div>
-                        <label class="label-dark">Assunto</label>
-                        <input asp-for="AssuntoTemplate" class="input-dark w-full"
-                               placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
-                        <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
-                    </div>
-                    <div>
-                        <label class="label-dark">Corpo (HTML)</label>
-                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs"
-                                  rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
-                    </div>
-                </div>
-
-                <div class="flex gap-3">
-                    <button type="submit" class="btn-primary px-6 py-2">Salvar</button>
-                    @if (Model.Id.HasValue)
-                    {
-                        <button type="submit" asp-page-handler="Preview" class="btn-secondary px-6 py-2">Preview</button>
-                    }
-                    <a href="/Notificacoes/Templates" class="btn-ghost px-6 py-2">Cancelar</a>
-                </div>
+    @if (Model.Id.HasValue && !Model.Aprovado)
+    {
+        <div class="bg-amber-900/30 border border-amber-500/40 rounded-lg p-3 text-sm text-amber-200 flex items-center justify-between flex-wrap gap-3">
+            <span>⚠️ Editar cria uma nova versao que precisa ser aprovada antes de entrar em uso.</span>
+            <form method="post" asp-page-handler="Aprovar" class="inline">
+                <button type="submit" class="btn-primary px-4 py-1.5 text-xs">Aprovar agora</button>
             </form>
         </div>
+    }
 
-        @if (Model.PreviewResult.HasValue)
-        {
-            <div class="space-y-4">
-                <h2 class="text-white font-semibold">Preview</h2>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-1">ASSUNTO</p>
-                    <p class="text-white font-medium">
-                        @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
-                    </p>
+    <div x-data="templateEditor()" x-init="init()" class="tpl-editor-grid">
+
+        <form method="post" class="space-y-4">
+            @if (ehNovo)
+            {
+                <div class="card space-y-4">
+                    <h2 class="text-es-ink font-semibold text-sm uppercase tracking-wide">Identificacao</h2>
+                    <div>
+                        <label class="label-dark">Codigo</label>
+                        <input asp-for="Codigo" x-model="codigo" class="input-dark font-mono" placeholder="produto_vencendo_email_v1" required />
+                        <p class="text-es-ink-mute text-xs mt-1">Convencao: <code class="text-es-accent">evento_canal_v1</code></p>
+                    </div>
+                    <div>
+                        <label class="label-dark">Nome</label>
+                        <input asp-for="Nome" class="input-dark" placeholder="Produto Vencendo — Email" required />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label-dark">Canal</label>
+                            <select asp-for="Canal" x-model="canal" @@change="aoMudarCanal()" class="input-dark">
+                                <option value="Email">📧 Email</option>
+                                <option value="Sms">📱 SMS</option>
+                                <option value="WhatsApp">💬 WhatsApp</option>
+                                <option value="InApp">🔔 In-App</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label-dark">Tipo de Evento</label>
+                            <select asp-for="TipoEvento" x-model="evento" @@change="aoMudarEvento()" class="input-dark">
+                                <option value="ProdutoVencendo">Produto Vencendo</option>
+                                <option value="ProdutoVencido">Produto Vencido</option>
+                                <option value="TarefaPendente">Tarefa Pendente</option>
+                                <option value="ResetSenha">Reset de Senha</option>
+                                <option value="AssinaturaExpirando">Assinatura Expirando</option>
+                                <option value="AssinaturaExpirada">Assinatura Expirada</option>
+                                <option value="BroadcastSuperAdmin">Broadcast Super Admin</option>
+                                <option value="ConfirmacaoEmail">Confirmacao de Email</option>
+                                <option value="AlertaEstoqueCritico">Alerta Estoque Critico</option>
+                                <option value="TicketCriado">Ticket Criado</option>
+                                <option value="TicketRespondidoCliente">Ticket Respondido por Cliente</option>
+                                <option value="TicketRespondidoAdmin">Ticket Respondido por Admin</option>
+                                <option value="TicketStatusAlterado">Ticket Status Alterado</option>
+                                <option value="TicketAtribuido">Ticket Atribuido</option>
+                                <option value="TicketEncaminhadoNivel">Ticket Encaminhado</option>
+                                <option value="SlaProximoVencer">SLA Proximo Vencer</option>
+                                <option value="SlaViolado">SLA Violado</option>
+                                <option value="BugFixCriado">Bug-fix Criado</option>
+                                <option value="FaturaCriada">Fatura Criada</option>
+                                <option value="FaturaVencendo">Fatura Vencendo</option>
+                                <option value="FaturaPaga">Fatura Paga</option>
+                                <option value="FaturaVencida">Fatura Vencida</option>
+                                <option value="PagamentoConfirmado">Pagamento Confirmado</option>
+                                <option value="PagamentoFalhou">Pagamento Falhou</option>
+                                <option value="ConviteCsat">Convite CSAT</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-2">CORPO</p>
-                    @* sandbox sem nenhuma flag bloqueia scripts/forms/popups dentro do iframe.
-                       Se um template HTML contiver <script>, ele será renderizado mas inerte —
-                       evita execução acidental de JS injetado em variáveis. *@
-                    <iframe class="w-full h-80 bg-white rounded"
-                            sandbox=""
-                            title="Preview do corpo do template"
-                            srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
-                    </iframe>
+            }
+            else
+            {
+                <input type="hidden" asp-for="Codigo" />
+                <input type="hidden" asp-for="Nome" />
+                <input type="hidden" asp-for="Canal" />
+                <input type="hidden" asp-for="TipoEvento" />
+                <input type="hidden" asp-for="Idioma" />
+            }
+
+            <div class="card space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-es-ink font-semibold text-sm uppercase tracking-wide">Conteudo</h2>
+                    <span class="text-es-ink-mute text-xs">Scriban · <code class="text-es-accent">@("{{ variavel }}")</code></span>
+                </div>
+
+                <div>
+                    <label class="label-dark">Assunto / titulo</label>
+                    <input asp-for="AssuntoTemplate" x-model="assunto" @@input.debounce.400ms="atualizarPreview()"
+                           class="input-dark font-mono text-sm"
+                           placeholder="@("Ex: {{ produto_nome }} vence em {{ dias_restantes }} dias")" />
+                </div>
+
+                <div>
+                    <label class="label-dark flex items-center justify-between">
+                        <span>Corpo (HTML para email; texto puro para SMS/InApp)</span>
+                        <span class="text-es-ink-mute normal-case font-normal tracking-normal text-[10px]" x-text="corpo.length + ' chars'"></span>
+                    </label>
+                    <textarea asp-for="CorpoTemplate" x-model="corpo" @@input.debounce.400ms="atualizarPreview()"
+                              rows="14" class="input-dark font-mono text-xs leading-relaxed"
+                              placeholder="@("<p>Ola! Produto {{ produto_nome }} vence em {{ dias_restantes }} dias.</p>")"></textarea>
+                </div>
+
+                <div x-show="varsDesconhecidas.length > 0" x-cloak class="var-unknown-warning">
+                    <strong>⚠️ Variaveis nao listadas no catalogo do evento:</strong>
+                    <template x-for="v in varsDesconhecidas" :key="v"><code x-text="v"></code></template>
+                    <p class="text-xs mt-1 opacity-75">Vao renderizar como string vazia se o disparador nao injetar.</p>
                 </div>
             </div>
-        }
+
+            <div class="card space-y-3" x-show="['Email'].includes(canal)" x-cloak>
+                <h2 class="text-es-ink font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+                    📦 Snippets HTML
+                    <span class="text-es-ink-mute text-xs normal-case font-normal tracking-normal">clique para inserir no cursor do corpo</span>
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <button type="button" class="snippet-btn" @@click="inserirSnippet('cabecalho')">
+                        <span class="snip-name">🎨 Cabecalho com logo</span>
+                        <span class="snip-desc">Header navy + accent laranja</span>
+                    </button>
+                    <button type="button" class="snippet-btn" @@click="inserirSnippet('botao_cta')">
+                        <span class="snip-name">🔘 Botao CTA</span>
+                        <span class="snip-desc">Botao laranja com link</span>
+                    </button>
+                    <button type="button" class="snippet-btn" @@click="inserirSnippet('caixa_destaque')">
+                        <span class="snip-name">📦 Caixa de destaque</span>
+                        <span class="snip-desc">Fundo cinza com borda laranja</span>
+                    </button>
+                    <button type="button" class="snippet-btn" @@click="inserirSnippet('rodape_lgpd')">
+                        <span class="snip-name">🔒 Rodape LGPD</span>
+                        <span class="snip-desc">Link unsubscribe + endereco</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex gap-3 flex-wrap items-center">
+                <button type="submit" class="btn-primary px-6 py-2">@(ehNovo ? "Criar template" : "Salvar nova versao")</button>
+                <button type="button" @@click="atualizarPreview()" class="btn-secondary px-6 py-2">Atualizar preview</button>
+                <a href="/Notificacoes/Templates" class="btn-secondary px-6 py-2">Cancelar</a>
+
+                @if (Model.Id.HasValue)
+                {
+                    <div class="ml-auto flex gap-2">
+                        <span class="text-es-ink-mute text-xs">Duplicar para:</span>
+                        <a href="/Notificacoes/Templates/Edit?duplicarDe=@Model.Id&canalAlvo=Email"
+                           class="btn-secondary px-3 py-2 text-xs">📧</a>
+                        <a href="/Notificacoes/Templates/Edit?duplicarDe=@Model.Id&canalAlvo=InApp"
+                           class="btn-secondary px-3 py-2 text-xs">🔔</a>
+                        <a href="/Notificacoes/Templates/Edit?duplicarDe=@Model.Id&canalAlvo=Sms"
+                           class="btn-secondary px-3 py-2 text-xs">📱</a>
+                        <a href="/Notificacoes/Templates/Edit?duplicarDe=@Model.Id&canalAlvo=WhatsApp"
+                           class="btn-secondary px-3 py-2 text-xs">💬</a>
+                    </div>
+                }
+            </div>
+        </form>
+
+        <div class="space-y-4">
+            <div class="card space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-es-ink font-semibold text-sm uppercase tracking-wide">🏷️ Variaveis disponiveis</h2>
+                    <span class="text-es-ink-mute text-xs" x-text="varsDoEvento.length + ' var(s)'"></span>
+                </div>
+                <p class="text-es-ink-mute text-xs">Clique para inserir <code class="text-es-accent">@("{{ nome }}")</code> no ultimo campo focado.</p>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="v in varsDoEvento" :key="v.nome">
+                        <button type="button" class="var-chip" @@click="inserirVar(v.nome)" :title="v.descricao + ' — ex: ' + v.exemplo">
+                            <span x-text="'{{ ' + v.nome + ' }}'"></span>
+                        </button>
+                    </template>
+                    <template x-if="varsDoEvento.length === 0">
+                        <span class="text-es-ink-mute text-xs italic">Nenhuma variavel catalogada para este evento.</span>
+                    </template>
+                </div>
+            </div>
+
+            <div class="card space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h2 class="text-es-ink font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+                        👁️ Preview ao vivo
+                        <span class="text-es-ink-mute text-xs normal-case font-normal tracking-normal" x-show="loadingPreview">renderizando...</span>
+                    </h2>
+                    <div class="preview-toggle" role="tablist">
+                        <button type="button" :class="modoPreview === 'desktop' ? 'active' : ''" @@click="modoPreview = 'desktop'">🖥️ desktop</button>
+                        <button type="button" :class="modoPreview === 'mobile' ? 'active' : ''" @@click="modoPreview = 'mobile'">📱 mobile</button>
+                        <button type="button" :class="modoPreview === 'raw' ? 'active' : ''" @@click="modoPreview = 'raw'">📄 raw</button>
+                    </div>
+                </div>
+
+                <div class="bg-es-bg border border-es-border rounded-md p-3">
+                    <div class="text-es-ink-mute text-[10px] uppercase tracking-widest mb-1">Assunto renderizado</div>
+                    <div class="text-es-ink text-sm" x-text="assuntoRenderizado || '(vazio)'"></div>
+                </div>
+
+                <div x-show="erroPreview" x-cloak class="bg-red-900/30 border border-red-500/40 text-red-200 text-xs px-3 py-2 rounded">
+                    <strong>Erro Scriban:</strong> <span x-text="erroPreview"></span>
+                </div>
+
+                <div x-show="modoPreview !== 'raw'" class="preview-frame-wrap">
+                    <iframe :class="modoPreview === 'mobile' ? 'preview-frame is-mobile' : 'preview-frame'"
+                            sandbox=""
+                            title="Preview do corpo do template"
+                            :srcdoc="corpoRenderizado"></iframe>
+                </div>
+                <div x-show="modoPreview === 'raw'" x-cloak
+                     class="bg-es-bg border border-es-border rounded-md p-3 font-mono text-xs whitespace-pre-wrap text-es-ink overflow-auto"
+                     style="max-height: 28rem"
+                     x-text="corpoRenderizado"></div>
+            </div>
+        </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    window.__notifVarCatalogo = @Html.Raw(catalogoJson);
+
+    function templateEditor() {
+        return {
+            codigo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Codigo ?? "")),
+            canal: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Canal ?? "Email")),
+            evento: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TipoEvento ?? "AlertaEstoqueCritico")),
+            assunto: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AssuntoTemplate ?? "")),
+            corpo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CorpoTemplate ?? "")),
+
+            assuntoRenderizado: '',
+            corpoRenderizado: '',
+            erroPreview: '',
+            loadingPreview: false,
+            modoPreview: 'desktop',
+            varsDoEvento: [],
+            varsDesconhecidas: [],
+            ultimoCampoFocado: 'corpo',
+
+            init() {
+                this.atualizarVarsDoEvento();
+                this.detectarVarsDesconhecidas();
+                this.$nextTick(() => {
+                    const ass = document.querySelector('[name="AssuntoTemplate"]');
+                    const cor = document.querySelector('[name="CorpoTemplate"]');
+                    if (ass) ass.addEventListener('focus', () => this.ultimoCampoFocado = 'assunto');
+                    if (cor) cor.addEventListener('focus', () => this.ultimoCampoFocado = 'corpo');
+                });
+                this.atualizarPreview();
+            },
+
+            aoMudarCanal() {
+                if (!this.codigo || this.codigo.match(/_(email|inapp|sms|whatsapp)_v\d+$/i)) this.sugerirCodigo();
+            },
+            aoMudarEvento() {
+                this.atualizarVarsDoEvento();
+                this.detectarVarsDesconhecidas();
+                this.atualizarPreview();
+                this.sugerirCodigo();
+            },
+
+            sugerirCodigo() {
+                const ev = this.evento.replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase();
+                this.codigo = ev + '_' + this.canal.toLowerCase() + '_v1';
+            },
+
+            atualizarVarsDoEvento() {
+                this.varsDoEvento = (window.__notifVarCatalogo[this.evento] || []).slice();
+            },
+
+            detectarVarsDesconhecidas() {
+                const reservadas = new Set(['if','else','end','for','in','this','true','false','null','and','or','not','with','unless','case','when','capture','assign']);
+                const texto = (this.assunto + ' ' + this.corpo);
+                const matches = [...texto.matchAll(/\{\{\s*([a-zA-Z_][\w\.]*)/g)];
+                const conhecidas = new Set(this.varsDoEvento.map(v => v.nome));
+                conhecidas.add('__unsubscribe_url');
+                const descs = new Set();
+                for (const m of matches) {
+                    const nome = m[1].split('.')[0];
+                    if (reservadas.has(nome.toLowerCase())) continue;
+                    if (!conhecidas.has(nome)) descs.add(nome);
+                }
+                this.varsDesconhecidas = [...descs];
+            },
+
+            inserirVar(nome) { this.inserirNoCampoFocado('{{ ' + nome + ' }}'); },
+
+            inserirNoCampoFocado(texto) {
+                const seletor = this.ultimoCampoFocado === 'assunto' ? '[name="AssuntoTemplate"]' : '[name="CorpoTemplate"]';
+                const el = document.querySelector(seletor);
+                if (!el) return;
+                const start = el.selectionStart ?? el.value.length;
+                const end = el.selectionEnd ?? el.value.length;
+                const novo = el.value.substring(0, start) + texto + el.value.substring(end);
+                el.value = novo;
+                if (this.ultimoCampoFocado === 'assunto') this.assunto = novo;
+                else this.corpo = novo;
+                el.focus();
+                const cursor = start + texto.length;
+                el.setSelectionRange(cursor, cursor);
+                this.atualizarPreview();
+            },
+
+            inserirSnippet(tipo) {
+                const snips = {
+                    cabecalho: `<div style="background:#0E2A6E;padding:20px;text-align:center;border-radius:8px 8px 0 0">
+  <h1 style="color:#fff;font-family:sans-serif;margin:0;font-size:24px">Easy<span style="color:#F26B25">Stok</span></h1>
+</div>
+<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;background:#fff;border-radius:0 0 8px 8px">
+  <!-- corpo aqui -->
+</div>`,
+                    botao_cta: `<p style="text-align:center;margin:24px 0">
+  <a href="{{ link_pagamento }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Acessar EasyStok</a>
+</p>`,
+                    caixa_destaque: `<div style="background:#f3f4f6;border-left:4px solid #E85814;padding:16px;border-radius:4px;margin:16px 0">
+  <p style="margin:0;color:#374151">Texto importante aqui.</p>
+</div>`,
+                    rodape_lgpd: `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+<p style="color:#6b7280;font-size:11px;text-align:center;line-height:1.6">
+  Voce esta recebendo este email porque possui uma conta na plataforma EasyStok.<br/>
+  <a href="{{ __unsubscribe_url }}" style="color:#6b7280">Cancelar inscricao</a> &middot; EasyStok &middot; CNPJ 00.000.000/0001-00
+</p>`
+                };
+                const c = snips[tipo];
+                if (!c) return;
+                this.ultimoCampoFocado = 'corpo';
+                this.inserirNoCampoFocado(c);
+            },
+
+            async atualizarPreview() {
+                this.detectarVarsDesconhecidas();
+                this.loadingPreview = true;
+                this.erroPreview = '';
+                try {
+                    const variaveis = {};
+                    for (const v of this.varsDoEvento) variaveis[v.nome] = v.exemplo;
+                    variaveis.__unsubscribe_url = '#';
+                    const r = await fetch('/api-proxy/notif/preview-draft', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            assuntoTemplate: this.assunto,
+                            corpoTemplate: this.corpo,
+                            variaveis: variaveis
+                        })
+                    });
+                    if (!r.ok) {
+                        const t = await r.text();
+                        try {
+                            const j = JSON.parse(t);
+                            this.erroPreview = j.error?.message || j.error?.detail || ('HTTP ' + r.status);
+                        } catch { this.erroPreview = 'HTTP ' + r.status; }
+                        return;
+                    }
+                    const j = await r.json();
+                    const d = j.data || j;
+                    this.assuntoRenderizado = d.assuntoRenderizado || '';
+                    this.corpoRenderizado = d.corpoRenderizado || '';
+                } catch (e) {
+                    this.erroPreview = e.message || 'Falha de rede';
+                } finally {
+                    this.loadingPreview = false;
+                }
+            }
+        };
+    }
+</script>
+}

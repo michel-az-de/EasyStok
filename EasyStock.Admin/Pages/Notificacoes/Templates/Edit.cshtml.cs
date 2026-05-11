@@ -8,6 +8,8 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public Guid? Id { get; set; }
+    [BindProperty(SupportsGet = true)] public Guid? DuplicarDe { get; set; }
+    [BindProperty(SupportsGet = true)] public string? CanalAlvo { get; set; }
 
     [BindProperty] public string Codigo { get; set; } = "";
     [BindProperty] public string Nome { get; set; } = "";
@@ -18,33 +20,82 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     [BindProperty] public string Idioma { get; set; } = "pt-BR";
 
     public JsonElement? TemplateAtual { get; private set; }
-    public JsonElement? PreviewResult { get; private set; }
     public string? Erro { get; private set; }
+    public int Versao { get; private set; } = 1;
+    public bool Aprovado { get; private set; }
+    public bool Ativo { get; private set; }
+    public DateTime? AtualizadoEm { get; private set; }
+    public string? AtualizadoPor { get; private set; }
 
     public async Task OnGetAsync()
     {
-        if (Id.HasValue)
+        if (Id.HasValue) { await CarregarTemplateAsync(Id.Value); return; }
+        if (DuplicarDe.HasValue) await CarregarDuplicandoAsync(DuplicarDe.Value);
+    }
+
+    private async Task CarregarTemplateAsync(Guid id)
+    {
+        try
         {
-            try
-            {
-                var result = await api.GetRawAsync($"api/admin/notificacoes/templates/{Id}");
-                TemplateAtual = result.GetProperty("data");
-                var t = TemplateAtual.Value;
-                Codigo = t.GetProperty("codigo").GetString()!;
-                Nome = t.GetProperty("nome").GetString()!;
-                Canal = t.GetProperty("canal").GetString()!;
-                TipoEvento = t.GetProperty("tipoEvento").GetString()!;
-                AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString()!;
-                CorpoTemplate = t.GetProperty("corpoTemplate").GetString()!;
-                Idioma = t.TryGetProperty("idioma", out var id) ? id.GetString() ?? "pt-BR" : "pt-BR";
-            }
-            catch (SessionExpiredException) { throw; }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Erro ao carregar template {Id}", Id);
-                Erro = "Erro ao carregar template.";
-            }
+            var result = await api.GetRawAsync($"api/admin/notificacoes/templates/{id}");
+            TemplateAtual = result.GetProperty("data");
+            var t = TemplateAtual.Value;
+            Codigo = t.GetProperty("codigo").GetString()!;
+            Nome = t.GetProperty("nome").GetString()!;
+            Canal = t.GetProperty("canal").GetString()!;
+            TipoEvento = t.GetProperty("tipoEvento").GetString()!;
+            AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString()!;
+            CorpoTemplate = t.GetProperty("corpoTemplate").GetString()!;
+            Idioma = t.TryGetProperty("idioma", out var id1) ? id1.GetString() ?? "pt-BR" : "pt-BR";
+            Versao = t.TryGetProperty("versao", out var ve) ? ve.GetInt32() : 1;
+            Aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
+            Ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
+            if (t.TryGetProperty("atualizadoEm", out var ae) && ae.ValueKind == JsonValueKind.String)
+                AtualizadoEm = ae.GetDateTime();
+            AtualizadoPor = t.TryGetProperty("atualizadoPor", out var ap2) ? ap2.GetString() : null;
         }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Erro ao carregar template {Id}", id);
+            Erro = "Erro ao carregar template.";
+        }
+    }
+
+    private async Task CarregarDuplicandoAsync(Guid origem)
+    {
+        try
+        {
+            var result = await api.GetRawAsync($"api/admin/notificacoes/templates/{origem}");
+            var t = result.GetProperty("data");
+            var codigoOriginal = t.GetProperty("codigo").GetString() ?? "";
+            var canalOriginal = t.GetProperty("canal").GetString() ?? "Email";
+            var canalDestino = string.IsNullOrWhiteSpace(CanalAlvo) ? canalOriginal : CanalAlvo;
+
+            Nome = (t.GetProperty("nome").GetString() ?? "") + $" — copia ({canalDestino})";
+            Canal = canalDestino;
+            TipoEvento = t.GetProperty("tipoEvento").GetString()!;
+            AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString() ?? "";
+            CorpoTemplate = t.GetProperty("corpoTemplate").GetString() ?? "";
+            Idioma = t.TryGetProperty("idioma", out var id1) ? id1.GetString() ?? "pt-BR" : "pt-BR";
+            Codigo = SugerirCodigoDuplicado(codigoOriginal, canalDestino);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Erro ao carregar template origem {Id}", origem);
+            Erro = "Erro ao carregar template de origem.";
+        }
+    }
+
+    private static string SugerirCodigoDuplicado(string codigoOriginal, string canalDestino)
+    {
+        var canalLower = canalDestino.ToLowerInvariant();
+        var sufixos = new[] { "_email_v1", "_inapp_v1", "_sms_v1", "_whatsapp_v1" };
+        foreach (var s in sufixos)
+            if (codigoOriginal.EndsWith(s, StringComparison.OrdinalIgnoreCase))
+                return $"{codigoOriginal[..^s.Length]}_{canalLower}_v1";
+        return $"{codigoOriginal}_{canalLower}_v1";
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -58,7 +109,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                     novoAssunto = AssuntoTemplate,
                     novoCorpo = CorpoTemplate
                 });
-                SetSucesso("Template atualizado. Nova versão criada.");
+                SetSucesso("Template atualizado. Nova versao criada — aprove para ativar.");
             }
             else
             {
@@ -68,7 +119,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                     tipoEvento = TipoEvento, assuntoTemplate = AssuntoTemplate,
                     corpoTemplate = CorpoTemplate, idioma = Idioma
                 });
-                SetSucesso("Template criado com sucesso.");
+                SetSucesso("Template criado. Aprove para ativar.");
             }
             return RedirectToPage("Index");
         }
@@ -76,50 +127,21 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         catch (Exception ex)
         {
             SetErro(ex.Message);
+            await OnGetAsync();
             return Page();
         }
     }
 
-    public async Task<IActionResult> OnPostPreviewAsync()
+    public async Task<IActionResult> OnPostAprovarAsync()
     {
-        if (!Id.HasValue)
-        {
-            SetErro("Salve o template antes de visualizar o preview.");
-            return Page();
-        }
+        if (!Id.HasValue) { SetErro("Salve o template antes de aprovar."); return RedirectToPage(); }
         try
         {
-            var result = await api.PostRawAsync("api/admin/notificacoes/templates/preview", new
-            {
-                templateId = Id.Value,
-                variaveis = new Dictionary<string, object?>
-                {
-                    // ProdutoVencendo / AlertaEstoque
-                    ["nomeProduto"] = "Produto Exemplo",
-                    ["diasRestantes"] = 3,
-                    ["expiraEm"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
-                    ["quantidade"] = 5,
-                    // AssinaturaExpirando
-                    ["dataExpiracao"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
-                    ["eTrial"] = false,
-                    // ResetSenha / ConfirmacaoEmail
-                    ["nomeUsuario"] = "Usuário Exemplo",
-                    ["email"] = "usuario@exemplo.com",
-                    ["linkRedefinicao"] = "#",
-                    ["linkConfirmacao"] = "#",
-                    // Footer LGPD
-                    ["__unsubscribe_url"] = "#"
-                }
-            });
-            PreviewResult = result.GetProperty("data");
-            await OnGetAsync();
-            return Page();
+            await api.PostRawAsync($"api/admin/notificacoes/templates/{Id}/aprovar", new { });
+            SetSucesso("Template aprovado e ativo.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex)
-        {
-            SetErro(ex.Message);
-            return Page();
-        }
+        catch (Exception ex) { SetErro(ex.Message); }
+        return RedirectToPage("Index");
     }
 }

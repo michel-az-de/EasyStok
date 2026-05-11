@@ -22,6 +22,7 @@ public sealed class AdminNotificacoesController(
     AtualizarTemplateUseCase atualizarTemplate,
     AprovarTemplateUseCase aprovarTemplate,
     PreviewTemplateUseCase previewTemplate,
+    PreviewDraftTemplateUseCase previewDraftTemplate,
     CriarRotinaUseCase criarRotina,
     AtualizarRotinaUseCase atualizarRotina,
     AtivarRotinaUseCase ativarRotina,
@@ -92,6 +93,22 @@ public sealed class AdminNotificacoesController(
     {
         var result = await previewTemplate.ExecuteAsync(
             new PreviewTemplateCommand(req.TemplateId, req.Variaveis ?? new Dictionary<string, object?>()));
+        return DataOk(result);
+    }
+
+    /// <summary>
+    /// Renderiza um template em modo "draft" — assunto/corpo fornecidos no body
+    /// sem precisar salvar antes. Usado pelo editor da Admin para preview ao vivo
+    /// enquanto o usuario digita.
+    /// </summary>
+    [HttpPost("templates/preview-draft")]
+    public async Task<IActionResult> PreviewDraftTemplate([FromBody] PreviewDraftRequest req)
+    {
+        var result = await previewDraftTemplate.ExecuteAsync(
+            new PreviewDraftTemplateCommand(
+                req.AssuntoTemplate ?? string.Empty,
+                req.CorpoTemplate ?? string.Empty,
+                req.Variaveis ?? new Dictionary<string, object?>()));
         return DataOk(result);
     }
 
@@ -233,6 +250,11 @@ public sealed class AdminNotificacoesController(
 
     public record PreviewTemplateRequest(
         Guid TemplateId,
+        IDictionary<string, object?>? Variaveis = null);
+
+    public record PreviewDraftRequest(
+        string? AssuntoTemplate,
+        string? CorpoTemplate,
         IDictionary<string, object?>? Variaveis = null);
 
     public record CriarRotinaRequest(
