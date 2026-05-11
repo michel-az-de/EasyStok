@@ -30,10 +30,6 @@
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/form-validation.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
-    <style>
-        /* Previne flash de dropdowns antes do Alpine.js inicializar */
-        .app-dropdown { display: none; }
-    </style>
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);color:var(--text-primary);">
