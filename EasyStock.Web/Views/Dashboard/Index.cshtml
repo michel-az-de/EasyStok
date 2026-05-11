@@ -50,11 +50,40 @@
     };
 }
 
-<div class="ds-header mb-6">
+@if (Model.TodasApisFalharam)
+{
+    <div class="ws ds-api-error mb-6" role="alert">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
+            </svg>
+            <div class="flex-1">
+                <h2 class="font-bold text-slate-800">Não conseguimos carregar seus dados agora</h2>
+                <p class="text-sm text-slate-600 mt-1">Pode ser instabilidade na conexão ou no servidor. Tente recarregar a página em alguns segundos.</p>
+                <button type="button" onclick="window.location.reload()" class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                    Recarregar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else if (Model.ResumoApiFalhou)
+{
+    <div class="ws ds-api-warning mb-6" role="status">
+        <div class="flex items-center gap-3">
+            <svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-sm text-slate-700">Alguns indicadores podem estar desatualizados — não conseguimos atualizar o resumo agora.</p>
+        </div>
+    </div>
+}
+
+<header class="ds-header mb-6">
     <h1 class="text-2xl font-bold text-slate-900">@saudacao@(string.IsNullOrEmpty(primeiroNome) ? "." : $", {primeiroNome}.")</h1>
-    <p class="ds-status @toneClass mt-1">@statusMsg</p>
+    <p class="ds-status @toneClass mt-1" role="status" aria-live="polite">@statusMsg</p>
     <p class="text-xs text-slate-400 mt-1">@dataHoje</p>
-</div>
+</header>
 
 @* ─── KPIs principais (3 cards) ─────────────────────────────── *@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -90,9 +119,9 @@
 @* ─── Alertas priorizados (só aparece quando há algo) ────────── *@
 @if (Model.TemQualquerAlerta)
 {
-    <div class="ws ds-alerts mb-6">
+    <section class="ws ds-alerts mb-6" aria-labelledby="ds-alerts-title">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="font-bold text-slate-800 flex items-center gap-2">
+            <h2 id="ds-alerts-title" class="font-bold text-slate-800 flex items-center gap-2">
                 <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
                 </svg>
@@ -103,50 +132,57 @@
         <ul class="ds-alerts-list">
             @if (Model.EstoqueCritico > 0)
             {
+                var lbl = Model.EstoqueCritico == 1 ? "produto crítico" : "produtos críticos";
                 <li>
-                    <a href="/estoque?status=critico" class="ds-alert ds-alert--critical">
-                        <span class="ds-alert-dot"></span>
+                    <a href="/estoque?status=critico" class="ds-alert ds-alert--critical"
+                       aria-label="@(Model.EstoqueCritico) @lbl. Ir para a lista para repor.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.EstoqueCritico</span>
-                        <span class="ds-alert-text">@(Model.EstoqueCritico == 1 ? "produto crítico" : "produtos críticos")</span>
-                        <span class="ds-alert-cta">Repor agora →</span>
+                        <span class="ds-alert-text">@lbl</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Repor agora →</span>
                     </a>
                 </li>
             }
             @if (Model.ProximosVencimento > 0)
             {
+                var lbl = Model.ProximosVencimento == 1 ? "produto vence em 7 dias" : "produtos vencem em 7 dias";
                 <li>
-                    <a href="/estoque?status=atencao" class="ds-alert ds-alert--warning">
-                        <span class="ds-alert-dot"></span>
+                    <a href="/estoque?status=atencao" class="ds-alert ds-alert--warning"
+                       aria-label="@(Model.ProximosVencimento) @lbl. Ir para os lotes.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.ProximosVencimento</span>
                         <span class="ds-alert-text">@(Model.ProximosVencimento == 1 ? "vence em 7 dias" : "vencem em 7 dias")</span>
-                        <span class="ds-alert-cta">Ver lotes →</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Ver lotes →</span>
                     </a>
                 </li>
             }
             @if (Model.ProdutosParados > 0)
             {
                 <li>
-                    <a href="/estoque?status=parado" class="ds-alert ds-alert--info">
-                        <span class="ds-alert-dot"></span>
+                    <a href="/estoque?status=parado" class="ds-alert ds-alert--info"
+                       aria-label="@(Model.ProdutosParados) produto(s) parado(s) há mais de 30 dias. Considerar liquidar.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.ProdutosParados</span>
                         <span class="ds-alert-text">parado(s) há +30 dias</span>
-                        <span class="ds-alert-cta">Considerar liquidar →</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Considerar liquidar →</span>
                     </a>
                 </li>
             }
             @if (Model.SugestoesReposicao > 0)
             {
+                var lbl = Model.SugestoesReposicao == 1 ? "sugestão de reposição" : "sugestões de reposição";
                 <li>
-                    <a href="/entradas/reposicao" class="ds-alert ds-alert--success">
-                        <span class="ds-alert-dot"></span>
+                    <a href="/entradas/reposicao" class="ds-alert ds-alert--success"
+                       aria-label="@(Model.SugestoesReposicao) @lbl. Ver a lista.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.SugestoesReposicao</span>
-                        <span class="ds-alert-text">@(Model.SugestoesReposicao == 1 ? "sugestão de reposição" : "sugestões de reposição")</span>
-                        <span class="ds-alert-cta">Ver lista →</span>
+                        <span class="ds-alert-text">@lbl</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Ver lista →</span>
                     </a>
                 </li>
             }
         </ul>
-    </div>
+    </section>
 }
 
 @* ─── Gráfico de vendas por mês ─────────────────────────────── *@

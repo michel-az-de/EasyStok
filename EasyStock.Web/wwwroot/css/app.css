@@ -4647,3 +4647,39 @@ html.theme-dark .ds-quick-action--secondary:hover {
         display: none;
     }
 }
+
+@media (prefers-reduced-motion: reduce) {
+    .ds-kpi,
+    .ds-alert,
+    .ds-quick-action,
+    .ds-mov-row {
+        transition: none;
+    }
+    .ds-kpi:hover,
+    .ds-alert:hover,
+    .ds-quick-action:hover {
+        transform: none;
+    }
+}
+
+/* ── Banners de estado de API ──────────────────────────────── */
+.ds-api-error {
+    border-left: 4px solid #DC2626;
+    background: linear-gradient(180deg, rgba(254, 226, 226, .55) 0%, rgba(254, 226, 226, .35) 100%);
+}
+
+.ds-api-warning {
+    border-left: 4px solid #D97706;
+    background: linear-gradient(180deg, rgba(254, 243, 199, .55) 0%, rgba(254, 243, 199, .35) 100%);
+    padding: 12px 16px;
+}
+
+html.theme-dark .ds-api-error {
+    background: rgba(127, 29, 29, .22);
+    border-left-color: #F87171;
+}
+
+html.theme-dark .ds-api-warning {
+    background: rgba(146, 64, 14, .22);
+    border-left-color: #FBBF24;
+}

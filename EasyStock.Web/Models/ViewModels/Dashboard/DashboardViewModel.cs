@@ -36,6 +36,9 @@ public class DashboardViewModel
     public bool TemAlertasCriticos => EstoqueCritico > 0 || ProximosVencimento > 0;
     public bool TemQualquerAlerta =>
         EstoqueCritico > 0 || ProximosVencimento > 0 || ProdutosParados > 0 || SugestoesReposicao > 0;
+
+    public bool ResumoApiFalhou { get; set; }
+    public bool TodasApisFalharam { get; set; }
 }
 
 public class MovimentacaoRecente

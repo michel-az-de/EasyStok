@@ -85,6 +85,12 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.GeracoesIaLimite = ia.LimiteMensal ?? 0;
         }
 
+        vm.ResumoApiFalhou = !dashResult.Success;
+        vm.TodasApisFalharam = !dashResult.Success
+            && !reposResult.Success
+            && !movsResult.Success
+            && !receitaResult.Success;
+
         return View(vm);
     }
 }
