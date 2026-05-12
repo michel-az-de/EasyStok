@@ -2,6 +2,8 @@ using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
@@ -40,6 +42,8 @@ public class SyncController(
     MobileStockReconciler stockReconciler,
     MobileSaleSyncService saleSync,
     MobileEventBroker eventBroker,
+    IPedidoRepository pedidoRepo,
+    CriarPedidoUseCase criarPedidoUseCase,
     IConfiguration appConfig,
     ILogger<SyncController> log) : ControllerBase
 {
@@ -47,6 +51,8 @@ public class SyncController(
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
     private readonly MobileSaleSyncService _saleSync = saleSync;
     private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
+    private readonly CriarPedidoUseCase _criarPedidoUseCase = criarPedidoUseCase;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncController> _log = log;
 
@@ -66,8 +72,10 @@ public class SyncController(
         var rejected = new List<SyncConflict>();
         // F0 — IDs de Product/Client aplicados com sucesso, candidatos a
         // auto-link com Produto/Cliente web depois do SaveChanges principal.
+        // F1 — idem para Order → Pedido (promove o mobile_order a Pedido ERP).
         var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var m in req.Mutations)
         {
@@ -77,7 +85,7 @@ public class SyncController(
                 accepted.Add(m.Id);
                 // Coleta IDs pra auto-link (so se mutation foi aceita).
                 var typePrefix = m.Type?.Split('.')[0];
-                if (typePrefix == "product" || typePrefix == "client")
+                if (typePrefix == "product" || typePrefix == "client" || typePrefix == "order")
                 {
                     try
                     {
@@ -86,8 +94,9 @@ public class SyncController(
                             var payloadId = idEl.GetString();
                             if (!string.IsNullOrEmpty(payloadId))
                             {
-                                if (typePrefix == "product") autoLinkProductIds.Add(payloadId);
-                                else autoLinkClientIds.Add(payloadId);
+                                if (typePrefix == "product")    autoLinkProductIds.Add(payloadId);
+                                else if (typePrefix == "client") autoLinkClientIds.Add(payloadId);
+                                else                             autoLinkOrderIds.Add(payloadId);
                             }
                         }
                     }
@@ -110,25 +119,27 @@ public class SyncController(
 
         await _db.SaveChangesAsync();
 
-        // F0 — auto-link Product/Client ↔ Produto/Cliente web. Roda DEPOIS do
-        // SaveChanges principal pra (a) ler entities tracked, (b) falha aqui
-        // nao bloqueia o sync (mutations ja foram aceitas), (c) idempotente
-        // (skip se ErpProductId/ErpClienteId ja preenchido). Feature flag:
-        // MobileSync:AutoLink:Product/Client (default true).
-        if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0)
+        // F0/F1 — auto-link Product/Client/Order ↔ Produto/Cliente/Pedido web.
+        // Roda DEPOIS do SaveChanges principal pra (a) ler entities tracked,
+        // (b) falha aqui nao bloqueia o sync, (c) idempotente. Feature flags:
+        // MobileSync:AutoLink:Product/Client/Order (default true).
+        if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0 || autoLinkOrderIds.Count > 0)
         {
             try
             {
                 var autoLinkProd   = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
                 var autoLinkClient = _appConfig.GetValue<bool>("MobileSync:AutoLink:Client", true);
+                var autoLinkOrder  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Order", true);
                 if (autoLinkProd   && autoLinkProductIds.Count > 0) await TryAutoLinkProductsAsync(autoLinkProductIds, empresaId);
                 if (autoLinkClient && autoLinkClientIds.Count  > 0) await TryAutoLinkClientsAsync(autoLinkClientIds, empresaId);
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                // F1 — promove orders DEPOIS de products/clients pra que FKs (ErpProductId,
+                // ErpClienteId) ja estejam preenchidas e o Pedido criado fique consistente.
+                if (autoLinkOrder  && autoLinkOrderIds.Count   > 0) await TryAutoLinkOrdersAsync(autoLinkOrderIds, empresaId);
             }
             catch (Exception ex)
             {
-                // Auto-link nao deve quebrar sync. Logamos e seguimos.
-                _log.LogWarning(ex, "Falha auto-link Produto/Cliente apos sync");
+                _log.LogWarning(ex, "Falha auto-link Produto/Cliente/Order apos sync");
             }
         }
 
@@ -752,6 +763,86 @@ public class SyncController(
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "AutoLink Cliente falhou pra mobile={MobileId}", cid);
+            }
+        }
+    }
+
+    // F1 — promove mobile_order → Pedido web via CriarPedidoUseCase. Idempotente
+    // via pedidoRepo.FindByMobileOrderIdAsync (skip se ja promovido). Resolve
+    // ClienteId via ErpClienteId (preenchido em F0). Itens vao sem ProdutoId FK
+    // por enquanto (futuras iteracoes resolvem via ErpProductId tambem).
+    //
+    // Caso o Pedido falhe a criar (validacao, etc), engole excecao e segue —
+    // mobile_order continua existindo e pode ser linkado manualmente via
+    // MobileOrdersController.Link depois.
+    private async Task TryAutoLinkOrdersAsync(IEnumerable<string> mobileOrderIds, Guid? empresaId)
+    {
+        if (!empresaId.HasValue) return;
+        foreach (var oid in mobileOrderIds)
+        {
+            try
+            {
+                var mobileO = await _db.Set<Order>().IgnoreQueryFilters()
+                    .Include(o => o.Items)
+                    .FirstOrDefaultAsync(o => o.Id == oid && o.EmpresaId == empresaId);
+                if (mobileO == null) continue;
+                if (mobileO.ErpPedidoId.HasValue && mobileO.ErpPedidoId.Value != Guid.Empty) continue;
+
+                // Idempotencia cross-request: se ja existe Pedido com este MobileOrderId,
+                // so faz o link reverso.
+                var jaPromovido = await _pedidoRepo.FindByMobileOrderIdAsync(empresaId.Value, mobileO.Id);
+                if (jaPromovido != null)
+                {
+                    mobileO.ErpPedidoId = jaPromovido.Id;
+                    mobileO.UpdatedAt = DateTime.UtcNow;
+                    _log.LogInformation("AutoLink Pedido (idempotente): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
+                    continue;
+                }
+
+                // Resolve ClienteId via ErpClienteId do mobile.Client (F0 deve ter preenchido).
+                Guid? clienteIdResolved = null;
+                if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
+                {
+                    var mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
+                    clienteIdResolved = mClient?.ErpClienteId;
+                }
+
+                var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
+                    Nome: i.Name,
+                    Quantidade: i.Qty,
+                    PrecoUnitario: i.UnitPrice,
+                    ProdutoId: null,
+                    Emoji: i.Emoji,
+                    Unidade: i.Unit,
+                    Observacao: null
+                )).ToList();
+
+                var result = await _criarPedidoUseCase.ExecuteAsync(new CriarPedidoCommand(
+                    EmpresaId: empresaId.Value,
+                    LojaId: mobileO.LojaId,
+                    ClienteId: clienteIdResolved,
+                    ClienteNomeAdHoc: clienteIdResolved == null ? mobileO.ClientSnapshotName : null,
+                    ClienteAptAdHoc: null,
+                    ClienteTelefoneAdHoc: null,
+                    Observacoes: mobileO.Notes,
+                    Origem: "mobile",
+                    MobileOrderId: mobileO.Id,
+                    Itens: itens,
+                    CriadoPorUserId: null,
+                    CriadoPorNome: mobileO.LastOperatorName,
+                    AgendadoParaEm: mobileO.ScheduledDeliveryAt
+                ));
+
+                mobileO.ErpPedidoId = result.Id;
+                mobileO.UpdatedAt = DateTime.UtcNow;
+                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                _log.LogInformation("AutoLink Pedido CRIADO: mobile={MobileId} → erp={ErpId} status={Status}",
+                    oid, result.Id, mobileO.Status);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "AutoLink Pedido falhou pra mobile={MobileId}", oid);
             }
         }
     }

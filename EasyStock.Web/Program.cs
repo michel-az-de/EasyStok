@@ -134,6 +134,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 var app = builder.Build();
 
+// ForwardedHeaders: Fly/Render/etc fazem TLS termination no edge e mandam
+// HTTP pra container com X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection
+// vê HTTP, tenta redirect, e estoura 400 (não sabe qual porta HTTPS).
+app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
+    KnownNetworks = { },
+    KnownProxies = { }
+});
+
 // Startup: verificar conectividade com a API (não-bloqueante).
 // Tudo envolto em try/catch externo porque falhas em GetRequiredService
 // (antes de entrar no try interno) senão seriam exceções não observadas em Task.Run.
@@ -199,6 +211,13 @@ app.UseAuthentication();
 app.UseMiddleware<SessionRestoreMiddleware>(); // Restaura sessão do _rt cookie após deploys
 app.UseAuthorization();
 app.UseMiddleware<LojaRequiredMiddleware>(); // Bloqueia navegacao sem LojaId selecionada
+
+// Atalhos de URL: rotas canônicas que o menu/sidebar usa mas que usuários
+// podem tentar acessar diretamente pelo alias mais curto.
+app.MapGet("/compras", () => Results.Redirect("/listas-compras", permanent: false))
+   .RequireAuthorization();
+app.MapGet("/entradas", () => Results.Redirect("/entradas/historico", permanent: false))
+   .RequireAuthorization();
 
 // Roteamento — landing publica e raiz; Dashboard e o resto via path explicito.
 // Quando os dois dominios forem ativados (easystok.com.br + app.easystok.com.br),

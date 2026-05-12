@@ -240,6 +240,17 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
+// X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
+app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
+    KnownNetworks = { },
+    KnownProxies = { }
+});
+
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 // Em produção com múltiplas réplicas, desabilitar via RunMigrationsOnStartup=false
 // e rodar migrations em init-container ou job separado antes do deploy.
@@ -482,6 +493,10 @@ Log.Information("""
     app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
+// ExceptionHandler deve ser o primeiro middleware para capturar exceções de qualquer
+// middleware abaixo, incluindo swagger, static files e autenticação.
+app.UseExceptionHandler();
+
 // ResponseCompression precisa rodar cedo, antes de StaticFiles e do request logging,
 // pra ter chance de capturar o output dos middlewares seguintes.
 app.UseResponseCompression();
@@ -580,13 +595,19 @@ app.UseSerilogRequestLogging(options =>
         var originalBody = context.Response.Body;
         using var buffer = new System.IO.MemoryStream();
         context.Response.Body = buffer;
-        await next();
+        try
+        {
+            await next();
+        }
+        finally
+        {
+            context.Response.Body = originalBody;
+        }
         buffer.Position = 0;
         var body = buffer.ToArray();
         var contentType = context.Response.ContentType ?? "application/json";
         swaggerCache[path] = (body, contentType, DateTimeOffset.UtcNow);
         context.Response.Headers["X-Swagger-Cache"] = "MISS";
-        context.Response.Body = originalBody;
         await originalBody.WriteAsync(body);
     });
 }
@@ -645,7 +666,6 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
 // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
 EasyStock.Api.Mobile.MobileModule.UseMobilePwa(app);
 
-app.UseExceptionHandler(); // deve ser o primeiro para capturar exceções de qualquer middleware abaixo
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
