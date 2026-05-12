@@ -44,6 +44,7 @@ public class SyncController(
     MobileEventBroker eventBroker,
     IPedidoRepository pedidoRepo,
     CriarPedidoUseCase criarPedidoUseCase,
+    ILoteRepository loteRepo,
     IConfiguration appConfig,
     ILogger<SyncController> log) : ControllerBase
 {
@@ -53,6 +54,7 @@ public class SyncController(
     private readonly MobileEventBroker _eventBroker = eventBroker;
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
     private readonly CriarPedidoUseCase _criarPedidoUseCase = criarPedidoUseCase;
+    private readonly ILoteRepository _loteRepo = loteRepo;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncController> _log = log;
 
@@ -76,6 +78,8 @@ public class SyncController(
         var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var m in req.Mutations)
         {
@@ -85,7 +89,8 @@ public class SyncController(
                 accepted.Add(m.Id);
                 // Coleta IDs pra auto-link (so se mutation foi aceita).
                 var typePrefix = m.Type?.Split('.')[0];
-                if (typePrefix == "product" || typePrefix == "client" || typePrefix == "order")
+                if (typePrefix == "product" || typePrefix == "client" || typePrefix == "order"
+                    || typePrefix == "batch" || typePrefix == "cashEntry")
                 {
                     try
                     {
@@ -94,9 +99,11 @@ public class SyncController(
                             var payloadId = idEl.GetString();
                             if (!string.IsNullOrEmpty(payloadId))
                             {
-                                if (typePrefix == "product")    autoLinkProductIds.Add(payloadId);
-                                else if (typePrefix == "client") autoLinkClientIds.Add(payloadId);
-                                else                             autoLinkOrderIds.Add(payloadId);
+                                if (typePrefix == "product")        autoLinkProductIds.Add(payloadId);
+                                else if (typePrefix == "client")    autoLinkClientIds.Add(payloadId);
+                                else if (typePrefix == "order")     autoLinkOrderIds.Add(payloadId);
+                                else if (typePrefix == "batch")     autoLinkBatchIds.Add(payloadId);
+                                else                                 autoLinkCashIds.Add(payloadId);
                             }
                         }
                     }
@@ -123,23 +130,29 @@ public class SyncController(
         // Roda DEPOIS do SaveChanges principal pra (a) ler entities tracked,
         // (b) falha aqui nao bloqueia o sync, (c) idempotente. Feature flags:
         // MobileSync:AutoLink:Product/Client/Order (default true).
-        if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0 || autoLinkOrderIds.Count > 0)
+        if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0
+            || autoLinkOrderIds.Count > 0 || autoLinkBatchIds.Count > 0
+            || autoLinkCashIds.Count  > 0)
         {
             try
             {
                 var autoLinkProd   = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
                 var autoLinkClient = _appConfig.GetValue<bool>("MobileSync:AutoLink:Client", true);
                 var autoLinkOrder  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Order", true);
+                var autoLinkBatch  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Batch", true);
+                var autoLinkCash   = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
                 if (autoLinkProd   && autoLinkProductIds.Count > 0) await TryAutoLinkProductsAsync(autoLinkProductIds, empresaId);
                 if (autoLinkClient && autoLinkClientIds.Count  > 0) await TryAutoLinkClientsAsync(autoLinkClientIds, empresaId);
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-                // F1 — promove orders DEPOIS de products/clients pra que FKs (ErpProductId,
-                // ErpClienteId) ja estejam preenchidas e o Pedido criado fique consistente.
+                // F1/F2/F3 — promove orders, batches e cash entries DEPOIS de products/clients
+                // pra que FKs (ErpProductId, ErpClienteId) ja estejam preenchidas.
                 if (autoLinkOrder  && autoLinkOrderIds.Count   > 0) await TryAutoLinkOrdersAsync(autoLinkOrderIds, empresaId);
+                if (autoLinkBatch  && autoLinkBatchIds.Count   > 0) await TryAutoLinkBatchesAsync(autoLinkBatchIds, empresaId);
+                if (autoLinkCash   && autoLinkCashIds.Count    > 0) await TryAutoLinkCashEntriesAsync(autoLinkCashIds, empresaId);
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "Falha auto-link Produto/Cliente/Order apos sync");
+                _log.LogWarning(ex, "Falha auto-link mobile→ERP apos sync");
             }
         }
 
@@ -151,6 +164,61 @@ public class SyncController(
         }
 
         return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null));
+    }
+
+    /// <summary>
+    /// F5 — Backfill auto-link mobile→ERP de entidades pre-existentes.
+    /// Itera todos os Product/Client/Order/Batch/CashEntry da empresa do device
+    /// pareado que ainda não têm ErpId preenchido e roda o pipeline de auto-link.
+    /// Idempotente: pode chamar quantas vezes quiser. Disparado manualmente
+    /// (PowerShell ou UI futura), não em todo sync.
+    /// </summary>
+    [HttpPost("backfill-erp-link")]
+    [MobileApiKey]
+    public async Task<IActionResult> BackfillErpLink(CancellationToken ct)
+    {
+        var device = HttpContext.GetMobileDevice();
+        if (device is null) return Unauthorized(new { error = "device não pareado" });
+        var empresaId = (Guid?)device.EmpresaId;
+
+        var productIds = await _db.Set<Product>().IgnoreQueryFilters()
+            .Where(p => p.EmpresaId == empresaId && p.ErpProductId == null)
+            .Select(p => p.Id).ToListAsync(ct);
+        var clientIds = await _db.Set<Client>().IgnoreQueryFilters()
+            .Where(c => c.EmpresaId == empresaId && c.ErpClienteId == null)
+            .Select(c => c.Id).ToListAsync(ct);
+        var orderIds = await _db.Set<Order>().IgnoreQueryFilters()
+            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId == null)
+            .Select(o => o.Id).ToListAsync(ct);
+        var batchIds = await _db.Set<Batch>().IgnoreQueryFilters()
+            .Where(b => b.EmpresaId == empresaId && b.ErpLoteId == null)
+            .Select(b => b.Id).ToListAsync(ct);
+        var cashIds = await _db.Set<CashEntry>().IgnoreQueryFilters()
+            .Where(c => c.EmpresaId == empresaId && c.ErpMovimentoCaixaId == null)
+            .Select(c => c.Id).ToListAsync(ct);
+
+        _log.LogInformation("Backfill empresa={EmpresaId}: products={P} clients={C} orders={O} batches={B} cash={CE}",
+            empresaId, productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);
+
+        await TryAutoLinkProductsAsync(productIds, empresaId);
+        await TryAutoLinkClientsAsync(clientIds, empresaId);
+        if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
+        await TryAutoLinkOrdersAsync(orderIds, empresaId);
+        await TryAutoLinkBatchesAsync(batchIds, empresaId);
+        await TryAutoLinkCashEntriesAsync(cashIds, empresaId);
+
+        return Ok(new
+        {
+            empresaId,
+            processed = new
+            {
+                products = productIds.Count,
+                clients = clientIds.Count,
+                orders = orderIds.Count,
+                batches = batchIds.Count,
+                cashEntries = cashIds.Count
+            }
+        });
     }
 
     [HttpGet("pull")]
@@ -843,6 +911,134 @@ public class SyncController(
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "AutoLink Pedido falhou pra mobile={MobileId}", oid);
+            }
+        }
+    }
+
+    // F2 — promove mobile_batch → Lote web. Mobile produz e finaliza ao mesmo
+    // tempo (Batch e' insert-only no mobile), entao o Lote ja nasce com
+    // Status="finalizado". Itens com ProdutoId resolvido via Product.ErpProductId
+    // (F0 preenche). Idempotente via FindByMobileBatchIdAsync.
+    private async Task TryAutoLinkBatchesAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
+    {
+        if (!empresaId.HasValue) return;
+        foreach (var bid in mobileBatchIds)
+        {
+            try
+            {
+                var mobileB = await _db.Set<Batch>().IgnoreQueryFilters()
+                    .Include(b => b.Items)
+                    .FirstOrDefaultAsync(b => b.Id == bid && b.EmpresaId == empresaId);
+                if (mobileB == null) continue;
+                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty) continue;
+
+                var jaPromovido = await _loteRepo.FindByMobileBatchIdAsync(empresaId.Value, mobileB.Id);
+                if (jaPromovido != null)
+                {
+                    mobileB.ErpLoteId = jaPromovido.Id;
+                    _log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} → erp={ErpId}", bid, jaPromovido.Id);
+                    continue;
+                }
+
+                // Codigo do Lote: usa o mesmo identificador do mobile (LOT-YYMMDD) ou,
+                // se ausente, gera com sequencial do dia pra unicidade.
+                var codigo = !string.IsNullOrWhiteSpace(mobileB.Lote)
+                    ? mobileB.Lote!
+                    : !string.IsNullOrWhiteSpace(mobileB.Code)
+                        ? mobileB.Code!
+                        : $"LOT-{mobileB.CreatedAt:yyMMdd}-{await _loteRepo.GetNextSequencialDoDiaAsync(empresaId.Value, DateOnly.FromDateTime(mobileB.CreatedAt)):D3}";
+
+                var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
+                lote.MobileBatchId = mobileB.Id;
+                lote.OperadorNome  = mobileB.LastOperatorName;
+                lote.Origem        = "mobile";
+
+                foreach (var item in mobileB.Items)
+                {
+                    // Resolve ProdutoId via mobile.Product.ErpProductId (F0 preenche).
+                    Guid? produtoIdResolved = null;
+                    if (!string.IsNullOrWhiteSpace(item.ProductId))
+                    {
+                        var mProd = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                            .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+                        produtoIdResolved = mProd?.ErpProductId;
+                    }
+                    lote.Itens.Add(new LoteItem
+                    {
+                        Id = Guid.NewGuid(),
+                        LoteId = lote.Id,
+                        ProdutoId = produtoIdResolved,
+                        Nome = item.Name,
+                        Emoji = item.Emoji,
+                        Unidade = item.Unit,
+                        Quantidade = item.Qty,
+                        PesoG = item.WeightG,
+                        ValidadeDias = item.ValidityDays,
+                        ExpiraEm = item.ExpiresAt,
+                        CriadoEm = DateTime.UtcNow
+                    });
+                }
+
+                // Mobile entrega lote ja finalizado (insert-only). Espelha esse status.
+                lote.Finalizar();
+
+                await _loteRepo.AddAsync(lote);
+                mobileB.ErpLoteId = lote.Id;
+                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                _log.LogInformation("AutoLink Lote CRIADO: mobile={MobileId} → erp={ErpId} itens={N}",
+                    bid, lote.Id, lote.Itens.Count);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "AutoLink Lote falhou pra mobile={MobileId}", bid);
+            }
+        }
+    }
+
+    // F3 — promove mobile_cash_entry → MovimentoCaixa web. Idempotente via
+    // campo Referencia="mobile:<id>" (MovimentoCaixa.Referencia foi feito pra
+    // identificador externo). Mobile so manda "income"/"expense" — mapeamos
+    // pra "entrada"/"saida". Metodo default "dinheiro" (operador pode editar
+    // no admin depois).
+    private async Task TryAutoLinkCashEntriesAsync(IEnumerable<string> mobileCashIds, Guid? empresaId)
+    {
+        if (!empresaId.HasValue) return;
+        foreach (var ceid in mobileCashIds)
+        {
+            try
+            {
+                var mobileCE = await _db.Set<CashEntry>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == ceid && c.EmpresaId == empresaId);
+                if (mobileCE == null) continue;
+                if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) continue;
+
+                var referencia = $"mobile:{mobileCE.Id}";
+                var jaPromovido = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Referencia == referencia);
+                if (jaPromovido != null)
+                {
+                    mobileCE.ErpMovimentoCaixaId = jaPromovido.Id;
+                    _log.LogInformation("AutoLink MovimentoCaixa (idempotente): mobile={MobileId} → erp={ErpId}", ceid, jaPromovido.Id);
+                    continue;
+                }
+
+                var tipo = string.Equals(mobileCE.Type, "income", StringComparison.OrdinalIgnoreCase) ? "entrada" : "saida";
+                var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, mobileCE.CreatedAt, mobileCE.LojaId);
+                mov.Descricao = mobileCE.Description;
+                mov.Metodo = "dinheiro"; // default; operador refina no admin
+                mov.Origem = "mobile";
+                mov.RegistradoPorNome = mobileCE.LastOperatorName;
+                mov.Referencia = referencia;
+
+                _db.Add(mov);
+                mobileCE.ErpMovimentoCaixaId = mov.Id;
+                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                _log.LogInformation("AutoLink MovimentoCaixa CRIADO: mobile={MobileId} → erp={ErpId} tipo={Tipo} valor={Valor}",
+                    ceid, mov.Id, tipo, mov.Valor);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "AutoLink MovimentoCaixa falhou pra mobile={MobileId}", ceid);
             }
         }
     }
