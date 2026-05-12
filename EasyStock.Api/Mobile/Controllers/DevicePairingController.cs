@@ -269,7 +269,11 @@ public class DevicePairingController(
         }
 
         // Valida loja existe e pertence à empresa configurada.
-        var loja = await _db.Set<Loja>().AsNoTracking()
+        // IgnoreQueryFilters: endpoint anônimo (sem JWT) então o Global Query Filter
+        // tenant veria CurrentTenantId=Guid.Empty e descartaria tudo. A validação
+        // cross-tenant aqui é segura porque (a) secret bate, (b) empresaId/lojaId
+        // vêm de env vars no server.
+        var loja = await _db.Set<Loja>().IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(l => l.Id == lojaId && l.EmpresaId == empresaId, ct);
         if (loja == null)
         {
@@ -287,7 +291,9 @@ public class DevicePairingController(
 
         // Idempotente: se mesmo deviceId já existe e não foi revogado, rotaciona apiKey
         // (re-install do APK, troca de aparelho com mesmo install token, etc).
-        var existing = await _db.Set<MobileDevice>()
+        // IgnoreQueryFilters pelo mesmo motivo do SELECT da loja acima — sem JWT
+        // o filter tenant zera o resultado.
+        var existing = await _db.Set<MobileDevice>().IgnoreQueryFilters()
             .FirstOrDefaultAsync(d => d.Id == deviceFromApp && !d.Revoked, ct);
 
         if (existing != null)
