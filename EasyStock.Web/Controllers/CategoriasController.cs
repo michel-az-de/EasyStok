@@ -89,4 +89,35 @@ public class CategoriasController(CategoriasService svc, SessionService session)
         var lista = (result.Data ?? []).Select(c => new { id = c.Id, nome = c.Nome });
         return Json(lista);
     }
+
+    [HttpPost("/categorias/criar-json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarJson([FromBody] CategoriaFormRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Nome))
+            return BadRequest(new { success = false, error = new { code = "VALIDATION_ERROR", message = "O nome é obrigatório." } });
+
+        var result = await svc.CriarAsync(req.Nome.Trim(), req.QuantidadeMinima, req.QuantidadeCritica);
+        if (!result.Success)
+            return BadRequest(new { success = false, error = result.Error });
+
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("/categorias/{id}/editar-json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditarJson(string id, [FromBody] CategoriaFormRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Nome))
+            return BadRequest(new { success = false, error = new { code = "VALIDATION_ERROR", message = "O nome é obrigatório." } });
+
+        var editResult = await svc.EditarAsync(id, req.Nome.Trim());
+        if (!editResult.Success)
+            return BadRequest(new { success = false, error = editResult.Error });
+
+        await svc.AtualizarLimiarAsync(id, req.QuantidadeMinima, req.QuantidadeCritica);
+        return Ok(new { success = true });
+    }
 }
+
+public record CategoriaFormRequest(string Nome, int? QuantidadeMinima, int? QuantidadeCritica);
