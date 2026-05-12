@@ -6677,6 +6677,69 @@ body.ux-calm [data-screen="producao"] .section-label {
    printer fora de alcance, backup desatualizado, etc). Click no
    "Resolver" abre Diagnostico unificado. NAO bloqueia o app.
    =========================================================== */
+/* ===========================================================
+   Modal Initial Pull Report
+   Card central com contadores do que o pull inicial baixou.
+   Disparado por sync.js apos pareamento. Auto-dismiss 3s.
+   =========================================================== */
+.ipr-overlay {
+  position: fixed; inset: 0; z-index: 13000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 24px;
+  animation: ipr-fade-in 200ms ease-out;
+}
+.ipr-overlay[hidden] { display: none; }
+.ipr-card {
+  background: #1a1410; color: #f5e6d3;
+  border-radius: 16px; padding: 24px;
+  max-width: 360px; width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(212, 162, 58, 0.3);
+}
+.ipr-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #4a8a3a; color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 700;
+  margin: 0 auto 12px;
+}
+.ipr-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 24px; text-align: center; margin-bottom: 16px;
+}
+.ipr-counts {
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px; padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.ipr-row {
+  display: flex; justify-content: space-between;
+  font-size: 14px; line-height: 1.4;
+}
+.ipr-row b { color: #d4a23a; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ipr-actions { display: flex; gap: 8px; }
+.ipr-btn {
+  flex: 1; padding: 10px 16px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit;
+}
+.ipr-btn-primary { background: #d4a23a; color: #1a1410; }
+.ipr-btn-secondary { background: rgba(255, 255, 255, 0.08); color: #f5e6d3; }
+.ipr-details {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px; color: #b8a890;
+}
+.ipr-details[hidden] { display: none; }
+.ipr-detail-line { margin: 4px 0; }
+.ipr-detail-line span { color: #f5e6d3; font-family: monospace; }
+@keyframes ipr-fade-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 .health-banner {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -7697,6 +7760,33 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeCashModal()">Cancelar</button>
         <button class="cta-btn primary" id="cashSaveBtn" onclick="saveCashEntry()" disabled>Lançar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de relatorio do pull inicial pos-pareamento.
+       Dispara quando sync.js seta cdb-pull-report-pending=1 ou via evento
+       cdb-initial-pull-done. Auto-dismiss 3s + botao "Detalhes". -->
+  <div id="initialPullReport" class="ipr-overlay" role="dialog" aria-modal="true" hidden>
+    <div class="ipr-card">
+      <div class="ipr-icon">✓</div>
+      <div class="ipr-title">Sincronizado</div>
+      <div class="ipr-counts">
+        <div class="ipr-row"><span>Produtos</span><b id="iprProducts">0</b></div>
+        <div class="ipr-row"><span>Clientes</span><b id="iprClients">0</b></div>
+        <div class="ipr-row"><span>Pedidos</span><b id="iprOrders">0</b></div>
+        <div class="ipr-row"><span>Lotes</span><b id="iprBatches">0</b></div>
+        <div class="ipr-row"><span>Caixa</span><b id="iprCash">0</b></div>
+      </div>
+      <div class="ipr-actions">
+        <button type="button" class="ipr-btn ipr-btn-secondary" onclick="iprToggleDetails()">Detalhes</button>
+        <button type="button" class="ipr-btn ipr-btn-primary" onclick="iprDismiss()">OK</button>
+      </div>
+      <div class="ipr-details" id="iprDetails" hidden>
+        <div class="ipr-detail-line">Loja: <span id="iprLoja">—</span></div>
+        <div class="ipr-detail-line">Pareado em: <span id="iprPairedAt">—</span></div>
+        <div class="ipr-detail-line">Endpoint: <span id="iprEndpoint">—</span></div>
+        <div class="ipr-detail-line">Última sync: <span id="iprLastSync">agora</span></div>
       </div>
     </div>
   </div>
@@ -15250,13 +15340,43 @@ function setupGlobalErrorHandlers() {
   window.__cdbErrorHooked = true;
   window.addEventListener('error', function (ev) {
     const err = ev && ev.error ? ev.error : (ev && ev.message ? new Error(ev.message) : new Error('window.onerror'));
-    logError(err, 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : ''));
+    const ctx = 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : '');
+    logError(err, ctx);
+    _maybeOpenTicketForException(err, ctx);
   });
   window.addEventListener('unhandledrejection', function (ev) {
     const reason = ev && ev.reason;
-    logError(reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection')), 'unhandledrejection');
+    const err = reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection'));
+    logError(err, 'unhandledrejection');
+    _maybeOpenTicketForException(err, 'unhandledrejection');
   });
 }
+
+// Abre ticket automatico em exception grave — anti-spam controlado pelo
+// proprio openTicketAuto (cooldown 1h + max 5/dia/device).
+function _maybeOpenTicketForException(err, ctx) {
+  try {
+    if (!window.cdbSync || typeof window.cdbSync.openTicketAuto !== 'function') return;
+    const msg = String((err && err.message) || err || '').slice(0, 300);
+    const stack = String((err && err.stack) || '').split('\n').slice(0, 6).join('\n');
+    window.cdbSync.openTicketAuto(
+      'Exceção não capturada no app',
+      'Contexto: ' + ctx + '\n\nMensagem: ' + msg + '\n\nStack:\n' + stack,
+      'Bug',
+      'unhandled-exception'
+    );
+  } catch (_) {}
+}
+// Toast discreto quando ticket auto eh aberto pelo sync.js.
+window.addEventListener('cdb-ticket-opened', function (ev) {
+  try {
+    const id = ev && ev.detail && ev.detail.ticketId;
+    const titulo = ev && ev.detail && ev.detail.titulo;
+    if (!id) return;
+    const shortId = String(id).slice(0, 8);
+    showToast('Ticket #' + shortId + ' aberto — ' + (titulo || 'suporte avisado'));
+  } catch (_) {}
+});
 
 const CAM_ERRORS_KEY = 'cdb-cam-errors';
 const CAM_ERRORS_MAX = 10;
@@ -18664,6 +18784,66 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
+
+// ============================================================
+// MODAL DE RELATORIO PULL INICIAL
+// ============================================================
+// Disparado por sync.js apos pareamento (pairAuto/pairWithCode) ter feito
+// pull inicial. Le contadores atuais do state, mostra modal com auto-dismiss
+// 3s. Botao "Detalhes" expande info de pareamento. Botao "OK" fecha imediato.
+let _iprDismissTimer = null;
+function iprShow() {
+  const el = document.getElementById('initialPullReport');
+  if (!el) return;
+  const state = (typeof window.cdbApp !== 'undefined' && window.cdbApp.getState)
+    ? window.cdbApp.getState() : {};
+  document.getElementById('iprProducts').textContent = (state.products || []).length;
+  document.getElementById('iprClients').textContent  = (state.clients || []).length;
+  document.getElementById('iprOrders').textContent   = (state.orders || []).length;
+  document.getElementById('iprBatches').textContent  = (state.batches || []).length;
+  document.getElementById('iprCash').textContent     = (state.cashEntries || []).length;
+  // Preenche detalhes (visiveis so apos click)
+  try {
+    const pairing = window.cdbSync && window.cdbSync.getPairing && window.cdbSync.getPairing();
+    if (pairing) {
+      document.getElementById('iprLoja').textContent = String(pairing.label || pairing.lojaId || '—').slice(0, 40);
+      document.getElementById('iprPairedAt').textContent = pairing.pairedAt
+        ? new Date(pairing.pairedAt).toLocaleString('pt-BR') : '—';
+    }
+    const cfg = window.CDB_CONFIG || {};
+    document.getElementById('iprEndpoint').textContent = cfg.apiBaseUrl || '(mesmo host)';
+  } catch (_) {}
+  el.hidden = false;
+  // Auto-dismiss em 3s
+  if (_iprDismissTimer) clearTimeout(_iprDismissTimer);
+  _iprDismissTimer = setTimeout(iprDismiss, 3000);
+}
+function iprDismiss() {
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const el = document.getElementById('initialPullReport');
+  if (el) el.hidden = true;
+  try { localStorage.removeItem('cdb-pull-report-pending'); } catch (_) {}
+}
+function iprToggleDetails() {
+  // Click em Detalhes cancela auto-dismiss e mostra info estendida
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const d = document.getElementById('iprDetails');
+  if (d) d.hidden = !d.hidden;
+}
+// Boot: se a flag estiver setada (pull causou reload), mostra o modal.
+// Espera 600ms pro cdbApp inicializar antes de ler state.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    if (localStorage.getItem('cdb-pull-report-pending') !== '1') return;
+    setTimeout(iprShow, 600);
+  } catch (_) {}
+});
+// Evento sincronizo do sync.js quando pull rodou sem causar reload
+// (nenhuma mutation nova) — UI ainda quer mostrar o modal.
+window.addEventListener('cdb-initial-pull-done', function () {
+  if (document.getElementById('initialPullReport') && document.getElementById('initialPullReport').hidden === false) return;
+  iprShow();
+});
 
 // ============================================================
 // MENSAGENS DE ERRO HUMANIZADAS

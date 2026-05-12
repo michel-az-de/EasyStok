@@ -422,6 +422,13 @@
       if (!resp.ok) {
         console.warn('Sync falhou, status', resp.status);
         _consecutiveFlushFailures = Math.min(_consecutiveFlushFailures + 1, 5);
+        if (_consecutiveFlushFailures >= 5) {
+          openTicketAuto(
+            'Sincronização falhando consecutivamente',
+            'Device ' + deviceId + ' acumulou 5+ falhas de flush. Ultimo HTTP status: ' + resp.status,
+            'Incidente', 'flush-fail'
+          );
+        }
         return 'retry';
       }
 
@@ -481,6 +488,13 @@
     } catch (e) {
       console.warn('Erro no sync:', e.message);
       _consecutiveFlushFailures = Math.min(_consecutiveFlushFailures + 1, 5);
+      if (_consecutiveFlushFailures >= 5) {
+        openTicketAuto(
+          'Sincronização falhando consecutivamente',
+          'Device ' + deviceId + ' acumulou 5+ falhas de flush. Exception: ' + (e && e.message || e),
+          'Incidente', 'flush-fail'
+        );
+      }
       return 'retry';
     } finally {
       flushing = false;
@@ -1716,7 +1730,22 @@
     });
     _pairingInvalid = false;
     try { await pingVersion(); } catch (_) {}
+    // Marca a UI pra mostrar modal de relatorio apos o pull inicial.
+    // Sobrevive ao location.reload() que applyServerMutations dispara
+    // quando o pull trouxe dados — boot do index.html le a flag e
+    // renderiza o modal com contadores atualizados.
+    try { localStorage.setItem('cdb-pull-report-pending', '1'); } catch (_) {}
     try { flush(); } catch (_) {}
+    try { await pull(); } catch (_) {}
+    // Pull rodou sem causar reload (nenhuma mutation) — dispara evento
+    // manual pra UI mostrar modal "sem novidades" tambem.
+    if (typeof window !== 'undefined') {
+      try {
+        if (localStorage.getItem('cdb-pull-report-pending') === '1') {
+          window.dispatchEvent(new CustomEvent('cdb-initial-pull-done', { detail: { reloaded: false } }));
+        }
+      } catch (_) {}
+    }
     return data;
   }
 
@@ -1766,9 +1795,21 @@
     _pairingInvalid = false;
     // Re-pinga version pra atualizar info no diagnostico
     try { await pingVersion(); } catch (_) {}
+    // Marca a UI pra mostrar modal de relatorio apos o pull inicial.
+    try { localStorage.setItem('cdb-pull-report-pending', '1'); } catch (_) {}
     // Tenta drenar fila imediatamente — pode ter mutations acumuladas
     // do periodo offline / sem pairing.
     try { flush(); } catch (_) {}
+    // Pull inicial pra trazer produtos/clientes/pedidos. Sem isso a UI
+    // fica vazia ate o ciclo de 30s do sync loop disparar o proximo pull.
+    try { await pull(); } catch (_) {}
+    if (typeof window !== 'undefined') {
+      try {
+        if (localStorage.getItem('cdb-pull-report-pending') === '1') {
+          window.dispatchEvent(new CustomEvent('cdb-initial-pull-done', { detail: { reloaded: false } }));
+        }
+      } catch (_) {}
+    }
     return data;
   }
 
@@ -1843,6 +1884,78 @@
   // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
   setTimeout(pingVersion, 700);
 
+  // ---- Abertura automatica de tickets (erros graves) ----
+  // Criterios:
+  //   - flush: 5+ falhas consecutivas (server fora, schema mismatch, etc)
+  //   - window.onerror: exception nao capturada (handler em index.html chama
+  //     window.cdbSync.openTicketAuto)
+  // Anti-spam: cooldown 1h por tipo de evento + maximo 5 tickets/dia/device.
+  // Precondicao: device JA pareado. Sem pairing nao consegue autenticar a
+  // chamada POST /tickets — falha de pareamento fica so no cdb-error-log local.
+  const TICKET_COOLDOWN_KEY = 'cdb-ticket-cooldown';
+  const TICKET_DAILY_KEY = 'cdb-ticket-daily';
+  const TICKET_COOLDOWN_MS = 60 * 60 * 1000;   // 1h por tipo
+  const TICKET_MAX_PER_DAY = 5;
+  let _flushFailTicketArmed = false;
+
+  function _canOpenTicket(tipo) {
+    try {
+      const cd = JSON.parse(localStorage.getItem(TICKET_COOLDOWN_KEY) || '{}');
+      if (cd[tipo] && Date.now() - cd[tipo] < TICKET_COOLDOWN_MS) return false;
+      const daily = JSON.parse(localStorage.getItem(TICKET_DAILY_KEY) || '{}');
+      const today = new Date().toISOString().slice(0, 10);
+      if ((daily[today] || 0) >= TICKET_MAX_PER_DAY) return false;
+      return true;
+    } catch (_) { return true; }
+  }
+
+  function _markTicketOpened(tipo) {
+    try {
+      const cd = JSON.parse(localStorage.getItem(TICKET_COOLDOWN_KEY) || '{}');
+      cd[tipo] = Date.now();
+      localStorage.setItem(TICKET_COOLDOWN_KEY, JSON.stringify(cd));
+      const daily = JSON.parse(localStorage.getItem(TICKET_DAILY_KEY) || '{}');
+      const today = new Date().toISOString().slice(0, 10);
+      daily[today] = (daily[today] || 0) + 1;
+      // Limpa datas antigas para nao crescer indefinidamente.
+      Object.keys(daily).forEach(k => { if (k !== today) delete daily[k]; });
+      localStorage.setItem(TICKET_DAILY_KEY, JSON.stringify(daily));
+    } catch (_) {}
+  }
+
+  async function openTicketAuto(titulo, descricao, categoria, tipo) {
+    if (!loadPairing()) return null;
+    if (!navigator.onLine) return null;
+    const tipoKey = tipo || titulo;
+    if (!_canOpenTicket(tipoKey)) return null;
+    let errorLogJson = null;
+    try {
+      const errors = JSON.parse(localStorage.getItem('cdb-error-log') || '[]');
+      if (errors.length > 0) errorLogJson = JSON.stringify(errors.slice(-5), null, 2);
+    } catch (_) {}
+    try {
+      const resp = await fetch(API_BASE_URL + API_PREFIX + '/tickets', {
+        method: 'POST',
+        headers: baseHeaders(),
+        body: JSON.stringify({
+          titulo: String(titulo || 'Erro detectado no app').slice(0, 200),
+          descricao: String(descricao || '').slice(0, 10000),
+          categoria: categoria || 'Bug',
+          errorLogJson: errorLogJson
+        })
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      _markTicketOpened(tipoKey);
+      try {
+        window.dispatchEvent(new CustomEvent('cdb-ticket-opened', {
+          detail: { ticketId: data.ticketId, titulo: data.titulo }
+        }));
+      } catch (_) {}
+      return data;
+    } catch (_) { return null; }
+  }
+
   // Auto-pair on first boot. Dois modos exclusivos (provisioning prefere):
   //  1. forcedProvisioningSecret (preferido) — token de longa vida embutido
   //     no APK + 3 env vars no server (AppProvisioning:Secret/EmpresaId/LojaId).
@@ -1852,7 +1965,20 @@
   // No PWA padrao ambos sao undefined — bloco vira no-op.
   // Idempotente: se cdb-pairing ja existe (ex: APK atualizado por cima de
   // instalacao previamente pareada), pula.
+  // Retry com backoff (60s, 2min, 5min) ate succeed - cobre cenarios onde
+  // primeira tentativa falha por CORS/network e a segunda passa.
+  let _autoPairAttempt = 0;
+  const _autoPairDelays = [60000, 120000, 300000, 600000];
+  function _logAutoPairError(msg) {
+    try {
+      if (typeof window !== 'undefined' && typeof window.logError === 'function') {
+        window.logError(new Error(msg), 'auto-pair');
+      }
+    } catch (_) {}
+    try { console.warn('[auto-pair]', msg); } catch (_) {}
+  }
   setTimeout(async function autoPairFromForcedCode() {
+    _autoPairAttempt++;
     try {
       if (loadPairing()) return;
       const cfg = window.CDB_CONFIG || {};
@@ -1860,31 +1986,35 @@
       const code = cfg.forcedPairingCode;
       if (!provisioningSecret && !code) return;
       if (!navigator.onLine) {
-        // Sem rede agora — tenta de novo daqui a 30s. Codigo expira em poucos
-        // minutos no server, mas vale insistir caso o WiFi do dispositivo so
-        // levantou apos o boot.
         setTimeout(autoPairFromForcedCode, 30 * 1000);
         return;
       }
       // Modo 1: provisioning secret (preferido)
       if (provisioningSecret) {
-        try { console.log('[auto-pair] tentando auto-provisioning via token'); } catch (_) {}
+        try { console.log('[auto-pair] tentativa ' + _autoPairAttempt + ' via provisioning secret'); } catch (_) {}
         try {
           await pairAuto(provisioningSecret, cfg.forcedProvisioningLabel || cfg.forcedPairingLabel || 'Casa da Baba');
           try { console.log('[auto-pair] provisionado com sucesso'); } catch (_) {}
           return;
         } catch (e) {
-          try { console.warn('[auto-pair] provisioning falhou:', e && e.message); } catch (_) {}
-          // Fallback pro modo 2 se houver codigo embutido tambem
-          if (!code) return;
+          _logAutoPairError('tentativa ' + _autoPairAttempt + ' falhou: ' + (e && e.message || e));
+          if (!code) {
+            // Sem fallback - agenda retry
+            const delay = _autoPairDelays[Math.min(_autoPairAttempt - 1, _autoPairDelays.length - 1)];
+            setTimeout(autoPairFromForcedCode, delay);
+            return;
+          }
         }
       }
       // Modo 2: pairing code legacy
-      try { console.log('[auto-pair] tentando parear com codigo embutido (length=' + String(code).length + ')'); } catch (_) {}
-      await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
-      try { console.log('[auto-pair] pareado com sucesso'); } catch (_) {}
+      try {
+        await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
+        try { console.log('[auto-pair] pareado com sucesso'); } catch (_) {}
+      } catch (e) {
+        _logAutoPairError('pairing code falhou: ' + (e && e.message || e));
+      }
     } catch (e) {
-      try { console.warn('[auto-pair] falhou:', e && e.message); } catch (_) {}
+      _logAutoPairError('boot exception: ' + (e && e.message || e));
     }
   }, 2000);
 
@@ -1893,6 +2023,7 @@
     flush, pull, stop,
     pingVersion, uploadErrorLog,
     pairWithCode, pairAuto,
+    openTicketAuto,
     getPairing: loadPairing,
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,
