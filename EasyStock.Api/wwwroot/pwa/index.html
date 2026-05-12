@@ -2212,6 +2212,30 @@ button:disabled {
   background: rgba(214, 80, 51, 0.18);
   color: var(--accent);
 }
+/* Saldo projetado: estoque atual + produzido. Aparece so quando count>0. */
+.stock-after-prod {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--basil);
+  border: 1px dashed currentColor;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.prod-summary .ps-after {
+  display: block;
+  font-size: 11px;
+  color: var(--basil);
+  margin-top: 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .sr-warn { color: var(--accent); font-weight: 700; }
 .product-tile.add-tile {
   background: transparent;
@@ -5454,6 +5478,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   color: #c24e32;
   border-color: rgba(207,87,56,0.22);
 }
+[data-theme="light"] .stock-after-prod { color: #168f7a; }
+[data-theme="light"] .prod-summary .ps-after { color: #168f7a; }
 .product-tile .prod-tile-action.danger {
   color: var(--accent);
   border-color: rgba(214,80,51,0.32);
@@ -11293,6 +11319,7 @@ function renderProductGrid() {
             <div class="punit">
               ${escapeHtml(p.unit || '')}
               <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
+              ${qty > 0 ? `<span class="stock-after-prod" title="Saldo previsto apos registrar essa producao">&rarr; ${stock + qty} apos</span>` : ''}
               <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
             </div>
           </div>
@@ -11429,12 +11456,21 @@ function openProductionConfirm() {
   currentBatchCode = buildBatchCode(items);
 
   const summary = document.getElementById('prodSummary');
-  summary.innerHTML = items.map(i => `
+  summary.innerHTML = items.map(i => {
+    const stockAtual = Number(i.stock) || 0;
+    const apos = stockAtual + (Number(i.count) || 0);
+    return `
     <div class="ps-item">
-      <div class="n"><span class="e">${i.emoji}</span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></div>
+      <div class="n">
+        <span class="e">${i.emoji}</span>
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
+          <span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></span>
+          <span class="ps-after">${stockAtual} no estoque &rarr; ${apos} apos</span>
+        </span>
+      </div>
       <div class="q">×${i.count}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
   populateProdDetailList(items);
@@ -17073,6 +17109,7 @@ function orderLabelHtml(o) {
     <div class="pa-title">${escapeHtml(empresa)}</div>
     <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
     <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
+    ${o.scheduledDeliveryAt ? `<div class="pa-meta pa-meta-scheduled" style="font-weight:800">📅 Entregar em: ${new Date(o.scheduledDeliveryAt).toLocaleString('pt-BR')}</div>` : ''}
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
       <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>

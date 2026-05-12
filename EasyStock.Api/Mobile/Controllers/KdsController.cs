@@ -51,12 +51,18 @@ public class KdsController(
 
         var filtro = ParsearStatuses(statuses);
 
+        // KDS so puxa pedidos do dia: nao-agendados aparecem sempre; agendados
+        // aparecem 24h antes da entrega. Cobre fuso BR sem precisar saber TZ
+        // da empresa (UtcNow + 24h da janela de 1 dia em qualquer fuso).
+        var janelaKds = DateTime.UtcNow.AddHours(24);
+
         var query = db.Set<Order>()
             .AsNoTracking()
             .Include(o => o.Items)
             .Where(o => o.EmpresaId == device.EmpresaId
                      && o.LojaId == device.LojaId
-                     && filtro.Contains(o.Status));
+                     && filtro.Contains(o.Status)
+                     && (o.ScheduledDeliveryAt == null || o.ScheduledDeliveryAt <= janelaKds));
 
         var orders = await query
             .OrderBy(o => o.CreatedAt)

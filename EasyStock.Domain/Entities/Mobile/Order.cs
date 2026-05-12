@@ -75,10 +75,23 @@ public class Order
     /// <summary>
     /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
     /// Pedidos agendados aparecem ordenados por esta data e ganham badge no PWA/KDS.
-    /// MVP: sem alertas/recorrência — só ordenação visual.
     /// </summary>
     [Column("scheduled_delivery_at")]
     public DateTime? ScheduledDeliveryAt { get; set; }
+
+    /// <summary>
+    /// Idempotência das notificações de agendamento (AgendamentoNotificacaoService).
+    /// NULL = ainda nao enviada; preenchido = enviada naquele momento. So pedidos com
+    /// ScheduledDeliveryAt != null sao candidatos. Nao apagar — preserva historico.
+    /// </summary>
+    [Column("agendamento_notificado_dia_em")]
+    public DateTime? AgendamentoNotificadoDiaEm { get; set; }
+
+    [Column("agendamento_notificado_1h_em")]
+    public DateTime? AgendamentoNotificado1hEm { get; set; }
+
+    [Column("agendamento_notificado_10min_em")]
+    public DateTime? AgendamentoNotificado10minEm { get; set; }
 
     /// <summary>Multi-tenant (Onda 1). Resolvido via device autenticado.</summary>
     [Column("empresa_id")]

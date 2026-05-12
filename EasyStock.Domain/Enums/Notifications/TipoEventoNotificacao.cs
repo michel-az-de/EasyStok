@@ -30,5 +30,11 @@ public enum TipoEventoNotificacao
     PagamentoFalhou = 24,
 
     // Modulo Helpdesk — convite CSAT pos fechamento
-    ConviteCsat = 25
+    ConviteCsat = 25,
+
+    // Pedido agendado (mobile) — lembretes disparados pelo AgendamentoNotificacaoService.
+    // Idempotencia via colunas mobile_orders.agendamento_notificado_*_em.
+    PedidoAgendadoHoje = 26,
+    PedidoAgendadoEm1Hora = 27,
+    PedidoAgendadoEm10Minutos = 28
 }

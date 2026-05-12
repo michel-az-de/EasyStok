@@ -504,7 +504,22 @@ public class SyncController(
             o.Items.Select(i => new OrderItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).ToList(),
             o.Notes, o.Total, o.Status,
             new DateTimeOffset(o.CreatedAt).ToUnixTimeMilliseconds(),
-            new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds());
+            new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds(),
+            // Campos opcionais: sem isto o pull silenciosamente zerava
+            // factAt/confirmedAt/scheduledDeliveryAt quando outro device sincronizava.
+            History: o.HistoryJson != null
+                ? JsonDocument.Parse(o.HistoryJson).RootElement.Clone()
+                : (JsonElement?)null,
+            ConfirmedBy: o.ConfirmedBy,
+            ConfirmedAt: o.ConfirmedAt.HasValue
+                ? new DateTimeOffset(o.ConfirmedAt.Value).ToUnixTimeMilliseconds()
+                : (long?)null,
+            FactAt: o.FactAt.HasValue
+                ? new DateTimeOffset(o.FactAt.Value).ToUnixTimeMilliseconds()
+                : (long?)null,
+            ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
+                ? new DateTimeOffset(o.ScheduledDeliveryAt.Value).ToUnixTimeMilliseconds()
+                : (long?)null);
 
     private static BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
