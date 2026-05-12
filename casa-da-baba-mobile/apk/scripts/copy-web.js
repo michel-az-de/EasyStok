@@ -42,14 +42,24 @@ function copy(src, dst) {
 }
 
 function injectConfigBeforeSyncJs(htmlPath) {
-  const marker = '<script src="sync.js"></script>';
-  const inject = '<script src="config.js"></script>\n' + marker;
   let html = fs.readFileSync(htmlPath, 'utf8');
-  if (html.includes(marker) && !html.includes('config.js')) {
-    html = html.replace(marker, inject);
-    fs.writeFileSync(htmlPath, html, 'utf8');
-    console.log('[copy-web] injetou <script src="config.js"> antes de sync.js');
+  // Idempotente: se config.js ja referenciado, nao mexe (build incremental).
+  if (/<script[^>]+src=["']config\.js/i.test(html)) {
+    console.log('[copy-web] config.js ja injetado (idempotente)');
+    return;
   }
+  // Match flexivel: aceita cache-buster `?v=...` que o workflow CI injeta
+  // (rewrite-cache-version.ps1) — antes a regex era literal e quebrava
+  // silenciosamente, deixando o config.js orfao no APK.
+  const re = /<script\s+src=["']sync\.js[^"']*["']\s*><\/script>/i;
+  if (!re.test(html)) {
+    console.error('[copy-web] ERRO: nao encontrei <script src="sync.js..."> em index.html');
+    console.error('[copy-web]   config.js NAO sera carregado pelo HTML - build invalido.');
+    process.exit(1);
+  }
+  html = html.replace(re, '<script src="config.js"></script>\n  $&');
+  fs.writeFileSync(htmlPath, html, 'utf8');
+  console.log('[copy-web] injetou <script src="config.js"> antes de sync.js');
 }
 
 function stampVersionInHtml(htmlPath) {
