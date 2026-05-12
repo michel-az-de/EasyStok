@@ -492,16 +492,21 @@
             <div class="field-group">
                 <label for="Email">> E-mail</label>
                 <input asp-for="Email" id="Email" type="email" required autocomplete="username"
-                       autofocus
                        class="field-input"
                        placeholder="admin@easystock.com.br" />
             </div>
 
             <div class="field-group">
                 <label for="Senha">> Senha</label>
-                <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
-                       class="field-input"
-                       placeholder="••••••••••••" />
+                <div class="relative">
+                    <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
+                           class="field-input pr-10"
+                           placeholder="••••••••••••" />
+                    <button type="button" id="toggleSenha"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-es-ink-mute hover:text-es-ink text-base leading-none"
+                            aria-label="Mostrar/ocultar senha"
+                            onclick="const s=document.getElementById('Senha');s.type=s.type==='password'?'text':'password';this.textContent=s.type==='password'?'👁':'🙈';">👁</button>
+                </div>
             </div>
 
             <button type="submit" class="btn-launch" id="loginBtn">
@@ -559,6 +564,11 @@
         const overlay = document.getElementById('loadingOverlay');
         const btn = document.getElementById('loginBtn');
         if (!form || !overlay) return;
+
+        // Foco inteligente: se há erro de autenticação server-side foca senha,
+        // senão foca email (substitui o autofocus nativo removido).
+        const hasServerError = !!document.querySelector('.alert-error');
+        (hasServerError ? document.getElementById('Senha') : document.getElementById('Email'))?.focus();
 
         form.addEventListener('submit', function () {
             // Não previne o submit — só mostra o overlay enquanto o servidor processa

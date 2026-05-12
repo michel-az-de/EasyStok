@@ -330,7 +330,7 @@ function alertaBanner(tenantId) {
         </div>
         <div class="card p-0 overflow-hidden">
             <table class="table-admin">
-                <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
+                <thead><tr><th class="whitespace-nowrap min-w-[180px]">Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
                 <tbody>
                     @if (!Model.Usuarios.Any())
                     {
@@ -354,7 +354,7 @@ function alertaBanner(tenantId) {
                         var unomeEscaped = unome.Replace("\\", "\\\\").Replace("'", "\\'");
                         var uemailEscaped = uemail.Replace("\\", "\\\\").Replace("'", "\\'");
                         <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@Html.Raw(uemailEscaped)'))">
-                            <td class="text-es-ink font-medium">@unome</td>
+                            <td class="text-es-ink font-medium whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis" title="@unome">@unome</td>
                             <td class="text-es-ink-dim font-mono text-xs">
                                 <span x-text="piiValor"></span>
                                 <button type="button" :title="piiVisivel ? 'Re-mascarar' : 'Ver completo (auditado)'"
@@ -1034,7 +1034,7 @@ function alertaBanner(tenantId) {
     </div>
 
     <!-- Atividade unificada (P1) — timeline com filtros -->
-    <div x-show="tab === 'atividade'" x-cloak x-data="atividadeTimeline('@Model.Id')" x-init="$watch('tab', t => { if (t === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); } })">
+    <div x-show="tab === 'atividade'" x-cloak x-data="atividadeTimeline('@Model.Id')" x-init="$watch('tab', t => { if (t === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); } }); if (tab === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); }">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
             <!-- Timeline -->
             <div class="card p-0 overflow-hidden">

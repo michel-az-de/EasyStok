@@ -19,10 +19,15 @@
     <template x-if="!empresaId">
         <div class="rounded-xl p-6"
              style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
-            <p class="text-es-ink-dim text-sm">
-                Selecione um cliente em
-                <a href="/Tenants" class="text-es-accent hover:underline">/Tenants</a>
-                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>.
+            <p class="text-es-ink-dim text-sm mb-3">Selecione um cliente para ver os dados de operação.</p>
+            <button type="button"
+                    class="btn-secondary text-sm flex items-center gap-2"
+                    @@click="$dispatch('open-cmdk', { onPick: id => window.location.href = '/Operacao?empresaId=' + id })">
+                🔍 Buscar cliente…
+                <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute font-mono">Ctrl K</kbd>
+            </button>
+            <p class="text-es-ink-mute text-xs mt-3">
+                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>
             </p>
         </div>
     </template>

@@ -37,17 +37,17 @@
                     <th>IP</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach (var l in Model.Logs)
-                {
-                    var adminEmail = l.TryGetProperty("adminEmail", out var aeP) ? aeP.GetString() : "—";
-                    var acao       = l.TryGetProperty("acao", out var aP) ? aP.GetString() : "—";
-                    var detalhes   = l.TryGetProperty("detalhes", out var dP) && dP.ValueKind != System.Text.Json.JsonValueKind.Null ? dP.GetString() : "—";
-                    var tenantId   = l.TryGetProperty("tenantId", out var tP) && tP.ValueKind != System.Text.Json.JsonValueKind.Null ? tP.GetString() : null;
-                    var ip         = l.TryGetProperty("ip", out var iP) && iP.ValueKind != System.Text.Json.JsonValueKind.Null ? iP.GetString() : "—";
-                    var criadoEm   = l.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : null;
-                    DateTime.TryParse(criadoEm, out var criadoDt);
-                    <tr>
+            @foreach (var l in Model.Logs)
+            {
+                var adminEmail = l.TryGetProperty("adminEmail", out var aeP) ? aeP.GetString() : "—";
+                var acao       = l.TryGetProperty("acao", out var aP) ? aP.GetString() : "—";
+                var detalhes   = l.TryGetProperty("detalhes", out var dP) && dP.ValueKind != System.Text.Json.JsonValueKind.Null ? dP.GetString() : "—";
+                var tenantId   = l.TryGetProperty("tenantId", out var tP) && tP.ValueKind != System.Text.Json.JsonValueKind.Null ? tP.GetString() : null;
+                var ip         = l.TryGetProperty("ip", out var iP) && iP.ValueKind != System.Text.Json.JsonValueKind.Null ? iP.GetString() : "—";
+                var criadoEm   = l.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : null;
+                DateTime.TryParse(criadoEm, out var criadoDt);
+                <tbody x-data="{ expandido: false }">
+                    <tr class="cursor-pointer" @@click="expandido = !expandido" :class="expandido ? 'bg-es-surface-2/40' : ''">
                         <td class="text-es-ink-dim text-xs whitespace-nowrap">@criadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm:ss")</td>
                         <td class="text-es-ink-dim text-xs">@adminEmail</td>
                         <td><span class="font-mono text-xs text-es-accent">@acao</span></td>
@@ -55,18 +55,23 @@
                         <td class="text-xs">
                             @if (tenantId != null)
                             {
-                                <a href="/Tenants/Detail/@tenantId" class="text-es-accent hover:text-es-cream text-xs">Ver →</a>
+                                <a href="/Tenants/Detail/@tenantId" class="text-es-accent hover:text-es-cream text-xs" @@click.stop>Ver →</a>
                             }
                             else { <span class="text-es-ink-mute">—</span> }
                         </td>
                         <td class="text-es-ink-mute text-xs">@ip</td>
                     </tr>
-                }
-                @if (!Model.Logs.Any())
-                {
-                    <tr><td colspan="6" class="text-center text-es-ink-mute py-8">Nenhum registro encontrado.</td></tr>
-                }
-            </tbody>
+                    <tr x-show="expandido" x-cloak>
+                        <td colspan="6" class="p-0">
+                            <pre class="text-xs px-4 py-3 bg-es-surface-2/60 whitespace-pre-wrap break-all text-es-ink-dim">@detalhes</pre>
+                        </td>
+                    </tr>
+                </tbody>
+            }
+            @if (!Model.Logs.Any())
+            {
+                <tbody><tr><td colspan="6" class="text-center text-es-ink-mute py-8">Nenhum registro encontrado.</td></tr></tbody>
+            }
         </table>
     </div>
 </div>

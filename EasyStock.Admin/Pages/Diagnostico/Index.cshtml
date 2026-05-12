@@ -751,9 +751,9 @@ function diagnosticoPage() {
         cidInput: '',
 
         header: {
-            ultimaHora: null,
-            total24h: null,
-            lastUpdated: ''
+            ultimaHora: 0,
+            total24h: 0,
+            lastUpdated: null
         },
 
         // ── Sub-states (factories internas) ──────────────────────────────────
@@ -809,7 +809,7 @@ function diagnosticoPage() {
                 const key = now.toISOString().slice(0, 13).replace('T', ' ');
                 this.header.ultimaHora = (resumo.errorsByHour && resumo.errorsByHour[key]) || 0;
                 this.header.lastUpdated = now.toLocaleTimeString('pt-BR');
-            } catch { /* mantém último valor */ }
+            } catch { this.header.lastUpdated = 'Erro ao atualizar'; }
         },
 
         onRangeChange() {

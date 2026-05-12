@@ -72,7 +72,7 @@
                 <tr>
                     <th class="min-w-[160px]">Nome</th>
                     <th>Documento</th>
-                    <th>Plano</th>
+                    <th class="whitespace-nowrap">Plano</th>
                     <th>Status</th>
                     <th>Usuários</th>
                     <th>Lojas</th>
@@ -101,7 +101,7 @@
                     <tr>
                         <td class="font-medium text-es-ink whitespace-nowrap">@nome</td>
                         <td class="text-es-ink-dim">@(doc ?? "—")</td>
-                        <td class="text-es-ink-dim">@(plano ?? "—")</td>
+                        <td class="text-es-ink-dim whitespace-nowrap overflow-hidden text-ellipsis max-w-[160px]" title="@(plano ?? "—")">@(plano ?? "—")</td>
                         <td><span class="status-badge @statusClass">@(status ?? "—")</span></td>
                         <td class="text-es-ink-dim text-center">@usuarios</td>
                         <td class="text-es-ink-dim text-center">@lojas</td>
