@@ -423,9 +423,10 @@ public class SyncController(
         }
 
         // MovimentoCaixa web sem Referencia="mobile:..." (criados direto no admin).
+        // F7-B: incluir tambem estornados — mobile aplica flag Estornado pra
+        // refletir o estado real (ate hoje o filtro escondia estornos no APK).
         var movimentosQ = _db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
             .Where(m => m.EmpresaId == empresaId && m.CriadoEm > sinceDate
-                && m.EstornadoEm == null
                 && (m.Referencia == null || !m.Referencia.StartsWith("mobile:")));
         if (lojaId.HasValue) movimentosQ = movimentosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
         var movimentos = await movimentosQ.ToListAsync();
@@ -444,9 +445,31 @@ public class SyncController(
                 Type: type,
                 Amount: m.Valor,
                 Description: m.Descricao ?? "",
-                CreatedAt: new DateTimeOffset(m.DataMovimento).ToUnixTimeMilliseconds());
+                CreatedAt: new DateTimeOffset(m.DataMovimento).ToUnixTimeMilliseconds(),
+                Estornado: m.EstornadoEm.HasValue,
+                Metodo: m.Metodo);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "cashEntry.upsert", Serialize(dto), new DateTimeOffset(m.CriadoEm).ToUnixTimeMilliseconds()));
+        }
+
+        // F7-C — Fechamentos de caixa do web (alterados depois do `since`).
+        var fechamentosQ = _db.Set<FechamentoCaixa>().IgnoreQueryFilters().AsNoTracking()
+            .Where(f => f.EmpresaId == empresaId && f.FechadoEm > sinceDate);
+        if (lojaId.HasValue) fechamentosQ = fechamentosQ.Where(f => f.LojaId == lojaId || f.LojaId == null);
+        var fechamentos = await fechamentosQ.ToListAsync();
+        foreach (var f in fechamentos)
+        {
+            var dto = new CashClosingDto(
+                Id: f.Id.ToString(),
+                DateKey: f.Data.ToString("yyyy-MM-dd"),
+                ClosedAt: new DateTimeOffset(f.FechadoEm).ToUnixTimeMilliseconds(),
+                ClosedByName: f.FechadoPorNome,
+                TotalPagamentosPedidos: f.TotalPagamentosPedidos,
+                TotalSaidasExtras: f.TotalSaidasExtras,
+                SaldoFinal: f.SaldoFinal,
+                Notes: f.Observacoes);
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "closing.upsert", Serialize(dto), new DateTimeOffset(f.FechadoEm).ToUnixTimeMilliseconds()));
         }
     }
 
@@ -467,6 +490,7 @@ public class SyncController(
             case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
+            case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
@@ -822,6 +846,60 @@ public class SyncController(
         });
     }
 
+    /// <summary>
+    /// F7-C — aplica fechamento de caixa enviado pelo mobile (cashClosings.upsert).
+    /// Cria FechamentoCaixa via factory. Idempotente: (EmpresaId + Data) unique
+    /// — segunda chamada do mesmo dia faz update do snapshot.
+    /// Caso o servidor receba `closing.upsert` em DTO com formato CashClosingDto,
+    /// processa. Se o DTO falhar a deserializar (cliente antigo, formato outro),
+    /// silenciosamente ignora — não bloqueia o sync.
+    /// </summary>
+    private async Task ApplyClosing(MutationDto m, string deviceId, Guid? empresaId, Guid? lojaId)
+    {
+        if (!empresaId.HasValue) return;
+        CashClosingDto? dto;
+        try { dto = m.Payload.Deserialize<CashClosingDto>(JsonOpts); }
+        catch { return; }
+        if (dto == null) return;
+        if (!DateOnly.TryParse(dto.DateKey, out var data)) return;
+
+        var existing = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Data == data
+                && (lojaId == null || f.LojaId == lojaId || f.LojaId == null));
+
+        var closedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.ClosedAt).UtcDateTime;
+        if (existing == null)
+        {
+            var f = FechamentoCaixa.Criar(
+                empresaId: empresaId.Value,
+                data: data,
+                saldoInicial: 0,
+                totalVendas: 0,
+                totalPagamentosPedidos: dto.TotalPagamentosPedidos,
+                totalEntradasExtras: 0,
+                totalSaidasExtras: dto.TotalSaidasExtras,
+                lojaId: lojaId);
+            // Override SaldoFinal e FechadoEm com snapshot do mobile (verdade do operador no momento)
+            f.SaldoFinal = dto.SaldoFinal;
+            f.FechadoEm = closedAt;
+            f.FechadoPorNome = dto.ClosedByName;
+            f.Observacoes = dto.Notes;
+            _db.Add(f);
+            _log.LogInformation("F7-C Fechamento CRIADO: empresa={EmpresaId} data={Data} saldo={Saldo}",
+                empresaId, data, dto.SaldoFinal);
+        }
+        else
+        {
+            existing.TotalPagamentosPedidos = dto.TotalPagamentosPedidos;
+            existing.TotalSaidasExtras = dto.TotalSaidasExtras;
+            existing.SaldoFinal = dto.SaldoFinal;
+            existing.FechadoEm = closedAt;
+            if (!string.IsNullOrWhiteSpace(dto.ClosedByName)) existing.FechadoPorNome = dto.ClosedByName;
+            if (!string.IsNullOrWhiteSpace(dto.Notes)) existing.Observacoes = dto.Notes;
+            _log.LogInformation("F7-C Fechamento ATUALIZADO: empresa={EmpresaId} data={Data}", empresaId, data);
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // DTO conversores para pull
     // ──────────────────────────────────────────────────────────────────────
@@ -1024,88 +1102,134 @@ public class SyncController(
                     .Include(o => o.Items)
                     .FirstOrDefaultAsync(o => o.Id == oid && o.EmpresaId == empresaId);
                 if (mobileO == null) continue;
-                if (mobileO.ErpPedidoId.HasValue && mobileO.ErpPedidoId.Value != Guid.Empty) continue;
 
-                // Idempotencia cross-request: se ja existe Pedido com este MobileOrderId,
-                // so faz o link reverso.
-                var jaPromovido = await _pedidoRepo.FindByMobileOrderIdAsync(empresaId.Value, mobileO.Id);
-                if (jaPromovido != null)
+                Guid? pedidoIdResolvido = null;
+
+                if (mobileO.ErpPedidoId.HasValue && mobileO.ErpPedidoId.Value != Guid.Empty)
                 {
-                    mobileO.ErpPedidoId = jaPromovido.Id;
-                    mobileO.UpdatedAt = DateTime.UtcNow;
-                    _log.LogInformation("AutoLink Pedido (idempotente MobileOrderId): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
-                    continue;
+                    pedidoIdResolvido = mobileO.ErpPedidoId.Value;
                 }
-
-                // F6 idempotencia: se o mobile.Id e Guid valido (caso pull web→mobile
-                // retornou Pedido web, APK criou mobile_order com mesmo Guid no Id,
-                // depois reenfileirou de volta), tenta achar Pedido por Id direto.
-                // Se achar, so linka reverso (Pedido.MobileOrderId = mobile.Id) e skip
-                // criacao — evita duplicar Pedido web ao receber eco do APK.
-                if (Guid.TryParse(mobileO.Id, out var pedidoIdAsGuid))
+                else
                 {
-                    var pedidoExistente = await _pedidoRepo.GetByIdAsync(empresaId.Value, pedidoIdAsGuid);
-                    if (pedidoExistente != null)
+                    // Idempotencia cross-request: se ja existe Pedido com este MobileOrderId.
+                    var jaPromovido = await _pedidoRepo.FindByMobileOrderIdAsync(empresaId.Value, mobileO.Id);
+                    if (jaPromovido != null)
                     {
-                        mobileO.ErpPedidoId = pedidoExistente.Id;
+                        mobileO.ErpPedidoId = jaPromovido.Id;
                         mobileO.UpdatedAt = DateTime.UtcNow;
-                        if (string.IsNullOrEmpty(pedidoExistente.MobileOrderId))
+                        pedidoIdResolvido = jaPromovido.Id;
+                        _log.LogInformation("AutoLink Pedido (idempotente MobileOrderId): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
+                    }
+                    // F6 idempotencia: pull web→mobile retornou Pedido web com Guid,
+                    // APK reenfileirou de volta com mobile.Id=Guid. So linka reverso.
+                    else if (Guid.TryParse(mobileO.Id, out var pedidoIdAsGuid))
+                    {
+                        var pedidoExistente = await _pedidoRepo.GetByIdAsync(empresaId.Value, pedidoIdAsGuid);
+                        if (pedidoExistente != null)
                         {
-                            pedidoExistente.MobileOrderId = mobileO.Id;
-                            await _pedidoRepo.UpdateAsync(pedidoExistente);
+                            mobileO.ErpPedidoId = pedidoExistente.Id;
+                            mobileO.UpdatedAt = DateTime.UtcNow;
+                            if (string.IsNullOrEmpty(pedidoExistente.MobileOrderId))
+                            {
+                                pedidoExistente.MobileOrderId = mobileO.Id;
+                                await _pedidoRepo.UpdateAsync(pedidoExistente);
+                            }
+                            pedidoIdResolvido = pedidoExistente.Id;
+                            _log.LogInformation("AutoLink Pedido (idempotente Guid eco): mobile={MobileId} ↔ erp={ErpId}",
+                                oid, pedidoExistente.Id);
                         }
-                        _log.LogInformation("AutoLink Pedido (idempotente Guid eco): mobile={MobileId} ↔ erp={ErpId}",
-                            oid, pedidoExistente.Id);
-                        continue;
+                    }
+
+                    if (pedidoIdResolvido == null)
+                    {
+                        // Cria Pedido novo via CriarPedidoUseCase.
+                        Guid? clienteIdResolved = null;
+                        if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
+                        {
+                            var mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+                                .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
+                            clienteIdResolved = mClient?.ErpClienteId;
+                        }
+
+                        var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
+                            Nome: i.Name,
+                            Quantidade: i.Qty,
+                            PrecoUnitario: i.UnitPrice,
+                            ProdutoId: null,
+                            Emoji: i.Emoji,
+                            Unidade: i.Unit,
+                            Observacao: null
+                        )).ToList();
+
+                        var result = await _criarPedidoUseCase.ExecuteAsync(new CriarPedidoCommand(
+                            EmpresaId: empresaId.Value,
+                            LojaId: mobileO.LojaId,
+                            ClienteId: clienteIdResolved,
+                            ClienteNomeAdHoc: clienteIdResolved == null ? mobileO.ClientSnapshotName : null,
+                            ClienteAptAdHoc: null,
+                            ClienteTelefoneAdHoc: null,
+                            Observacoes: mobileO.Notes,
+                            Origem: "mobile",
+                            MobileOrderId: mobileO.Id,
+                            Itens: itens,
+                            CriadoPorUserId: null,
+                            CriadoPorNome: mobileO.LastOperatorName,
+                            AgendadoParaEm: mobileO.ScheduledDeliveryAt
+                        ));
+
+                        mobileO.ErpPedidoId = result.Id;
+                        mobileO.UpdatedAt = DateTime.UtcNow;
+                        if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                        pedidoIdResolvido = result.Id;
+                        _log.LogInformation("AutoLink Pedido CRIADO: mobile={MobileId} → erp={ErpId} status={Status}",
+                            oid, result.Id, mobileO.Status);
                     }
                 }
 
-                // Resolve ClienteId via ErpClienteId do mobile.Client (F0 deve ter preenchido).
-                Guid? clienteIdResolved = null;
-                if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
+                // F7-A — Pagamento auto. Quando mobileO.Status == "entregue", criar
+                // PedidoPagamento default "dinheiro" cobrindo o Total (se ainda
+                // nao tiver pagamento registrado). Operador refina metodo no admin.
+                // Idempotente: skip se Pedido ja tem qualquer pagamento OU se Total=0.
+                if (pedidoIdResolvido.HasValue
+                    && string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
                 {
-                    var mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
-                        .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
-                    clienteIdResolved = mClient?.ErpClienteId;
+                    await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
                 }
-
-                var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
-                    Nome: i.Name,
-                    Quantidade: i.Qty,
-                    PrecoUnitario: i.UnitPrice,
-                    ProdutoId: null,
-                    Emoji: i.Emoji,
-                    Unidade: i.Unit,
-                    Observacao: null
-                )).ToList();
-
-                var result = await _criarPedidoUseCase.ExecuteAsync(new CriarPedidoCommand(
-                    EmpresaId: empresaId.Value,
-                    LojaId: mobileO.LojaId,
-                    ClienteId: clienteIdResolved,
-                    ClienteNomeAdHoc: clienteIdResolved == null ? mobileO.ClientSnapshotName : null,
-                    ClienteAptAdHoc: null,
-                    ClienteTelefoneAdHoc: null,
-                    Observacoes: mobileO.Notes,
-                    Origem: "mobile",
-                    MobileOrderId: mobileO.Id,
-                    Itens: itens,
-                    CriadoPorUserId: null,
-                    CriadoPorNome: mobileO.LastOperatorName,
-                    AgendadoParaEm: mobileO.ScheduledDeliveryAt
-                ));
-
-                mobileO.ErpPedidoId = result.Id;
-                mobileO.UpdatedAt = DateTime.UtcNow;
-                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-                _log.LogInformation("AutoLink Pedido CRIADO: mobile={MobileId} → erp={ErpId} status={Status}",
-                    oid, result.Id, mobileO.Status);
             }
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "AutoLink Pedido falhou pra mobile={MobileId}", oid);
             }
         }
+    }
+
+    /// <summary>
+    /// F7-A: garante 1 PedidoPagamento default ("dinheiro", total) num Pedido
+    /// cujo status veio do mobile como "entregue". Idempotente: skip se ja
+    /// tem qualquer pagamento OU se Total = 0.
+    /// </summary>
+    private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
+    {
+        var pedido = await _db.Set<Pedido>().IgnoreQueryFilters()
+            .Include(p => p.Pagamentos)
+            .FirstOrDefaultAsync(p => p.Id == pedidoId);
+        if (pedido == null) return;
+        if (pedido.Pagamentos.Count > 0) return;
+        if (pedido.Total.Valor <= 0) return;
+
+        pedido.Pagamentos.Add(new PedidoPagamento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            Metodo = "dinheiro",
+            Valor = pedido.Total.Valor,
+            PagoEm = mobileO.UpdatedAt,
+            RegistradoPorNome = mobileO.LastOperatorName,
+            Observacao = "Auto-registrado pelo F7-A (mobile→ERP). Refine método no admin se necessário."
+        });
+        await _db.SaveChangesAsync();
+        _log.LogInformation("F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
+            pedido.Id, pedido.Total.Valor);
     }
 
     // F2 — promove mobile_batch → Lote web. Mobile produz e finaliza ao mesmo

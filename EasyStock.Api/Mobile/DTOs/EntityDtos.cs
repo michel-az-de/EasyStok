@@ -86,5 +86,27 @@ public record CashEntryDto(
     string Type,
     decimal Amount,
     string Description,
-    long CreatedAt
+    long CreatedAt,
+    // F7-B — estorno propagado. Web seta EstornadoEm, server reflete pro APK
+    // como flag. Mobile aplica como soft-delete visual (a mutation traz o item
+    // mas com flag estornado; mobile pode esconder).
+    bool? Estornado = null,
+    // F7-C — fechamento de caixa pode carregar metodo/categoria. Mobile cria
+    // entradas type=income/expense; web tem Metodo (pix/dinheiro/etc) opcional.
+    string? Metodo = null
+);
+
+/// <summary>
+/// F7-C — Fechamento de caixa snapshot. Mobile (cashClosings) ↔ Web
+/// (FechamentoCaixa). DTO carrega o sumário consolidado do dia.
+/// </summary>
+public record CashClosingDto(
+    string Id,
+    string DateKey,           // "YYYY-MM-DD" — chave do dia
+    long ClosedAt,
+    string? ClosedByName,
+    decimal TotalPagamentosPedidos,
+    decimal TotalSaidasExtras,
+    decimal SaldoFinal,
+    string? Notes
 );
