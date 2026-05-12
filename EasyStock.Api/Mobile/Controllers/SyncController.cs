@@ -70,7 +70,9 @@ public class SyncController(
             {
                 // Onda 5 — conflict explícito. Reason começa com "conflict:" pra
                 // PWA detectar e mostrar UX especializada (toast + force-pull).
-                rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message));
+                // C3: cex.WinningPayload (opcional) traz a versao server vencedora
+                // pra cliente exibir diff visual ao operador.
+                rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message, cex.WinningPayload));
             }
             catch (Exception ex)
             {
@@ -192,7 +194,9 @@ public class SyncController(
             {
                 throw new ConflictException(
                     $"Servidor já tem versão mais nova ({DateTimeOffset.FromUnixTimeMilliseconds(serverTsMs):HH:mm:ss}) " +
-                    $"editada por {existing.LastOperatorName ?? "outro device"}");
+                    $"editada por {existing.LastOperatorName ?? "outro device"}",
+                    // C3: payload server vencedor — PWA exibe diff ao operador.
+                    Serialize(ToDto(existing)));
             }
         }
 
@@ -282,6 +286,24 @@ public class SyncController(
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
+
+        // C3: conflict detection (last-write-loser) pra orders. Cenario tipico:
+        // device A marca pedido "preparando", device B marca "cancelado" offline;
+        // quando B volta online, server ja tem mudanca de A com timestamp maior.
+        // Sem deteccao, B sobrescrevia silenciosamente — producao entregava pedido
+        // que deveria ser cancelado, ou vice-versa.
+        // Tolerancia 2s pra clock skew. So dispara se outro device editou (LastDeviceId).
+        if (existing != null && m.Ts > 0)
+        {
+            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
+            {
+                throw new ConflictException(
+                    $"Pedido editado em {DateTimeOffset.FromUnixTimeMilliseconds(serverTsMs):HH:mm:ss} " +
+                    $"por {existing.LastOperatorName ?? "outro device"} — status atual: {existing.Status}",
+                    Serialize(ToDto(existing)));
+            }
+        }
 
         // Auditoria/conferência/retroativo: campos opcionais — só persiste se vier no DTO.
         var historyJson = dto.History.HasValue ? dto.History.Value.GetRawText() : null;
@@ -373,6 +395,21 @@ public class SyncController(
             else if (oldStatus == "entregue" && dto.Status == "cancelado")
             {
                 await _saleSync.CancelVendaForOrderAsync(existing);
+            }
+
+            // C4 — Transicao para "pronto" alerta garcom em outros devices via
+            // SSE. Best-effort: se broker falhar ou nao houver loja, polling
+            // 30s do PWA continua resolvendo. Garcom recebe notification
+            // imediata em vez de descobrir no proximo refresh.
+            if (oldStatus != "pronto" && dto.Status == "pronto")
+            {
+                try
+                {
+                    await _eventBroker.NotifyOrderReadyAsync(
+                        existing.EmpresaId, existing.LojaId, deviceId,
+                        existing.Id, existing.ClientSnapshotName, existing.Total, existing.Items.Count);
+                }
+                catch { /* fail-safe — nao bloqueia sync */ }
             }
         }
     }
@@ -508,8 +545,8 @@ public class SyncController(
             // Campos opcionais: sem isto o pull silenciosamente zerava
             // factAt/confirmedAt/scheduledDeliveryAt quando outro device sincronizava.
             History: o.HistoryJson != null
-                ? JsonDocument.Parse(o.HistoryJson).RootElement.Clone()
-                : (JsonElement?)null,
+                ? TryParseJson(o.HistoryJson)
+                : null,
             ConfirmedBy: o.ConfirmedBy,
             ConfirmedAt: o.ConfirmedAt.HasValue
                 ? new DateTimeOffset(o.ConfirmedAt.Value).ToUnixTimeMilliseconds()
@@ -537,6 +574,12 @@ public class SyncController(
         new(c.Id, c.Type, c.Amount, c.Description,
             new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds());
 
+    private static JsonElement? TryParseJson(string json)
+    {
+        try { return JsonDocument.Parse(json).RootElement.Clone(); }
+        catch { return null; }
+    }
+
     private static JsonElement Serialize<T>(T obj)
     {
         var json = JsonSerializer.Serialize(obj, JsonOpts);
@@ -553,5 +596,11 @@ public class SyncController(
 /// <summary>
 /// Lançada quando uma mutation chega com timestamp anterior à versão
 /// do servidor — sinaliza last-write-loser que o cliente precisa tratar.
+/// C3: <see cref="WinningPayload"/> traz a versao server vencedora (DTO serializado)
+/// pra que o PWA possa exibir diff visual ao operador antes de sobrescrever.
+/// Opcional — nem todo conflict tem payload (ex: validacoes de tenant).
 /// </summary>
-public class ConflictException(string message) : Exception(message);
+public class ConflictException(string message, System.Text.Json.JsonElement? winningPayload = null) : Exception(message)
+{
+    public System.Text.Json.JsonElement? WinningPayload { get; } = winningPayload;
+}

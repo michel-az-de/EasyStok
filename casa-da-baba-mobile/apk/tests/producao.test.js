@@ -43,6 +43,45 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(runInSandbox(`prodScanModeLabel('xyz')`), 'QR + barras');
   });
 
+  // A4 — switchLoja deve drenar a fila antes de trocar pra evitar mutations
+  // da loja antiga subirem APOS o switch atribuidas a loja nova (drama
+  // silencioso cross-loja). Testes validam o contrato de entrada.
+  test('A4: switchLoja rejeita lojaId vazio', async () => {
+    const cdbSync = sandbox.window && sandbox.window.cdbSync;
+    if (!cdbSync || !cdbSync.switchLoja) return;
+    // Pairing valido + online pra chegar no check de lojaId (ordem: rede,
+    // pareado, lojaId, fila, fetch).
+    sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'mk_test' }));
+    sandbox.navigator.onLine = true;
+    try {
+      await assert.rejects(cdbSync.switchLoja(null), /lojaId/);
+      await assert.rejects(cdbSync.switchLoja(''), /lojaId/);
+      await assert.rejects(cdbSync.switchLoja(undefined), /lojaId/);
+    } finally {
+      sandbox.localStorage.removeItem('cdb-pairing');
+    }
+  });
+
+  test('A4: switchLoja rejeita quando sem rede', async () => {
+    const cdbSync = sandbox.window && sandbox.window.cdbSync;
+    if (!cdbSync || !cdbSync.switchLoja) return;
+    const origOnLine = sandbox.navigator.onLine;
+    sandbox.navigator.onLine = false;
+    try {
+      await assert.rejects(cdbSync.switchLoja('lj-x'), /sem rede/);
+    } finally {
+      sandbox.navigator.onLine = origOnLine;
+    }
+  });
+
+  test('A4: switchLoja rejeita quando nao pareado', async () => {
+    const cdbSync = sandbox.window && sandbox.window.cdbSync;
+    if (!cdbSync || !cdbSync.switchLoja) return;
+    sandbox.localStorage.removeItem('cdb-pairing');
+    // navigator.onLine padrao do sandbox = true; entao chega no check de pairing.
+    await assert.rejects(cdbSync.switchLoja('lj-x'), /pareado/);
+  });
+
   test('producao: etiquetasFromBatch expande N etiquetas (1 por unidade)', () => {
     const r = runInSandbox(`
       products = [{ id: 'p1', name: 'Pao', emoji: '🍞', archived: false }];

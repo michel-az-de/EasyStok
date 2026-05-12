@@ -17,7 +17,7 @@
 // recebido com cdb-pwa-installed-version local; quando diferente, pede update.
 // Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v3-20260511b';
+const CACHE_VERSION = 'cdb-v4-20260512a';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -116,6 +116,58 @@ self.addEventListener('message', (event) => {
     );
     return;
   }
+});
+
+// C5 — Web Push handler. Permite que o browser receba notificacoes
+// PUSH mesmo com aba/app fechado (depende de Push API + subscricao prévia).
+// Em APK Capacitor, isso eh complementado pelo FCM nativo; aqui cobrimos o
+// PWA web puro (Chromium desktop/mobile com PWA instalada).
+//
+// Formato esperado do payload: { type, title, body, tag, data }.
+// Fail-safe: payload ausente ou malformado → notification generica "Atualizacao".
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    if (event.data) {
+      try { payload = event.data.json(); }
+      catch { payload = { title: 'Atualizacao', body: event.data.text() }; }
+    }
+  } catch (_) { /* sem data: notification generica */ }
+
+  const title = payload.title || (payload.type === 'order.ready' ? 'Pedido pronto' : 'Casa da Baba');
+  const body = payload.body
+    || (payload.type === 'order.ready'
+        ? ((payload.clientName ? payload.clientName + ' — ' : '') + 'pedido pronto pra entrega')
+        : 'Nova atualizacao');
+  const tag = payload.tag || (payload.type && payload.orderId
+    ? 'cdb-' + payload.type + '-' + payload.orderId
+    : 'cdb-default');
+
+  const opts = {
+    body: body,
+    tag: tag,
+    renotify: false,
+    icon: './icons/icon-192.png',
+    badge: './icons/favicon.png',
+    data: payload
+  };
+
+  event.waitUntil(self.registration.showNotification(title, opts));
+});
+
+// Click na notification: foca aba existente ou abre nova.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const target = data.url || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if ('focus' in w) return w.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });
 
 self.addEventListener('fetch', (event) => {
