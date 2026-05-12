@@ -135,17 +135,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            // Filtrar por status se fornecido
             if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-            {
                 query = query.Where(i => i.Status == statusEnum);
-            }
+
+            if (categoriaId.HasValue)
+                query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query

@@ -43,7 +43,7 @@ public class EstoqueService(ApiClient api, SessionService session)
         api.GetAsync<ProdutoDetalhe>($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
-        api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&pageSize=20");
+        api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&pageSize=20&status=critico");
 
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ExportarAsync()
     {

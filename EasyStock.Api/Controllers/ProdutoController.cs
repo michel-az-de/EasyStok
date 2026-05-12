@@ -93,12 +93,12 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] Guid empresaId, [FromQuery] string termo)
+    public async Task<IActionResult> Search([FromQuery] Guid empresaId, [FromQuery] string termo, [FromQuery] int limite = 20)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        return DataOk(await produtoRepository.SearchAsync(resolvedEmpresaId, termo));
+        return DataOk(await produtoRepository.SearchAsync(resolvedEmpresaId, termo, Math.Min(limite, 100)));
     }
 
     [SwaggerOperation(Summary = "Create new product")]

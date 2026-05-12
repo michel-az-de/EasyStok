@@ -87,14 +87,14 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             page,
             pageSize);
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null)
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null)
     {
         var filter = Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
 
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-        {
             filter = Builders<ItemEstoque>.Filter.And(filter, Builders<ItemEstoque>.Filter.Eq(x => x.Status, statusEnum));
-        }
+
+        // categoriaId filter not supported in MongoDB (no join to Produto); silently ignored.
 
         return PaginateAsync(filter, Builders<ItemEstoque>.Sort.Ascending(x => x.ProdutoId), page, pageSize);
     }
