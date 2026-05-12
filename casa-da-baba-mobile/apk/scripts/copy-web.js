@@ -102,6 +102,15 @@ function main() {
     cfg.forcedPairingLabel = String(process.env.PAIRING_LABEL || 'Casa da Baba (auto-pair)');
     console.log('[copy-web] forcedPairingCode injetado (length=' + cfg.forcedPairingCode.length + ')');
   }
+  // PROVISIONING_SECRET: token de longa vida bate com AppProvisioning:Secret
+  // no server (3 env vars no server setam empresa/loja default). APK pareia
+  // sozinho via POST /api/mobile/devices/pair-auto, sem expirar como o pairing
+  // code de 6 digitos. Recomendado pra APK distribuido pre-configurado.
+  if (process.env.PROVISIONING_SECRET) {
+    cfg.forcedProvisioningSecret = String(process.env.PROVISIONING_SECRET).trim();
+    cfg.forcedProvisioningLabel = String(process.env.PROVISIONING_LABEL || 'Casa da Baba (provisioned)');
+    console.log('[copy-web] forcedProvisioningSecret injetado (length=' + cfg.forcedProvisioningSecret.length + ')');
+  }
   fs.writeFileSync(configPath, 'window.CDB_CONFIG = ' + JSON.stringify(cfg) + ';\n', 'utf8');
   console.log('[copy-web] Gerou', configPath, `(apiBaseUrl=${apiBaseUrl || '""'})`);
 

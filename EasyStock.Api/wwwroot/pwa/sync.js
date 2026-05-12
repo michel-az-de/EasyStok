@@ -1672,6 +1672,54 @@
     }
   }
 
+  // ---- Auto-provisionamento via token compartilhado ----
+  // APK pre-configurado (Casa da Baba) embute o secret no config.js. No
+  // primeiro boot o sync.js troca o secret por apiKey + contexto via
+  // POST /api/mobile/devices/pair-auto, sem operador digitar nada.
+  // Idempotente no server (mesmo deviceId rotaciona apiKey).
+  async function pairAuto(provisioningSecret, label) {
+    if (!navigator.onLine) throw new Error('sem rede');
+    const url = API_BASE_URL + API_PREFIX + '/devices/pair-auto';
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 12000);
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+        body: JSON.stringify({
+          provisioningSecret: String(provisioningSecret || '').trim(),
+          deviceId,
+          label: label || null
+        }),
+        signal: ctrl.signal
+      });
+    } catch (e) {
+      throw new Error('servidor inacessivel');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!resp.ok) {
+      let msg = 'auto-provisioning rejeitado';
+      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    savePairing({
+      apiKey: data.apiKey,
+      empresaId: data.empresaId,
+      lojaId: data.lojaId,
+      label: data.label,
+      defaultOperatorName: data.defaultOperatorName,
+      pairedAt: data.pairedAt,
+      deviceId: data.deviceId
+    });
+    _pairingInvalid = false;
+    try { await pingVersion(); } catch (_) {}
+    try { flush(); } catch (_) {}
+    return data;
+  }
+
   // ---- Pareamento (Onda 1) ----
   // Troca codigo de 6 digitos por apiKey + contexto (empresa/loja).
   // Ao pareamento bem-sucedido, persiste em cdb-pairing e proximas chamadas
@@ -1795,18 +1843,22 @@
   // Ping inicial — não bloqueia, dispara em paralelo com primeiro flush.
   setTimeout(pingVersion, 700);
 
-  // Auto-pair on first boot via codigo embutido no APK (build customizado).
-  // No PWA padrao window.CDB_CONFIG.forcedPairingCode e undefined — bloco
-  // vira no-op. So o workflow build-casadababa-release.yml injeta o codigo
-  // em config.js no momento do build, e apenas no APK. Producao nao muda.
-  // Idempotente: se cdb-pairing ja existe (ex: APK que foi atualizado por
-  // cima de instalacao previamente pareada), pula.
+  // Auto-pair on first boot. Dois modos exclusivos (provisioning prefere):
+  //  1. forcedProvisioningSecret (preferido) — token de longa vida embutido
+  //     no APK + 3 env vars no server (AppProvisioning:Secret/EmpresaId/LojaId).
+  //     APK pareia sozinho na primeira execucao, sem operador digitar nada.
+  //  2. forcedPairingCode (legacy) — codigo de 6 digitos gerado no Admin e
+  //     embutido pelo workflow build-casadababa-release.yml. Expira em ~10min.
+  // No PWA padrao ambos sao undefined — bloco vira no-op.
+  // Idempotente: se cdb-pairing ja existe (ex: APK atualizado por cima de
+  // instalacao previamente pareada), pula.
   setTimeout(async function autoPairFromForcedCode() {
     try {
       if (loadPairing()) return;
       const cfg = window.CDB_CONFIG || {};
+      const provisioningSecret = cfg.forcedProvisioningSecret;
       const code = cfg.forcedPairingCode;
-      if (!code) return;
+      if (!provisioningSecret && !code) return;
       if (!navigator.onLine) {
         // Sem rede agora — tenta de novo daqui a 30s. Codigo expira em poucos
         // minutos no server, mas vale insistir caso o WiFi do dispositivo so
@@ -1814,6 +1866,20 @@
         setTimeout(autoPairFromForcedCode, 30 * 1000);
         return;
       }
+      // Modo 1: provisioning secret (preferido)
+      if (provisioningSecret) {
+        try { console.log('[auto-pair] tentando auto-provisioning via token'); } catch (_) {}
+        try {
+          await pairAuto(provisioningSecret, cfg.forcedProvisioningLabel || cfg.forcedPairingLabel || 'Casa da Baba');
+          try { console.log('[auto-pair] provisionado com sucesso'); } catch (_) {}
+          return;
+        } catch (e) {
+          try { console.warn('[auto-pair] provisioning falhou:', e && e.message); } catch (_) {}
+          // Fallback pro modo 2 se houver codigo embutido tambem
+          if (!code) return;
+        }
+      }
+      // Modo 2: pairing code legacy
       try { console.log('[auto-pair] tentando parear com codigo embutido (length=' + String(code).length + ')'); } catch (_) {}
       await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
       try { console.log('[auto-pair] pareado com sucesso'); } catch (_) {}
@@ -1826,7 +1892,7 @@
   window.cdbSync = {
     flush, pull, stop,
     pingVersion, uploadErrorLog,
-    pairWithCode,
+    pairWithCode, pairAuto,
     getPairing: loadPairing,
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,
