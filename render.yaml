@@ -35,6 +35,8 @@ services:
         value: http://+:8080
       - key: BUILD_SHA
         value: master  # CI sobrescreve via deploy hook payload
+      - key: Swagger__EnableInProduction
+        value: "true"
     previews:
       generation: automatic
       envVars:

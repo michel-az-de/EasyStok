@@ -12,7 +12,7 @@ public class PreferenciasController(ApiClient api, SessionService session) : Bas
         ViewBag.Title = "Preferências de Notificação";
         ViewBag.ActiveMenuItem = "Preferencias";
 
-        var result = await api.GetAsync<List<ConsentimentoDto>>("api/consentimentos");
+        var result = await api.GetAsync<List<ConsentimentoDto>>("consentimentos");
         var vm = new PreferenciasViewModel();
 
         if (result.Success && result.Data != null)
@@ -37,7 +37,7 @@ public class PreferenciasController(ApiClient api, SessionService session) : Bas
                       where categoria != "Transacional" // sempre opt-in, não modificar
                       let key = $"toggle_{canal}_{categoria}"
                       let optIn = Request.Form.ContainsKey(key)
-                      let endpoint = optIn ? "api/consentimentos/opt-in" : "api/consentimentos/opt-out"
+                      let endpoint = optIn ? "consentimentos/opt-in" : "consentimentos/opt-out"
                       select api.PostAsync<object>(endpoint, new { canal, categoria })
                           .ContinueWith(t =>
                           {
