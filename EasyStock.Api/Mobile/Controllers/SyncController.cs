@@ -277,7 +277,177 @@ public class SyncController(
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), c.LastDeviceId ?? "server",
                 "cashEntry.upsert", Serialize(ToDto(c)), new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds()));
 
+        // F6 — sync reverso web→mobile. Retorna entidades web que (a) NAO foram
+        // originadas no mobile (sem MobileOrderId/MobileBatchId, sem mobile_*
+        // com Erp*Id equivalente, ou Referencia sem prefixo 'mobile:'), e (b)
+        // foram alteradas depois do `since`. APK aplica como upserts no estado
+        // local + reenfileira no proximo push (idempotencia em ApplyOrder/etc
+        // detecta Pedido com Id=mobile.Id pra evitar duplicar).
+        if (empresaId.HasValue && _appConfig.GetValue<bool>("MobileSync:PullReverse:Enabled", true))
+        {
+            try
+            {
+                await AppendWebReversePullAsync(mutations, sinceDate, empresaId.Value, lojaId);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Falha pull reverso web→mobile");
+            }
+        }
+
         return Ok(new SyncPullResponse(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), mutations));
+    }
+
+    /// <summary>
+    /// F6 — Acrescenta na resposta do pull as entidades criadas/editadas no web
+    /// (Pedido/Produto/Cliente/Lote/MovimentoCaixa) que ainda nao tem espelho
+    /// mobile. Reusa IgnoreQueryFilters porque endpoint anonimo (sem JWT).
+    /// </summary>
+    private async Task AppendWebReversePullAsync(
+        List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // Produtos web sem mobile_product correspondente (Erp link).
+        var mobileLinkedProdutos = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.ErpProductId != null)
+            .Select(p => p.ErpProductId!.Value).ToListAsync();
+        var produtosQ = _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && p.Status == StatusProduto.Ativo
+                && !mobileLinkedProdutos.Contains(p.Id));
+        var produtos = await produtosQ.ToListAsync();
+        foreach (var p in produtos)
+        {
+            var dto = new ProductDto(
+                Id: p.Id.ToString(),
+                Name: p.Nome,
+                Emoji: null,
+                Category: "Geral",
+                Unit: null,
+                Price: p.PrecoReferencia?.Valor ?? 0m,
+                Stock: 0,
+                Custom: false,
+                Sku: p.CodigoBarras,
+                DefaultWeightG: null,
+                DefaultValidityDays: null);
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "product.upsert", Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+        }
+
+        // Clientes web sem mobile_client correspondente.
+        var mobileLinkedClientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && c.ErpClienteId != null)
+            .Select(c => c.ErpClienteId!.Value).ToListAsync();
+        var clientesQ = _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && c.AlteradoEm > sinceDate
+                && c.Ativo && !mobileLinkedClientes.Contains(c.Id));
+        var clientes = await clientesQ.ToListAsync();
+        foreach (var c in clientes)
+        {
+            var dto = new ClientDto(
+                Id: c.Id.ToString(),
+                Name: c.Nome,
+                Apt: c.Apt,
+                Address: c.Endereco,
+                Phone: c.Telefone,
+                LastOrder: c.LastOrderAt.HasValue ? new DateTimeOffset(c.LastOrderAt.Value).ToUnixTimeMilliseconds() : 0,
+                OrderCount: c.OrderCount);
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "client.upsert", Serialize(dto), new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds()));
+        }
+
+        // Pedidos web sem MobileOrderId (criados via /api/pedidos).
+        var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Include(p => p.Itens)
+            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && (p.MobileOrderId == null || p.MobileOrderId == ""));
+        if (lojaId.HasValue) pedidosQ = pedidosQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
+        var pedidos = await pedidosQ.ToListAsync();
+        foreach (var p in pedidos)
+        {
+            var items = p.Itens.Select(i => new OrderItemDto(
+                ProductId: i.ProdutoId?.ToString() ?? "",
+                Name: i.Nome ?? "",
+                Emoji: i.Emoji,
+                Unit: i.Unidade,
+                Qty: (int)i.Quantidade,
+                UnitPrice: i.PrecoUnitario
+            )).ToList();
+            var dto = new OrderDto(
+                Id: p.Id.ToString(),
+                ClientId: p.ClienteId?.ToString(),
+                ClientSnapshot: new ClientSnapshotDto(p.ClienteNome ?? "", null),
+                Items: items,
+                Notes: p.Observacoes,
+                Total: p.Total.Valor,
+                Status: p.Status ?? "aguardando",
+                CreatedAt: new DateTimeOffset(p.CriadoEm).ToUnixTimeMilliseconds(),
+                UpdatedAt: new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds(),
+                ScheduledDeliveryAt: p.AgendadoParaEm.HasValue
+                    ? new DateTimeOffset(p.AgendadoParaEm.Value).ToUnixTimeMilliseconds()
+                    : null);
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "order.upsert", Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+        }
+
+        // Lotes web sem MobileBatchId (criados direto no admin/web).
+        var lotesQ = _db.Set<Lote>().IgnoreQueryFilters().AsNoTracking()
+            .Include(l => l.Itens)
+            .Where(l => l.EmpresaId == empresaId && l.AlteradoEm > sinceDate
+                && (l.MobileBatchId == null || l.MobileBatchId == ""));
+        if (lojaId.HasValue) lotesQ = lotesQ.Where(l => l.LojaId == lojaId || l.LojaId == null);
+        var lotes = await lotesQ.ToListAsync();
+        foreach (var l in lotes)
+        {
+            var items = l.Itens.Select(it => new BatchItemDto(
+                ProductId: it.ProdutoId?.ToString() ?? "",
+                Name: it.Nome,
+                Emoji: it.Emoji,
+                Unit: it.Unidade,
+                Qty: it.Quantidade,
+                Photo: it.FotoUrl,
+                WeightG: it.PesoG,
+                ValidityDays: it.ValidadeDias,
+                ExpiresAt: it.ExpiraEm.HasValue ? new DateTimeOffset(it.ExpiraEm.Value).ToUnixTimeMilliseconds() : null
+            )).ToList();
+            var dto = new BatchDto(
+                Id: l.Id.ToString(),
+                Code: l.Codigo,
+                Items: items,
+                BatchPhoto: null,
+                CreatedAt: new DateTimeOffset(l.DataProducao).ToUnixTimeMilliseconds(),
+                Lote: l.Codigo);
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "batch.upsert", Serialize(dto), new DateTimeOffset(l.AlteradoEm).ToUnixTimeMilliseconds()));
+        }
+
+        // MovimentoCaixa web sem Referencia="mobile:..." (criados direto no admin).
+        var movimentosQ = _db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId && m.CriadoEm > sinceDate
+                && m.EstornadoEm == null
+                && (m.Referencia == null || !m.Referencia.StartsWith("mobile:")));
+        if (lojaId.HasValue) movimentosQ = movimentosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
+        var movimentos = await movimentosQ.ToListAsync();
+        foreach (var m in movimentos)
+        {
+            // Mobile entende so "income"/"expense"; mapeamos pelos tipos web.
+            string type = m.Tipo switch
+            {
+                "entrada" => "income",
+                "abertura" => "income",
+                "saida" => "expense",
+                _ => "expense" // fechamento e outros: tratar como expense (marker zerado)
+            };
+            var dto = new CashEntryDto(
+                Id: m.Id.ToString(),
+                Type: type,
+                Amount: m.Valor,
+                Description: m.Descricao ?? "",
+                CreatedAt: new DateTimeOffset(m.DataMovimento).ToUnixTimeMilliseconds());
+            mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                "cashEntry.upsert", Serialize(dto), new DateTimeOffset(m.CriadoEm).ToUnixTimeMilliseconds()));
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -863,8 +1033,31 @@ public class SyncController(
                 {
                     mobileO.ErpPedidoId = jaPromovido.Id;
                     mobileO.UpdatedAt = DateTime.UtcNow;
-                    _log.LogInformation("AutoLink Pedido (idempotente): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
+                    _log.LogInformation("AutoLink Pedido (idempotente MobileOrderId): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
                     continue;
+                }
+
+                // F6 idempotencia: se o mobile.Id e Guid valido (caso pull web→mobile
+                // retornou Pedido web, APK criou mobile_order com mesmo Guid no Id,
+                // depois reenfileirou de volta), tenta achar Pedido por Id direto.
+                // Se achar, so linka reverso (Pedido.MobileOrderId = mobile.Id) e skip
+                // criacao — evita duplicar Pedido web ao receber eco do APK.
+                if (Guid.TryParse(mobileO.Id, out var pedidoIdAsGuid))
+                {
+                    var pedidoExistente = await _pedidoRepo.GetByIdAsync(empresaId.Value, pedidoIdAsGuid);
+                    if (pedidoExistente != null)
+                    {
+                        mobileO.ErpPedidoId = pedidoExistente.Id;
+                        mobileO.UpdatedAt = DateTime.UtcNow;
+                        if (string.IsNullOrEmpty(pedidoExistente.MobileOrderId))
+                        {
+                            pedidoExistente.MobileOrderId = mobileO.Id;
+                            await _pedidoRepo.UpdateAsync(pedidoExistente);
+                        }
+                        _log.LogInformation("AutoLink Pedido (idempotente Guid eco): mobile={MobileId} ↔ erp={ErpId}",
+                            oid, pedidoExistente.Id);
+                        continue;
+                    }
                 }
 
                 // Resolve ClienteId via ErpClienteId do mobile.Client (F0 deve ter preenchido).
