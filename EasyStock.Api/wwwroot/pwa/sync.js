@@ -503,6 +503,8 @@
 
   // ---- Pull: traz mudanças do servidor (outros devices) ----
   // OFFLINE-FIRST: silencioso quando offline ou pairing invalido.
+  // F7: contador de falhas consecutivas — abre ticket auto apos 5.
+  let _consecutivePullFailures = 0;
   async function pull() {
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
@@ -517,61 +519,117 @@
       } finally {
         clearTimeout(timeoutId);
       }
-      // B3: calibra serverTimeOffset.
       updateServerTimeFromResponse(resp);
       if (resp.status === 401) { _pairingInvalid = true; return; }
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        _consecutivePullFailures++;
+        if (_consecutivePullFailures >= 5) {
+          openTicketAuto(
+            'Pull do servidor falhando',
+            'Device ' + deviceId + ' acumulou ' + _consecutivePullFailures + ' falhas consecutivas de pull. Ultimo HTTP status: ' + resp.status,
+            'Incidente', 'pull-fail'
+          );
+        }
+        return;
+      }
       const data = await resp.json();
       if (data && data.mutations && Array.isArray(data.mutations)) {
         applyServerMutations(data.mutations);
       }
+      _consecutivePullFailures = 0;
     } catch (e) {
-      console.warn('Pull falhou:', e.message);
+      _consecutivePullFailures++;
+      try {
+        if (typeof window !== 'undefined' && typeof window.logError === 'function') {
+          window.logError(e, 'sync.pull');
+        }
+      } catch (_) {}
+      console.warn('Pull falhou:', e && e.message);
+      if (_consecutivePullFailures >= 5) {
+        openTicketAuto(
+          'Pull do servidor falhando',
+          'Device ' + deviceId + ' acumulou ' + _consecutivePullFailures + ' falhas consecutivas. Exception: ' + (e && e.message || e),
+          'Incidente', 'pull-fail'
+        );
+      }
     }
   }
+
+  // F7-C: cashClosings vem como state.cashClosings (acessivel via cdbApp).
+  // Mapeamento de tipo de mutation → colecao no state + chave localStorage.
+  const _SERVER_MUTATION_MAP = {
+    product:   { stateKey: 'products',     storage: 'cdb-products' },
+    client:    { stateKey: 'clients',      storage: 'cdb-clients'  },
+    order:     { stateKey: 'orders',       storage: 'cdb-orders'   },
+    cashEntry: { stateKey: 'cashEntries',  storage: 'cdb-cash'     },
+    batch:     { stateKey: 'batches',      storage: 'cdb-batches'  },
+    // F7-C: fechamento de caixa snapshot. Mobile mantem em cashClosings[].
+    closing:   { stateKey: 'cashClosings', storage: 'cdb-cash-closings' }
+  };
+  let _consecutiveApplyFailures = 0;
 
   function applyServerMutations(mutations) {
     if (!mutations.length || !window.cdbApp) return;
     const state = window.cdbApp.getState();
     let changed = false;
+    let errorsThisBatch = 0;
     mutations.forEach(m => {
-      const [type, op] = m.type.split('.');
-      const coll = {
-        product: state.products,
-        client: state.clients,
-        order: state.orders,
-        cashEntry: state.cashEntries,
-        batch: state.batches
-      }[type];
-      if (!coll) return;
-      const key = {
-        product: 'cdb-products',
-        client: 'cdb-clients',
-        order: 'cdb-orders',
-        cashEntry: 'cdb-cash',
-        batch: 'cdb-batches'
-      }[type];
-      const idx = coll.findIndex(x => x.id === m.payload.id);
-      if (op === 'upsert') {
-        if (idx >= 0) coll[idx] = m.payload;
-        else coll.push(m.payload);
-        changed = true;
-      } else if (op === 'delete') {
-        if (idx >= 0) coll.splice(idx, 1);
-        changed = true;
+      try {
+        const [type, op] = m.type.split('.');
+        const map = _SERVER_MUTATION_MAP[type];
+        if (!map) return; // tipo desconhecido — ignora silenciosamente
+        const coll = state[map.stateKey];
+        if (!coll) return;
+        const idx = coll.findIndex(x => x.id === m.payload.id);
+
+        // F7-B: cashEntry com estornado=true → mobile esconde do operador
+        // (remove do array). Preserva no localStorage NUNCA — quando vier
+        // pull pos-restauracao, server reenvia. Soft-delete visual.
+        if (type === 'cashEntry' && m.payload && m.payload.estornado === true) {
+          if (idx >= 0) { coll.splice(idx, 1); changed = true; }
+          try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+          return;
+        }
+
+        if (op === 'upsert') {
+          if (idx >= 0) coll[idx] = m.payload;
+          else coll.push(m.payload);
+          changed = true;
+        } else if (op === 'delete') {
+          if (idx >= 0) { coll.splice(idx, 1); changed = true; }
+        }
+        try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+      } catch (e) {
+        errorsThisBatch++;
+        try {
+          if (typeof window.logError === 'function') {
+            window.logError(e, 'applyServerMutations:' + (m && m.type));
+          }
+        } catch (_) {}
       }
-      try { localStorage.setItem(key, JSON.stringify(coll)); } catch (e) {}
     });
+
+    // F7: tickets automaticos se applyServerMutations falhar muito.
+    if (errorsThisBatch > 0) {
+      _consecutiveApplyFailures++;
+      if (_consecutiveApplyFailures >= 5) {
+        try {
+          openTicketAuto(
+            'Sincronização do servidor falhando',
+            'Device ' + deviceId + ' falhou ' + _consecutiveApplyFailures
+              + ' batches de applyServerMutations consecutivas. '
+              + 'Erros no batch atual: ' + errorsThisBatch + '/' + mutations.length,
+            'Incidente', 'apply-server-fail');
+        } catch (_) {}
+      }
+    } else if (mutations.length > 0) {
+      _consecutiveApplyFailures = 0;
+    }
+
     if (changed) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
-      // Onda 3.5: aguarda flush() resolver com await em vez de finally+setTimeout.
-      // Anteriormente usava .finally(() => setTimeout(reload, 500)) — o reload
-      // disparava 500ms depois do *inicio* do flush, podendo recarregar antes
-      // dele terminar (operador perdia mutacao local).
-      // Agora flush() resolve, ai sim o reload acontece.
       (async () => {
         try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
-        // Pequeno delay pra garantir que IndexedDB persistiu antes do reload.
         setTimeout(() => location.reload(), 100);
       })();
     }

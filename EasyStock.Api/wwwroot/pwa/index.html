@@ -19093,7 +19093,7 @@ try {
 
 // Exposição pro sync.js
 window.cdbApp = {
-  getState: () => ({ products, clients, orders, cashEntries, batches }),
+  getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
