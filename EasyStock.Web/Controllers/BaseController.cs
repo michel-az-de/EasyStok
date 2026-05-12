@@ -26,6 +26,20 @@ public abstract class BaseController(SessionService session) : Controller
         "Assinatura"
     };
 
+    protected bool IsAdmin()
+    {
+        var role = session.GetUsuarioRole() ?? string.Empty;
+        return role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected bool IsGerente()
+    {
+        var role = session.GetUsuarioRole() ?? string.Empty;
+        return IsAdmin()
+            || role.Equals("Gerente", StringComparison.OrdinalIgnoreCase);
+    }
+
     protected void Toast(string type, string message, string? undoUrl = null) =>
         TempData["Toast"] = undoUrl is not null ? $"{type}|{message}|{undoUrl}" : $"{type}|{message}";
 

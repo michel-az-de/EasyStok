@@ -11,11 +11,25 @@ public class PedidosService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
+    public Task<ApiResult<PagedResult<Pedido>>> ListarPaginadoAsync(
+        int page = 1, int pageSize = 30,
+        string? status = null, Guid? clienteId = null,
+        DateTime? desde = null, DateTime? ate = null, string? search = null)
+    {
+        var qs = $"pedidos?empresaId={GetEmpresaId()}&page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
+        if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
+        if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
+        if (ate.HasValue)   qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
+        if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
+        return api.GetAsync<PagedResult<Pedido>>(qs);
+    }
+
     public Task<ApiResult<List<Pedido>>> ListarAsync(
         string? status = null, Guid? clienteId = null,
         DateTime? desde = null, DateTime? ate = null, string? search = null)
     {
-        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=200";
+        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=500";
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";

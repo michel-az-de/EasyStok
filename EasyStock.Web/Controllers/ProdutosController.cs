@@ -310,6 +310,12 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Excluir(string id)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem excluir produtos.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.ExcluirAsync(id);
         if (!result.Success)
         {
@@ -326,6 +332,12 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Restaurar(string id)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem restaurar produtos.");
+            return RedirectToAction(nameof(Index));
+        }
+
         var result = await svc.RestaurarAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
@@ -371,6 +383,12 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoverVariacao(string id, string vid)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem remover variações.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.RemoverVariacaoAsync(id, vid);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
@@ -382,6 +400,12 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RestaurarVariacao(string id, string vid)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem restaurar variações.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.RestaurarVariacaoAsync(id, vid);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 

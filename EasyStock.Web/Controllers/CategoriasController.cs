@@ -99,7 +99,7 @@ public class CategoriasController(CategoriasService svc, SessionService session)
 
         var result = await svc.CriarAsync(req.Nome.Trim(), req.QuantidadeMinima, req.QuantidadeCritica);
         if (!result.Success)
-            return BadRequest(new { success = false, error = result.Error });
+            return BadRequest(new { success = false, error = new { code = result.ErrorCode, message = result.ErrorMessage } });
 
         return Ok(new { success = true });
     }
@@ -113,7 +113,7 @@ public class CategoriasController(CategoriasService svc, SessionService session)
 
         var editResult = await svc.EditarAsync(id, req.Nome.Trim());
         if (!editResult.Success)
-            return BadRequest(new { success = false, error = editResult.Error });
+            return BadRequest(new { success = false, error = new { code = editResult.ErrorCode, message = editResult.ErrorMessage } });
 
         await svc.AtualizarLimiarAsync(id, req.QuantidadeMinima, req.QuantidadeCritica);
         return Ok(new { success = true });

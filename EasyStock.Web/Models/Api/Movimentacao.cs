@@ -19,7 +19,7 @@ public record Movimentacao
     public string? DocumentoReferencia { get; init; }
     public DateTime? EstornadaEm { get; init; }
     public string? MovimentacaoEstornadaId { get; init; }
-    public Produto? Produto { get; init; }
+    public ProdutoResumoApi? Produto { get; init; }
     public Variacao? ProdutoVariacao { get; init; }
 
     // Auditoria de movimentacao (P0-2): quem/de onde/qual dispositivo.

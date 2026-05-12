@@ -166,6 +166,12 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Excluir(string id)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem desativar fornecedores.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.ExcluirAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
