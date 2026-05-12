@@ -237,7 +237,7 @@
       // começando com "conflict:" quando outro device sincronizou primeiro.
       // PWA mostra toast + força pull pra refletir versão mais nova.
       if (result.rejected && Array.isArray(result.rejected) && result.rejected.length > 0) {
-        const conflicts = result.rejected.filter(r => r.reason && r.reason.indexOf('conflict:') === 0);
+        const conflicts = result.rejected.filter(r => r.reason && r.reason.startsWith('conflict:'));
         if (conflicts.length > 0) {
           // Remove os conflitados da fila (não vão ser aceitos mesmo).
           // Server retorna { mutationId, reason } — usar mutationId, não id.
@@ -273,7 +273,7 @@
     if (_pairingInvalid) return;
     try {
       const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
-      const url = API_BASE_URL + API_PREFIX + '/sync/pull?since=' + since + '&deviceId=' + encodeURIComponent(deviceId);
+      const url = API_BASE_URL + API_PREFIX + '/sync/pull?' + new URLSearchParams({ since, deviceId });
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 15000);
       let resp;
@@ -455,7 +455,7 @@
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.indexOf('cdb-') === 0) {
+        if (k && k.startsWith('cdb-')) {
           // Pula sensiveis: api-key (do pairing) e bt-trail (debug verboso).
           if (k === 'cdb-pairing' || k === 'cdb-bt-trail') continue;
           snap[k] = localStorage.getItem(k);
@@ -706,7 +706,7 @@
       // Fallback: aceita objeto plano de chaves cdb-* (snapshot direto)
       if (parsed && typeof parsed === 'object') {
         var keys = Object.keys(parsed);
-        if (keys.some(function (k) { return k.indexOf('cdb-') === 0; })) {
+        if (keys.some(function (k) { return k.startsWith('cdb-'); })) {
           return {
             kind: 'snapshot',
             filename: res.filename,

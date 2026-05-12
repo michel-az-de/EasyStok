@@ -121,8 +121,17 @@
   // ---- Enfileira mutations ----
   function enqueue(mutations) {
     if (!mutations.length) return;
-    const queue = loadQueue();
+    let queue = loadQueue();
     mutations.forEach(m => {
+      // Dedup local: se ja tem mutation pendente pro mesmo (type, payload.id),
+      // descarta as antigas — servidor faz upsert idempotente last-write-wins
+      // entao mandar 5 versoes seguidas do mesmo pedido (aguardando -> preparando
+      // -> pronto) gasta payload/bateria sem ganho. Mutations sem payload.id
+      // (caso degenerado) passam direto, mantendo comportamento anterior.
+      if (m.payload && m.payload.id) {
+        queue = queue.filter(q =>
+          !(q.type === m.type && q.payload && q.payload.id === m.payload.id));
+      }
       queue.push({
         id: 'm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
         deviceId,
@@ -149,15 +158,22 @@
   // Não deletamos o pairing local — Felipe pode re-parear sem perder fila.
   // Quando true: stop tentando flush ate operador re-parear OU clearPairing.
   let _pairingInvalid = false;
+  // Backoff exponencial em erro transitorio (network/5xx/timeout). Reseta em
+  // flush bem sucedido OU quando rede volta (handleOnline). Sem backoff, um
+  // server caido por 1h causaria ~120 reqs/h por device — com backoff cai
+  // pra ~6 reqs/h apos 5 falhas consecutivas.
+  let _consecutiveFlushFailures = 0;
+  const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
+  const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
   async function flush() {
-    if (flushing) return;
-    if (_pairingInvalid) return; // backoff até re-parear
+    if (flushing) return 'busy';
+    if (_pairingInvalid) return 'auth'; // backoff até re-parear
     const queue = loadQueue();
     if (queue.length === 0) {
       if (window.cdbApp) window.cdbApp.markAllSynced();
-      return;
+      return 'empty';
     }
-    if (!navigator.onLine) return;
+    if (!navigator.onLine) return 'offline';
 
     flushing = true;
     try {
@@ -190,16 +206,19 @@
         if (window.cdbApp && window.cdbApp.onPairingInvalid) {
           try { window.cdbApp.onPairingInvalid(); } catch (e) {}
         }
-        return;
+        return 'auth';
       }
       if (!resp.ok) {
         console.warn('Sync falhou, status', resp.status);
-        return;
+        _consecutiveFlushFailures = Math.min(_consecutiveFlushFailures + 1, 5);
+        return 'retry';
       }
 
       const result = await resp.json().catch(() => ({}));
+      let acceptedCount = 0;
       if (result.acceptedIds && Array.isArray(result.acceptedIds)) {
         const accepted = new Set(result.acceptedIds);
+        acceptedCount = accepted.size;
         // Recarrega a fila do localStorage em vez de usar o snapshot inicial:
         // mutações enfileiradas DURANTE a fetch não são perdidas.
         const currentQueue = loadQueue();
@@ -207,12 +226,18 @@
         saveQueue(remaining);
       }
       // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
+      // F4 — feedback visual: avisa o app pra mostrar toast com qtd sincronizada.
+      if (acceptedCount > 0) {
+        try {
+          window.dispatchEvent(new CustomEvent('cdb-sync-success', { detail: { count: acceptedCount } }));
+        } catch (_) {}
+      }
 
       // Onda 5: trata conflicts. Server retorna rejected[] com reason
       // começando com "conflict:" quando outro device sincronizou primeiro.
       // PWA mostra toast + força pull pra refletir versão mais nova.
       if (result.rejected && Array.isArray(result.rejected) && result.rejected.length > 0) {
-        const conflicts = result.rejected.filter(r => r.reason && r.reason.indexOf('conflict:') === 0);
+        const conflicts = result.rejected.filter(r => r.reason && r.reason.startsWith('conflict:'));
         if (conflicts.length > 0) {
           // Remove os conflitados da fila (não vão ser aceitos mesmo).
           // Server retorna { mutationId, reason } — usar mutationId, não id.
@@ -229,8 +254,13 @@
       }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
       updatePendingCount();
+      // Sucesso — reseta backoff pra delay normal no proximo tick.
+      _consecutiveFlushFailures = 0;
+      return 'ok';
     } catch (e) {
       console.warn('Erro no sync:', e.message);
+      _consecutiveFlushFailures = Math.min(_consecutiveFlushFailures + 1, 5);
+      return 'retry';
     } finally {
       flushing = false;
     }
@@ -243,7 +273,7 @@
     if (_pairingInvalid) return;
     try {
       const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
-      const url = API_BASE_URL + API_PREFIX + '/sync/pull?since=' + since + '&deviceId=' + encodeURIComponent(deviceId);
+      const url = API_BASE_URL + API_PREFIX + '/sync/pull?' + new URLSearchParams({ since, deviceId });
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 15000);
       let resp;
@@ -327,10 +357,30 @@
     }
   };
 
+  // ---- Backoff exponencial ----
+  // Calcula o proximo delay baseado no status do ultimo flush:
+  //   ok / empty     → 30s (normal)
+  //   retry          → 30s * 2^(failures-1), cap 10min (60/120/240/480/600)
+  //   auth           → 10min (so re-pareamento destrava; loop checa de vez em quando)
+  //   offline / busy → 30s (sem mudar contador — proximo tick vai tentar)
+  function computeFlushDelay(status) {
+    if (status === 'auth') return FLUSH_DELAY_CAP_MS;
+    if (status === 'retry') {
+      const exp = Math.pow(2, Math.max(0, _consecutiveFlushFailures - 1));
+      return Math.min(FLUSH_DELAY_NORMAL_MS * exp, FLUSH_DELAY_CAP_MS);
+    }
+    return FLUSH_DELAY_NORMAL_MS;
+  }
+
   // ---- Eventos de conectividade ----
   function handleOnline() {
     console.log('Voltei online, sincronizando...');
-    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
+    // Reseta backoff: nao faz sentido manter delay longo se a rede acabou
+    // de voltar. Tambem reagenda o ciclo imediato pra nao esperar o tick
+    // longo que ja estava agendado (ex: cap 10min apos varias falhas).
+    _consecutiveFlushFailures = 0;
+    scheduleNextFlush(0);
+    pull().then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
   }
   function handleOffline() {
     stopRealtime();
@@ -341,8 +391,26 @@
 
   // ---- Inicialização ----
   let flushIntervalId = null;
+  // Auto-reagenda apos cada tick com delay computado pelo backoff. Cancela
+  // qualquer timer pendente pra evitar duplo agendamento se chamado fora de tick.
+  function scheduleNextFlush(delayMs) {
+    if (flushIntervalId) { clearTimeout(flushIntervalId); flushIntervalId = null; }
+    const delay = typeof delayMs === 'number' ? delayMs : FLUSH_DELAY_NORMAL_MS;
+    flushIntervalId = setTimeout(async function flushTick() {
+      let status = 'ok';
+      try {
+        status = (await flush()) || 'ok';
+        fetchAndProcessCommands();
+      } catch (e) {
+        try { console.warn('[sync] tick falhou:', e && e.message); } catch (_) {}
+        status = 'retry';
+      } finally {
+        scheduleNextFlush(computeFlushDelay(status));
+      }
+    }, delay);
+  }
   function stop() {
-    if (flushIntervalId) { clearInterval(flushIntervalId); flushIntervalId = null; }
+    if (flushIntervalId) { clearTimeout(flushIntervalId); flushIntervalId = null; }
     stopRealtime();
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
@@ -364,13 +432,11 @@
     }
     updatePendingCount();
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
-    // Flush periódico a cada 30s. Guarda o id pra permitir cleanup
-    // (ex: navegação SPA, hot-reload do Capacitor) e evitar timer ghost.
-    // Combina flush + commands no mesmo tick — economia de battery.
-    flushIntervalId = setInterval(function () {
-      flush();
-      fetchAndProcessCommands();
-    }, 30000);
+    // Loop self-rescheduling com backoff exponencial em erro (substitui o
+    // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
+    // longo do server escala ate 10min entre tentativas, economizando
+    // bateria/rede sem perder mutations (fila persiste).
+    scheduleNextFlush(FLUSH_DELAY_NORMAL_MS);
   }, 500);
 
   // ---- Version ping (Onda 0): verifica compat + capabilities do servidor ----
@@ -389,7 +455,7 @@
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.indexOf('cdb-') === 0) {
+        if (k && k.startsWith('cdb-')) {
           // Pula sensiveis: api-key (do pairing) e bt-trail (debug verboso).
           if (k === 'cdb-pairing' || k === 'cdb-bt-trail') continue;
           snap[k] = localStorage.getItem(k);
@@ -640,7 +706,7 @@
       // Fallback: aceita objeto plano de chaves cdb-* (snapshot direto)
       if (parsed && typeof parsed === 'object') {
         var keys = Object.keys(parsed);
-        if (keys.some(function (k) { return k.indexOf('cdb-') === 0; })) {
+        if (keys.some(function (k) { return k.startsWith('cdb-'); })) {
           return {
             kind: 'snapshot',
             filename: res.filename,
