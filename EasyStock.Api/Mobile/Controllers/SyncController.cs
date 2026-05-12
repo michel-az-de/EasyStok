@@ -2,8 +2,10 @@ using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -37,12 +39,16 @@ public class SyncController(
     EasyStockDbContext db,
     MobileStockReconciler stockReconciler,
     MobileSaleSyncService saleSync,
-    MobileEventBroker eventBroker) : ControllerBase
+    MobileEventBroker eventBroker,
+    IConfiguration appConfig,
+    ILogger<SyncController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
     private readonly MobileSaleSyncService _saleSync = saleSync;
     private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly IConfiguration _appConfig = appConfig;
+    private readonly ILogger<SyncController> _log = log;
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -58,6 +64,10 @@ public class SyncController(
 
         var accepted = new List<string>();
         var rejected = new List<SyncConflict>();
+        // F0 — IDs de Product/Client aplicados com sucesso, candidatos a
+        // auto-link com Produto/Cliente web depois do SaveChanges principal.
+        var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var m in req.Mutations)
         {
@@ -65,6 +75,24 @@ public class SyncController(
             {
                 await ApplyMutation(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
                 accepted.Add(m.Id);
+                // Coleta IDs pra auto-link (so se mutation foi aceita).
+                var typePrefix = m.Type?.Split('.')[0];
+                if (typePrefix == "product" || typePrefix == "client")
+                {
+                    try
+                    {
+                        if (m.Payload.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String)
+                        {
+                            var payloadId = idEl.GetString();
+                            if (!string.IsNullOrEmpty(payloadId))
+                            {
+                                if (typePrefix == "product") autoLinkProductIds.Add(payloadId);
+                                else autoLinkClientIds.Add(payloadId);
+                            }
+                        }
+                    }
+                    catch (Exception ex) { _log.LogWarning(ex, "Falha extraindo id de payload pra auto-link"); }
+                }
             }
             catch (ConflictException cex)
             {
@@ -81,6 +109,28 @@ public class SyncController(
         }
 
         await _db.SaveChangesAsync();
+
+        // F0 — auto-link Product/Client ↔ Produto/Cliente web. Roda DEPOIS do
+        // SaveChanges principal pra (a) ler entities tracked, (b) falha aqui
+        // nao bloqueia o sync (mutations ja foram aceitas), (c) idempotente
+        // (skip se ErpProductId/ErpClienteId ja preenchido). Feature flag:
+        // MobileSync:AutoLink:Product/Client (default true).
+        if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0)
+        {
+            try
+            {
+                var autoLinkProd   = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
+                var autoLinkClient = _appConfig.GetValue<bool>("MobileSync:AutoLink:Client", true);
+                if (autoLinkProd   && autoLinkProductIds.Count > 0) await TryAutoLinkProductsAsync(autoLinkProductIds, empresaId);
+                if (autoLinkClient && autoLinkClientIds.Count  > 0) await TryAutoLinkClientsAsync(autoLinkClientIds, empresaId);
+                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Auto-link nao deve quebrar sync. Logamos e seguimos.
+                _log.LogWarning(ex, "Falha auto-link Produto/Cliente apos sync");
+            }
+        }
 
         // Onda 5: notifica outros devices da mesma loja em realtime.
         // Fail-safe: se hub indisponível, devices pegam no polling 30s normal.
@@ -591,6 +641,153 @@ public class SyncController(
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
+
+    // ─── F0: auto-link Product ↔ Produto / Client ↔ Cliente ────────────────
+    // Unifica o domínio mobile com o ERP web. Sem isso, pedidos mobile não
+    // viram Pedido web (contabilidade quebrada). Cada Product mobile vira
+    // (ou liga a) um Produto web, preservando ErpProductId no mobile pra
+    // referencia futura. Falha aqui NÃO bloqueia sync (tratada no caller).
+    //
+    // Estratégia de match:
+    //   - Produto: nome ILIKE + empresa
+    //   - Cliente: nome ILIKE + empresa; fallback por telefone
+    //   - Se sem match, cria entity web com defaults seguros.
+
+    private async Task TryAutoLinkProductsAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
+    {
+        if (!empresaId.HasValue) return;
+        Guid? cachedCategoriaId = null;
+        foreach (var pid in mobileProductIds)
+        {
+            try
+            {
+                var mobileP = await _db.Set<Product>()
+                    .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
+                if (mobileP == null || mobileP.ErpProductId.HasValue) continue;
+
+                var webP = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                    .FirstOrDefaultAsync(p =>
+                        p.EmpresaId == empresaId
+                        && p.Status == StatusProduto.Ativo
+                        && EF.Functions.ILike(p.Nome, mobileP.Name));
+
+                if (webP != null)
+                {
+                    mobileP.ErpProductId = webP.Id;
+                    _log.LogInformation("AutoLink Produto: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
+                    continue;
+                }
+
+                // Criar Produto web. Categoria default cacheada por request pra
+                // evitar N+1 quando varios produtos novos sobem juntos.
+                cachedCategoriaId ??= await GetOrCreateDefaultCategoriaAsync(empresaId.Value);
+
+                var novoProd = new Produto
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId.Value,
+                    CategoriaId = cachedCategoriaId.Value,
+                    Nome = mobileP.Name,
+                    Tipo = TipoProduto.Alimento, // default Casa da Babá (food); admin pode reclassificar
+                    Status = StatusProduto.Ativo,
+                    PrecoReferencia = mobileP.Price is { } pr && pr > 0 ? Dinheiro.FromDecimal(pr) : null,
+                    CodigoBarras = mobileP.Sku,
+                    ControlaValidade = mobileP.DefaultValidityDays.HasValue,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow
+                };
+                _db.Add(novoProd);
+                mobileP.ErpProductId = novoProd.Id;
+                _log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
+                    pid, novoProd.Id, mobileP.Name);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "AutoLink Produto falhou pra mobile={MobileId}", pid);
+            }
+        }
+    }
+
+    private async Task TryAutoLinkClientsAsync(IEnumerable<string> mobileClientIds, Guid? empresaId)
+    {
+        if (!empresaId.HasValue) return;
+        foreach (var cid in mobileClientIds)
+        {
+            try
+            {
+                var mobileC = await _db.Set<Client>()
+                    .FirstOrDefaultAsync(c => c.Id == cid && c.EmpresaId == empresaId);
+                if (mobileC == null || mobileC.ErpClienteId.HasValue) continue;
+
+                var baseQuery = _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
+                    .Where(c => c.EmpresaId == empresaId && c.Ativo);
+
+                Cliente? match = await baseQuery
+                    .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Nome, mobileC.Name));
+
+                if (match == null && !string.IsNullOrWhiteSpace(mobileC.Phone))
+                {
+                    var phone = mobileC.Phone;
+                    match = await baseQuery.FirstOrDefaultAsync(c => c.Telefone == phone);
+                }
+
+                if (match != null)
+                {
+                    mobileC.ErpClienteId = match.Id;
+                    _log.LogInformation("AutoLink Cliente: mobile={MobileId} → erp={ErpId}", cid, match.Id);
+                    continue;
+                }
+
+                var novoC = Cliente.Criar(empresaId.Value, mobileC.Name);
+                novoC.Apt      = mobileC.Apt;
+                novoC.Endereco = mobileC.Address;
+                novoC.Telefone = mobileC.Phone;
+                novoC.LastOrderAt = mobileC.LastOrder;
+                novoC.OrderCount  = mobileC.OrderCount;
+                _db.Add(novoC);
+                mobileC.ErpClienteId = novoC.Id;
+                _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
+                    cid, novoC.Id, mobileC.Name);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "AutoLink Cliente falhou pra mobile={MobileId}", cid);
+            }
+        }
+    }
+
+    private async Task<Guid> GetOrCreateDefaultCategoriaAsync(Guid empresaId)
+    {
+        // Reusa categoria existente preferindo nomes neutros (Mobile/Geral).
+        // Sem ordering por bool no SQL: fazer client-side é OK porque o N é
+        // pequeno (raramente uma empresa tem > 100 categorias).
+        var existentes = await _db.Set<Categoria>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId)
+            .Select(c => new { c.Id, c.Nome, c.CriadoEm })
+            .ToListAsync();
+        if (existentes.Count > 0)
+        {
+            var preferida = existentes
+                .OrderBy(c => c.Nome == "Mobile" ? 0 : (c.Nome == "Geral" ? 1 : 2))
+                .ThenBy(c => c.CriadoEm)
+                .First();
+            return preferida.Id;
+        }
+
+        // Empresa sem nenhuma categoria — cria "Mobile" como default.
+        var nova = new Categoria
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Mobile",
+            Descricao = "Categoria default criada pelo auto-link mobile→ERP",
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        };
+        _db.Add(nova);
+        _log.LogInformation("AutoLink: criada Categoria 'Mobile' default empresa={EmpresaId}", empresaId);
+        return nova.Id;
+    }
 }
 
 /// <summary>
