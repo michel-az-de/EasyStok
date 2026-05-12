@@ -16,7 +16,7 @@
             <a href="/AuditLogs" class="btn-secondary">Limpar</a>
         }
     </form>
-    <div class="text-es-ink-mute text-sm">@Model.Total registro(s)</div>
+    <div class="text-es-ink-mute text-sm">@(Model.Total == 1 ? "1 registro" : $"{Model.Total} registros")</div>
 </div>
 
 @if (Model.Erro != null)

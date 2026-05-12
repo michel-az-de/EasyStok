@@ -3,6 +3,9 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Tickets";
+    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status)
+        || !string.IsNullOrEmpty(Model.Prioridade) || !string.IsNullOrEmpty(Model.Nivel)
+        || !string.IsNullOrEmpty(Model.SlaStatus) || !string.IsNullOrEmpty(Model.Categoria);
 }
 
 <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
@@ -10,10 +13,12 @@
     <div class="flex gap-2">
         <a href="/Tickets/Dashboard" class="btn-secondary text-sm">📊 Dashboard</a>
         <a href="/Configuracoes/SlaMatriz" class="btn-secondary text-sm">⚙ Matriz SLA</a>
+        <button type="button" onclick="window.dispatchEvent(new Event('openNovoTicket'))" class="btn-primary text-sm">+ Novo Ticket</button>
     </div>
 </div>
 
-<div class="flex items-center justify-between mb-6 flex-wrap gap-4" x-data="{ modalNovo: false, empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null }">
+<div class="flex items-center mb-6 flex-wrap gap-4" x-data="{ modalNovo: false, empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null }"
+     @@openNovoTicket.window="modalNovo = true; empresaSelecionada = null; buscaEmpresa = ''; resultadosEmpresa = []">
     <form method="get" class="flex items-center gap-2 flex-wrap">
         <input type="text" name="search" value="@Model.Search" placeholder="Buscar por título..."
                class="form-input max-w-xs" />
@@ -60,8 +65,6 @@
             <a href="/Tickets" class="btn-secondary">Limpar</a>
         }
     </form>
-
-    <button type="button" @@click="modalNovo = true; empresaSelecionada = null; buscaEmpresa = ''; resultadosEmpresa = []" class="btn-primary">+ Novo Ticket</button>
 
     <!-- Modal novo ticket -->
     <div x-show="modalNovo" x-cloak class="modal-overlay" @@click.self="modalNovo = false">
@@ -160,8 +163,8 @@
                     <th>SLA</th>
                     <th>Título</th>
                     <th>Empresa</th>
-                    <th>Cat</th>
-                    <th>Prio</th>
+                    <th title="Categoria">Cat</th>
+                    <th title="Prioridade">Prio</th>
                     <th>Nível</th>
                     <th>Status</th>
                     <th>Atendente</th>
@@ -238,7 +241,21 @@
                 }
                 @if (!Model.Tickets.Any())
                 {
-                    <tr><td colspan="9" class="text-center text-es-ink-mute py-8">Nenhum ticket encontrado.</td></tr>
+                    <tr>
+                        <td colspan="9" class="text-center text-es-ink-mute py-10">
+                            @if (hasFilters)
+                            {
+                                <div>Nenhum ticket com estes filtros. <a href="/Tickets" class="text-es-accent hover:underline">Limpar filtros</a></div>
+                            }
+                            else
+                            {
+                                <div class="space-y-2">
+                                    <div class="text-3xl">🎫</div>
+                                    <div class="font-semibold text-es-ink">Nenhum ticket cadastrado ainda.</div>
+                                </div>
+                            }
+                        </td>
+                    </tr>
                 }
             </tbody>
         </table>
