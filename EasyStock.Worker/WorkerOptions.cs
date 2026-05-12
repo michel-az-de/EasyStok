@@ -18,4 +18,7 @@ public sealed class WorkerOptions
 
     /// <summary>Intervalo (em segundos) entre ticks do AgendamentoNotificacaoService. Mínimo 60. Padrão 60 (1 min, pra acertar a janela de 10min).</summary>
     public int AgendamentoNotificacaoIntervalSeconds { get; set; } = 60;
+
+    /// <summary>Intervalo (em segundos) entre ticks do EndpointHealthMonitorService. Mínimo 60. Padrão 300 (5 min).</summary>
+    public int EndpointHealthIntervalSeconds { get; set; } = 300;
 }

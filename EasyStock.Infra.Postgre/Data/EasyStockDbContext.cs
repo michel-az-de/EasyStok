@@ -107,6 +107,12 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
 
+        // Endpoint health monitoring (Worker EndpointHealthMonitorService)
+        public DbSet<EndpointHealthState> EndpointHealthStates { get; set; } = null!;
+
+        // Releases de APK distribuidos via CapacitorUpdater (Casa da Baba e outros).
+        public DbSet<EasyStock.Domain.Entities.Mobile.ApkRelease> ApkReleases { get; set; } = null!;
+
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;

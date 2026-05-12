@@ -89,6 +89,12 @@ builder.Services.AddHostedService<SlaMonitorService>();
 // no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 
+// Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
+// quando >threshold falhas consecutivas. Idempotencia via tabela
+// endpoint_health_state + cooldown 24h.
+builder.Services.AddHttpClient("endpoint-health");
+builder.Services.AddHostedService<EndpointHealthMonitorService>();
+
 // Outbox de eventos de integração externa (F4.c) — consome
 // OutboxEventoIntegracao e despacha via handlers registrados.
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).
