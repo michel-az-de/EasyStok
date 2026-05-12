@@ -232,9 +232,10 @@ public class AdminTicketsController(
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var msg = await ticketService.ResponderAsync(new ResponderAdminTicketCommand(
                 id, req.Conteudo, req.Interno, req.AnexoIds));
-            await audit.LogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", null);
+            await audit.LogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", tenantId);
             return DataCreated($"/api/admin/tickets/{id}/mensagens/{msg.Id}", new { msg.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -271,20 +272,29 @@ public class AdminTicketsController(
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var bug = await bugFixService.GerarAsync(new GerarBugFixCommand(
                 id, req.Titulo, req.Descricao, req.Severidade, req.Componente, req.StackTrace));
-            await audit.LogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", null);
+            await audit.LogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", tenantId);
             return DataCreated($"/api/admin/tickets/{bug.Id}", new { bug.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
         catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
     }
 
+    private static readonly HashSet<string> _extensoesPermitidas =
+        new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".txt", ".csv", ".xlsx", ".docx", ".zip" };
+    private const long MaxAnexoBytes = 10 * 1024 * 1024;
+
     [HttpPost("{id:guid}/anexos")]
     [RequestSizeLimit(15 * 1024 * 1024)]
     public async Task<IActionResult> Anexar(Guid id, IFormFile file, [FromQuery] Guid? mensagemId = null)
     {
         if (file is null || file.Length == 0) return DataBadRequest("Arquivo obrigatorio.");
+        if (file.Length > MaxAnexoBytes) return DataBadRequest("Arquivo excede o limite de 10 MB.");
+        var ext = Path.GetExtension(file.FileName);
+        if (string.IsNullOrEmpty(ext) || !_extensoesPermitidas.Contains(ext))
+            return DataBadRequest($"Tipo de arquivo nao permitido. Extensoes aceitas: {string.Join(", ", _extensoesPermitidas)}");
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
@@ -304,8 +314,9 @@ public class AdminTicketsController(
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             await ticketService.AlterarStatusAsync(new AlterarStatusTicketCommand(id, TicketStatus.Fechado));
-            await audit.LogAsync("TicketFechado", $"TicketId={id}", null);
+            await audit.LogAsync("TicketFechado", $"TicketId={id}", tenantId);
             return DataOk(new { id, status = "Fechado" });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }

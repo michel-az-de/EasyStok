@@ -111,9 +111,11 @@ public class ApkDistributionController(
 
     private string BuildDownloadUrl(Guid releaseId)
     {
-        // Absolute URL pra plugin baixar mesmo se base URL do app for outra.
-        var scheme = Request.Scheme;
-        var host = Request.Host.ToUriComponent();
+        // Render (e maioria dos PaaS) termina TLS no load balancer e repassa
+        // como HTTP interno. Request.Scheme seria "http" mesmo pra clientes HTTPS.
+        // X-Forwarded-Proto tem o scheme real vindo do cliente.
+        var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
+        var host = Request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? Request.Host.ToUriComponent();
         return $"{scheme}://{host}/api/mobile/apk/download/{releaseId}";
     }
 }

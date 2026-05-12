@@ -22,15 +22,18 @@ public class MobileDevicesController(
         var healthTask = opSvc.ObterSaudeDevicesAsync();
         await Task.WhenAll(listTask, healthTask);
 
-        if (HasError(listTask.Result)) return View(new List<MobileDeviceApi>());
+        var listResult = await listTask;
+        var healthResult = await healthTask;
+
+        if (HasError(listResult)) return View(new List<MobileDeviceApi>());
 
         // Mapeia health por id pra view consultar O(1).
-        var healthById = healthTask.Result.Success && healthTask.Result.Data != null
-            ? healthTask.Result.Data.ToDictionary(h => h.Id)
+        var healthById = healthResult.Success && healthResult.Data != null
+            ? healthResult.Data.ToDictionary(h => h.Id)
             : new Dictionary<string, DeviceHealthApi>();
         ViewBag.HealthById = healthById;
 
-        return View(listTask.Result.Data ?? []);
+        return View(listResult.Data ?? []);
     }
 
     [HttpPost("/dispositivos/parear")]

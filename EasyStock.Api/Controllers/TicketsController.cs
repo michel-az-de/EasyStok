@@ -64,6 +64,10 @@ namespace EasyStock.Api.Controllers
             return NoContent();
         }
 
+        private static readonly HashSet<string> _extensoesPermitidas =
+            new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".txt", ".csv", ".xlsx", ".docx", ".zip" };
+        private const long MaxAnexoBytes = 10 * 1024 * 1024; // 10 MB
+
         [HttpPost("{id:guid}/anexos")]
         [RequestSizeLimit(15 * 1024 * 1024)]
         public async Task<IActionResult> AnexarCliente(Guid id, IFormFile file)
@@ -71,6 +75,10 @@ namespace EasyStock.Api.Controllers
             if (!currentUser.TemPermissao(Permissao.ResponderTickets))
                 return Forbid();
             if (file is null || file.Length == 0) return DataBadRequest("Arquivo obrigatorio.");
+            if (file.Length > MaxAnexoBytes) return DataBadRequest("Arquivo excede o limite de 10 MB.");
+            var ext = Path.GetExtension(file.FileName);
+            if (string.IsNullOrEmpty(ext) || !_extensoesPermitidas.Contains(ext))
+                return DataBadRequest($"Tipo de arquivo nao permitido. Extensoes aceitas: {string.Join(", ", _extensoesPermitidas)}");
 
             // Garantir que o ticket pertence ao cliente atual antes de aceitar upload.
             var ticket = await ticketRepo.GetByIdAsync(currentUser.EmpresaId, id, clienteId: currentUser.UsuarioId);

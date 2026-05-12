@@ -42,6 +42,10 @@ public class AdminApkReleaseController(
             return BadRequest(new { error = "arquivo apk obrigatorio" });
         if (apk.Length > MaxApkBytes)
             return BadRequest(new { error = $"apk excede limite de {MaxApkBytes / 1024 / 1024}MB" });
+        // Valida extensao e content-type para nao servir arquivos arbitrarios via download.
+        var ext = Path.GetExtension(apk.FileName ?? "").ToLowerInvariant();
+        if (ext != ".apk" && apk.ContentType != "application/vnd.android.package-archive")
+            return BadRequest(new { error = "arquivo deve ser um .apk valido" });
         if (string.IsNullOrWhiteSpace(version))
             return BadRequest(new { error = "version obrigatoria" });
 

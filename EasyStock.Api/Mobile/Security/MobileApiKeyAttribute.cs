@@ -109,7 +109,7 @@ internal sealed class MobileApiKeyFilter(
             }
             catch (Exception ex)
             {
-                logger.LogDebug(ex, "Falha ao atualizar last_seen_at do device {DeviceId}", device.Id);
+                logger.LogWarning(ex, "Falha ao atualizar last_seen_at do device {DeviceId}", device.Id);
             }
         });
 

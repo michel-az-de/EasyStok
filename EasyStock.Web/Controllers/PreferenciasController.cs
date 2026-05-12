@@ -41,9 +41,11 @@ public class PreferenciasController(ApiClient api, SessionService session) : Bas
                       select api.PostAsync<object>(endpoint, new { canal, categoria })
                           .ContinueWith(t =>
                           {
-                              if (t.IsCompletedSuccessfully && !t.Result.Success)
+                              if (t.IsFaulted)
+                                  lock (erros) erros.Add($"{canal}/{categoria}: erro de comunicação");
+                              else if (t.IsCompletedSuccessfully && !t.Result.Success)
                                   lock (erros) erros.Add($"{canal}/{categoria}: {t.Result.ErrorMessage}");
-                          });
+                          }, TaskContinuationOptions.ExecuteSynchronously);
 
         await Task.WhenAll(tarefas);
 
