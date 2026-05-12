@@ -90,13 +90,17 @@ public class AnunciosController(
         using var s = stream;
         using var reader = new StreamReader(s);
 
-        while (!reader.EndOfStream && !HttpContext.RequestAborted.IsCancellationRequested)
+        try
         {
-            var line = await reader.ReadLineAsync();
-            if (line is null) break;
-            await Response.WriteAsync(line + "\n");
-            await Response.Body.FlushAsync();
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync(HttpContext.RequestAborted);
+                if (line is null) break;
+                await Response.WriteAsync(line + "\n");
+                await Response.Body.FlushAsync();
+            }
         }
+        catch (OperationCanceledException) { /* cliente desconectou */ }
     }
 
     // GET is intentional — SSE streams never need anti-forgery
@@ -127,12 +131,16 @@ public class AnunciosController(
         using var s = stream;
         using var reader = new StreamReader(s);
 
-        while (!reader.EndOfStream && !HttpContext.RequestAborted.IsCancellationRequested)
+        try
         {
-            var line = await reader.ReadLineAsync();
-            if (line is null) break;
-            await Response.WriteAsync(line + "\n");
-            await Response.Body.FlushAsync();
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync(HttpContext.RequestAborted);
+                if (line is null) break;
+                await Response.WriteAsync(line + "\n");
+                await Response.Body.FlushAsync();
+            }
         }
+        catch (OperationCanceledException) { /* cliente desconectou */ }
     }
 }

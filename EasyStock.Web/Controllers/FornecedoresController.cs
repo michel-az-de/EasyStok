@@ -62,11 +62,18 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (result.Data is null) return RedirectToAction(nameof(Index));
         var vm = new FornecedorDetailViewModel { Fornecedor = result.Data };
 
-        var historicoResult = await svc.ObterHistoricoAsync(id);
+        var historicoTask     = svc.ObterHistoricoAsync(id);
+        var estatisticasTask  = svc.ObterEstatisticasAsync(id);
+        var alteracoesTask    = svc.ObterAlteracoesAsync(id);
+        await Task.WhenAll(historicoTask, estatisticasTask, alteracoesTask);
+
+        var historicoResult    = historicoTask.Result;
+        var estatisticasResult = estatisticasTask.Result;
+        var alteracoesResult   = alteracoesTask.Result;
+
         if (historicoResult.Success && historicoResult.Data is not null)
             vm.Historico = historicoResult.Data;
 
-        var estatisticasResult = await svc.ObterEstatisticasAsync(id);
         if (estatisticasResult.Success && estatisticasResult.Data is not null)
         {
             var stats = estatisticasResult.Data;
@@ -75,8 +82,6 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
             vm.QuantidadePedidos = stats.QuantidadePedidos;
         }
 
-        // Onda P4 — trail de alterações.
-        var alteracoesResult = await svc.ObterAlteracoesAsync(id);
         if (alteracoesResult.Success && alteracoesResult.Data is not null)
             vm.Alteracoes = alteracoesResult.Data;
 
