@@ -668,7 +668,9 @@ app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
 // /console e /api-docs apontam pro EasyStock Console (UI dark sci-fi alternativa ao /swagger).
 app.MapGet("/console", () => Results.Redirect("/api-docs/", permanent: false))
    .ExcludeFromDescription();
-app.MapGet("/api-docs", () => Results.Redirect("/api-docs/", permanent: false))
+app.MapGet("/api-docs", () => Results.Redirect("/api-docs/index.html", permanent: false))
+   .ExcludeFromDescription();
+app.MapGet("/api-docs/", () => Results.Redirect("/api-docs/index.html", permanent: false))
    .ExcludeFromDescription();
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
