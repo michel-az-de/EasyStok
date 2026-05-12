@@ -20,6 +20,29 @@
   const DEVICE_ID_KEY = 'cdb-device-id';
   const QUEUE_KEY = 'cdb-sync-queue';
   const LAST_FULL_SYNC_KEY = 'cdb-last-sync';
+  // B4: versao do formato de mutations enfileiradas. Independente de
+  // PWA_REQUIRED_API_VERSION (que aponta pro schema do server). Quando este
+  // valor bumpar, mutations enfileiradas em formato anterior devem passar
+  // por mutationMigrators antes de retentativa. Server sinaliza necessidade
+  // via rejected.reason = 'migrate:N' (N = versao alvo).
+  const PWA_MUTATION_SCHEMA_VERSION = 1;
+
+  // D2: detecta WebView sem Service Worker. Acontece em Android WebView
+  // antigo, em modo privacy/incognito de alguns browsers, ou em ambientes
+  // de teste (Node VM). Modo degradado: cache offline via SW ausente, mas
+  // o sync.js continua funcional (fila persiste em localStorage/IDB).
+  // Heartbeat reporta degraded=true pra Diagnostico alertar operador a
+  // recarregar via HTTPS / atualizar WebView.
+  const _swSupported = (function () {
+    try {
+      return typeof navigator !== 'undefined'
+        && typeof navigator.serviceWorker !== 'undefined'
+        && typeof navigator.serviceWorker.getRegistration === 'function';
+    } catch (_) { return false; }
+  })();
+  if (!_swSupported) {
+    try { console.warn('[degraded] Service Worker indisponivel — cache offline ausente, sync funciona normalmente'); } catch (_) {}
+  }
   // Onda 1 — pareamento de devices.
   // Apos pareamento, server retorna { apiKey, empresaId, lojaId, ... }.
   // Persistimos tudo em cdb-pairing pra usar em todo request subsequente.
@@ -44,6 +67,17 @@
     try { localStorage.setItem(PAIRING_KEY, JSON.stringify(p)); } catch (e) {}
   }
   function clearPairing() {
+    // INVARIANTE: clearPairing remove APENAS PAIRING_KEY (cdb-pairing).
+    // NAO toca em cdb-sync-queue (fila offline), cdb-device-id (identidade
+    // do device), cdb-products / cdb-orders / cdb-batches / cdb-cash etc
+    // (dados de negocio), cdb-last-* (timestamps), cdb-pwa-installed-version
+    // (versao OTA), nem qualquer outra chave cdb-*.
+    //
+    // Re-pareamento mantem fila intacta: mutations enfileiradas durante o
+    // periodo offline sobem assim que pairWithCode salvar nova apiKey e
+    // disparar flush automatico. Apagar a fila aqui = perder vendas.
+    // Mudancas neste invariante DEVEM atualizar tests/pairing.test.js
+    // ("clearPairing preserva fila").
     try { localStorage.removeItem(PAIRING_KEY); } catch (e) {}
     // Reseta flag de invalido — sem pairing, comportamento volta ao
     // legado (request anonimo). App segue offline-first.
@@ -59,6 +93,59 @@
     const apiKey = getApiKey();
     if (apiKey) h['X-Mobile-Api-Key'] = apiKey;
     return h;
+  }
+
+  // ---- B3: ServerTimeOffset + monotonic ts ----
+  // PROBLEMA: enqueue carimba mutations com Date.now() local. Se o operador
+  // adulterar o relogio do device (ou bateria descarrega e o RTC reseta),
+  // mutations carimbadas pra TRAS podem perder em conflict-resolution
+  // last-write-wins. Drama silencioso: edicao recente foi "reescrita" por
+  // mutation com ts no passado.
+  //
+  // MITIGACAO: a cada response 2xx do servidor, capturamos o header Date e
+  // calculamos offset (serverTs - localTs). Usamos esse offset em todas as
+  // futuras chamadas a nowSafe(). Adicionalmente, garantimos monotonia:
+  // nowSafe() nunca retorna valor < _lastSeenServerTs + 1, mesmo se o relogio
+  // voltou. Isto blinda contra adulteracao e clock drift.
+  //
+  // Persistencia: offset e last-seen-server-ts ficam em localStorage pra
+  // sobreviver reload (sem isso, primeira mutation pos-boot seria carimbada
+  // com Date.now() puro ate o primeiro fetch responder).
+  const SERVER_OFFSET_KEY = 'cdb-server-time-offset-ms';
+  const LAST_SEEN_SERVER_TS_KEY = 'cdb-last-seen-server-ts';
+  let _serverTimeOffsetMs = (function () {
+    try { return parseInt(localStorage.getItem(SERVER_OFFSET_KEY) || '0', 10) || 0; } catch (_) { return 0; }
+  })();
+  let _lastSeenServerTs = (function () {
+    try { return parseInt(localStorage.getItem(LAST_SEEN_SERVER_TS_KEY) || '0', 10) || 0; } catch (_) { return 0; }
+  })();
+
+  function updateServerTimeFromResponse(resp) {
+    try {
+      if (!resp || !resp.headers || typeof resp.headers.get !== 'function') return;
+      const dateHeader = resp.headers.get('Date');
+      if (!dateHeader) return;
+      const serverTs = Date.parse(dateHeader);
+      if (!isFinite(serverTs)) return;
+      _serverTimeOffsetMs = serverTs - Date.now();
+      if (serverTs > _lastSeenServerTs) _lastSeenServerTs = serverTs;
+      try {
+        localStorage.setItem(SERVER_OFFSET_KEY, String(_serverTimeOffsetMs));
+        localStorage.setItem(LAST_SEEN_SERVER_TS_KEY, String(_lastSeenServerTs));
+      } catch (_) {}
+    } catch (_) {}
+  }
+
+  function nowSafe() {
+    const candidate = Date.now() + _serverTimeOffsetMs;
+    // Monotonia: relogio voltou ou nao temos ack do server ainda? Garante
+    // que ts cresce sempre. +1 evita empate exato com ultima leitura.
+    if (candidate <= _lastSeenServerTs) {
+      _lastSeenServerTs = _lastSeenServerTs + 1;
+      return _lastSeenServerTs;
+    }
+    _lastSeenServerTs = candidate;
+    return candidate;
   }
 
   // ---- Fila persistente ----
@@ -87,6 +174,62 @@
   // Snapshot do estado anterior pra calcular delta
   let lastSnapshot = null;
 
+  // ---- A6: strip de bytes pesados antes de enqueue ----
+  // Batches carregam fotos do lote (batchPhoto) e fotos por item (items[].photo).
+  // Quando o operador tira foto pela camera do device, o data-URL base64 fica
+  // de 1MB a 5MB por foto. Uma producao com 8 fotos = 30MB facil, e a fila
+  // cdb-sync-queue mora em localStorage (cap 5MB total). Resultado: quota
+  // estoura, saveQueue cai no catch, mutations perdidas em silencio.
+  //
+  // Estrategia: strip os bytes ANTES de enfileirar, mantendo apenas um hash
+  // (FNV-1a + tamanho) como referencia. O estado local (cdb-batches) preserva
+  // as fotos completas — operador segue vendo as imagens no app. So a copia
+  // que vai pra fila e' enxuta. Quando o photo-store IDB (A7) + endpoint
+  // POST /batches/{id}/photos (A8) entrarem, o upload separado usa o hash
+  // pra endereçar a foto no IDB local e mandar binario.
+  //
+  // TODO A7+A8: implementar photo-store.js IDB + endpoint upload. Enquanto
+  // isso, fotos NAO sincronizam entre devices — apenas no device que tirou.
+  // Aceitavel temporariamente: melhor que perder a fila inteira por quota.
+  function simpleHash(s) {
+    // FNV-1a 32-bit. Barato e suficiente pra identificar a foto.
+    // Nao e cripto, e nao precisa ser.
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h * 0x01000193) >>> 0;
+    }
+    return 'fnv1a:' + h.toString(16) + ':' + s.length;
+  }
+
+  function isHeavyDataUrl(v) {
+    // Trata como pesado qualquer data-URL acima de 4KB (cobre fotos reais
+    // e ignora pequenos icones SVG / placeholders inline).
+    return typeof v === 'string' && v.length > 4096 && v.indexOf('data:') === 0;
+  }
+
+  function stripBatchPhotoBytes(batch) {
+    if (!batch || typeof batch !== 'object') return batch;
+    // Deep clone pra nao mutar o estado local — operador segue vendo as fotos.
+    const clone = JSON.parse(JSON.stringify(batch));
+    if (isHeavyDataUrl(clone.batchPhoto)) {
+      clone.batchPhotoHash = simpleHash(clone.batchPhoto);
+      delete clone.batchPhoto;
+    }
+    if (Array.isArray(clone.items)) {
+      clone.items = clone.items.map(item => {
+        if (item && isHeavyDataUrl(item.photo)) {
+          const out = Object.assign({}, item);
+          out.photoHash = simpleHash(item.photo);
+          delete out.photo;
+          return out;
+        }
+        return item;
+      });
+    }
+    return clone;
+  }
+
   // ---- Calcula diff entre estados e gera mutations ----
   function computeMutations(prev, curr) {
     const muts = [];
@@ -113,7 +256,11 @@
     diffCollection(curr.clients, prev && prev.clients, 'client', c => c.lastOrder);
     diffCollection(curr.orders, prev && prev.orders, 'order', o => o.updatedAt);
     diffCollection(curr.cashEntries, prev && prev.cashEntries, 'cashEntry');
-    diffCollection(curr.batches, prev && prev.batches, 'batch');
+    // A6: batches stripadas de bytes pesados (fotos base64) antes do diff.
+    // O prev snapshot ja foi guardado stripado em cdbOnPersist, entao a
+    // comparacao bate. Diff sem strip causava enfileiramento de payloads
+    // multi-MB que estouravam localStorage.
+    diffCollection(curr.batches.map(stripBatchPhotoBytes), prev && prev.batches, 'batch');
 
     return muts;
   }
@@ -137,7 +284,15 @@
         deviceId,
         type: m.type,
         payload: m.payload,
-        ts: Date.now()
+        // B3: nowSafe() = Date.now() + serverTimeOffset, com garantia
+        // monotonica vs _lastSeenServerTs. Protege contra adulteracao de
+        // relogio do device — last-write-wins fica honesto.
+        ts: nowSafe(),
+        // B4: schemaVersion em cada item permite que o servidor sinalize
+        // "migra pra vN antes de aplicar" via rejected:migrate:N. Sem isto,
+        // bump do MobileSchemaVersion no server tornava mutations enfileiradas
+        // em formato antigo lixo silencioso (server rejeita com generic 4xx).
+        schemaVersion: PWA_MUTATION_SCHEMA_VERSION
       });
     });
     saveQueue(queue);
@@ -147,6 +302,58 @@
   function updatePendingCount() {
     const q = loadQueue();
     if (window.cdbApp) window.cdbApp.setPendingSync(q.length);
+  }
+
+  // ---- B4: schema migration de mutations ----
+  // Registry de transformers: { targetVersion: (mutation) => migratedMutation }.
+  // Inicialmente vazio porque PWA_MUTATION_SCHEMA_VERSION=1 e' o primeiro.
+  // Quando bumpar pra 2 (ex: renomeacao de campo em order.upsert), registre
+  // mutationMigrators[2] = m => { ...m, payload: rename(m.payload), schemaVersion: 2 };
+  //
+  // Migrators sao deterministicos e idempotentes — chamar duas vezes da o mesmo
+  // resultado. Server sinaliza versao alvo via rejected.reason='migrate:N'.
+  const mutationMigrators = {};
+
+  function applyMutationMigrationsAndRequeue(rejectedItems) {
+    const queue = loadQueue();
+    const byId = new Map(queue.map(m => [m.id, m]));
+    let migratedCount = 0, droppedCount = 0;
+    const toDrop = new Set();
+    const toMigrate = [];
+
+    for (const r of rejectedItems) {
+      const orig = byId.get(r.mutationId);
+      if (!orig) { droppedCount++; continue; } // ja saiu da fila
+      const target = parseInt(String(r.reason).split(':')[1] || '0', 10);
+      const migrator = mutationMigrators[target];
+      if (!migrator) {
+        try { console.warn('[migrate] sem migrator pra v' + target + ' — descartando mutation', r.mutationId); } catch (_) {}
+        toDrop.add(r.mutationId);
+        droppedCount++;
+        continue;
+      }
+      try {
+        const migrated = migrator(orig);
+        if (migrated && migrated.id && migrated.type) {
+          toDrop.add(r.mutationId);   // remove versao antiga
+          toMigrate.push(migrated);   // re-enfileira versao nova
+          migratedCount++;
+        } else {
+          toDrop.add(r.mutationId);
+          droppedCount++;
+        }
+      } catch (e) {
+        try { console.warn('[migrate] migrator v' + target + ' falhou:', e && e.message); } catch (_) {}
+        toDrop.add(r.mutationId);
+        droppedCount++;
+      }
+    }
+
+    if (toDrop.size > 0 || toMigrate.length > 0) {
+      const remaining = queue.filter(m => !toDrop.has(m.id)).concat(toMigrate);
+      saveQueue(remaining);
+      try { console.log('[migrate] migrated=' + migratedCount + ' dropped=' + droppedCount); } catch (_) {}
+    }
   }
 
   // ---- Flush: tenta enviar tudo ao backend ----
@@ -198,6 +405,10 @@
         clearTimeout(timeoutId);
       }
 
+      // B3: captura header Date pra calibrar serverTimeOffset (todas as
+      // respostas, mesmo erros — server seguramente carimba Date).
+      updateServerTimeFromResponse(resp);
+
       if (resp.status === 401) {
         // Pairing revogado/expirado. Marca em memoria, para de tentar.
         // Operador vai precisar re-parear pelo Diagnostico.
@@ -244,12 +455,22 @@
           const conflictIds = new Set(conflicts.map(c => c.mutationId));
           const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
           saveQueue(remaining);
-          // Notifica o app pra exibir UX e logar
+          // C3: server pode incluir winningPayload com a versao server vencedora;
+          // app usa pra mostrar diff visual (versao local vs server) ao operador.
           if (window.cdbApp && typeof window.cdbApp.onSyncConflict === 'function') {
             try { window.cdbApp.onSyncConflict(conflicts); } catch (e) {}
           }
           // Force pull pra alinhar com servidor
           setTimeout(pull, 200);
+        }
+
+        // B4: server pode rejeitar mutations em schema antigo com reason='migrate:N'.
+        // Tentamos transformar via mutationMigrators[N] e re-enfileirar pra proxima
+        // tentativa. Se nao houver migrator registrado, descarta com warn pra log
+        // (alternativa seria deixar na fila pra acumular eternamente — pior).
+        const toMigrate = result.rejected.filter(r => r.reason && r.reason.startsWith('migrate:'));
+        if (toMigrate.length > 0) {
+          applyMutationMigrationsAndRequeue(toMigrate);
         }
       }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
@@ -282,6 +503,8 @@
       } finally {
         clearTimeout(timeoutId);
       }
+      // B3: calibra serverTimeOffset.
+      updateServerTimeFromResponse(resp);
       if (resp.status === 401) { _pairingInvalid = true; return; }
       if (!resp.ok) return;
       const data = await resp.json();
@@ -348,7 +571,8 @@
       clients: state.clients,
       orders: state.orders,
       cashEntries: state.cashEntries,
-      batches: state.batches
+      // A6: snapshot stripado pra bater com o diff em computeMutations.
+      batches: state.batches.map(stripBatchPhotoBytes)
     }));
     if (muts.length) {
       enqueue(muts);
@@ -367,7 +591,12 @@
     if (status === 'auth') return FLUSH_DELAY_CAP_MS;
     if (status === 'retry') {
       const exp = Math.pow(2, Math.max(0, _consecutiveFlushFailures - 1));
-      return Math.min(FLUSH_DELAY_NORMAL_MS * exp, FLUSH_DELAY_CAP_MS);
+      const base = Math.min(FLUSH_DELAY_NORMAL_MS * exp, FLUSH_DELAY_CAP_MS);
+      // B1: jitter +/-50% pra evitar tempestade quando frota inteira sai do
+      // backoff junto (ex: servidor caiu por 10min e volta — N devices em
+      // FLUSH_DELAY_CAP_MS sincronizado disparariam todos no mesmo tick).
+      // Math.random() em [0, 1) → fator em [0.5, 1.5). Garante delay > 0.
+      return Math.max(1000, Math.floor(base * (0.5 + Math.random())));
     }
     return FLUSH_DELAY_NORMAL_MS;
   }
@@ -388,6 +617,22 @@
   }
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
+
+  // B2: visibilitychange → flush. Android pode matar timers em background;
+  // ao voltar pro app o operador espera ate 30s pelo proximo tick. Com este
+  // listener, qualquer transicao "background -> foreground" aciona flush
+  // imediato. document pode nao existir em ambientes esotericos (tests vm)
+  // entao testamos antes.
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && navigator.onLine) {
+        // Reseta backoff: voltar ao foreground sinaliza que ha demanda do
+        // operador, vale tentar de novo sem esperar o cap acumulado.
+        _consecutiveFlushFailures = 0;
+        scheduleNextFlush(0);
+      }
+    });
+  }
 
   // ---- Inicialização ----
   let flushIntervalId = null;
@@ -427,10 +672,17 @@
         clients: s.clients,
         orders: s.orders,
         cashEntries: s.cashEntries,
-        batches: s.batches
+        // A6: snapshot inicial tambem stripado, senao o primeiro diff
+        // gerado por cdbOnPersist comparar inflated vs stripped e enfileirar
+        // batch inteira como "novidade".
+        batches: s.batches.map(stripBatchPhotoBytes)
       }));
     }
     updatePendingCount();
+    // A5: detecta reinstalacao + oferece restore via backup local. Roda em
+    // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
+    // index.html escuta. Falha silenciosa nao bloqueia o app.
+    maybeOfferRestoreOnReinstall();
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
     // Loop self-rescheduling com backoff exponencial em erro (substitui o
     // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
@@ -683,6 +935,78 @@
     return null;
   }
 
+  // ---- A5: deteccao de reinstalacao + oferta de restore ----
+  // Em Android, quando o usuario desinstala/reinstala o APK, o localStorage
+  // do WebView eh limpo — todos os dados de negocio (pedidos, lotes, caixa)
+  // somem. Antes desta entrega o operador descobria isso somente quando
+  // notava o app vazio (e ai a fila ja era perdida tambem).
+  //
+  // Agora: no boot, se nao houver dados de negocio E houver backup local
+  // preservado em MediaStore publico (que SOBREVIVE a uninstall em muitos
+  // OEMs Android), dispara o evento window 'cdb-restore-prompt' com payload
+  // do backup. O index.html escuta esse evento e mostra modal pro operador
+  // confirmar o restore. Sem confirmacao explicita, dados nao sao escritos
+  // — operador pode optar por comecar zerado se a perda foi intencional.
+  function _localStorageHasBusinessData() {
+    // Boot pos-reinstall = sem chaves de negocio (ou apenas '[]' vazio).
+    // cdb-device-id pode existir pq foi recriado no getDeviceId() acima,
+    // entao ignoramos. Mesmo pra cdb-pwa-installed-version e cdb-pairing.
+    const businessKeys = [
+      'cdb-products', 'cdb-orders', 'cdb-clients',
+      'cdb-batches', 'cdb-cash', 'cdb-cash-closings'
+    ];
+    for (let i = 0; i < businessKeys.length; i++) {
+      const v = localStorage.getItem(businessKeys[i]);
+      if (v && v !== '[]' && v !== 'null' && v !== '{}') return true;
+    }
+    return false;
+  }
+
+  async function maybeOfferRestoreOnReinstall() {
+    try {
+      if (_localStorageHasBusinessData()) return; // boot normal
+      const backup = await readLocalBackup();
+      if (!backup || !backup.data) return;
+      try { console.log('[restore] backup local detectado pos-reinstall — emitindo cdb-restore-prompt'); } catch (_) {}
+      try {
+        window.dispatchEvent(new CustomEvent('cdb-restore-prompt', {
+          detail: {
+            backup: backup,
+            capturedAt: backup.capturedAt || null,
+            capturedAtIso: backup.capturedAtIso || null,
+            deviceId: backup.deviceId || null,
+            source: 'local-mediastore'
+          }
+        }));
+      } catch (_) {}
+    } catch (e) {
+      try { console.warn('[restore] maybeOfferRestoreOnReinstall falhou:', e && e.message); } catch (_) {}
+    }
+  }
+
+  // Aplica o snapshot do backup escrevendo as chaves cdb-* no localStorage.
+  // index.html chama isto apos o operador confirmar no modal de restore.
+  // Forca reload em seguida pra que o app re-hidrate de cdb-* e reflita
+  // os dados restaurados. Retorna { restored: number, skipped: number }.
+  function applyBackupSnapshot(backup) {
+    if (!backup || !backup.data || typeof backup.data !== 'object') {
+      throw new Error('backup invalido');
+    }
+    let restored = 0, skipped = 0;
+    const data = backup.data;
+    Object.keys(data).forEach(k => {
+      if (k.indexOf('cdb-') !== 0) { skipped++; return; }
+      // Nunca sobrescrever pairing nem device-id no restore — se este device
+      // foi re-pareado depois do backup, o pairing atual eh o correto.
+      if (k === 'cdb-pairing' || k === 'cdb-device-id') { skipped++; return; }
+      try {
+        localStorage.setItem(k, String(data[k]));
+        restored++;
+      } catch (e) { skipped++; }
+    });
+    return { restored, skipped };
+  }
+
   // ULTIMA LINHA DE DEFESA: SAF picker. Em Android 11+ apos reinstall, o
   // app perde ownership dos arquivos publicos que ele criou. SAF deixa o
   // user selecionar manualmente o arquivo (`backup-latest.json` ou backup
@@ -758,6 +1082,24 @@
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
     if (!lojaId) throw new Error('lojaId obrigatorio');
+
+    // Pre-drain: se fila tem mutations pendentes, drenar ANTES do switch.
+    // Sem isto, mutations da loja antiga sobem APOS o POST switch-loja e
+    // sao atribuidas (pelo servidor) ao pairing atual = loja nova. Drama
+    // silencioso de cross-loja: vendas/lotes da loja A aparecem na loja B.
+    // Drenagem tem cap de 40s (5x8s); se nao drenar, aborta com erro claro
+    // pra o operador decidir (conectar rede melhor / esperar / cancelar).
+    const pendingBefore = loadQueue().length;
+    if (pendingBefore > 0) {
+      const drainResult = await drainQueueWithBackoff(5, 8000);
+      if (!drainResult.drained) {
+        throw new Error(
+          'Fila tem ' + drainResult.remaining + ' mutacao(oes) pendente(s) da loja atual. ' +
+          'Conecte a uma rede estavel e tente sincronizar antes de trocar de loja.'
+        );
+      }
+    }
+
     const url = API_BASE_URL + API_PREFIX + '/devices/me/switch-loja';
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 10000);
@@ -872,6 +1214,29 @@
           } else if (data && data.type === 'command-queued') {
             console.log('[realtime] command-queued', data.commandType);
             fetchAndProcessCommands();
+          } else if (data && data.type === 'order.ready') {
+            // C4: pedido ficou pronto em outro device — alerta garcom aqui.
+            // Custom event pra index.html mostrar UX (toast/beep/badge).
+            try {
+              window.dispatchEvent(new CustomEvent('cdb-order-ready', { detail: data }));
+            } catch (_) {}
+            // Notification API: dispara so quando aba/app esta em background
+            // (operador no foreground ja viu via UX in-app). Permission
+            // tem que ter sido concedida previamente — sem prompt aqui.
+            try {
+              if (typeof Notification !== 'undefined'
+                  && Notification.permission === 'granted'
+                  && typeof document !== 'undefined' && document.hidden) {
+                const body = (data.clientName ? data.clientName + ' — ' : '')
+                  + (data.itemCount || 0) + ' item(s) — R$ ' + (data.total || 0);
+                // tag: dedup notificacoes do mesmo pedido (substitui em vez de empilhar)
+                new Notification('Pedido pronto', {
+                  body: body,
+                  tag: 'cdb-order-ready-' + data.orderId,
+                  renotify: false
+                });
+              }
+            } catch (_) {}
           }
         } catch (e) {}
       };
@@ -993,7 +1358,10 @@
         schemaVersion: (versionPayload && versionPayload.MobileSchemaVersion) || 0,
         queueSize: loadQueue().length,
         lastSyncAt: lastSync,
-        online: !!navigator.onLine
+        online: !!navigator.onLine,
+        // D2: alerta Diagnostico quando WebView nao tem suporte a Service
+        // Worker (cache offline ausente). Sync.js segue funcional.
+        degraded: !_swSupported
       };
       fetch(API_BASE_URL + API_PREFIX + '/diagnostics/heartbeat', {
         method: 'POST',
@@ -1016,6 +1384,8 @@
       } finally {
         clearTimeout(timeoutId);
       }
+      // B3: calibra serverTimeOffset.
+      updateServerTimeFromResponse(resp);
       if (!resp.ok) return null;
       const data = await resp.json();
       try {
@@ -1094,16 +1464,22 @@
   // Loop ate fila vazia ou tentativas esgotadas. flush() ja tem seu proprio
   // guard (flushing flag); aqui so esperamos entre tentativas e re-checamos
   // o tamanho da fila persistida.
+  //
+  // Retorna { drained: bool, remaining: number }. Defaults 5x8000ms — antes
+  // eram 3x5000ms, insuficiente em rede ruim com fila >100 mutations
+  // (cenario observado em frota voltando online junto: tempestade de POSTs
+  // no servidor faz flush demorar). 5x8s = 40s no pior caso, ainda cabe
+  // dentro da janela aceitavel pra OTA e switchLoja.
   async function drainQueueWithBackoff(maxAttempts, perAttemptMs) {
-    maxAttempts = maxAttempts || 3;
-    perAttemptMs = perAttemptMs || 5000;
+    maxAttempts = maxAttempts || 5;
+    perAttemptMs = perAttemptMs || 8000;
     for (let i = 0; i < maxAttempts; i++) {
-      if (loadQueue().length === 0) return true;
+      if (loadQueue().length === 0) return { drained: true, remaining: 0 };
       try { await flush(); } catch (e) { /* flush eh defensivo */ }
       await new Promise(r => setTimeout(r, perAttemptMs));
-      if (loadQueue().length === 0) return true;
     }
-    return loadQueue().length === 0;
+    const remaining = loadQueue().length;
+    return { drained: remaining === 0, remaining };
   }
 
   // Telemetria best-effort do ciclo de update. Em F5 vira POST formal pra
@@ -1201,12 +1577,15 @@
 
     _pwaUpdating = true;
     let drainedOk = false;
+    let drainRemaining = 0;
     let backupOk = false;
     try {
       // F4: 1) drena a fila antes de aplicar (anti-perda de venda).
-      drainedOk = await drainQueueWithBackoff(3, 5000);
+      const drainResult = await drainQueueWithBackoff(5, 8000);
+      drainedOk = drainResult.drained;
+      drainRemaining = drainResult.remaining;
       if (!drainedOk && !opts.force) {
-        try { console.warn('[OTA] fila com pendencias — postergando update 5min'); } catch (_) {}
+        try { console.warn('[OTA] fila com', drainRemaining, 'pendencias — postergando update 5min'); } catch (_) {}
         releaseUpdateLock();
         _pwaUpdating = false;
         setTimeout(() => triggerPwaUpdate(opts), 5 * 60 * 1000);
@@ -1221,8 +1600,21 @@
         }
       } catch (e) {
         try { console.warn('[OTA] backup pre-update falhou:', e && e.message); } catch (_) {}
-        // Nao abortamos por causa de backup falho: servidor ja retem ate 7d
-        // e o snapshot anterior continua valido. Apenas logamos.
+      }
+
+      // D1: se device pareado mas backup falhou (e nao e' force), adia.
+      // Pareado + online + backup falhando indica problema transitorio
+      // (servidor instavel, rede ruim, quota). SE este OTA corromper o
+      // localStorage e nao houver snapshot recente, perda potencial. O
+      // commando remoto pwa_update com force:true ignora esse gate pra
+      // dar ao gestor controle manual em casos extremos. Devices nao
+      // pareados nao tentam backup, entao prosseguem normalmente.
+      if (getApiKey() && !backupOk && !opts.force) {
+        try { console.warn('[OTA] backup pre-update falhou em device pareado — postergando update 5min'); } catch (_) {}
+        releaseUpdateLock();
+        _pwaUpdating = false;
+        setTimeout(() => triggerPwaUpdate(opts), 5 * 60 * 1000);
+        return;
       }
 
       // F4: 3) telemetria do ciclo (best-effort).
@@ -1384,7 +1776,8 @@
     (s.products || []).forEach(p => { if (p && p.id) muts.push({ type: 'product.upsert', payload: stripProd(p) }); });
     (s.clients || []).forEach(c => { if (c && c.id) muts.push({ type: 'client.upsert', payload: c }); });
     (s.orders || []).forEach(o => { if (o && o.id) muts.push({ type: 'order.upsert', payload: o }); });
-    (s.batches || []).forEach(b => { if (b && b.id) muts.push({ type: 'batch.upsert', payload: b }); });
+    // A6: pushAll tambem stripa fotos pesadas antes de enfileirar.
+    (s.batches || []).forEach(b => { if (b && b.id) muts.push({ type: 'batch.upsert', payload: stripBatchPhotoBytes(b) }); });
     (s.cashEntries || []).forEach(c => { if (c && c.id) muts.push({ type: 'cashEntry.upsert', payload: c }); });
     if (muts.length === 0) return { enqueued: 0, queueSize: loadQueue().length };
     enqueue(muts);
@@ -1444,6 +1837,23 @@
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
     pickBackupViaSAF,
+    // A5: restore-on-reinstall — index.html chama applyBackupSnapshot
+    // depois de o operador confirmar no modal disparado por cdb-restore-prompt.
+    maybeOfferRestoreOnReinstall, applyBackupSnapshot,
+    // A6: stripBatchPhotoBytes exposto pra testes — retorna copia do batch
+    // sem bytes de fotos pesadas (substituidos por *Hash). Estado local
+    // permanece intacto.
+    computeStrippedBatch: stripBatchPhotoBytes,
+    // B/C/D: hooks de inspecao pra testes e diagnostico runtime. Nao parte
+    // do contrato publico — uso em UI deve ser raro/justificado.
+    _internal: {
+      nowSafe: nowSafe,                                   // B3
+      getServerTimeOffsetMs: () => _serverTimeOffsetMs,   // B3
+      getLastSeenServerTs: () => _lastSeenServerTs,       // B3
+      mutationMigrators: mutationMigrators,               // B4 (mutable: register migrators)
+      mutationSchemaVersion: PWA_MUTATION_SCHEMA_VERSION, // B4
+      swSupported: () => _swSupported                     // D2
+    },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
