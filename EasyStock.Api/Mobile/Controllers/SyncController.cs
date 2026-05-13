@@ -1066,6 +1066,17 @@ public class SyncController(
                 {
                     mobileC.ErpClienteId = match.Id;
                     _log.LogInformation("AutoLink Cliente: mobile={MobileId} → erp={ErpId}", cid, match.Id);
+                    // F9-C: registra vinculacao na auditoria pra aparecer na aba Atividade.
+                    _db.Add(new ClienteAlteracao
+                    {
+                        Id = Guid.NewGuid(),
+                        ClienteId = match.Id,
+                        Campo = "vinculacao_mobile",
+                        ValorAntigo = null,
+                        ValorNovo = $"mobile_client={cid}",
+                        AlteradoEm = DateTime.UtcNow,
+                        Origem = "mobile"
+                    });
                     continue;
                 }
 
@@ -1077,6 +1088,17 @@ public class SyncController(
                 novoC.OrderCount  = mobileC.OrderCount;
                 _db.Add(novoC);
                 mobileC.ErpClienteId = novoC.Id;
+                // F9-C: registra criacao via mobile na auditoria.
+                _db.Add(new ClienteAlteracao
+                {
+                    Id = Guid.NewGuid(),
+                    ClienteId = novoC.Id,
+                    Campo = "criado",
+                    ValorAntigo = null,
+                    ValorNovo = $"Nome={mobileC.Name}; Telefone={mobileC.Phone}; mobile_client={cid}",
+                    AlteradoEm = DateTime.UtcNow,
+                    Origem = "mobile"
+                });
                 _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
                     cid, novoC.Id, mobileC.Name);
             }
@@ -1258,6 +1280,11 @@ public class SyncController(
                 if (pedidoIdResolvido.HasValue)
                 {
                     await EnsureStatusSyncAsync(pedidoIdResolvido.Value, mobileO);
+                    // F9-B: fallback de linkagem ClienteId quando o nome casa.
+                    // Pedido pode ter sido criado com ClienteId=null se mobile_client
+                    // ainda nao tinha erp_cliente_id no momento da criacao. Tenta
+                    // re-linkar por nome. Idempotente: so atualiza se ClienteId=null.
+                    await EnsureClienteLinkAsync(pedidoIdResolvido.Value, mobileO);
                 }
 
                 // F7-A — Pagamento auto quando mobileO.Status == "entregue".
@@ -1329,7 +1356,6 @@ public class SyncController(
     /// </summary>
     private async Task EnsureVendaAsync(Order mobileO)
     {
-        if (mobileO.ErpVendaId.HasValue && mobileO.ErpVendaId.Value != Guid.Empty) return;
         try
         {
             // mobile_orders refetch (AsTracking) — o service seta ErpVendaId no
@@ -1338,23 +1364,75 @@ public class SyncController(
                 .Include(o => o.Items)
                 .FirstOrDefaultAsync(o => o.Id == mobileO.Id);
             if (trackedOrder == null) return;
-            if (trackedOrder.ErpVendaId.HasValue) return;
 
-            var created = await _saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder, trackedOrder.Items.Select(i => new OrderItemDto(
-                ProductId: i.ProductId ?? "",
-                Name: i.Name,
-                Emoji: i.Emoji,
-                Unit: i.Unit,
-                Qty: i.Qty,
-                UnitPrice: i.UnitPrice
-            )).ToList());
-            // O service faz _db.Add(...) mas nao chama SaveChanges. Persiste aqui.
-            if (created && _db.ChangeTracker.HasChanges())
-                await _db.SaveChangesAsync();
+            // Cria a Venda apenas se nao existe (idempotente).
+            if (!trackedOrder.ErpVendaId.HasValue)
+            {
+                var created = await _saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder, trackedOrder.Items.Select(i => new OrderItemDto(
+                    ProductId: i.ProductId ?? "",
+                    Name: i.Name,
+                    Emoji: i.Emoji,
+                    Unit: i.Unit,
+                    Qty: i.Qty,
+                    UnitPrice: i.UnitPrice
+                )).ToList());
+                // O service faz _db.Add(...) mas nao chama SaveChanges. Persiste aqui.
+                if (created && _db.ChangeTracker.HasChanges())
+                    await _db.SaveChangesAsync();
+            }
+
+            // F9-A: popula Pedido.VendaId mesmo quando a Venda ja existia.
+            // Rodar sempre garante idempotencia retroativa pros pedidos antigos.
+            if (trackedOrder.ErpVendaId.HasValue && trackedOrder.ErpPedidoId.HasValue)
+            {
+                await _db.Set<Pedido>().IgnoreQueryFilters()
+                    .Where(p => p.Id == trackedOrder.ErpPedidoId.Value && p.VendaId == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.VendaId, trackedOrder.ErpVendaId.Value));
+            }
         }
         catch (Exception ex)
         {
             _log.LogWarning(ex, "F8-G Venda falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// F9-B: re-linka Pedido.ClienteId via match por nome quando o pedido
+    /// foi criado com ClienteId=null. Acontece quando mobile_client ainda
+    /// nao tinha erp_cliente_id no momento da criacao ou quando o cliente
+    /// foi cadastrado depois no web. Idempotente: so atualiza se ClienteId
+    /// continua null E achou exatamente 1 cliente com aquele nome.
+    /// </summary>
+    private async Task EnsureClienteLinkAsync(Guid pedidoId, Order mobileO)
+    {
+        try
+        {
+            var pedido = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == pedidoId);
+            if (pedido == null || pedido.ClienteId.HasValue) return;
+            if (string.IsNullOrWhiteSpace(pedido.ClienteNome)) return;
+            // "Avulso" e nomes obviamente nao-pessoa nao linkam.
+            var nome = pedido.ClienteNome.Trim();
+            if (string.Equals(nome, "Avulso", StringComparison.OrdinalIgnoreCase)) return;
+
+            // Match exato por nome (case-insensitive) na mesma empresa.
+            var candidatos = await _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.EmpresaId == pedido.EmpresaId
+                         && c.Nome.ToLower() == nome.ToLower())
+                .Select(c => c.Id).Take(2).ToListAsync();
+            if (candidatos.Count != 1) return; // ambiguidade: deixa pra resolver manual
+
+            var clienteId = candidatos[0];
+            var rows = await _db.Set<Pedido>().IgnoreQueryFilters()
+                .Where(p => p.Id == pedidoId && p.ClienteId == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.ClienteId, clienteId));
+            if (rows > 0)
+                _log.LogInformation("F9-B: Pedido {PedidoId} linkado ao Cliente {ClienteId} por nome={Nome}",
+                    pedidoId, clienteId, nome);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "F9-B EnsureClienteLink falhou pedido={PedidoId}: {Msg}", pedidoId, ex.Message);
         }
     }
 
