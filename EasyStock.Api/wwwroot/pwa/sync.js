@@ -27,6 +27,84 @@
   // via rejected.reason = 'migrate:N' (N = versao alvo).
   const PWA_MUTATION_SCHEMA_VERSION = 1;
 
+  // ───────────────────────────────────────────────────────────────────────
+  // CONTINGÊNCIA — Trace estruturado + auto-diagnóstico
+  // ───────────────────────────────────────────────────────────────────────
+  // Cada momento crítico (boot, auto-pair, pull, flush, ticket-auto) registra
+  // em `cdb-sync-trace` (round-buffer 200 eventos). Operador exporta via
+  // Diagnóstico → "Copiar trace" e cola direto em chat/ticket. Evita ficar
+  // dependendo de `fly logs` ou Render dashboard pra diagnosticar problema
+  // de instalação. Cada entry: { t (ms), cat, msg, data?, ok?: bool }.
+  const TRACE_KEY = 'cdb-sync-trace';
+  const TRACE_MAX = 200;
+  function _trace(cat, msg, data) {
+    try {
+      const entry = { t: Date.now(), cat: String(cat || '').slice(0, 40),
+                      msg: String(msg || '').slice(0, 240) };
+      if (data !== undefined && data !== null) {
+        try { entry.data = JSON.parse(JSON.stringify(data)); }
+        catch (_) { entry.data = String(data).slice(0, 400); }
+      }
+      const arr = JSON.parse(localStorage.getItem(TRACE_KEY) || '[]');
+      arr.push(entry);
+      if (arr.length > TRACE_MAX) arr.splice(0, arr.length - TRACE_MAX);
+      localStorage.setItem(TRACE_KEY, JSON.stringify(arr));
+    } catch (_) { /* localStorage cheio ou bug: ignora — trace é best-effort */ }
+    try { console.log('[cdb-trace]', cat, msg, data || ''); } catch (_) {}
+  }
+  function getTrace() {
+    try { return JSON.parse(localStorage.getItem(TRACE_KEY) || '[]'); }
+    catch (_) { return []; }
+  }
+  function clearTrace() {
+    try { localStorage.removeItem(TRACE_KEY); } catch (_) {}
+  }
+  function exportTraceText() {
+    const arr = getTrace();
+    const cfg = window.CDB_CONFIG || {};
+    const pair = (function () {
+      try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); }
+      catch (_) { return null; }
+    })();
+    const header = [
+      '=== CDB SYNC TRACE ===',
+      'exportado: ' + new Date().toISOString(),
+      'deviceId: ' + (localStorage.getItem(DEVICE_ID_KEY) || '(none)'),
+      'apiBaseUrl: ' + (cfg.apiBaseUrl || '(mesmo host)'),
+      'configLoaded: ' + (typeof window.CDB_CONFIG !== 'undefined'),
+      'hasProvisioning: ' + (!!cfg.forcedProvisioningSecret),
+      'hasPairingCode: ' + (!!cfg.forcedPairingCode),
+      'paired: ' + (!!pair),
+      'lastSync: ' + (localStorage.getItem(LAST_FULL_SYNC_KEY) || '(none)'),
+      'queueLen: ' + (function () { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').length; } catch (_) { return -1; } })(),
+      'userAgent: ' + (navigator.userAgent || '').slice(0, 200),
+      ''
+    ].join('\n');
+    const lines = arr.map(e => {
+      const ts = new Date(e.t).toISOString();
+      const dataStr = e.data ? ' ' + JSON.stringify(e.data) : '';
+      return '[' + ts + '] [' + e.cat + '] ' + e.msg + dataStr;
+    }).join('\n');
+    return header + (lines || '(trace vazio)');
+  }
+
+  // Pré-check no boot: detecta falhas catastróficas do empacotamento
+  // (config.js não carregou, secret ausente em APK que deveria ter etc) e
+  // registra com sinal explícito antes de qualquer tentativa de pareamento.
+  (function _preCheck() {
+    _trace('boot', 'sync.js iniciando', {
+      hasConfig: typeof window.CDB_CONFIG !== 'undefined',
+      apiBaseUrl: CFG.apiBaseUrl || '(mesmo host)',
+      hasProvisioning: !!CFG.forcedProvisioningSecret,
+      hasPairingCode: !!CFG.forcedPairingCode
+    });
+    if (typeof window.CDB_CONFIG === 'undefined') {
+      _trace('boot', 'CRITICO: window.CDB_CONFIG undefined — config.js nao carregou. APK pode estar corrompido ou index.html sem <script src="config.js">.', null);
+    } else if (!CFG.apiBaseUrl) {
+      _trace('boot', 'AVISO: apiBaseUrl vazio — sync vai usar mesmo host. Em APK isto significa http://localhost (nao tem backend).', null);
+    }
+  })();
+
   // D2: detecta WebView sem Service Worker. Acontece em Android WebView
   // antigo, em modo privacy/incognito de alguns browsers, ou em ambientes
   // de teste (Node VM). Modo degradado: cache offline via SW ausente, mas
@@ -1750,10 +1828,15 @@
   // POST /api/mobile/devices/pair-auto, sem operador digitar nada.
   // Idempotente no server (mesmo deviceId rotaciona apiKey).
   async function pairAuto(provisioningSecret, label) {
-    if (!navigator.onLine) throw new Error('sem rede');
+    if (!navigator.onLine) {
+      _trace('pair-auto', 'abort: offline', null);
+      throw new Error('sem rede');
+    }
     const url = API_BASE_URL + API_PREFIX + '/devices/pair-auto';
+    _trace('pair-auto', 'fetch ' + url, { secretLen: (provisioningSecret || '').length, deviceId });
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 12000);
+    const startT = Date.now();
     let resp;
     try {
       resp = await fetch(url, {
@@ -1767,16 +1850,20 @@
         signal: ctrl.signal
       });
     } catch (e) {
+      _trace('pair-auto', 'network FAIL ' + (Date.now() - startT) + 'ms: ' + (e && e.message || e), null);
       throw new Error('servidor inacessivel');
     } finally {
       clearTimeout(timeoutId);
     }
+    _trace('pair-auto', 'http ' + resp.status + ' ' + (Date.now() - startT) + 'ms', null);
     if (!resp.ok) {
       let msg = 'auto-provisioning rejeitado';
       try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      _trace('pair-auto', 'rejeitado: ' + msg, null);
       throw new Error(msg);
     }
     const data = await resp.json();
+    _trace('pair-auto', 'OK pareado', { empresaId: data.empresaId, lojaId: data.lojaId });
     savePairing({
       apiKey: data.apiKey,
       empresaId: data.empresaId,
@@ -2026,8 +2113,12 @@
   // Retry com backoff (60s, 2min, 5min) ate succeed - cobre cenarios onde
   // primeira tentativa falha por CORS/network e a segunda passa.
   let _autoPairAttempt = 0;
-  const _autoPairDelays = [60000, 120000, 300000, 600000];
+  // Retry agressivo: 5s, 15s, 30s, 1min, 2min, 5min, 10min. Antes era
+  // 60s, 2min, 5min — primeira tentativa demorava demais quando a
+  // primeira falha era CORS transitorio que se resolvia em segundos.
+  const _autoPairDelays = [5000, 15000, 30000, 60000, 120000, 300000, 600000];
   function _logAutoPairError(msg) {
+    _trace('auto-pair', msg, null);
     try {
       if (typeof window !== 'undefined' && typeof window.logError === 'function') {
         window.logError(new Error(msg), 'auto-pair');
@@ -2035,30 +2126,70 @@
     } catch (_) {}
     try { console.warn('[auto-pair]', msg); } catch (_) {}
   }
+  // Healthcheck do servidor antes de qualquer tentativa de pareamento.
+  // Resolve `true` se servidor responde, `false` se 4xx/5xx/timeout.
+  async function _serverHealthOk() {
+    if (!navigator.onLine) return false;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(API_BASE_URL + '/health/live', { signal: ctrl.signal });
+      clearTimeout(t);
+      return r.ok;
+    } catch (_) { return false; }
+  }
   setTimeout(async function autoPairFromForcedCode() {
     _autoPairAttempt++;
     try {
-      if (loadPairing()) return;
+      if (loadPairing()) {
+        if (_autoPairAttempt === 1) _trace('auto-pair', 'skip: ja pareado', null);
+        return;
+      }
       const cfg = window.CDB_CONFIG || {};
       const provisioningSecret = cfg.forcedProvisioningSecret;
       const code = cfg.forcedPairingCode;
-      if (!provisioningSecret && !code) return;
-      if (!navigator.onLine) {
-        setTimeout(autoPairFromForcedCode, 30 * 1000);
+
+      // CONTINGÊNCIA: APK gerado sem o secret embutido = problema do build,
+      // não da rede. Para de tentar e deixa diagnóstico óbvio.
+      if (!provisioningSecret && !code) {
+        if (_autoPairAttempt === 1) {
+          if (typeof window.CDB_CONFIG === 'undefined') {
+            _trace('auto-pair', 'ABORT: window.CDB_CONFIG undefined — config.js nao foi carregado pelo index.html', null);
+          } else {
+            _trace('auto-pair', 'ABORT: sem forcedProvisioningSecret nem forcedPairingCode no config.js — APK gerado sem secret embutido', null);
+          }
+        }
         return;
       }
+
+      if (!navigator.onLine) {
+        _trace('auto-pair', 'tentativa ' + _autoPairAttempt + ' offline — retry em 30s', null);
+        setTimeout(autoPairFromForcedCode, 30000);
+        return;
+      }
+
+      // Pré-flight: server respondendo? Evita acumular tentativas inúteis
+      // quando o servidor está down (e tickets falsos por sync.flush failure).
+      const healthy = await _serverHealthOk();
+      if (!healthy) {
+        _trace('auto-pair', 'tentativa ' + _autoPairAttempt + ' health probe FAIL em ' + API_BASE_URL + '/health/live', null);
+        const delay = _autoPairDelays[Math.min(_autoPairAttempt - 1, _autoPairDelays.length - 1)];
+        setTimeout(autoPairFromForcedCode, delay);
+        return;
+      }
+      _trace('auto-pair', 'tentativa ' + _autoPairAttempt + ' health probe OK', null);
+
       // Modo 1: provisioning secret (preferido)
       if (provisioningSecret) {
-        try { console.log('[auto-pair] tentativa ' + _autoPairAttempt + ' via provisioning secret'); } catch (_) {}
         try {
           await pairAuto(provisioningSecret, cfg.forcedProvisioningLabel || cfg.forcedPairingLabel || 'Casa da Baba');
-          try { console.log('[auto-pair] provisionado com sucesso'); } catch (_) {}
+          _trace('auto-pair', 'SUCESSO via provisioning secret tentativa ' + _autoPairAttempt, null);
           return;
         } catch (e) {
-          _logAutoPairError('tentativa ' + _autoPairAttempt + ' falhou: ' + (e && e.message || e));
+          _logAutoPairError('tentativa ' + _autoPairAttempt + ' provisioning falhou: ' + (e && e.message || e));
           if (!code) {
-            // Sem fallback - agenda retry
             const delay = _autoPairDelays[Math.min(_autoPairAttempt - 1, _autoPairDelays.length - 1)];
+            _trace('auto-pair', 'retry em ' + delay + 'ms', null);
             setTimeout(autoPairFromForcedCode, delay);
             return;
           }
@@ -2067,9 +2198,11 @@
       // Modo 2: pairing code legacy
       try {
         await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
-        try { console.log('[auto-pair] pareado com sucesso'); } catch (_) {}
+        _trace('auto-pair', 'SUCESSO via pairing code tentativa ' + _autoPairAttempt, null);
       } catch (e) {
         _logAutoPairError('pairing code falhou: ' + (e && e.message || e));
+        const delay = _autoPairDelays[Math.min(_autoPairAttempt - 1, _autoPairDelays.length - 1)];
+        setTimeout(autoPairFromForcedCode, delay);
       }
     } catch (e) {
       _logAutoPairError('boot exception: ' + (e && e.message || e));
@@ -2082,6 +2215,18 @@
     pingVersion, uploadErrorLog,
     pairWithCode, pairAuto,
     openTicketAuto,
+    // Contingência: trace + diagnóstico expostos pro Diagnóstico UI usar
+    getTrace, clearTrace, exportTraceText,
+    serverHealthOk: _serverHealthOk,
+    // Força um único ciclo de pareamento manualmente (botão Diagnóstico).
+    forcePairNow: function () { _autoPairAttempt = 0; return (async function () {
+      const cfg = window.CDB_CONFIG || {};
+      const secret = cfg.forcedProvisioningSecret;
+      const code = cfg.forcedPairingCode;
+      if (secret) return await pairAuto(secret, cfg.forcedProvisioningLabel || 'Casa da Baba');
+      if (code) return await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
+      throw new Error('Nenhum secret/codigo embutido no APK — não é possível parear automaticamente.');
+    })(); },
     getPairing: loadPairing,
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,

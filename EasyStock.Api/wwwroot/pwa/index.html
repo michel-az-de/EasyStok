@@ -14202,6 +14202,88 @@ async function diagBackupNow() {
 // flush. Idempotente no servidor (last-write-wins por (Id, EmpresaId)).
 // Pré-condição operacional: device deve estar pareado E backup local
 // recente — confirmação dupla aqui pra evitar acidente.
+// CONTINGÊNCIA — Diagnostico estendido: copia trace, envia ao server,
+// força pareamento manual quando auto-pair não rolou.
+async function diagCopyTrace() {
+  try {
+    const text = (window.cdbSync && window.cdbSync.exportTraceText)
+      ? window.cdbSync.exportTraceText()
+      : '(sync.js sem trace exportável)';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('Trace copiado pro clipboard. Cole no chat/ticket pro suporte.');
+    } else {
+      // Fallback: prompt com texto pra operador copiar manualmente
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('Trace copiado (fallback).');
+    }
+  } catch (e) {
+    try { logError(e, 'diagCopyTrace'); } catch (_) {}
+    showToast('Falha ao copiar trace: ' + (e.message || e));
+  }
+}
+
+async function diagSendTrace() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.getTrace) {
+      showToast('Trace indisponível (sync.js antigo).');
+      return;
+    }
+    const cfg = window.CDB_CONFIG || {};
+    const apiBase = cfg.apiBaseUrl || '';
+    if (!apiBase) {
+      showToast('apiBaseUrl ausente — APK sem config. Use "Copiar trace" e envie manualmente.');
+      return;
+    }
+    const pair = (function () {
+      try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); }
+      catch (_) { return null; }
+    })();
+    const body = {
+      deviceId: localStorage.getItem('cdb-device-id') || '(unknown)',
+      apiBaseUrl: apiBase,
+      hasConfig: typeof window.CDB_CONFIG !== 'undefined',
+      hasProvisioning: !!cfg.forcedProvisioningSecret,
+      hasPairing: !!pair,
+      userAgent: (navigator.userAgent || '').slice(0, 300),
+      trace: window.cdbSync.getTrace(),
+      notes: prompt('Descreva rapido o problema (opcional):') || null
+    };
+    const r = await fetch(apiBase + '/api/mobile/diag/trace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) showToast('Trace enviado ao suporte. Ref: device ' + (body.deviceId || '').slice(-8));
+    else showToast('Servidor rejeitou (status ' + r.status + '). Tente "Copiar trace" e envie pelo chat.');
+  } catch (e) {
+    try { logError(e, 'diagSendTrace'); } catch (_) {}
+    showToast('Falha ao enviar trace: ' + (e.message || e) + '. Use "Copiar trace".');
+  }
+}
+
+async function diagForcePairNow() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.forcePairNow) {
+      showToast('sync.js antigo — atualize o app.');
+      return;
+    }
+    showToast('Tentando parear...');
+    const result = await window.cdbSync.forcePairNow();
+    if (result && result.apiKey) {
+      showToast('✓ Pareado com sucesso! Loja: ' + (result.label || result.lojaId || ''));
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('Pareamento sem resposta. Veja "Copiar trace" pra detalhes.');
+    }
+  } catch (e) {
+    try { logError(e, 'diagForcePairNow'); } catch (_) {}
+    showToast('Pareamento falhou: ' + (e.message || e) + '. Veja "Copiar trace".');
+  }
+}
+
 async function diagPushAll() {
   if (!window.cdbSync || typeof window.cdbSync.pushAllAndFlush !== 'function') {
     showToast('Sync indisponivel'); return;
@@ -14479,9 +14561,12 @@ function openDiagnostics() {
           + (p
               ? '<button class="diag-action" onclick="diagPushAll()">Sincronizar tudo agora</button>'
               : '')
+          + '<button class="diag-action" onclick="diagCopyTrace()">Copiar trace</button>'
+          + '<button class="diag-action" onclick="diagSendTrace()">Enviar trace ao suporte</button>'
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
-              : '<button class="diag-action" onclick="pairDevicePrompt()">Parear dispositivo</button>')
+              : '<button class="diag-action" onclick="diagForcePairNow()">Forçar pareamento agora</button>'
+              + '<button class="diag-action" onclick="pairDevicePrompt()">Parear com código</button>')
         , '');
       })()
     + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
