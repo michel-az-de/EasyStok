@@ -31,9 +31,11 @@ namespace EasyStock.Api.Mobile.Services;
 /// </summary>
 public class MobileStockReconciler(
     EasyStockDbContext db,
+    MobileSystemUserResolver systemUserResolver,
     ILogger<MobileStockReconciler> log)
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
     private readonly ILogger<MobileStockReconciler> _log = log;
 
     /// <summary>
@@ -133,6 +135,26 @@ public class MobileStockReconciler(
                 CriadoEm = DateTime.UtcNow
             };
             _db.Add(movimentacao);
+
+            // F9-F: audit criacao da movimentacao em movimentacao_estoque_alteracoes.
+            // UsuarioId NOT NULL no schema; resolve "Sistema Mobile Sync" lazily.
+            var sysUserId = await _systemUserResolver.GetOrCreateAsync(empresaId, ct);
+            _db.Add(new MovimentacaoEstoqueAlteracao
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                MovimentacaoEstoqueId = movimentacao.Id,
+                UsuarioId = sysUserId,
+                NomeUsuario = "Sistema Mobile Sync",
+                EmailUsuario = null,
+                Acao = "criada",
+                Motivo = $"Sync mobile · {natureza}",
+                Observacao = descricao,
+                AlteracoesJson = null,
+                Ip = null,
+                UserAgent = $"mobile_product={mobileProduct.Id}; doc={referenciaDocumento}",
+                AlteradoEm = DateTime.UtcNow
+            });
 
             // Espelha a quantidade no mobile_product (fonte da verdade local pro app)
             mobileProduct.Stock = novo;

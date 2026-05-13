@@ -45,6 +45,7 @@ public class SyncController(
     IPedidoRepository pedidoRepo,
     CriarPedidoUseCase criarPedidoUseCase,
     ILoteRepository loteRepo,
+    MobileSystemUserResolver systemUserResolver,
     IConfiguration appConfig,
     ILogger<SyncController> log) : ControllerBase
 {
@@ -55,6 +56,7 @@ public class SyncController(
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
     private readonly CriarPedidoUseCase _criarPedidoUseCase = criarPedidoUseCase;
     private readonly ILoteRepository _loteRepo = loteRepo;
+    private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncController> _log = log;
 
@@ -988,6 +990,7 @@ public class SyncController(
     {
         if (!empresaId.HasValue) return;
         Guid? cachedCategoriaId = null;
+        Guid? cachedSysUserId = null; // F9-E: cache do Usuario sistema p/ audit
         foreach (var pid in mobileProductIds)
         {
             try
@@ -1006,6 +1009,20 @@ public class SyncController(
                 {
                     mobileP.ErpProductId = webP.Id;
                     _log.LogInformation("AutoLink Produto: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
+                    // F9-E: audit do vinculo.
+                    cachedSysUserId ??= await _systemUserResolver.GetOrCreateAsync(empresaId.Value);
+                    _db.Add(new ProdutoAlteracao
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = empresaId.Value,
+                        ProdutoId = webP.Id,
+                        UsuarioId = cachedSysUserId.Value,
+                        Acao = "atualizado",
+                        AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
+                        Motivo = "Sync mobile",
+                        Observacao = $"Vinculado ao mobile_product {pid}",
+                        AlteradoEm = DateTime.UtcNow
+                    });
                     continue;
                 }
 
@@ -1029,6 +1046,20 @@ public class SyncController(
                 };
                 _db.Add(novoProd);
                 mobileP.ErpProductId = novoProd.Id;
+                // F9-E: audit de criacao.
+                cachedSysUserId ??= await _systemUserResolver.GetOrCreateAsync(empresaId.Value);
+                _db.Add(new ProdutoAlteracao
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId.Value,
+                    ProdutoId = novoProd.Id,
+                    UsuarioId = cachedSysUserId.Value,
+                    Acao = "cadastrado",
+                    AlteracoesJson = null,
+                    Motivo = "Sync mobile",
+                    Observacao = $"Criado via mobile_product {pid}; Nome={novoProd.Nome}; Preco={novoProd.PrecoReferencia?.Valor}",
+                    AlteradoEm = DateTime.UtcNow
+                });
                 _log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
                     pid, novoProd.Id, mobileP.Name);
             }

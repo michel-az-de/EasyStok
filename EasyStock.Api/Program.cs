@@ -220,6 +220,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
 // Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>();
+// F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
+// (tabelas com UsuarioId NOT NULL). Lookup-or-create idempotente por empresa.
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSystemUserResolver>();
 // Onda 5: SSE realtime entre devices da mesma loja.
 // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
 // Em multi-instance, evoluir pra Redis pubsub.
