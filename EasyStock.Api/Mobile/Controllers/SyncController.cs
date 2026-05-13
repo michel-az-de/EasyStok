@@ -1268,6 +1268,11 @@ public class SyncController(
                     // F8-G: tambem cria Venda do Pedido entregue (idempotente via
                     // mobileO.ErpVendaId no MobileSaleSyncService).
                     await EnsureVendaAsync(mobileO);
+                    // F8-J: aplica a saida de estoque (MovimentacaoEstoque com
+                    // Natureza=Venda) pro pedido entregue. Idempotente via
+                    // DocumentoReferencia=mobileO.Id. Necessario porque
+                    // ApplyStockRule normal so roda no fluxo de mutation order.upsert.
+                    await EnsureStockSaidaAsync(mobileO);
                 }
             }
             catch (Exception ex)
@@ -1350,6 +1355,52 @@ public class SyncController(
         catch (Exception ex)
         {
             _log.LogWarning(ex, "F8-G Venda falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// F8-J — aplica saida de estoque para pedido entregue. ApplyStockRule
+    /// regular so dispara no fluxo de mutation order.upsert; backfill traz
+    /// pedidos ja entregues que nunca passaram pelo handler, entao a saida
+    /// fica sem registrar.
+    /// Idempotente via DocumentoReferencia=mobileO.Id em movimentacoes_estoque.
+    /// </summary>
+    private async Task EnsureStockSaidaAsync(Order mobileO)
+    {
+        try
+        {
+            if (mobileO.EmpresaId == null) return;
+            // IgnoreQueryFilters: endpoint mobile sem JWT.
+            var jaAplicou = await _db.Set<MovimentacaoEstoque>()
+                .IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(m => m.DocumentoReferencia == mobileO.Id
+                            && m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+            if (jaAplicou) return;
+
+            // Refetch order com items pra ter Qty/ProductId.
+            var trackedOrder = await _db.Set<Order>().IgnoreQueryFilters()
+                .Include(o => o.Items)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == mobileO.Id);
+            if (trackedOrder == null) return;
+
+            foreach (var i in trackedOrder.Items)
+            {
+                if (string.IsNullOrWhiteSpace(i.ProductId)) continue;
+                var p = await _db.Set<Product>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == mobileO.EmpresaId);
+                if (p == null) continue;
+                await _stockReconciler.ApplyDeltaAsync(
+                    p, -i.Qty,
+                    NaturezaMovimentacaoEstoque.Venda,
+                    descricao: $"Pedido mobile {mobileO.Id} entregue (backfill F8-J)",
+                    referenciaDocumento: mobileO.Id);
+            }
+            if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "F8-J StockSaida falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
         }
     }
 
