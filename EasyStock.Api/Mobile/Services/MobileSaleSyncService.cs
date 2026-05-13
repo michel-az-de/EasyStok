@@ -51,9 +51,12 @@ public class MobileSaleSyncService(
             if (items == null || items.Count == 0) return false;
 
             // Resolve mobile_products pra cada item — só os linkados viram ItemVenda.
+            // IgnoreQueryFilters: backfill/endpoint mobile não tem JWT, então o
+            // Global Query Filter tenant zeraria (CurrentTenantId=Guid.Empty).
+            // Filtragem manual por EmpresaId já garante o isolamento.
             var mobileIds = items.Select(i => i.ProductId).Distinct().ToList();
-            var products = await _db.Set<Product>().AsNoTracking()
-                .Where(p => mobileIds.Contains(p.Id))
+            var products = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.EmpresaId == order.EmpresaId && mobileIds.Contains(p.Id))
                 .ToListAsync(ct);
 
             var linkedItems = items
@@ -93,7 +96,8 @@ public class MobileSaleSyncService(
             foreach (var li in linkedItems)
             {
                 var produtoId = li.Product!.ErpProductId!.Value;
-                var itemEstoque = await _db.Set<ItemEstoque>().AsNoTracking()
+                // IgnoreQueryFilters: vide comentario no SELECT de products acima.
+                var itemEstoque = await _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
                     .Where(ie => ie.EmpresaId == order.EmpresaId &&
                                  ie.ProdutoId == produtoId &&
                                  (ie.LojaId == null || ie.LojaId == order.LojaId))
@@ -151,7 +155,9 @@ public class MobileSaleSyncService(
         {
             if (!order.ErpVendaId.HasValue) return false;
 
-            var venda = await _db.Set<Venda>().FirstOrDefaultAsync(v => v.Id == order.ErpVendaId, ct);
+            // IgnoreQueryFilters: endpoint mobile sem JWT (CurrentTenantId=Empty).
+            var venda = await _db.Set<Venda>().IgnoreQueryFilters()
+                .FirstOrDefaultAsync(v => v.Id == order.ErpVendaId, ct);
             if (venda == null) return false;
 
             var prefix = "[CANCELADO no mobile em " + DateTime.UtcNow.ToString("dd/MM HH:mm") + "] ";
