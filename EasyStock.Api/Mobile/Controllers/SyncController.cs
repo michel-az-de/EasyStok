@@ -1289,13 +1289,22 @@ public class SyncController(
                     continue;
                 }
 
-                // Codigo do Lote: usa o mesmo identificador do mobile (LOT-YYMMDD) ou,
-                // se ausente, gera com sequencial do dia pra unicidade.
-                var codigo = !string.IsNullOrWhiteSpace(mobileB.Lote)
+                // Codigo do Lote: usa o identificador do mobile (LOT-YYMMDD) MAS
+                // sempre acrescenta sufixo com final do mobile.Id pra garantir
+                // unicidade (IX_lotes_EmpresaId_Codigo). Mobile gera batches
+                // diferentes do mesmo dia com mesmo "Lote"=LOT-YYMMDD — sem
+                // sufixo daria duplicate key constraint violation no web.
+                var codigoBase = !string.IsNullOrWhiteSpace(mobileB.Lote)
                     ? mobileB.Lote!
                     : !string.IsNullOrWhiteSpace(mobileB.Code)
                         ? mobileB.Code!
-                        : $"LOT-{mobileB.CreatedAt:yyMMdd}-{await _loteRepo.GetNextSequencialDoDiaAsync(empresaId.Value, DateOnly.FromDateTime(mobileB.CreatedAt)):D3}";
+                        : $"LOT-{mobileB.CreatedAt:yyMMdd}";
+                var sufixo = mobileB.Id.Length >= 6
+                    ? mobileB.Id.Substring(mobileB.Id.Length - 6)
+                    : mobileB.Id;
+                // Sanitiza sufixo pra evitar caracteres invalidos em codigo de lote.
+                sufixo = new string(sufixo.Where(c => char.IsLetterOrDigit(c)).ToArray());
+                var codigo = string.IsNullOrEmpty(sufixo) ? codigoBase : (codigoBase + "-" + sufixo);
 
                 var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
                 lote.MobileBatchId = mobileB.Id;
