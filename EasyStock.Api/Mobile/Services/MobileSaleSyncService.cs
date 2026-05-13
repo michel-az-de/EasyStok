@@ -168,6 +168,21 @@ public class MobileSaleSyncService(
 
             order.ErpVendaId = vendaId;
 
+            // F9-D: auditoria — registra criacao da Venda em venda_alteracoes.
+            // AlteradoPorUserId nullable; usa LastOperatorName do mobile como nome.
+            _db.Add(new VendaAlteracao
+            {
+                Id = Guid.NewGuid(),
+                VendaId = vendaId,
+                AlteradoPorUserId = null,
+                AlteradoPorNome = string.IsNullOrWhiteSpace(order.LastOperatorName) ? "Sync mobile" : order.LastOperatorName,
+                Campo = "criada",
+                ValorAntigo = null,
+                ValorNovo = $"Pedido mobile #{order.Id.Substring(Math.Max(0, order.Id.Length - 8))} entregue. ItensCount={venda.ItensVenda?.Count ?? 0}; Total={venda.ValorTotal.Valor}",
+                AlteradoEm = DateTime.UtcNow,
+                Origem = "mobile"
+            });
+
             _log.LogInformation(
                 "Onda 3: Venda {VendaId} criada pra pedido mobile {OrderId} ({ItemsCount} itens, total {Total})",
                 vendaId, order.Id, venda.ItensVenda?.Count ?? 0, venda.ValorTotal.Valor);
