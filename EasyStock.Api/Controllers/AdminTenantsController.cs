@@ -114,6 +114,66 @@ public class AdminTenantsController(
         return DataOk(detalhe);
     }
 
+    /// <summary>
+    /// F4 — Health check da sincronizacao mobile pra esse tenant. Retorna
+    /// contagens de mobile_* sem o respectivo erp_*_id, mostrando o gap de
+    /// sync. Operador SuperAdmin usa pra detectar pedidos travados/perda
+    /// de dados antes do cliente reclamar.
+    ///
+    /// Todos os contadores em 0 = sincronia 100%.
+    /// </summary>
+    [HttpGet("{id:guid}/mobile-sync-health")]
+    public async Task<IActionResult> GetMobileSyncHealth(Guid id)
+    {
+        // Usa SQL raw pra evitar carregar entidades — leitura de contagens
+        // em tabelas mobile_*. IgnoreQueryFilters: SuperAdmin policy.
+        var pendingOrders = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id && o.ErpPedidoId == null);
+        var entregueSemVenda = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id && o.Status == "entregue" && o.ErpVendaId == null);
+        var pendingClients = await db.Set<Domain.Entities.Mobile.Client>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id && c.ErpClienteId == null);
+        var pendingProducts = await db.Set<Domain.Entities.Mobile.Product>().IgnoreQueryFilters()
+            .CountAsync(p => p.EmpresaId == id && p.ErpProductId == null);
+        var pendingBatches = await db.Set<Domain.Entities.Mobile.Batch>().IgnoreQueryFilters()
+            .CountAsync(b => b.EmpresaId == id && b.ErpLoteId == null);
+        var pendingCash = await db.Set<Domain.Entities.Mobile.CashEntry>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id && c.ErpMovimentoCaixaId == null);
+
+        var totalOrders = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id);
+        var totalClients = await db.Set<Domain.Entities.Mobile.Client>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id);
+        var totalProducts = await db.Set<Domain.Entities.Mobile.Product>().IgnoreQueryFilters()
+            .CountAsync(p => p.EmpresaId == id);
+        var totalBatches = await db.Set<Domain.Entities.Mobile.Batch>().IgnoreQueryFilters()
+            .CountAsync(b => b.EmpresaId == id);
+        var totalCash = await db.Set<Domain.Entities.Mobile.CashEntry>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id);
+        var devices = await db.Set<Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+            .CountAsync(d => d.EmpresaId == id && !d.Revoked);
+        var lastSync = await db.Set<Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+            .Where(d => d.EmpresaId == id)
+            .MaxAsync(d => (DateTime?)d.LastSeenAt);
+
+        var totalPending = pendingOrders + entregueSemVenda + pendingClients
+                         + pendingProducts + pendingBatches + pendingCash;
+        var healthy = totalPending == 0;
+
+        return DataOk(new
+        {
+            healthy,
+            totalPending,
+            lastSyncAt = lastSync,
+            devices,
+            orders   = new { total = totalOrders,   pending = pendingOrders,   entregueSemVenda },
+            clients  = new { total = totalClients,  pending = pendingClients },
+            products = new { total = totalProducts, pending = pendingProducts },
+            batches  = new { total = totalBatches,  pending = pendingBatches },
+            cash     = new { total = totalCash,     pending = pendingCash }
+        });
+    }
+
     // TODO B4 follow-up: extrair os endpoints de mutação para UseCases dedicados.
     // Hoje: PatchStatus, PatchPlano, GrantTrial, AplicarCupom já usam ports (IAssinatura/
     // IPlano/ICupom/IAuditLog Repository). Restam Impersonate e GetAudit que ainda
