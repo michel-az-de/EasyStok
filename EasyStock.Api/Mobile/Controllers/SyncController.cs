@@ -1151,11 +1151,19 @@ public class SyncController(
                             clienteIdResolved = mClient?.ErpClienteId;
                         }
 
+                        // F8-D: resolve ProdutoId de cada item via mobile_product.ErpProductId.
+                        // Pre-fetch em batch pra evitar N+1.
+                        var productIds = mobileO.Items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId))
+                            .Select(i => i.ProductId).Distinct().ToList();
+                        var produtoMap = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                            .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
+                            .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
+
                         var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
                             Nome: i.Name,
                             Quantidade: i.Qty,
                             PrecoUnitario: i.UnitPrice,
-                            ProdutoId: null,
+                            ProdutoId: (i.ProductId != null && produtoMap.TryGetValue(i.ProductId, out var pid) && pid.HasValue) ? pid : null,
                             Emoji: i.Emoji,
                             Unidade: i.Unit,
                             Observacao: null
@@ -1205,8 +1213,10 @@ public class SyncController(
 
     /// <summary>
     /// F7-A: garante 1 PedidoPagamento default ("dinheiro", total) num Pedido
-    /// cujo status veio do mobile como "entregue". Idempotente: skip se ja
-    /// tem qualquer pagamento OU se Total = 0.
+    /// cujo status veio do mobile como "entregue". F8-C: alem disso, cria
+    /// MovimentoCaixa de entrada espelhando o pagamento (caixa diario passa
+    /// a refletir o recebimento). Idempotente: skip se ja tem pagamento OU
+    /// Total = 0; idempotente cross-runs via Referencia="pedido-pagamento:<id>".
     /// </summary>
     private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
     {
@@ -1217,9 +1227,10 @@ public class SyncController(
         if (pedido.Pagamentos.Count > 0) return;
         if (pedido.Total.Valor <= 0) return;
 
+        var pagamentoId = Guid.NewGuid();
         pedido.Pagamentos.Add(new PedidoPagamento
         {
-            Id = Guid.NewGuid(),
+            Id = pagamentoId,
             PedidoId = pedido.Id,
             Metodo = "dinheiro",
             Valor = pedido.Total.Valor,
@@ -1227,9 +1238,30 @@ public class SyncController(
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = "Auto-registrado pelo F7-A (mobile→ERP). Refine método no admin se necessário."
         });
+
+        // F8-C: espelha o pagamento como MovimentoCaixa de entrada do dia.
+        // Idempotente cross-runs via Referencia="pedido-pagamento:<pagamentoId>".
+        var refKey = "pedido-pagamento:" + pagamentoId;
+        var jaExiste = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+            .AnyAsync(m => m.Referencia == refKey);
+        if (!jaExiste)
+        {
+            var mov = MovimentoCaixa.Criar(pedido.EmpresaId, "entrada", pedido.Total.Valor,
+                dataMovimento: mobileO.UpdatedAt, lojaId: pedido.LojaId);
+            mov.Descricao = "Pagamento pedido " + (pedido.Id.ToString().Substring(0, 8)) +
+                            (string.IsNullOrEmpty(pedido.ClienteNome) ? "" : " — " + pedido.ClienteNome);
+            mov.Metodo = "dinheiro";
+            mov.Categoria = "pedido";
+            mov.Origem = "mobile-payment";
+            mov.Referencia = refKey;
+            mov.RegistradoPorNome = mobileO.LastOperatorName;
+            _db.Add(mov);
+        }
+
         await _db.SaveChangesAsync();
-        _log.LogInformation("F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
-            pedido.Id, pedido.Total.Valor);
+        _log.LogInformation(
+            "F7-A/F8-C Pagamento+MovCaixa CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro mov_existia={Existia}",
+            pedido.Id, pedido.Total.Valor, jaExiste);
     }
 
     // F2 — promove mobile_batch → Lote web. Mobile produz e finaliza ao mesmo
@@ -1302,12 +1334,114 @@ public class SyncController(
                 await _loteRepo.AddAsync(lote);
                 mobileB.ErpLoteId = lote.Id;
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-                _log.LogInformation("AutoLink Lote CRIADO: mobile={MobileId} → erp={ErpId} itens={N}",
+                _log.LogInformation("F2 Lote CRIADO: mobile={MobileId} → erp={ErpId} itens={N}",
                     bid, lote.Id, lote.Itens.Count);
+
+                // F8-A: produzido = entrada de estoque. Pra cada LoteItem com
+                // ProdutoId resolvido (F0 preencheu Product.ErpProductId), criar
+                // ItemEstoque + MovimentacaoEstoque (Entrada). Idempotente via
+                // CodigoInterno="lote:<loteId>:<produtoId>".
+                await EnsureEntradaEstoqueDoLoteAsync(lote);
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "AutoLink Lote falhou pra mobile={MobileId}", bid);
+                // F8-E: log explicito com stack pra diagnose ficar acessivel via
+                // painel Fly logs (era LogWarning sem detail antes).
+                _log.LogError(ex,
+                    "F2 AutoLink Lote FALHOU mobile={MobileId}: {Tipo}: {Mensagem}",
+                    bid, ex.GetType().Name, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// F8-A — Cria ItemEstoque + MovimentacaoEstoque (Entrada) para cada
+    /// LoteItem com ProdutoId resolvido. Idempotente: CodigoInterno=
+    /// "lote:&lt;loteId&gt;:&lt;produtoId&gt;" garante que segunda execucao
+    /// detecta duplicacao e skipa.
+    ///
+    /// Custo unitario: Produto.CustoReferencia ou 0. Preco sugerido:
+    /// Produto.PrecoReferencia. Sem variacao (Casa da Baba nao usa).
+    /// </summary>
+    private async Task EnsureEntradaEstoqueDoLoteAsync(Lote lote)
+    {
+        foreach (var item in lote.Itens.Where(i => i.ProdutoId.HasValue && i.Quantidade > 0))
+        {
+            try
+            {
+                var codigoInterno = $"lote:{lote.Id}:{item.ProdutoId}";
+
+                var jaTem = await _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(ie => ie.EmpresaId == lote.EmpresaId && ie.CodigoInterno == codigoInterno);
+                if (jaTem)
+                {
+                    _log.LogInformation("F8-A skip (idempotente): lote={LoteId} produto={ProdutoId} codigoInterno={Codigo}",
+                        lote.Id, item.ProdutoId, codigoInterno);
+                    continue;
+                }
+
+                var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId);
+                if (produto == null)
+                {
+                    _log.LogWarning("F8-A: produto {ProdutoId} nao existe; pulando entrada do lote {LoteId}",
+                        item.ProdutoId, lote.Id);
+                    continue;
+                }
+
+                var custoUnit = produto.CustoReferencia ?? Dinheiro.Zero;
+                var precoVenda = produto.PrecoReferencia;
+                Validade? validade = item.ExpiraEm.HasValue ? Validade.From(item.ExpiraEm.Value) : null;
+                var qtd = Quantidade.From(item.Quantidade);
+
+                var itemEstoque = ItemEstoque.CriarParaEntrada(
+                    id: Guid.NewGuid(),
+                    empresaId: lote.EmpresaId,
+                    produto: produto,
+                    variacao: null,
+                    quantidade: qtd,
+                    custoUnitario: custoUnit,
+                    precoVendaSugerido: precoVenda,
+                    dataEntrada: lote.DataProducao,
+                    codigoInterno: codigoInterno,
+                    codigoLote: null,
+                    codigoMarketplace: null,
+                    variacaoDescricao: null,
+                    cor: null,
+                    tamanho: null,
+                    descricaoAnuncio: null,
+                    dimensoesReais: null,
+                    fornecedorNome: null,
+                    validade: validade,
+                    observacoes: $"Auto-gerado pelo F8-A a partir do Lote {lote.Codigo}",
+                    criadoEm: DateTime.UtcNow);
+                if (lote.LojaId.HasValue) itemEstoque.LojaId = lote.LojaId;
+
+                _db.Add(itemEstoque);
+
+                var movimentacao = MovimentacaoEstoque.CriarEntrada(
+                    id: Guid.NewGuid(),
+                    empresaId: lote.EmpresaId,
+                    item: itemEstoque,
+                    natureza: NaturezaMovimentacaoEstoque.Producao,
+                    quantidade: qtd,
+                    valorUnitario: custoUnit,
+                    dataMovimentacao: lote.DataProducao,
+                    descricao: $"Producao lote {lote.Codigo}",
+                    documentoReferencia: $"lote:{lote.Id}",
+                    criadoEm: DateTime.UtcNow);
+                _db.Add(movimentacao);
+
+                await _db.SaveChangesAsync();
+                _log.LogInformation(
+                    "F8-A ItemEstoque + Movimentacao CRIADOS: lote={LoteId} produto={ProdutoId} qtd={Qtd}",
+                    lote.Id, item.ProdutoId, item.Quantidade);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex,
+                    "F8-A FALHOU pra lote={LoteId} produto={ProdutoId}: {Tipo}: {Mensagem}",
+                    lote.Id, item.ProdutoId, ex.GetType().Name, ex.Message);
             }
         }
     }
