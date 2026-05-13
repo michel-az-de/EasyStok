@@ -43,6 +43,7 @@ public sealed class MobileApiKeyAttribute : TypeFilterAttribute
 
 internal sealed class MobileApiKeyFilter(
     EasyStockDbContext db,
+    IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     ILogger<MobileApiKeyFilter> logger) : IAsyncActionFilter
 {
@@ -95,21 +96,28 @@ internal sealed class MobileApiKeyFilter(
         // Disponibiliza o device pro controller via HttpContext.Items.
         http.Items[MobileAuth.HttpContextItemDevice] = device;
 
-        // Atualiza last_seen async (fire-and-forget). Não espera nem
-        // bloqueia o request — perda eventual em crash não é crítico.
+        // Atualiza last_seen async (fire-and-forget) num scope DI proprio.
+        // Antes usava o mesmo `db` do request — concorrente com operacoes
+        // do controller causava "A second operation was started on this
+        // context instance" em endpoints com muitas queries (ex: backfill).
+        // Agora abre novo scope com novo DbContext, sem interferencia.
+        var deviceId = device.Id;
+        var remoteIp = http.Connection.RemoteIpAddress?.ToString() ?? "";
         _ = Task.Run(async () =>
         {
             try
             {
-                await db.Database.ExecuteSqlInterpolatedAsync($@"
+                using var scope = scopeFactory.CreateScope();
+                var bgDb = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                await bgDb.Database.ExecuteSqlInterpolatedAsync($@"
                     UPDATE mobile_devices
                     SET last_seen_at = {DateTime.UtcNow},
-                        last_seen_ip = {http.Connection.RemoteIpAddress?.ToString() ?? ""}
-                    WHERE ""Id"" = {device.Id}");
+                        last_seen_ip = {remoteIp}
+                    WHERE ""Id"" = {deviceId}");
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Falha ao atualizar last_seen_at do device {DeviceId}", device.Id);
+                logger.LogWarning(ex, "Falha ao atualizar last_seen_at do device {DeviceId}", deviceId);
             }
         });
 
