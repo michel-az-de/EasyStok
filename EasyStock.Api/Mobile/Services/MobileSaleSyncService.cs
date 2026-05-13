@@ -105,10 +105,48 @@ public class MobileSaleSyncService(
 
                 if (itemEstoque == null)
                 {
-                    _log.LogWarning(
-                        "Onda 3: produto {ErpId} (mobile {MobileId}) sem ItemEstoque na empresa/loja — ItemVenda não criado. Pedido {OrderId}",
-                        produtoId, li.Product.Id, order.Id);
-                    continue;
+                    // F8-I: auto-cria ItemEstoque com qtd=0 pra produtos vendidos
+                    // sem entrada previa (ad-hoc). Sem isso a Venda nasce vazia
+                    // e perde-se rastreabilidade. Saldo negativo é a verdade —
+                    // produto vendido sem entrada registrada.
+                    var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.Id == produtoId, ct);
+                    if (produto == null)
+                    {
+                        _log.LogWarning(
+                            "Onda 3: produto {ErpId} nao existe — ItemVenda não criado. Pedido {OrderId}",
+                            produtoId, order.Id);
+                        continue;
+                    }
+
+                    var custoUnit = produto.CustoReferencia ?? Dinheiro.Zero;
+                    var novoItem = ItemEstoque.CriarParaEntrada(
+                        id: Guid.NewGuid(),
+                        empresaId: order.EmpresaId.Value,
+                        produto: produto,
+                        variacao: null,
+                        quantidade: Quantidade.Zero,
+                        custoUnitario: custoUnit,
+                        precoVendaSugerido: produto.PrecoReferencia,
+                        dataEntrada: DateTime.UtcNow,
+                        codigoInterno: $"AUTO-{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+                        codigoLote: null,
+                        codigoMarketplace: null,
+                        variacaoDescricao: null,
+                        cor: null,
+                        tamanho: null,
+                        descricaoAnuncio: null,
+                        dimensoesReais: null,
+                        fornecedorNome: null,
+                        validade: null,
+                        observacoes: $"Auto-criado pela Onda 3 — produto vendido (pedido mobile {order.Id}) sem entrada previa de estoque",
+                        criadoEm: DateTime.UtcNow);
+                    if (order.LojaId.HasValue) novoItem.LojaId = order.LojaId;
+                    _db.Add(novoItem);
+                    itemEstoque = novoItem;
+                    _log.LogInformation(
+                        "Onda 3: ItemEstoque auto-criado (qtd=0) pra produto {ErpId} (mobile {MobileId}) loja {LojaId} pedido {OrderId}",
+                        produtoId, li.Product.Id, order.LojaId, order.Id);
                 }
 
                 var itemVenda = new ItemVenda
