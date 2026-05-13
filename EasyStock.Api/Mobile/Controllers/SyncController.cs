@@ -187,8 +187,12 @@ public class SyncController(
         var clientIds = await _db.Set<Client>().IgnoreQueryFilters()
             .Where(c => c.EmpresaId == empresaId && c.ErpClienteId == null)
             .Select(c => c.Id).ToListAsync(ct);
+        // F8 backfill: processa TODOS os orders (mesmo ja promovidos) — pedido
+        // ja com Pedido linked mas sem PedidoPagamento ainda precisa que
+        // EnsurePagamentoEntregueAsync rode pra criar pagamento + MovimentoCaixa.
+        // TryAutoLinkOrdersAsync detecta idempotencia internamente.
         var orderIds = await _db.Set<Order>().IgnoreQueryFilters()
-            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId == null)
+            .Where(o => o.EmpresaId == empresaId)
             .Select(o => o.Id).ToListAsync(ct);
         var batchIds = await _db.Set<Batch>().IgnoreQueryFilters()
             .Where(b => b.EmpresaId == empresaId && b.ErpLoteId == null)
