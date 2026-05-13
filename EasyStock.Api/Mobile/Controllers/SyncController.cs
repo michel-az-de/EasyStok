@@ -1146,47 +1146,44 @@ public class SyncController(
 
                     if (pedidoIdResolvido == null)
                     {
-                        // Cria Pedido novo via CriarPedidoUseCase.
-                        // F8 robustez: valida que o Cliente erp ainda existe (pode ter
-                        // sido deletado por reset/cleanup). Se nao, cai pra ad-hoc.
-                        Guid? clienteIdResolved = null;
+                        // CriarPedidoUseCase usa clienteRepo/produtoRepo que aplicam o
+                        // Global Query Filter tenant. Endpoint anonimo (sem JWT) faz
+                        // o filter zerar TUDO. Resultado: validacao do use case sempre
+                        // dispara "Cliente nao encontrado nesta empresa" / "Produto
+                        // do item nao pertence a esta empresa", mesmo que existam.
+                        //
+                        // Solucao: passa Cliente/Produto sempre como NULL + snapshot
+                        // ad-hoc. Pedido nasce sem FK explicita; admin linka depois
+                        // via UI (ja existe MobileOrderId pra rastrear origem).
+                        // Trade-off aceitavel ate refatorar repos pra suportar contexto
+                        // anonimo (provavelmente via overload com IgnoreQueryFilters).
+                        Client? mClient = null;
                         if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
                         {
-                            var mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+                            mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
                                 .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
-                            if (mClient?.ErpClienteId.HasValue == true)
-                            {
-                                var existeErp = await _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
-                                    .AnyAsync(c => c.Id == mClient.ErpClienteId.Value && c.EmpresaId == empresaId);
-                                if (existeErp) clienteIdResolved = mClient.ErpClienteId;
-                            }
                         }
-
-                        // F8-D: resolve ProdutoId de cada item via mobile_product.ErpProductId.
-                        // Pre-fetch em batch pra evitar N+1.
-                        var productIds = mobileO.Items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId))
-                            .Select(i => i.ProductId).Distinct().ToList();
-                        var produtoMap = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
-                            .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
-                            .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
 
                         var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
                             Nome: i.Name,
                             Quantidade: i.Qty,
                             PrecoUnitario: i.UnitPrice,
-                            ProdutoId: (i.ProductId != null && produtoMap.TryGetValue(i.ProductId, out var pid) && pid.HasValue) ? pid : null,
+                            ProdutoId: null, // ad-hoc: use case revalidaria com filter zerado
                             Emoji: i.Emoji,
                             Unidade: i.Unit,
                             Observacao: null
                         )).ToList();
 
+                        var clienteNomeFinal = !string.IsNullOrWhiteSpace(mobileO.ClientSnapshotName)
+                            ? mobileO.ClientSnapshotName
+                            : (mClient?.Name ?? "Avulso");
                         var result = await _criarPedidoUseCase.ExecuteAsync(new CriarPedidoCommand(
                             EmpresaId: empresaId.Value,
                             LojaId: mobileO.LojaId,
-                            ClienteId: clienteIdResolved,
-                            ClienteNomeAdHoc: clienteIdResolved == null ? mobileO.ClientSnapshotName : null,
-                            ClienteAptAdHoc: null,
-                            ClienteTelefoneAdHoc: null,
+                            ClienteId: null,
+                            ClienteNomeAdHoc: clienteNomeFinal,
+                            ClienteAptAdHoc: mClient?.Apt,
+                            ClienteTelefoneAdHoc: mClient?.Phone,
                             Observacoes: mobileO.Notes,
                             Origem: "mobile",
                             MobileOrderId: mobileO.Id,
@@ -1195,6 +1192,55 @@ public class SyncController(
                             CriadoPorNome: mobileO.LastOperatorName,
                             AgendadoParaEm: mobileO.ScheduledDeliveryAt
                         ));
+
+                        // Pos-criacao: linka FKs (Cliente e Produtos) que o use case
+                        // nao podia setar por causa do filter tenant. Usamos UPDATE
+                        // direto via _db tracker — entities ja existem.
+                        try
+                        {
+                            Guid? clienteFk = null;
+                            if (mClient?.ErpClienteId.HasValue == true)
+                            {
+                                var existeErp = await _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
+                                    .AnyAsync(c => c.Id == mClient.ErpClienteId.Value && c.EmpresaId == empresaId);
+                                if (existeErp) clienteFk = mClient.ErpClienteId;
+                            }
+                            if (clienteFk.HasValue)
+                            {
+                                await _db.Set<Pedido>().IgnoreQueryFilters()
+                                    .Where(p => p.Id == result.Id)
+                                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.ClienteId, clienteFk));
+                            }
+
+                            // Mapa mobile.product.Id -> ErpProductId
+                            var productIds = mobileO.Items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId))
+                                .Select(i => i.ProductId).Distinct().ToList();
+                            var produtoMap = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                                .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
+                                .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
+
+                            // Carrega pedido_itens criados pelo use case e atualiza ProdutoId
+                            // por matching de Nome (mesma ordem que mobile envia).
+                            var pedidoItens = await _db.Set<PedidoItem>().IgnoreQueryFilters()
+                                .Where(pi => pi.PedidoId == result.Id)
+                                .OrderBy(pi => pi.Id).ToListAsync();
+                            for (int idx = 0; idx < Math.Min(pedidoItens.Count, mobileO.Items.Count); idx++)
+                            {
+                                var mobItem = mobileO.Items[idx];
+                                if (!string.IsNullOrWhiteSpace(mobItem.ProductId)
+                                    && produtoMap.TryGetValue(mobItem.ProductId, out var prodFk)
+                                    && prodFk.HasValue)
+                                {
+                                    pedidoItens[idx].ProdutoId = prodFk;
+                                }
+                            }
+                            if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                        }
+                        catch (Exception linkEx)
+                        {
+                            _log.LogWarning(linkEx, "Pedido {ErpId}: falha ao linkar Cliente/Produto FKs (pedido criado mas ad-hoc). {Msg}",
+                                result.Id, linkEx.Message);
+                        }
 
                         mobileO.ErpPedidoId = result.Id;
                         mobileO.UpdatedAt = DateTime.UtcNow;
