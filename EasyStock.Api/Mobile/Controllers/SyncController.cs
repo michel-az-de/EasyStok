@@ -1251,14 +1251,23 @@ public class SyncController(
                     }
                 }
 
-                // F7-A — Pagamento auto. Quando mobileO.Status == "entregue", criar
-                // PedidoPagamento default "dinheiro" cobrindo o Total (se ainda
-                // nao tiver pagamento registrado). Operador refina metodo no admin.
-                // Idempotente: skip se Pedido ja tem qualquer pagamento OU se Total=0.
+                // F8-F: sincroniza Status do Pedido com mobileO.Status SEMPRE.
+                // CriarPedidoUseCase nasce com "aguardando"; mobile pode estar
+                // em qualquer estado (entregue/cancelado/etc). Sem isto, KDS
+                // e dashboard contam todos como aguardando.
+                if (pedidoIdResolvido.HasValue)
+                {
+                    await EnsureStatusSyncAsync(pedidoIdResolvido.Value, mobileO);
+                }
+
+                // F7-A — Pagamento auto quando mobileO.Status == "entregue".
                 if (pedidoIdResolvido.HasValue
                     && string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
                 {
                     await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
+                    // F8-G: tambem cria Venda do Pedido entregue (idempotente via
+                    // mobileO.ErpVendaId no MobileSaleSyncService).
+                    await EnsureVendaAsync(mobileO);
                 }
             }
             catch (Exception ex)
@@ -1275,6 +1284,64 @@ public class SyncController(
     /// a refletir o recebimento). Idempotente: skip se ja tem pagamento OU
     /// Total = 0; idempotente cross-runs via Referencia="pedido-pagamento:<id>".
     /// </summary>
+    /// <summary>
+    /// F8-F — sincroniza Status do Pedido web com mobileO.Status. Use case
+    /// nasce sempre como "aguardando". Mobile pode estar em entregue, pronto,
+    /// preparando, cancelado. Update direto via ExecuteUpdateAsync (sem
+    /// tracker, sem state machine). Idempotente.
+    /// </summary>
+    private async Task EnsureStatusSyncAsync(Guid pedidoId, Order mobileO)
+    {
+        var alvo = (mobileO.Status ?? "").ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(alvo)) return;
+        var validos = new HashSet<string> { "aguardando", "preparando", "pronto", "entregue", "cancelado" };
+        if (!validos.Contains(alvo)) return;
+        try
+        {
+            var rows = await _db.Set<Pedido>().IgnoreQueryFilters()
+                .Where(p => p.Id == pedidoId && p.Status != alvo)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.Status, alvo)
+                    .SetProperty(p => p.AlteradoEm, DateTime.UtcNow)
+                    .SetProperty(p => p.EntreguEm, p =>
+                        alvo == "entregue" ? (DateTime?)mobileO.UpdatedAt : p.EntreguEm)
+                    .SetProperty(p => p.CanceladoEm, p =>
+                        alvo == "cancelado" ? (DateTime?)mobileO.UpdatedAt : p.CanceladoEm));
+            if (rows > 0)
+                _log.LogInformation("F8-F Status sincronizado: pedido={ErpId} → {Status}", pedidoId, alvo);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "F8-F Status sync falhou pedido={ErpId}: {Msg}", pedidoId, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// F8-G — cria Venda quando pedido entregue. Idempotente via mobileO.ErpVendaId.
+    /// Reusa MobileSaleSyncService que ja existia (usado por ApplyOrder em
+    /// transicao→entregue, mas backfill nao acionava porque pedido vinha
+    /// direto como entregue do mobile sem transicao).
+    /// </summary>
+    private async Task EnsureVendaAsync(Order mobileO)
+    {
+        if (mobileO.ErpVendaId.HasValue && mobileO.ErpVendaId.Value != Guid.Empty) return;
+        try
+        {
+            await _saleSync.CreateVendaForDeliveredOrderAsync(mobileO, mobileO.Items.Select(i => new OrderItemDto(
+                ProductId: i.ProductId ?? "",
+                Name: i.Name,
+                Emoji: i.Emoji,
+                Unit: i.Unit,
+                Qty: i.Qty,
+                UnitPrice: i.UnitPrice
+            )).ToList());
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "F8-G Venda falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
+        }
+    }
+
     private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
     {
         // Carrega SEM tracking pra evitar DbUpdateConcurrencyException quando
