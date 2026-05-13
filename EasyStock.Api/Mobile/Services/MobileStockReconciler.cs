@@ -69,12 +69,15 @@ public class MobileStockReconciler(
             // só cai pro fallback (loja=null) se o app está em modo sem loja
             // amarrada. Isso evita que device A consuma estoque da loja B
             // silenciosamente em multi-loja.
+            // IgnoreQueryFilters: chamado de endpoints mobile sem JWT (CurrentTenantId=Empty),
+            // o Global Query Filter zeraria o resultado. Tenant isolation ja garantido
+            // pelo filtro manual i.EmpresaId == empresaId (vem de mobileProduct.EmpresaId).
             var item = lojaId.HasValue
-                ? await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
+                ? await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
                     i.EmpresaId == empresaId &&
                     i.ProdutoId == produtoId &&
                     i.LojaId == lojaId, ct)
-                : await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
+                : await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
                     i.EmpresaId == empresaId &&
                     i.ProdutoId == produtoId &&
                     i.LojaId == null, ct);
