@@ -19595,6 +19595,17 @@ function closeUpdateModal() {
 //     reg.update() — se ha SW novo, o updatefound listener abaixo manda
 //     SKIP_WAITING pra ele ativar imediatamente, e o controllerchange recarrega.
 // (c) Web Admin pode forcar isso via comando pwa_update (ver sync.js executor).
+// D2 (Robustez): detecta se a runtime atual nao suporta Service Worker
+// (Capacitor WebView Android antigo, WebView corporativa restrita, etc).
+// Marca flag pra Diagnostico exibir + telemetria; cache offline degrada
+// mas app segue funcionando online-only.
+if (!('serviceWorker' in navigator)) {
+  try { localStorage.setItem('cdb-degraded-mode', 'no-sw'); } catch (_) {}
+  try { console.warn('[degraded] runtime sem ServiceWorker — cache offline desabilitado'); } catch (_) {}
+} else {
+  try { localStorage.removeItem('cdb-degraded-mode'); } catch (_) {}
+}
+
 if ('serviceWorker' in navigator) {
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
