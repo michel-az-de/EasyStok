@@ -1327,7 +1327,15 @@ public class SyncController(
         if (mobileO.ErpVendaId.HasValue && mobileO.ErpVendaId.Value != Guid.Empty) return;
         try
         {
-            await _saleSync.CreateVendaForDeliveredOrderAsync(mobileO, mobileO.Items.Select(i => new OrderItemDto(
+            // mobile_orders refetch (AsTracking) — o service seta ErpVendaId no
+            // entity e precisa do tracker pra persistir no SaveChanges abaixo.
+            var trackedOrder = await _db.Set<Order>().IgnoreQueryFilters()
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == mobileO.Id);
+            if (trackedOrder == null) return;
+            if (trackedOrder.ErpVendaId.HasValue) return;
+
+            var created = await _saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder, trackedOrder.Items.Select(i => new OrderItemDto(
                 ProductId: i.ProductId ?? "",
                 Name: i.Name,
                 Emoji: i.Emoji,
@@ -1335,6 +1343,9 @@ public class SyncController(
                 Qty: i.Qty,
                 UnitPrice: i.UnitPrice
             )).ToList());
+            // O service faz _db.Add(...) mas nao chama SaveChanges. Persiste aqui.
+            if (created && _db.ChangeTracker.HasChanges())
+                await _db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
