@@ -1147,12 +1147,19 @@ public class SyncController(
                     if (pedidoIdResolvido == null)
                     {
                         // Cria Pedido novo via CriarPedidoUseCase.
+                        // F8 robustez: valida que o Cliente erp ainda existe (pode ter
+                        // sido deletado por reset/cleanup). Se nao, cai pra ad-hoc.
                         Guid? clienteIdResolved = null;
                         if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
                         {
                             var mClient = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
                                 .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
-                            clienteIdResolved = mClient?.ErpClienteId;
+                            if (mClient?.ErpClienteId.HasValue == true)
+                            {
+                                var existeErp = await _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
+                                    .AnyAsync(c => c.Id == mClient.ErpClienteId.Value && c.EmpresaId == empresaId);
+                                if (existeErp) clienteIdResolved = mClient.ErpClienteId;
+                            }
                         }
 
                         // F8-D: resolve ProdutoId de cada item via mobile_product.ErpProductId.
@@ -1224,15 +1231,22 @@ public class SyncController(
     /// </summary>
     private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
     {
-        var pedido = await _db.Set<Pedido>().IgnoreQueryFilters()
-            .Include(p => p.Pagamentos)
+        // Carrega SEM tracking pra evitar DbUpdateConcurrencyException quando
+        // varias mutations do mesmo pedido sao processadas (versao anterior
+        // dava .Include(p.Pagamentos) e .Add com tracker — o EF tentava
+        // re-salvar campos do Pedido pai e dava concurrency error).
+        var pedido = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == pedidoId);
         if (pedido == null) return;
-        if (pedido.Pagamentos.Count > 0) return;
         if (pedido.Total.Valor <= 0) return;
 
+        // Idempotencia: ja tem pagamento?
+        var temPagamento = await _db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(pp => pp.PedidoId == pedidoId);
+        if (temPagamento) return;
+
         var pagamentoId = Guid.NewGuid();
-        pedido.Pagamentos.Add(new PedidoPagamento
+        _db.Add(new PedidoPagamento
         {
             Id = pagamentoId,
             PedidoId = pedido.Id,
@@ -1244,11 +1258,10 @@ public class SyncController(
         });
 
         // F8-C: espelha o pagamento como MovimentoCaixa de entrada do dia.
-        // Idempotente cross-runs via Referencia="pedido-pagamento:<pagamentoId>".
         var refKey = "pedido-pagamento:" + pagamentoId;
-        var jaExiste = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+        var jaExisteMov = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
             .AnyAsync(m => m.Referencia == refKey);
-        if (!jaExiste)
+        if (!jaExisteMov)
         {
             var mov = MovimentoCaixa.Criar(pedido.EmpresaId, "entrada", pedido.Total.Valor,
                 dataMovimento: mobileO.UpdatedAt, lojaId: pedido.LojaId);
@@ -1264,8 +1277,8 @@ public class SyncController(
 
         await _db.SaveChangesAsync();
         _log.LogInformation(
-            "F7-A/F8-C Pagamento+MovCaixa CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro mov_existia={Existia}",
-            pedido.Id, pedido.Total.Valor, jaExiste);
+            "F7-A/F8-C Pagamento+MovCaixa CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
+            pedido.Id, pedido.Total.Valor);
     }
 
     // F2 — promove mobile_batch → Lote web. Mobile produz e finaliza ao mesmo
