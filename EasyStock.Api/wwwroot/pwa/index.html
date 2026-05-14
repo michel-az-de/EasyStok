@@ -14582,6 +14582,22 @@ function openDiagnostics() {
               '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.ctx || '') + ': ' + escapeHtml(e.msg) + '</div>'
             ).join('') + '</div>'
           : ''))
+    // F10-C-6: Seção "Fila Avançada" com dead-letter, conflitos, export/import
+    + (function () {
+        var qs = window.cdbQueueStore;
+        if (!qs || !qs.ready) return '';
+        var level = 'ok';
+        // Será atualizado async — por agora mostra placeholder
+        return section('Fila Avançada', level, ''
+          + _diagRow('Storage', qs.degraded ? 'localStorage (degradado)' : 'IndexedDB', qs.degraded ? 'warn' : '')
+          + '<div id="diagQueueStatsBody"><em style="font-size:11px;color:var(--ink-mute)">Carregando stats...</em></div>'
+        , ''
+          + '<button class="diag-action" onclick="diagExportQueue()">Exportar fila JSON</button>'
+          + '<button class="diag-action" onclick="diagImportQueue()">Importar fila</button>'
+          + '<button class="diag-action" onclick="diagViewDeadletter()">Ver dead-letter</button>'
+          + '<button class="diag-action" onclick="diagViewConflicts()">Ver conflitos</button>'
+        , '');
+      })()
     + section('Atalhos de emergência', 'ok',
         '<div style="font-size:11px;color:var(--ink-mute);line-height:1.5;margin-bottom:8px">Use só se algo estiver claramente travado.</div>'
       , ''
@@ -14590,12 +14606,95 @@ function openDiagnostics() {
       , '');
 
   toggleModal('diagnosticsModal', true);
+
+  // F10-C-6: carrega stats async do queue-store
+  (async function () {
+    try {
+      if (!window.cdbSync || !window.cdbSync.getQueueStats) return;
+      var stats = await window.cdbSync.getQueueStats();
+      var el = document.getElementById('diagQueueStatsBody');
+      if (!el) return;
+      el.innerHTML = ''
+        + _diagRow('Fila principal', stats.queueCount + ' mutations')
+        + _diagRow('Dead-letter', stats.deadletterCount || 0, stats.deadletterCount > 0 ? 'warn' : '')
+        + _diagRow('Conflitos', stats.conflictCount || 0, stats.conflictCount > 0 ? 'warn' : '')
+        + (stats.oldestItemAge > 0 ? _diagRow('Item mais antigo', _fmtRelTime(Date.now() - stats.oldestItemAge),
+            stats.oldestItemAge > 86400000 ? 'warn' : '') : '')
+        + (stats.criticalPending > 0 ? _diagRow('Criticas pendentes', stats.criticalPending, 'warn') : '');
+    } catch (e) {}
+  })();
 }
 function diagClearErrorLog() {
   if (!confirm('Limpar log de erros?\n\nIrreversivel — exporte antes se precisar investigar.')) return;
   clearErrorLog();
   showToast('Log de erros limpo');
   openDiagnostics();
+}
+
+// F10-C-6: Funções de export/import/dead-letter/conflitos
+async function diagExportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.exportAll) { showToast('Queue store indisponivel'); return; }
+    var bundle = await qs.exportAll();
+    var json = JSON.stringify(bundle, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'cdb-export-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Fila exportada (' + (bundle.queue || []).length + ' mutations)');
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagImportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.importBundle) { showToast('Queue store indisponivel'); return; }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async function () {
+      try {
+        var file = input.files[0];
+        if (!file) return;
+        var text = await file.text();
+        var bundle = JSON.parse(text);
+        var result = await qs.importBundle(bundle);
+        showToast('Importado: ' + result.imported + ' itens');
+        openDiagnostics();
+      } catch (e) { showToast('Erro import: ' + (e && e.message)); }
+    };
+    input.click();
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewDeadletter() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getDeadletter) { showToast('Queue store indisponivel'); return; }
+    var items = await qs.getDeadletter();
+    if (items.length === 0) { showToast('Dead-letter vazia'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' (' + (i.deadletterReason || '?') + ') — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Dead-letter (' + items.length + '):\n\n' + msg + (items.length > 20 ? '\n\n... e mais ' + (items.length - 20) : ''));
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewConflicts() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getConflicts) { showToast('Queue store indisponivel'); return; }
+    var items = await qs.getConflicts();
+    if (items.length === 0) { showToast('Nenhum conflito pendente'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Conflitos (' + items.length + '):\n\n' + msg);
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
 }
 
 // Onda 0: pinga /api/mobile/version e re-renderiza diagnostico com resposta
