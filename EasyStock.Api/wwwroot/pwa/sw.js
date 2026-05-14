@@ -17,7 +17,7 @@
 // recebido com cdb-pwa-installed-version local; quando diferente, pede update.
 // Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v4-20260512a';
+const CACHE_VERSION = 'cdb-v5-etiquetas';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -27,8 +27,26 @@ const STATIC_ASSETS = [
   './icons/favicon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/icon-maskable-512.png'
+  './icons/icon-maskable-512.png',
+  // F6 — módulo de etiquetas
+  './etiqueta/etiqueta.css',
+  './etiqueta/render.js',
+  './etiqueta/codes.js',
+  './etiqueta/variables.js',
+  './etiqueta/migrate.js',
+  './etiqueta/imprimir.js',
+  './etiqueta/editor/editor.css',
+  './etiqueta/editor/editor.js',
+  './etiqueta/vendor/qrcode.min.js',
+  './etiqueta/vendor/jsbarcode.min.js',
+  './etiqueta/assets/logo-easystok.svg',
+  './etiqueta/assets/lockup-easystok.svg',
 ];
+
+// Cache de render de etiquetas com TTL de 1 hora
+// (stale-while-revalidate com expiração para não servir ficha técnica editada)
+const ETQ_RENDER_TTL_MS = 60 * 60 * 1000; // 1h
+const ETQ_RENDER_CACHE  = 'etq-render-v1';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -116,6 +134,33 @@ self.addEventListener('message', (event) => {
     );
     return;
   }
+  // F6 — Invalida cache de render de uma etiqueta específica após marcar-impressas
+  if (type === 'CACHE_DELETE') {
+    const urlToDelete = data.url;
+    if (urlToDelete) {
+      event.waitUntil(
+        caches.open(ETQ_RENDER_CACHE).then(c => c.delete(urlToDelete))
+      );
+    }
+    return;
+  }
+  // F6 — Logout: limpa caches de API do usuário anterior (escopo por userId)
+  // Mantém assets estáticos (CACHE_VERSION). Protege contra aba fechada antes do logout.
+  if (type === 'LOGOUT_CLEAR') {
+    const loggedOutUserId = data.userId;
+    event.waitUntil(
+      caches.open(ETQ_RENDER_CACHE).then(c =>
+        c.keys().then(keys =>
+          Promise.all(
+            keys
+              .filter(req => !loggedOutUserId || req.url.includes(`userId=${loggedOutUserId}`))
+              .map(req => c.delete(req))
+          )
+        )
+      )
+    );
+    return;
+  }
 });
 
 // C5 — Web Push handler. Permite que o browser receba notificacoes
@@ -170,15 +215,50 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// F6 — Stale-while-revalidate com TTL para endpoint de render de etiquetas.
+// TTL de 1h evita servir ficha técnica editada pelo operador entre cache e impressão.
+function etqRenderWithTtl(req) {
+  const now = Date.now();
+  return caches.open(ETQ_RENDER_CACHE).then(cache =>
+    cache.match(req).then(cached => {
+      const fetchAndStore = fetch(req).then(resp => {
+        if (resp.ok) {
+          const copy = resp.clone();
+          // Armazena com timestamp no header sintético via Response wrapping
+          cache.put(req, copy);
+        }
+        return resp;
+      }).catch(() => cached);
+
+      if (cached) {
+        const age = now - (parseInt(cached.headers.get('x-sw-cached-at') || '0', 10) || 0);
+        // Se ainda dentro do TTL, serve stale e revalida em background
+        if (age < ETQ_RENDER_TTL_MS) {
+          fetchAndStore; // background
+          return cached;
+        }
+      }
+      // Expirado ou sem cache: aguarda rede
+      return fetchAndStore;
+    })
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // API: bypass (sync precisa de rede)
-  if (url.pathname.startsWith('/api/')) return;
-
   // Google Fonts: deixa o browser cachear nativamente
   if (url.origin.includes('fonts.googleapis.com') || url.origin.includes('fonts.gstatic.com')) return;
+
+  // F6 — Endpoint de render de etiquetas: stale-while-revalidate com TTL 1h
+  if (url.pathname.match(/^\/api\/lotes\/[^/]+\/etiquetas\/render$/)) {
+    event.respondWith(etqRenderWithTtl(event.request));
+    return;
+  }
+
+  // Demais rotas de API: bypass (sync precisa de rede)
+  if (url.pathname.startsWith('/api/')) return;
 
   const isHtml = event.request.mode === 'navigate'
               || url.pathname === '/'

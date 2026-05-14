@@ -40,5 +40,6 @@ public sealed record LoteEtiquetaResult(
     Guid Id, Guid LoteId, Guid LoteItemId,
     int Sequencial, string Codigo, string Status,
     DateTime? ConferidaEm, Guid? ConferidaPorUserId, string? ConferidaPorNome,
-    string? ObservacaoConferencia, DateTime CriadoEm
+    string? ObservacaoConferencia, DateTime CriadoEm,
+    string? LayoutSnapshotJson, string? LayoutSnapshotMeta
 );

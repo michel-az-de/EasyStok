@@ -1,0 +1,88 @@
+@{
+    Layout    = null;
+    var templateId = ViewBag.TemplateId as string ?? "";
+    var layoutJson = ViewBag.LayoutJson as string ?? "{}";
+    var empresaId  = ViewBag.EmpresaId as string ?? "";
+    var nome       = ViewBag.Nome as string ?? "";
+}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <title>Editor de modelo — EasyStok</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/etiqueta/etiqueta.css" />
+    <link rel="stylesheet" href="/etiqueta/editor/editor.css" />
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+<!-- Editor shell — mirrors PWA index.html editor overlay but always open -->
+<div id="etq-editor-overlay" role="dialog" aria-modal="true" aria-label="Editor de modelo de etiqueta" style="position:fixed;inset:0;z-index:1;display:flex;">
+  <div class="etq-ed-toolbar"></div>
+  <div class="etq-ed-body">
+    <aside class="etq-ed-sidebar" aria-label="Elementos disponíveis"></aside>
+    <div class="etq-ed-canvas-area" role="main">
+      <div class="etq-ed-canvas-wrap">
+        <div class="etq-ed-canvas" tabindex="0" aria-label="Canvas de edição da etiqueta"></div>
+        <div class="etq-ed-val-overlay" aria-live="polite"></div>
+      </div>
+    </div>
+    <aside class="etq-ed-props" aria-label="Propriedades do elemento">
+      <div class="etq-ed-props-empty">Selecione um elemento no layout para editar.</div>
+    </aside>
+  </div>
+  <div class="etq-ed-firstrun" style="display:none" role="dialog" aria-modal="true">
+    <div class="etq-ed-firstrun-card">
+      <div class="etq-ed-firstrun-step"></div>
+      <div class="etq-ed-firstrun-title"></div>
+      <div class="etq-ed-firstrun-body"></div>
+      <div class="etq-ed-firstrun-dots"></div>
+      <div class="etq-ed-firstrun-actions">
+        <button class="etq-ed-firstrun-next">Próximo →</button>
+        <button class="etq-ed-firstrun-skip">Pular</button>
+      </div>
+    </div>
+  </div>
+  <div class="etq-ed-confirm" role="dialog" aria-modal="true">
+    <div class="etq-ed-confirm-card">
+      <div class="etq-ed-confirm-title"></div>
+      <div class="etq-ed-confirm-body"></div>
+      <div class="etq-ed-confirm-btns"></div>
+    </div>
+  </div>
+</div>
+<div id="etq-ed-autocomplete" class="etq-ed-autocomplete" style="display:none" role="listbox"></div>
+<div id="etq-ed-live" aria-live="polite" role="status"></div>
+
+<script src="/etiqueta/vendor/qrcode.min.js"></script>
+<script src="/etiqueta/vendor/jsbarcode.min.js"></script>
+<script type="module">
+import { initEditor, etqEditorAbrir } from '/etiqueta/editor/editor.js';
+
+// In Web the overlay is always "open" — patch close to redirect instead
+window._editorWebMode = true;
+
+initEditor();
+
+// Patch etqEditorFechar to navigate back for Web context
+window.etqEditorFechar = function() {
+    if (window._editorUnsaved) {
+        if (!confirm('Descartar alterações não salvas?')) return;
+    }
+    window.location.href = '/etiquetas/modelos';
+};
+
+// Open immediately with server-side data
+etqEditorAbrir(@Html.Raw(Json.Serialize(templateId)), @Html.Raw(Json.Serialize(layoutJson)), @Html.Raw(Json.Serialize(empresaId)));
+
+// Patch overlay so "open" class is always present in Web
+document.getElementById('etq-editor-overlay').classList.add('open');
+
+// Patch save to redirect on success
+const origSave = window._etqEdSave;
+</script>
+</body>
+</html>

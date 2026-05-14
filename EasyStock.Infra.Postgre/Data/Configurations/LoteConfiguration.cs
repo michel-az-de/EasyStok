@@ -53,9 +53,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.ToTable("lote_etiquetas");
             b.HasKey(x => x.Id);
             b.Property(x => x.Codigo).IsRequired().HasMaxLength(60);
-            b.Property(x => x.Status).IsRequired().HasMaxLength(20);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(25);
             b.Property(x => x.ConferidaPorNome).HasMaxLength(120);
             b.Property(x => x.ObservacaoConferencia).HasColumnType("text");
+            b.Property(x => x.LayoutSnapshotJson).HasColumnType("text");
+            b.Property(x => x.LayoutSnapshotMeta).HasColumnType("text");
 
             b.HasIndex(x => x.Codigo).IsUnique();
             b.HasIndex(x => new { x.LoteId, x.Status });

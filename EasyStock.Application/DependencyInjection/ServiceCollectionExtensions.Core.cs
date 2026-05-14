@@ -26,6 +26,7 @@ using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.ConferirEtiqueta;
+using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -96,6 +97,16 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
         services.AddScoped<ConferirEtiquetaUseCase>();
+
+        // Módulo Etiquetas (F2)
+        services.AddScoped<ListarTemplatesUseCase>();
+        services.AddScoped<CriarTemplateUseCase>();
+        services.AddScoped<AtualizarTemplateUseCase>();
+        services.AddScoped<RemoverTemplateUseCase>();
+        services.AddScoped<DefinirPadraoUseCase>();
+        services.AddScoped<MontarPayloadRenderUseCase>();
+        services.AddScoped<MarcarEtiquetasImpressasUseCase>();
+        services.AddScoped<SalvarFichaTecnicaUseCase>();
 
         // Onda P5.B — Listas de Compras
         services.AddScoped<ListarListasComprasUseCase>();

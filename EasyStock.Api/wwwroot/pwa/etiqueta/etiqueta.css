@@ -1,0 +1,176 @@
+/* etiqueta.css — Módulo de impressão EasyStok
+   Screen layer: tokens completos / Print layer: raw hex + B&W */
+
+/* ── Fontes ─────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+/* ── Screen layer — Wrapper e preview ───────────────────────────────────── */
+
+.etq-preview-wrap {
+  background:  var(--ink-100, #ECEFF5);
+  padding:     16px;
+  display:     flex;
+  flex-direction: column;
+  align-items: center;
+  gap:         12px;
+}
+
+.etq-label {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 0 1px var(--border-strong, #C8CFD8);
+  border-radius: 2px;
+}
+
+/* Screen: VAL/LOT prefix in orange */
+.etq-val-prefix {
+  color: var(--orange-600, #E85814);
+}
+
+/* Screen: @easystok footer color */
+.etq-el[data-etq-id="footer"] {
+  color: var(--orange-600, #E85814) !important;
+}
+
+/* ── Status badges ───────────────────────────────────────────────────────── */
+
+.etq-status {
+  display:       inline-flex;
+  align-items:   center;
+  border-radius: var(--r-pill, 999px);
+  padding:       2px 8px;
+  font-size:     11px;
+  font-weight:   500;
+  font-family:   var(--font-sans, 'Inter', sans-serif);
+}
+
+.etq-status--pendente         { color: var(--ink-600,  #4D5665); background: var(--ink-100,  #ECEFF5); }
+.etq-status--enviada_impressao{ color: var(--warn-700, #92400E); background: var(--warn-50,  #FFFBEB); }
+.etq-status--impressa         { color: var(--ok-700,   #166534); background: var(--ok-50,    #F0FDF4); }
+
+/* ── Buttons (scoped to etq to avoid global collision) ──────────────────── */
+
+.etq-btn-primary {
+  background:    var(--navy-700, #1A2E5A);
+  color:         #fff;
+  border:        none;
+  border-radius: var(--r-sm, 6px);
+  padding:       8px 16px;
+  font-weight:   600;
+  font-family:   var(--font-sans, 'Inter', sans-serif);
+  cursor:        pointer;
+}
+.etq-btn-primary:hover  { background: var(--navy-600, #243B6E); }
+.etq-btn-secondary {
+  background:    #fff;
+  color:         var(--ink-700, #3A4350);
+  border:        1px solid var(--border-soft, #D8DCE3);
+  border-radius: var(--r-sm, 6px);
+  padding:       8px 16px;
+  font-weight:   500;
+  font-family:   var(--font-sans, 'Inter', sans-serif);
+  cursor:        pointer;
+}
+.etq-btn-secondary:hover { background: var(--ink-50, #F5F7FA); }
+
+/* ── Typography scale for UI screens ────────────────────────────────────── */
+
+.etq-page-title  { font-size:18px; font-weight:700; color:var(--ink-900,#1A1F26); font-family:var(--font-sans,'Inter',sans-serif); }
+.etq-section-lbl { font-size:14px; font-weight:600; color:var(--ink-700,#3A4350); font-family:var(--font-sans,'Inter',sans-serif); }
+.etq-body        { font-size:13px; font-weight:400; color:var(--ink-600,#4D5665); font-family:var(--font-sans,'Inter',sans-serif); }
+.etq-caption     { font-size:11px; color:var(--ink-500,#6B7480); font-family:var(--font-sans,'Inter',sans-serif); }
+.etq-mono        { font-size:12px; font-family:var(--font-mono,'JetBrains Mono','Courier New',monospace); }
+
+/* ── Model card ─────────────────────────────────────────────────────────── */
+
+.etq-card {
+  background:    #fff;
+  border:        1px solid var(--border-soft, #D8DCE3);
+  border-radius: var(--r-md, 8px);
+  box-shadow:    0 1px 3px rgba(0,0,0,0.06);
+  overflow:      hidden;
+  transition:    box-shadow 0.15s, border-color 0.15s;
+}
+.etq-card:hover {
+  box-shadow:    0 2px 8px rgba(0,0,0,0.12);
+  border-color:  var(--navy-200, #A8B8D4);
+}
+
+.etq-card-thumb {
+  width:           160px;
+  height:          80px;
+  overflow:        hidden;
+  background:      var(--ink-50, #F5F7FA);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  position:        relative;
+}
+
+.etq-card-thumb .etq-label {
+  transform-origin: top left;
+  /* scale set inline via JS: transform: scale(ratio) */
+  position: absolute;
+  top: 0; left: 0;
+}
+
+.etq-card-thumb-placeholder {
+  color: var(--ink-300, #C8CFD8);
+}
+
+/* ── ANVISA disclaimer ───────────────────────────────────────────────────── */
+
+.etq-disclaimer {
+  font-size:  11px;
+  color:      var(--ink-600, #4D5665);
+  padding:    6px 10px;
+  background: var(--warn-50, #FFFBEB);
+  border-left: 3px solid var(--warn-600, #D97706);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── Print layer ─────────────────────────────────────────────────────────── */
+
+@media print {
+  /* Force B&W on everything inside a label */
+  .etq-label * {
+    color:      #000 !important;
+    background: transparent !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Override screen orange accent for print */
+  .etq-val-prefix,
+  .etq-el[data-etq-id="footer"] {
+    color: #000 !important;
+  }
+
+  /* Alérgenos pills: borda sólida, sem fill */
+  .etq-al-pill {
+    border: 0.5pt solid #000 !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  /* Prevent page breaks inside a single label */
+  .etq-label {
+    page-break-inside: avoid;
+    break-inside:      avoid;
+    box-shadow: none;
+  }
+
+  /* Page break between labels in a multi-label job */
+  .etq-page + .etq-page {
+    page-break-before: always;
+    break-before:      page;
+  }
+
+  /* Hide UI chrome when printing */
+  .etq-preview-wrap,
+  .etq-btn-primary,
+  .etq-btn-secondary,
+  .etq-status,
+  .etq-disclaimer,
+  nav, header, footer, .no-print {
+    display: none !important;
+  }
+}
