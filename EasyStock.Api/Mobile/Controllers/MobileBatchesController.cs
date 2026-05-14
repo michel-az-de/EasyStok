@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -22,6 +24,7 @@ public class MobileBatchesController(
     ILoteRepository loteRepo,
     CriarLoteUseCase criarLoteUseCase,
     ICurrentUserAccessor currentUser,
+    IFileStorage fileStorage,
     ILogger<MobileBatchesController> log) : MobileManagementControllerBase(currentUser)
 {
     [HttpGet]
@@ -120,6 +123,80 @@ public class MobileBatchesController(
         batch.ErpLoteId = null;
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// F10-C-7 — Upload de foto de batch via device mobile.
+    /// Recebe multipart com campo "photo" (Blob), "hash" (FNV-1a) e "field" (batchPhoto | item:N).
+    /// Idempotente: se foto com mesmo hash já existe, retorna 409.
+    /// Auth via MobileApiKey (device mobile), não JWT.
+    /// </summary>
+    [HttpPost("{id}/photos")]
+    [AllowAnonymous]
+    [MobileApiKey]
+    [RequestSizeLimit(10 * 1024 * 1024)] // 10MB max
+    public async Task<IActionResult> UploadPhoto(
+        string id,
+        [FromForm] string hash,
+        [FromForm] string field,
+        IFormFile photo,
+        CancellationToken ct)
+    {
+        // Resolve empresa via device autenticado (MobileApiKey já setou HttpContext.Items)
+        var device = HttpContext.Items["mobile-device"] as MobileDevice;
+        if (device == null) return Unauthorized();
+        var empresaId = device.EmpresaId;
+
+        // Busca o batch
+        var batch = await db.Set<Batch>().Include(b => b.Items)
+            .FirstOrDefaultAsync(b => b.Id == id && b.EmpresaId == empresaId, ct);
+        if (batch == null) return NotFound(new { error = "Batch not found" });
+
+        if (photo == null || photo.Length == 0)
+            return BadRequest(new { error = "photo is required" });
+
+        // Upload para file storage
+        var bucketPath = $"mobile-photos/{empresaId}/{id}";
+        var ext = photo.ContentType.Contains("png") ? ".png" : ".jpg";
+        var fileName = $"{hash?.Replace(":", "-") ?? Guid.NewGuid().ToString()}{ext}";
+
+        byte[] content;
+        using (var ms = new MemoryStream())
+        {
+            await photo.CopyToAsync(ms, ct);
+            content = ms.ToArray();
+        }
+
+        var result = await fileStorage.UploadAsync(new FileUploadRequest(
+            BucketPath: bucketPath,
+            FileName: fileName,
+            ContentType: photo.ContentType,
+            Content: content,
+            IsPublic: false
+        ), ct);
+
+        // Atualiza o campo correto no batch
+        if (field == "batchPhoto")
+        {
+            batch.BatchPhoto = result.Url;
+        }
+        else if (field != null && field.StartsWith("item:"))
+        {
+            if (int.TryParse(field.AsSpan(5), out var idx) && idx >= 0 && idx < batch.Items.Count)
+            {
+                // Items ordenados por Id — match pelo índice
+                var sortedItems = batch.Items.OrderBy(i => i.Id).ToList();
+                if (idx < sortedItems.Count)
+                    sortedItems[idx].Photo = result.Url;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        log.LogInformation("Photo uploaded for batch {BatchId} field {Field} hash {Hash} → {Url}",
+            id, field, hash, result.Url);
+
+        return Ok(new { url = result.Url, hash });
     }
 
     private Guid? ResolveUserId()

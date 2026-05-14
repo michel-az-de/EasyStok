@@ -328,14 +328,20 @@
     // Deep clone pra nao mutar o estado local — operador segue vendo as fotos.
     const clone = JSON.parse(JSON.stringify(batch));
     if (isHeavyDataUrl(clone.batchPhoto)) {
-      clone.batchPhotoHash = simpleHash(clone.batchPhoto);
+      const hash = simpleHash(clone.batchPhoto);
+      clone.batchPhotoHash = hash;
+      // F10-C-7: persiste foto no photo-store IDB antes de descartar bytes.
+      _persistPhotoAsync(hash, clone.batchPhoto, batch.id || '', 'batchPhoto');
       delete clone.batchPhoto;
     }
     if (Array.isArray(clone.items)) {
-      clone.items = clone.items.map(item => {
+      clone.items = clone.items.map((item, idx) => {
         if (item && isHeavyDataUrl(item.photo)) {
           const out = Object.assign({}, item);
-          out.photoHash = simpleHash(item.photo);
+          const hash = simpleHash(item.photo);
+          out.photoHash = hash;
+          // F10-C-7: persiste foto do item no photo-store IDB.
+          _persistPhotoAsync(hash, item.photo, batch.id || '', 'item:' + idx);
           delete out.photo;
           return out;
         }
@@ -343,6 +349,19 @@
       });
     }
     return clone;
+  }
+
+  // F10-C-7: fire-and-forget persist de foto no IDB photo-store.
+  // Falha silenciosa — se IDB indisponivel, foto se perde (mesmo
+  // comportamento de antes do F10-C-7, mas agora com tentativa de salvar).
+  function _persistPhotoAsync(hash, dataUrl, batchId, field) {
+    try {
+      if (window.cdbPhotoStore && window.cdbPhotoStore.ready) {
+        window.cdbPhotoStore.save(hash, dataUrl, batchId, field).catch(function (e) {
+          console.warn('[sync] photo-store save failed:', hash, e && e.message);
+        });
+      }
+    } catch (e) {}
   }
 
   // ---- Calcula diff entre estados e gera mutations ----
@@ -657,6 +676,12 @@
       updatePendingCount();
       // Sucesso — reseta backoff pra delay normal no proximo tick.
       _consecutiveFlushFailures = 0;
+      // F10-C-7: dispara upload de fotos em background apos flush bem-sucedido.
+      try {
+        if (window.cdbPhotoUpload && typeof window.cdbPhotoUpload.flush === 'function') {
+          window.cdbPhotoUpload.flush(); // fire-and-forget
+        }
+      } catch (_) {}
       return 'ok';
     } catch (e) {
       console.warn('Erro no sync:', e.message);
@@ -944,6 +969,12 @@
     }).catch(function (e) {
       _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
     });
+    // F10-C-7: inicializa photo-store IDB (separado do queue-store).
+    if (window.cdbPhotoStore && typeof window.cdbPhotoStore.init === 'function') {
+      window.cdbPhotoStore.init().catch(function (e) {
+        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+      });
+    }
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
     // Loop self-rescheduling com backoff exponencial em erro (substitui o
     // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
