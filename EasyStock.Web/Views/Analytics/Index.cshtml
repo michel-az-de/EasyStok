@@ -60,7 +60,16 @@
         </div>
         <div class="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100">
             <div class="text-sm text-slate-400 mb-1">💰</div>
-            <div class="text-xl font-bold text-indigo-600">@Model.ProjReceita30d.ToString("C", ptBR)</div>
+            @if (Model.ReceitaProjetadaDisponivel)
+            {
+                <div class="text-xl font-bold text-indigo-600">@Model.ProjReceita30d.ToString("C", ptBR)</div>
+            }
+            else
+            {
+                <div class="text-sm font-semibold text-slate-500">Receita indisponível</div>
+                <div class="text-xs text-slate-400 mt-1">Produtos sem preço cadastrado</div>
+                <a href="/produtos" class="text-xs text-indigo-500 hover:underline">Cadastrar preços →</a>
+            }
             <div class="text-xs text-slate-500 mt-1">receita proj. 30d</div>
         </div>
     </div>

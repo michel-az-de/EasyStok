@@ -69,7 +69,7 @@
             }
         </div>
         <!-- Date range -->
-        <div class="flex gap-2 items-center ml-auto">
+        <div class="flex flex-wrap gap-2 items-center ml-auto">
             <input type="date" name="de" value="@Model.PeriodoInicio"
                    class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
             <span class="text-slate-400 text-sm">a</span>
@@ -166,7 +166,19 @@
                         </td>
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
                         <td class="text-slate-500 text-sm">@(s.DocumentoReferencia ?? "—")</td>
-                        <td class="text-slate-500 text-sm">@(s.Descricao ?? "—")</td>
+                        <td class="text-slate-500 text-sm">
+                            @if (s.Descricao?.StartsWith("DIVERGENCIA_SYNC") == true)
+                            {
+                                <span class="text-xs text-slate-400"
+                                      title="@(User.IsInRole("Admin") ? s.Descricao : null)">
+                                    Sync automático
+                                </span>
+                            }
+                            else
+                            {
+                                <span>@(s.Descricao ?? "—")</span>
+                            }
+                        </td>
                         <td class="text-xs text-slate-500">
                             @if (!string.IsNullOrEmpty(s.UsuarioId) || !string.IsNullOrEmpty(s.Ip) || !string.IsNullOrEmpty(s.MotivoEstorno))
                             {

@@ -6,7 +6,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item no estoque" : "itens no estoque") <span class="text-slate-400 text-xs font-normal">· por lote/entrada</span></p>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "entrada" : "entradas") em estoque</p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"
@@ -28,11 +28,12 @@
 
 <!-- Filtros -->
 <div class="ws mb-4">
-    <form method="get" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar estoque">
+    <form method="get" x-data="{}" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar estoque">
         <input type="hidden" name="status" value="@Model.StatusFiltro" />
         <input type="hidden" name="categoria" value="@Model.Categoria" />
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar produto ou SKU..."
                aria-label="Buscar produto ou SKU"
+               @@input.debounce.600ms="$el.form.requestSubmit()"
                class="flex-1 min-w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
 
         <!-- Pills de status -->
@@ -46,39 +47,29 @@
                 </a>
             }
         </div>
-
-        <button type="submit"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            Buscar
-        </button>
     </form>
 </div>
 
 <!-- Modal saída rápida (Alpine global) -->
 <div x-data="saidaModal()" id="saida-modal-wrapper">
     <div x-show="open" x-cloak
-         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         class="modal-backdrop"
          @@click.self="open = false"
          @@keydown.window.escape="open = false"
          x-transition>
-        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col"
+        <div class="modal-panel modal-sm"
              role="dialog" aria-modal="true" aria-labelledby="saida-title">
             <!-- Header -->
-            <header class="px-5 pt-5 pb-3 border-b border-slate-200 dark:border-slate-700">
-                <div class="flex items-start gap-3">
-                    <div class="flex-1">
-                        <h3 id="saida-title" class="font-bold text-slate-900 dark:text-slate-100 text-lg">
-                            Registrar saída
-                        </h3>
-                        <p class="text-slate-500 dark:text-slate-400 text-sm mt-0.5" x-text="produtoNome"></p>
-                    </div>
-                    <button type="button" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none"
-                            aria-label="Fechar" @@click="open = false">✕</button>
+            <div class="modal-header">
+                <div class="flex-1">
+                    <h3 id="saida-title" class="text-base font-semibold m-0">Registrar saída</h3>
+                    <p class="text-sm text-slate-500 mt-0.5" x-text="produtoNome"></p>
                 </div>
-            </header>
+                <button type="button" class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="open = false">✕</button>
+            </div>
 
             <!-- Body -->
-            <div class="px-5 py-4 space-y-4">
+            <div class="modal-body space-y-4">
                 <!-- Erro inline -->
                 <div x-show="erroMsg" x-cloak
                      class="text-sm rounded-lg px-3 py-2 bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800"
@@ -137,12 +128,17 @@
                 <!-- Valor (somente Venda e Prejuízo) -->
                 <div x-show="natureza === 'venda' || natureza === 'prejuizo'" x-cloak>
                     <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
-                        <span x-show="natureza === 'venda'">Valor unitário (R$)</span>
+                        <span x-show="natureza === 'venda'">Valor unitário (R$) <span class="text-red-500">*</span></span>
                         <span x-show="natureza === 'prejuizo'" x-cloak>Custo perdido por unidade (R$, opcional)</span>
                     </label>
-                    <input type="number" x-model.number="valor" step="0.01" min="0"
+                    <input type="number" x-model.number="valor" step="0.01" min="0.01"
                            placeholder="0,00"
-                           class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           :class="natureza === 'venda' && semPreco ? 'border-amber-400 focus:ring-amber-300' : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-300'"
+                           class="w-full px-3 py-2 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 border" />
+                    <p x-show="natureza === 'venda' && semPreco" x-cloak
+                       class="text-xs text-amber-600 mt-1">
+                        Produto sem preço cadastrado. Informe o valor de venda para calcular a receita.
+                    </p>
                 </div>
 
                 <!-- Motivo (Perda e Prejuízo) -->
@@ -172,9 +168,9 @@
             @Html.AntiForgeryToken()
 
             <!-- Footer -->
-            <footer class="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex gap-3">
+            <div class="modal-footer">
                 <button type="button" @@click="open = false"
-                        class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                        class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
                     Cancelar
                 </button>
                 <button type="button" @@click="confirmarSaida()"
@@ -184,7 +180,7 @@
                     <span x-show="!loading" x-text="ctaLabel"></span>
                     <span x-show="loading" x-cloak>Salvando…</span>
                 </button>
-            </footer>
+            </div>
         </div>
     </div>
 
@@ -216,7 +212,13 @@
                         <tr id="row-@item.Id">
                             <td>
                                 <div class="font-semibold text-slate-900">@(item.Produto?.Nome ?? item.Sku)</div>
-                                <div class="text-xs text-slate-400">@(item.Variacao?.Nome ?? "Padrão")</div>
+                                <div class="text-xs text-slate-400">
+                                    @(item.Variacao?.Nome ?? "Padrão")
+                                    @if (!string.IsNullOrEmpty(item.Lote))
+                                    {
+                                        <span class="ml-1 text-slate-400">· Lote: @item.Lote</span>
+                                    }
+                                </div>
                             </td>
                             <td class="font-mono text-xs text-slate-500">@item.Sku</td>
                             <td class="text-center">
@@ -225,15 +227,22 @@
                                 </span>
                             </td>
                             <td class="text-center hidden md:table-cell">
-                                <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias)">
-                                    @for (int seg = 1; seg <= 5; seg++)
-                                    {
-                                        var segClass = seg <= velInt
-                                            ? (velInt >= 4 ? "g" : velInt >= 2 ? "a" : "r")
-                                            : "";
-                                        <div class="vel-seg @segClass"></div>
-                                    }
-                                </div>
+                                @if (item.Vel == 0)
+                                {
+                                    <span class="text-xs text-slate-400" title="Sem saídas nos últimos 30 dias">Sem mov.</span>
+                                }
+                                else
+                                {
+                                    <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias) — cada barra = 0,5 un/dia">
+                                        @for (int seg = 1; seg <= 5; seg++)
+                                        {
+                                            var segClass = seg <= velInt
+                                                ? (velInt >= 4 ? "g" : velInt >= 2 ? "a" : "r")
+                                                : "";
+                                            <div class="vel-seg @segClass"></div>
+                                        }
+                                    </div>
+                                }
                             </td>
                             <td class="text-slate-500 text-xs hidden md:table-cell">
                                 @item.LastMov.ToString("dd/MM/yyyy")
@@ -251,7 +260,14 @@
                                 }
                                 else
                                 {
-                                    <span class="text-slate-400">—</span>
+                                    @if (item.Qty == 0)
+                                    {
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sem validade</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-400">—</span>
+                                    }
                                 }
                             </td>
                             <td class="text-center">
@@ -264,21 +280,33 @@
                                         _ => "badge-warn"
                                     };
                                 }
-                                <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@item.Status</span>
+                                @{
+                                    var statusLabel = (item.Status?.ToLower()) switch {
+                                        "critico" => "Crítico",
+                                        "atencao" => "Atenção",
+                                        "ok" => "OK",
+                                        "parado" => "Parado",
+                                        "vencido" => "Vencido",
+                                        "descartado" => "Descartado",
+                                        "bloqueado" => "Bloqueado",
+                                        _ => item.Status ?? "—"
+                                    };
+                                }
+                                <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@statusLabel</span>
                             </td>
                             <td>
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-end gap-2" style="white-space:nowrap">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
-                                       class="grid-action-btn grid-action-btn--primary">
+                                       class="grid-action-btn grid-action-btn--ghost">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m14.836 2A8.001 8.001 0 005.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-14.837-2m14.837 2H15" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
                                         Repor
                                     </a>
-                                    <button @@click="openModal('@item.Id', '@(item.Produto?.Nome ?? item.Sku)'.replace(/'/g, ''), @item.Qty)"
-                                            class="grid-action-btn grid-action-btn--danger">
+                                    <button @@click="openModal('@item.Id', '@(item.Produto?.Nome ?? item.Sku)'.replace(/'/g, ''), @item.Qty, @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
+                                            class="grid-action-btn grid-action-btn--warning">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                                         </svg>
                                         Saída
                                     </button>
@@ -296,7 +324,11 @@
                 var estPgStart = Math.Max(1, Model.Paginacao.Page - 2);
                 var estPgEnd = Math.Min(Model.Paginacao.Pages, Model.Paginacao.Page + 2);
                 <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                    <span class="text-sm text-slate-500">Página @Model.Paginacao.Page de @Model.Paginacao.Pages</span>
+                    @{
+                        var pgStart = (Model.Paginacao.Page - 1) * Model.Paginacao.Limit + 1;
+                        var pgEnd = Math.Min(Model.Paginacao.Page * Model.Paginacao.Limit, Model.Paginacao.Total);
+                    }
+                    <span class="text-sm text-slate-500">Mostrando @pgStart–@pgEnd de @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "entrada" : "entradas")</span>
                     <div class="flex items-center gap-1">
                         @if (Model.Paginacao.HasPrevious)
                         {
@@ -356,12 +388,17 @@
                 motivo: '',
                 data: new Date().toLocaleDateString('en-CA'),
 
-                openModal(id, nome, qty) {
+                precoSugerido: null,
+                semPreco: false,
+
+                openModal(id, nome, qty, precoSugerido) {
                     this.estoqueId = id;
                     this.produtoNome = nome;
                     this.qtyDisponivel = qty;
                     this.qty = 1;
-                    this.valor = null;
+                    this.precoSugerido = precoSugerido && precoSugerido !== 'null' ? Number(precoSugerido) : null;
+                    this.valor = this.precoSugerido;
+                    this.semPreco = this.precoSugerido === null;
                     this.motivo = '';
                     this.erroMsg = '';
                     this.natureza = 'venda';

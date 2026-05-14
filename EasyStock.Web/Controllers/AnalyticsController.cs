@@ -37,6 +37,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
             vm.ProjUnidades7d = dash.MediaVendasDiaria * 7;
             vm.ProjUnidades30d = dash.MediaVendasDiaria * 30;
             vm.ProjReceita30d = dash.ReceitaEstimadaPeriodo;
+            vm.ReceitaProjetadaDisponivel = dash.ReceitaEstimadaPeriodo > 0;
         }
 
         if (receitaResult.Success && receitaResult.Data is { } receita && receita.Count > 0)

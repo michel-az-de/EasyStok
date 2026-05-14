@@ -134,7 +134,7 @@ public class ProdutoControllerTests
         var empresaId = Guid.NewGuid();
         var termo = "teste";
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto Teste" } };
-        _produtoRepository.SearchAsync(empresaId, termo).Returns(produtos);
+        _produtoRepository.SearchAsync(empresaId, termo, Arg.Any<int>()).Returns(produtos);
 
         var result = await _controller.Search(empresaId, termo);
 
