@@ -76,6 +76,7 @@ builder.Services.AddScoped<ClientesService>();
 builder.Services.AddScoped<PedidosService>();
 builder.Services.AddScoped<CaixaService>();
 builder.Services.AddScoped<LotesService>();
+builder.Services.AddScoped<EtiquetasService>();
 builder.Services.AddScoped<ListasComprasService>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<InteligenciaService>();
@@ -91,6 +92,7 @@ builder.Services.AddScoped<InteligenciaLojasService>();
 builder.Services.AddScoped<MobileDevicesService>();
 builder.Services.AddScoped<MobileProductsService>();
 builder.Services.AddScoped<OperacaoMobileService>();
+builder.Services.AddScoped<RelatoriosService>();
 
 // 6b. Marketing options + Leads API service (landing publica)
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));

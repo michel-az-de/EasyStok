@@ -1,0 +1,286 @@
+@using EasyStock.Web.Services
+@{
+    Layout = "_Layout";
+    var catalog = ViewBag.Catalog as List<ReportCatalogItemApi> ?? new();
+    var runs    = ViewBag.Runs as List<ReportRunApi> ?? new();
+    var total   = (int)(ViewBag.RunsTotal ?? 0);
+    var page    = (int)(ViewBag.Page ?? 1);
+    var filtroCategoria = ViewBag.FiltroCategoria as string;
+    var filtroStatus    = ViewBag.FiltroStatus as string;
+
+    var categorias = catalog.Select(c => c.Categoria).Distinct().OrderBy(c => c).ToList();
+    var categoriaIcons = new Dictionary<string, string>
+    {
+        ["Vendas"]    = "M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z",
+        ["Estoque"]   = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+        ["Fiscal"]    = "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+        ["Contabil"]  = "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    };
+
+    string StatusBadge(string status) => status switch
+    {
+        "Pending"   => "bg-yellow-100 text-yellow-800",
+        "Running"   => "bg-blue-100 text-blue-800",
+        "Succeeded" => "bg-green-100 text-green-800",
+        "Canceled"  => "bg-gray-100 text-gray-500",
+        "Canceling" => "bg-orange-100 text-orange-700",
+        "Failed"    => "bg-red-100 text-red-800",
+        _           => "bg-gray-100 text-gray-600"
+    };
+
+    string StatusLabel(string status) => status switch
+    {
+        "Pending"   => "Pendente",
+        "Running"   => "Executando",
+        "Succeeded" => "Concluído",
+        "Canceled"  => "Cancelado",
+        "Canceling" => "Cancelando",
+        "Failed"    => "Falhou",
+        _           => status
+    };
+
+    string FormatSize(long? bytes)
+    {
+        if (bytes is null || bytes == 0) return "-";
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+}
+
+<!-- ══════════ Catálogo: gerar novo relatório ══════════ -->
+<section class="mb-8">
+    <h2 class="text-lg font-semibold text-slate-200 mb-4">Gerar novo relatório</h2>
+
+    @if (catalog.Count == 0)
+    {
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-6 text-center text-slate-400">
+            Nenhum relatório disponível para sua empresa.
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var rpt in catalog)
+            {
+                var iconPath = categoriaIcons.GetValueOrDefault(rpt.Categoria, categoriaIcons["Vendas"]);
+                <div class="rounded-lg border border-white/10 bg-white/[0.02] p-4 hover:bg-white/[0.04] transition-colors"
+                     x-data="{ open: false }">
+                    <div class="flex items-start gap-3 mb-3">
+                        <div class="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="@iconPath" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-semibold text-slate-100 truncate">@rpt.Label</h3>
+                            <p class="text-xs text-slate-400 mt-0.5 line-clamp-2">@rpt.Descricao</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-500 font-medium">@rpt.Categoria</span>
+                        <div class="flex items-center gap-1.5">
+                            @foreach (var fmt in rpt.FormatosSuportados)
+                            {
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-400 font-mono">@fmt</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-white/5">
+                        <button @@click="open = !open"
+                                class="text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">
+                            <span x-text="open ? 'Fechar' : 'Gerar relatório'"></span>
+                        </button>
+                        <form x-show="open" x-cloak x-transition
+                              method="post" action="/relatorios/enqueue"
+                              class="mt-3 space-y-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="key" value="@rpt.Key" />
+                            <div>
+                                <label class="text-[11px] text-slate-400 block mb-1">Parâmetros (JSON)</label>
+                                <textarea name="paramsJson" rows="2"
+                                          class="w-full rounded border border-white/10 bg-white/5 text-xs text-slate-200 px-2 py-1.5 font-mono focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+                                          placeholder='{"de":"2026-01-01","ate":"2026-05-14"}'>{}</textarea>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select name="format"
+                                        class="rounded border border-white/10 bg-white/5 text-xs text-slate-200 px-2 py-1.5 focus:ring-1 focus:ring-orange-500">
+                                    @foreach (var fmt in rpt.FormatosSuportados)
+                                    {
+                                        if (fmt == "Xlsx")
+                                        {
+                                            <option value="@fmt" selected>@fmt</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@fmt">@fmt</option>
+                                        }
+                                    }
+                                </select>
+                                <button type="submit"
+                                        class="px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors">
+                                    Gerar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<!-- ══════════ Filtros ══════════ -->
+<section class="mb-4 flex flex-wrap items-center gap-2">
+    <a href="/relatorios"
+       class="text-xs px-2.5 py-1 rounded-full transition-colors @(filtroCategoria == null && filtroStatus == null ? "bg-orange-500/20 text-orange-300" : "bg-white/5 text-slate-400 hover:bg-white/10")">
+        Todos
+    </a>
+    @foreach (var cat in categorias)
+    {
+        <a href="/relatorios?categoria=@cat"
+           class="text-xs px-2.5 py-1 rounded-full transition-colors @(filtroCategoria == cat ? "bg-orange-500/20 text-orange-300" : "bg-white/5 text-slate-400 hover:bg-white/10")">
+            @cat
+        </a>
+    }
+    <span class="text-white/10 mx-1">|</span>
+    @foreach (var st in new[] { "Pending", "Running", "Succeeded", "Failed" })
+    {
+        <a href="/relatorios?status=@st@(filtroCategoria != null ? $"&categoria={filtroCategoria}" : "")"
+           class="text-xs px-2.5 py-1 rounded-full transition-colors @(filtroStatus == st ? "bg-orange-500/20 text-orange-300" : "bg-white/5 text-slate-400 hover:bg-white/10")">
+            @StatusLabel(st)
+        </a>
+    }
+</section>
+
+<!-- ══════════ Execuções recentes ══════════ -->
+<section>
+    <h2 class="text-lg font-semibold text-slate-200 mb-4">
+        Execuções recentes
+        <span class="text-sm font-normal text-slate-500">(@total)</span>
+    </h2>
+
+    @if (runs.Count == 0)
+    {
+        <div class="rounded-lg border border-white/10 bg-white/[0.02] p-8 text-center text-slate-400">
+            Nenhuma execução encontrada. Gere um relatório acima para começar.
+        </div>
+    }
+    else
+    {
+        <div class="overflow-x-auto rounded-lg border border-white/10">
+            <table class="w-full text-sm">
+                <thead class="bg-white/[0.03] text-slate-400 text-xs uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">Relatório</th>
+                        <th class="px-4 py-3 text-left font-medium">Formato</th>
+                        <th class="px-4 py-3 text-left font-medium">Status</th>
+                        <th class="px-4 py-3 text-right font-medium">Linhas</th>
+                        <th class="px-4 py-3 text-right font-medium">Tamanho</th>
+                        <th class="px-4 py-3 text-left font-medium">Criado em</th>
+                        <th class="px-4 py-3 text-center font-medium">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    @foreach (var run in runs)
+                    {
+                        <tr class="hover:bg-white/[0.02] transition-colors">
+                            <td class="px-4 py-3">
+                                <div class="text-slate-200 font-medium">@run.ReportLabel</div>
+                                <div class="text-[11px] text-slate-500 font-mono">@run.ReportKey</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-xs px-1.5 py-0.5 rounded bg-white/5 text-slate-300 font-mono">@run.Format</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-[11px] px-2 py-0.5 rounded-full font-medium @StatusBadge(run.Status)">
+                                    @StatusLabel(run.Status)
+                                </span>
+                                @if (run.Status == "Failed" && run.ErrorMessage != null)
+                                {
+                                    <div class="text-[10px] text-red-400 mt-0.5 truncate max-w-[200px]" title="@run.ErrorMessage">
+                                        @run.ErrorMessage
+                                    </div>
+                                }
+                            </td>
+                            <td class="px-4 py-3 text-right text-slate-300 tabular-nums">
+                                @(run.RowCount?.ToString("N0") ?? "-")
+                            </td>
+                            <td class="px-4 py-3 text-right text-slate-400 text-xs tabular-nums">
+                                @FormatSize(run.ArtifactSizeBytes)
+                            </td>
+                            <td class="px-4 py-3 text-slate-400 text-xs tabular-nums">
+                                @run.EnqueuedAt.ToLocalTime().ToString("dd/MM HH:mm")
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    @if (run.CanDownload && run.DownloadUrl != null)
+                                    {
+                                        <a href="@run.DownloadUrl" target="_blank" rel="noopener"
+                                           class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-600/20 text-green-400 text-xs hover:bg-green-600/30 transition-colors"
+                                           title="Baixar">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Baixar
+                                        </a>
+                                    }
+                                    else if (run.Status == "Succeeded")
+                                    {
+                                        <a href="/relatorios/run/@run.Id"
+                                           class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                                            Ver link
+                                        </a>
+                                    }
+
+                                    @if (run.Status is "Pending" or "Running")
+                                    {
+                                        <form method="post" action="/relatorios/cancel/@run.Id" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit"
+                                                    class="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                                    title="Cancelar">Cancelar</button>
+                                        </form>
+                                    }
+
+                                    @if (run.Status is "Succeeded" or "Failed")
+                                    {
+                                        <form method="post" action="/relatorios/repeat/@run.Id" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit"
+                                                    class="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                                                    title="Gerar novamente">Repetir</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginação simples -->
+        @if (total > 25)
+        {
+            var totalPages = (int)Math.Ceiling(total / 25.0);
+            <div class="mt-4 flex items-center justify-center gap-2">
+                @if (page > 1)
+                {
+                    <a href="/relatorios?page=@(page-1)@(filtroCategoria != null ? $"&categoria={filtroCategoria}" : "")@(filtroStatus != null ? $"&status={filtroStatus}" : "")"
+                       class="px-3 py-1.5 rounded bg-white/5 text-slate-300 text-xs hover:bg-white/10 transition-colors">
+                        Anterior
+                    </a>
+                }
+                <span class="text-xs text-slate-400">Página @(page) de @totalPages</span>
+                @if (page < totalPages)
+                {
+                    <a href="/relatorios?page=@(page+1)@(filtroCategoria != null ? $"&categoria={filtroCategoria}" : "")@(filtroStatus != null ? $"&status={filtroStatus}" : "")"
+                       class="px-3 py-1.5 rounded bg-white/5 text-slate-300 text-xs hover:bg-white/10 transition-colors">
+                        Próxima
+                    </a>
+                }
+            </div>
+        }
+    }
+</section>
