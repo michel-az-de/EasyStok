@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,13 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513000001_RefactorQuantidadeToDecimal")]
+    partial class RefactorQuantidadeToDecimal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -671,9 +674,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("ClienteId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Origem")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -686,9 +686,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClienteId");
-
-                    b.HasIndex("EmpresaId", "ClienteId", "AlteradoEm");
+                    b.HasIndex("ClienteId", "AlteradoEm");
 
                     b.ToTable("cliente_alteracoes", (string)null);
                 });
@@ -5287,10 +5285,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("FormaPagamentoPrincipal")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid");
 
@@ -5306,25 +5300,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
 
-                    b.Property<decimal?>("Subtotal")
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal?>("ValorDesconto")
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<decimal>("ValorTotal")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<Guid?>("VendedorId")
-                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("EmpresaId");
 
                     b.HasIndex("LojaId");
-
-                    b.HasIndex("VendedorId");
 
                     b.ToTable("vendas", (string)null);
                 });
@@ -5623,10 +5606,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<string>("ProtocoloEvento")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("NfeDocumentoId", "OcorridoEm")
@@ -5641,15 +5620,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("BaseIcms")
-                        .HasColumnType("numeric(14,2)");
-
                     b.Property<string>("CfopSnapshot")
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)");
-
-                    b.Property<decimal?>("Cofins")
-                        .HasColumnType("numeric(14,2)");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
@@ -5661,12 +5634,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("NcmSnapshot")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
-
-                    b.Property<decimal?>("Pis")
-                        .HasColumnType("numeric(14,2)");
-
-                    b.Property<decimal?>("ValorIcms")
-                        .HasColumnType("numeric(14,2)");
 
                     b.Property<Guid>("NfeDocumentoId")
                         .HasColumnType("uuid");
@@ -5703,14 +5670,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("NfeDocumentoId", "Ordem")
                         .HasDatabaseName("ix_nfe_itens_documento_ordem");
-
-                    b.HasIndex("NfeDocumentoId", "CfopSnapshot")
-                        .HasDatabaseName("ix_nfe_itens_cfop")
-                        .HasFilter("\"CfopSnapshot\" IS NOT NULL");
-
-                    b.HasIndex("NfeDocumentoId", "NcmSnapshot")
-                        .HasDatabaseName("ix_nfe_itens_ncm")
-                        .HasFilter("\"NcmSnapshot\" IS NOT NULL");
 
                     b.ToTable("nfe_itens", (string)null);
                 });
@@ -5899,161 +5858,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_outbox_evento_integracao_empresa_status");
 
                     b.ToTable("outbox_evento_integracao", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Reporting.ReportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("ArtifactSha256")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("artifact_sha256");
-
-                    b.Property<long?>("ArtifactSizeBytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("artifact_size_bytes");
-
-                    b.Property<string>("ArtifactStorageKey")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("artifact_storage_key");
-
-                    b.Property<short>("Categoria")
-                        .HasColumnType("smallint")
-                        .HasColumnName("categoria");
-
-                    b.Property<short>("Contexto")
-                        .HasColumnType("smallint")
-                        .HasColumnName("contexto");
-
-                    b.Property<DateTimeOffset>("CriadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em");
-
-                    b.Property<Guid?>("EmpresaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("empresa_id");
-
-                    b.Property<DateTimeOffset>("EnqueuedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("enqueued_at");
-
-                    b.Property<string>("ErrorClass")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("error_class");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text")
-                        .HasColumnName("error_message");
-
-                    b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<short>("Format")
-                        .HasColumnType("smallint")
-                        .HasColumnName("format");
-
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("idempotency_key");
-
-                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lease_expires_at");
-
-                    b.Property<int>("MaxTentativas")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(3)
-                        .HasColumnName("max_tentativas");
-
-                    b.Property<string>("MotivoExecucao")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("motivo_execucao");
-
-                    b.Property<DateTimeOffset?>("NextAttemptAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_attempt_at");
-
-                    b.Property<string>("ParamsHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("params_hash");
-
-                    b.Property<string>("ParamsJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("params_json");
-
-                    b.Property<string>("ReportKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("report_key");
-
-                    b.Property<long?>("RowCount")
-                        .HasColumnType("bigint")
-                        .HasColumnName("row_count");
-
-                    b.Property<string>("SemanticVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("1.0")
-                        .HasColumnName("semantic_version");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<short>("Status")
-                        .HasColumnType("smallint")
-                        .HasColumnName("status");
-
-                    b.Property<int>("Tentativas")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("tentativas");
-
-                    b.Property<Guid>("UsuarioSolicitanteId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("usuario_solicitante_id");
-
-                    b.Property<string>("WarningsJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("warnings_json");
-
-                    b.Property<uint>("Xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "UsuarioSolicitanteId", "EnqueuedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_report_runs_user_listing");
-
-                    b.ToTable("report_runs", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AdminImpersonationLog", b =>
@@ -7312,16 +7116,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasForeignKey("LojaId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("EasyStock.Domain.Entities.Usuario", "Vendedor")
-                        .WithMany()
-                        .HasForeignKey("VendedorId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Empresa");
 
                     b.Navigation("Loja");
-
-                    b.Navigation("Vendedor");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.VendaAlteracao", b =>

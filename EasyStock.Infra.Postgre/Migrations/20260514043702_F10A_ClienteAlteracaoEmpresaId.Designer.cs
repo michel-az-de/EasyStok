@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260514043702_F10A_ClienteAlteracaoEmpresaId")]
+    partial class F10A_ClienteAlteracaoEmpresaId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5623,10 +5626,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<string>("ProtocoloEvento")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("NfeDocumentoId", "OcorridoEm")
@@ -5641,15 +5640,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("BaseIcms")
-                        .HasColumnType("numeric(14,2)");
-
                     b.Property<string>("CfopSnapshot")
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)");
-
-                    b.Property<decimal?>("Cofins")
-                        .HasColumnType("numeric(14,2)");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
@@ -5661,12 +5654,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("NcmSnapshot")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
-
-                    b.Property<decimal?>("Pis")
-                        .HasColumnType("numeric(14,2)");
-
-                    b.Property<decimal?>("ValorIcms")
-                        .HasColumnType("numeric(14,2)");
 
                     b.Property<Guid>("NfeDocumentoId")
                         .HasColumnType("uuid");
@@ -5703,14 +5690,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("NfeDocumentoId", "Ordem")
                         .HasDatabaseName("ix_nfe_itens_documento_ordem");
-
-                    b.HasIndex("NfeDocumentoId", "CfopSnapshot")
-                        .HasDatabaseName("ix_nfe_itens_cfop")
-                        .HasFilter("\"CfopSnapshot\" IS NOT NULL");
-
-                    b.HasIndex("NfeDocumentoId", "NcmSnapshot")
-                        .HasDatabaseName("ix_nfe_itens_ncm")
-                        .HasFilter("\"NcmSnapshot\" IS NOT NULL");
 
                     b.ToTable("nfe_itens", (string)null);
                 });

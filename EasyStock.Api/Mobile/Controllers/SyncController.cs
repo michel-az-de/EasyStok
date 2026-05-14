@@ -1098,9 +1098,11 @@ public class SyncController(
                     mobileC.ErpClienteId = match.Id;
                     _log.LogInformation("AutoLink Cliente: mobile={MobileId} → erp={ErpId}", cid, match.Id);
                     // F9-C: registra vinculacao na auditoria pra aparecer na aba Atividade.
+                    // F10-A: EmpresaId obrigatorio pro Global Query Filter.
                     _db.Add(new ClienteAlteracao
                     {
                         Id = Guid.NewGuid(),
+                        EmpresaId = empresaId.Value,
                         ClienteId = match.Id,
                         Campo = "vinculacao_mobile",
                         ValorAntigo = null,
@@ -1120,9 +1122,11 @@ public class SyncController(
                 _db.Add(novoC);
                 mobileC.ErpClienteId = novoC.Id;
                 // F9-C: registra criacao via mobile na auditoria.
+                // F10-A: EmpresaId obrigatorio pro Global Query Filter.
                 _db.Add(new ClienteAlteracao
                 {
                     Id = Guid.NewGuid(),
+                    EmpresaId = empresaId.Value,
                     ClienteId = novoC.Id,
                     Campo = "criado",
                     ValorAntigo = null,

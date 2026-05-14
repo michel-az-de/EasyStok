@@ -167,6 +167,13 @@ namespace EasyStock.Domain.Entities
     public class ClienteAlteracao
     {
         public Guid Id { get; set; }
+        /// <summary>
+        /// F10-A: tenant isolation. Sem este campo o Global Query Filter nao
+        /// aplica e a tabela fica cross-tenant. Backfill via migration:
+        /// UPDATE ca SET "EmpresaId" = c."EmpresaId" FROM clientes c
+        /// WHERE c."Id" = ca."ClienteId".
+        /// </summary>
+        public Guid EmpresaId { get; set; }
         public Guid ClienteId { get; set; }
         public Guid? AlteradoPorUserId { get; set; }
         public string? AlteradoPorNome { get; set; }
