@@ -90,16 +90,15 @@ public class EntityAuditController(
                      && a.TipoEntidade == "Cliente"
                      && a.EntidadeId == clienteId);
 
-        // Pedidos do cliente (buscamos os IDs primeiro)
-        var pedidoIds = await db.Pedidos.AsNoTracking()
+        // Pedidos do cliente — subquery no banco (sem materializar IDs em memória)
+        var pedidoIdsQuery = db.Pedidos.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId && p.ClienteId == clienteId)
-            .Select(p => p.Id)
-            .ToListAsync(ct);
+            .Select(p => p.Id);
 
         var pedidoEntries = db.EntityAlteracoes.AsNoTracking()
             .Where(a => a.EmpresaId == empresaId
                      && (a.TipoEntidade == "Pedido" || a.TipoEntidade == "PedidoItem" || a.TipoEntidade == "PedidoPagamento")
-                     && pedidoIds.Contains(a.EntidadeId));
+                     && pedidoIdsQuery.Contains(a.EntidadeId));
 
         var union = clienteEntries.Union(pedidoEntries)
             .OrderByDescending(a => a.AlteradoEm);

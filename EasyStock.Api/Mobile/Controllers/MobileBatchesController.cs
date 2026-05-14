@@ -155,10 +155,11 @@ public class MobileBatchesController(
         if (photo == null || photo.Length == 0)
             return BadRequest(new { error = "photo is required" });
 
-        // Upload para file storage
+        // Upload para file storage — sanitize hash to prevent path traversal
         var bucketPath = $"mobile-photos/{empresaId}/{id}";
         var ext = photo.ContentType.Contains("png") ? ".png" : ".jpg";
-        var fileName = $"{hash?.Replace(":", "-") ?? Guid.NewGuid().ToString()}{ext}";
+        var safeHash = SanitizeFileName(hash);
+        var fileName = $"{safeHash}{ext}";
 
         byte[] content;
         using (var ms = new MemoryStream())
@@ -197,6 +198,18 @@ public class MobileBatchesController(
             id, field, hash, result.Url);
 
         return Ok(new { url = result.Url, hash });
+    }
+
+    /// <summary>
+    /// Sanitiza hash para uso seguro em filename — remove path traversal e caracteres especiais.
+    /// </summary>
+    private static string SanitizeFileName(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return Guid.NewGuid().ToString();
+        // Remove path separators and dangerous chars, keep alphanum + dash + underscore
+        var sanitized = new string(raw.Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').ToArray());
+        return string.IsNullOrEmpty(sanitized) ? Guid.NewGuid().ToString() : sanitized;
     }
 
     private Guid? ResolveUserId()

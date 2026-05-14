@@ -94,7 +94,7 @@
       var deviceId = localStorage.getItem('cdb-device-id') || '';
       if (!apiKey) return; // sem apiKey, nao pode fazer upload
       headers = {
-        'X-Api-Key': apiKey,
+        'X-Mobile-Api-Key': apiKey,
         'X-Device-Id': deviceId
       };
     } catch (e) {
@@ -127,15 +127,23 @@
     days = days || 7;
     var cutoff = Date.now() - (days * 86400000);
     try {
-      var stats = await window.cdbPhotoStore.getStats();
-      if (stats.uploadedCount === 0) return;
-      // Scan e remove uploaded antigas
-      var t = window.cdbPhotoStore;
-      // listPending retorna apenas nao-uploaded; precisamos scan completo
-      // Usa IDB diretamente... mas photo-store nao expoe cursor publico.
-      // Alternativa: adiciona listUploaded. Por agora, skip cleanup —
-      // fotos uploadadas ficam ate limpeza manual via diagCleanPhotos.
-    } catch (e) {}
+      var uploaded = await window.cdbPhotoStore.listUploaded();
+      if (!uploaded || uploaded.length === 0) return;
+      var toRemove = [];
+      for (var i = 0; i < uploaded.length; i++) {
+        if (uploaded[i].uploadedAt && uploaded[i].uploadedAt < cutoff) {
+          toRemove.push(uploaded[i].hash);
+        }
+      }
+      for (var j = 0; j < toRemove.length; j++) {
+        await window.cdbPhotoStore.remove(toRemove[j]);
+      }
+      if (toRemove.length > 0) {
+        console.log('[photo-upload] cleaned up ' + toRemove.length + ' uploaded photos older than ' + days + 'd');
+      }
+    } catch (e) {
+      console.warn('[photo-upload] cleanup error:', e && e.message);
+    }
   }
 
   // ---------- Expose ----------

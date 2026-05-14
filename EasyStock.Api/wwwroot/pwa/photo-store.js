@@ -160,12 +160,44 @@
 
   async function markUploaded(hash) {
     if (!_ready) return;
-    var t = tx('readwrite');
+    // Single read-write tx for atomicity
+    return new Promise(function (resolve, reject) {
+      var t = _db.transaction(STORE, 'readwrite');
+      var store = t.objectStore(STORE);
+      var getReq = store.get(hash);
+      getReq.onsuccess = function () {
+        var existing = getReq.result;
+        if (!existing) { resolve(); return; }
+        existing.uploadedAt = Date.now();
+        store.put(existing);
+      };
+      t.oncomplete = function () { resolve(); };
+      t.onerror = function () { reject(t.error); };
+    });
+  }
+
+  /**
+   * Lista fotos que já foram uploadadas (uploadedAt != null).
+   * @returns {Promise<Array>}
+   */
+  async function listUploaded() {
+    if (!_ready) return [];
+    var t = tx('readonly');
     var store = t.objectStore(STORE);
-    var existing = await idbReq(store.get(hash));
-    if (!existing) return;
-    existing.uploadedAt = Date.now();
-    await idbReq(store.put(existing));
+    return new Promise(function (resolve, reject) {
+      var results = [];
+      var cursor = store.openCursor();
+      cursor.onsuccess = function (e) {
+        var c = e.target.result;
+        if (c) {
+          if (c.value.uploadedAt) results.push(c.value);
+          c.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      cursor.onerror = function () { reject(cursor.error); };
+    });
   }
 
   async function getStats() {
@@ -204,6 +236,7 @@
     get: get,
     remove: remove,
     listPending: listPending,
+    listUploaded: listUploaded,
     listByBatch: listByBatch,
     markUploaded: markUploaded,
     getStats: getStats,

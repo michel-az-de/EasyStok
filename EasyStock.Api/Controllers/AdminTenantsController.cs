@@ -200,37 +200,55 @@ public class AdminTenantsController(
             .Distinct()
             .ToListAsync();
 
-        var results = new List<object>();
         var now = DateTime.UtcNow;
 
+        // Batch queries — avoid N+1 per empresa
+        var empresas = await db.Empresas.AsNoTracking().IgnoreQueryFilters()
+            .Where(e => empresaIds.Contains(e.Id))
+            .Select(e => new { e.Id, e.Nome })
+            .ToDictionaryAsync(e => e.Id);
+
+        var pendingOrdersByEmp = await db.Set<Domain.Entities.Mobile.Order>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(o => o.EmpresaId.HasValue && empresaIds.Contains(o.EmpresaId.Value) && o.ErpPedidoId == null)
+            .GroupBy(o => o.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var pendingBatchesByEmp = await db.Set<Domain.Entities.Mobile.Batch>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(b => b.EmpresaId.HasValue && empresaIds.Contains(b.EmpresaId.Value) && b.ErpLoteId == null)
+            .GroupBy(b => b.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var pendingCashByEmp = await db.Set<Domain.Entities.Mobile.CashEntry>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(c => c.EmpresaId.HasValue && empresaIds.Contains(c.EmpresaId.Value) && c.ErpMovimentoCaixaId == null)
+            .GroupBy(c => c.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var deviceInfoByEmp = await db.Set<Domain.Entities.Mobile.MobileDevice>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(d => empresaIds.Contains(d.EmpresaId) && !d.Revoked)
+            .GroupBy(d => d.EmpresaId)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count(), LastSeen = g.Max(d => (DateTime?)d.LastSeenAt) })
+            .ToDictionaryAsync(x => x.EmpresaId);
+
+        var results = new List<object>();
         foreach (var empId in empresaIds)
         {
-            var empresa = await db.Empresas.AsNoTracking().IgnoreQueryFilters()
-                .Where(e => e.Id == empId)
-                .Select(e => new { e.Id, e.Nome })
-                .FirstOrDefaultAsync();
-            if (empresa == null) continue;
+            if (!empresas.TryGetValue(empId, out var empresa)) continue;
 
-            var pendingOrders = await db.Set<Domain.Entities.Mobile.Order>()
-                .AsNoTracking().IgnoreQueryFilters()
-                .CountAsync(o => o.EmpresaId == empId && o.ErpPedidoId == null);
-            var pendingBatches = await db.Set<Domain.Entities.Mobile.Batch>()
-                .AsNoTracking().IgnoreQueryFilters()
-                .CountAsync(b => b.EmpresaId == empId && b.ErpLoteId == null);
-            var pendingCash = await db.Set<Domain.Entities.Mobile.CashEntry>()
-                .AsNoTracking().IgnoreQueryFilters()
-                .CountAsync(c => c.EmpresaId == empId && c.ErpMovimentoCaixaId == null);
-
+            var pendingOrders = pendingOrdersByEmp.GetValueOrDefault(empId);
+            var pendingBatches = pendingBatchesByEmp.GetValueOrDefault(empId);
+            var pendingCash = pendingCashByEmp.GetValueOrDefault(empId);
             var totalPending = pendingOrders + pendingBatches + pendingCash;
 
-            var lastSync = await db.Set<Domain.Entities.Mobile.MobileDevice>()
-                .AsNoTracking().IgnoreQueryFilters()
-                .Where(d => d.EmpresaId == empId && !d.Revoked)
-                .MaxAsync(d => (DateTime?)d.LastSeenAt);
-
-            var deviceCount = await db.Set<Domain.Entities.Mobile.MobileDevice>()
-                .AsNoTracking().IgnoreQueryFilters()
-                .CountAsync(d => d.EmpresaId == empId && !d.Revoked);
+            deviceInfoByEmp.TryGetValue(empId, out var devInfo);
+            var lastSync = devInfo?.LastSeen;
+            var deviceCount = devInfo?.Count ?? 0;
 
             var staleSync = lastSync.HasValue && (now - lastSync.Value).TotalHours > 24;
             var status = totalPending == 0 && !staleSync ? "green"

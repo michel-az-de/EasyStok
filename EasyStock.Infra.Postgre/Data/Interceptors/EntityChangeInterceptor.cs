@@ -299,19 +299,30 @@ public sealed class EntityChangeInterceptor : SaveChangesInterceptor
         return "***" + value[^4..];
     }
 
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+    };
+
     private static string? SerializeChanges(List<object> changes)
     {
-        var json = JsonSerializer.Serialize(changes, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false,
-        });
+        var json = JsonSerializer.Serialize(changes, JsonOptions);
 
         if (json.Length > MaxAlteracoesJsonBytes)
         {
-            // Truncar: pega o que cabe + flag
-            var truncated = new { _truncated = true, count = changes.Count, partial = json[..MaxAlteracoesJsonBytes] };
-            return JsonSerializer.Serialize(truncated);
+            // Truncar: reduz lista de changes até caber, mantendo JSON válido
+            var keep = changes.Count;
+            while (keep > 1)
+            {
+                keep = keep / 2;
+                var partial = changes.Take(keep).ToList();
+                partial.Add(new { _truncated = true, totalFields = changes.Count, keptFields = keep });
+                json = JsonSerializer.Serialize(partial, JsonOptions);
+                if (json.Length <= MaxAlteracoesJsonBytes) return json;
+            }
+            // Fallback: metadata only
+            return JsonSerializer.Serialize(new { _truncated = true, totalFields = changes.Count, keptFields = 0 }, JsonOptions);
         }
 
         return json;

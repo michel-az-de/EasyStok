@@ -88,27 +88,26 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
         var defaultThreshold = now.AddDays(-DefaultRetentionDays);
         var knownTypes = RetentionDays.Keys.ToList();
 
-        int batch;
-        do
+        // EF translates List<string>.Contains() to SQL NOT IN
+        var defaultDeleted = await db.EntityAlteracoes
+            .Where(a => a.AlteradoEm < defaultThreshold
+                     && !knownTypes.Contains(a.TipoEntidade))
+            .OrderBy(a => a.AlteradoEm)
+            .Take(BatchSize)
+            .ExecuteDeleteAsync(ct);
+        totalDeleted += defaultDeleted;
+
+        // Continue in batches if we hit the limit
+        while (defaultDeleted == BatchSize && !ct.IsCancellationRequested)
         {
-            batch = await db.Database.ExecuteSqlRawAsync(
-                @"DELETE FROM entity_alteracoes
-                  WHERE ""Id"" IN (
-                    SELECT ""Id"" FROM entity_alteracoes
-                    WHERE ""AlteradoEm"" < {0}
-                      AND ""TipoEntidade"" NOT IN ({1}, {2}, {3}, {4}, {5})
-                    LIMIT {6}
-                  )",
-                defaultThreshold,
-                knownTypes.ElementAtOrDefault(0) ?? "",
-                knownTypes.ElementAtOrDefault(1) ?? "",
-                knownTypes.ElementAtOrDefault(2) ?? "",
-                knownTypes.ElementAtOrDefault(3) ?? "",
-                knownTypes.ElementAtOrDefault(4) ?? "",
-                BatchSize,
-                ct);
-            totalDeleted += batch;
-        } while (batch == BatchSize && !ct.IsCancellationRequested);
+            defaultDeleted = await db.EntityAlteracoes
+                .Where(a => a.AlteradoEm < defaultThreshold
+                         && !knownTypes.Contains(a.TipoEntidade))
+                .OrderBy(a => a.AlteradoEm)
+                .Take(BatchSize)
+                .ExecuteDeleteAsync(ct);
+            totalDeleted += defaultDeleted;
+        }
 
         if (totalDeleted > 0)
             _logger.LogInformation("EntityAlteracaoRetentionService: {Count} entries removidas", totalDeleted);
