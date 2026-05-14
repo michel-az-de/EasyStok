@@ -343,6 +343,37 @@
     return muts;
   }
 
+  // ---- F10-C-1: gerador de UUID v4 estavel pra mutation IDs ----
+  // crypto.randomUUID e' garantido em Chrome 92+/Safari 15.4+/Firefox 95+.
+  // Capacitor 6 minimum Chrome 100. Fallback formata bytes de
+  // crypto.getRandomValues pra v4 — mesma fonte de entropia,
+  // criptograficamente seguro, zero colisao em volumes realistas
+  // (122 bits aleatorios).
+  function generateMutationUuid() {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch (_) {}
+    // Fallback v4: 16 bytes random, set version 4 + variant 10xx
+    try {
+      const buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+      buf[8] = (buf[8] & 0x3f) | 0x80; // variant 10
+      const hex = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+      return hex.substring(0,8) + '-' + hex.substring(8,12) + '-' +
+             hex.substring(12,16) + '-' + hex.substring(16,20) + '-' +
+             hex.substring(20);
+    } catch (_) {
+      // Ultimo fallback (caso crypto.getRandomValues nao exista): timestamp
+      // + Math.random. Inferior, mas operacao continua funcionando.
+      return 'fb-' + Date.now() + '-' +
+             Math.random().toString(36).substr(2, 8) +
+             Math.random().toString(36).substr(2, 8);
+    }
+  }
+
   // ---- Enfileira mutations ----
   function enqueue(mutations) {
     if (!mutations.length) return;
@@ -358,7 +389,11 @@
           !(q.type === m.type && q.payload && q.payload.id === m.payload.id));
       }
       queue.push({
-        id: 'm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+        // F10-C-1: UUID v4 via crypto.randomUUID (Chrome 92+, garantido no
+        // Capacitor 6 com Chrome 100+). Fallback usa crypto.getRandomValues
+        // formatado pra v4 — mesma fonte de entropia, sem Math.random fraco.
+        // Prefixo 'mut_' facilita filtro em logs e diferencia de UUIDs do server.
+        id: 'mut_' + generateMutationUuid(),
         deviceId,
         type: m.type,
         payload: m.payload,
@@ -438,7 +473,18 @@
   // OFFLINE-FIRST: se servidor indisponivel, fila persiste no localStorage
   // e proximo flush (30s ou quando rede voltar) tenta de novo. App continua
   // funcional sem rede em qualquer cenario.
-  let flushing = false;
+  // F10-C-1: promise-based mutex substitui o `flushing` boolean.
+  // Race condition antiga: Android suspende WebView entre `flushing = true`
+  // e o POST; outro tick (visibilitychange/setInterval) entra, le `flushing`
+  // ja como false porque `finally` rodou apos resume — 2 POSTs simultaneos
+  // com a mesma fila. Resultado: server processa 2x (idempotente por upsert
+  // mas gasta CPU+log, e em conflict-flow podia rejeitar a 2a wave inteira).
+  //
+  // Promise-based: chamadas concorrentes recebem a MESMA promise pendente.
+  // Re-entry vira merge automatico; ninguem perde resultado. Callers que
+  // ignoram retorno (fire-and-forget) seguem funcionando — promise so e'
+  // referenciada se quiserem await.
+  let flushPromise = null;
   // Marcador soft de pairing invalidado (revogado/expirado no server).
   // Não deletamos o pairing local — Felipe pode re-parear sem perder fila.
   // Quando true: stop tentando flush ate operador re-parear OU clearPairing.
@@ -451,7 +497,13 @@
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
   async function flush() {
-    if (flushing) return 'busy';
+    // F10-C-1: re-entry retorna a MESMA promise pendente. Sem race.
+    if (flushPromise) return flushPromise;
+    flushPromise = _flushInner().finally(() => { flushPromise = null; });
+    return flushPromise;
+  }
+
+  async function _flushInner() {
     if (_pairingInvalid) return 'auth'; // backoff até re-parear
     const queue = loadQueue();
     if (queue.length === 0) {
@@ -460,7 +512,6 @@
     }
     if (!navigator.onLine) return 'offline';
 
-    flushing = true;
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
       // Operador lido dinamicamente a cada sync — se o usuário trocar o nome
@@ -574,9 +625,8 @@
         );
       }
       return 'retry';
-    } finally {
-      flushing = false;
     }
+    // F10-C-1: o reset do flushPromise mora no `.finally(...)` do wrapper flush().
   }
 
   // ---- Pull: traz mudanças do servidor (outros devices) ----
