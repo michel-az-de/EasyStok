@@ -135,6 +135,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
 
             // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
             services.AddHostedService<EntityAlteracaoRetentionService>();
+            // F10-D: Mobile alert service — verifica devices offline a cada 30min.
+            services.AddHostedService<MobileAlertService>();
 
             return services;
         }

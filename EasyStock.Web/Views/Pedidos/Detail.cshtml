@@ -191,13 +191,14 @@ else
                 @foreach (var (key, label, count) in new[] {
                     ("itens",       "Itens",       Model.Detalhe.Itens.Count),
                     ("pagamentos",  "Pagamentos",  Model.Detalhe.Pagamentos.Count),
-                    ("eventos",     "Histórico",   Model.Detalhe.Eventos.Count)
+                    ("eventos",     "Histórico",   Model.Detalhe.Eventos.Count),
+                    ("auditoria",   "Auditoria",   -1)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"
                             :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
                             class="px-3 py-2 text-sm font-medium border-b-2">
-                        @label <span class="text-xs text-slate-400">(@count)</span>
+                        @label @if (count >= 0) { <span class="text-xs text-slate-400">(@count)</span> }
                     </button>
                 }
             </div>
@@ -378,9 +379,64 @@ else
                 }
                 else { <p class="text-sm text-slate-500">Nenhum evento.</p> }
             </div>
+
+            <!-- F10-D: Auditoria (entity_alteracoes via AJAX) -->
+            <div x-show="tab === 'auditoria'" x-cloak class="p-4"
+                 x-init="$watch('tab', v => { if (v === 'auditoria') loadAuditoria(); })">
+                <div id="auditoria-content">
+                    <p class="text-sm text-slate-500">Carregando auditoria...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function loadAuditoria() {
+    var el = document.getElementById('auditoria-content');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    fetch('/api/audit/entity/Pedido/@p.Id')
+        .then(r => r.json())
+        .then(res => {
+            var items = (res.data && res.data.items) || [];
+            if (items.length === 0) {
+                el.innerHTML = '<p class="text-sm text-slate-500">Nenhuma alteração registrada.</p>';
+                return;
+            }
+            var html = '<ul class="divide-y divide-slate-100">';
+            items.forEach(function(a) {
+                var dt = new Date(a.alteradoEm);
+                var fmt = dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' +
+                          dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                html += '<li class="py-2 text-sm">';
+                html += '<div class="flex items-center gap-2 flex-wrap">';
+                html += '<span class="text-xs text-slate-400 font-mono">' + fmt + '</span>';
+                html += '<span class="font-medium text-slate-900">' + escHtml(a.acao) + '</span>';
+                if (a.campo) {
+                    html += '<span class="text-xs text-slate-600">' + escHtml(a.campo) + '</span>';
+                }
+                if (a.valorAntigo != null || a.valorNovo != null) {
+                    html += '<span class="text-xs text-slate-500">';
+                    if (a.valorAntigo != null) html += '<del class="text-red-400">' + escHtml(trunc(a.valorAntigo, 50)) + '</del> ';
+                    if (a.valorNovo != null) html += '<ins class="text-green-600 no-underline">' + escHtml(trunc(a.valorNovo, 50)) + '</ins>';
+                    html += '</span>';
+                }
+                if (a.origem) html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.origem) + '</span>';
+                if (a.hasPii) html += '<span class="text-xs" title="Contém PII mascarada">🔒</span>';
+                html += '</div>';
+                if (a.alteradoPorNome) html += '<div class="text-xs text-slate-400 ml-2">por ' + escHtml(a.alteradoPorNome) + '</div>';
+                html += '</li>';
+            });
+            html += '</ul>';
+            if (res.data.total > 50) html += '<p class="text-xs text-slate-400 mt-2">Mostrando 50 de ' + res.data.total + ' alterações.</p>';
+            el.innerHTML = html;
+        })
+        .catch(function() { el.innerHTML = '<p class="text-sm text-red-500">Erro ao carregar auditoria.</p>'; });
+}
+function escHtml(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s; }
+</script>
 
 @if (p.Status != "entregue" && !isCancelado)
 {
