@@ -163,7 +163,7 @@ else
 </div>
 
 <!-- Gráfico receita mensal -->
-@if (Model.GraficoLabels.Any())
+@if (Model.GraficoLabels.Any() && Model.GraficoDados.Any(d => d > 0))
 {
     <div class="ws mb-6">
         <div class="flex items-center justify-between mb-4">
@@ -184,7 +184,7 @@ else
 }
 
 @section Scripts {
-    @if (Model.GraficoLabels.Any())
+    @if (Model.GraficoLabels.Any() && Model.GraficoDados.Any(d => d > 0))
     {
         <script>
             const ctx = document.getElementById('grafico-receita-analytics');

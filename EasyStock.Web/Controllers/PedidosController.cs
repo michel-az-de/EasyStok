@@ -20,6 +20,9 @@ public class PedidosController(
     ProdutosService produtosSvc,
     SessionService session) : BaseController(session)
 {
+    [HttpGet("/pedidos/novo")]
+    public IActionResult Novo() => RedirectToAction(nameof(Index));
+
     [HttpGet("/pedidos")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
     {

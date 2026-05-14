@@ -296,7 +296,9 @@
                 @if (Model.Detalhe.Alteracoes.Any())
                 {
                     <ul class="divide-y divide-slate-100">
-                    @foreach (var a in Model.Detalhe.Alteracoes)
+                    @foreach (var a in Model.Detalhe.Alteracoes.Where(a =>
+                        string.IsNullOrEmpty(a.Origem) ||
+                        !a.Origem.Contains("sync", StringComparison.OrdinalIgnoreCase)))
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">

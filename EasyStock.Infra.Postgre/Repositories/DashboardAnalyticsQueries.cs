@@ -140,8 +140,8 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var query = dbContext.MovimentacoesEstoque
             .AsNoTracking()
             .Where(m => m.EmpresaId == empresaId &&
-                m.DataMovimentacao >= de &&
-                m.DataMovimentacao <= ate);
+                m.DataMovimentacao >= DateTime.SpecifyKind(de, DateTimeKind.Utc) &&
+                m.DataMovimentacao <= DateTime.SpecifyKind(ate, DateTimeKind.Utc));
 
         if (tipo.HasValue)
             query = query.Where(m => m.Tipo == tipo.Value);

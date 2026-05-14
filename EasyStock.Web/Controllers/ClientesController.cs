@@ -29,6 +29,9 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         return View(vm);
     }
 
+    [HttpGet("/clientes/novo")]
+    public IActionResult Novo() => RedirectToAction(nameof(Index));
+
     [HttpGet("/clientes/{id}")]
     public async Task<IActionResult> Detail(string id)
     {

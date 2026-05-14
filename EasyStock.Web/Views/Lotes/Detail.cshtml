@@ -90,7 +90,7 @@
             <div class="flex border-b border-slate-200 px-4 pt-2 gap-1">
                 @foreach (var (key, label, count) in new[] {
                     ("itens",     "Itens",     Model.Detalhe.Itens.Count),
-                    ("etiquetas", "Etiquetas", Model.Detalhe.Etiquetas.Count)
+                    ("etiquetas", "Etiquetas", (int)l.TotalUnidades)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"

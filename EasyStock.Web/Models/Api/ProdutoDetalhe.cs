@@ -22,7 +22,7 @@ public record ProdutoDetalhe
     public decimal? PrecoReferencia { get; init; }
     public decimal? MargemEstimada { get; init; }
     public ProdutoDimensoesDetalhe? Dimensoes { get; init; }
-    public int QuantidadeTotalEstoque { get; init; }
+    public decimal QuantidadeTotalEstoque { get; init; }
     public DateTime? UltimaEntradaEm { get; init; }
     public List<ProdutoFotoDetalhe> Fotos { get; init; } = [];
     public List<VariacaoDetalhe> Variacoes { get; init; } = [];

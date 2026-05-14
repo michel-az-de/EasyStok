@@ -1,3 +1,4 @@
+using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,15 +18,12 @@ public class MobileDevicesController(
         ViewBag.Title = "Dispositivos";
         ViewBag.ActiveMenuItem = "Dispositivos";
 
-        // Onda 7: carrega saúde em paralelo pra mostrar coluna colorida.
-        var listTask = svc.ListarAsync();
-        var healthTask = opSvc.ObterSaudeDevicesAsync();
-        await Task.WhenAll(listTask, healthTask);
-
-        var listResult = await listTask;
-        var healthResult = await healthTask;
-
+        var listResult = await svc.ListarAsync();
         if (HasError(listResult)) return View(new List<MobileDeviceApi>());
+
+        ApiResult<List<DeviceHealthApi>> healthResult;
+        try { healthResult = await opSvc.ObterSaudeDevicesAsync(); }
+        catch { healthResult = ApiResult<List<DeviceHealthApi>>.Fail("ERR", "Falha ao carregar saúde dos dispositivos."); }
 
         // Mapeia health por id pra view consultar O(1).
         var healthById = healthResult.Success && healthResult.Data != null

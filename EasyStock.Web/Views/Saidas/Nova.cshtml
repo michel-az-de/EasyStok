@@ -369,7 +369,7 @@ function saidaForm() {
             if (this.variacoes.length > 0 && this.variacoes[0].quantidadeEmEstoque !== undefined) {
                 this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque;
             }
-            this.valorUnit = d.precoReferencia || d.precoVendaSugerido || d.custoUnitario || 0;
+            this.valorUnit = d.precoReferencia || d.custoReferencia || 0;
             this.produtoFotoUrl = d.fotoUrl || '';
             this.produtoMarca = d.marca || '';
             this.produtoCodigoBarras = d.codigoBarras || '';

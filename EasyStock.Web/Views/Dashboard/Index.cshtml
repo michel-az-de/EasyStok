@@ -217,7 +217,7 @@
     </div>
 </div>
 
-<div class="ws">
+<div class="ws hidden lg:block">
     <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
     <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
         @{
@@ -253,7 +253,7 @@
 </div>
 
 @section Scripts {
-    @if (Model.GraficoLabels.Any())
+    @if (Model.GraficoLabels.Any() && Model.GraficoDados.Any(d => d > 0))
     {
     <script>
         const ctx = document.getElementById('grafico-receita');
