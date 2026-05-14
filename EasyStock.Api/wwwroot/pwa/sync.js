@@ -414,6 +414,13 @@
   // ---- Enfileira mutations ----
   function enqueue(mutations) {
     if (!mutations.length) return;
+    // F10-C-5: bloqueia enqueues nao-criticas durante OTA.
+    if (_mutationsBlocked) {
+      mutations = mutations.filter(function (m) {
+        return CRITICAL_MUTATION_TYPES[m.type] === true;
+      });
+      if (!mutations.length) return;
+    }
     let queue = loadQueue();
     mutations.forEach(m => {
       // Dedup local: se ja tem mutation pendente pro mesmo (type, payload.id),
@@ -900,6 +907,17 @@
   // Cleanup no unload — em Capacitor o pagehide dispara antes de descarregar
   // a webview; no browser puro tambem cobre fechamento de aba.
   window.addEventListener('pagehide', stop);
+
+  // F10-C-5: limpa locks de OTA expirados (TTL 60s). Se app fechou durante
+  // OTA, heartbeat parou e o lock expirou — boot limpa.
+  try {
+    const lockTs = parseInt(localStorage.getItem(UPDATE_LOCK_KEY) || '0', 10);
+    if (lockTs && (Date.now() - lockTs > UPDATE_LOCK_TTL_MS)) {
+      localStorage.removeItem(UPDATE_LOCK_KEY);
+      localStorage.removeItem('cdb-mutations-blocked');
+      _trace('boot', 'OTA lock expirado — limpando');
+    }
+  } catch (_) {}
 
   setTimeout(() => {
     if (window.cdbApp) {
@@ -1674,7 +1692,34 @@
   // cdb-update-in-progress mora no localStorage — sobrevive a reload e impede
   // que um segundo ciclo dispare se o reload do controllerchange demorar.
   const UPDATE_LOCK_KEY = 'cdb-update-in-progress';
-  const UPDATE_LOCK_TTL_MS = 5 * 60 * 1000;
+  // F10-C-5: TTL reduzido pra 60s + heartbeat 5s. Se app fechar durante OTA,
+  // TTL expira rapido e boot seguinte limpa o lock.
+  const UPDATE_LOCK_TTL_MS = 60 * 1000;
+  const UPDATE_HEARTBEAT_MS = 5000;
+  let _updateHeartbeatTimer = null;
+
+  function startUpdateHeartbeat() {
+    stopUpdateHeartbeat();
+    _updateHeartbeatTimer = setInterval(function () {
+      try { localStorage.setItem(UPDATE_LOCK_KEY, String(Date.now())); } catch (_) {}
+    }, UPDATE_HEARTBEAT_MS);
+  }
+
+  function stopUpdateHeartbeat() {
+    if (_updateHeartbeatTimer) {
+      clearInterval(_updateHeartbeatTimer);
+      _updateHeartbeatTimer = null;
+    }
+  }
+
+  // F10-C-5: flag que bloqueia enqueues nao-criticas durante OTA.
+  let _mutationsBlocked = false;
+  const CRITICAL_MUTATION_TYPES = {
+    'order.upsert': true, 'order.update': true,
+    'cashEntry.upsert': true, 'cashEntry.update': true,
+    'batch.upsert': true, 'batch.update': true,
+    'cashClosing.upsert': true
+  };
   // Schema minimo do servidor que esta versao do PWA requer. Bate com
   // MobileVersionController.mobileSchemaVersion. Bump quando o PWA passar a
   // depender de mutations/comandos novos.
@@ -1819,6 +1864,16 @@
     }
 
     _pwaUpdating = true;
+    // F10-C-5: bloqueia mutations nao-criticas + heartbeat
+    _mutationsBlocked = true;
+    localStorage.setItem('cdb-mutations-blocked', 'true');
+    startUpdateHeartbeat();
+    try {
+      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+        window.cdbApp.showToast('Atualizando — aguarde 10s...', 'info');
+      }
+    } catch (_) {}
+
     let drainedOk = false;
     let drainRemaining = 0;
     let backupOk = false;
@@ -1911,7 +1966,13 @@
       // pra sempre se o reload nao acontecer. Tambem libera o lock persistente
       // (cdb-update-in-progress) caso a pagina nao recarregue (ex: registration
       // ja era nula). Em fluxo normal o reload limpa tudo via TTL.
-      setTimeout(() => { _pwaUpdating = false; releaseUpdateLock(); }, 5000);
+      setTimeout(() => {
+        _pwaUpdating = false;
+        _mutationsBlocked = false;
+        try { localStorage.removeItem('cdb-mutations-blocked'); } catch (_) {}
+        stopUpdateHeartbeat();
+        releaseUpdateLock();
+      }, 5000);
     }
   }
 
