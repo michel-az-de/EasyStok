@@ -96,7 +96,7 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     Ilimitado
                 </span>
-                <span class="text-sm text-slate-500">@Model.GeracoesIaUsadas geração(ões) realizadas</span>
+                <span class="text-sm text-slate-500">@Model.GeracoesIaUsadas @(Model.GeracoesIaUsadas == 1 ? "geração realizada" : "gerações realizadas")</span>
             </div>
         }
         else

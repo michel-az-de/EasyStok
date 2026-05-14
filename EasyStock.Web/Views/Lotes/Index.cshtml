@@ -91,7 +91,17 @@
                     </td>
                     <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().ToString("dd/MM HH:mm")</td>
                     <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
-                    <td class="text-slate-600 text-sm tabular-nums">@l.ItensCount item(s) · @l.TotalUnidades un</td>
+                    <td class="text-slate-600 text-sm tabular-nums">
+                        @if (l.TotalUnidades == 0)
+                        {
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                  title="Nenhuma unidade cadastrada neste lote">Sem itens</span>
+                        }
+                        else
+                        {
+                            @l.ItensCount <text>item(s) · </text>@l.TotalUnidades <text>un</text>
+                        }
+                    </td>
                     <td class="text-sm text-slate-600 tabular-nums">
                         @if (l.TotalUnidades > 0) { <span>@l.EtiquetasConferidas/@l.TotalUnidades</span> }
                         else { <span class="text-slate-400">—</span> }
