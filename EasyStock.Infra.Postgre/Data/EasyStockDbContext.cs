@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
 using Microsoft.Extensions.Logging;
 
@@ -90,6 +91,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
+        public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
+        public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
 
         // Admin Module DbSets
@@ -150,6 +153,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<NfeDocumento> NfeDocumentos { get; set; } = null!;
         public DbSet<NfeItem> NfeItens { get; set; } = null!;
         public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
+
+        // Módulo de Relatórios — motor assíncrono multi-tenant
+        public DbSet<ReportRun> ReportRuns { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
@@ -331,6 +337,13 @@ namespace EasyStock.Infra.Postgre.Data
             // Modulo Casa da Baba Mobile — esquema mobile_* e escopo proprio.
             if (clrType.Namespace?.StartsWith("EasyStock.Domain.Entities.Mobile", StringComparison.Ordinal) == true)
                 return true;
+
+            // ReportRun — EmpresaId é nullable (null para contexto AdminSaaS).
+            // Isolamento multi-tenant tratado manualmente em WorkerCurrentUserAccessor
+            // e ITenantScopedQueryBuilder (defesa em profundidade §ADR-R07).
+            // Se aplicarmos o filtro global, runs AdminSaaS (EmpresaId=null)
+            // jamais seriam retornadas e o filter quebraria para elas.
+            if (clrType == typeof(ReportRun)) return true;
 
             // Admin tooling — auditoria/feature flags cross-tenant.
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).

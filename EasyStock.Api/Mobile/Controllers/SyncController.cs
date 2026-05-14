@@ -83,8 +83,32 @@ public class SyncController(
         var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
 
+        // F10-C-3 — Idempotency: pre-check mutations já processadas.
+        // Reenvio retorna mesma resposta sem reprocessar (principio #8).
+        var mutationIds = req.Mutations.Select(m => m.Id).Where(id => !string.IsNullOrEmpty(id)).ToList();
+        var alreadyProcessed = new Dictionary<string, MobileProcessedMutation>(StringComparer.Ordinal);
+        if (mutationIds.Count > 0 && !string.IsNullOrEmpty(req.DeviceId))
+        {
+            var existing = await _db.MobileProcessedMutations
+                .AsNoTracking()
+                .Where(p => mutationIds.Contains(p.MutationId) && p.DeviceId == req.DeviceId)
+                .ToListAsync();
+            foreach (var e in existing)
+                alreadyProcessed[e.MutationId] = e;
+        }
+
         foreach (var m in req.Mutations)
         {
+            // F10-C-3: mutation já processada → replay resposta sem reprocessar.
+            if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
+            {
+                if (prev.Outcome == "accepted")
+                    accepted.Add(m.Id);
+                else
+                    rejected.Add(new SyncConflict(m.Id, prev.Outcome));
+                continue;
+            }
+
             try
             {
                 await ApplyMutation(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
@@ -123,6 +147,38 @@ public class SyncController(
             catch (Exception ex)
             {
                 rejected.Add(new SyncConflict(m.Id, ex.Message));
+            }
+        }
+
+        // F10-C-3 — Registra mutations processadas pra idempotency futura.
+        // Inserido ANTES do SaveChanges pra mesma tx atomica.
+        if (!string.IsNullOrEmpty(req.DeviceId))
+        {
+            var now = DateTime.UtcNow;
+            foreach (var aId in accepted)
+            {
+                if (string.IsNullOrEmpty(aId) || alreadyProcessed.ContainsKey(aId)) continue;
+                _db.MobileProcessedMutations.Add(new MobileProcessedMutation
+                {
+                    MutationId = aId,
+                    DeviceId = req.DeviceId,
+                    EmpresaId = empresaId ?? Guid.Empty,
+                    Outcome = "accepted",
+                    CriadoEm = now,
+                });
+            }
+            foreach (var r in rejected)
+            {
+                if (string.IsNullOrEmpty(r.MutationId) || alreadyProcessed.ContainsKey(r.MutationId)) continue;
+                _db.MobileProcessedMutations.Add(new MobileProcessedMutation
+                {
+                    MutationId = r.MutationId,
+                    DeviceId = req.DeviceId,
+                    EmpresaId = empresaId ?? Guid.Empty,
+                    Outcome = (r.Reason?.StartsWith("conflict:") == true ? "rejected:conflict" : "rejected:validation"),
+                    ResponseMeta = r.Reason,
+                    CriadoEm = now,
+                });
             }
         }
 

@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260514055600_F10B_EntityAlteracoes")]
+    partial class F10B_EntityAlteracoes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3169,38 +3172,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("mobile_products");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.MobileProcessedMutation", b =>
-                {
-                    b.Property<string>("MutationId")
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.Property<string>("DeviceId")
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("ResponseMeta")
-                        .HasColumnType("text");
-
-                    b.HasKey("MutationId", "DeviceId");
-
-                    b.HasIndex("EmpresaId", "CriadoEm")
-                        .HasDatabaseName("ix_mpm_retention");
-
-                    b.ToTable("mobile_processed_mutations", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.MovimentacaoEstoque", b =>

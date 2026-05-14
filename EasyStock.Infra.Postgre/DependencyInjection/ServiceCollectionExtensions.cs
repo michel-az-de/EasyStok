@@ -7,6 +7,7 @@ using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Events;
+using EasyStock.Infra.Postgre.Hosting;
 using EasyStock.Infra.Postgre.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
             services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddScoped<EntityChangeInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
@@ -40,7 +42,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
                 })
-                .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
+                .AddInterceptors(
+                    sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                    sp.GetRequiredService<EntityChangeInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
@@ -128,6 +132,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
+
+            // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
+            services.AddHostedService<EntityAlteracaoRetentionService>();
 
             return services;
         }
