@@ -8,6 +8,7 @@ using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
+using EasyStock.Worker.DependencyInjection;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -99,6 +100,11 @@ builder.Services.AddHostedService<EndpointHealthMonitorService>();
 // OutboxEventoIntegracao e despacha via handlers registrados.
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).
 builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
+
+// Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
+// Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
+// WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
+builder.Services.AddReportingWorker();
 
 // Health checks
 builder.Services.AddHealthChecks();

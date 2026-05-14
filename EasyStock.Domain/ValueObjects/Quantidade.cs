@@ -7,20 +7,23 @@ namespace EasyStock.Domain.ValueObjects
     [JsonConverter(typeof(QuantidadeJsonConverter))]
     public sealed record Quantidade
     {
-        public int Value { get; }
+        public decimal Value { get; }
 
-        private Quantidade(int value)
+        private Quantidade(decimal value)
         {
             Value = value;
         }
 
-        public static Quantidade From(int value)
+        public static Quantidade From(decimal value)
         {
             if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "Quantidade não pode ser negativa.");
             return new Quantidade(value);
         }
 
-        public static Quantidade Zero => new(0);
+        // Overload mantido para compatibilidade com call-sites que passam int literal
+        public static Quantidade From(int value) => From((decimal)value);
+
+        public static Quantidade Zero => new(0m);
         public Quantidade Add(Quantidade other) => From(Value + other.Value);
         public Quantidade Subtract(Quantidade other)
         {
@@ -29,10 +32,15 @@ namespace EasyStock.Domain.ValueObjects
             return From(result);
         }
 
-        public static implicit operator int(Quantidade q) => q.Value;
-        public static implicit operator int?(Quantidade? q) => q?.Value;
+        // Operadores decimais (primários)
+        public static implicit operator decimal(Quantidade q) => q.Value;
+        public static implicit operator decimal?(Quantidade? q) => q?.Value;
 
-        public override string ToString() => Value.ToString();
+        // Operadores int mantidos para retrocompatibilidade com sites que consomem int
+        public static implicit operator int(Quantidade q) => (int)q.Value;
+        public static implicit operator int?(Quantidade? q) => q == null ? (int?)null : (int)q.Value;
+
+        public override string ToString() => Value.ToString("G");
 
         private sealed class QuantidadeJsonConverter : JsonConverter<Quantidade>
         {
@@ -40,18 +48,18 @@ namespace EasyStock.Domain.ValueObjects
             {
                 if (reader.TokenType == JsonTokenType.Null) return null;
                 if (reader.TokenType == JsonTokenType.Number)
-                    return From(reader.GetInt32());
+                    return From(reader.GetDecimal());
 
                 if (reader.TokenType == JsonTokenType.StartObject)
                 {
-                    int? val = null;
+                    decimal? val = null;
                     while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
                     {
                         if (reader.TokenType == JsonTokenType.PropertyName &&
                             reader.GetString()!.Equals("value", StringComparison.OrdinalIgnoreCase))
                         {
                             reader.Read();
-                            val = reader.GetInt32();
+                            val = reader.GetDecimal();
                         }
                     }
                     return val.HasValue ? From(val.Value) : null;

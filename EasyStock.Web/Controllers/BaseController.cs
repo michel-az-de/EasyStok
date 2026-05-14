@@ -23,7 +23,11 @@ public abstract class BaseController(SessionService session) : Controller
     private static readonly HashSet<string> ControllersAllowedWithoutLoja = new(StringComparer.OrdinalIgnoreCase)
     {
         "Lojas",
-        "Assinatura"
+        "Assinatura",
+        // KDS filtra por empresaId (não lojaId) — funciona sem loja selecionada.
+        // Sem esta entrada, login com múltiplas lojas redireciona para SelecionarLoja
+        // antes que o usuário possa acessar a tela de cozinha.
+        "Kds"
     };
 
     protected bool IsAdmin()

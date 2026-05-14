@@ -53,7 +53,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
             return View("Nova", vm);
         }
 
-        Toast("success", "Saída registrada com sucesso!");
+        Toast("success", "Saída registrada.");
         return RedirectToAction(nameof(Historico));
     }
 
@@ -63,6 +63,12 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
     {
         ViewBag.Title = "Histórico de Saídas";
         ViewBag.ActiveMenuItem = "Saidas";
+
+        if (string.IsNullOrEmpty(de) && string.IsNullOrEmpty(ate))
+        {
+            de = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
+            ate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        }
 
         var result = await svc.ListarAsync(page, natureza, de, ate);
         var kpisResult = await svc.ObterKpisAsync(natureza, de, ate);

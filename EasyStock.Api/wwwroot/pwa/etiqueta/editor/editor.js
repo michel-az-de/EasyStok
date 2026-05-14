@@ -100,6 +100,7 @@ export function etqEditorAbrir(templateId, layoutJson, empresaId) {
     _unsaved    = false;
     _zoom       = 1;
 
+    _overlay.style.display = '';
     _overlay.classList.add('open');
     _resetCanvas();
     _renderSidebar();

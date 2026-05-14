@@ -85,11 +85,13 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             paradosQuery = paradosQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasParados = await paradosQuery.CountAsync();
 
-        // Vendas do período (via movimentações de saída — mesma lógica do original)
+        // Receita do período — filtra Natureza=Venda para excluir Perda,
+        // Prejuizo, Vencimento, Doacao e UsoInterno do cálculo de receita.
         var movQuery = dbContext.MovimentacoesEstoque
             .AsNoTracking()
             .Where(m => m.EmpresaId == empresaId &&
                 m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                m.Natureza == NaturezaMovimentacaoEstoque.Venda &&
                 m.DataMovimentacao >= de &&
                 m.DataMovimentacao <= ate);
         if (lojaId.HasValue)

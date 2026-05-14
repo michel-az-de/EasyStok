@@ -5055,14 +5055,46 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .etq-head h3 { margin: 0; font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); }
 .etq-head .etq-sub { font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
-.etq-mode-chip {
-  display: inline-flex; align-items: center;
-  margin-top: 8px; padding: 5px 9px;
-  border-radius: 999px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04); color: var(--gold);
-  font-size: 11px; font-weight: 850; letter-spacing: 0.04em;
-  text-transform: uppercase;
+.etq-config-bar {
+  padding: 10px 16px; border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  display: flex; flex-direction: column; gap: 8px;
 }
+.etq-config-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.etq-config-lbl {
+  font-size: 11px; font-weight: 700; color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  min-width: 72px;
+}
+.etq-config-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.etq-chip {
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: transparent;
+  color: var(--ink-mute); font-size: 11px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.etq-chip.active {
+  background: var(--gold, #E0A64A); color: #000;
+  border-color: var(--gold, #E0A64A);
+}
+/* Etiqueta horizontal */
+.etq-card.etq-horiz {
+  width: 380px; max-width: 100%;
+  display: flex; flex-direction: row; gap: 12px;
+  padding: 14px;
+}
+.etq-card.etq-horiz .et-main { flex: 1; min-width: 0; }
+.etq-card.etq-horiz .et-side {
+  flex-shrink: 0; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; justify-content: center;
+  min-width: 110px;
+}
+.etq-card.etq-horiz .et-scan {
+  border: none; padding: 0; margin: 0; background: transparent;
+}
+.etq-card.etq-horiz .et-qr svg { width: 90px; height: 90px; }
 .etq-success-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; background: rgba(22,143,122,0.18); color: var(--basil);
@@ -5086,133 +5118,150 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .etq-card {
   width: 320px; max-width: 100%;
   background: #fff; color: #000;
-  /* Manrope: tipografia robusta para etiqueta (visualmente coerente com o
-     que sai impresso na termica). Pesos 600-800 dao traço largo, sem o
-     visual "falhado" do monospace antigo. */
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-  font-size: 15px; line-height: 1.38; font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-size: 13px; line-height: 1.4; font-weight: 500;
   -webkit-font-smoothing: antialiased;
-  padding: 17px 15px 15px;
-  border: 1px solid #ececec;
-  border-radius: 6px;
-  box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+  padding: 16px 14px 14px;
+  border: 1px solid #e2e5ea;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
   position: relative;
 }
 .etq-card::before,
 .etq-card::after {
-  content: ''; position: absolute; left: 12px; right: 12px; height: 1px;
-  background: repeating-linear-gradient(90deg, #d8d8d8 0 5px, transparent 5px 10px);
+  content: ''; position: absolute; left: 10px; right: 10px; height: 1px;
+  background: repeating-linear-gradient(90deg, #d0d4db 0 4px, transparent 4px 8px);
 }
-.etq-card::before { top: 7px; }
-.etq-card::after { bottom: 7px; }
-.etq-card .et-title,
-.etq-card .pa-title { overflow-wrap: anywhere; }
-.etq-card .pa-logo,
-.print-area .pa-logo {
-  display: flex;
-  justify-content: center;
-  margin: 0 auto 6px;
+.etq-card::before { top: 5px; }
+.etq-card::after { bottom: 5px; }
+/* ── Logo EasyStok ── */
+.etq-card .et-brand {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
 }
-.etq-card .pa-logo img,
-.print-area .pa-logo img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-.etq-card .et-title {
-  text-align: center; font-size: 20px; font-weight: 950;
-  margin-bottom: 2px; line-height: 1.08;
-}
-.etq-card .et-kicker,
-.etq-card .pa-kicker {
-  text-align: center; font-size: 11px; font-weight: 900;
-  letter-spacing: 0.16em; text-transform: uppercase; color: #555;
-  margin-bottom: 8px;
-}
+.etq-card .et-brand img { width: 28px; height: 28px; }
+.etq-card .et-brand-name { font-size: 15px; font-weight: 800; color: #1A2E5A; letter-spacing: -0.01em; }
+.etq-card .et-brand-name b { color: #E85814; font-weight: 800; }
+/* ── Produção ── */
 .etq-card .et-prod {
-  text-align: center; font-size: 18px; font-weight: 950;
-  margin: 10px 0 9px; padding: 9px 8px;
-  border: 2px solid #000; border-radius: 8px;
-  line-height: 1.2; overflow-wrap: anywhere;
+  font-size: 17px; font-weight: 800; line-height: 1.15;
+  margin: 0 0 2px; overflow-wrap: anywhere; color: #000;
+  border: none; padding: 0; border-radius: 0;
 }
+.etq-card .et-unit { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 8px; }
 .etq-card .et-photo-wrap {
-  display: flex; justify-content: center; margin: 8px 0 4px;
+  display: flex; justify-content: center; margin: 6px 0;
 }
 .etq-card .et-photo {
-  max-width: 90%; max-height: 140px; object-fit: contain;
-  border: 1px solid #000; border-radius: 4px; background: #fff;
+  max-width: 90%; max-height: 120px; object-fit: contain;
+  border: 1px solid #e2e5ea; border-radius: 6px; background: #fff;
 }
+.etq-card .et-info { margin-bottom: 8px; }
+.etq-card .et-info-row {
+  display: flex; gap: 8px; padding: 2px 0; font-size: 13px;
+}
+.etq-card .et-lbl {
+  font-weight: 800; color: #1A2E5A; min-width: 42px;
+  font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.etq-card .et-val { font-weight: 600; color: #000; font-size: 13px; }
+.etq-card .et-conserv {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #555; font-weight: 500; margin: 4px 0 8px;
+}
+/* ── Scan area ── */
 .etq-card .et-scan {
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  border: 2px solid #000; border-radius: 10px;
-  padding: 12px 10px; margin: 10px 0 12px;
-  background: #fafafa;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 1.5px solid #e2e5ea; border-radius: 8px;
+  padding: 10px; margin: 6px 0;
+  background: #fafbfc;
 }
 .etq-card .et-bars {
-  display: flex; height: 58px; margin: 4px auto 2px;
+  display: flex; height: 50px; margin: 0 auto;
   align-items: stretch; justify-content: center;
-  background: #fff;
-  max-width: 100%; overflow: hidden;
+  background: #fff; max-width: 100%; overflow: hidden;
 }
-.etq-card .et-bars svg { display: block; max-width: 100%; height: 58px; }
+.etq-card .et-bars svg { display: block; max-width: 100%; height: 50px; }
 .etq-card .et-bars .bar { background: #000; height: 100%; }
 .etq-card .et-bars .gap { background: transparent; height: 100%; }
 .etq-card .et-code {
-  text-align: center; font-size: 14px; font-weight: 900;
-  letter-spacing: 0.04em; line-height: 1.25; overflow-wrap: anywhere;
+  text-align: center; font-size: 11px; font-weight: 700;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  letter-spacing: 0.03em; color: #333; overflow-wrap: anywhere;
 }
 .etq-card .et-qr {
   display: flex; justify-content: center; align-items: center;
-  margin: 0 0 3px;
 }
-.etq-card .et-qr svg { display: block; width: 128px; height: 128px; }
-.etq-card .et-hint { font-size: 11px; color: #555; font-weight: 800; }
+.etq-card .et-qr svg { display: block; width: 110px; height: 110px; }
+.etq-card .et-hint { font-size: 10px; color: #888; font-weight: 500; }
+/* ── Dados grid (pedido) ── */
 .etq-card .et-grid,
 .etq-card .pa-grid {
-  border: 1.5px solid #000; border-radius: 9px; padding: 10px 12px;
-  background: #fff;
+  border: 1.5px solid #e2e5ea; border-radius: 8px; padding: 8px 10px;
+  background: #fafbfc;
 }
 .etq-card .et-row {
   display: flex; justify-content: space-between;
-  gap: 10px; padding: 5px 0; font-size: 14px; font-weight: 800;
-  border-bottom: 1px dotted #c9c9c9;
+  gap: 8px; padding: 3px 0; font-size: 13px; font-weight: 600;
+  border-bottom: 1px solid #eef0f3;
 }
 .etq-card .et-row:last-child { border-bottom: 0; }
-.etq-card .et-row .lbl { font-weight: 900; }
-.etq-card .pa-title  { text-align: center; font-size: 21px; font-weight: 950; margin-bottom: 2px; line-height: 1.08; }
-.etq-card .pa-center { text-align: center; font-weight: 800; }
-.etq-card .pa-meta   { text-align: center; font-size: 11px; color: #555; margin-bottom: 8px; }
-.etq-card .pa-sep    { border-top: 1px dashed #000; height: 0; margin: 8px 0; }
+.etq-card .et-row .lbl { font-weight: 800; color: #1A2E5A; font-size: 11px; text-transform: uppercase; }
+/* ── Pedido (recibo) ── */
+.etq-card .pa-title,
+.etq-card .et-title { overflow-wrap: anywhere; }
+.etq-card .pa-logo,
+.print-area .pa-logo {
+  display: flex; justify-content: center; margin: 0 auto 6px;
+}
+.etq-card .pa-logo img,
+.print-area .pa-logo img {
+  width: 48px; height: 48px; object-fit: contain; border-radius: 8px;
+}
+.etq-card .et-title {
+  text-align: center; font-size: 18px; font-weight: 800;
+  margin-bottom: 2px; line-height: 1.1; color: #000;
+}
+.etq-card .et-kicker,
+.etq-card .pa-kicker {
+  text-align: center; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: #1A2E5A;
+  margin-bottom: 6px;
+}
+.etq-card .pa-title  { text-align: center; font-size: 19px; font-weight: 800; margin-bottom: 2px; line-height: 1.1; }
+.etq-card .pa-center { text-align: center; font-weight: 700; }
+.etq-card .pa-meta   { text-align: center; font-size: 11px; color: #888; margin-bottom: 6px; }
+.etq-card .pa-sep    { border-top: 1px solid #e2e5ea; height: 0; margin: 6px 0; }
 .etq-card .pa-block  { margin: 6px 0; }
 .etq-card .pa-label  {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
-  font-weight: 900; color: #555; margin-bottom: 3px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; color: #1A2E5A; margin-bottom: 2px;
 }
 .etq-card .pa-item   { display: flex; justify-content: space-between; gap: 6px; padding: 3px 0; align-items: flex-start; }
 .etq-card .pa-item .pi-main { flex: 1; min-width: 0; }
-.etq-card .pa-item .pi-name { display: block; font-weight: 900; word-break: break-word; }
-.etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #666; margin-top: 1px; }
-.etq-card .pa-item .pi-qty { font-weight: 900; min-width: 28px; }
-.etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 900; }
+.etq-card .pa-item .pi-name { display: block; font-weight: 700; word-break: break-word; }
+.etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #888; margin-top: 1px; }
+.etq-card .pa-item .pi-qty { font-weight: 700; min-width: 26px; }
+.etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 700; }
 .etq-card .pa-row    { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
-.etq-card .pa-bold   { font-weight: 900; }
+.etq-card .pa-bold   { font-weight: 700; }
 .etq-card .pa-large  {
-  font-size: 22px; border: 2px solid #000; border-radius: 9px;
-  padding: 8px 10px; margin-top: 8px; background: #f7f7f7;
+  font-size: 20px; border: 1.5px solid #1A2E5A; border-radius: 8px;
+  padding: 8px 10px; margin-top: 6px; background: #f8f9fb;
 }
 .etq-card .pa-note {
-  border: 1px dashed #000; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  border: 1px solid #e2e5ea; border-radius: 8px; padding: 8px 10px; margin-top: 6px;
+  background: #fafbfc;
 }
 .etq-card .pa-confer {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  border: 1.5px solid #000; border-radius: 12px; padding: 12px;
-  margin: 10px 0;
+  border: 1.5px solid #e2e5ea; border-radius: 8px; padding: 10px;
+  margin: 8px 0; background: #fafbfc;
 }
-.etq-card .pa-confer-qr svg { display: block; max-width: 130px; height: auto; }
-.etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 268px; height: auto; margin: 6px auto; }
-.etq-card .pa-confer-code { font-size: 16px; letter-spacing: 0.05em; }
-.etq-card .pa-confer-hint { font-size: 11px; color: #555; }
+.etq-card .pa-confer-qr svg { display: block; max-width: 120px; height: auto; }
+.etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 260px; height: auto; margin: 4px auto; }
+.etq-card .pa-confer-code { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+.etq-card .pa-confer-hint { font-size: 10px; color: #888; }
 .etq-actions {
   display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background:
@@ -7663,13 +7712,14 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="ajustes-section ajustes-section-feature" data-group="loja">
         <h4>Formato das etiquetas</h4>
-        <p class="hint">Escolha se as etiquetas de produção saem com QR Code, codigo de barras ou os dois.</p>
+        <p class="hint">Escolha se as etiquetas de produção saem com QR Code, codigo de barras, os dois ou nenhum.</p>
         <div class="field">
           <label>Codigo impresso na produção</label>
           <select id="ajusteProdScanMode" class="scan-mode-select">
             <option value="both">QR + codigo de barras</option>
             <option value="barcode">Somente codigo de barras</option>
             <option value="qr">Somente QR Code</option>
+            <option value="none">Sem codigo</option>
           </select>
           <div class="scan-mode-options" id="scanModeOptions">
             <button type="button" class="scan-mode-card" data-mode="both" onclick="setScanModeChoice('both', true)">
@@ -7693,6 +7743,35 @@ body.ux-calm [data-screen="producao"] .section-label {
               <span class="scan-mode-text">
                 <strong>QR Code</strong>
                 <span>Mais limpo para leitura pela câmera do app.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-mode="none" onclick="setScanModeChoice('none', true)">
+              <span class="scan-mode-icon">—</span>
+              <span class="scan-mode-text">
+                <strong>Sem codigo</strong>
+                <span>Etiqueta limpa, só texto. Leitura manual.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>Orientação da etiqueta</label>
+          <div class="scan-mode-options" id="orientModeOptions">
+            <button type="button" class="scan-mode-card" data-orient="vertical" onclick="setOrientChoice('vertical')">
+              <span class="scan-mode-icon" style="font-size:18px">▯</span>
+              <span class="scan-mode-text">
+                <strong>Vertical</strong>
+                <span>Informações em cima, codigo embaixo.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-orient="horizontal" onclick="setOrientChoice('horizontal')">
+              <span class="scan-mode-icon" style="font-size:18px">▭</span>
+              <span class="scan-mode-text">
+                <strong>Horizontal</strong>
+                <span>Info à esquerda, codigo à direita. Mais compacta.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
@@ -8052,9 +8131,26 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div>
           <h3 id="etqTitle">Etiquetas geradas</h3>
           <div class="etq-sub" id="etqSubtitle">—</div>
-          <div class="etq-mode-chip" id="etqModeChip">QR + barras</div>
         </div>
         <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
+      </div>
+      <div class="etq-config-bar" id="etqConfigBar">
+        <div class="etq-config-row">
+          <span class="etq-config-lbl">Código</span>
+          <div class="etq-config-chips" id="etqCodeChips">
+            <button class="etq-chip active" onclick="setEtqCode('both')">QR + Barras</button>
+            <button class="etq-chip" onclick="setEtqCode('qr')">Só QR</button>
+            <button class="etq-chip" onclick="setEtqCode('barcode')">Só Barras</button>
+            <button class="etq-chip" onclick="setEtqCode('none')">Sem código</button>
+          </div>
+        </div>
+        <div class="etq-config-row">
+          <span class="etq-config-lbl">Orientação</span>
+          <div class="etq-config-chips" id="etqOrientChips">
+            <button class="etq-chip active" onclick="setEtqOrient('vertical')">Vertical</button>
+            <button class="etq-chip" onclick="setEtqOrient('horizontal')">Horizontal</button>
+          </div>
+        </div>
       </div>
       <div class="etq-success-banner" id="etqSuccessBanner" style="display:none">
         <span class="etq-success-icon">✓</span>
@@ -8112,6 +8208,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <button class="more-menu-item" onclick="go('caixa')"><strong>Caixa</strong><span>Saldo, lancamentos e fechamento.</span></button>
       <button class="more-menu-item" onclick="go('finalizados')"><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></button>
       <button class="more-menu-item" onclick="go('suporte')"><strong>Suporte</strong><span>Chamado com diagnóstico.</span></button>
+      <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><strong>Etiquetas</strong><span>Modelos de impressão e layout.</span></button>
       <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><strong>Ajustes</strong><span>Loja, impressora, backup e demo.</span></button>
       <button class="more-menu-item" onclick="closeMoreMenu(); openGlobalSearch()"><strong>Busca</strong><span>Cliente, pedido, produto ou lote.</span></button>
     </div>
@@ -12892,7 +12989,7 @@ function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder') 
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
 function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
-const SCAN_MODES = ['both', 'barcode', 'qr'];
+const SCAN_MODES = ['both', 'barcode', 'qr', 'none'];
 function getProdScanMode() {
   try {
     const mode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
@@ -12904,7 +13001,7 @@ function getProdScanMode() {
 // de producao) — antes ficava espalhada com flags _csm/_cshowQr/_cshowBars.
 function scanModeFlags(mode) {
   const m = mode || getProdScanMode();
-  return { mode: m, showQr: m !== 'barcode', showBars: m !== 'qr' };
+  return { mode: m, showQr: m === 'both' || m === 'qr', showBars: m === 'both' || m === 'barcode' };
 }
 
 // Helper de console: cdbSetPix(key, holder, type, empresa).
@@ -13213,7 +13310,7 @@ function refreshBodyModalClass() {
 // ================================================================
 let ajustesListenersBound = false;
 function setScanModeChoice(mode, persistNow = false) {
-  const normalized = ['both','barcode','qr'].includes(mode) ? mode : 'both';
+  const normalized = ['both','barcode','qr','none'].includes(mode) ? mode : 'both';
   const select = document.getElementById('ajusteProdScanMode');
   if (select) select.value = normalized;
   document.querySelectorAll('.scan-mode-card').forEach(card => {
@@ -13223,14 +13320,9 @@ function setScanModeChoice(mode, persistNow = false) {
     try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {}
     const modeChip = document.getElementById('etqModeChip');
     if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
-    const previewBody = document.getElementById('etqBody');
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
-    if (previewOpen && previewBody && currentEtiquetas.length) {
-      if (currentEtiquetasKind === 'order') {
-        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
-      } else {
-        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
-      }
+    if (previewOpen && currentEtiquetas.length) {
+      refreshEtqPreview();
     }
     showToast('Formato das etiquetas: ' + prodScanModeLabel(normalized));
   }
@@ -16526,29 +16618,34 @@ function etiquetasFromBatch(batch) {
 }
 
 function etiquetaProducaoHtml(et) {
-  const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
-  // Foto opcional do produto entre nome e barcode
+  const { showQr, showBars: showBarcode } = scanModeFlags();
   const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
-  return `
-    <div class="et-kicker">Etiqueta de lote</div>
-    <div class="et-title">${escapeHtml(et.empresa)}</div>
-    <div class="et-prod">${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
-    ${photo}
-    <div class="et-scan">
-      ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, 132)}</div>` : ''}
-      ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, 268, 58)}</div>` : ''}
-      <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
-      <div class="et-hint">Escaneie no app para conferir</div>
-    </div>
-    <div class="et-grid">
-      ${peso}
-      <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
-      <div class="et-row"><span class="lbl">Validade</span><span>${escapeHtml(venc)}</span></div>
-      <div class="et-row"><span class="lbl">Lote</span><span>${escapeHtml(et.lote)}</span></div>
-    </div>
-  `;
+  const hasCodes = showQr || showBarcode;
+  const horiz = currentEtqOrient === 'horizontal';
+
+  const brand = `<div class="et-brand">
+    <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+    <span class="et-brand-name">Easy<b>Stok</b></span>
+  </div>`;
+  const prodBlock = `<div class="et-prod">${escapeHtml(et.productName)}</div>
+    ${et.unit ? `<div class="et-unit">${escapeHtml(et.unit)}</div>` : ''}`;
+  const infoBlock = `<div class="et-info">
+    <div class="et-info-row"><span class="et-lbl">FAB:</span><span class="et-val">${fmtDateBR(et.productionDate)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">VAL:</span><span class="et-val">${escapeHtml(venc)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">LOTE:</span><span class="et-val">${escapeHtml(et.lote)}</span></div>
+    ${et.weightG ? `<div class="et-info-row"><span class="et-lbl">PESO:</span><span class="et-val">${fmtPesoG(et.weightG)}</span></div>` : ''}
+  </div>`;
+  const scanBlock = hasCodes ? `<div class="et-scan">
+    ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, horiz ? 90 : 110)}</div>` : ''}
+    ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, horiz ? 160 : 260, 50)}</div>` : ''}
+    <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+  </div>` : '';
+
+  if (horiz) {
+    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}</div><div class="et-side">${scanBlock}</div>`;
+  }
+  return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}`;
 }
 
 function escPosLabelProducao(et) {
@@ -16568,20 +16665,17 @@ function escPosLabelProducao(et) {
   wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
   b.boldOff();
   b.line(divider());
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
+  const { showQr, showBars: showBarcode } = scanModeFlags();
   if (showQr) {
-    // QR: mais robusto no scanner do app e mais legivel em termica.
-    // moduleSize=8 dots + ECL=M (no escPosQrCommands) compensam o bleed
-    // termico da WTP05; 2 LFs garantem quiet zone inferior.
     b.push(...escPosQrCommands(et.codigoBarras, 0x08));
     b.push(0x0A, 0x0A);
   }
-  b.bold().line(et.codigoBarras).boldOff();
-  b.line('Escaneie no app para conferir');
+  if (showQr || showBarcode) {
+    b.bold().line(et.codigoBarras).boldOff();
+    b.line('Escaneie no app para conferir');
+  }
   if (showBarcode) {
     b.line(divider());
-    // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
-    // Mantido por compatibilidade com leitores de codigo de barras.
     b.push(...escPosBarcode128(et.codigoBarras));
     b.push(0x0A);
   }
@@ -16600,15 +16694,26 @@ function escPosLabelProducao(et) {
  * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
  */
 function etiquetasToPng(etiquetas, kind) {
-  // 384px ≈ 50mm @ ~195dpi — bate com a impressora térmica de 50mm.
   const W = 384;
-  // order: blocos com cliente, itens, total, observacao e PIX.
-  // producao: branding, barcode e grade de lote/validade.
-  // ROW_H: producao sem foto = 510; com foto = 670 (QR + barras + miniatura).
-  const hasAnyPhoto = kind !== 'order' && etiquetas.some(et => et && et.photo);
-  const ROW_H = kind === 'order' ? 620 : (hasAnyPhoto ? 670 : 510);
   const GAP = 20;
-  const H = etiquetas.length * (ROW_H + GAP) + GAP;
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  function calcRowH(et) {
+    if (kind === 'order') {
+      const o = et.order || {};
+      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24), 0);
+      const notesH = o.notes ? 64 : 0;
+      const scanH = (showQr ? 148 : 0) + (showBarcode ? 74 : 0) + (hasCodes ? 46 : 0);
+      return 340 + itemsH + notesH + scanH + 80;
+    }
+    const hasPhoto = et && et.photo;
+    return hasPhoto ? 670 : (hasCodes ? 510 : 340);
+  }
+
+  const rowHeights = etiquetas.map(et => calcRowH(et));
+  const H = rowHeights.reduce((s, h) => s + h + GAP, GAP);
+
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -16616,8 +16721,6 @@ function etiquetasToPng(etiquetas, kind) {
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
 
-  // Pre-carrega TODAS as fotos antes de desenhar — Image.onload é async,
-  // se não esperarmos o canvas sai sem fotos. Pre-load idempotente.
   const photoPromises = etiquetas.map(et => {
     if (!et || !et.photo) return Promise.resolve(null);
     return new Promise(resolve => {
@@ -16629,13 +16732,14 @@ function etiquetasToPng(etiquetas, kind) {
   });
 
   return Promise.all(photoPromises).then(images => {
+    let yTop = GAP;
     etiquetas.forEach((et, i) => {
-      const yTop = GAP + i * (ROW_H + GAP);
       if (kind === 'order') {
-        drawOrderEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
+        drawOrderEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i]);
       } else {
-        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, ROW_H, images[i]);
+        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], images[i]);
       }
+      yTop += rowHeights[i] + GAP;
     });
     return new Promise((resolve, reject) => {
       try {
@@ -16650,85 +16754,116 @@ function etiquetasToPng(etiquetas, kind) {
 
 function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
   const cx = W / 2;
-  let y = y0 + 14;
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 18px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', lx + 30, y + 16);
+  y += 36;
+  // Product name
   ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.font = '900 12px monospace';
-  ctx.fillText('ETIQUETA DE LOTE', cx, y); y += 18;
-  ctx.font = '900 28px monospace';
-  ctx.fillText(et.empresa.toUpperCase().slice(0, 22), cx, y); y += 34;
-  ctx.font = '900 22px monospace';
-  // Nome do produto com word-wrap (preserva palavras inteiras)
-  wordWrap(et.productName, 24).forEach(l => { ctx.fillText(l, cx, y); y += 26; });
-  if (et.unit) { ctx.font = '700 14px monospace'; ctx.fillText(et.unit, cx, y); y += 18; }
-  ctx.fillRect(26, y, W - 52, 2); y += 10;
-  // Foto opcional (preserva aspect ratio, max 140px de altura)
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  wordWrap(et.productName, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
+  if (et.unit) {
+    ctx.fillStyle = '#555';
+    ctx.font = '500 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.unit, lx, y); y += 16;
+  }
+  // Photo
   if (photoImg && photoImg.width && photoImg.height) {
-    const maxW = W - 60;
-    const maxH = 140;
+    const maxW = W - 60, maxH = 120;
     const ratio = Math.min(maxW / photoImg.width, maxH / photoImg.height);
     const dw = Math.floor(photoImg.width * ratio);
     const dh = Math.floor(photoImg.height * ratio);
-    const dx = Math.floor((W - dw) / 2);
-    ctx.drawImage(photoImg, dx, y, dw, dh);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
-    ctx.strokeRect(dx, y, dw, dh);
-    y += dh + 10;
+    ctx.drawImage(photoImg, lx, y, dw, dh);
+    ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+    ctx.strokeRect(lx, y, dw, dh);
+    y += dh + 8;
   }
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
-  const qrSize = scanMode === 'both' ? 104 : 124;
-  const boxH = (showQr ? qrSize + 14 : 0) + (showBarcode ? 64 : 0) + 56;
-  ctx.strokeRect(20, y - 2, W - 40, boxH);
-  if (showQr) {
-    drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y + 10, qrSize);
-    y += qrSize + 18;
-  }
-  if (showBarcode) {
-    drawCode128OnCanvas(ctx, et.codigoBarras, 36, y, W - 72, 58);
-    y += 70;
-  }
-  ctx.font = '900 15px monospace';
-  wordWrap(et.codigoBarras, 28).forEach(l => { ctx.fillText(l, cx, y); y += 18; });
-  ctx.font = '700 11px monospace';
-  ctx.fillText('Escaneie no app para conferir', cx, y); y += 24;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(20, y - 2, W - 40, 118);
-  ctx.font = '900 17px monospace';
-  ctx.textAlign = 'left';
-  const lx = 34, rx = W - 34;
+  y += 6;
+  // Info rows: FAB, VAL, LOTE
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  const infoX = lx + 52;
+  ctx.fillText('FAB:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 20;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('VAL:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 20;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('LOTE:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(et.lote, infoX, y); y += 20;
   if (et.weightG) {
-    ctx.fillText('Peso', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtPesoG(et.weightG), rx, y + 10); ctx.textAlign = 'left'; y += 26;
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('PESO:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+    ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 20;
   }
-  ctx.fillText('Producao', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtDateBR(et.productionDate), rx, y + 10); ctx.textAlign = 'left'; y += 26;
-  ctx.fillText('Validade', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '-', rx, y + 10); ctx.textAlign = 'left'; y += 26;
-  ctx.fillText('Lote',     lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.lote, rx, y + 10); ctx.textAlign = 'left';
+  y += 6;
+  // Scan area
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+  const scanY = y;
+  const qrSize = showQr ? 100 : 0;
+  const barsH = showBarcode ? 50 : 0;
+  const scanH = (showQr ? qrSize + 10 : 0) + (showBarcode ? barsH + 10 : 0) + 30;
+  if (showQr || showBarcode) {
+    ctx.strokeRect(lx - 4, scanY, W - 40, scanH);
+    y = scanY + 8;
+    if (showQr) {
+      drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBarcode) {
+      drawCode128OnCanvas(ctx, et.codigoBarras, lx, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+    ctx.font = '700 11px JetBrains Mono, Courier New, monospace';
+    ctx.fillText(et.codigoBarras, cx, y); y += 16;
+    ctx.textAlign = 'left';
+  }
 }
 
 function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
-  // et = { order: o }
   const o = et.order;
   const pixText = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
   const cx = W / 2;
-  let y = y0 + 14;
-  ctx.fillStyle = '#000';
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(cx - 11, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(cx - 7, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
   ctx.textAlign = 'center';
-  ctx.font = '900 12px Arial, sans-serif';
-  ctx.fillStyle = '#4b5563';
-  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 18;
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', cx, y + 38); y += 52;
+  // Header
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 16;
   ctx.fillStyle = '#000';
-  ctx.font = '900 28px Arial, sans-serif';
-  ctx.fillText((getEmpresaName() || 'Easy Stock Mobile').toUpperCase().slice(0, 22), cx, y); y += 34;
-  ctx.font = '900 17px Arial, sans-serif';
+  ctx.font = '800 24px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 22), cx, y); y += 28;
+  ctx.font = '700 16px Inter, Arial, sans-serif';
   const orderRef = (o.id || '').slice(-8);
   ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
-  ctx.fillStyle = '#4b5563';
-  ctx.font = '700 12px Arial, sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.font = '500 12px Inter, Arial, sans-serif';
   ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(24, y, W - 48, 2); y += 12;
+  ctx.fillStyle = '#e2e5ea';
+  ctx.fillRect(lx, y, W - 48, 1); y += 10;
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
@@ -16892,10 +17027,33 @@ function drawCode128OnCanvas(ctx, data, x, y, w, h) {
 // Estado do preview de etiquetas
 let currentEtiquetas = [];
 let currentEtiquetasKind = 'producao'; // 'producao' | 'order'
+let currentEtqOrient = 'vertical';     // 'vertical' | 'horizontal'
+
+function setEtqCode(mode) {
+  setScanModeChoice(mode, true);
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === prodScanModeLabel(mode)));
+  refreshEtqPreview();
+}
+function setEtqOrient(orient) {
+  currentEtqOrient = orient;
+  try { localStorage.setItem('cdb-etq-orient', orient); } catch(e) {}
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === (orient === 'horizontal' ? 'Horizontal' : 'Vertical')));
+  refreshEtqPreview();
+}
+function refreshEtqPreview() {
+  const body = document.getElementById('etqBody');
+  if (!body || !currentEtiquetas.length) return;
+  if (currentEtiquetasKind === 'order') {
+    body.innerHTML = currentEtiquetas.map(et => `<div class="etq-card${currentEtqOrient === 'horizontal' ? ' etq-horiz' : ''}">${orderLabelHtml(et.order)}</div>`).join('');
+  } else {
+    body.innerHTML = currentEtiquetas.map(et => `<div class="etq-card${currentEtqOrient === 'horizontal' ? ' etq-horiz' : ''}">${etiquetaProducaoHtml(et)}</div>`).join('');
+  }
+}
 
 function prodScanModeLabel(mode) {
-  return mode === 'barcode' ? 'Codigo de barras'
-       : mode === 'qr' ? 'QR Code'
+  return mode === 'barcode' ? 'Só barras'
+       : mode === 'qr' ? 'Só QR'
+       : mode === 'none' ? 'Sem código'
        : 'QR + barras';
 }
 
@@ -16903,15 +17061,20 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   if (!etiquetas || !etiquetas.length) return;
   currentEtiquetas = etiquetas;
   currentEtiquetasKind = kind || 'producao';
+  try { currentEtqOrient = localStorage.getItem('cdb-etq-orient') || 'vertical'; } catch(e) {}
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
-  const modeChip = document.getElementById('etqModeChip');
-  if (modeChip) {
-    modeChip.textContent = prodScanModeLabel(getProdScanMode());
-  }
 
-  // Banner verde de confirmação. Garante que o operador veja "cadastrado"
-  // antes do passo de imprimir, mesmo que feche o modal sem imprimir.
+  // Sync config chips
+  const curMode = getProdScanMode();
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => {
+    const lbl = b.textContent.trim();
+    b.classList.toggle('active', lbl === prodScanModeLabel(curMode));
+  });
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (currentEtqOrient === 'horizontal' ? 'Horizontal' : 'Vertical'));
+  });
+
   const banner = document.getElementById('etqSuccessBanner');
   if (successMsg) {
     document.getElementById('etqSuccessText').textContent = successMsg;
@@ -16920,13 +17083,7 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
     banner.style.display = 'none';
   }
 
-  const body = document.getElementById('etqBody');
-  if (kind === 'order') {
-    // 1 etiqueta de pedido — mesmo container, mas usa orderLabelHtml.
-    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
-  } else {
-    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
-  }
+  refreshEtqPreview();
   document.getElementById('etiquetasPreview').classList.add('show');
 }
 
@@ -17186,7 +17343,10 @@ function orderLabelHtml(o) {
   const { showQr, showBars } = scanModeFlags();
   return `
     <div class="pa-receipt">
-    ${storeLogoHtml()}
+    <div class="et-brand" style="justify-content:center">
+      <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+      <span class="et-brand-name">Easy<b>Stok</b></span>
+    </div>
     <div class="pa-kicker">Recibo de pedido</div>
     <div class="pa-title">${escapeHtml(empresa)}</div>
     <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
@@ -19673,6 +19833,11 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <!-- Overlay: Lista de modelos -->
+<div id="etq-tpl-preview" class="etq-tpl-preview-overlay" onclick="this.classList.remove('open')">
+  <div class="etq-tpl-preview-name" id="etq-tpl-preview-name"></div>
+  <div class="etq-tpl-preview-wrap" id="etq-tpl-preview-wrap" onclick="event.stopPropagation()"></div>
+  <button class="etq-tpl-preview-close" onclick="document.getElementById('etq-tpl-preview').classList.remove('open')">Fechar</button>
+</div>
 <div id="etq-modelos-overlay" class="etq-overlay" role="dialog" aria-modal="true" style="display:none">
   <div class="etq-sheet etq-sheet--tall">
     <div class="etq-head">
@@ -19688,7 +19853,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
     <div id="etq-modelos-lista" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px"></div>
     <div style="padding:12px 16px;border-top:1px solid var(--border-soft,#D8DCE3)">
-      <button class="etq-btn-primary" onclick="etqModelosCriar()" style="width:100%">+ Novo modelo personalizado</button>
+      <button id="etq-modelos-criar-btn" class="etq-btn-primary" onclick="etqModelosCriar()" style="width:100%">+ Novo modelo personalizado</button>
     </div>
   </div>
 </div>
@@ -19702,11 +19867,11 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </div>
 
-<script type="module" src="/etiqueta/imprimir.js"></script>
+<script type="module" src="/etiqueta/imprimir.js?v=2"></script>
 
 <!-- ── Editor visual de etiquetas (F5) ──────────────────────────────────── -->
 <link rel="stylesheet" href="/etiqueta/editor/editor.css">
-<div id="etq-editor-overlay" role="dialog" aria-modal="true" aria-label="Editor de modelo de etiqueta">
+<div id="etq-editor-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Editor de modelo de etiqueta">
   <!-- Toolbar -->
   <div class="etq-ed-toolbar"></div>
   <!-- Body -->

@@ -36,5 +36,10 @@ public enum TipoEventoNotificacao
     // Idempotencia via colunas mobile_orders.agendamento_notificado_*_em.
     PedidoAgendadoHoje = 26,
     PedidoAgendadoEm1Hora = 27,
-    PedidoAgendadoEm10Minutos = 28
+    PedidoAgendadoEm10Minutos = 28,
+
+    // Módulo de Relatórios (PR-C0)
+    RelatorioPronto = 29,
+    RelatorioFalhou = 30,
+    RelatorioExpirado = 31
 }

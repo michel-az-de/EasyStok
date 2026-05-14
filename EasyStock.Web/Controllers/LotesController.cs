@@ -84,7 +84,16 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
     {
         var result = await svc.FinalizarAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
-        Toast("success", $"Lote finalizado. {result.Data?.TotalUnidades} etiqueta(s) geradas.");
+        Toast("success", $"Lote finalizado. {result.Data?.TotalUnidades} etiqueta(s) prontas. <a href='/lotes/{id}/imprimir'>Imprimir agora →</a>");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpGet("/lotes/{id}/imprimir")]
+    public async Task<IActionResult> Imprimir(string id)
+    {
+        ViewBag.Title     = "Imprimir etiquetas";
+        ViewBag.LoteId    = id;
+        ViewBag.EmpresaId = Session.GetEmpresaId();
+        return View();
     }
 }

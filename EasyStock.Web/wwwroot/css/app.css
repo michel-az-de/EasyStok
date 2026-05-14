@@ -340,6 +340,29 @@ html.theme-dark .badge-slow {
 
 /* ─── Sidebar nav ────────────────────────────────────────────── */
 .nav-sep {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 4px 4px;
+}
+.nav-sep::before,
+.nav-sep::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, .05);
+}
+.nav-sep span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(100, 116, 139, 0.5);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.nav-sep:not(:has(span)) {
+    display: block;
     height: 1px;
     background: rgba(255, 255, 255, .05);
     margin: 6px 4px;

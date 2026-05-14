@@ -23,5 +23,12 @@ public class NfeEvento
     /// <summary>"web" | "mobile" | "worker" | "webhook" — origem da acao.</summary>
     public string? Origem { get; set; }
 
+    /// <summary>
+    /// Número do protocolo SEFAZ do evento (cancelamento, inutilização).
+    /// Exemplo: protocolo do evento de cancelamento — distinto do ProtocoloAutorizacao da nota.
+    /// NULL para eventos que não geram protocolo próprio (criado, enviado, erro_transiente).
+    /// </summary>
+    public string? ProtocoloEvento { get; set; }
+
     public DateTime OcorridoEm { get; set; }
 }

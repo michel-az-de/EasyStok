@@ -188,12 +188,25 @@
             <fieldset class="fm-section">
                 <legend class="fm-section__legend">Contato e localização</legend>
                 <div class="fm-grid">
-                    <div class="fm-field">
+                    <div class="fm-field" x-data="{ avisoTel: '' }">
                         <label class="fm-field__label" for="cli-tel">Telefone / WhatsApp</label>
                         <input id="cli-tel" type="text" x-model="form.telefone" x-mask:phone
                                inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
                                data-validate-phone
-                               class="ui-field w-full text-sm" />
+                               class="ui-field w-full text-sm"
+                               @@blur="async () => {
+                                   avisoTel = '';
+                                   const tel = (form.telefone || '').replace(/\D/g,'');
+                                   if (tel.length < 10) return;
+                                   try {
+                                       const r = await fetch('/clientes/buscar-json?q=' + encodeURIComponent(form.telefone) + '&limit=1');
+                                       if (!r.ok) return;
+                                       const d = await r.json();
+                                       if (d && d.length > 0) avisoTel = 'Já existe um cliente com este telefone (' + d[0].nome + '). Verifique antes de continuar.';
+                                   } catch { }
+                               }" />
+                        <p x-show="avisoTel" x-text="avisoTel" x-cloak
+                           class="text-amber-700 text-xs mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1"></p>
                     </div>
                     <div class="fm-field">
                         <label class="fm-field__label" for="cli-email">E-mail</label>

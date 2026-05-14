@@ -41,7 +41,7 @@ public class PedidosController(
         return View(vm);
     }
 
-    [HttpGet("/pedidos/{id}")]
+    [HttpGet("/pedidos/{id:guid}")]
     public async Task<IActionResult> Detail(string id)
     {
         ViewBag.Title = "Pedido";

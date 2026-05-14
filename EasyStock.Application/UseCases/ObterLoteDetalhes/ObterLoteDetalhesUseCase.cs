@@ -26,7 +26,8 @@ public class ObterLoteDetalhesUseCase(ILoteRepository repo)
             l.Etiquetas.OrderBy(e => e.Sequencial).Select(e => new LoteEtiquetaResult(
                 e.Id, e.LoteId, e.LoteItemId, e.Sequencial, e.Codigo, e.Status,
                 e.ConferidaEm, e.ConferidaPorUserId, e.ConferidaPorNome,
-                e.ObservacaoConferencia, e.CriadoEm)).ToList()
+                e.ObservacaoConferencia, e.CriadoEm,
+                e.LayoutSnapshotJson, e.LayoutSnapshotMeta)).ToList()
         );
     }
 }

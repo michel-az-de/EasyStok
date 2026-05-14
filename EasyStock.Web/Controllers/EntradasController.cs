@@ -149,6 +149,12 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         ViewBag.Title = "Histórico de Entradas";
         ViewBag.ActiveMenuItem = "Entradas";
 
+        if (string.IsNullOrEmpty(periodoInicio) && string.IsNullOrEmpty(periodoFim))
+        {
+            periodoInicio = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
+            periodoFim = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        }
+
         var result = await svc.HistoricoAsync(page, tipo, periodoInicio, periodoFim);
         if (HasError(result)) return View(new EntradasHistoricoViewModel());
 

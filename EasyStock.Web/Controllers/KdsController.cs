@@ -74,10 +74,8 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
     public async Task<IActionResult> Avancar(string id, string status)
     {
         var result = await svc.AtualizarStatusAsync(id, status);
-        if (HasError(result))
-        {
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage });
-        }
+        if (!result.Success)
+            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao atualizar pedido." });
         return Ok(new { success = true });
     }
 }

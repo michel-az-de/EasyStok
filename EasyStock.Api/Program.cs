@@ -191,6 +191,7 @@ switch (resolvedProvider)
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
+builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);

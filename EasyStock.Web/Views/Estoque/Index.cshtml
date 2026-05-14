@@ -1,12 +1,12 @@
 @model EstoqueListViewModel
 @{
-    var statusOpcoes = new[] { ("", "Tudo"), ("ok", "OK"), ("atencao", "Atenção"), ("critico", "Crítico"), ("parado", "Parado") };
+    var statusOpcoes = new[] { ("", "Todos"), ("ok", "OK"), ("atencao", "Atenção"), ("critico", "Crítico"), ("parado", "Parado") };
 }
 
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "entrada" : "entradas") em estoque</p>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote" : "lotes") em estoque</p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"
@@ -192,10 +192,10 @@
             <table class="tbl-full">
                 <thead>
                     <tr>
-                        <th>Produto / Variação</th>
+                        <th class="sticky left-0 z-10 bg-white">Produto / Variação</th>
                         <th>SKU</th>
                         <th class="text-center">Qtd</th>
-                        <th class="text-center hidden md:table-cell">Rotatividade</th>
+                        <th class="text-center hidden md:table-cell">Giro</th>
                         <th class="hidden md:table-cell">Último mov.</th>
                         <th>Validade</th>
                         <th class="text-center">Status</th>
@@ -210,7 +210,7 @@
                             : (int?)null;
                         var velInt = (int)Math.Min(Math.Round(item.Vel * 5), 5);
                         <tr id="row-@item.Id">
-                            <td>
+                            <td class="sticky left-0 z-10 bg-white">
                                 <div class="font-semibold text-slate-900">@(item.Produto?.Nome ?? item.Sku)</div>
                                 <div class="text-xs text-slate-400">
                                     @(item.Variacao?.Nome ?? "Padrão")
@@ -229,7 +229,7 @@
                             <td class="text-center hidden md:table-cell">
                                 @if (item.Vel == 0)
                                 {
-                                    <span class="text-xs text-slate-400" title="Sem saídas nos últimos 30 dias">Sem mov.</span>
+                                    <span class="text-xs text-slate-400" title="Sem saídas nos últimos 30 dias">Parado</span>
                                 }
                                 else
                                 {
@@ -297,14 +297,16 @@
                             <td>
                                 <div class="flex items-center justify-end gap-2" style="white-space:nowrap">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
-                                       class="grid-action-btn grid-action-btn--ghost">
+                                       class="grid-action-btn grid-action-btn--ghost"
+                                       aria-label="Repor estoque de @(item.Produto?.Nome ?? item.Sku)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
                                         Repor
                                     </a>
-                                    <button @@click="openModal('@item.Id', '@(item.Produto?.Nome ?? item.Sku)'.replace(/'/g, ''), @item.Qty, @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
-                                            class="grid-action-btn grid-action-btn--warning">
+                                    <button @@click="openModal('@item.Id', '@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(item.Produto?.Nome ?? item.Sku ?? ""))', @item.Qty, @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
+                                            class="grid-action-btn grid-action-btn--warning"
+                                            aria-label="Registrar saída de @(item.Produto?.Nome ?? item.Sku)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                                         </svg>
@@ -328,7 +330,7 @@
                         var pgStart = (Model.Paginacao.Page - 1) * Model.Paginacao.Limit + 1;
                         var pgEnd = Math.Min(Model.Paginacao.Page * Model.Paginacao.Limit, Model.Paginacao.Total);
                     }
-                    <span class="text-sm text-slate-500">Mostrando @pgStart–@pgEnd de @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "entrada" : "entradas")</span>
+                    <span class="text-sm text-slate-500">Mostrando @pgStart–@pgEnd de @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote" : "lotes")</span>
                     <div class="flex items-center gap-1">
                         @if (Model.Paginacao.HasPrevious)
                         {

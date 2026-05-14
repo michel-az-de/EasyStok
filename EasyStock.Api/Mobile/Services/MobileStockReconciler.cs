@@ -157,7 +157,7 @@ public class MobileStockReconciler(
             });
 
             // Espelha a quantidade no mobile_product (fonte da verdade local pro app)
-            mobileProduct.Stock = novo;
+            mobileProduct.Stock = (int)novo;
             mobileProduct.UpdatedAt = DateTime.UtcNow;
 
             // Marcador de divergência: registra MovimentacaoEstoque adicional

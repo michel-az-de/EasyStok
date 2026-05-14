@@ -7,6 +7,13 @@ let _templates  = [];     // EtiquetaTemplateListItem[]
 let _loteId     = null;
 let _empresaId  = null;
 let _selectedTemplate = null;  // { origem, id, nome, layoutJson }
+let _offlineMode = false;
+
+const _FALLBACK_TEMPLATES = [
+  { Id:'sys-identificacao', Origem:'Sistema', Nome:'Identificação', Descricao:'Compacta. Logo + nome + lote + QR.', IsDefault:true, LayoutJson:JSON.stringify({v:1,size:{preset:"80x40mm",w_mm:80,h_mm:40,orientation:"horizontal"},elements:[{id:"logo",type:"image",asset:"system:lockup-easystok",x_mm:2,y_mm:2,w_mm:10,h_mm:5,locked:false},{id:"nome",type:"text",content:"{produto.nome}",x_mm:14,y_mm:2,w_mm:44,h_mm:8,font:"sans",size_pt:14,weight:700,align:"left",overflow:"shrink-then-ellipsis"},{id:"marca",type:"text",content:"{produto.marca}",x_mm:14,y_mm:11,w_mm:44,h_mm:5,font:"sans",size_pt:9,weight:400,align:"left",overflow:"shrink-then-ellipsis"},{id:"lote",type:"text",content:"LOT {lote.codigo}",x_mm:2,y_mm:26,w_mm:56,h_mm:4,font:"mono",size_pt:9,weight:700,align:"left",overflow:"clip"},{id:"val",type:"text",content:"VAL {lote.validadeEm:dd/MM/yyyy}",x_mm:2,y_mm:31,w_mm:56,h_mm:5,font:"mono",size_pt:9,weight:400,align:"left",overflow:"clip"},{id:"qr",type:"code",format:"qr",content:"{etiqueta.codigo}",x_mm:60,y_mm:4,w_mm:18,h_mm:18,quiet_zone_mm:1},{id:"seq",type:"text",content:"{etiqueta.sequencial}",x_mm:60,y_mm:22,w_mm:18,h_mm:5,font:"mono",size_pt:8,weight:400,align:"center",overflow:"clip"},{id:"footer",type:"text",content:"@easystok",x_mm:62,y_mm:35,w_mm:16,h_mm:3,font:"sans",size_pt:6,weight:400,align:"center",color:"ink-500",locked:false}]}) },
+  { Id:'sys-nutricional', Origem:'Sistema', Nome:'Com tabela nutricional', Descricao:'Identificação + tabela ANVISA-friendly.', IsDefault:false, LayoutJson:JSON.stringify({v:1,size:{preset:"80x40mm",w_mm:80,h_mm:40,orientation:"horizontal"},elements:[{id:"logo",type:"image",asset:"system:logo-easystok",x_mm:2,y_mm:2,w_mm:6,h_mm:6,locked:false},{id:"nome",type:"text",content:"{produto.nome}",x_mm:12,y_mm:2,w_mm:40,h_mm:7,font:"sans",size_pt:11,weight:700,align:"left",overflow:"shrink-then-ellipsis"},{id:"lote",type:"text",content:"LOT {lote.codigo}",x_mm:12,y_mm:10,w_mm:40,h_mm:4,font:"mono",size_pt:8,weight:700,align:"left",overflow:"clip"},{id:"val",type:"text",content:"VAL {lote.validadeEm:dd/MM/yyyy}",x_mm:12,y_mm:15,w_mm:40,h_mm:4,font:"mono",size_pt:8,weight:400,align:"left",overflow:"clip"},{id:"nutri",type:"nutritional-table",x_mm:2,y_mm:20,w_mm:52,h_mm:16,size_pt_min:6,size_pt_max:8},{id:"qr",type:"code",format:"qr",content:"{etiqueta.codigo}",x_mm:60,y_mm:2,w_mm:18,h_mm:18,quiet_zone_mm:1},{id:"empresa",type:"text",content:"{empresa.nome}",x_mm:56,y_mm:22,w_mm:22,h_mm:4,font:"sans",size_pt:7,weight:400,align:"center",overflow:"shrink-then-ellipsis"},{id:"footer",type:"text",content:"@easystok",x_mm:62,y_mm:35,w_mm:16,h_mm:3,font:"sans",size_pt:6,weight:400,align:"center",color:"ink-500",locked:false}]}) },
+  { Id:'sys-refeicao', Origem:'Sistema', Nome:'Refeição completa', Descricao:'Nutrição + alérgenos. Refeições prontas.', IsDefault:false, LayoutJson:JSON.stringify({v:1,size:{preset:"80x40mm",w_mm:80,h_mm:40,orientation:"horizontal"},elements:[{id:"logo",type:"image",asset:"system:logo-easystok",x_mm:2,y_mm:2,w_mm:6,h_mm:6,locked:false},{id:"nome",type:"text",content:"{produto.nome}",x_mm:12,y_mm:2,w_mm:40,h_mm:6,font:"sans",size_pt:11,weight:700,align:"left",overflow:"shrink-then-ellipsis"},{id:"val",type:"text",content:"VAL {lote.validadeEm:dd/MM/yyyy}",x_mm:12,y_mm:9,w_mm:40,h_mm:4,font:"mono",size_pt:8,weight:700,align:"left",overflow:"clip"},{id:"nutri",type:"nutritional-table",x_mm:2,y_mm:14,w_mm:46,h_mm:16},{id:"alergenos",type:"alergenos-pills",x_mm:2,y_mm:31,w_mm:54,h_mm:4},{id:"qr",type:"code",format:"qr",content:"{etiqueta.codigo}",x_mm:60,y_mm:2,w_mm:18,h_mm:18,quiet_zone_mm:1},{id:"lote",type:"text",content:"LOT {lote.codigo}",x_mm:56,y_mm:22,w_mm:22,h_mm:4,font:"mono",size_pt:7,weight:400,align:"center",overflow:"clip"},{id:"empresa",type:"text",content:"{empresa.nome}",x_mm:56,y_mm:27,w_mm:22,h_mm:4,font:"sans",size_pt:7,weight:400,align:"center",overflow:"shrink-then-ellipsis"},{id:"footer",type:"text",content:"@easystok",x_mm:62,y_mm:35,w_mm:16,h_mm:3,font:"sans",size_pt:6,weight:400,align:"center",color:"ink-500",locked:false}]}) },
+];
 
 // ── Public API (called from index.html inline handlers + lote card) ──────────
 
@@ -131,15 +138,24 @@ window.etqModelosAba = function(aba) {
 };
 
 window.etqModelosCriar = function() {
-  // F5: Editor — placeholder
+  if (_offlineMode) {
+    alert('Criar modelos personalizados requer conexão com o servidor.');
+    return;
+  }
   window.etqAbrirEditor && window.etqAbrirEditor(null);
 };
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _loadTemplates() {
-  const res = await _apiFetch(`/api/etiquetas/templates?empresaId=${_empresaId}`);
-  _templates = res.data ?? [];
+  try {
+    const res = await _apiFetch(`/api/etiquetas/templates?empresaId=${_empresaId}`);
+    _templates = res.data ?? [];
+    _offlineMode = false;
+  } catch {
+    _templates = _FALLBACK_TEMPLATES;
+    _offlineMode = true;
+  }
 }
 
 async function _loadPayload() {
@@ -407,14 +423,12 @@ let _modelosAba = 'sistema';
 async function _carregarModelos() {
   const lista = document.getElementById('etq-modelos-lista');
   lista.innerHTML = '<div class="etq-caption" style="padding:12px">Carregando…</div>';
-  try {
-    await _loadTemplates();
-    const empresa = _templates.filter(t => t.Origem === 'Empresa');
-    document.getElementById('etq-tab-empresa-count').textContent = empresa.length;
-    _renderModeloLista(_modelosAba);
-  } catch (err) {
-    lista.innerHTML = `<div class="etq-caption">Erro: ${_esc(err.message)}</div>`;
-  }
+  await _loadTemplates();
+  const empresa = _templates.filter(t => t.Origem === 'Empresa');
+  document.getElementById('etq-tab-empresa-count').textContent = empresa.length;
+  const criarBtn = document.getElementById('etq-modelos-criar-btn');
+  if (criarBtn) criarBtn.style.display = _offlineMode ? 'none' : '';
+  _renderModeloLista(_modelosAba);
 }
 
 function _renderModeloLista(aba) {
@@ -437,9 +451,9 @@ function _renderModeloLista(aba) {
     const eOrigem = _esc(t.Origem);
     const eDesc = t.Descricao ? _esc(t.Descricao) : '';
     return `
-    <div class="etq-card" style="padding:12px">
-      <div class="etq-card-thumb" id="thumb-${eId}">
-        <span class="etq-card-thumb-placeholder">⊞</span>
+    <div class="etq-tpl-card" style="padding:12px">
+      <div class="etq-tpl-card-thumb" id="thumb-${eId}">
+        <span class="etq-tpl-card-thumb-placeholder">⊞</span>
       </div>
       <div style="padding:8px 0 0">
         <div style="display:flex;align-items:center;gap:6px">
@@ -452,8 +466,8 @@ function _renderModeloLista(aba) {
           : ''}
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
           ${aba === 'sistema' ? `
-            <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDefinirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
-            <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDuplicar('${eId}','${eNome}')">Duplicar para personalizar</button>
+            ${_offlineMode ? '' : `<button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDefinirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>`}
+            ${_offlineMode ? '' : `<button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDuplicar('${eId}','${eNome}')">Duplicar para personalizar</button>`}
           ` : `
             <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="window.etqAbrirEditor && etqAbrirEditor('${eId}')">Editar</button>
             <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDefinirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>

@@ -52,7 +52,7 @@ public sealed record ProdutoDetalheResult(
     decimal? PrecoReferencia,
     decimal? MargemEstimada,
     DimensoesDetalheResult? Dimensoes,
-    int QuantidadeTotalEstoque,
+    decimal QuantidadeTotalEstoque,
     DateTime? UltimaEntradaEm,
     IReadOnlyCollection<ProdutoFotoResult> Fotos,
     IReadOnlyCollection<ProdutoVariacaoDetalheResult> Variacoes,
@@ -83,7 +83,7 @@ public sealed record ProdutoVariacaoDetalheResult(
     string? Sku,
     string? CodigoBarras,
     bool Ativa,
-    int QuantidadeEmEstoque,
+    decimal QuantidadeEmEstoque,
     DateTime? UltimaEntradaEm);
 
 public sealed record ProdutoCaracteristicaDetalheResult(
@@ -106,7 +106,7 @@ public sealed record ProdutoHistoricoItemResult(
     Guid MovimentacaoId,
     TipoMovimentacaoEstoque Tipo,
     string Natureza,
-    int Quantidade,
+    decimal Quantidade,
     decimal? ValorTotal,
     DateTime DataMovimentacao,
     Guid? ItemEstoqueId,
@@ -115,7 +115,7 @@ public sealed record ProdutoHistoricoItemResult(
 
 public sealed record ProdutoEstatisticasResult(
     Guid ProdutoId,
-    int QuantidadeEmEstoque,
+    decimal QuantidadeEmEstoque,
     decimal? MargemRealPercentual,
     decimal Velocidade30Dias,
     int? PrevisaoZeramentoDias,

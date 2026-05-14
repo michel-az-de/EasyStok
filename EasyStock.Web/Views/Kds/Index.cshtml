@@ -289,8 +289,10 @@ function kdsAutoRefresh() {
                                     : btn.dataset.status === 'pronto'    ? '✓ Marcar pronto'
                                                                           : '📦 Marcar entregue';
                     if (card) card.classList.remove('kds-card--saindo');
-                    if (window.toast) window.toast('error', 'Não foi possível atualizar o pedido. Tente novamente.');
-                    else alert('Não foi possível atualizar o pedido.');
+                    let errMsg = 'Não foi possível atualizar o pedido. Tente novamente.';
+                    try { const body = await r.json(); if (body?.errorMessage) errMsg = body.errorMessage; } catch {}
+                    if (window.toast) window.toast('error', errMsg);
+                    else alert(errMsg);
                 }
             } catch {
                 btn.disabled = false;

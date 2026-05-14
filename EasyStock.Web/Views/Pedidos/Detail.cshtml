@@ -22,9 +22,9 @@
     } ?? "";
     string nextLabel(string s) => s switch
     {
-        "aguardando" => "▶ Iniciar preparo",
-        "preparando" => "✓ Marcar pronto",
-        "pronto"     => "✓ Marcar entregue",
+        "aguardando" => "Iniciar preparo",
+        "preparando" => "Marcar como pronto",
+        "pronto"     => "Confirmar entrega",
         _            => ""
     };
 
@@ -113,6 +113,23 @@ else
     </div>
 }
 
+@if (p.Status == "entregue" && !p.Quitado)
+{
+    <div class="flex items-start gap-3 p-4 mb-6 bg-yellow-50 border border-yellow-200 rounded-xl">
+        <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <div class="flex-1">
+            <div class="font-semibold text-yellow-900 text-sm">Pagamento pendente</div>
+            <div class="text-xs text-yellow-800 mt-0.5">Este pedido foi entregue mas o pagamento ainda não foi registrado.</div>
+        </div>
+        <button type="button" x-data @@click="$dispatch('open-modal', 'registrar-pagamento')"
+                class="shrink-0 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-lg">
+            Registrar recebimento
+        </button>
+    </div>
+}
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-1 space-y-4">
         <!-- Card de pagamento (destaque) -->
@@ -129,7 +146,7 @@ else
                 }
                 else
                 {
-                    <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">Em aberto</span>
+                    <span class="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full">Pendente</span>
                 }
             </div>
             <div class="text-3xl font-bold text-slate-900 mb-1">@p.Total.ToString("C")</div>
@@ -161,7 +178,7 @@ else
                 {
                     <div>
                         <dt class="text-slate-500">Cliente</dt>
-                        <dd class="font-medium">@p.ClienteNome <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded ml-1">avulso</span></dd>
+                        <dd class="font-medium">@p.ClienteNome <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded ml-1">Sem cadastro</span></dd>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt / Mesa</dt><dd>@p.ClienteApt</dd></div> }
@@ -171,11 +188,11 @@ else
                 @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
-                    <div><dt class="text-slate-500">Mobile order</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
+                    <div><dt class="text-slate-500">ID externo (app)</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
                 }
                 @if (p.VendaId.HasValue)
                 {
-                    <div><dt class="text-slate-500">Venda ERP</dt><dd class="font-mono text-xs">@p.VendaId</dd></div>
+                    <div><dt class="text-slate-500">Referência interna</dt><dd class="font-mono text-xs">@p.VendaId</dd></div>
                 }
                 @if (!string.IsNullOrEmpty(p.Observacoes))
                 {
@@ -191,7 +208,7 @@ else
                 @foreach (var (key, label, count) in new[] {
                     ("itens",       "Itens",       Model.Detalhe.Itens.Count),
                     ("pagamentos",  "Pagamentos",  Model.Detalhe.Pagamentos.Count),
-                    ("eventos",     "Histórico",   Model.Detalhe.Eventos.Count),
+                    ("eventos",     "Eventos",     Model.Detalhe.Eventos.Count),
                     ("auditoria",   "Auditoria",   -1)
                 })
                 {
@@ -232,7 +249,7 @@ else
                                     @if (p.Status != "entregue" && !isCancelado)
                                     {
                                         <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline"
-                                              x-data @@submit.prevent="if (confirm('Remover \'@i.Nome\' do pedido?')) $el.submit()">
+                                              x-data @@submit.prevent="if (confirm('Remover \x27@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(i.Nome ?? ""))\x27 do pedido?')) $el.submit()">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Remover @i.Nome">✕</button>
                                         </form>

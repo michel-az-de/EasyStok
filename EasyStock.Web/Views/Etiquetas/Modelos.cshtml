@@ -76,9 +76,9 @@ function renderLista(aba) {
         const eId = _esc(t.Id), eNome = _esc(t.Nome), eOrigem = _esc(t.Origem);
         const eDesc = t.Descricao ? _esc(t.Descricao) : '';
         return `
-        <div class="etq-card" style="padding:14px;display:flex;gap:12px;align-items:flex-start">
-            <div class="etq-card-thumb" id="thumb-${eId}" style="flex-shrink:0">
-                <span class="etq-card-thumb-placeholder etq-caption">⊞</span>
+        <div class="etq-tpl-card" style="padding:14px;display:flex;gap:12px;align-items:flex-start">
+            <div class="etq-tpl-card-thumb" id="thumb-${eId}" style="flex-shrink:0">
+                <span class="etq-tpl-card-thumb-placeholder etq-caption">⊞</span>
             </div>
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">

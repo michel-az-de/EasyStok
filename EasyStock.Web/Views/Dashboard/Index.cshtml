@@ -13,26 +13,26 @@
 </div>
 
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="ws dashboard-kpi-card" title="Produtos distintos com ao menos uma unidade em estoque">
-        <div class="kpi-lbl">SKUs em estoque</div>
+    <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Produtos distintos com ao menos uma unidade em estoque">
+        <div class="kpi-lbl">Produtos</div>
         <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
-        <div class="text-xs text-slate-400 mt-1">produtos distintos</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Soma das quantidades de todas as unidades em estoque (todos os lotes)">
-        <div class="kpi-lbl">Itens em estoque</div>
+        <div class="text-xs text-slate-400 mt-1">SKUs únicos</div>
+    </a>
+    <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Soma das quantidades de todas as unidades em estoque (todos os lotes)">
+        <div class="kpi-lbl">Unidades em estoque</div>
         <div class="kpi-val dashboard-kpi-value text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
-        <div class="text-xs text-slate-400 mt-1">unidades totais</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Valor de venda estimado de todo o estoque atual">
+        <div class="text-xs text-slate-400 mt-1">total em lotes</div>
+    </a>
+    <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Valor de venda estimado de todo o estoque atual">
         <div class="kpi-lbl">Valor em estoque</div>
         <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
         <div class="text-xs text-slate-400 mt-1">preço de venda</div>
-    </div>
-    <div class="ws dashboard-kpi-card" title="Receita gerada com saídas nos últimos 30 dias">
-        <div class="kpi-lbl">Receita estimada</div>
+    </a>
+    <a href="/saidas/historico" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Receita registrada com saídas nos últimos 30 dias">
+        <div class="kpi-lbl">Receita registrada</div>
         <div class="kpi-val dashboard-kpi-value text-emerald-800">@Model.ReceitaMes.ToString("C", ptBR)</div>
         <div class="text-xs text-slate-400 mt-1">últimos 30 dias</div>
-    </div>
+    </a>
 </div>
 
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -176,7 +176,7 @@
         {
             @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
                 { "EmptyIllustration", "chart" },
-                { "EmptyTitle", "Nenhuma movimentação ainda" },
+                { "EmptyTitle", "Nenhuma movimentação este mês" },
                 { "EmptyDescription", "Registre sua primeira entrada para começar a acompanhar o fluxo do estoque." },
                 { "EmptyCta", "Registrar entrada" },
                 { "EmptyCtaHref", "/entradas/nova" }

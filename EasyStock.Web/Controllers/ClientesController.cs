@@ -54,6 +54,15 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         return RedirectToAction(nameof(Detail), new { id = result.Data?.Id });
     }
 
+    [HttpGet("/clientes/buscar-json")]
+    public async Task<IActionResult> BuscarJson(string? q = null, int limit = 5)
+    {
+        if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
+        var result = await svc.ListarAsync(null, q);
+        if (!result.Success || result.Data is null) return Ok(Array.Empty<object>());
+        return Ok(result.Data.Take(limit).Select(c => new { id = c.Id, nome = c.Nome, telefone = c.Telefone }));
+    }
+
     [HttpPost("/clientes/json")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CriarJson([FromBody] CriarClienteWebRequest req)
