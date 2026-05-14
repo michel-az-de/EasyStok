@@ -7,9 +7,10 @@
 //    setar window.CDB_CONFIG = { apiBaseUrl: 'https://easystock.exemplo.com' }
 //    ANTES de carregar este script (via config.js ou capacitor.config).
 //
-// Offline-first: toda mutação vai pra uma fila persistente em localStorage.
-// Fila é drenada quando a rede volta ou a cada 30s. O app funciona 100% sem
-// rede — sync é oportunístico, nunca bloqueante.
+// Offline-first: toda mutação vai pra uma fila persistente (IndexedDB primário,
+// localStorage fallback). Fila é drenada quando a rede volta ou a cada 30s.
+// O app funciona 100% sem rede — sync é oportunístico, nunca bloqueante.
+// F10-C-2: queue-store.js provê IDB wrapper com migração dual-read.
 
 (function () {
   'use strict';
@@ -227,25 +228,61 @@
   }
 
   // ---- Fila persistente ----
-  function loadQueue() {
+  // F10-C-2: bridge sincrona pra cdbQueueStore (IDB async).
+  // _queueCache mantém cópia em memória pra chamadas sync (loadQueue/saveQueue)
+  // — IDB é atualizado em background. Boot chama _initQueueStore() pra
+  // popular o cache. Fallback: localStorage direto se IDB indisponível.
+  let _queueCache = null; // null = não inicializado; [] = vazio
+  let _queueStoreReady = false;
+
+  async function _initQueueStore() {
+    try {
+      if (typeof window.cdbQueueStore !== 'undefined') {
+        const result = await window.cdbQueueStore.init();
+        _queueStoreReady = true;
+        _queueCache = await window.cdbQueueStore.loadAll();
+        _trace('boot', 'queue-store inicializado', { storage: result.storage, items: _queueCache.length, degraded: result.degraded });
+        return result;
+      }
+    } catch (e) {
+      _trace('boot', 'queue-store init falhou, usando localStorage', { error: e && e.message });
+    }
+    // Fallback: carregar de localStorage
+    _queueCache = _loadQueueLS();
+    _queueStoreReady = true;
+    return { storage: 'localStorage', degraded: true };
+  }
+
+  function _loadQueueLS() {
     try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
   }
+
+  function loadQueue() {
+    if (_queueCache !== null) return _queueCache;
+    return _loadQueueLS();
+  }
+
   function saveQueue(q) {
+    _queueCache = q;
+    // Persist to IDB (async, fire-and-forget) + localStorage (sync fallback)
     try {
       localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
     } catch (e) {
-      // QuotaExceededError: localStorage cheio (~5MB). Não descarta a fila —
-      // avisar o operador para conectar à rede e sincronizar antes de continuar.
       if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
         console.error('[sync] localStorage quota excedido — fila nao salva, conecte e sincronize!');
         try {
           if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
             window.cdbApp.showToast('Memória local cheia. Conecte à internet para sincronizar.', 'error');
           }
-          // Força flush imediato se online — drena fila antes de acumular mais.
           if (navigator.onLine) setTimeout(flush, 500);
         } catch (_) {}
       }
+    }
+    // Async persist to IDB
+    if (_queueStoreReady && typeof window.cdbQueueStore !== 'undefined' && !window.cdbQueueStore.degraded) {
+      window.cdbQueueStore.saveAll(q).catch(function (e) {
+        console.warn('[sync] IDB saveAll falhou:', e && e.message);
+      });
     }
   }
 
@@ -883,6 +920,12 @@
     // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
     // index.html escuta. Falha silenciosa nao bloqueia o app.
     maybeOfferRestoreOnReinstall();
+    // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
+    _initQueueStore().then(function () {
+      updatePendingCount();
+    }).catch(function (e) {
+      _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
+    });
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
     // Loop self-rescheduling com backoff exponencial em erro (substitui o
     // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
@@ -2309,6 +2352,15 @@
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
+    // F10-C-2: acesso ao queue-store pra diagnostico e export/import
+    queueStore: typeof window.cdbQueueStore !== 'undefined' ? window.cdbQueueStore : null,
+    getQueueStats: async () => {
+      if (typeof window.cdbQueueStore !== 'undefined' && window.cdbQueueStore.ready) {
+        return window.cdbQueueStore.getStats();
+      }
+      var q = loadQueue();
+      return { queueCount: q.length, deadletterCount: 0, conflictCount: 0, storage: 'localStorage', degraded: true };
+    },
     pushAll, pushAllAndFlush,
     // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
     forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
