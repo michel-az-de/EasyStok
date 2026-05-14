@@ -19,6 +19,13 @@ public class EstoqueService(ApiClient api, SessionService session)
                     buscarResult.ErrorCode!, buscarResult.ErrorMessage!, buscarResult.HttpStatus);
 
             var searchItems = buscarResult.Data ?? [];
+
+            // Aplicar filtro de status sobre os resultados de busca (client-side)
+            if (!string.IsNullOrEmpty(status))
+                searchItems = searchItems
+                    .Where(i => string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
             return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
             {
                 Data = searchItems,

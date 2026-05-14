@@ -1062,6 +1062,12 @@ html.theme-dark [x-data="criarFornecedorModal()"] .supplier-modal__footer {
     background: linear-gradient(180deg, rgba(254, 242, 242, .98) 0%, rgba(254, 226, 226, .92) 100%);
 }
 
+.grid-action-btn--warning {
+    border-color: rgba(253, 186, 116, .8);
+    color: #C2410C;
+    background: linear-gradient(180deg, rgba(255, 247, 237, .98) 0%, rgba(254, 237, 199, .92) 100%);
+}
+
 .grid-action-btn--ghost {
     border-color: rgba(226, 232, 240, .94);
     color: #334155;
@@ -1098,6 +1104,12 @@ html.theme-dark .grid-action-btn--danger {
     border-color: rgba(239, 68, 68, .34);
     color: #FECACA;
     background: linear-gradient(180deg, rgba(127, 29, 29, .46) 0%, rgba(15, 23, 42, .92) 100%);
+}
+
+html.theme-dark .grid-action-btn--warning {
+    border-color: rgba(251, 146, 60, .34);
+    color: #FED7AA;
+    background: linear-gradient(180deg, rgba(124, 45, 18, .46) 0%, rgba(15, 23, 42, .92) 100%);
 }
 
 html.theme-dark .pedido-modal__header,
