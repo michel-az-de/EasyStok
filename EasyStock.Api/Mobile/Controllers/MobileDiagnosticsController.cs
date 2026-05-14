@@ -99,6 +99,48 @@ public class MobileDiagnosticsController(ILogger<MobileDiagnosticsController> lo
         return Ok(new { received = true, serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
     }
 
+    /// <summary>
+    /// F10-D — Telemetria de storage exhausted.
+    /// Chamado pelo PWA quando quota IDB ou localStorage estoura.
+    /// Loga via Serilog para dashboard de alertas.
+    /// </summary>
+    [HttpPost("storage")]
+    public IActionResult ReportStorage([FromBody] MobileStorageReport req)
+    {
+        if (req == null) return BadRequest(new { error = "payload vazio" });
+
+        _log.LogWarning(
+            "[mobile-storage-alert] device={DeviceId} type={StorageType} exhausted={Exhausted} queueSize={QueueSize} deadletterSize={DeadletterSize} photosPending={PhotosPending}",
+            req.DeviceId ?? "unknown",
+            req.StorageType ?? "unknown",
+            req.Exhausted,
+            req.QueueSize,
+            req.DeadletterSize,
+            req.PhotosPending);
+
+        return Ok(new { received = true });
+    }
+
+    /// <summary>
+    /// F10-D — Device reporta foto-upload stats.
+    /// Permite saber se fotos estão sincronizando ou acumulando.
+    /// </summary>
+    [HttpPost("photo-stats")]
+    public IActionResult ReportPhotoStats([FromBody] MobilePhotoStatsReport req)
+    {
+        if (req == null) return BadRequest(new { error = "payload vazio" });
+
+        _log.LogInformation(
+            "[mobile-photo-stats] device={DeviceId} total={Total} pending={Pending} uploaded={Uploaded} sizeEstimate={SizeEstimate}",
+            req.DeviceId ?? "unknown",
+            req.Total,
+            req.Pending,
+            req.Uploaded,
+            req.SizeEstimate);
+
+        return Ok(new { received = true });
+    }
+
     private static string Truncate(string s, int max)
         => s.Length <= max ? s : s[..max] + "…";
 }
@@ -129,4 +171,23 @@ public record MobileErrorEntry(
     string? Stack,
     string? Screen,
     string? Operator
+);
+
+/// <summary>F10-D — Telemetria de storage exhausted do PWA.</summary>
+public record MobileStorageReport(
+    string? DeviceId,
+    string? StorageType,
+    bool Exhausted,
+    int QueueSize,
+    int DeadletterSize,
+    int PhotosPending
+);
+
+/// <summary>F10-D — Stats de fotos do photo-store do PWA.</summary>
+public record MobilePhotoStatsReport(
+    string? DeviceId,
+    int Total,
+    int Pending,
+    int Uploaded,
+    long SizeEstimate
 );
