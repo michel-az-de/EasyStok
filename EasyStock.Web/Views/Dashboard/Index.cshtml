@@ -11,7 +11,7 @@
 
 <div x-data="dashboardApp()" x-init="init()" class="space-y-6">
 
-    {{-- Header — saudação calculada no client p/ refletir fuso do usuário; data inclui o ano --}}
+    @* Header — saudação calculada no client p/ refletir fuso do usuário; data inclui o ano *@
     <div class="pg-hd flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div x-data="{
                 get saudacao() {
@@ -72,7 +72,7 @@
         </div>
     </div>
 
-    {{-- Entregues sem venda banner (BUG 2) --}}
+    @* Entregues sem venda banner (BUG 2) *@
     <template x-if="data && data.entreguesSemVenda > 0">
         <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +85,7 @@
         </div>
     </template>
 
-    {{-- ===== SEÇÃO 1: VISÃO GERAL (KPI Cards) ===== --}}
+    @* ===== SEÇÃO 1: VISÃO GERAL (KPI Cards) ===== *@
     <section>
         <div class="flex items-center gap-2 mb-4">
             <h2 class="font-bold text-slate-800">Visão geral</h2>
@@ -93,7 +93,7 @@
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {{-- Receita --}}
+            @* Receita *@
             <div class="ws group" title="Total de vendas confirmadas no período">
                 <div class="kpi-lbl">Receita</div>
                 <template x-if="loading && !data">
@@ -110,7 +110,7 @@
                 </template>
             </div>
 
-            {{-- Ticket Médio --}}
+            @* Ticket Médio *@
             <div class="ws group" title="Receita dividida pelo número de pedidos pagos">
                 <div class="kpi-lbl">Ticket médio</div>
                 <template x-if="loading && !data">
@@ -127,7 +127,7 @@
                 </template>
             </div>
 
-            {{-- Pedidos --}}
+            @* Pedidos *@
             <a href="/pedidos" class="ws group hover:border-slate-300 transition-colors" title="Total de pedidos criados, incluindo entregues e pendentes">
                 <div class="kpi-lbl">Pedidos</div>
                 <template x-if="loading && !data">
@@ -144,7 +144,7 @@
                 </template>
             </a>
 
-            {{-- Itens em Estoque --}}
+            @* Itens em Estoque *@
             <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Unidades ativas com quantidade maior que zero">
                 <div class="kpi-lbl">Itens em estoque</div>
                 <template x-if="loading && !data">
@@ -163,7 +163,7 @@
                 </template>
             </a>
 
-            {{-- Custo em Estoque --}}
+            @* Custo em Estoque *@
             <div class="ws group" title="Valor investido, pelo custo de compra dos produtos">
                 <div class="kpi-lbl">Custo em estoque</div>
                 <template x-if="loading && !data">
@@ -180,7 +180,7 @@
                 </template>
             </div>
 
-            {{-- Margem Bruta --}}
+            @* Margem Bruta *@
             <div class="ws group" title="Quanto sobra depois de descontar o custo. Baseado no custo médio de entrada">
                 <div class="kpi-lbl">Margem bruta</div>
                 <template x-if="loading && !data">
@@ -199,7 +199,7 @@
                 </template>
             </div>
 
-            {{-- Lotes Produzidos --}}
+            @* Lotes Produzidos *@
             <a href="/lotes" class="ws group hover:border-slate-300 transition-colors" title="Lotes de produção finalizados no período">
                 <div class="kpi-lbl">Lotes produzidos</div>
                 <template x-if="loading && !data">
@@ -216,7 +216,7 @@
                 </template>
             </a>
 
-            {{-- Clientes Ativos --}}
+            @* Clientes Ativos *@
             <a href="/clientes" class="ws group hover:border-slate-300 transition-colors" title="Clientes com pelo menos um pedido no período">
                 <div class="kpi-lbl">Clientes ativos</div>
                 <template x-if="loading && !data">
@@ -235,7 +235,7 @@
         </div>
     </section>
 
-    {{-- Insights --}}
+    @* Insights *@
     <template x-if="data && data.insights && data.insights.length > 0">
         <section class="space-y-2">
             <template x-for="insight in data.insights" :key="insight.componente + insight.texto">
@@ -259,7 +259,7 @@
         </section>
     </template>
 
-    {{-- ===== SEÇÃO 2: VENDAS & FINANCEIRO ===== --}}
+    @* ===== SEÇÃO 2: VENDAS & FINANCEIRO ===== *@
     <section x-data="{ open: true }">
         <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
             <h2 class="font-bold text-slate-800">Vendas e financeiro</h2>
@@ -268,7 +268,7 @@
             </svg>
         </button>
         <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-            {{-- Pedidos pendentes resumo --}}
+            @* Pedidos pendentes resumo *@
             <template x-if="data && data.pedidosPendentesTotal > 0">
                 <div class="ws">
                     <div class="flex items-center justify-between mb-3">
@@ -322,7 +322,7 @@
                 </div>
             </div>
 
-            {{-- Fluxo de Caixa --}}
+            @* Fluxo de Caixa *@
             <div class="ws">
                 <h3 class="font-semibold text-slate-700 mb-3">Fluxo de caixa</h3>
                 <template x-if="!extrasLoaded">
@@ -336,7 +336,7 @@
                 </div>
             </div>
 
-            {{-- Rankings --}}
+            @* Rankings *@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="ws">
                     <h3 class="font-semibold text-slate-700 mb-3">Top 5 produtos vendidos</h3>
@@ -360,7 +360,7 @@
         </div>
     </section>
 
-    {{-- ===== SEÇÃO 3: ESTOQUE & PRODUÇÃO ===== --}}
+    @* ===== SEÇÃO 3: ESTOQUE & PRODUÇÃO ===== *@
     <section x-data="{ open: true }">
         <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
             <h2 class="font-bold text-slate-800">Estoque e produção</h2>
@@ -369,7 +369,7 @@
             </svg>
         </button>
         <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-            {{-- Estoque status --}}
+            @* Estoque status *@
             <template x-if="data">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div class="ws flex items-center gap-3">
@@ -403,7 +403,7 @@
                 </div>
             </template>
 
-            {{-- Alertas de estoque --}}
+            @* Alertas de estoque *@
             <div>
                 <template x-if="data && data.alertasEstoque && data.alertasEstoque.length > 0">
                     <div class="ws">
@@ -413,7 +413,7 @@
                                 <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-700 text-xs font-bold"
                                       x-text="data.alertasEstoque.length"></span>
                             </div>
-                            {{-- Filtros de tipo --}}
+                            @* Filtros de tipo *@
                             <div class="flex gap-1 text-xs">
                                 <button type="button" @@click="filtroAlerta = 'todos'"
                                         :class="filtroAlerta === 'todos' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
@@ -455,7 +455,7 @@
                                          'border-amber-200 bg-amber-50': a.tipo === 'vencimento',
                                          'border-slate-200 bg-slate-50': a.tipo === 'parado'
                                      }">
-                                    {{-- Ícone --}}
+                                    @* Ícone *@
                                     <div class="flex-shrink-0 mt-0.5 rounded-lg p-1.5"
                                          :class="{
                                              'bg-red-100 text-red-600':    a.tipo === 'critico',
@@ -467,13 +467,13 @@
                                         </svg>
                                     </div>
 
-                                    {{-- Conteúdo --}}
+                                    @* Conteúdo *@
                                     <div class="flex-1 min-w-0">
                                         <p class="font-semibold text-slate-800 text-sm truncate" x-text="a.nomeProduto || 'Produto'"></p>
                                         <p class="text-xs text-slate-500 mt-0.5" x-text="labelAlerta(a)"></p>
                                     </div>
 
-                                    {{-- CTA --}}
+                                    @* CTA *@
                                     <a :href="a.tipo === 'parado'
                                                 ? '/saidas/nova?produtoId=' + a.produtoId
                                                 : '/entradas/reposicao?produtoId=' + a.produtoId"
@@ -508,7 +508,7 @@
                 </template>
             </div>
 
-            {{-- Estoque: donut + validade timeline --}}
+            @* Estoque: donut + validade timeline *@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="ws">
                     <h3 class="font-semibold text-slate-700 mb-3">Situação do estoque</h3>
@@ -527,7 +527,7 @@
                 </div>
             </div>
 
-            {{-- Produção por operador + entradas/saídas semanal --}}
+            @* Produção por operador + entradas/saídas semanal *@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="ws">
                     <h3 class="font-semibold text-slate-700 mb-3">Produção por operador</h3>
@@ -557,7 +557,7 @@
         </div>
     </section>
 
-    {{-- ===== SEÇÃO 4: CLIENTES & FORNECEDORES ===== --}}
+    @* ===== SEÇÃO 4: CLIENTES & FORNECEDORES ===== *@
     <section x-data="{ open: false }">
         <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
             <h2 class="font-bold text-slate-800">Clientes e fornecedores</h2>
@@ -567,7 +567,7 @@
         </button>
         <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
 
-            {{-- Novos clientes por mês --}}
+            @* Novos clientes por mês *@
             <div class="ws">
                 <h3 class="font-semibold text-slate-700 mb-3">Novos clientes por mês</h3>
                 <template x-if="!extrasLoaded">
@@ -584,7 +584,7 @@
                 </div>
             </div>
 
-            {{-- Fornecedores --}}
+            @* Fornecedores *@
             <template x-if="extrasLoaded && extras && extras.fornecedores">
                 <div class="ws">
                     <h3 class="font-semibold text-slate-700 mb-4">Fornecedores</h3>
@@ -629,7 +629,7 @@
         </div>
     </section>
 
-    {{-- IA usage (preserved from original) --}}
+    @* IA usage (preserved from original) *@
     @if (Model.IaConfigurada)
     {
         <div class="ws">
@@ -664,7 +664,7 @@
         </div>
     }
 
-    {{-- Quick actions --}}
+    @* Quick actions *@
     <div class="ws hidden lg:block">
         <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
         <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -694,7 +694,7 @@
         </div>
     </div>
 
-    {{-- Drawer: detalhes do pedido --}}
+    @* Drawer: detalhes do pedido *@
     <div x-show="drawer.open"
          class="fixed inset-0 z-50 flex justify-end no-print"
          style="display:none"
@@ -732,7 +732,7 @@
         </div>
     </div>
 
-    {{-- Error state --}}
+    @* Error state *@
     <template x-if="error">
         <div class="ws text-center py-8">
             <p class="text-red-600 mb-3" x-text="error"></p>
