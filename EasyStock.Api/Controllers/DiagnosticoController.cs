@@ -59,11 +59,27 @@ public sealed class DiagnosticoController(
             Configuracoes = GetConfiguracoesStatus()
         };
 
-        // Determinar status geral
-        if (result.Banco.Conexao == "falha" || result.Configuracoes.JwtSecretPresente == false)
+        // Determinar status geral — hierarquia: critical > degraded > ok.
+        // Considera todos os subsistemas relevantes; status verde só com tudo saudável.
+        var isCritical =
+            result.Banco.Conexao == "falha" ||
+            result.Configuracoes.JwtSecretPresente == false ||
+            result.Configuracoes.ConnectionStringPresente == false;
+
+        var isDegraded =
+            result.Redis.Conexao == "falha" ||
+            result.Banco.Fallback ||
+            result.Configuracoes.JwtSecretSeguro == false ||
+            // IA habilitada mas sem API Key configurada — recurso degradado.
+            (result.Ia.Habilitado && !result.Ia.ApiKeyPresente) ||
+            // Storage configurado mas diretório inacessível.
+            (result.Storage.Configurado && result.Storage.DiretorioExiste == false) ||
+            // Latência de banco alta sinaliza degradação real.
+            result.Banco.LatenciaMs > 500;
+
+        if (isCritical)
             result.Status = "critical";
-        else if (result.Redis.Conexao == "falha" || result.Banco.Fallback ||
-                 result.Configuracoes.JwtSecretSeguro == false)
+        else if (isDegraded)
             result.Status = "degraded";
 
         // Causas prováveis

@@ -225,6 +225,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
     private async Task<ApiResult<T>> ParseResponse<T>(HttpResponseMessage response)
     {
         var status = (int)response.StatusCode;
+        var correlationId = ExtractCorrelationId(response);
 
         if (response.IsSuccessStatusCode)
         {
@@ -234,7 +235,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                 // 204 NoContent (e respostas com corpo vazio em geral): tratar como sucesso
                 // sem tentar deserializar — o tipo T pode ser object/bool/etc.
                 if (string.IsNullOrWhiteSpace(json))
-                    return ApiResult<T>.Ok(default!) with { HttpStatus = status };
+                    return ApiResult<T>.Ok(default!) with { HttpStatus = status, CorrelationId = correlationId };
 
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
@@ -245,46 +246,56 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
 
                 var data = payload.Deserialize<T>(JsonOpts);
                 return data is null
-                    ? ApiResult<T>.Fail("EMPTY_RESPONSE", "Resposta vazia do servidor.", status)
-                    : ApiResult<T>.Ok(data) with { HttpStatus = status };
+                    ? ApiResult<T>.Fail("EMPTY_RESPONSE", "Resposta vazia do servidor.", status, correlationId)
+                    : ApiResult<T>.Ok(data) with { HttpStatus = status, CorrelationId = correlationId };
             }
             catch (JsonException ex)
             {
-                log.LogWarning(ex, "JSON deserialization to {Type} failed (HTTP {Status}).", typeof(T).Name, status);
-                return ApiResult<T>.Fail("PARSE_ERROR", "Erro ao processar resposta do servidor.", status);
+                log.LogWarning(ex, "JSON deserialization to {Type} failed (HTTP {Status}, CID {CorrelationId}).",
+                    typeof(T).Name, status, correlationId);
+                return ApiResult<T>.Fail("PARSE_ERROR", "Erro ao processar resposta do servidor.", status, correlationId);
             }
         }
 
         return await ParseErrorResponse<T>(response);
     }
 
+    private static string? ExtractCorrelationId(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("X-Correlation-Id", out var values))
+            return values.FirstOrDefault();
+        return null;
+    }
+
     private async Task<ApiResult<T>> ParseErrorResponse<T>(HttpResponseMessage response)
     {
         var status = (int)response.StatusCode;
+        var cid = ExtractCorrelationId(response);
 
         return response.StatusCode switch
         {
             HttpStatusCode.Unauthorized =>
-                ApiResult<T>.Fail("AUTH_TOKEN_EXPIRED", "Sessão expirada. Faça login novamente.", status),
-            HttpStatusCode.PaymentRequired => await ParseLimitError<T>(response, status),
+                ApiResult<T>.Fail("AUTH_TOKEN_EXPIRED", "Sessão expirada. Faça login novamente.", status, cid),
+            HttpStatusCode.PaymentRequired => await ParseLimitError<T>(response, status, cid),
             HttpStatusCode.Forbidden =>
-                ApiResult<T>.Fail("PERMISSAO_INSUFICIENTE", "Você não tem permissão para esta ação.", status),
+                ApiResult<T>.Fail("PERMISSAO_INSUFICIENTE", "Você não tem permissão para esta ação.", status, cid),
             HttpStatusCode.NotFound =>
-                ApiResult<T>.Fail("NOT_FOUND", "Recurso não encontrado.", status),
+                ApiResult<T>.Fail("NOT_FOUND", "Recurso não encontrado.", status, cid),
             HttpStatusCode.TooManyRequests =>
-                ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status),
-            HttpStatusCode.InternalServerError => await ParseBodyError<T>(response, status),
-            HttpStatusCode.BadRequest => await ParseBodyError<T>(response, status),
-            HttpStatusCode.Conflict => await ParseBodyError<T>(response, status),
-            HttpStatusCode.UnprocessableEntity => await ParseBodyError<T>(response, status),
+                ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status, cid),
+            HttpStatusCode.InternalServerError => await ParseBodyError<T>(response, status, cid),
+            HttpStatusCode.BadRequest => await ParseBodyError<T>(response, status, cid),
+            HttpStatusCode.Conflict => await ParseBodyError<T>(response, status, cid),
+            HttpStatusCode.UnprocessableEntity => await ParseBodyError<T>(response, status, cid),
             // Demais 4xx/5xx: tenta extrair detail do envelope ApiError. Se vier vazio,
             // ParseBodyError já cai em UserFacingErrors.FallbackForStatus.
-            _ => await ParseBodyError<T>(response, status)
+            _ => await ParseBodyError<T>(response, status, cid)
         };
     }
 
-    private async Task<ApiResult<T>> ParseBodyError<T>(HttpResponseMessage response, int status)
+    private async Task<ApiResult<T>> ParseBodyError<T>(HttpResponseMessage response, int status, string? cid = null)
     {
+        cid ??= ExtractCorrelationId(response);
         try
         {
             var json = await response.Content.ReadAsStringAsync();
@@ -292,7 +303,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             // Corpo vazio: 400/409/422 sem JSON. Não vale a pena dizer "Erro na requisição"
             // genérico — orientamos pelo status.
             if (string.IsNullOrWhiteSpace(json))
-                return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status);
+                return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status, cid);
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -302,7 +313,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             {
                 var code = TryString(errEl, "code") ?? "API_ERROR";
                 var msg = TryString(errEl, "detail") ?? TryString(errEl, "message");
-                return ApiResult<T>.Fail(code, ResolveMessage(code, msg, status), status);
+                return ApiResult<T>.Fail(code, ResolveMessage(code, msg, status), status, cid);
             }
 
             // Format 2: FluentValidation / ASP.NET { errors: { "Field": ["msg", ...] } }
@@ -321,7 +332,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                     }
                 }
                 var joined = messages.Count > 0 ? string.Join(" ", messages) : UserFacingErrors.FallbackForStatus(status);
-                return ApiResult<T>.Fail("VALIDATION_ERROR", joined, status);
+                return ApiResult<T>.Fail("VALIDATION_ERROR", joined, status, cid);
             }
 
             // Format 3: { code, message } (flat) ou { title } (ProblemDetails)
@@ -329,12 +340,12 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             var flatMsg = TryString(root, "message")
                 ?? TryString(root, "detail")
                 ?? TryString(root, "title");
-            return ApiResult<T>.Fail(flatCode, ResolveMessage(flatCode, flatMsg, status), status);
+            return ApiResult<T>.Fail(flatCode, ResolveMessage(flatCode, flatMsg, status), status, cid);
         }
         catch (Exception ex)
         {
             log.LogDebug(ex, "Could not parse error body from HTTP {Status} response on path handling", status);
-            return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status);
+            return ApiResult<T>.Fail("API_ERROR", UserFacingErrors.FallbackForStatus(status), status, cid);
         }
     }
 
@@ -344,8 +355,9 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
     private static string ResolveMessage(string code, string? message, int status) =>
         UserFacingErrors.Sanitize(code, message, status);
 
-    private async Task<ApiResult<T>> ParseLimitError<T>(HttpResponseMessage response, int status)
+    private async Task<ApiResult<T>> ParseLimitError<T>(HttpResponseMessage response, int status, string? cid = null)
     {
+        cid ??= ExtractCorrelationId(response);
         try
         {
             var json = await response.Content.ReadAsStringAsync();
@@ -355,11 +367,11 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             if (root.TryGetProperty("error", out var errEl) && errEl.TryGetProperty("recurso", out var r))
                 recurso = r.GetString();
             var code = recurso != null ? $"LIMITE_PLANO:{recurso}" : "LIMITE_PLANO";
-            return ApiResult<T>.Fail(code, "Limite do plano atingido.", status);
+            return ApiResult<T>.Fail(code, "Limite do plano atingido.", status, cid);
         }
         catch
         {
-            return ApiResult<T>.Fail("LIMITE_PLANO", "Limite do plano atingido.", status);
+            return ApiResult<T>.Fail("LIMITE_PLANO", "Limite do plano atingido.", status, cid);
         }
     }
 

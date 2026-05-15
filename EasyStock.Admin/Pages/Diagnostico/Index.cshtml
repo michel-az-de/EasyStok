@@ -1046,12 +1046,14 @@ function diagnosticoPage() {
         },
 
         // ── Sub-states (factories internas) ──────────────────────────────────
-        resumo: null,
-        erros: null,
-        sysErros: null,
-        logMode: null,
-        infra: null,
-        perf: null,
+        // Stub mínimo para evitar `Cannot read properties of null` quando Alpine
+        // avalia bindings reativos antes do init() trocar pelos factories reais.
+        resumo: { data: {}, loading: false },
+        erros: { _loadedOnce: false, items: [], total: 0 },
+        sysErros: { _loadedOnce: false, total: 0 },
+        logMode: { loaded: false, verbose: false },
+        infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
+        perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
 
         init() {
             this.resumo = resumoState.call(this);
