@@ -98,6 +98,7 @@ builder.Services.AddScoped<RelatoriosService>();
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));
 builder.Services.AddScoped<LeadsApiService>();
 builder.Services.AddScoped<FaqApiService>();
+builder.Services.AddScoped<TicketsApiService>();
 
 // 6c. Response compression — Brotli/Gzip pra Razor HTML, JSON do AJAX e estaticos.
 // CPU overhead marginal vs ganho de bandwidth (Render cobra acima do free tier).

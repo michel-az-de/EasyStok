@@ -18,6 +18,7 @@ public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
     ProdutosService produtosSvc,
+    TicketsApiService ticketsSvc,
     SessionService session) : BaseController(session)
 {
     [HttpGet("/pedidos/novo")]
@@ -117,6 +118,36 @@ public class PedidosController(
 
         Toast("success", "Pedido cancelado.");
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Onda 1.1 — abre ticket SaaS pra EasyStok reportando problema sobre
+    /// um pedido especifico. Vincula via PedidoId (cross-tenant validado no
+    /// use case). Cliente nao escolhe prioridade; categoria default Solicitacao.
+    /// </summary>
+    [HttpPost("/pedidos/{id:guid}/reportar-problema")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReportarProblema(Guid id, string motivo, string? descricao, string? categoria)
+    {
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            Toast("error", "Informe o motivo da reclamacao.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var titulo = $"Pedido {id.ToString().Substring(0, 8)} — {motivo}";
+        var desc = string.IsNullOrWhiteSpace(descricao) ? motivo : descricao;
+        var cat = string.IsNullOrWhiteSpace(categoria) ? "Solicitacao" : categoria;
+
+        var result = await ticketsSvc.AbrirAsync(titulo, desc, cat, pedidoId: id);
+        if (HasError(result))
+        {
+            Toast("error", $"Falha ao abrir ticket: {result.ErrorMessage}");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        Toast("success", $"Ticket aberto. Acompanhe em Suporte.");
+        return RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpPost("/pedidos/{id}/itens")]

@@ -73,6 +73,11 @@
                 Cancelar pedido
             </button>
         }
+        <button type="button" x-data @@click="$dispatch('open-modal', 'reportar-problema')"
+                class="px-3.5 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-semibold rounded-lg hover:bg-amber-50"
+                title="Abre ticket pra EasyStok sobre este pedido">
+            ⚠ Reportar problema
+        </button>
     </div>
 </div>
 
@@ -514,6 +519,76 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
         </form>
     </div>
 
+    <!-- Modal: reportar problema -->
+    <div x-data="reportarProblemaModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition duration-100 ease-in"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="alertdialog" aria-modal="true" aria-labelledby="fm-report-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 520px"
+              method="post" action="/pedidos/@p.Id/reportar-problema"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-report-title" class="fm-header__title text-amber-700">Reportar problema deste pedido</h2>
+                    <p class="fm-header__subtitle">
+                        Abre ticket pra EasyStok sobre este pedido. Voce pode acompanhar a resposta em Suporte.
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-motivo">Motivo *</label>
+                    <select id="report-motivo" name="motivo" required class="ui-select w-full text-sm">
+                        <option value="">— escolha —</option>
+                        <option value="Pedido travado / nao avancou status">Pedido travado / nao avancou status</option>
+                        <option value="Sync falhou (mobile <-> web)">Sync falhou (mobile <-> web)</option>
+                        <option value="Item duplicado ou faltando">Item duplicado ou faltando</option>
+                        <option value="Pagamento nao registrou">Pagamento nao registrou</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-categoria">Categoria</label>
+                    <select id="report-categoria" name="categoria" class="ui-select w-full text-sm">
+                        <option value="Solicitacao">Solicitacao</option>
+                        <option value="Incidente">Incidente</option>
+                        <option value="Bug">Bug</option>
+                        <option value="Duvida">Duvida</option>
+                    </select>
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-descricao">Descricao (opcional)</label>
+                    <textarea id="report-descricao" name="descricao" rows="4"
+                              placeholder="Detalhes adicionais que ajudem a entender o problema..."
+                              class="ui-textarea w-full text-sm"></textarea>
+                    <span class="fm-field__hint">O ticket vai linkar automaticamente ao pedido @p.Id.Substring(0, 8)</span>
+                </div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
+                    Abrir ticket
+                </button>
+            </footer>
+        </form>
+    </div>
+
     @section Scripts {
     <script>
     function cancelarPedidoModal() {
@@ -526,6 +601,26 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
                     this._previousFocus = document.activeElement;
                     this.open = true;
                     this.$nextTick(() => this.$refs.panel.querySelector('textarea')?.focus());
+                });
+                this.$watch('open', (v) => {
+                    document.body.style.overflow = v ? 'hidden' : '';
+                    if (!v && this._previousFocus) this._previousFocus.focus?.();
+                });
+            },
+            close() { this.open = false; }
+        };
+    }
+
+    function reportarProblemaModal() {
+        return {
+            open: false,
+            _previousFocus: null,
+            init() {
+                window.addEventListener('open-modal', (e) => {
+                    if (e.detail !== 'reportar-problema') return;
+                    this._previousFocus = document.activeElement;
+                    this.open = true;
+                    this.$nextTick(() => this.$refs.panel.querySelector('select[name="motivo"]')?.focus());
                 });
                 this.$watch('open', (v) => {
                     document.body.style.overflow = v ? 'hidden' : '';
