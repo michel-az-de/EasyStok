@@ -29,7 +29,11 @@ namespace EasyStock.Api.Controllers
                 return Forbid();
 
             var canal = req.CanalOrigem ?? InferirCanalDoUserAgent();
-            var cmd = new AbrirTicketClienteCommand(req.Titulo, req.Descricao, req.Categoria, req.FaturaId, canal);
+            var cmd = new AbrirTicketClienteCommand(
+                req.Titulo, req.Descricao, req.Categoria,
+                FaturaId: req.FaturaId,
+                PedidoId: req.PedidoId,
+                CanalOrigem: canal);
             var result = await abrirUseCase.ExecuteAsync(cmd);
 
             return DataCreated($"api/tickets/{result.TicketId}", result);
