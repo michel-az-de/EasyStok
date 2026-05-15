@@ -20,26 +20,16 @@ public class GetDashboardFullUseCase(
         var de = ate.AddDays(-cmd.PeriodoDias);
         var dePrev = de.AddDays(-cmd.PeriodoDias);
 
-        var kpisTask = analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, de, ate, cmd.LojaId);
-        var kpisPrevTask = analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, dePrev, de, cmd.LojaId);
-        var estoqueStatusTask = analyticsRepository.GetEstoqueStatusDistribuicaoAsync(cmd.EmpresaId, cmd.LojaId);
-        var pendentesTask = analyticsRepository.GetPedidosPendentesAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
-        var alertasValidadeTask = analyticsRepository.GetAlertasValidadeAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);
-        var alertasParadosTask = analyticsRepository.GetItensParadosDetalhadosAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);
-        var alertasCriticosTask = analyticsRepository.GetItensCriticosResumoAsync(cmd.EmpresaId, 10, cmd.LojaId);
-        var entreguesSemVendaTask = analyticsRepository.GetEntreguesSemVendaCountAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
-
-        await Task.WhenAll(kpisTask, kpisPrevTask, estoqueStatusTask, pendentesTask,
-            alertasValidadeTask, alertasParadosTask, alertasCriticosTask, entreguesSemVendaTask);
-
-        var kpis = kpisTask.Result;
-        var kpisPrev = kpisPrevTask.Result;
-        var estoqueStatus = estoqueStatusTask.Result;
-        var pendentes = pendentesTask.Result;
-        var (alertasValidade, _) = alertasValidadeTask.Result;
-        var (alertasParados, _) = alertasParadosTask.Result;
-        var alertasCriticos = alertasCriticosTask.Result;
-        var entreguesSemVenda = entreguesSemVendaTask.Result;
+        // DbContext scoped não é thread-safe. Queries executadas sequencialmente.
+        // A maioria responde do cache Redis (5min TTL) então o custo total fica baixo.
+        var kpis = await analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, de, ate, cmd.LojaId);
+        var kpisPrev = await analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, dePrev, de, cmd.LojaId);
+        var estoqueStatus = await analyticsRepository.GetEstoqueStatusDistribuicaoAsync(cmd.EmpresaId, cmd.LojaId);
+        var pendentes = await analyticsRepository.GetPedidosPendentesAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
+        var (alertasValidade, _) = await analyticsRepository.GetAlertasValidadeAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);
+        var (alertasParados, _) = await analyticsRepository.GetItensParadosDetalhadosAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);
+        var alertasCriticos = await analyticsRepository.GetItensCriticosResumoAsync(cmd.EmpresaId, 10, cmd.LojaId);
+        var entreguesSemVenda = await analyticsRepository.GetEntreguesSemVendaCountAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
 
         var delta = CalculateDelta(kpis, kpisPrev);
 
