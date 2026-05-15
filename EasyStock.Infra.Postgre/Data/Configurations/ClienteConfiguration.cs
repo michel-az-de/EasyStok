@@ -23,6 +23,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(c => c.EmpresaId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Suporta GetNovosClientesPorMesAsync (filtra EmpresaId + CriadoEm).
+            builder.HasIndex(c => new { c.EmpresaId, c.CriadoEm });
+
             builder.HasMany(c => c.Enderecos)
                 .WithOne(e => e.Cliente)
                 .HasForeignKey(e => e.ClienteId)

@@ -19,6 +19,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.MobileBatchId).HasMaxLength(64);
 
             b.HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
+            // Suporta GetProducaoPorOperadorAsync (filtra Status + DataProducao por período).
+            b.HasIndex(x => new { x.EmpresaId, x.Status, x.DataProducao });
 
             b.HasOne(x => x.Empresa).WithMany().HasForeignKey(x => x.EmpresaId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne(x => x.Loja).WithMany().HasForeignKey(x => x.LojaId).OnDelete(DeleteBehavior.SetNull);
