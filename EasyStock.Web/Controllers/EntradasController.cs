@@ -152,7 +152,7 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         if (string.IsNullOrEmpty(periodoInicio) && string.IsNullOrEmpty(periodoFim))
         {
             periodoInicio = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
-            periodoFim = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            periodoFim = DateTime.UtcNow.ToString("yyyy-MM-dd") + "T23:59:59";
         }
 
         var result = await svc.HistoricoAsync(page, tipo, periodoInicio, periodoFim);

@@ -107,7 +107,7 @@
                         else { <span class="text-slate-400">—</span> }
                         @if (l.EtiquetasDivergentes > 0) { <span class="text-xs text-red-600">· @l.EtiquetasDivergentes div</span> }
                     </td>
-                    <td class="text-right"><a asp-action="Detail" asp-controller="Lotes" asp-route-id="@l.Id" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a></td>
+                    <td class="text-right"><a href="/lotes/@l.Id" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a></td>
                 </tr>
             }
             </tbody>

@@ -275,17 +275,19 @@
                                     var sClass = item.Status?.ToLower() switch
                                     {
                                         "ok" or "normal" => "badge-ok",
-                                        "critico" or "crítico" => "badge-critical",
-                                        "parado" => "badge-slow",
+                                        "critico" or "crítico" or "critical" => "badge-critical",
+                                        "esgotado" => "badge-warn",
+                                        "parado" or "slow" => "badge-slow",
                                         _ => "badge-warn"
                                     };
                                 }
                                 @{
                                     var statusLabel = (item.Status?.ToLower()) switch {
-                                        "critico" => "Crítico",
-                                        "atencao" => "Atenção",
+                                        "critico" or "critical" => "Crítico",
+                                        "esgotado" => "Esgotado",
+                                        "atencao" or "warn" => "Atenção",
                                         "ok" => "OK",
-                                        "parado" => "Parado",
+                                        "parado" or "slow" => "Parado",
                                         "vencido" => "Vencido",
                                         "descartado" => "Descartado",
                                         "bloqueado" => "Bloqueado",

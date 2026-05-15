@@ -67,7 +67,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         if (string.IsNullOrEmpty(de) && string.IsNullOrEmpty(ate))
         {
             de = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
-            ate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            ate = DateTime.UtcNow.ToString("yyyy-MM-dd") + "T23:59:59";
         }
 
         var result = await svc.ListarAsync(page, natureza, de, ate);

@@ -148,6 +148,18 @@ public class CriarPedidoUseCase(
             cliente.RegistrarPedido(pedido.CriadoEm);
             await clienteRepo.UpdateAsync(cliente);
         }
+        else if (!string.IsNullOrWhiteSpace(cmd.ClienteNomeAdHoc))
+        {
+            // Pedido balcão: tenta associar ao cliente cadastrado com o mesmo nome.
+            var matches = await clienteRepo.SearchAsync(cmd.EmpresaId, cmd.ClienteNomeAdHoc, maxResults: 1);
+            var clienteAdHoc = matches.FirstOrDefault(c =>
+                string.Equals(c.Nome, cmd.ClienteNomeAdHoc, StringComparison.OrdinalIgnoreCase));
+            if (clienteAdHoc != null)
+            {
+                clienteAdHoc.RegistrarPedido(pedido.CriadoEm);
+                await clienteRepo.UpdateAsync(clienteAdHoc);
+            }
+        }
 
         await uow.CommitAsync();
 

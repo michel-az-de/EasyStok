@@ -218,6 +218,8 @@ app.UseMiddleware<LojaRequiredMiddleware>(); // Bloqueia navegacao sem LojaId se
 // podem tentar acessar diretamente pelo alias mais curto.
 app.MapGet("/compras", () => Results.Redirect("/listas-compras", permanent: false))
    .RequireAuthorization();
+app.MapGet("/lista-de-compras", () => Results.Redirect("/listas-compras", permanent: true))
+   .RequireAuthorization();
 app.MapGet("/entradas", () => Results.Redirect("/entradas/historico", permanent: false))
    .RequireAuthorization();
 

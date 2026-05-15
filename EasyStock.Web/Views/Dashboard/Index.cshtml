@@ -13,10 +13,10 @@
 </div>
 
 <div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Produtos distintos com ao menos uma unidade em estoque">
-        <div class="kpi-lbl">Produtos</div>
+    <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Produtos com estoque ativo (exclui vencidos e sem lotes)">
+        <div class="kpi-lbl">Produtos ativos</div>
         <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
-        <div class="text-xs text-slate-400 mt-1">SKUs únicos</div>
+        <div class="text-xs text-slate-400 mt-1">com estoque não vencido</div>
     </a>
     <a href="/estoque" class="ws dashboard-kpi-card block hover:border-slate-300 transition-colors" title="Soma das quantidades de todas as unidades em estoque (todos os lotes)">
         <div class="kpi-lbl">Unidades em estoque</div>

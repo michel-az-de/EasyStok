@@ -55,7 +55,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
                     Tipo = m.Tipo,
                     TotalMovimentacoes = m.TotalMovimentacoes,
                     Qty = m.QuantidadeTotal,
-                    Valor = m.ValorTotal > 0 ? m.ValorTotal : null,
+                    Valor = m.ValorTotal > 0 ? m.ValorTotal : (decimal?)0,
                     Data = new DateOnly(m.Ano, m.Mes, m.Dia)
                 });
             }

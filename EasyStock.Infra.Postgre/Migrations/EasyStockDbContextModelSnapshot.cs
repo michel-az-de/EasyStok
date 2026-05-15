@@ -4731,6 +4731,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("EmpresaId", "Status")
                         .HasDatabaseName("ix_produtos_empresa_status");
 
+                    b.HasIndex("EmpresaId", "Nome")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Produtos_EmpresaId_Nome");
+
                     b.ToTable("produtos", (string)null);
                 });
 
