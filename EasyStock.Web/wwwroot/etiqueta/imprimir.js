@@ -437,10 +437,14 @@ function _renderModeloLista(aba) {
   const items = _templates.filter(t => (aba === 'sistema' ? t.Origem === 'Sistema' : t.Origem === 'Empresa'));
 
   if (!items.length) {
-    lista.innerHTML = `<div class="etq-caption" style="padding:12px">
-      ${aba === 'empresa'
-        ? 'Você ainda não tem modelos personalizados. <a href="#" onclick="etqModelosCriar();return false">Duplique um modelo pronto</a> para começar.'
-        : 'Nenhum modelo do sistema.'}
+    lista.innerHTML = `<div style="text-align:center;padding:32px 16px">
+      <div style="font-size:32px;margin-bottom:8px;opacity:0.4">🏷️</div>
+      <div class="etq-section-lbl" style="margin-bottom:4px">${aba === 'empresa' ? 'Nenhum modelo personalizado' : 'Nenhum modelo do sistema'}</div>
+      <div class="etq-caption">${aba === 'empresa'
+        ? (_offlineMode
+          ? 'Conecte ao servidor para duplicar modelos prontos e criar os seus.'
+          : 'Duplique um modelo pronto na aba anterior para começar.')
+        : 'Modelos prontos aparecerão aqui.'}</div>
     </div>`;
     return;
   }
@@ -450,24 +454,27 @@ function _renderModeloLista(aba) {
     const eNome = _esc(t.Nome);
     const eOrigem = _esc(t.Origem);
     const eDesc = t.Descricao ? _esc(t.Descricao) : '';
+    const features = _getFeatureTags(t);
     return `
-    <div class="etq-tpl-card" style="padding:12px">
-      <div class="etq-tpl-card-thumb" id="thumb-${eId}">
+    <div class="etq-tpl-card">
+      <div class="etq-tpl-card-thumb" id="thumb-${eId}" onclick="etqModeloPreview('${eId}')" title="Toque para ampliar">
         <span class="etq-tpl-card-thumb-placeholder">⊞</span>
       </div>
-      <div style="padding:8px 0 0">
-        <div style="display:flex;align-items:center;gap:6px">
+      <div style="padding:10px 12px 12px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="etq-section-lbl">${eNome}</span>
-          ${t.IsDefault ? '<span class="etq-status etq-status--impressa" title="Usado por padrão ao imprimir.">Padrão</span>' : ''}
+          ${t.IsDefault ? '<span class="etq-status etq-status--impressa">Padrão</span>' : ''}
         </div>
         ${eDesc ? `<div class="etq-caption" style="margin-top:2px">${eDesc}</div>` : ''}
+        <div class="etq-tpl-features">${features}</div>
         ${_temNutricional(t)
-          ? '<div class="etq-disclaimer" style="margin-top:4px">ℹ️ Confira a RDC 727 antes de usar em embalagem de venda. O EasyStok não valida conformidade nutricional.</div>'
+          ? '<div class="etq-disclaimer" style="margin-top:6px">ℹ️ Confira a RDC 727 antes de usar em embalagem de venda.</div>'
           : ''}
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloPreview('${eId}')">Visualizar</button>
           ${aba === 'sistema' ? `
             ${_offlineMode ? '' : `<button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDefinirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>`}
-            ${_offlineMode ? '' : `<button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDuplicar('${eId}','${eNome}')">Duplicar para personalizar</button>`}
+            ${_offlineMode ? '' : `<button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDuplicar('${eId}','${eNome}')">Duplicar</button>`}
           ` : `
             <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="window.etqAbrirEditor && etqAbrirEditor('${eId}')">Editar</button>
             <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="etqModeloDefinirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
@@ -478,11 +485,41 @@ function _renderModeloLista(aba) {
     </div>`;
   }).join('');
 
-  // Render thumbnails async
   for (const t of items) {
     _renderThumbnail(t);
   }
 }
+
+function _getFeatureTags(t) {
+  const tags = [];
+  try {
+    const layout = JSON.parse(t.LayoutJson);
+    const els = layout.elements || [];
+    if (els.some(e => e.type === 'code')) tags.push('<span class="etq-tpl-feat etq-tpl-feat--qr">QR / Código</span>');
+    if (els.some(e => e.type === 'nutritional-table')) tags.push('<span class="etq-tpl-feat etq-tpl-feat--nutri">Nutricional</span>');
+    if (els.some(e => e.type === 'alergenos-pills')) tags.push('<span class="etq-tpl-feat etq-tpl-feat--alerg">Alérgenos</span>');
+    if (els.some(e => e.type === 'image' && e.asset && e.asset.startsWith('system:'))) tags.push('<span class="etq-tpl-feat etq-tpl-feat--brand">EasyStok</span>');
+    const size = layout.size;
+    if (size) tags.push(`<span class="etq-tpl-feat" style="color:var(--ink-500,#6B7480);background:var(--ink-50,#F5F7FA)">${size.w_mm}×${size.h_mm}mm</span>`);
+  } catch {}
+  return tags.join('');
+}
+
+window.etqModeloPreview = function(id) {
+  const t = _templates.find(x => x.Id === id);
+  if (!t) return;
+  try {
+    const layout = JSON.parse(t.LayoutJson);
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
+    const el = renderEtiqueta(layout, dados);
+    const wrap = document.getElementById('etq-tpl-preview-wrap');
+    wrap.innerHTML = '';
+    wrap.appendChild(el);
+    renderCodes(wrap);
+    document.getElementById('etq-tpl-preview-name').textContent = t.Nome;
+    document.getElementById('etq-tpl-preview').classList.add('open');
+  } catch (err) { alert('Erro ao visualizar: ' + err.message); }
+};
 
 async function _renderThumbnail(t) {
   const wrap = document.getElementById(`thumb-${t.Id}`);
@@ -491,13 +528,21 @@ async function _renderThumbnail(t) {
     const layout = JSON.parse(t.LayoutJson);
     const wMm = layout.size?.w_mm ?? 80;
     const hMm = layout.size?.h_mm ?? 40;
-    const scale = 160 / (wMm * 3.7795);
+    const wPx = wMm * 3.7795;
+    const hPx = hMm * 3.7795;
+    const containerW = wrap.clientWidth || 320;
+    const containerH = 120;
+    const scale = Math.min((containerW - 16) / wPx, (containerH - 8) / hPx);
+    const scaledW = wPx * scale;
 
-    const dados = { produto: { Nome: 'Nome do Produto', Marca: 'Marca', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date().toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'EasyStok', LogoUrl: null } };
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
 
     const el = renderEtiqueta(layout, dados);
     el.style.transform = `scale(${scale})`;
     el.style.transformOrigin = 'top left';
+    el.style.position = 'absolute';
+    el.style.top = '4px';
+    el.style.left = `${Math.max(8, (containerW - scaledW) / 2)}px`;
     wrap.innerHTML = '';
     wrap.appendChild(el);
     await renderCodes(wrap);

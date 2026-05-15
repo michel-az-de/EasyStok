@@ -99,7 +99,6 @@ body {
 /* Phone frame */
 .phone {
   width: 100%;
-  max-width: 430px;
   height: 100vh;
   height: 100dvh;           /* viewport dinâmico em mobile — exclui URL bar */
   max-height: 932px;
@@ -3618,6 +3617,9 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: grid;
   gap: 8px;
 }
+#orientModeOptions {
+  grid-template-columns: 1fr 1fr;
+}
 .scan-mode-card {
   display: grid;
   grid-template-columns: 36px 1fr auto;
@@ -5039,6 +5041,19 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   backdrop-filter: blur(8px);
 }
 .etq-overlay.show { display: flex; }
+.etq-tpl-preview-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7,10,16,0.92);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 12000; padding: 16px; gap: 12px;
+}
+.etq-tpl-preview-overlay.open { display: flex; }
+.etq-tpl-preview-name { color: #fff; font-size: 14px; font-weight: 700; }
+.etq-tpl-preview-wrap { max-width: 100%; max-height: 70vh; overflow: auto; background: #fff; border-radius: 8px; }
+.etq-tpl-preview-close {
+  padding: 10px 22px; background: var(--gold, #F0B84A); color: #1c1408;
+  border: 0; border-radius: 8px; font-weight: 700; cursor: pointer;
+}
 .etq-sheet {
   flex: 1;
   display: flex; flex-direction: column;
@@ -5079,9 +5094,9 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: var(--gold, #E0A64A); color: #000;
   border-color: var(--gold, #E0A64A);
 }
-/* Etiqueta horizontal */
+/* Etiqueta horizontal — producao */
 .etq-card.etq-horiz {
-  width: 380px; max-width: 100%;
+  width: 380px;
   display: flex; flex-direction: row; gap: 12px;
   padding: 14px;
 }
@@ -5095,6 +5110,37 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border: none; padding: 0; margin: 0; background: transparent;
 }
 .etq-card.etq-horiz .et-qr svg { width: 90px; height: 90px; }
+/* ── Pedido horizontal — classe explicita sem :has() ── */
+.etq-card.etq-order-horiz {
+  width: 620px;
+  display: block; padding: 16px 14px 14px;
+}
+.etq-card .pa-receipt.pa-horiz {
+  display: flex; flex-direction: row; gap: 14px; align-items: stretch;
+}
+.etq-card .pa-receipt.pa-horiz .pa-receipt-main {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 0;
+}
+.etq-card .pa-receipt.pa-horiz .pa-receipt-side {
+  flex-shrink: 0; width: 180px;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-left: 12px; border-left: 1px dashed #d0d4db;
+}
+.etq-card .pa-receipt.pa-horiz .et-brand { justify-content: flex-start !important; margin-bottom: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-kicker { text-align: left; }
+.etq-card .pa-receipt.pa-horiz .pa-title { text-align: left; font-size: 17px; margin-bottom: 1px; }
+.etq-card .pa-receipt.pa-horiz .pa-center { text-align: left; font-size: 14px; }
+.etq-card .pa-receipt.pa-horiz .pa-meta { text-align: left; margin-bottom: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-grid { margin-top: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-confer {
+  align-items: center; text-align: center; padding-top: 4px;
+}
+.etq-card .pa-receipt.pa-horiz .pa-confer-qr svg { max-width: 96px; }
+.etq-card .pa-receipt.pa-horiz .pa-confer-bars svg { max-width: 160px; }
+.etq-card .pa-receipt.pa-horiz .pa-pix {
+  margin-top: auto; padding-top: 8px; border-top: 1px dashed #d0d4db;
+}
 .etq-success-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; background: rgba(22,143,122,0.18); color: var(--basil);
@@ -5106,7 +5152,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   font-size: 14px;
 }
 .etq-body {
-  flex: 1; overflow-y: auto;
+  flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: 22px 16px 30px;
   background:
     linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
@@ -5115,8 +5161,13 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background-size: 18px 18px, auto, auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
+.etq-card-wrap {
+  /* Wrapper que absorve o espaço de layout após scale */
+  overflow: hidden;
+  display: block;
+}
 .etq-card {
-  width: 320px; max-width: 100%;
+  width: 384px;
   background: #fff; color: #000;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   font-size: 13px; line-height: 1.4; font-weight: 500;
@@ -5164,7 +5215,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px;
   text-transform: uppercase; letter-spacing: 0.02em;
 }
-.etq-card .et-val { font-weight: 600; color: #000; font-size: 13px; }
+.etq-card .et-val { font-weight: 600; color: #000; font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
 .etq-card .et-conserv {
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; color: #555; font-weight: 500; margin: 4px 0 8px;
@@ -5239,7 +5290,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .etq-card .pa-item   { display: flex; justify-content: space-between; gap: 6px; padding: 3px 0; align-items: flex-start; }
 .etq-card .pa-item .pi-main { flex: 1; min-width: 0; }
-.etq-card .pa-item .pi-name { display: block; font-weight: 700; word-break: break-word; }
+.etq-card .pa-item .pi-name { display: block; font-weight: 700; overflow-wrap: anywhere; }
 .etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #888; margin-top: 1px; }
 .etq-card .pa-item .pi-qty { font-weight: 700; min-width: 26px; }
 .etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 700; }
@@ -5253,6 +5304,11 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border: 1px solid #e2e5ea; border-radius: 8px; padding: 8px 10px; margin-top: 6px;
   background: #fafbfc;
 }
+.etq-card .pa-nota-rapida {
+  border: 1.5px solid #f97316; border-radius: 8px; padding: 6px 10px; margin-top: 6px;
+  background: rgba(249,115,22,0.06); overflow-wrap: break-word;
+}
+.etq-card .pa-nota-rapida .pa-label { color: #c2410c; }
 .etq-card .pa-confer {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   border: 1.5px solid #e2e5ea; border-radius: 8px; padding: 10px;
@@ -5262,6 +5318,19 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 260px; height: auto; margin: 4px auto; }
 .etq-card .pa-confer-code { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
 .etq-card .pa-confer-hint { font-size: 10px; color: #888; }
+.etq-note-bar {
+  padding: 8px 16px 0;
+  background: var(--bg-elev);
+}
+.etq-note-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  background: var(--bg); color: var(--ink);
+  outline: none;
+}
+.etq-note-input:focus { border-color: var(--gold, #F0B84A); }
+.etq-note-input::placeholder { color: var(--ink-mute); }
 .etq-actions {
   display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background:
@@ -5279,6 +5348,10 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .etq-actions .etq-save   { background: rgba(96,165,250,0.18); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
 .etq-actions .etq-share  { background: rgba(37,211,102,0.18); color: #25D366; border: 1px solid rgba(37,211,102,0.3); }
 .etq-actions .etq-btn:active { transform: scale(0.97); }
+@media (max-width: 380px) {
+  .etq-actions { flex-wrap: wrap; gap: 6px; }
+  .etq-actions .etq-btn { flex: 1 1 auto; font-size: 13px; }
+}
 @media (min-width: 720px) {
   .etq-overlay { align-items: center; justify-content: center; padding: 28px; }
   .etq-sheet {
@@ -7712,7 +7785,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="ajustes-section ajustes-section-feature" data-group="loja">
         <h4>Formato das etiquetas</h4>
-        <p class="hint">Escolha se as etiquetas de produção saem com QR Code, codigo de barras, os dois ou nenhum.</p>
+        <p class="hint">Defina o que aparece na etiqueta e como ela fica disposta. Vale para todas as etiquetas de produção.</p>
         <div class="field">
           <label>Codigo impresso na produção</label>
           <select id="ajusteProdScanMode" class="scan-mode-select">
@@ -7722,35 +7795,35 @@ body.ux-calm [data-screen="producao"] .section-label {
             <option value="none">Sem codigo</option>
           </select>
           <div class="scan-mode-options" id="scanModeOptions">
-            <button type="button" class="scan-mode-card" data-mode="both" onclick="setScanModeChoice('both', true)">
+            <button type="button" class="scan-mode-card" data-mode="both" aria-pressed="false" onclick="setScanModeChoice('both', true)">
               <span class="scan-mode-icon">2</span>
               <span class="scan-mode-text">
                 <strong>QR + barras</strong>
-                <span>Mais completo para câmera e leitor dedicado.</span>
+                <span>Funciona tanto na câmera quanto no leitor.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="barcode" onclick="setScanModeChoice('barcode', true)">
+            <button type="button" class="scan-mode-card" data-mode="barcode" aria-pressed="false" onclick="setScanModeChoice('barcode', true)">
               <span class="scan-mode-icon">|||</span>
               <span class="scan-mode-text">
                 <strong>Codigo de barras</strong>
-                <span>Melhor para operação com leitor fisico.</span>
+                <span>Para quem usa leitor de mão. Conferência mais rápida.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="qr" onclick="setScanModeChoice('qr', true)">
+            <button type="button" class="scan-mode-card" data-mode="qr" aria-pressed="false" onclick="setScanModeChoice('qr', true)">
               <span class="scan-mode-icon">QR</span>
               <span class="scan-mode-text">
                 <strong>QR Code</strong>
-                <span>Mais limpo para leitura pela câmera do app.</span>
+                <span>Lê só pelo celular. Visual mais limpo.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="none" onclick="setScanModeChoice('none', true)">
+            <button type="button" class="scan-mode-card" data-mode="none" aria-pressed="false" onclick="setScanModeChoice('none', true)">
               <span class="scan-mode-icon">—</span>
               <span class="scan-mode-text">
                 <strong>Sem codigo</strong>
-                <span>Etiqueta limpa, só texto. Leitura manual.</span>
+                <span>Sem código nenhum. Operador identifica visualmente.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
@@ -7759,23 +7832,27 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="field" style="margin-top:12px">
           <label>Orientação da etiqueta</label>
           <div class="scan-mode-options" id="orientModeOptions">
-            <button type="button" class="scan-mode-card" data-orient="vertical" onclick="setOrientChoice('vertical')">
-              <span class="scan-mode-icon" style="font-size:18px">▯</span>
+            <button type="button" class="scan-mode-card" data-orient="vertical" aria-pressed="false" onclick="setOrientChoice('vertical', true)">
+              <span class="scan-mode-icon" aria-hidden="true"><svg width="14" height="20" viewBox="0 0 14 20"><rect x="1" y="1" width="12" height="18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
               <span class="scan-mode-text">
                 <strong>Vertical</strong>
-                <span>Informações em cima, codigo embaixo.</span>
+                <span>Texto em cima, código embaixo. Padrão para pote.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-orient="horizontal" onclick="setOrientChoice('horizontal')">
-              <span class="scan-mode-icon" style="font-size:18px">▭</span>
+            <button type="button" class="scan-mode-card" data-orient="horizontal" aria-pressed="false" onclick="setOrientChoice('horizontal', true)">
+              <span class="scan-mode-icon" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><rect x="1" y="1" width="18" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
               <span class="scan-mode-text">
                 <strong>Horizontal</strong>
-                <span>Info à esquerda, codigo à direita. Mais compacta.</span>
+                <span>Texto à esquerda, código à direita. Boa para embalagem larga.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
           </div>
+        </div>
+        <div class="etq-thumb-wrap" style="margin-top:12px;display:flex;align-items:center;gap:12px">
+          <span class="hint" style="margin:0">Prévia:</span>
+          <canvas id="ajustesEtqThumb" width="160" height="80" style="background:#fff;border:1px solid var(--border-soft, #e2e5ea);border-radius:4px"></canvas>
         </div>
       </div>
 
@@ -8157,6 +8234,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <span class="etq-success-text" id="etqSuccessText">Produção cadastrada</span>
       </div>
       <div class="etq-body" id="etqBody"></div>
+      <div class="etq-note-bar">
+        <input class="etq-note-input" id="etqNoteInput" type="text"
+               placeholder="Observação na imagem (opcional)" maxlength="40" autocomplete="off"
+               aria-label="Observação rápida para a etiqueta" title="Máximo 40 caracteres"
+               oninput="onEtqNoteInput()">
+      </div>
       <div class="etq-actions">
         <button class="etq-btn etq-print"  onclick="etqAction('print')">Imprimir</button>
         <button class="etq-btn etq-save"   onclick="etqAction('save')">Salvar PNG</button>
@@ -13309,22 +13392,105 @@ function refreshBodyModalClass() {
 // AJUSTES — operador, PIX, impressora térmica
 // ================================================================
 let ajustesListenersBound = false;
+
+// Getter centralizado com whitelist + warn (problema N do plano)
+function getEtqOrient() {
+  const raw = localStorage.getItem('cdb-etq-orient');
+  if (raw && raw !== 'vertical' && raw !== 'horizontal') {
+    console.warn('cdb-etq-orient invalido, fallback para vertical:', raw);
+    return 'vertical';
+  }
+  return raw || 'vertical';
+}
+
+// Toast unificado mostrando estado completo das etiquetas
+function showToastEtiquetaState() {
+  const mode = getProdScanMode();
+  const orient = getEtqOrient();
+  showToast('Etiquetas: ' + prodScanModeLabel(mode) + ', ' + (orient === 'horizontal' ? 'horizontal' : 'vertical'));
+}
+
+// Mini-thumb live em Ajustes (anti-retrabalho do ciclo "fecha-testa-reabre")
+function redrawAjustesEtqThumb() {
+  const canvas = document.getElementById('ajustesEtqThumb');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 160, 80);
+  // Sample com weightG (problema O) e tipos number consistente com fmtDateBR(ms) (problema P)
+  const sample = {
+    productName: 'Bolo de Cenoura',
+    unit: '500g',
+    productionDate: Date.now(),
+    expiresAt: Date.now() + 7 * 86400000,
+    lote: 'L260514',
+    codigoBarras: '7891234567890',
+    weightG: 480
+  };
+  ctx.save();
+  ctx.scale(0.42, 0.42);
+  drawProducaoEtiquetaCanvas(ctx, sample, 384, 0, 190, null);
+  ctx.restore();
+}
+
 function setScanModeChoice(mode, persistNow = false) {
-  const normalized = ['both','barcode','qr','none'].includes(mode) ? mode : 'both';
+  const prev = getProdScanMode();
+  const normalized = SCAN_MODES.includes(mode) ? mode : 'both';
   const select = document.getElementById('ajusteProdScanMode');
   if (select) select.value = normalized;
-  document.querySelectorAll('.scan-mode-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.mode === normalized);
+  // Escopo: so os cards de scan mode, nao os de orientacao (bug A)
+  document.querySelectorAll('#scanModeOptions .scan-mode-card').forEach(card => {
+    const isActive = card.dataset.mode === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
+  redrawAjustesEtqThumb();
   if (persistNow) {
     try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {}
     const modeChip = document.getElementById('etqModeChip');
     if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
-    if (previewOpen && currentEtiquetas.length) {
-      refreshEtqPreview();
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    // Audit inline (mitigacao L) — corrige bug retroativo: antes ficava preso ao saveAjustes
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Codigo da etiqueta: ' + prodScanModeLabel(normalized),
+        diff: { prodScanMode: { from: prev, to: normalized } }
+      });
     }
-    showToast('Formato das etiquetas: ' + prodScanModeLabel(normalized));
+  }
+}
+
+function setOrientChoice(orient, persistNow = false) {
+  const prev = currentEtqOrient;
+  const normalized = ['vertical','horizontal'].includes(orient) ? orient : 'vertical';
+  currentEtqOrient = normalized;
+  // Atualiza cards em Ajustes (escopo: #orientModeOptions)
+  document.querySelectorAll('#orientModeOptions .scan-mode-card').forEach(card => {
+    const isActive = card.dataset.orient === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  // Atualiza chips na Preview overlay
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === (normalized === 'horizontal' ? 'Horizontal' : 'Vertical'))
+  );
+  redrawAjustesEtqThumb();
+  if (persistNow) {
+    try { localStorage.setItem('cdb-etq-orient', normalized); } catch (e) {}
+    const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Orientacao da etiqueta: ' + normalized,
+        diff: { orientation: { from: prev, to: normalized } }
+      });
+    }
   }
 }
 function openAjustes() {
@@ -13334,6 +13500,8 @@ function openAjustes() {
   document.getElementById('ajustePixKey').value    = getPixKey();
   document.getElementById('ajustePixHolder').value = getPixHolder();
   setScanModeChoice(getProdScanMode());
+  setOrientChoice(getEtqOrient());
+  redrawAjustesEtqThumb();
   if (!ajustesListenersBound) {
     document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
     document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
@@ -13430,33 +13598,30 @@ function saveAjustes() {
   const type    = document.getElementById('ajustePixType').value;
   const key     = (document.getElementById('ajustePixKey').value    || '').trim();
   const holder  = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
-  const prodScanMode = (document.getElementById('ajusteProdScanMode')?.value || 'both');
   if (key && !validatePixKey(key, type)) {
     showToast('Chave PIX inválida pra esse tipo');
     return;
   }
   // Calcula diff antes de salvar pra registrar no log o que mudou
+  // (prodScanMode e orientation tem audit inline no setScanModeChoice / setOrientChoice)
   const before = {
     operator: operatorName,
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder(),
-    prodScanMode: getProdScanMode()
+    pixHolder: getPixHolder()
   };
   if (op) saveOperatorName(op);
   cdbSetPix(key || null, holder || null, type, empresa || null);
-  try { localStorage.setItem('cdb-prod-scan-mode', ['both','barcode','qr'].includes(prodScanMode) ? prodScanMode : 'both'); } catch (e) {}
   renderBrandName();
   const after = {
     operator: operatorName,
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder(),
-    prodScanMode: getProdScanMode()
+    pixHolder: getPixHolder()
   };
-  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder','prodScanMode']);
+  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder']);
   if (diff) {
     logAction({
       action: 'settings.update',
@@ -16302,7 +16467,7 @@ function escPosBarcode128(data) {
   return out;
 }
 
-function escPosOrderLabel(o) {
+function escPosOrderLabel(o, nota) {
   const empresa = (getEmpresaName() || 'EASY STOCK MOBILE').toUpperCase();
   const pixType = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
@@ -16332,6 +16497,12 @@ function escPosOrderLabel(o) {
     const obs = asciiNorm(o.notes);
     b.line('Obs: ' + obs.slice(0, PRINT_COLS - 5));
     if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
+  }
+  // Nota rapida digitada na hora (campo da tela de preview)
+  if (nota) {
+    const n = asciiNorm(String(nota));
+    b.bold().line('* NOTA: ' + n.slice(0, PRINT_COLS - 8)).boldOff();
+    if (n.length > PRINT_COLS - 8) b.line('  ' + n.slice(PRINT_COLS - 8, PRINT_COLS - 8 + PRINT_COLS - 2));
   }
   b.line(divider());
   // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo.
@@ -16512,6 +16683,7 @@ function fmtPesoG(g)     { return g >= 1000 ? (g/1000).toFixed(2).replace('.',',
  * Retorna string SVG inline com width/height fixos pra controlar layout.
  */
 function generateQrSvg(data, size = 96) {
+  if (!data) return '';
   if (typeof qrcode !== 'function') return ''; // lib não carregada — silencioso
   try {
     const qr = qrcode(0, 'L');
@@ -16617,10 +16789,19 @@ function etiquetasFromBatch(batch) {
   return out;
 }
 
-function etiquetaProducaoHtml(et) {
+function safePhotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'data:') ? url : '';
+  } catch { return ''; }
+}
+
+function etiquetaProducaoHtml(et, nota) {
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
   const { showQr, showBars: showBarcode } = scanModeFlags();
-  const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
+  const photoSrc = safePhotoUrl(et.photo);
+  const photo = photoSrc ? `<div class="et-photo-wrap"><img class="et-photo" src="${photoSrc}" alt="Foto do produto"/></div>` : '';
   const hasCodes = showQr || showBarcode;
   const horiz = currentEtqOrient === 'horizontal';
 
@@ -16641,11 +16822,14 @@ function etiquetaProducaoHtml(et) {
     ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, horiz ? 160 : 260, 50)}</div>` : ''}
     <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
   </div>` : '';
+  const notaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
 
   if (horiz) {
-    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}</div><div class="et-side">${scanBlock}</div>`;
+    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
   }
-  return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}`;
+  return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
 
 function escPosLabelProducao(et) {
@@ -16685,6 +16869,10 @@ function escPosLabelProducao(et) {
   b.line(padLine('Producao', fmtDateBR(et.productionDate)));
   b.line(padLine('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
   b.line(padLine('Lote',     et.lote));
+  if (et._nota) {
+    b.line(divider());
+    b.bold().line('* NOTA: ' + asciiNorm(String(et._nota)).slice(0, PRINT_COLS - 8)).boldOff();
+  }
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
@@ -16693,9 +16881,11 @@ function escPosLabelProducao(et) {
  * Largura fixa 384px (= 58mm a 200dpi). Cada etiqueta ocupa ~280px + 20px gap.
  * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
  */
-function etiquetasToPng(etiquetas, kind) {
-  const W = 384;
+function etiquetasToPng(etiquetas, kind, note) {
+  const horizOrder = kind === 'order' && currentEtqOrient === 'horizontal';
+  const W = horizOrder ? 620 : 384;
   const GAP = 20;
+  const NOTA_H = note ? 44 : 0; // altura extra por etiqueta quando nota presente
   const { showQr, showBars: showBarcode } = scanModeFlags();
   const hasCodes = showQr || showBarcode;
 
@@ -16703,21 +16893,37 @@ function etiquetasToPng(etiquetas, kind) {
     if (kind === 'order') {
       const o = et.order || {};
       const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24), 0);
+      if (horizOrder) {
+        // Horizontal: duas colunas. Altura = max(left, right).
+        // Left: brand(30)+kicker(14)+title(24)+ref(18)+date(16)+cliente(70)+items+ITENS(12)+total(48)+notes+nota
+        const leftH = 30 + 14 + 24 + 18 + 16 + 70 + 12 + itemsH + 48 + (o.notes ? 50 : 0) + NOTA_H;
+        // Right: 18 top + codeBox(QR106+bars46+38) + pixSpacer(10) + pix(76)
+        const codeBoxH = (showQr ? 106 : 0) + (showBarcode ? 46 : 0) + 38;
+        const rightH = 18 + codeBoxH + 10 + 76;
+        return Math.max(leftH, rightH) + 28;
+      }
       const notesH = o.notes ? 64 : 0;
-      const scanH = (showQr ? 148 : 0) + (showBarcode ? 74 : 0) + (hasCodes ? 46 : 0);
-      return 340 + itemsH + notesH + scanH + 80;
+      const codesH = (showQr ? 148 : 0) + (showBarcode ? 74 : 0) + (hasCodes ? 46 : 0);
+      const refTextH = 38;
+      const pixH = 84;
+      return 340 + itemsH + notesH + codesH + refTextH + pixH + NOTA_H;
     }
+    const horiz = currentEtqOrient === 'horizontal';
     const hasPhoto = et && et.photo;
-    return hasPhoto ? 670 : (hasCodes ? 510 : 340);
+    if (horiz) {
+      return hasPhoto ? 360 + NOTA_H : 240 + NOTA_H;
+    }
+    return (hasPhoto ? 670 : (hasCodes ? 510 : 340)) + NOTA_H;
   }
 
   const rowHeights = etiquetas.map(et => calcRowH(et));
-  const H = rowHeights.reduce((s, h) => s + h + GAP, GAP);
+  const labelsH = rowHeights.reduce((s, h) => s + h + GAP, GAP);
 
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = W; canvas.height = labelsH;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  if (!ctx) throw new Error('canvas ctx unavailable');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, labelsH);
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
 
@@ -16735,9 +16941,9 @@ function etiquetasToPng(etiquetas, kind) {
     let yTop = GAP;
     etiquetas.forEach((et, i) => {
       if (kind === 'order') {
-        drawOrderEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i]);
+        drawOrderEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], horizOrder, note);
       } else {
-        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], images[i]);
+        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], images[i], note);
       }
       yTop += rowHeights[i] + GAP;
     });
@@ -16752,7 +16958,115 @@ function etiquetasToPng(etiquetas, kind) {
   });
 }
 
-function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
+function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
+  const horiz = currentEtqOrient === 'horizontal';
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  if (horiz) {
+    // ── Layout horizontal: info esquerda, códigos direita ──
+    const sideW = hasCodes ? 140 : 0;
+    const mainW = W - sideW;
+    const lx = 24;
+    let y = y0 + 16;
+
+    // Logo EasyStok
+    ctx.fillStyle = '#1A2E5A';
+    ctx.fillRect(lx, y, 22, 22);
+    ctx.fillStyle = '#E85814';
+    ctx.fillRect(lx + 4, y + 4, 14, 6);
+    ctx.fillStyle = '#1A2E5A';
+    ctx.textAlign = 'left';
+    ctx.font = '800 16px Inter, Arial, sans-serif';
+    ctx.fillText('EasyStok', lx + 30, y + 14);
+    y += 34;
+
+    // Nome do produto
+    ctx.fillStyle = '#000';
+    ctx.font = '800 18px Inter, Arial, sans-serif';
+    const maxChars = Math.max(8, Math.floor((mainW - lx - 8) / 10));
+    wordWrap(et.productName, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
+    if (et.unit) {
+      ctx.fillStyle = '#555';
+      ctx.font = '500 12px Inter, Arial, sans-serif';
+      ctx.fillText(et.unit, lx, y); y += 16;
+    }
+
+    // Foto (menor na coluna esquerda)
+    if (photoImg && photoImg.width && photoImg.height) {
+      const maxPW = mainW - lx - 16, maxPH = 80;
+      const ratio = Math.min(maxPW / photoImg.width, maxPH / photoImg.height);
+      const dw = Math.floor(photoImg.width * ratio);
+      const dh = Math.floor(photoImg.height * ratio);
+      ctx.drawImage(photoImg, lx, y, dw, dh);
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+      ctx.strokeRect(lx, y, dw, dh);
+      y += dh + 6;
+    }
+    y += 4;
+
+    // Info rows
+    const infoX = lx + 48;
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('FAB:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('VAL:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('LOTE:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.lote, infoX, y); y += 18;
+
+    if (et.weightG) {
+      ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+      ctx.fillText('PESO:', lx, y);
+      ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+      ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 18;
+    }
+
+    // Coluna direita: códigos
+    if (hasCodes) {
+      const sx = mainW + 8;
+      const sideCenter = mainW + sideW / 2;
+      let sy = y0 + 16;
+
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(sx - 4, y0 + 8, sideW - 8, H - 16);
+
+      if (showQr) {
+        const qrSz = 90;
+        drawQrOnCanvas(ctx, et.codigoBarras, sideCenter - qrSz / 2, sy, qrSz);
+        sy += qrSz + 8;
+      }
+      if (showBarcode) {
+        drawCode128OnCanvas(ctx, et.codigoBarras, sx, sy, sideW - 16, 40);
+        sy += 48;
+      }
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+      ctx.font = '700 10px JetBrains Mono, Courier New, monospace';
+      ctx.fillText(et.codigoBarras, sideCenter, sy);
+      ctx.textAlign = 'left';
+    }
+    if (nota) {
+      const ny = y0 + H - 44;
+      const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+      ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(lx, ny, W - lx - 24, 36);
+      ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+      ctx.fillText('NOTA', lx + 6, ny + 6);
+      ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+      ctx.fillText(String(nota).slice(0, 42), lx + 6, ny + 20);
+      ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+    }
+    return;
+  }
+
+  // ── Layout vertical (original) ──
   const cx = W / 2;
   const lx = 24;
   let y = y0 + 16;
@@ -16810,13 +17124,12 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
   }
   y += 6;
   // Scan area
-  const { showQr, showBars: showBarcode } = scanModeFlags();
   ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
   const scanY = y;
   const qrSize = showQr ? 100 : 0;
   const barsH = showBarcode ? 50 : 0;
   const scanH = (showQr ? qrSize + 10 : 0) + (showBarcode ? barsH + 10 : 0) + 30;
-  if (showQr || showBarcode) {
+  if (hasCodes) {
     ctx.strokeRect(lx - 4, scanY, W - 40, scanH);
     y = scanY + 8;
     if (showQr) {
@@ -16832,11 +17145,31 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
     ctx.fillText(et.codigoBarras, cx, y); y += 16;
     ctx.textAlign = 'left';
   }
+  if (nota) {
+    const lx2 = 24;
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx2, ny, W - lx2 * 2, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx2 + 6, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 42), lx2 + 6, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
 }
 
-function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
+function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
   const o = et.order;
   const pixText = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
+  const orderRef = (o.id || '').slice(-8);
+  const { showQr, showBars } = scanModeFlags();
+
+  if (horizontal) {
+    drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota);
+    return;
+  }
+
   const cx = W / 2;
   const lx = 24;
   let y = y0 + 16;
@@ -16857,7 +17190,6 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = '800 24px Inter, Arial, sans-serif';
   ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 22), cx, y); y += 28;
   ctx.font = '700 16px Inter, Arial, sans-serif';
-  const orderRef = (o.id || '').slice(-8);
   ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
   ctx.fillStyle = '#888';
   ctx.font = '500 12px Inter, Arial, sans-serif';
@@ -16919,29 +17251,39 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     y += 64;
   }
   // QR / codigo de barras de conferencia (respeita modo configurado)
-  const { showQr, showBars } = scanModeFlags();
-  const qrSize = showQr ? 130 : 0;
-  const barsH = showBars ? 56 : 0;
-  const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(20, y - 4, W - 40, boxH);
-  if (showQr) {
-    drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
-    y += qrSize + 8;
+  if (showQr || showBars) {
+    const qrSize = showQr ? 130 : 0;
+    const barsH = showBars ? 56 : 0;
+    const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, y - 4, W - 40, boxH);
+    if (showQr) {
+      drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBars) {
+      drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 16px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
+    ctx.textAlign = 'left';
+  } else {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '700 13px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo', cx, y); y += 18;
+    ctx.textAlign = 'left';
   }
-  if (showBars) {
-    drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
-    y += barsH + 8;
-  }
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#000';
-  ctx.font = '900 16px Arial, sans-serif';
-  ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
-  ctx.fillStyle = '#4b5563';
-  ctx.font = '700 11px Arial, sans-serif';
-  ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
-  ctx.textAlign = 'left';
   ctx.fillStyle = '#000';
   ctx.strokeRect(20, y, W - 40, 68);
   ctx.fillStyle = '#4b5563';
@@ -16954,6 +17296,185 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = '700 12px Arial, sans-serif';
   ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
   ctx.fillStyle = '#000';
+  if (nota) {
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(20, ny, W - 40, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', 28, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 50), 28, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+}
+
+// Pedido em formato landscape — coluna esquerda com info, coluna direita com QR + PIX.
+// Usado quando o operador escolhe Orientação: Horizontal no preview do recibo.
+function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota) {
+  const sideW = 180;
+  const lx = 18;
+  const mainW = W - sideW - 36;
+  const sx = lx + mainW + 18;
+  let y = y0 + 16;
+
+  // Separador vertical entre colunas
+  ctx.strokeStyle = '#d0d4db';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx - 8, y0 + 12);
+  ctx.lineTo(sx - 8, y0 + H - 12);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── COLUNA ESQUERDA ──
+  // Logo + brand
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', lx + 28, y + 14);
+  y += 30;
+
+  // Kicker + título
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', lx, y); y += 14;
+  ctx.fillStyle = '#000';
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 26), lx, y); y += 24;
+  ctx.font = '700 14px Inter, Arial, sans-serif';
+  ctx.fillText('Pedido ' + orderRef, lx, y); y += 18;
+  ctx.fillStyle = '#888';
+  ctx.font = '500 11px Inter, Arial, sans-serif';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), lx, y); y += 16;
+
+  // Cliente — box com 3 linhas; fillText usa baseline, logo +10/+24/+38 dentro de 52px
+  const clientH = o.clientSnapshot?.ref ? 58 : 44;
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(lx, y, mainW, clientH);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('CLIENTE', lx + 8, y + 10);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 14px Arial, sans-serif';
+  ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 32), lx + 8, y + 26);
+  if (o.clientSnapshot?.ref) {
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 36), lx + 8, y + 42);
+  }
+  y += clientH + 12;
+
+  // Itens
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('ITENS', lx, y); y += 12;
+  (o.items || []).forEach(it => {
+    ctx.fillStyle = '#000';
+    ctx.font = '700 12px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText((it.qty + 'x  ' + it.name).slice(0, 30), lx, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(money(it.qty * it.unitPrice), lx + mainW - 4, y);
+    if (it.unit) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#888';
+      ctx.font = '400 10px Arial, sans-serif';
+      ctx.fillText(String(it.unit).slice(0, 24), lx + 20, y + 13);
+    }
+    y += it.unit ? 28 : 18;
+  });
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + mainW, y); ctx.stroke();
+  y += 8;
+
+  // Total
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+  ctx.strokeRect(lx, y, mainW, 38);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 18px Arial, sans-serif';
+  // textBaseline='top': 18px font em caixa 38px → topo em y+10 centraliza (38-18)/2=10
+  ctx.fillText('TOTAL', lx + 10, y + 10);
+  ctx.textAlign = 'right';
+  ctx.fillText(money(o.total), lx + mainW - 10, y + 10);
+  ctx.textAlign = 'left';
+  y += 48;
+
+  if (o.notes) {
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 40);
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '900 10px Arial, sans-serif';
+    ctx.fillText('OBSERVACAO', lx + 8, y + 6);
+    ctx.fillStyle = '#000';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText(String(o.notes).slice(0, 40), lx + 8, y + 20);
+    y += 50;
+  }
+  if (nota) {
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx + 6, y + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 40), lx + 6, y + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+
+  // ── COLUNA DIREITA ──
+  let sy = y0 + 18;
+  const sCenter = sx + sideW / 2;
+  // codeBoxH: 106 por QR (96 drawável + 10 gap), 46 por barcode (38 + 8 gap), 38 fixo pra "Codigo" + hint
+  const codeBoxH = (showQr ? 106 : 0) + (showBars ? 46 : 0) + 38;
+
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
+  ctx.strokeRect(sx, sy, sideW, codeBoxH);
+  sy += 8; // padding interno topo
+
+  if (showQr) {
+    drawQrOnCanvas(ctx, orderRef, sCenter - 48, sy, 96);
+    sy += 106; // avança 106 (alocação do codeBoxH para QR)
+  }
+  if (showBars) {
+    drawCode128OnCanvas(ctx, orderRef, sx + 4, sy, sideW - 8, 38);
+    sy += 46;
+  }
+  // Texto "Codigo" e "Confira" dentro do box — sem offset extra para caber nos 38px finais
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
+  ctx.font = '700 12px Arial, sans-serif';
+  ctx.fillText('Codigo: ' + orderRef, sCenter, sy); sy += 14;
+  ctx.fillStyle = '#888';
+  ctx.font = '400 9px Arial, sans-serif';
+  ctx.fillText(showQr || showBars ? 'Confira no app' : 'Ref. do pedido', sCenter, sy);
+  sy = y0 + 18 + codeBoxH + 10; // avança para depois do box + gap
+  ctx.textAlign = 'left';
+
+  // PIX (sempre na base da coluna direita — equivale ao margin-top:auto do CSS)
+  const pixY = y0 + H - 76;
+  ctx.strokeStyle = '#d0d4db'; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx, pixY - 4);
+  ctx.lineTo(sx + sideW, pixY - 4);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 10px Arial, sans-serif';
+  ctx.fillText('PAGAMENTO PIX', sx, pixY + 6);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 12px Arial, sans-serif';
+  ctx.fillText(pixText.slice(0, 26), sx, pixY + 22);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '500 10px Arial, sans-serif';
+  ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 24), sx, pixY + 38);
 }
 
 /**
@@ -17034,20 +17555,94 @@ function setEtqCode(mode) {
   document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === prodScanModeLabel(mode)));
   refreshEtqPreview();
 }
-function setEtqOrient(orient) {
-  currentEtqOrient = orient;
-  try { localStorage.setItem('cdb-etq-orient', orient); } catch(e) {}
-  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === (orient === 'horizontal' ? 'Horizontal' : 'Vertical')));
-  refreshEtqPreview();
+// Alias: chama o setOrientChoice unificado que cuida de Ajustes + Preview + state + audit
+function setEtqOrient(orient) { setOrientChoice(orient, true); }
+
+function getEtqNota() {
+  return (document.getElementById('etqNoteInput')?.value || '').trim();
 }
+
+let _etqNoteDebounce;
+function onEtqNoteInput() {
+  clearTimeout(_etqNoteDebounce);
+  _etqNoteDebounce = setTimeout(refreshEtqPreview, 150);
+}
+
 function refreshEtqPreview() {
   const body = document.getElementById('etqBody');
   if (!body || !currentEtiquetas.length) return;
-  if (currentEtiquetasKind === 'order') {
-    body.innerHTML = currentEtiquetas.map(et => `<div class="etq-card${currentEtqOrient === 'horizontal' ? ' etq-horiz' : ''}">${orderLabelHtml(et.order)}</div>`).join('');
+  const horiz = currentEtqOrient === 'horizontal';
+  const isOrder = currentEtiquetasKind === 'order';
+  // etq-order-horiz: classe explicita para pedido horizontal (sem :has() que nao roda em WebView antigo)
+  const cls = horiz
+    ? (isOrder ? 'etq-card etq-order-horiz' : 'etq-card etq-horiz')
+    : 'etq-card';
+  const nota = getEtqNota();
+  if (isOrder) {
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
+    ).join('');
   } else {
-    body.innerHTML = currentEtiquetas.map(et => `<div class="etq-card${currentEtqOrient === 'horizontal' ? ' etq-horiz' : ''}">${etiquetaProducaoHtml(et)}</div>`).join('');
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
+    ).join('');
   }
+  // setTimeout em vez de rAF: garante que o layout ja foi calculado antes de medir
+  setTimeout(scaleEtqCards, 0);
+}
+
+function scaleEtqCards() {
+  const body = document.getElementById('etqBody');
+  if (!body) return;
+  const avail = body.clientWidth - 32;
+  if (avail <= 0) return;
+  body.querySelectorAll('.etq-card-wrap').forEach(wrap => {
+    const card = wrap.firstElementChild;
+    if (!card) return;
+    // Reset all inline styles so we read natural dimensions below
+    card.style.transform = '';
+    card.style.transformOrigin = '';
+    card.style.position = '';
+    card.style.top = '';
+    card.style.left = '';
+    wrap.style.position = '';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+    const cardW = card.offsetWidth;
+    const cardH = card.offsetHeight;
+    if (!cardH || !cardW) return; // guard: not yet rendered
+    const isHorizOrder = card.classList.contains('etq-order-horiz');
+    if (isHorizOrder) {
+      // Rotaciona +90deg (CW): coluna ESQUERDA (empresa/itens) vai para o TOPO.
+      // Scale limita AMBAS as dimensões: largura (avail) e altura (body.clientHeight)
+      // para caber na tela sem precisar de scroll.
+      // Após rotate(90°): largura na tela = cardH*s, altura na tela = cardW*s.
+      const availH = Math.max(200, body.clientHeight - 64);
+      const s = Math.min(1, avail / cardH, availH / cardW);
+      // position:absolute tira o card do fluxo — sem isso o card de 620px causa overflow
+      // no etqBody e quebra o layout flex, travando a tela.
+      card.style.position = 'absolute';
+      card.style.top = '0';
+      card.style.left = '0';
+      wrap.style.position = 'relative';
+      wrap.style.width  = Math.ceil(cardH * s) + 'px';
+      wrap.style.height = Math.ceil(cardW * s) + 'px';
+      wrap.style.overflow = 'hidden';
+      card.style.transformOrigin = '0 0';
+      card.style.transform = `translate(${Math.ceil(cardH * s)}px, 0) rotate(90deg) scale(${s})`;
+    } else {
+      wrap.style.width = Math.min(cardW, avail) + 'px';
+      if (cardW <= avail) {
+        wrap.style.height = cardH + 'px';
+      } else {
+        const s = avail / cardW;
+        card.style.transformOrigin = '0 0';
+        card.style.transform = `scale(${s})`;
+        wrap.style.height = Math.ceil(cardH * s) + 'px';
+      }
+    }
+  });
 }
 
 function prodScanModeLabel(mode) {
@@ -17059,9 +17654,10 @@ function prodScanModeLabel(mode) {
 
 function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   if (!etiquetas || !etiquetas.length) return;
-  currentEtiquetas = etiquetas;
+  currentEtiquetas = etiquetas.map(e => Object.assign({}, e));
   currentEtiquetasKind = kind || 'producao';
-  try { currentEtqOrient = localStorage.getItem('cdb-etq-orient') || 'vertical'; } catch(e) {}
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { currentEtqOrient = getEtqOrient(); } catch(e) {}
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
 
@@ -17089,6 +17685,7 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
 
 function closeEtiquetasPreview() {
   document.getElementById('etiquetasPreview').classList.remove('show');
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
   if (currentEtiquetasKind === 'producao') go('home');
   currentEtiquetas = [];
@@ -17276,16 +17873,23 @@ async function etqAction(action) {
       }
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
-        printViaBluetooth(escPosOrderLabel(et.order), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        const printNota = getEtqNota() || null;
+        printViaBluetooth(escPosOrderLabel(et.order, printNota), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
+        const prodNota = getEtqNota() || null;
         let totalLen = 0;
         const parts = currentEtiquetas.map(et => {
-          const b = escPosLabelProducao(et);
-          totalLen += b.length;
-          return b;
+          if (prodNota) et._nota = prodNota;
+          try {
+            const b = escPosLabelProducao(et);
+            totalLen += b.length;
+            return b;
+          } finally {
+            delete et._nota;
+          }
         });
         const totalBytes = new Uint8Array(totalLen);
         let off = 0;
@@ -17294,20 +17898,20 @@ async function etqAction(action) {
       }
       return;
     }
-    if (action === 'save') {
-      showToast('Gerando imagem…');
-      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
+    if (action === 'save' || action === 'share') {
+      const note = getEtqNota();
+      const label = action === 'save' ? 'Gerando imagem…' : 'Preparando…';
+      showToast(label);
+      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind, note || null);
       if (!blob) { showToast('Falha ao gerar imagem'); return; }
       const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      await saveImageToDevice(blob, filename);
-      return;
-    }
-    if (action === 'share') {
-      showToast('Preparando…');
-      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
-      if (!blob) { showToast('Falha ao gerar imagem'); return; }
-      const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      await shareImageNative(blob, filename);
+      if (action === 'save') {
+        await saveImageToDevice(blob, filename);
+      } else {
+        await shareImageNative(blob, filename);
+      }
+      // Limpa o campo de observação após uso
+      try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
       return;
     }
   } catch (e) {
@@ -17324,7 +17928,7 @@ function printEtiqueta(orderId) {
   showEtiquetasPreview([{ order: o }], 'order', `Pedido ${(o.id||'').slice(-8)}`);
 }
 
-function orderLabelHtml(o) {
+function orderLabelHtml(o, horizontal, nota) {
   const items = (o.items || []).map(it =>
     `<div class="pa-item">
       <span class="pi-qty">${it.qty}×</span>
@@ -17341,8 +17945,9 @@ function orderLabelHtml(o) {
   const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
   const { showQr, showBars } = scanModeFlags();
-  return `
-    <div class="pa-receipt">
+  const hasCodes = showQr || showBars;
+
+  const brandBlock = `
     <div class="et-brand" style="justify-content:center">
       <img src="/etiqueta/assets/logo-easystok.svg" alt="">
       <span class="et-brand-name">Easy<b>Stok</b></span>
@@ -17351,12 +17956,20 @@ function orderLabelHtml(o) {
     <div class="pa-title">${escapeHtml(empresa)}</div>
     <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
     <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
-    ${o.scheduledDeliveryAt ? `<div class="pa-meta pa-meta-scheduled" style="font-weight:800">📅 Entregar em: ${new Date(o.scheduledDeliveryAt).toLocaleString('pt-BR')}</div>` : ''}
+    ${o.scheduledDeliveryAt ? `<div class="pa-meta pa-meta-scheduled" style="font-weight:800">📅 Entregar em: ${new Date(o.scheduledDeliveryAt).toLocaleString('pt-BR')}</div>` : ''}`;
+
+  const clientBlock = `
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
       <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
       ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
-    </div>
+    </div>`;
+
+  const notaRapidaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
+
+  const itemsBlock = `
     <div class="pa-block">
       <div class="pa-label">Itens</div>
       ${items}
@@ -17365,18 +17978,46 @@ function orderLabelHtml(o) {
       <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
     </div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
+    ${notaRapidaBlock}`;
+
+  const conferBlock = `
     <div class="pa-confer">
-      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>` : ''}
-      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, 268, 54)}</div>` : ''}
+      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, horizontal ? 96 : 120)}</div>` : ''}
+      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, horizontal ? 180 : 268, horizontal ? 42 : 54)}</div>` : ''}
       <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
-      <div class="pa-confer-hint">Confira no app pelo codigo${showQr ? ' ou QR' : ''}</div>
-    </div>
-    <div class="pa-grid">
+      <div class="pa-confer-hint">${hasCodes ? ('Confira no app pelo codigo' + (showQr ? ' ou QR' : '')) : 'Referencia do pedido'}</div>
+    </div>`;
+
+  const pixBlock = `
+    <div class="pa-grid pa-pix">
       <div class="pa-label">Pagamento PIX</div>
       <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
       <div>Titular: ${escapeHtml(getPixHolder())}</div>
       ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
-    </div>
+    </div>`;
+
+  if (horizontal) {
+    return `
+      <div class="pa-receipt pa-horiz">
+        <div class="pa-receipt-main">
+          ${brandBlock}
+          ${clientBlock}
+          ${itemsBlock}
+        </div>
+        <div class="pa-receipt-side">
+          ${conferBlock}
+          ${pixBlock}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="pa-receipt">
+      ${brandBlock}
+      ${clientBlock}
+      ${itemsBlock}
+      ${conferBlock}
+      ${pixBlock}
     </div>`;
 }
 

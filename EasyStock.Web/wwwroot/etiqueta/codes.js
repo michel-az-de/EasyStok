@@ -40,17 +40,18 @@ export async function renderCodes(root) {
 }
 
 function renderQr(el, content, quietMm) {
-  const size = Math.min(el.offsetWidth, el.offsetHeight);
-  const qrDiv = document.createElement('div');
-  el.appendChild(qrDiv);
-  new QRCode(qrDiv, {
-    text:          content,
-    width:         size,
-    height:        size,
-    colorDark:     '#000',
-    colorLight:    '#fff',
-    correctLevel:  QRCode.CorrectLevel.M,
-  });
+  // qrcode-generator (Kazuhiko Arase) expoe global `qrcode` (lowercase, funcional)
+  // typeNumber 0 = auto-deteccao; nivel 'M' = ~15% correcao
+  const qr = qrcode(0, 'M');
+  qr.addData(content);
+  qr.make();
+  const modules = qr.getModuleCount();
+  const size = Math.min(el.offsetWidth, el.offsetHeight) || 64;
+  const cellSize = Math.max(1, Math.floor(size / (modules + 2)));
+  // createSvgTag escala perfeitamente em qualquer zoom; margin em modulos
+  el.innerHTML = qr.createSvgTag({ cellSize, margin: 1, scalable: true });
+  const svg = el.querySelector('svg');
+  if (svg) { svg.style.width = '100%'; svg.style.height = '100%'; svg.style.display = 'block'; }
 }
 
 function renderBarcode(el, content, format) {

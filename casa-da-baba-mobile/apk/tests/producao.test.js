@@ -37,8 +37,8 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
   });
 
   test('producao: prodScanModeLabel rotula corretamente', () => {
-    assert.strictEqual(runInSandbox(`prodScanModeLabel('qr')`), 'QR Code');
-    assert.strictEqual(runInSandbox(`prodScanModeLabel('barcode')`), 'Codigo de barras');
+    assert.strictEqual(runInSandbox(`prodScanModeLabel('qr')`), 'Só QR');
+    assert.strictEqual(runInSandbox(`prodScanModeLabel('barcode')`), 'Só barras');
     assert.strictEqual(runInSandbox(`prodScanModeLabel('both')`), 'QR + barras');
     assert.strictEqual(runInSandbox(`prodScanModeLabel('xyz')`), 'QR + barras');
   });

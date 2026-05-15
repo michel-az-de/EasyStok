@@ -9,7 +9,7 @@ const ALLOWLIST = new Set([
   'empresa.nome',
 ]);
 
-const VAR_RE = /\{([a-z]+(?:\.[a-z_]+)*)(?::([^}]+))?\}/g;
+const VAR_RE = /\{([a-zA-Z]+(?:\.[a-zA-Z_]+)*)(?::([^}]+))?\}/g;
 
 /**
  * Resolve all variables in a content string against the dados context.
