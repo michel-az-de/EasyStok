@@ -118,6 +118,7 @@ public class AdminTicketsController(
             .Include(t => t.OrigemTicket)
             .Include(t => t.MetaTecnico)
             .Include(t => t.Fatura)
+            .Include(t => t.Pedido)
             .Include(t => t.Mensagens)
                 .ThenInclude(m => m.Autor)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -165,6 +166,10 @@ public class AdminTicketsController(
             origemTicketTitulo = ticket.OrigemTicket?.Titulo,
             ticket.FaturaId,
             faturaNumero = ticket.Fatura?.Numero,
+            ticket.PedidoId,
+            pedidoStatus = ticket.Pedido?.Status,
+            pedidoClienteNome = ticket.Pedido?.ClienteNome,
+            pedidoTotal = ticket.Pedido is null ? (decimal?)null : (decimal)ticket.Pedido.Total,
             metaTecnico = ticket.MetaTecnico is null ? null : new
             {
                 ticket.MetaTecnico.SeveridadeTecnica,
