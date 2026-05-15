@@ -210,6 +210,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("AvaliadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("CanalOrigem")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Categoria")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -642,7 +645,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmpresaId");
+                    b.HasIndex("EmpresaId", "CriadoEm");
 
                     b.ToTable("clientes", (string)null);
                 });
@@ -1384,6 +1387,207 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique();
 
                     b.ToTable("etiqueta_templates_sistema", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqCategoria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Icone")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Publica")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ux_faq_categorias_slug");
+
+                    b.HasIndex("Publica", "Ordem")
+                        .HasDatabaseName("ix_faq_categorias_publica_ordem");
+
+                    b.ToTable("faq_categorias", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comentario")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Util")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "Util")
+                        .HasDatabaseName("ix_faq_feedbacks_item_util");
+
+                    b.ToTable("faq_feedbacks", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AutorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoriaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Conteudo")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.Property<string>("ConteudoBusca")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("NaoUtilCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PublicadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TagsCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("UtilCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("Visualizacoes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Visualizacoes")
+                        .HasDatabaseName("ix_faq_itens_visualizacoes");
+
+                    b.HasIndex("CategoriaId", "Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ux_faq_itens_categoria_slug");
+
+                    b.HasIndex("Status", "PublicadoEm")
+                        .HasDatabaseName("ix_faq_itens_status_publicado");
+
+                    b.ToTable("faq_itens", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqVisualizacao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Origem")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Termo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "CriadoEm")
+                        .HasDatabaseName("ix_faq_visualizacoes_item_criado");
+
+                    b.ToTable("faq_visualizacoes", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
@@ -2414,6 +2618,8 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("EmpresaId", "Codigo")
                         .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Status", "DataProducao");
 
                     b.ToTable("lotes", (string)null);
                 });
@@ -4731,10 +4937,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("EmpresaId", "Status")
                         .HasDatabaseName("ix_produtos_empresa_status");
 
-                    b.HasIndex("EmpresaId", "Nome")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Produtos_EmpresaId_Nome");
-
                     b.ToTable("produtos", (string)null);
                 });
 
@@ -6533,6 +6735,39 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqFeedback", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.FaqItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqItem", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.FaqCategoria", "Categoria")
+                        .WithMany("Itens")
+                        .HasForeignKey("CategoriaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Categoria");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqVisualizacao", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.FaqItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Cliente", "Cliente")
@@ -7681,6 +7916,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("VariacoesProduto");
 
                     b.Navigation("Vendas");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.FaqCategoria", b =>
+                {
+                    b.Navigation("Itens");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Fatura", b =>
