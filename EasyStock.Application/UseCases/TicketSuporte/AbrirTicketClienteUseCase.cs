@@ -20,6 +20,13 @@ namespace EasyStock.Application.UseCases.TicketSuporte
         /// vincula a fatura ao ticket bidirecionalmente (F9).
         /// </summary>
         Guid? FaturaId = null,
+        /// <summary>
+        /// FK opcional a um <see cref="Pedido"/> que motivou o ticket.
+        /// Quando informado, valida pertencimento a empresa do user,
+        /// vincula o pedido ao ticket e registra PedidoEvento "ticket_aberto"
+        /// na trilha de auditoria do pedido (Onda 1.1).
+        /// </summary>
+        Guid? PedidoId = null,
         CanalOrigem CanalOrigem = CanalOrigem.Pwa);
 
     public sealed record AbrirTicketClienteResult(
@@ -30,6 +37,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
     public sealed class AbrirTicketClienteUseCase(
         IClienteTicketRepository ticketRepo,
         IFaturaRepository faturaRepo,
+        IPedidoRepository pedidoRepo,
         ISlaResolver slaResolver,
         INotificadorService notificador,
         IUnitOfWork unitOfWork,
@@ -55,6 +63,18 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     throw new UseCaseValidationException("Fatura não encontrada ou não pertence à sua empresa.");
             }
 
+            // Onda 1.1 — Valida que o pedido pertence a empresa do user.
+            // Espelha guard do FaturaId. Defesa em camadas: HasQueryFilter global
+            // ja filtra por tenant, mas o use case valida explicitamente para
+            // dar mensagem 400 amigavel em vez de NotFound silencioso.
+            EasyStock.Domain.Entities.Pedido? pedido = null;
+            if (cmd.PedidoId.HasValue && cmd.PedidoId.Value != Guid.Empty)
+            {
+                pedido = await pedidoRepo.GetByIdAsync(currentUser.EmpresaId, cmd.PedidoId.Value);
+                if (pedido is null)
+                    throw new UseCaseValidationException("Pedido não encontrado ou não pertence à sua empresa.");
+            }
+
             // Prioridade default Normal — cliente nao escolhe (so admin via PATCH).
             var prioridade = TicketPrioridade.Normal;
             var sla = await slaResolver.ResolverAsync(currentUser.EmpresaId, prioridade, ct: ct);
@@ -70,6 +90,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                 criadoPorId: currentUser.UsuarioId,
                 canalOrigem: cmd.CanalOrigem);
             ticket.FaturaId = fatura?.Id;
+            ticket.PedidoId = pedido?.Id;
 
             ticket.Mensagens.Add(AdminTicketMensagem.Criar(
                 ticketId: ticket.Id,
@@ -88,7 +109,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     nivel = ticket.Nivel.ToString(),
                     categoria = ticket.Categoria.ToString(),
                     canalOrigem = ticket.CanalOrigem.ToString(),
-                    faturaId = fatura?.Id
+                    faturaId = fatura?.Id,
+                    pedidoId = pedido?.Id
                 })));
 
             // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
@@ -96,6 +118,22 @@ namespace EasyStock.Application.UseCases.TicketSuporte
             if (fatura is not null && fatura.VinculaTicket(ticket.Id))
             {
                 await faturaRepo.UpdateAsync(fatura);
+            }
+
+            // Trilha cruzada: PedidoEvento "ticket_aberto" liga o pedido ao
+            // ticket que o motivou. Apenas registro; nao altera estado do pedido.
+            if (pedido is not null)
+            {
+                await pedidoRepo.AddEventoAsync(new PedidoEvento
+                {
+                    Id = Guid.NewGuid(),
+                    PedidoId = pedido.Id,
+                    Tipo = "ticket_aberto",
+                    Detalhes = JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
+                    UsuarioId = currentUser.UsuarioId,
+                    Origem = "api",
+                    OcorridoEm = DateTime.UtcNow
+                });
             }
 
             await unitOfWork.CommitAsync();
@@ -113,6 +151,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     prioridade = ticket.Prioridade.ToString(),
                     categoria = ticket.Categoria.ToString(),
                     canalOrigem = ticket.CanalOrigem.ToString(),
+                    faturaId = fatura?.Id,
+                    pedidoId = pedido?.Id,
                     abertoPorCliente = true
                 }),
                 ct: ct);
