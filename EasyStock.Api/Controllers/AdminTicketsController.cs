@@ -2,6 +2,7 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,8 @@ public class AdminTicketsController(
     AdminAuditService audit,
     HelpdeskTicketService ticketService,
     HelpdeskAnexoService anexoService,
-    HelpdeskBugFixService bugFixService) : EasyStockControllerBase
+    HelpdeskBugFixService bugFixService,
+    ObterPedidoDetalhesUseCase obterPedidoUseCase) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetTickets(
@@ -203,8 +205,9 @@ public class AdminTicketsController(
         try
         {
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
-                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, FaturaId: req.FaturaId));
-            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}", req.EmpresaId);
+                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel,
+                FaturaId: req.FaturaId, PedidoId: req.PedidoId));
+            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -309,6 +312,28 @@ public class AdminTicketsController(
         catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
     }
 
+    /// <summary>
+    /// Onda 1.1 — retorna snapshot read-only do pedido vinculado ao ticket (se houver).
+    /// Reutiliza ObterPedidoDetalhesUseCase e DTOs Pedido* existentes. Carrega
+    /// EmpresaId do ticket (SuperAdmin tem acesso cross-tenant). 404 se ticket
+    /// nao existe ou nao tem pedido vinculado.
+    /// </summary>
+    [HttpGet("{id:guid}/pedido-resumo")]
+    public async Task<IActionResult> GetPedidoResumo(Guid id)
+    {
+        var t = await db.AdminTickets
+            .Where(x => x.Id == id)
+            .Select(x => new { x.EmpresaId, x.PedidoId })
+            .FirstOrDefaultAsync();
+        if (t is null) return DataNotFound("Ticket nao encontrado.");
+        if (!t.PedidoId.HasValue) return DataNotFound("Ticket nao tem pedido vinculado.");
+
+        var detalhe = await obterPedidoUseCase.ExecuteAsync(new ObterPedidoDetalhesQuery(t.EmpresaId, t.PedidoId.Value));
+        if (detalhe is null) return DataNotFound("Pedido vinculado nao encontrado (pode ter sido excluido).");
+
+        return DataOk(detalhe);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteTicket(Guid id)
     {
@@ -323,7 +348,7 @@ public class AdminTicketsController(
     }
 }
 
-public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null);
+public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null, Guid? PedidoId = null);
 public record PatchTicketRequest(string? Status, string? Prioridade, Guid? AtendenteId);
 public record AddMensagemRequest(string Conteudo, bool Interno = false, IReadOnlyList<Guid>? AnexoIds = null);
 public record EncaminharRequest(string NovoNivel, string? Motivo);
