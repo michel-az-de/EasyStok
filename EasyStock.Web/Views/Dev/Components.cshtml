@@ -293,6 +293,111 @@
         </div>
     </section>
 
+    <!-- Polish 2026-05 primitivos -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Polish 2026-05 — tokens, FormField, Tooltip, atalhos</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">Motion tokens</h3>
+                <p class="text-sm text-slate-600 mb-3">Use <code>--motion-fast</code> (120ms), <code>--motion-base</code> (200ms), <code>--motion-slow</code> (320ms) com <code>var(--ease-out)</code>.</p>
+                <div class="flex gap-2 flex-wrap">
+                    <button class="btn btn-secondary btn-sm" style="transition: transform var(--motion-fast) var(--ease-out);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''">fast 120ms</button>
+                    <button class="btn btn-secondary btn-sm" style="transition: transform var(--motion-base) var(--ease-out);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''">base 200ms</button>
+                    <button class="btn btn-secondary btn-sm" style="transition: transform var(--motion-slow) var(--ease-out);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''">slow 320ms</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">Button loading</h3>
+                <p class="text-sm text-slate-600 mb-3"><code>aria-busy="true"</code> adiciona spinner inline preservando o texto.</p>
+                <div class="flex gap-2 items-center">
+                    <button class="btn btn-primary btn-sm">Normal</button>
+                    <button class="btn btn-primary btn-sm" aria-busy="true">Loading</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">FormField primitivo</h3>
+                @await Html.PartialAsync("_FormField", new {
+                    Label = "E-mail",
+                    For = "showcase-email",
+                    Required = true,
+                    Helper = "Usamos para login e notificacoes",
+                    InputHtml = "<input class=\"ui-field\" id=\"showcase-email\" type=\"email\" placeholder=\"voce@exemplo.com\" />"
+                })
+                <hr class="my-3" />
+                @await Html.PartialAsync("_FormField", new {
+                    Label = "Senha",
+                    For = "showcase-senha",
+                    Required = true,
+                    Error = "Senha deve ter pelo menos 8 caracteres",
+                    InputHtml = "<input class=\"ui-field\" id=\"showcase-senha\" type=\"password\" />"
+                })
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">Tooltip CSS-only</h3>
+                <p class="text-sm text-slate-600 mb-3">Adicione <code>data-tooltip="texto"</code> em qualquer elemento. Delay 400ms.</p>
+                <div class="flex items-center gap-3">
+                    <button class="btn btn-secondary btn-sm" data-tooltip="Atalho: Ctrl+S">Salvar</button>
+                    @await Html.PartialAsync("_Tooltip", new { Text = "Validade nominal — sera estendida ate domingo" })
+                    <span class="text-sm text-slate-500">passe o mouse</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">Status vocabulary canônico</h3>
+                <p class="text-sm text-slate-600 mb-3"><code>StatusHelper.Resolve(s)</code> entrega label + badge class.</p>
+                <div class="flex flex-wrap gap-2">
+                    @foreach (var s in new[] { "aguardando", "preparando", "pronto", "entregue", "cancelado", "em_producao", "finalizado", "expirado", "aberto", "fechado", "fechado-pendente" })
+                    {
+                        var info = EasyStock.Web.Helpers.StatusHelper.Resolve(s);
+                        <span class="badge @info.BadgeClass" title="@s">@info.Label</span>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">Atalhos de teclado</h3>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <dt>Buscar e abrir paginas</dt>
+                        <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">Ctrl+K</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt>Criar novo na pagina atual</dt>
+                        <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">N</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt>Fechar modal</dt>
+                        <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">Esc</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt>Mostrar ajuda</dt>
+                        <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">?</kbd></dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="card">
+                <h3 class="t-eyebrow mb-3">FormatHelper (C#)</h3>
+                <p class="text-sm text-slate-600 mb-3">Extension methods em <code>EasyStock.Web.Helpers.FormatHelper</code>.</p>
+                <dl class="space-y-2 text-sm font-mono">
+                    <div class="flex items-center justify-between"><dt>1234.56m.AsMoney()</dt><dd class="tabular-nums">@((1234.56m).AsMoney())</dd></div>
+                    <div class="flex items-center justify-between"><dt>DateTime.Now.AsDate()</dt><dd>@(DateTime.Now.AsDate())</dd></div>
+                    <div class="flex items-center justify-between"><dt>DateTime.Now.AsDateTime()</dt><dd>@(DateTime.Now.AsDateTime())</dd></div>
+                    <div class="flex items-center justify-between"><dt>AsRelativeDate (10min atras)</dt><dd>@(DateTime.UtcNow.AddMinutes(-10).AsRelativeDate())</dd></div>
+                    <div class="flex items-center justify-between"><dt>AsRelativeDate (3h atras)</dt><dd>@(DateTime.UtcNow.AddHours(-3).AsRelativeDate())</dd></div>
+                    <div class="flex items-center justify-between"><dt>AsRelativeDate (4d atras)</dt><dd>@(DateTime.UtcNow.AddDays(-4).AsRelativeDate())</dd></div>
+                    <div class="flex items-center justify-between"><dt>AsRelativeDate (30d atras)</dt><dd>@(DateTime.UtcNow.AddDays(-30).AsRelativeDate())</dd></div>
+                    <div class="flex items-center justify-between"><dt>2.5m.AsQuantity("kg")</dt><dd>@((2.5m).AsQuantity("kg"))</dd></div>
+                </dl>
+            </div>
+
+        </div>
+    </section>
+
 </div>
 </body>
 </html>
