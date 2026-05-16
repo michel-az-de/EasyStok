@@ -823,7 +823,7 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     // ── Receita × Custo (not implemented for MongoDB) ────────────────────
 
-    public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+    public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0)
         => throw new NotImplementedException("Receita × Custo não implementado para MongoDB. Use o provedor PostgreSQL.");
 
     // ── Dashboard Full (not implemented for MongoDB) ──────────────────────

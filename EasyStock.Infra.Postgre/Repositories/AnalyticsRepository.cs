@@ -85,8 +85,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // ── Delegation — Receita × Custo ────────────────────────────────────
 
-        public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
-            => _dashboard.GetReceitaCustoSerieAsync(empresaId, de, ate, lojaId);
+        public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0)
+            => _dashboard.GetReceitaCustoSerieAsync(empresaId, de, ate, lojaId, timezoneOffsetMinutes);
 
         // ── Delegation — Dashboard Extras ───────────────────────────────────
 

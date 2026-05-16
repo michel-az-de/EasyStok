@@ -178,7 +178,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal? MargemBruta,
         int LotesProduzidos,
         int ClientesAtivos,
-        decimal PercentualCritico);
+        decimal PercentualCritico,
+        int LotesAtivos);
 
     public sealed record DashboardKpisDelta(
         decimal? Receita,
@@ -353,7 +354,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Receita × Custo ─────────────────────────────────────────────
 
         /// <summary>Série temporal de Receita/Custo/Lucro: por dia (≤30d) ou por mês (>30d).</summary>
-        Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+        Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0);
 
         // ── Alertas ──────────────────────────────────────────────────────
 
