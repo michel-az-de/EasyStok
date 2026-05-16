@@ -126,6 +126,15 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             }
 
             var agora = DateTime.UtcNow;
+            // Gating de status: produto sem preco de venda nasce Inativo (rascunho).
+            // Antes nascia sempre Ativo e podia ser exposto na vitrine sem preco, gerando
+            // pedidos com R$0 e leitura gerencial errada (auditoria QA 2026-05-16).
+            var statusInicial = (command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0)
+                ? StatusProduto.Ativo
+                : StatusProduto.Inativo;
+            if (statusInicial == StatusProduto.Inativo)
+                logger.LogInformation("Produto {Nome} criado como Inativo (sem preco de venda definido).", command.Nome);
+
             var produto = new Produto
             {
                 Id = Guid.NewGuid(),
@@ -145,7 +154,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 MargemEstimada = command.MargemEstimada,
                 AtributosJson = command.AtributosJson,
                 FotosJson = command.FotosJson,
-                Status = StatusProduto.Ativo,
+                Status = statusInicial,
                 CriadoEm = agora,
                 AlteradoEm = agora,
                 CriadoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null,

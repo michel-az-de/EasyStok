@@ -234,7 +234,13 @@ public sealed class GerenciarProdutoUseCase(
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
         produto.AtributosJson = command.AtributosJson;
-        produto.Status = command.Status;
+        // Gating: nao deixa Ativo sem preco de venda. Antes o usuario podia salvar
+        // produto Ativo sem preco e ele aparecia na vitrine como "Definir preco →"
+        // mas vendavel — gerava pedido com R$0 (auditoria QA 2026-05-16).
+        var precoValido = command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0;
+        produto.Status = (command.Status == StatusProduto.Ativo && !precoValido)
+            ? StatusProduto.Inativo
+            : command.Status;
         produto.ObservacaoInterna = command.ObservacaoInterna;
         produto.AlteradoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
