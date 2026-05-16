@@ -43,6 +43,10 @@ public record ProdutoDetalhe
     public int? QuantidadeMinima { get; init; }
     public int? QuantidadeCritica { get; init; }
 
+    // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
+    // Preenchido via PUT /api/produtos/{id}/ficha-tecnica.
+    public string? AtributosJson { get; init; }
+
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 }
 

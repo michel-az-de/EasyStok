@@ -309,6 +309,20 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         return RedirectToAction(nameof(Detail), new { id });
     }
 
+    [HttpPost("/produtos/{id}/ficha-tecnica")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SalvarFichaTecnica(string id, [FromBody] FichaTecnicaCommand cmd)
+    {
+        if (cmd is null)
+            return BadRequest(new { erro = "Comando vazio." });
+
+        var result = await svc.SalvarFichaTecnicaAsync(id, cmd);
+        if (!result.Success)
+            return BadRequest(new { erro = result.ErrorMessage ?? "Erro ao salvar ficha tecnica." });
+
+        return Json(new { sucesso = true });
+    }
+
     [HttpPost("/produtos/{id}/excluir")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Excluir(string id)

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Validators;
@@ -11,7 +12,8 @@ public sealed record SalvarFichaTecnicaResult(Guid ProdutoId, string AtributosJs
 public class SalvarFichaTecnicaUseCase(
     IProdutoRepository produtoRepo,
     IAuditLogRepository auditRepo,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    ICacheService? cacheService = null)
 {
     private static readonly ProdutoFichaTecnicaValidator Validator = new();
 
@@ -55,6 +57,13 @@ public class SalvarFichaTecnicaUseCase(
         }
 
         await uow.CommitAsync();
+
+        // Invalida cache do detalhe do produto e dependencias (listagem, stats, dashboard).
+        // Sem isso, GET /api/produtos/{id} retorna versao stale por ate 5min e a UI mostra
+        // ficha antiga apos salvar.
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(cmd.EmpresaId, cmd.ProdutoId));
+
         return new(produto.Id, produto.AtributosJson);
     }
 }

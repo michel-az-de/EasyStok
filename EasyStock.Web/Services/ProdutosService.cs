@@ -169,6 +169,25 @@ public class ProdutosService(ApiClient api, SessionService session)
             observacaoInterna = vm.ObservacaoInterna
         });
 
+    public Task<ApiResult<object>> SalvarFichaTecnicaAsync(string id, FichaTecnicaCommand cmd) =>
+        api.PutAsync<object>($"produtos/{id}/ficha-tecnica?empresaId={GetEmpresaId()}", new
+        {
+            empresaId = GetEmpresaId(),
+            produtoId = Guid.TryParse(id, out var pid) ? pid : Guid.Empty,
+            porcaoG = cmd.PorcaoG,
+            kcal = cmd.Kcal,
+            carbsG = cmd.CarbsG,
+            proteinaG = cmd.ProteinaG,
+            gorduraG = cmd.GorduraG,
+            gorduraSaturadaG = cmd.GorduraSaturadaG,
+            fibrasG = cmd.FibrasG,
+            sodioMg = cmd.SodioMg,
+            modoPreparo = cmd.ModoPreparo,
+            ingredientes = cmd.Ingredientes,
+            alergenos = cmd.Alergenos,
+            alergenosOutros = cmd.AlergenosOutros
+        });
+
     public Task<ApiResult<object>> AtualizarLimiarAsync(string id, int? quantidadeMinima, int? quantidadeCritica) =>
         api.PatchAsync<object>($"produtos/{id}/limiar?empresaId={GetEmpresaId()}", new
         {

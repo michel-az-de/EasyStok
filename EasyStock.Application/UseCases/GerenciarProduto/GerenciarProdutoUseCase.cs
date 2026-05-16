@@ -70,7 +70,9 @@ public sealed record ProdutoDetalheResult(
     int? QuantidadeMinima = null,
     int? QuantidadeCritica = null,
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
-    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
+    // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
+    string? AtributosJson = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -240,7 +242,11 @@ public sealed class GerenciarProdutoUseCase(
         produto.CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null;
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
-        produto.AtributosJson = command.AtributosJson;
+        // Preserva ficha tecnica quando o command omite AtributosJson. Form.cshtml de
+        // produtos nao carrega/devolve esse campo — sem este guard, qualquer edicao via
+        // Form zerava a ficha cadastrada via PUT /api/produtos/{id}/ficha-tecnica.
+        if (command.AtributosJson != null)
+            produto.AtributosJson = command.AtributosJson;
         // Gating: nao deixa Ativo sem preco de venda. Antes o usuario podia salvar
         // produto Ativo sem preco e ele aparecia na vitrine como "Definir preco →"
         // mas vendavel — gerava pedido com R$0 (auditoria QA 2026-05-16).
@@ -593,7 +599,8 @@ public sealed class GerenciarProdutoUseCase(
             AlteradoEm: produto.AlteradoEm,
             QuantidadeMinima: produto.QuantidadeMinima,
             QuantidadeCritica: produto.QuantidadeCritica,
-            TipoEmbalagem: produto.TipoEmbalagem); // C2 (RDC 727/2022)
+            TipoEmbalagem: produto.TipoEmbalagem, // C2 (RDC 727/2022)
+            AtributosJson: produto.AtributosJson);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));
