@@ -908,7 +908,8 @@
 
 @media (max-width: 319px) {
     .viewport-too-narrow-warning {
-        display: flex;
+        /* !important para sobrescrever o atributo HTML `hidden` no _Layout.cshtml. */
+        display: flex !important;
     }
     /* Esconde o app principal abaixo de 320px (split-screen casos extremos). */
     body > div.flex.h-screen {
