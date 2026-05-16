@@ -72,7 +72,7 @@ public class RegistrarPagamentoPedidoUseCase(
             Detalhes = $"+{pag.Valor:C} via {metodo}"
         });
 
-        await GarantirCaixaAbertoAsync(cmd, pedido, pag.PagoEm);
+        await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm);
 
         await uow.CommitAsync();
 
@@ -81,22 +81,47 @@ public class RegistrarPagamentoPedidoUseCase(
         return CriarPedidoUseCase.Map(pedido);
     }
 
-    private async Task GarantirCaixaAbertoAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm)
+    private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm)
     {
         // Caixa segue Pedido: ao receber o primeiro pagamento do dia, abrimos o caixa
         // automaticamente para evitar divergência "pedidos pagos mas caixa zerado".
+        //
+        // Best-effort: qualquer falha aqui não pode derrubar o pagamento. Race condition
+        // entre TXs paralelas é mitigada pelo UNIQUE INDEX parcial em movimentos_caixa
+        // (migration 20260516010000_UniqueAberturaCaixaPorDia) — quem perde a corrida
+        // recebe unique_violation, capturado abaixo.
         if (caixaRepo is null) return;
 
-        var data = DateOnly.FromDateTime(pagoEm);
-        var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
-        if (movimentos.Any(m => m.Tipo == "abertura")) return;
+        try
+        {
+            var data = DateOnly.FromDateTime(pagoEm);
 
-        var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
-        abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";
-        abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
-        abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
-        abertura.Origem = "auto-pagamento";
-        await caixaRepo.AddMovimentoAsync(abertura);
-        logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+            // Não reabre caixa fechado (replica regra de AbrirCaixaUseCase). Pagamentos
+            // retroativos em dia fechado ficam apenas como PedidoPagamento; aparecem
+            // na agregação do dia via GetTotalPagamentosPedidosDoDiaAsync.
+            var fechamento = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
+            if (fechamento != null)
+            {
+                logger.LogInformation("Caixa de {Data} já fechado; pagamento {PedidoId} não dispara abertura automática.", data, pedido.Id);
+                return;
+            }
+
+            var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
+            if (movimentos.Any(m => m.Tipo == "abertura")) return;
+
+            var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
+            abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";
+            abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
+            abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
+            abertura.Origem = "auto-pagamento";
+            await caixaRepo.AddMovimentoAsync(abertura);
+            logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+        }
+        catch (Exception ex)
+        {
+            // Não propagar: pagamento já foi adicionado ao UoW. Se a abertura falhar
+            // (race, constraint, timeout), o pagamento deve persistir mesmo assim.
+            logger.LogWarning(ex, "Falha ao abrir caixa automaticamente para pedido {PedidoId}. Pagamento prossegue.", pedido.Id);
+        }
     }
 }
