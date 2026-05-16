@@ -99,6 +99,21 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         return PaginateAsync(filter, Builders<ItemEstoque>.Sort.Ascending(x => x.ProdutoId), page, pageSize);
     }
 
+    public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+    {
+        var filter = Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
+            filter = Builders<ItemEstoque>.Filter.And(filter, Builders<ItemEstoque>.Filter.Eq(x => x.Status, statusEnum));
+        // categoriaId silently ignored (no Produto join in Mongo).
+
+        var cadastrados = (int)await Collection.CountDocumentsAsync(filter);
+        var comSaldoFilter = Builders<ItemEstoque>.Filter.And(
+            filter,
+            Builders<ItemEstoque>.Filter.Gt(x => x.QuantidadeAtual, EasyStock.Domain.ValueObjects.Quantidade.Zero));
+        var comSaldo = (int)await Collection.CountDocumentsAsync(comSaldoFilter);
+        return (cadastrados, comSaldo);
+    }
+
     public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
     {
         var resumo = await Collection.Aggregate()

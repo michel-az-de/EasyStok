@@ -40,6 +40,16 @@ public class EstoqueService(ApiClient api, SessionService session)
         return await api.GetAsync<PagedResult<EstoqueSku>>(qs);
     }
 
+    public async Task<ApiResult<EstoqueContadores>> ContadoresAsync(string? status = null, string? categoria = null)
+    {
+        var qs = $"estoque/contadores?empresaId={GetEmpresaId()}";
+        if (!string.IsNullOrEmpty(status))
+            qs += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
+            qs += $"&categoriaId={catId}";
+        return await api.GetAsync<EstoqueContadores>(qs);
+    }
+
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>
         api.GetAsync<EstoqueSku>($"estoque/{id}?empresaId={GetEmpresaId()}");
 

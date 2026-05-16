@@ -19,6 +19,16 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20, Guid? lojaId = null);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null);
+
+        /// <summary>
+        /// Contadores rapidos para o cabecalho de /estoque, batendo com o mesmo
+        /// universo de GetItensEstoquePaginadosAsync mas separando "lotes
+        /// cadastrados" (tudo) de "lotes com saldo" (qty > 0). Permite a UI
+        /// exibir os dois numeros sem confusao com o KPI "Unidades em estoque"
+        /// do dashboard (que conta unidades, nao linhas).
+        /// </summary>
+        Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null);
+
         Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId);
         Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
         /// <param name="fefo">true = FEFO (saída pelo lote com validade mais próxima); false = FIFO (saída pela entrada mais antiga).</param>

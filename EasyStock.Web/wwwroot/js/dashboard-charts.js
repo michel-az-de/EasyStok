@@ -180,7 +180,15 @@
     destroyChart('fluxoCaixa');
 
     if (!serie || serie.length === 0) {
-      emptyState('chart-fluxo-caixa', 'Nenhuma movimentação de caixa encontrada.', 'Abrir caixa →', '/caixa');
+      // Fluxo de Caixa le de FechamentosCaixa, nao de Pagamentos diretamente. Empty
+      // state agora explica o gap pra o dono nao concluir "vi receita de R$ 795 mas
+      // o caixa diz zero — sistema quebrado". Conserto longo (reconciliacao
+      // automatica) vira no modulo Caixa Conciliado.
+      emptyState(
+        'chart-fluxo-caixa',
+        'O caixa do dia ainda nao foi fechado. Os pagamentos recebidos so entram aqui depois do fechamento.',
+        'Fechar caixa de hoje →',
+        '/caixa');
       return;
     }
 
