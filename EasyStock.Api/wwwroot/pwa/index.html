@@ -7370,6 +7370,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="support-actions">
         <button class="primary" onclick="copySupportTicket()">Copiar chamado</button>
         <button onclick="openDiagnostics()">Ver diagnóstico</button>
+        <button onclick="openWhatsAppSuporte()" title="Abre WhatsApp da EasyStok com contexto pré-preenchido">💬 Falar com EasyStok</button>
       </div>
     </div>
 
@@ -14931,6 +14932,32 @@ function renderSupportPreview() {
 
 function copySupportTicket() {
   copyToClipboard(buildSupportTicketText(), 'Chamado copiado com diagnostico');
+}
+
+// Onda 1.5 — deep link para WhatsApp da EasyStok com contexto pre-preenchido.
+// SUBSTITUIR placeholder antes de buildar APK pra producao.
+// Formato wa.me: numero em E.164 sem '+' nem espaços (ex: 5511999999999).
+const CDB_EASYSTOK_WHATSAPP_NUMERO = '55XXXXXXXXXXX'; // TODO: substituir pelo numero real
+function openWhatsAppSuporte() {
+  try {
+    const tipo = (typeof currentSupportType !== 'undefined' && currentSupportType) ? currentSupportType : 'duvida';
+    const desc = (document.getElementById('supportDescription')?.value || '').trim();
+    const deviceId = (window.cdbSync && typeof window.cdbSync.getDeviceId === 'function')
+      ? window.cdbSync.getDeviceId() : 'sem-device-id';
+    const versao = (typeof CDB_BUILD_INFO !== 'undefined' && CDB_BUILD_INFO?.version) ? CDB_BUILD_INFO.version : 'unknown';
+    const linhas = [
+      'Suporte Casa da Baba',
+      'Tipo: ' + tipo,
+      'Device: ' + deviceId,
+      'Versao: ' + versao
+    ];
+    if (desc) linhas.push('---', desc);
+    const texto = encodeURIComponent(linhas.join('\n'));
+    const url = 'https://wa.me/' + CDB_EASYSTOK_WHATSAPP_NUMERO + '?text=' + texto;
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir WhatsApp: ' + (e.message || e));
+  }
 }
 
 // Compat com botao existente em Ajustes > Equipamento.
