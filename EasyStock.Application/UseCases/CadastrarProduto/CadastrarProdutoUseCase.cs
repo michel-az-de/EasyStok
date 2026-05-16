@@ -100,6 +100,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             if (!string.IsNullOrWhiteSpace(command.CodigoBarras))
             {
                 var codigoBarras = command.CodigoBarras.Trim();
+                try { _ = Gtin.Parse(codigoBarras); }
+                catch (ArgumentException ex) { throw new UseCaseValidationException(ex.Message); }
                 if (await produtoRepository.ExistsCodigoBarrasAsync(command.EmpresaId, codigoBarras))
                 {
                     throw new UseCaseValidationException("Código de barras (EAN) duplicado para esta empresa.");
