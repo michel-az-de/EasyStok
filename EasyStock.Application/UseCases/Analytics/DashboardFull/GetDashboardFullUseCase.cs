@@ -30,6 +30,7 @@ public class GetDashboardFullUseCase(
         var (alertasParados, _) = await analyticsRepository.GetItensParadosDetalhadosAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);
         var alertasCriticos = await analyticsRepository.GetItensCriticosResumoAsync(cmd.EmpresaId, 10, cmd.LojaId);
         var entreguesSemVenda = await analyticsRepository.GetEntreguesSemVendaCountAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
+        var fornecedores = await analyticsRepository.GetFornecedoresResumoAsync(cmd.EmpresaId, cmd.LojaId);
 
         var delta = CalculateDelta(kpis, kpisPrev);
 
@@ -42,7 +43,7 @@ public class GetDashboardFullUseCase(
         foreach (var p in alertasParados)
             alertas.Add(new AlertaEstoqueResumo(p.ItemEstoqueId, p.ProdutoId, p.NomeProduto, "parado", p.QuantidadeAtual, p.DiasSemMovimentacao));
 
-        var insights = GenerateInsights(kpis, delta, estoqueStatus, pendentes.Count);
+        var insights = GenerateInsights(kpis, delta, estoqueStatus, pendentes.Count, fornecedores.Ativos > 0);
         var pendentesTotal = pendentes.Sum(p => p.EmAberto);
 
         stopwatch.Stop();
@@ -76,7 +77,7 @@ public class GetDashboardFullUseCase(
     }
 
     private static List<InsightDto> GenerateInsights(DashboardKpis kpis, DashboardKpisDelta delta,
-        EstoqueStatusDistribuicao estoque, int pendentesCount)
+        EstoqueStatusDistribuicao estoque, int pendentesCount, bool temFornecedoresAtivos)
     {
         var insights = new List<InsightDto>();
 
@@ -92,7 +93,12 @@ public class GetDashboardFullUseCase(
         {
             var pctCritico = (decimal)estoque.Critico / estoque.Total * 100m;
             if (pctCritico > 20)
-                insights.Add(new InsightDto("estoque", "alert", $"{pctCritico:0}% do estoque está crítico. Considere repor agora."));
+            {
+                var msg = temFornecedoresAtivos
+                    ? $"{pctCritico:0}% do estoque está crítico. Considere repor agora."
+                    : $"{pctCritico:0}% do estoque está crítico — cadastre um fornecedor para conseguir repor.";
+                insights.Add(new InsightDto("estoque", "alert", msg));
+            }
         }
 
         if (pendentesCount > 0)
