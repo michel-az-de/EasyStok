@@ -38,6 +38,9 @@ using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
+using EasyStock.Application.UseCases.CalcularProducao;
+using EasyStock.Application.UseCases.PreviewSugestaoCompra;
+using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio;
 using EasyStock.Application.UseCases.ListarPlanos;
@@ -124,6 +127,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();
         services.AddScoped<GerenciarCategoriaUseCase>();
+
+        // Calculadora de Producao (Onda 1.3)
+        services.AddScoped<CalcularProducaoUseCase>();
+        services.AddScoped<PreviewSugestaoCompraUseCase>();
+        services.AddScoped<AdicionarItemPedidoFornecedorUseCase>();
 
         // Estoque
         services.AddScoped<RegistrarEntradaEstoqueUseCase>();
