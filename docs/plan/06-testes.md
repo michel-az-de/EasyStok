@@ -96,7 +96,15 @@ public void SomaPagamentosConfirmados_NuncaExcedeTotalDoPedido(Pedido pedido, Li
 }
 ```
 
-Pacote sugerido: **FsCheck.Xunit** 3.x.
+Pacote sugerido: **FsCheck.Xunit** 3.x. **Não está em uso no repo** (grep
+em todos os `.csproj`, incluindo worktrees, retornou zero matches em
+2026-05-16). Adicionar como `<PackageReference>` diretamente em
+`EasyStock.Application.Tests/EasyStock.Application.Tests.csproj` quando
+F2/F4 começar a escrever property-based tests. **Repo não usa Central
+Package Management (`Directory.Packages.props` inexistente)** — versão
+fica no `.csproj` do projeto consumidor, espelhando o padrão existente do
+projeto. Decidir versão exata no momento de adicionar (3.x estável é a
+recomendação default).
 
 ### G.2 Integration tests (`EasyStock.Api.IntegrationTests`)
 
@@ -165,9 +173,15 @@ public async Task FechamentoCaixa_GerarPdf_Layout()
 }
 ```
 
-Pacote: **Verify.Xunit** 24.x (já em uso? confirmar). Se não, considerar
-"comparação estrutural" via `PdfPig` extraindo texto e validando lista de
-seções esperadas — evita instabilidade de bytes em CI.
+Pacote: **Verify.Xunit** 24.x. **Não está em uso no repo** (grep em todos
+os `.csproj`, incluindo worktrees, retornou zero matches em 2026-05-16).
+Adicionar como `<PackageReference>` diretamente em
+`EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj`
+(ou no projeto de teste que conter os snapshot tests do PDF) quando F6
+começar. **Repo não usa Central Package Management** — versão por
+`.csproj`. Alternativa de menor dependência: "comparação estrutural" via
+`PdfPig` extraindo texto e validando lista de seções esperadas — evita
+instabilidade de bytes em CI e não requer Verify.
 
 #### G.3.2 Snapshot JSON
 
