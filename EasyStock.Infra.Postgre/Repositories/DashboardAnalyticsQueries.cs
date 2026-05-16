@@ -200,7 +200,6 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var custoEstoque = Math.Round(estoqueAgg?.Custo ?? 0m, 2);
         var pctCritico = estoqueAgg?.Count > 0
             ? Math.Round((decimal)(estoqueAgg.Critico) / estoqueAgg.Count * 100m, 1) : 0m;
-        var lotesAtivos = estoqueAgg?.Count ?? 0;
 
         // Lotes finalizados
         var lotesQuery = dbContext.Lotes.AsNoTracking()

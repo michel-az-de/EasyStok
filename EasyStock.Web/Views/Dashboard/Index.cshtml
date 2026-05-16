@@ -138,8 +138,9 @@
                 <template x-if="data">
                     <div>
                         <div class="kpi-val text-slate-900" x-text="data.kpis.pedidos"></div>
-                        <div class="flex items-center gap-1 mt-1">
+                        <div class="flex items-center gap-1 mt-1 flex-wrap">
                             <span :class="deltaClass(data.delta.pedidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.pedidos)"></span>
+                            <span class="text-xs text-slate-400">vs anterior</span>
                             <span class="text-xs text-slate-400" x-show="data.kpis.pedidosEntregues != null">
                                 · <span x-text="data.kpis.pedidosEntregues"></span> entregues
                             </span>
