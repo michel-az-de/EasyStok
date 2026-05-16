@@ -13,12 +13,24 @@
     <div class="pg-hd flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div x-data="{
                 get saudacao() {
-                    const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
-                    const h = parseInt(fmt.format(new Date()), 10);
+                    // Fallback robusto: alguns browsers sem ICU completo (ou casos onde
+                    // Intl.DateTimeFormat retorna string nao-numerica) caem em NaN e
+                    // todas as comparacoes `NaN < N` viram false — gerava 'Boa noite'
+                    // as 15h. Agora se NaN, usa getHours() do navegador como fallback.
+                    let h;
+                    try {
+                        const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
+                        h = parseInt(fmt.format(new Date()), 10);
+                    } catch (e) { h = NaN; }
+                    if (Number.isNaN(h)) h = new Date().getHours();
                     return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
                 },
                 get dataLocal() {
-                    return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' });
+                    try {
+                        return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' });
+                    } catch (e) {
+                        return new Date().toLocaleDateString('pt-BR');
+                    }
                 }
             }">
             <h1><span x-text="saudacao"></span>@(string.IsNullOrEmpty(primeiroNome) ? "!" : $", {primeiroNome}!")</h1>
@@ -705,8 +717,13 @@
         </div>
     </div>
 
-    @* Drawer: detalhes do pedido *@
+    @* Drawer: detalhes do pedido.
+       Acessibilidade: Esc fecha (handler em window pra capturar mesmo sem foco no drawer).
+       Cleanup explicito de body/footer ao fechar — antes o conteudo HTML ficava no DOM
+       e gerava "fantasma" transparente no primeiro click no X (cleanup de portal falho). *@
     <div x-show="drawer.open"
+         @@keydown.escape.window="closeDrawer()"
+         role="dialog" aria-modal="true" :aria-label="drawer.title"
          class="fixed inset-0 z-50 flex justify-end no-print"
          style="display:none"
          x-transition:enter="transition ease-out duration-200"
@@ -715,7 +732,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="fixed inset-0 bg-black/30" @@click="drawer.open = false"></div>
+        <div class="fixed inset-0 bg-black/30" @@click="closeDrawer()"></div>
         <div class="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full"
@@ -725,9 +742,9 @@
              x-transition:leave-end="translate-x-full">
             <div class="flex items-center justify-between px-5 py-4 border-b">
                 <h3 class="font-bold text-slate-800" x-text="drawer.title">Pedido</h3>
-                <button type="button" @@click="drawer.open = false"
+                <button type="button" @@click="closeDrawer()" aria-label="Fechar"
                         class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
@@ -836,6 +853,12 @@
 
                 exportarPDF() {
                     window.print();
+                },
+
+                closeDrawer() {
+                    // Reset explicito do conteudo HTML — antes ficava no DOM e o primeiro
+                    // click no X deixava o body anterior visivel como "fantasma" sobreposto.
+                    this.drawer = { open: false, title: '', body: '', footer: '' };
                 },
 
                 async openPedido(id) {

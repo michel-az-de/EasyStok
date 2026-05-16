@@ -278,11 +278,13 @@
         </button>
     </div>
 
-    <!-- Ação rápida (desktop only) -->
+    <!-- Acao rapida (desktop only). Antes tinha classe `app-primary-btn` que aplica
+         gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
+         escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
         <button @@click="open = !open"
-                class="app-primary-btn flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="ui-secondary-btn flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span class="hidden sm:inline">Ação rápida</span>

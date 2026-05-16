@@ -123,7 +123,13 @@
                             <div class="font-medium text-slate-900">@(p.ClienteNome ?? "—")</div>
                             @if (!string.IsNullOrEmpty(p.ClienteApt) || !string.IsNullOrEmpty(p.ClienteTelefone))
                             {
-                                <div class="text-xs text-slate-500">@p.ClienteApt @(string.IsNullOrEmpty(p.ClienteApt) ? "" : "·") @p.ClienteTelefone</div>
+                                @* Antes "21 · +55 11 98140-5122" colava unidade + DDD sem rotulo
+                                   e induzia leitura tipo "21·11 misturado". Agora "Apto 21 · Tel ..." *@
+                                <div class="text-xs text-slate-500">
+                                    @if (!string.IsNullOrEmpty(p.ClienteApt)) { <span title="Apartamento / mesa">Apto @p.ClienteApt</span> }
+                                    @if (!string.IsNullOrEmpty(p.ClienteApt) && !string.IsNullOrEmpty(p.ClienteTelefone)) { <span class="text-slate-300 mx-1">·</span> }
+                                    @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <span title="Telefone">@p.ClienteTelefone</span> }
+                                </div>
                             }
                         </td>
                         <td>
