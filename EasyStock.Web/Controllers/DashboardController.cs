@@ -8,7 +8,6 @@ namespace EasyStock.Web.Controllers;
 public class DashboardController(ApiClient api, SessionService session) : BaseController(session)
 {
     [HttpGet("/dashboard")]
-    [HttpGet("/")]
     public async Task<IActionResult> Index()
     {
         ViewBag.Title = "Dashboard";
