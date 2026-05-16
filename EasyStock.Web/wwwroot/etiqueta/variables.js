@@ -1,6 +1,7 @@
 // Canonical variable allowlist — mirrors backend LayoutJsonValidator
 const ALLOWLIST = new Set([
   'produto.nome', 'produto.marca',
+  'produto.peso_g', // C2 (RDC 727/2022): peso unitario obrigatorio para Embalado.
   'produto.ficha.kcal', 'produto.ficha.proteina_g', 'produto.ficha.carbs_g',
   'produto.ficha.gordura_g', 'produto.ficha.gordura_saturada_g',
   'produto.ficha.fibras_g', 'produto.ficha.sodio_mg', 'produto.ficha.porcao_g',
@@ -30,6 +31,7 @@ function getPath(dados, path, fmt) {
   switch (path) {
     case 'produto.nome':              return dados?.produto?.Nome ?? null;
     case 'produto.marca':             return dados?.produto?.Marca ?? null;
+    case 'produto.peso_g':            return dados?.produto?.PesoG ?? null;
     case 'produto.ficha.kcal':        return dados?.produto?.FichaKcal ?? null;
     case 'produto.ficha.proteina_g':  return dados?.produto?.FichaProteinaG ?? null;
     case 'produto.ficha.carbs_g':     return dados?.produto?.FichaCarbsG ?? null;
