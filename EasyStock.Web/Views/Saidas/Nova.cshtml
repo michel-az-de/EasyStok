@@ -382,6 +382,10 @@ function saidaForm() {
 
         async submitSaida() {
             if (!this.produtoId) { window.showToast('Selecione um produto.', 'warning'); return; }
+            // type="number" min="1" no input nao impede digitar -5 em todos os browsers.
+            // Sem essa validacao explicita o form ia ao server e retornava 400 sem feedback claro.
+            if (!this.qty || this.qty < 1) { window.showToast('Quantidade deve ser maior que zero.', 'warning'); return; }
+            if (this.valorUnit < 0) { window.showToast('Valor unitário não pode ser negativo.', 'warning'); return; }
             if (this.estoqueAtual === 0) { window.showToast('Este produto não tem estoque disponível.', 'error'); return; }
             if (this.qty > this.estoqueAtual) { window.showToast('Quantidade excede o estoque disponível (' + this.estoqueAtual + ').', 'error'); return; }
             if (this.valorUnit === 0 && !confirm('Deseja registrar uma saída com valor R$ 0,00?')) return;
