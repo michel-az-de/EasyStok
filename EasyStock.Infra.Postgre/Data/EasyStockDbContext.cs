@@ -127,6 +127,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
+        public DbSet<ProdutoComposicao> ProdutosComposicao { get; set; } = null!;
+        public DbSet<ProdutoComposicaoAlteracao> ProdutosComposicaoAlteracoes { get; set; } = null!;
         public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
         public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;

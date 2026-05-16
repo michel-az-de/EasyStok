@@ -51,6 +51,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnType("decimal(18,2)");
             builder.Property(p => p.MargemEstimada).HasColumnType("decimal(8,2)");
 
+            // Receita / Calculadora de Producao (Onda 1.2)
+            builder.Property(p => p.EhInsumo).IsRequired().HasDefaultValue(false);
+            builder.Property(p => p.RendimentoBase).HasColumnType("numeric(19,4)").IsRequired().HasDefaultValue(1m);
+            builder.Property(p => p.RendimentoUnidade).HasConversion<string>().HasMaxLength(8).IsRequired().HasDefaultValue(UnidadeMedida.Un);
+            builder.Property(p => p.UnidadeMedidaBase).HasConversion<string>().HasMaxLength(8).IsRequired().HasDefaultValue(UnidadeMedida.Un);
+
             builder.Property(p => p.CriadoPor).HasColumnType("uuid");
             builder.Property(p => p.AlteradoPor).HasColumnType("uuid");
             builder.Property(p => p.ObservacaoInterna).HasMaxLength(1000).HasColumnType("character varying(1000)");

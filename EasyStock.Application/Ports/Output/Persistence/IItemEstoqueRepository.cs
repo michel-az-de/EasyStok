@@ -21,6 +21,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null);
         Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId);
         Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
+
+        /// <summary>
+        /// Batch: traz lotes de varios produtos numa unica query (`WHERE ProdutoId IN (...)`).
+        /// Usado pela calculadora de producao pra evitar N round trips em receitas com varios insumos.
+        /// Filtra por loja se <paramref name="lojaId"/> informado.
+        /// Retorna dicionario produtoId -> lotes; produto sem estoque nao aparece (consumer usa TryGetValue + default vazio).
+        /// </summary>
+        Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default);
         /// <param name="fefo">true = FEFO (saída pelo lote com validade mais próxima); false = FIFO (saída pela entrada mais antiga).</param>
         Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true);
         Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId);

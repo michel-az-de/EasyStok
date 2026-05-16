@@ -191,6 +191,31 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync();
 
+        public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
+            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+        {
+            var ids = produtoIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>();
+
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && ids.Contains(i.ProdutoId));
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
+
+            var todos = await query
+                .OrderByDescending(i => i.EntradaEm)
+                .ToListAsync(ct);
+
+            return todos
+                .GroupBy(i => i.ProdutoId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
+        }
+
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
         {
             // FOR UPDATE garante serialização: requests concorrentes aguardam o lock
