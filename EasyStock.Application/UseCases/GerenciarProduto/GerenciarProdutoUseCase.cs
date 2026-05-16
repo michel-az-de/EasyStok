@@ -240,7 +240,11 @@ public sealed class GerenciarProdutoUseCase(
         produto.CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null;
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
-        produto.AtributosJson = command.AtributosJson;
+        // Preserva ficha tecnica quando o command omite AtributosJson. Form.cshtml de
+        // produtos nao carrega/devolve esse campo — sem este guard, qualquer edicao via
+        // Form zerava a ficha cadastrada via PUT /api/produtos/{id}/ficha-tecnica.
+        if (command.AtributosJson != null)
+            produto.AtributosJson = command.AtributosJson;
         // Gating: nao deixa Ativo sem preco de venda. Antes o usuario podia salvar
         // produto Ativo sem preco e ele aparecia na vitrine como "Definir preco →"
         // mas vendavel — gerava pedido com R$0 (auditoria QA 2026-05-16).
