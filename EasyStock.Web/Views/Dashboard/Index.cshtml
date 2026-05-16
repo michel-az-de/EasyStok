@@ -11,15 +11,16 @@
 
 <div x-data="dashboardApp()" x-init="init()" class="space-y-6">
 
-    @* Header — saudação calculada no client p/ refletir fuso do usuário; data inclui o ano *@
+    @* Header — saudação travada em fuso BR para evitar "Boa noite às 15h" quando o navegador roda em UTC. *@
     <div class="pg-hd flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div x-data="{
                 get saudacao() {
-                    const h = new Date().getHours();
+                    const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
+                    const h = parseInt(fmt.format(new Date()), 10);
                     return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
                 },
                 get dataLocal() {
-                    return new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+                    return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' });
                 }
             }">
             <h1><span x-text="saudacao"></span>@(string.IsNullOrEmpty(primeiroNome) ? "!" : $", {primeiroNome}!")</h1>
