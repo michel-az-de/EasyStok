@@ -104,8 +104,11 @@
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            @* Receita *@
-            <div class="ws group" title="Total de vendas confirmadas no período">
+            @* Receita: soma de Vendas confirmadas (Vendas.ValorTotal). Pedido cancelado ou
+               entregue-sem-cobranca nao gera Venda e nao soma aqui. Sub-rotulo expoe a
+               contagem usada pra evitar o cenario "olhei a tela de Pedidos, somei 1.113,
+               e o card diz 795". *@
+            <div class="ws group" title="Soma das vendas confirmadas no período (cada Venda equivale a um Pedido entregue e cobrado).">
                 <div class="kpi-lbl">Receita</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-24 bg-slate-100 rounded animate-pulse mt-1"></div>
@@ -113,18 +116,22 @@
                 <template x-if="data">
                     <div>
                         <div class="kpi-val text-emerald-700" x-text="fmt.currency(data.kpis.receita)"></div>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            <span x-text="data.kpis.pedidosEntregues"></span>
+                            <span x-text="data.kpis.pedidosEntregues === 1 ? 'venda confirmada' : 'vendas confirmadas'"></span>
+                        </p>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.receita)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.receita)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.receita == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
             </div>
 
-            @* Ticket Médio = Receita / Vendas confirmadas (com VendaId). Denominador
-               diferente do card "Pedidos" porque pedidos cancelados/pendentes nao geram
-               venda — o tooltip explica pra evitar leitura tipo "795 / 17 = 47 != 61". *@
-            <div class="ws group" title="Receita dividida pelo número de vendas confirmadas no período (pedidos cancelados ou ainda em aberto não entram no denominador).">
+            @* Ticket Médio = Receita / Vendas confirmadas. Denominador diferente do
+               card "Pedidos" (que inclui cancelados/pendentes/sem-cobranca) — sub-rotulo
+               visivel pra evitar leitura tipo "795 / 17 = 47 != 61". *@
+            <div class="ws group" title="Receita ÷ vendas confirmadas. Pedidos cancelados, em aberto ou entregues sem cobrança não entram no denominador.">
                 <div class="kpi-lbl">Ticket médio</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-20 bg-slate-100 rounded animate-pulse mt-1"></div>
@@ -132,16 +139,17 @@
                 <template x-if="data">
                     <div>
                         <div class="kpi-val text-slate-900" x-text="fmt.currency(data.kpis.ticketMedio)"></div>
+                        <p class="text-xs text-slate-400 mt-0.5">Receita ÷ vendas confirmadas</p>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.ticketMedio)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.ticketMedio)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.ticketMedio == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
             </div>
 
-            @* Pedidos: total criados (entregues + pendentes + cancelados). O sub-rotulo
-               de breakdown ajuda a conciliar com o ticket medio (que usa vendas, nao pedidos). *@
+            @* Pedidos: total criados (entregues + pendentes + cancelados). Sub-rotulo
+               diz quantos viraram venda — ajuda a conciliar com o ticket medio acima. *@
             <a href="/pedidos" class="ws group hover:border-slate-300 transition-colors" title="Total de pedidos criados no período — inclui entregues, pendentes e cancelados. O ticket médio acima usa só os que viraram venda confirmada.">
                 <div class="kpi-lbl">Pedidos</div>
                 <template x-if="loading && !data">
@@ -150,34 +158,41 @@
                 <template x-if="data">
                     <div>
                         <div class="kpi-val text-slate-900" x-text="data.kpis.pedidos"></div>
-                        <div class="flex items-center gap-1 mt-1 flex-wrap">
+                        <p class="text-xs text-slate-400 mt-0.5" x-show="data.kpis.pedidosEntregues != null">
+                            <span x-text="data.kpis.pedidosEntregues"></span>
+                            <span x-text="data.kpis.pedidosEntregues === 1 ? 'entregue' : 'entregues'"></span>
+                        </p>
+                        <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.pedidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.pedidos)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
-                            <span class="text-xs text-slate-400" x-show="data.kpis.pedidosEntregues != null">
-                                · <span x-text="data.kpis.pedidosEntregues"></span> entregues
-                            </span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.pedidos == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
             </a>
 
-            @* Itens em Estoque (soma de QuantidadeAtual de lotes ativos com qty > 0).
-               O sub-rotulo "% critico" se refere a LOTES (rows ItemEstoque), nao a unidades —
-               antes ficava ambiguo e podia mostrar 100% no card e 88% no donut da mesma tela. *@
-            <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Unidades em lotes ativos (quantidade > 0). O '% crítico' abaixo se refere aos lotes, não às unidades.">
-                <div class="kpi-lbl">Itens em estoque</div>
+            @* Unidades em estoque = SUM(QuantidadeAtual) sobre lotes com saldo (qty > 0,
+               nao vencidos, nao descartados). Sub-rotulo expoe o numero de lotes pra deixar
+               claro que a unidade do KPI eh UNIDADE, e o "% crítico" eh sobre LOTES — antes
+               grudava "0,0% · 100,0% dos lotes crítico" colando delta + criticidade. *@
+            <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Soma das unidades em lotes ativos (quantidade > 0). O percentual crítico abaixo se refere ao número de lotes, não às unidades.">
+                <div class="kpi-lbl">Unidades em estoque</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-14 bg-slate-100 rounded animate-pulse mt-1"></div>
                 </template>
                 <template x-if="data">
                     <div>
                         <div class="kpi-val text-indigo-600" x-text="fmt.number(data.kpis.itensEmEstoque)"></div>
+                        <p class="text-xs text-slate-400 mt-0.5" x-show="data.kpis.lotesAtivos > 0">
+                            em <span x-text="data.kpis.lotesAtivos"></span>
+                            <span x-text="data.kpis.lotesAtivos === 1 ? 'lote com saldo' : 'lotes com saldo'"></span>
+                        </p>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.itensEmEstoque)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.itensEmEstoque)"></span>
-                            <span class="text-xs text-slate-400" x-show="data.kpis.percentualCritico > 0">
-                                · <span x-text="fmt.pct(data.kpis.percentualCritico)"></span> dos lotes crítico
-                            </span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.itensEmEstoque == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
+                        <p class="text-xs text-amber-600 mt-0.5" x-show="data.kpis.percentualCritico > 0">
+                            <span x-text="fmt.pct(data.kpis.percentualCritico)"></span> dos lotes em estado crítico
+                        </p>
                     </div>
                 </template>
             </a>
@@ -193,7 +208,7 @@
                         <div class="kpi-val text-slate-900" x-text="fmt.currency(data.kpis.custoEstoque)"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.custoEstoque, true)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.custoEstoque)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.custoEstoque == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
@@ -216,7 +231,8 @@
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.margemBruta)" class="text-xs font-semibold"
                                   x-text="data.delta.margemBruta == null ? '—' : (data.delta.margemBruta > 0 ? '+' : '') + data.delta.margemBruta.toFixed(1).replace('.', ',') + ' pp'"></span>
-                            <span class="text-xs text-slate-400" x-text="data.kpis.margemBruta == null ? 'sem custo informado' : 'vs anterior'"></span>
+                            <span class="text-xs text-slate-400"
+                                  x-text="data.kpis.margemBruta == null ? 'sem custo informado' : (data.delta.margemBruta == null ? 'sem base de comparação' : 'vs anterior')"></span>
                         </div>
                     </div>
                 </template>
@@ -233,7 +249,7 @@
                         <div class="kpi-val text-slate-900" x-text="data.kpis.lotesProduzidos"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.lotesProduzidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.lotesProduzidos)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.lotesProduzidos == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
@@ -250,7 +266,7 @@
                         <div class="kpi-val text-slate-900" x-text="data.kpis.clientesAtivos"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.clientesAtivos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.clientesAtivos)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.delta.clientesAtivos == null ? 'sem base de comparação' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>
@@ -390,34 +406,48 @@
             </svg>
         </button>
         <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-            @* Estoque status *@
+            @* Estoque status: cards contam LOTES (rows de ItemEstoque com saldo > 0),
+               nao unidades. Manter o sufixo "lotes" pra reforcar diferenca em relacao ao
+               KPI "Unidades em estoque" do topo. *@
             <template x-if="data">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div class="ws flex items-center gap-3">
                         <div class="w-3 h-3 rounded-full bg-ok-500"></div>
                         <div>
-                            <div class="text-lg font-bold text-slate-900" x-text="data.estoqueStatus.ok"></div>
+                            <div class="text-lg font-bold text-slate-900">
+                                <span x-text="data.estoqueStatus.ok"></span>
+                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.ok === 1 ? 'lote' : 'lotes'"></span>
+                            </div>
                             <div class="text-xs text-slate-500">OK</div>
                         </div>
                     </div>
                     <div class="ws flex items-center gap-3">
                         <div class="w-3 h-3 rounded-full bg-warn-500"></div>
                         <div>
-                            <div class="text-lg font-bold text-slate-900" x-text="data.estoqueStatus.atencao"></div>
+                            <div class="text-lg font-bold text-slate-900">
+                                <span x-text="data.estoqueStatus.atencao"></span>
+                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.atencao === 1 ? 'lote' : 'lotes'"></span>
+                            </div>
                             <div class="text-xs text-slate-500">Atenção</div>
                         </div>
                     </div>
                     <div class="ws flex items-center gap-3">
                         <div class="w-3 h-3 rounded-full bg-crit-500"></div>
                         <div>
-                            <div class="text-lg font-bold text-slate-900" x-text="data.estoqueStatus.critico"></div>
+                            <div class="text-lg font-bold text-slate-900">
+                                <span x-text="data.estoqueStatus.critico"></span>
+                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.critico === 1 ? 'lote' : 'lotes'"></span>
+                            </div>
                             <div class="text-xs text-slate-500">Crítico</div>
                         </div>
                     </div>
                     <div class="ws flex items-center gap-3">
                         <div class="w-3 h-3 rounded-full bg-slate-400"></div>
                         <div>
-                            <div class="text-lg font-bold text-slate-900" x-text="data.estoqueStatus.parado"></div>
+                            <div class="text-lg font-bold text-slate-900">
+                                <span x-text="data.estoqueStatus.parado"></span>
+                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.parado === 1 ? 'lote' : 'lotes'"></span>
+                            </div>
                             <div class="text-xs text-slate-500">Parado</div>
                         </div>
                     </div>
