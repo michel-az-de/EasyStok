@@ -6,15 +6,16 @@ namespace EasyStock.Infra.Integrations.Fiscal.FocusNFe;
 
 /// <summary>
 /// Mapeia <see cref="NfeDocumento"/> + <see cref="ConfigFiscalDto"/> para
-/// <see cref="FocusNFeEmissaoRequest"/>. Centraliza traducao de regime
-/// tributario, presenca de comprador, modalidade de frete, etc.
+/// <see cref="FocusNFeEmissaoRequest"/>. Centraliza tradução de regime
+/// tributário, presença de comprador, modalidade de frete, etc.
 /// </summary>
 public static class FocusNFePayloadMapper
 {
-    public static FocusNFeEmissaoRequest Map(NfeDocumento nfe, ConfigFiscalDto config)
+    public static FocusNFeEmissaoRequest Map(NfeDocumento nfe, ConfigFiscalDto config, FocusNFeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(nfe);
         ArgumentNullException.ThrowIfNull(config);
+        options ??= new FocusNFeOptions();
 
         var request = new FocusNFeEmissaoRequest
         {
@@ -23,9 +24,9 @@ public static class FocusNFePayloadMapper
             TipoDocumento = 1,
             FinalidadeEmissao = 1,
             ConsumidorFinal = 1,
-            PresencaComprador = 1,
+            PresencaComprador = options.PresencaCompradorPadrao,
 
-            CnpjEmitente = SomenteDigitos(config.Cnpj),
+            CnpjEmitente = SomenteDigitos(config.Cnpj) ?? string.Empty,
             NomeEmitente = nfe.DadosEmitente.RazaoSocial ?? nfe.DadosEmitente.Nome ?? string.Empty,
             NomeFantasiaEmitente = nfe.DadosEmitente.Nome,
             LogradouroEmitente = config.Endereco?.Logradouro,
@@ -40,7 +41,7 @@ public static class FocusNFePayloadMapper
             CpfDestinatario = nfe.DadosDestinatario?.Documento is { Length: 11 } cpf ? cpf : null,
             NomeDestinatario = nfe.DadosDestinatario?.Nome,
 
-            ModalidadeFrete = 9, // sem frete
+            ModalidadeFrete = options.ModalidadeFretePadrao,
             ValorTotal = nfe.TotalNota.Valor,
             ValorProdutos = nfe.TotalNota.Valor,
 
@@ -65,12 +66,13 @@ public static class FocusNFePayloadMapper
                 })
                 .ToList(),
 
-            // FormasPagamento: NFC-e exige ao menos um pagamento. Sem dados detalhados,
-            // assume "dinheiro" com o total — F1 nao recebe pagamentos explicitos.
-            // Quando F3 adicionar PagamentoInput ao Command, mapear aqui.
+            // FormasPagamento: NFC-e exige ao menos um pagamento. Sem dados detalhados
+            // (F1 ainda não recebe pagamentos explícitos no Command), assume o padrão
+            // configurado em FocusNFeOptions.FormaPagamentoPadrao — em produção real,
+            // expor PagamentoInput no Command (F3.5) e mapear aqui é prioritário.
             FormasPagamento = new List<FocusNFePagamento>
             {
-                new() { FormaPagamento = "01", ValorPagamento = nfe.TotalNota.Valor },
+                new() { FormaPagamento = options.FormaPagamentoPadrao, ValorPagamento = nfe.TotalNota.Valor },
             },
         };
 

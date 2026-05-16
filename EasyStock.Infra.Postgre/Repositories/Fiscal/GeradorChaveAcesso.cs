@@ -34,7 +34,9 @@ public sealed class GeradorChaveAcesso : IGeradorChaveAcesso
 
         var cnpj = SomenteDigitos(cnpjEmitente);
         if (cnpj.Length != 14)
-            throw new ArgumentException("CNPJ deve ter 14 digitos.", nameof(cnpjEmitente));
+            throw new ArgumentException("CNPJ deve ter 14 dígitos.", nameof(cnpjEmitente));
+        if (!ValidarDvCnpj(cnpj))
+            throw new ArgumentException("CNPJ inválido (dígitos verificadores não conferem).", nameof(cnpjEmitente));
 
         if (serie is <= 0 or > 999)
             throw new ArgumentOutOfRangeException(nameof(serie), "Serie deve estar em 1..999.");
@@ -128,4 +130,27 @@ public sealed class GeradorChaveAcesso : IGeradorChaveAcesso
 
     private static string SomenteDigitos(string input) =>
         new(input.Where(char.IsDigit).ToArray());
+
+    /// <summary>
+    /// Valida os dois dígitos verificadores do CNPJ segundo algoritmo Receita Federal.
+    /// Rejeita também CNPJ "falso" formado por 14 dígitos iguais (00000000000000 etc.).
+    /// </summary>
+    private static bool ValidarDvCnpj(string cnpj)
+    {
+        if (cnpj.Length != 14 || !cnpj.All(char.IsDigit)) return false;
+        if (cnpj.Distinct().Count() == 1) return false;
+
+        ReadOnlySpan<int> pesos1 = stackalloc[] { 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
+        ReadOnlySpan<int> pesos2 = stackalloc[] { 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
+
+        var soma1 = 0;
+        for (var i = 0; i < 12; i++) soma1 += (cnpj[i] - '0') * pesos1[i];
+        var dv1 = soma1 % 11 < 2 ? 0 : 11 - (soma1 % 11);
+        if ((cnpj[12] - '0') != dv1) return false;
+
+        var soma2 = 0;
+        for (var i = 0; i < 13; i++) soma2 += (cnpj[i] - '0') * pesos2[i];
+        var dv2 = soma2 % 11 < 2 ? 0 : 11 - (soma2 % 11);
+        return (cnpj[13] - '0') == dv2;
+    }
 }

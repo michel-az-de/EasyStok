@@ -3,6 +3,7 @@ using EasyStock.Api.Models.Fiscal;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
+// Aliases para evitar fully-qualified names no MapearExcecaoFiscal abaixo.
 using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
 using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
 using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
@@ -34,11 +35,13 @@ public class NotasFiscaisController(
     INfeRepository nfeRepo,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Emite uma NFC-e em homologacao ou producao conforme config do tenant")]
+    [SwaggerOperation(Summary = "Emite uma NFC-e em homologação ou produção conforme config do tenant")]
     [ProducesResponseType(typeof(NfeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [HttpPost("emitir")]
     [EnableRateLimiting("nfe-emitir")]
     public async Task<IActionResult> Emitir(
@@ -74,13 +77,18 @@ public class NotasFiscaisController(
                     OrigemMercadoria: i.OrigemMercadoria,
                     CstOuCsosn: i.CstOuCsosn))
                 .ToList(),
-            UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
-            UsuarioNome: currentUser.Nome,
+            UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+            UsuarioNome: ResolverNomeUsuarioAtual(),
             Origem: "api");
 
-        var result = await emitirUseCase.ExecuteAsync(cmd);
-        var nfe = await nfeRepo.GetByIdAsync(eid, result.NfeId, ct);
-        return DataOk(MapToResponse(nfe!));
+        try
+        {
+            var result = await emitirUseCase.ExecuteAsync(cmd);
+            var nfe = await nfeRepo.GetByIdAsync(eid, result.NfeId, ct);
+            return DataOk(MapToResponse(nfe!));
+        }
+        catch (GatewayFiscalCredencialException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalDenegadaException ex) { return MapearExcecaoFiscal(ex); }
     }
 
     [SwaggerOperation(Summary = "Cancela uma NFC-e autorizada (prazo SEFAZ 24h)")]
@@ -102,8 +110,8 @@ public class NotasFiscaisController(
                 EmpresaId: eid,
                 NfeId: id,
                 Motivo: req.Motivo,
-                UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
-                UsuarioNome: currentUser.Nome,
+                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                UsuarioNome: ResolverNomeUsuarioAtual(),
                 Origem: "api"));
 
             return DataOk(new CancelarNfeResponse
@@ -117,6 +125,9 @@ public class NotasFiscaisController(
         {
             return DataBadRequest(ex.Message);
         }
+        catch (GatewayFiscalRejeitadaException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalCredencialException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalDenegadaException ex) { return MapearExcecaoFiscal(ex); }
     }
 
     [SwaggerOperation(Summary = "Inutiliza uma faixa de numeracao no mesmo ano fiscal")]
@@ -130,21 +141,27 @@ public class NotasFiscaisController(
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
 
-        var result = await inutilizarUseCase.ExecuteAsync(new InutilizarNumeracaoCommand(
-            EmpresaId: eid,
-            Serie: req.Serie,
-            NumeroInicial: req.NumeroInicial,
-            NumeroFinal: req.NumeroFinal,
-            Justificativa: req.Justificativa,
-            UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
-            UsuarioNome: currentUser.Nome,
-            Origem: "api"));
-
-        return DataOk(new InutilizarNumeracaoResponse
+        try
         {
-            ProtocoloEvento = result.ProtocoloEvento,
-            DataInutilizacao = result.DataInutilizacao,
-        });
+            var result = await inutilizarUseCase.ExecuteAsync(new InutilizarNumeracaoCommand(
+                EmpresaId: eid,
+                Serie: req.Serie,
+                NumeroInicial: req.NumeroInicial,
+                NumeroFinal: req.NumeroFinal,
+                Justificativa: req.Justificativa,
+                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                UsuarioNome: ResolverNomeUsuarioAtual(),
+                Origem: "api"));
+
+            return DataOk(new InutilizarNumeracaoResponse
+            {
+                ProtocoloEvento = result.ProtocoloEvento,
+                DataInutilizacao = result.DataInutilizacao,
+            });
+        }
+        catch (GatewayFiscalRejeitadaException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalCredencialException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalDenegadaException ex) { return MapearExcecaoFiscal(ex); }
     }
 
     [SwaggerOperation(Summary = "Detalhe de uma NFC-e com itens e eventos")]
@@ -251,4 +268,47 @@ public class NotasFiscaisController(
         CriadoEm = nfe.CriadoEm,
         AlteradoEm = nfe.AlteradoEm,
     };
+
+    /// <summary>
+    /// Mapeia exceções do gateway fiscal que propagam até o controller (não tratadas pelo use case)
+    /// em respostas HTTP com mensagem amigável ao operador, em vez de 500 genérico.
+    /// Mantém categoria técnica em log estruturado (logger do request pipeline).
+    /// </summary>
+    private IActionResult MapearExcecaoFiscal(EasyStock.Application.Ports.Output.Fiscal.GatewayFiscalException ex) => ex switch
+    {
+        EasyStock.Application.Ports.Output.Fiscal.GatewayFiscalCredencialException =>
+            StatusCode(StatusCodes.Status503ServiceUnavailable, new EasyStock.Api.Http.ApiErrorResponse(new EasyStock.Api.Http.ApiError(
+                "FISCAL_CREDENCIAL_INVALIDA",
+                "Configuração fiscal inválida. Avise o suporte — token ou certificado do tenant precisa ser atualizado.",
+                null, null))),
+
+        EasyStock.Application.Ports.Output.Fiscal.GatewayFiscalDenegadaException denegada =>
+            StatusCode(StatusCodes.Status422UnprocessableEntity, new EasyStock.Api.Http.ApiErrorResponse(new EasyStock.Api.Http.ApiError(
+                "FISCAL_DENEGADA",
+                $"NFC-e denegada pela SEFAZ (situação fiscal do contribuinte impede emissão): {denegada.Motivo}",
+                null, null))),
+
+        EasyStock.Application.Ports.Output.Fiscal.GatewayFiscalRejeitadaException rejeitada =>
+            StatusCode(StatusCodes.Status422UnprocessableEntity, new EasyStock.Api.Http.ApiErrorResponse(new EasyStock.Api.Http.ApiError(
+                "FISCAL_REJEITADA",
+                $"NFC-e rejeitada pela SEFAZ: {rejeitada.Motivo}. Verifique CPF/CNPJ do consumidor e dados dos itens.",
+                rejeitada.Codigo, null))),
+
+        _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new EasyStock.Api.Http.ApiErrorResponse(new EasyStock.Api.Http.ApiError(
+            "FISCAL_INDISPONIVEL",
+            "Gateway fiscal temporariamente indisponível. NFC-e em fila — tente novamente em alguns segundos.",
+            null, null))),
+    };
+
+    private string? ResolverNomeUsuarioAtual()
+    {
+        var nome = User?.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(nome))
+            return nome.Length > 120 ? nome[..120] : nome;
+        var claimNome = User?.FindFirst("name")?.Value
+            ?? User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        return string.IsNullOrWhiteSpace(claimNome)
+            ? null
+            : (claimNome.Length > 120 ? claimNome[..120] : claimNome);
+    }
 }

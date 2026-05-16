@@ -22,7 +22,19 @@ public interface INfeRepository
     /// <summary>
     /// Busca por chave de acesso. Usado pelo webhook (que NAO tem JWT, recebe a chave
     /// no payload assinado e precisa localizar o NfeDocumento correspondente).
-    /// Caller webhook deve fazer com bypass RLS — chave nao traz tenant.
+    ///
+    /// <para>
+    /// <b>⚠️ ATENÇÃO CROSS-TENANT:</b> esta query ignora o Global Query Filter via
+    /// <c>IgnoreQueryFilters()</c>. Pode retornar NfeDocumento de QUALQUER empresa.
+    /// SOMENTE chamar de:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>Webhook controller validado por HMAC (sem JWT, sem contexto de tenant).</item>
+    ///   <item>Jobs de contingência/reconciliação operando sob <see cref="EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass"/>.</item>
+    /// </list>
+    /// <para>
+    /// NUNCA chamar de request-path autenticado normal — perderia isolamento multi-tenant.
+    /// </para>
     /// </summary>
     Task<NfeDocumento?> FindByChaveAcessoAsync(string chaveAcesso, CancellationToken ct = default);
 

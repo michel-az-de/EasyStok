@@ -29,22 +29,29 @@ public sealed class NumeracaoNfeService(EasyStockDbContext db) : INumeracaoNfeSe
             FOR UPDATE
             """;
 
+        // Guarda defensiva: SELECT FOR UPDATE só funciona dentro de transação explícita.
+        // Sem isso, Postgres devolve o registro mas o lock NÃO persiste — duas emissões
+        // paralelas pegam o mesmo número. Falhamos rápido (ao invés de duplicar números).
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException(
+                "ReservarProximoNumeroAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — sem transação ativa, o FOR UPDATE é descartado e ocorrem números duplicados.");
+
         var config = await db.EmpresaConfiguracoesFiscais
             .FromSqlRaw(sql, empresaId)
             .FirstOrDefaultAsync(ct);
 
         if (config is null)
             throw new RegraDeDominioVioladaException(
-                $"Empresa {empresaId} nao possui configuracao fiscal. Criar via wizard antes de emitir.");
+                $"Empresa {empresaId} não possui configuração fiscal. Cadastre a configuração antes de emitir.");
 
         if (!config.Habilitada)
             throw new RegraDeDominioVioladaException(
-                $"Emissao fiscal nao habilitada para empresa {empresaId}. Habilitar via Admin > Config Fiscal.");
+                "Emissão fiscal não habilitada para este tenant. Habilite via POST /api/configuracao-fiscal/habilitar.");
 
         var serie = config.SerieNfce;
         var numero = config.ReservarProximoNumero();
 
-        // O caller commita a transacao — aqui apenas mutamos a entity rastreada
+        // O caller commita a transação — aqui apenas mutamos a entity rastreada.
         return (serie, numero);
     }
 }

@@ -76,7 +76,9 @@ public sealed class NfeCertificadoA1Service(
         try
         {
             using var cert = X509CertificateLoader.LoadPkcs12(pfxBytes, senha);
-            if (cert.NotAfter <= DateTime.UtcNow)
+            // X509Certificate2.NotAfter retorna DateTime com Kind=Local — comparar com
+            // DateTime.UtcNow daria erro de fuso (3h em SP). Usar DateTime.Now (mesmo Kind).
+            if (cert.NotAfter <= DateTime.Now)
                 throw new InvalidOperationException("Certificado expirado.");
             return cert.NotAfter;
         }
