@@ -840,65 +840,77 @@
                     };
                     try {
                         const resp = await window.api.get('/dashboard/pedido/' + safeId);
-                        const p = resp.data ?? resp;
-                        this.drawer.title = 'Pedido #' + String(p.id || id).substring(0, 8).toUpperCase();
-                        this.drawer.body = this._buildPedidoBody(p);
-                        this.drawer.footer = this._buildPedidoFooter(p);
+                        // API retorna PedidoDetalheResult = { pedido, itens, eventos, pagamentos }.
+                        // Antes lia campos flat em resp e tudo vinha undefined ("Sem cliente / R$ 0").
+                        const root = resp.data ?? resp;
+                        const pedido = root.pedido ?? root;
+                        const detalhes = {
+                            pedido,
+                            itens: root.itens ?? pedido.itens ?? [],
+                            pagamentos: root.pagamentos ?? pedido.pagamentos ?? []
+                        };
+                        this.drawer.title = 'Pedido #' + String(pedido.id || id).substring(0, 8).toUpperCase();
+                        this.drawer.body = this._buildPedidoBody(detalhes);
+                        this.drawer.footer = this._buildPedidoFooter(detalhes);
                     } catch (e) {
                         console.error('[dashboard] pedido:', e);
                         this.drawer.body = '<p class="text-red-600 text-sm">Não foi possível carregar os detalhes.</p>';
                     }
                 },
 
-                _buildPedidoBody(p) {
+                _buildPedidoBody({ pedido, itens, pagamentos }) {
                     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-                    const currency = (v) => fmtCurrency.format(v ?? 0);
+                    const currency = (v) => fmtCurrency.format(Number(v) || 0);
                     const date = (s) => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
+                    const statusMap = {
+                        aguardando: { cls: 'bg-amber-100 text-amber-700', label: 'Aguardando' },
+                        preparando: { cls: 'bg-blue-100 text-blue-700',   label: 'Em preparo' },
+                        pronto:     { cls: 'bg-violet-100 text-violet-700', label: 'Pronto' },
+                        entregue:   { cls: 'bg-emerald-100 text-emerald-700', label: 'Entregue' },
+                        cancelado:  { cls: 'bg-red-100 text-red-700', label: 'Cancelado' }
+                    };
                     const statusBadge = (s) => {
-                        const map = { aguardando: 'bg-amber-100 text-amber-700', em_preparo: 'bg-blue-100 text-blue-700', pronto: 'bg-indigo-100 text-indigo-700', entregue: 'bg-emerald-100 text-emerald-700', cancelado: 'bg-red-100 text-red-700' };
-                        const cls = map[s] || 'bg-slate-100 text-slate-600';
-                        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}">${esc(s || '—')}</span>`;
+                        const m = statusMap[s] || { cls: 'bg-slate-100 text-slate-600', label: s || '—' };
+                        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${m.cls}">${esc(m.label)}</span>`;
                     };
 
-                    let html = `<div class="space-y-4">`;
+                    const totalVal = Number(pedido.total) || 0;
+                    const totalPago = Number(pedido.totalPago) || 0;
+                    const cancelado = pedido.status === 'cancelado';
 
-                    // Resumo
+                    let html = `<div class="space-y-4">`;
                     html += `<div class="grid grid-cols-2 gap-3">
-                        <div><p class="text-xs text-slate-500">Cliente</p><p class="font-semibold text-slate-800">${esc(p.clienteNome || 'Sem cliente')}</p></div>
-                        <div><p class="text-xs text-slate-500">Situação</p><p class="mt-0.5">${statusBadge(p.status)}</p></div>
-                        <div><p class="text-xs text-slate-500">Data</p><p class="font-medium text-slate-700">${date(p.criadoEm)}</p></div>
-                        <div><p class="text-xs text-slate-500">Total</p><p class="font-bold text-slate-900">${currency(p.total?.valor ?? p.total)}</p></div>
+                        <div><p class="text-xs text-slate-500">Cliente</p><p class="font-semibold text-slate-800">${esc(pedido.clienteNome || 'Sem cliente')}</p></div>
+                        <div><p class="text-xs text-slate-500">Situação</p><p class="mt-0.5">${statusBadge(pedido.status)}</p></div>
+                        <div><p class="text-xs text-slate-500">Data</p><p class="font-medium text-slate-700">${date(pedido.criadoEm)}</p></div>
+                        <div><p class="text-xs text-slate-500">Total</p><p class="font-bold text-slate-900">${currency(totalVal)}</p></div>
                     </div>`;
 
-                    // Itens
-                    if (p.itens && p.itens.length) {
+                    if (itens && itens.length) {
                         html += `<div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Itens</p><div class="space-y-1.5">`;
-                        for (const item of p.itens) {
-                            const nome = esc(item.nome || item.descricaoSnapshot || 'Item');
-                            const qtd = Number(item.quantidade?.value ?? item.quantidade ?? 1);
-                            const preco = Number(item.precoTotal?.valor ?? item.precoTotal ?? 0);
-                            html += `<div class="flex justify-between text-sm"><span class="text-slate-700">${nome} × ${qtd}</span><span class="font-mono text-slate-600">${currency(preco)}</span></div>`;
+                        for (const item of itens) {
+                            const nome = esc(item.nome || 'Item');
+                            const qtd = Number(item.quantidade) || 0;
+                            const sub = Number(item.subtotal) || (Number(item.precoUnitario) || 0) * qtd;
+                            html += `<div class="flex justify-between text-sm"><span class="text-slate-700">${nome} × ${qtd}</span><span class="font-mono text-slate-600">${currency(sub)}</span></div>`;
                         }
                         html += `</div></div>`;
                     }
 
-                    // Pagamentos
-                    if (p.pagamentos && p.pagamentos.length) {
+                    if (pagamentos && pagamentos.length) {
                         html += `<div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Pagamentos</p><div class="space-y-1.5">`;
-                        for (const pg of p.pagamentos) {
-                            const valor = Number(pg.valor?.valor ?? pg.valor ?? 0);
-                            const forma = esc(pg.formaPagamento || pg.forma || 'Pagamento');
-                            const dt = date(pg.pagoEm || pg.criadoEm);
-                            html += `<div class="flex justify-between text-sm"><span class="text-slate-600">${forma} — ${dt}</span><span class="font-mono font-semibold text-emerald-700">${currency(valor)}</span></div>`;
+                        for (const pg of pagamentos) {
+                            const valor = Number(pg.valor) || 0;
+                            const metodo = esc(pg.metodo || 'Pagamento');
+                            const dt = date(pg.pagoEm);
+                            html += `<div class="flex justify-between text-sm"><span class="text-slate-600">${metodo} — ${dt}</span><span class="font-mono font-semibold text-emerald-700">${currency(valor)}</span></div>`;
                         }
                         html += `</div></div>`;
                     }
 
-                    // Saldo
-                    const totalPago = Number(p.totalPago ?? (p.pagamentos || []).reduce((s, pg) => s + Number(pg.valor?.valor ?? pg.valor ?? 0), 0));
-                    const totalVal = Number(p.total?.valor ?? p.total ?? 0);
+                    // Pedido cancelado nao tem saldo cobravel — nao exibe "Em aberto".
                     const emAberto = totalVal - totalPago;
-                    if (emAberto > 0) {
+                    if (!cancelado && emAberto > 0) {
                         html += `<div class="flex justify-between items-center pt-2 border-t"><span class="font-semibold text-slate-700">Em aberto</span><span class="font-bold text-amber-600 text-lg">${currency(emAberto)}</span></div>`;
                     }
 
@@ -906,12 +918,11 @@
                     return html;
                 },
 
-                _buildPedidoFooter(p) {
-                    const totalPago = p.totalPago ?? 0;
-                    const totalVal = p.total?.valor ?? p.total ?? 0;
-                    const emAberto = totalVal - totalPago;
-                    if (emAberto <= 0) return '';
-                    return `<a href="/pedidos/${p.id}" class="btn btn-sm btn-primary w-full text-center">Ver pedido completo →</a>`;
+                _buildPedidoFooter({ pedido }) {
+                    const totalVal = Number(pedido.total) || 0;
+                    const totalPago = Number(pedido.totalPago) || 0;
+                    if (pedido.status === 'cancelado' || (totalVal - totalPago) <= 0) return '';
+                    return `<a href="/pedidos/${pedido.id}" class="btn btn-sm btn-primary w-full text-center">Ver pedido completo →</a>`;
                 },
 
                 async loadExtras() {
