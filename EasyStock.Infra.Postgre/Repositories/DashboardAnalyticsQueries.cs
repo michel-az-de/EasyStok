@@ -173,9 +173,16 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var pedidosEntregues = pedidosData.Count(p => p.Status == "entregue");
         var pedidosPendentes = pedidosData.Count(p => p.Status != "entregue" && p.Status != "cancelado");
 
-        // Estoque (snapshot atual, não histórico)
+        // Estoque (snapshot atual, não histórico). Filtra QuantidadeAtual > 0
+        // pra alinhar com a base usada pelo GetEstoqueStatusDistribuicaoAsync
+        // (donut "Situação do estoque" + insight "X% do estoque está crítico").
+        // Antes esta query incluía lotes vazios (qty == 0) e podia dar 100%
+        // crítico enquanto o donut mostrava 88% — duas verdades diferentes.
         var estoqueQuery = dbContext.ItensEstoque.AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido && i.Status != StatusItemEstoque.Descartado);
+            .Where(i => i.EmpresaId == empresaId
+                && i.Status != StatusItemEstoque.Vencido
+                && i.Status != StatusItemEstoque.Descartado
+                && (int)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
 
@@ -183,7 +190,9 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         {
             Total = g.Sum(i => (int)i.QuantidadeAtual),
             Custo = g.Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual),
-            Critico = g.Count(i => i.Status == StatusItemEstoque.Critical || (int)i.QuantidadeAtual < i.QuantidadeMinima),
+            Critico = g.Count(i => i.Status == StatusItemEstoque.Critical
+                                   || i.Status == StatusItemEstoque.Esgotado
+                                   || (int)i.QuantidadeAtual < i.QuantidadeMinima),
             Count = g.Count()
         }).FirstOrDefaultAsync();
 
@@ -368,41 +377,40 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             .Select(m => new { m.DataMovimentacao, Valor = (decimal?)m.ValorTotal ?? 0m })
             .ToListAsync();
 
-        // Gerar todos os buckets do período para não ter gaps
-        var buckets = new SortedDictionary<string, (decimal Receita, decimal Custo)>();
+        // Buckets indexados por DateTime para ordenacao cronologica correta.
+        // Antes usava SortedDictionary<string,...> com chave "dd/MM" — ordenacao
+        // alfabetica colocava 01/05 antes de 15/04 e o grafico mostrava abril
+        // depois de maio no eixo X.
+        var buckets = new SortedDictionary<DateTime, (decimal Receita, decimal Custo)>();
+        var fmtLabel = porDia ? "dd/MM" : "MM/yyyy";
+        DateTime BucketKey(DateTime d) => porDia
+            ? d.Date
+            : new DateTime(d.Year, d.Month, 1);
+
         if (porDia)
         {
             for (var d = de.Date; d <= ate.Date; d = d.AddDays(1))
-                buckets[d.ToString("dd/MM")] = (0m, 0m);
-            foreach (var v in vendasRaw)
-            {
-                var k = v.DataVenda.ToLocalTime().Date.ToString("dd/MM");
-                if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita + v.Valor, b.Custo);
-            }
-            foreach (var c in custoRaw)
-            {
-                var k = c.DataMovimentacao.ToLocalTime().Date.ToString("dd/MM");
-                if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita, b.Custo + c.Valor);
-            }
+                buckets[d] = (0m, 0m);
         }
         else
         {
             for (var d = new DateTime(de.Year, de.Month, 1); d <= ate; d = d.AddMonths(1))
-                buckets[d.ToString("MM/yyyy")] = (0m, 0m);
-            foreach (var v in vendasRaw)
-            {
-                var k = v.DataVenda.ToString("MM/yyyy");
-                if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita + v.Valor, b.Custo);
-            }
-            foreach (var c in custoRaw)
-            {
-                var k = c.DataMovimentacao.ToString("MM/yyyy");
-                if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita, b.Custo + c.Valor);
-            }
+                buckets[d] = (0m, 0m);
+        }
+
+        foreach (var v in vendasRaw)
+        {
+            var k = BucketKey(porDia ? v.DataVenda.ToLocalTime() : v.DataVenda);
+            if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita + v.Valor, b.Custo);
+        }
+        foreach (var c in custoRaw)
+        {
+            var k = BucketKey(porDia ? c.DataMovimentacao.ToLocalTime() : c.DataMovimentacao);
+            if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita, b.Custo + c.Valor);
         }
 
         var result = buckets.Select(kvp => new ReceitaCustoDia(
-            Label: kvp.Key,
+            Label: kvp.Key.ToString(fmtLabel),
             Receita: Math.Round(kvp.Value.Receita, 2),
             Custo: Math.Round(kvp.Value.Custo, 2),
             Lucro: Math.Round(kvp.Value.Receita - kvp.Value.Custo, 2)

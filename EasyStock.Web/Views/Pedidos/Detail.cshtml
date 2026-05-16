@@ -268,7 +268,9 @@ else
                                     <span class="font-medium text-slate-900">@i.Emoji @i.Nome</span>
                                     @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400 ml-1">@i.Unidade</span>}
                                 </td>
-                                <td class="text-right text-slate-700">@i.Quantidade</td>
+                                @* Antes mostrava "3,000" quando a quantidade era decimal 3.000M
+                                   (precisao do tipo). 0.## suprime trailing zeros — vira "3" ou "3,5". *@
+                                <td class="text-right text-slate-700">@i.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
                                 <td class="text-right text-slate-700">@i.PrecoUnitario.ToString("C")</td>
                                 <td class="text-right font-semibold text-slate-900">@i.Subtotal.ToString("C")</td>
                                 <td class="text-right">

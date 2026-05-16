@@ -112,7 +112,7 @@
                         {
                             <tr>
                                 <td class="py-2"><span class="font-medium">@it.Emoji @it.Nome</span> @if (!string.IsNullOrEmpty(it.Unidade)) {<span class="text-xs text-slate-400">@it.Unidade</span>}</td>
-                                <td class="text-right">@it.Quantidade</td>
+                                <td class="text-right">@it.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
                                 <td class="text-right">@(it.PesoG.HasValue ? it.PesoG + "g" : "—")</td>
                                 <td class="text-right text-xs">@(it.ExpiraEm.HasValue ? it.ExpiraEm.Value.ToLocalTime().ToString("dd/MM/yy") : "—")</td>
                                 <td class="text-right">

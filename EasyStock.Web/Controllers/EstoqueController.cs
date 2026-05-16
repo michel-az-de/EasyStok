@@ -1,4 +1,5 @@
 using System.Text;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Estoque;
 using EasyStock.Web.Models.ViewModels.Saidas;
@@ -104,7 +105,7 @@ public class EstoqueController(
         var item = itemResult.Data;
 
         if (!DateOnly.TryParse(req.Data, out var data))
-            data = DateOnly.FromDateTime(DateTime.Today);
+            data = BrazilTime.Today();
 
         // Saída rápida a partir da listagem de estoque é sempre de um lote específico
         // (o que o usuário clicou). ItemEstoqueId força a API a consumir esse lote
