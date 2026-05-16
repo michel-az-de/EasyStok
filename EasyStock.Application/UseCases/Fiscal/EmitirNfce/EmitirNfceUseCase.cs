@@ -146,21 +146,66 @@ public class EmitirNfceUseCase(
         }
         catch (GatewayFiscalTransienteException trans)
         {
-            await uow.ExecuteInTransactionAsync(async _ =>
-            {
-                var nfe = await nfeRepo.GetByIdAsync(cmd.EmpresaId, nfeId)
-                    ?? throw new InvalidOperationException($"NfeDocumento {nfeId} sumiu antes do rollback FalhaTransiente.");
-
-                nfe.MarcarFalhaTransiente(trans.Message, cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem);
-                await nfeRepo.UpdateAsync(nfe);
-            });
-            logger.LogWarning(trans, "Nfe {Id} em FalhaTransiente — job de contingencia ira reprocessar.", nfeId);
+            await MarcarFalhaTransienteAsync(cmd, nfeId, trans, "transiente");
+        }
+        catch (Exception ex) when (ex is not GatewayFiscalCredencialException
+                                     and not GatewayFiscalDenegadaException)
+        {
+            // Captura defensiva: TaskCanceledException, HttpRequestException, falhas inesperadas
+            // do adapter. Sem este catch, a Nfe ficaria presa em EnviadaAguardandoRetorno
+            // (job de contingência só pega FalhaTransiente). Credencial/Denegada propagam
+            // porque exigem ação humana (renovar token / regularizar tenant na SEFAZ).
+            await MarcarFalhaTransienteAsync(cmd, nfeId, ex, "inesperada");
         }
 
+        // Round-trip final: re-leitura do agregado atualizado para resposta consistente.
+        // (Não usamos o tracker da Tx2 porque ele já foi descartado ao fechar o scope da transação.)
         var nfeFinal = await nfeRepo.GetByIdAsync(cmd.EmpresaId, nfeId)
-            ?? throw new InvalidOperationException($"NfeDocumento {nfeId} sumiu apos commit final.");
+            ?? throw new InvalidOperationException($"NfeDocumento {nfeId} sumiu após commit final.");
         return ToResult(nfeFinal);
     }
+
+    private async Task MarcarFalhaTransienteAsync(EmitirNfceCommand cmd, Guid nfeId, Exception causa, string tipo)
+    {
+        // Mensagem amigável para o operador no PWA Caixa — guia decisão de
+        // contingência em <2s. Categoria técnica fica no log estruturado.
+        var (categoria, mensagemOperador) = ClassificarFalhaParaOperador(causa);
+
+        await uow.ExecuteInTransactionAsync(async _ =>
+        {
+            var nfe = await nfeRepo.GetByIdAsync(cmd.EmpresaId, nfeId)
+                ?? throw new InvalidOperationException($"NfeDocumento {nfeId} sumiu antes do rollback FalhaTransiente ({tipo}).");
+
+            // detalhe gravado como motivoRejeicao é o que o caixa.js exibe ao operador.
+            nfe.MarcarFalhaTransiente(mensagemOperador, cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem);
+            await nfeRepo.UpdateAsync(nfe);
+        });
+
+        logger.LogWarning(causa,
+            "Nfe {Id} FalhaTransiente categoria={Categoria} tipo={Tipo} mensagemOperador={Msg}",
+            nfeId, categoria, tipo, mensagemOperador);
+    }
+
+    /// <summary>
+    /// Mapeia exception → (categoria, mensagem amigável). Categoria fica em logs/APM
+    /// para agrupar incidentes; mensagem vai pro operador no PWA Caixa.
+    /// </summary>
+    private static (string categoria, string mensagem) ClassificarFalhaParaOperador(Exception ex) =>
+        ex switch
+        {
+            TaskCanceledException => ("timeout",
+                "Tempo esgotado conectando ao SEFAZ. NFC-e está em fila — vai voltar em alguns segundos."),
+            OperationCanceledException => ("timeout",
+                "Tempo esgotado conectando ao SEFAZ. NFC-e está em fila — vai voltar em alguns segundos."),
+            TimeoutException => ("timeout",
+                "Tempo limite excedido pela SEFAZ. NFC-e em fila de reprocessamento."),
+            HttpRequestException => ("sem-conexao",
+                "Sem conexão com o gateway fiscal. NFC-e será reenviada automaticamente quando voltar."),
+            GatewayFiscalTransienteException => ("gateway-transiente",
+                "Gateway fiscal instável no momento. NFC-e em fila — sem ação necessária."),
+            _ => ("inesperada",
+                "Falha temporária na emissão. NFC-e em fila — toque em Nova venda e tente novamente se preferir.")
+        };
 
     private static EmitirNfceResult ToResult(NfeDocumento nfe) => new(
         NfeId: nfe.Id,

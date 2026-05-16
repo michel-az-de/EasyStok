@@ -74,7 +74,7 @@ public class EmitirNfceUseCaseTests
         PedidoId: Guid.NewGuid(),
         IdempotencyKey: "test-idempotency-12345",
         TotalNota: 100m,
-        Emitente: new DadosEmitenteInput("12345678000190", "Empresa Teste", null, null, null),
+        Emitente: new DadosEmitenteInput("11444777000161", "Empresa Teste", null, null, null),
         Destinatario: null,
         Itens: new List<EmitirNfceItemInput>
         {

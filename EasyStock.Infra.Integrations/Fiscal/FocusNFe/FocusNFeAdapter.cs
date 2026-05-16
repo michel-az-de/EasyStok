@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Domain.Fiscal;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Infra.Integrations.Fiscal.FocusNFe;
 
@@ -18,6 +19,7 @@ namespace EasyStock.Infra.Integrations.Fiscal.FocusNFe;
 /// </summary>
 public sealed class FocusNFeAdapter(
     FocusNFeHttpClient httpClient,
+    IOptions<FocusNFeOptions> options,
     ILogger<FocusNFeAdapter> logger) : IGatewayFiscal
 {
     public string Provedor => "focus";
@@ -27,10 +29,10 @@ public sealed class FocusNFeAdapter(
         ArgumentNullException.ThrowIfNull(nfe);
         ArgumentNullException.ThrowIfNull(config);
         if (string.IsNullOrWhiteSpace(config.CredencialToken))
-            throw new GatewayFiscalCredencialException("Token Focus ausente em ConfigFiscalDto.CredencialToken.");
+            throw new GatewayFiscalCredencialException("Token do Focus NFe ausente. Cadastre a credencial fiscal do tenant antes de emitir.");
 
         var referencia = nfe.Id.ToString("N");
-        var payload = FocusNFePayloadMapper.Map(nfe, config);
+        var payload = FocusNFePayloadMapper.Map(nfe, config, options.Value);
 
         logger.LogDebug("Focus emitir ref={Ref} cnpj={Cnpj} total={Total}",
             referencia, payload.CnpjEmitente, payload.ValorTotal);

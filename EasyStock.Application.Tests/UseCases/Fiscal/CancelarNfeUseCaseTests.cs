@@ -87,7 +87,7 @@ public class CancelarNfeUseCaseTests
             pedidoId: Guid.NewGuid(),
             serie: 1,
             numero: 1L,
-            dadosEmitente: new EasyStock.Domain.ValueObjects.DadosEmissor("Emp Teste", "12345678000190"),
+            dadosEmitente: new EasyStock.Domain.ValueObjects.DadosEmissor("Emp Teste", "11444777000161"),
             dadosDestinatario: null,
             totalNota: EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(100m));
 

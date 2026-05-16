@@ -29,15 +29,31 @@ public class WebhookFocusNFeController(
     FocusNFeWebhookValidator validator,
     ILogger<WebhookFocusNFeController> logger) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Recebe notificacao de status change da NFC-e (webhook Focus)")]
+    /// <summary>Limite defensivo do payload do webhook (Focus tipicamente envia &lt; 4KB).</summary>
+    private const int MaxBodySizeBytes = 64 * 1024;
+
+    [SwaggerOperation(Summary = "Recebe notificação de mudança de status da NFC-e (webhook Focus)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
     [HttpPost("nfe")]
     public async Task<IActionResult> ReceberWebhook(CancellationToken ct)
     {
-        // Le body como bytes (necessario para HMAC + nao desperdica ao deserializar 2x)
-        using var ms = new MemoryStream();
-        await Request.Body.CopyToAsync(ms, ct);
+        // Rejeita cedo se Content-Length declarar payload acima do limite (proteção DoS).
+        if (Request.ContentLength.GetValueOrDefault() > MaxBodySizeBytes)
+            return StatusCode(StatusCodes.Status413PayloadTooLarge);
+
+        // Lê body como bytes (necessário para HMAC + não desperdiça ao deserializar 2x).
+        // Limita stream para que requests sem Content-Length não estourem a memória.
+        using var ms = new MemoryStream(capacity: 4096);
+        var buffer = new byte[4096];
+        int read;
+        while ((read = await Request.Body.ReadAsync(buffer.AsMemory(), ct)) > 0)
+        {
+            if (ms.Length + read > MaxBodySizeBytes)
+                return StatusCode(StatusCodes.Status413PayloadTooLarge);
+            await ms.WriteAsync(buffer.AsMemory(0, read), ct);
+        }
         var bodyBytes = ms.ToArray();
 
         var assinatura = Request.Headers["X-Focus-Signature"].FirstOrDefault();

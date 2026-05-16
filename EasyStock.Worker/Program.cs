@@ -9,6 +9,8 @@ using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -105,6 +107,13 @@ builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
 // Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
 // WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
 builder.Services.AddReportingWorker();
+
+// Modulo Fiscal NFC-e (F4) — Polly pipelines + adapter Focus NFe + jobs background
+builder.Services.AddEasyStockIntegrationResilience();
+builder.Services.AddFocusNFeAdapter(builder.Configuration);
+builder.Services.AddDataProtection();
+builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
+builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
 
 // Health checks
 builder.Services.AddHealthChecks();
