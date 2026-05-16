@@ -9,21 +9,22 @@
 
   var charts = {};
 
-  var palette = {
-    receita:  '#22c55e',
-    custo:    '#ef4444',
-    lucro:    '#3b82f6',
-    neutro:   '#64748b',
-    ok:       getCSSVar('--color-ok-500')   || '#22c55e',
-    warn:     getCSSVar('--color-warn-500') || '#eab308',
-    crit:     getCSSVar('--color-crit-500') || '#ef4444',
-    parado:   '#94a3b8',
-  };
-
   function getCSSVar(prop) {
     try { return getComputedStyle(document.documentElement).getPropertyValue(prop).trim(); }
     catch (_) { return ''; }
   }
+
+  // Paleta unificada — consome tokens do EasyStok, com fallback hex se var indisponivel.
+  var palette = {
+    receita: getCSSVar('--ok-600')     || '#18874E',
+    custo:   getCSSVar('--crit-600')   || '#C03B2A',
+    lucro:   getCSSVar('--navy-600')   || '#15388A',
+    neutro:  getCSSVar('--ink-500')    || '#707892',
+    ok:      getCSSVar('--ok-500')     || '#2DA365',
+    warn:    getCSSVar('--warn-500')   || '#D89A1A',
+    crit:    getCSSVar('--crit-500')   || '#D45744',
+    parado:  getCSSVar('--ink-400')    || '#98A0B4',
+  };
 
   var currencyFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -32,12 +33,13 @@
 
   function defaultTooltip(extra) {
     return Object.assign({
-      backgroundColor: '#1e293b',
-      titleColor: '#94a3b8',
-      bodyColor: '#f1f5f9',
-      borderColor: '#334155',
+      backgroundColor: getCSSVar('--ink-900') || '#0A1530',
+      titleColor:      getCSSVar('--ink-300') || '#C2C8D6',
+      bodyColor:       '#FFFFFF',
+      borderColor:     getCSSVar('--ink-700') || '#2A3556',
       borderWidth: 1,
       padding: 10,
+      cornerRadius: 6,
     }, extra || {});
   }
 
