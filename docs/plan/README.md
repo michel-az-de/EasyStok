@@ -185,6 +185,34 @@ Detalhes por fase: [07-faseamento.md](07-faseamento.md).
    curl -s https://easystok.fly.dev/health | jq
    ```
 
+## Premissas já confirmadas no código (2026-05-16)
+
+Validadas via grep direto no repo antes do F0. **Não precisam mais
+validação humana**:
+
+- ✅ **`TenantFeatureFlag`** existe em
+  `EasyStock.Domain/Entities/TenantFeatureFlag.cs:5` + configuração em
+  `EasyStock.Infra.Postgre/Data/Configurations/TenantFeatureFlagConfiguration.cs:7`.
+  Reusar sem migration nova (D-01 resolvido).
+- ✅ **`IdempotencyOptions.Add(pathPrefix)`** existe em
+  `EasyStock.Api/Middleware/IdempotencyMiddleware.cs:223`. Extensão da
+  whitelist funciona como o plano descreve em
+  [03-api.md](03-api.md) D.4.
+- ✅ **Migration `20260430205554_AddGovernancaFeatures.cs`** existe em
+  `EasyStock.Infra.Postgre/Migrations/`. Referência do plano correta.
+
+## Premissas técnicas adicionais confirmadas
+
+- ❌ **Repo NÃO usa Central Package Management**:
+  `Directory.Packages.props` não existe na raiz. Versões de NuGet ficam
+  em cada `.csproj` individualmente. **Implicação para o plano**:
+  pacotes novos (FsCheck.Xunit, Verify.Xunit, QRCoder) são adicionados
+  como `<PackageReference>` no `.csproj` do projeto consumidor, não
+  em arquivo central. Ver [06-testes.md](06-testes.md) G.1.8 e G.3.1.
+- ❌ **`Verify.Xunit` e `FsCheck.Xunit` NÃO estão em uso** em nenhum
+  `.csproj` do repo (incluindo worktrees, grep 2026-05-16). Plano
+  decide versão no momento de adicionar.
+
 ## Premissas Explícitas que Precisam Validação Humana ANTES de F1
 
 Antes de codificar qualquer linha de F1, Felipe deve confirmar:
