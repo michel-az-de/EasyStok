@@ -52,7 +52,10 @@ public static class NotificationsInfraServiceCollectionExtensions
 
         services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:stub");
         services.AddKeyedScoped<IProvedorWhatsApp, TwilioWhatsAppProvider>("whatsapp:twilio");
-        services.AddKeyedScoped<IProvedorWhatsApp, MetaCloudWhatsAppProvider>("whatsapp:meta");
+        // Onda 2.1 — Meta concrete tambem registrado direto pra acesso ao EnviarTemplateAsync
+        // (templates aprovados Meta tem sintaxe propria, fora da interface IProvedorWhatsApp).
+        services.AddScoped<MetaCloudWhatsAppProvider>();
+        services.AddKeyedScoped<IProvedorWhatsApp>("whatsapp:meta", (sp, _) => sp.GetRequiredService<MetaCloudWhatsAppProvider>());
 
         var waProvider = configuration["Notifications:WhatsApp:Provider"] ?? "stub";
         services.AddKeyedScoped<IProvedorWhatsApp>(
