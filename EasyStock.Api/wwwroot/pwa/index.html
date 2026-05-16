@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Easy Stock Mobile</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,6 +14,41 @@
 <meta name="apple-mobile-web-app-title" content="Easy Stock Mobile">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
+/* === A1 (WCAG 1.4.4 / Resize Text) ===
+ * Anti-zoom iOS: inputs precisam ter font-size >= 16px senao iOS Safari
+ * da zoom automatico no focus. Aplicado primeiro com !important porque o
+ * style interno tem muitas regras especificas em 15px hardcoded
+ * (.gs-input, #cashCloseConferred, etc) e a viewport agora permite zoom
+ * manual via pinch (removido maximum-scale=1, user-scalable=no).
+ */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* === C1: Floor de viewport 320px === */
+.viewport-too-narrow-warning {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--bg, #111827);
+  color: var(--ink, #f7f2e8);
+  z-index: 99999;
+  padding: 16px;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'Manrope', sans-serif;
+}
+@media (max-width: 319px) {
+  .viewport-too-narrow-warning { display: flex; }
+  body > :not(.viewport-too-narrow-warning) { display: none !important; }
+  /* Excecao !important: estado de emergencia (viewport invalido) precisa
+     sobrepor TODOS os displays inline do PWA. */
+}
 :root {
   --bg: #111827;
   --bg-elev: #172033;
@@ -290,7 +325,10 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 0 22px calc(140px + env(safe-area-inset-bottom, 0px));
+  /* U2 (2026-05-16): aumentado de 140px para 160px para cobrir margem
+     extra entre bottom-nav (~78px) + safe-area + FAB clearance + 24px
+     breath. Antes, card "Nada conferido hoje" era cortado no fim. */
+  padding: 0 22px calc(160px + env(safe-area-inset-bottom, 0px));
   scrollbar-width: none;
 }
 .content::-webkit-scrollbar { display: none; }
@@ -913,7 +951,9 @@ button:disabled {
   box-shadow: 0 8px 20px rgba(21,31,49,0.055);
 }
 .more-menu {
-  position: absolute;
+  /* C1 (2026-05-16): fixed em vez de absolute - independe do scroll do parent.
+     Antes podia ficar fora da viewport em telas estreitas e empilhar sobre UI. */
+  position: fixed;
   left: 14px;
   right: 14px;
   bottom: calc(78px + env(safe-area-inset-bottom, 0px));
@@ -5973,8 +6013,10 @@ select:focus-visible {
 }
 .order-draft-summary {
   position: sticky;
-  top: 0;
-  z-index: 5;
+  /* C1: top respeita safe-area-inset-top (iPhone notch) */
+  top: calc(env(safe-area-inset-top, 0px));
+  /* C1: z-index 5 era baixo demais - subia abaixo de chips e modals. */
+  z-index: 15;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
@@ -7049,6 +7091,15 @@ body.ux-calm [data-screen="producao"] .section-label {
 </head>
 <body>
 
+<!-- C1 (2026-05-16): floor de viewport 320px. CSS mostra este div em
+     <320px e esconde resto do body. Split-screen extremo / janelas
+     estranhas de desktop. Celular real = 320-414px. -->
+<div class="viewport-too-narrow-warning" role="alert" aria-live="assertive">
+  <div style="font-size: 32px;">📱</div>
+  <h2 style="font-size: 15px; font-weight: 700;">Tela muito estreita</h2>
+  <p style="font-size: 13px; opacity: 0.8;">Gire o aparelho ou abra em tela maior (mínimo 320px).</p>
+</div>
+
 <!-- F4 — banner offline. Mostrado por updateSync() quando navigator.onLine===false.
      Posição fixed top, sobrepõe o topbar. Some sozinho ao voltar a rede. -->
 <div id="offlineBanner" role="status" aria-live="polite">
@@ -7839,10 +7890,14 @@ body.ux-calm [data-screen="producao"] .section-label {
     <button class="hb-close" id="hbClose" onclick="dismissHealthBanner()" aria-label="Fechar aviso">×</button>
   </div>
 
-  <!-- Toast -->
+  <!-- Toast
+       C3 (2026-05-16): botao <button class="undo"> removido daqui.
+       Era estatico e aparecia em qualquer toast (inclusive erro "Nao
+       encontrado"). undoLast() era stub que so mostrava outro toast
+       mentiroso. Para acoes reversiveis reais, use:
+       showUndoToast(msg, undoFn, onCommit). -->
   <div class="toast" id="toast">
     <div class="msg" id="toastMsg">Feito</div>
-    <button class="undo" onclick="undoLast()">desfazer</button>
   </div>
 
   <!-- Action toast (aparece após criar pedido, com próximas ações) -->
@@ -13074,7 +13129,11 @@ function applyImportedMutations(mutations) {
         upsertById(products, {
           id: p.id, name: p.name, emoji: p.emoji, category: p.category,
           unit: p.unit, price: p.price, stock: p.stock ?? 0,
-          custom: !!p.custom, count: 0, photo: null
+          custom: !!p.custom, count: 0, photo: null,
+          // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Vindo do
+          // ProductDto do server. exigePesoPara() trata undefined/null como
+          // Embalado conservadoramente (fallback seguro pra sync antigo).
+          tipoEmbalagem: p.tipoEmbalagem || 'Avulso'
         }, (cur, inc) => (m.ts || 0) >= 0); // sempre upserta produto
         break;
       case 'client.upsert':
@@ -18574,6 +18633,14 @@ function decProduct(id) {
 }
 
 let _isSavingProduction = false;
+// C2 (R2): fallback conservador — exige peso quando produto NAO esta
+// explicitamente marcado como Avulso. Cobre sync antigo sem campo
+// tipoEmbalagem (default seguro = exige peso para qualquer Embalado real).
+function exigePesoPara(p) {
+  if (!p) return true;                       // sem produto: bloqueia
+  return p.tipoEmbalagem !== 'Avulso';       // undefined/null/'Embalado' = exige
+}
+
 function confirmProduction() {
   // Guard contra duplo-clique: bloqueia execucao concorrente que poderia
   // gerar 2 batches duplicados + dobrar estoque.
@@ -18585,6 +18652,21 @@ function confirmProduction() {
   const detail = readProdDetailValues();
   if (!detail.valid) {
     showToast('Defina a validade de cada produto');
+    return;
+  }
+
+  // C2 (RDC 727/2022): peso obrigatorio para produtos Embalados.
+  // Server tambem valida (SyncController.ApplyBatch) mas falhar aqui
+  // antes evita feedback ruim apos sync no background.
+  const semPeso = [];
+  for (const p of itemsRaw) {
+    const d = detail.perProduct.get(p.id) || {};
+    if (exigePesoPara(p) && (!d.weightG || d.weightG <= 0)) {
+      semPeso.push(p.name);
+    }
+  }
+  if (semPeso.length > 0) {
+    showToast(`Peso obrigatório (RDC 727) em: ${semPeso.join(', ')}`);
     return;
   }
   // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
@@ -20051,10 +20133,10 @@ function showError(raw, context) {
   showToast(msg);
   return h; // retorna pra quem quiser usar (ex: alert detalhado)
 }
-function undoLast() {
-  document.getElementById('toast').classList.remove('show');
-  showToast('Ação desfeita');
-}
+// undoLast() removida 2026-05-16 (correcao C3): era stub vazio que enganava
+// o usuario. Botao .undo do #toast tambem removido do DOM. Para acao
+// reversivel real, use showUndoToast(msg, undoFn, onCommit) que escreve
+// no #actionToast (DIV separado) com callbacks reais.
 
 // ===== Toast com botao Desfazer (substitui confirm() em acoes reversiveis) =====
 // Padrao mobile-native: a acao executa imediatamente; operador tem N segundos
