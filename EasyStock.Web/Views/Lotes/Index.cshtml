@@ -63,33 +63,16 @@
             <tbody>
             @foreach (var l in Model.Items)
             {
-                string pillClass = l.Status switch {
-                    "em_producao" => "bg-blue-50 text-blue-700 ring-blue-200",
-                    "finalizado"  => "bg-emerald-50 text-emerald-800 ring-emerald-200",
-                    "expirado"    => "bg-red-50 text-red-700 ring-red-200",
-                    _             => "bg-slate-50 text-slate-600 ring-slate-200"
-                };
-                string dotClass = l.Status switch {
-                    "em_producao" => "bg-blue-500",
-                    "finalizado"  => "bg-emerald-500",
-                    "expirado"    => "bg-red-500",
-                    _             => "bg-slate-400"
-                };
-                string statusLabel = l.Status switch {
-                    "em_producao" => "Em produção",
-                    "finalizado"  => "Finalizado",
-                    "expirado"    => "Expirado",
-                    _             => l.Status ?? "—"
-                };
+                var statusInfo = StatusHelper.Resolve(l.Status);
                 <tr>
                     <td class="font-mono text-sm">@l.Codigo</td>
                     <td>
-                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 @pillClass">
-                            <span class="w-1.5 h-1.5 rounded-full @dotClass"></span>
-                            @statusLabel
+                        <span class="badge @statusInfo.BadgeClass">
+                            <span class="dot"></span>
+                            @statusInfo.Label
                         </span>
                     </td>
-                    <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                    <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().AsDateTime()</td>
                     <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
                     <td class="text-slate-600 text-sm tabular-nums">
                         @if (l.TotalUnidades == 0)

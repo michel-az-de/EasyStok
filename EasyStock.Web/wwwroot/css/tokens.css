@@ -388,6 +388,13 @@ html, body {
 }
 .ui-form-field--error .ui-form-field__label { color: var(--crit-700); }
 
+/* ----- KDS status — leitura a 2m de distancia precisa de maiusculo (visual, nao dado) ----- */
+.kds-status {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
 /* ----- Tooltip primitive (CSS-only via [data-tooltip]) ----- */
 [data-tooltip] { position: relative; }
 [data-tooltip]:hover::after,
