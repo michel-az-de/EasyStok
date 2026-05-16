@@ -79,6 +79,12 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
             }
 
+            var nomeTrim = command.Nome.Trim();
+            if (await produtoRepository.ExistsNomeAsync(command.EmpresaId, nomeTrim))
+            {
+                throw new UseCaseValidationException($"Já existe um produto cadastrado com o nome \"{nomeTrim}\" nesta empresa.");
+            }
+
             if (!string.IsNullOrWhiteSpace(command.SkuBase))
             {
                 var skuBase = command.SkuBase.Trim();
