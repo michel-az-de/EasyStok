@@ -671,6 +671,28 @@ app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     }
 });
 
+// Onda 1.3 — proxy do diagnostico de email (envia teste pelo provedor ativo).
+app.MapPost("/api-proxy/diag/email-teste", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var body = await ctx.Request.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/admin/diagnostico/email/teste", body);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/email-teste falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 // Onda 1.4 — proxy do resumo de tickets criticos.
 // - Sem empresaId: cross-tenant (badge global no _Layout admin)
 // - Com empresaId: por empresa (widget na pagina Operacao)

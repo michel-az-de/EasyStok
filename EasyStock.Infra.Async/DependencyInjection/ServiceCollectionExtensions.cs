@@ -23,23 +23,41 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
-        // Email Service
+        // Email Service — Onda 1.3: switch por Email:Provider em {smtp, sendgrid, console}.
+        // Compat: se Email:Provider nao setado, mantem comportamento legado (Smtp se existir, senao console).
+        var emailProvider = (configuration["Email:Provider"] ?? "").Trim().ToLowerInvariant();
         var smtpConfig = configuration.GetSection("Smtp");
-        if (smtpConfig.Exists())
+        var sendGridConfig = configuration.GetSection("SendGrid");
+
+        if (string.IsNullOrEmpty(emailProvider))
+            emailProvider = smtpConfig.Exists() ? "smtp" : "console";
+
+        switch (emailProvider)
         {
-            services.AddSingleton<IEmailService>(sp => new SmtpEmailService(
-                smtpConfig["Host"] ?? "localhost",
-                int.Parse(smtpConfig["Port"] ?? "587"),
-                smtpConfig["Username"] ?? "",
-                smtpConfig["Password"] ?? "",
-                smtpConfig["FromEmail"] ?? "noreply@easystock.com",
-                smtpConfig["FromName"] ?? "EasyStock",
-                bool.Parse(smtpConfig["EnableSsl"] ?? "true")));
-        }
-        else
-        {
-            // Fallback para desenvolvimento
-            services.AddSingleton<IEmailService, ConsoleEmailService>();
+            case "sendgrid":
+                services.AddSingleton<IEmailService>(_ => new SendGridEmailService(
+                    apiKey: sendGridConfig["ApiKey"]
+                        ?? throw new InvalidOperationException("SendGrid:ApiKey eh obrigatorio quando Email:Provider=sendgrid."),
+                    fromEmail: sendGridConfig["FromEmail"] ?? "noreply@easystock.com",
+                    fromName: sendGridConfig["FromName"] ?? "EasyStock",
+                    sandbox: bool.Parse(sendGridConfig["SandboxMode"] ?? "false")));
+                break;
+
+            case "smtp":
+                services.AddSingleton<IEmailService>(_ => new SmtpEmailService(
+                    smtpConfig["Host"] ?? "localhost",
+                    int.Parse(smtpConfig["Port"] ?? "587"),
+                    smtpConfig["Username"] ?? "",
+                    smtpConfig["Password"] ?? "",
+                    smtpConfig["FromEmail"] ?? "noreply@easystock.com",
+                    smtpConfig["FromName"] ?? "EasyStock",
+                    bool.Parse(smtpConfig["EnableSsl"] ?? "true")));
+                break;
+
+            default:
+                // Console — fallback dev. Loga email sem enviar.
+                services.AddSingleton<IEmailService, ConsoleEmailService>();
+                break;
         }
 
         // Storage Service
