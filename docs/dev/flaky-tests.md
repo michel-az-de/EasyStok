@@ -19,6 +19,16 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## EasyStock.ArchitectureTests / Exceptions_De_Domain_Devem_Ficar_No_Domain
+
+- **Por que falha:** o teste valida que todas as classes terminando em `Exception` residem em `EasyStock.Domain.Exceptions`. Atualmente alguma exception fora do Domain está violando essa regra arquitetural — vista falha em `ArchitectureTests.cs:92` desde o commit `4b018b39 chore(p-02-f0.5)`.
+- **Como confirmar:** `dotnet test EasyStock.ArchitectureTests --filter "FullyQualifiedName~Exceptions_De_Domain"` retorna `1 failed`. Falha determinística (não-flaky no sentido temporal — é regressão arquitetural não-corrigida).
+- **Por que não foi corrigido:** mover/renomear a exception ofensora exige análise — pode ser intencional (ex: `GatewayFiscalException` em `EasyStock.Infra.Integrations`) ou regressão. Decisão precisa Felipe + revisão.
+- **Quando promover a "corrigir":** quando Felipe priorizar limpeza arquitetural OU quando outra refatoração tocar Exceptions. Adicionar `[Trait("Category", "Architecture")]` ao teste depois para entrar no escopo do pre-commit Husky.
+- **Nota:** este teste NÃO tem `[Trait("Category", "Architecture")]` ainda, então não bloqueia commits via Husky pre-commit (que filtra Category=Architecture). Apenas falha em runs explícitos.
+
+---
+
 ## Política geral
 
 - **Não marcar teste como flaky sem documentar aqui.** Sem entrada neste arquivo + comment no próprio teste, o "sabe-se que é flaky" não é compartilhável (e some quando a memória do dev some).
