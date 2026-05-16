@@ -15,7 +15,11 @@ public record ProductDto(
     // Etiquetas de produção (opcionais — APKs antigos não enviam).
     string? Sku = null,
     int? DefaultWeightG = null,
-    int? DefaultValidityDays = null
+    int? DefaultValidityDays = null,
+    // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
+    // PWA usa para validar peso obrigatorio em confirmProduction.
+    // Inserido 2026-05-16. Lido do Produto(ERP) ligado via ErpProductId.
+    string TipoEmbalagem = "Avulso"
 );
 
 public record ClientDto(
