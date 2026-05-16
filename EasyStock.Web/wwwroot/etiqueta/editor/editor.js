@@ -126,7 +126,7 @@ window.etqAbrirEditor = async function(templateId) {
         const { data } = await res.json();
         etqEditorAbrir(templateId, data.LayoutJson, empresaId);
     } catch(e) {
-        (window.showToast || alert)('Erro ao abrir editor: ' + e.message, 'error');
+        alert('Erro ao abrir editor: ' + e.message);
     }
 };
 
@@ -838,13 +838,12 @@ function _setUnsaved(v) {
 // ── Save ───────────────────────────────────────────────────────────────────
 async function _save() {
     const nome = (_overlay.querySelector('.etq-ed-tb-name')?.value ?? '').trim();
-    const notify = window.showToast || ((m, t) => console.error('[notify-fallback]', t, m));
-    if (!nome) { notify('O nome do modelo é obrigatório.', 'warning'); return; }
+    if (!nome) { alert('O nome do modelo é obrigatório.'); return; }
 
     const errors = _getValidationErrors();
-    if (errors.length) { notify(`Há ${errors.length} elemento(s) com problemas:\n${errors.join('\n')}`, 'error'); return; }
+    if (errors.length) { alert(`Há ${errors.length} elemento(s) com problemas:\n${errors.join('\n')}`); return; }
 
-    if (_offline) { notify('Sem conexão. Salve quando voltar.', 'warning'); return; }
+    if (_offline) { alert('Sem conexão. Salve quando voltar.'); return; }
 
     const layoutJson = JSON.stringify({ v: _layout.v, size: _layout.size, elements: _layout.elements });
     try {
@@ -854,13 +853,13 @@ async function _save() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nome, layoutJson }),
         });
-        if (res.status === 409) { notify('Outro usuário modificou este modelo. Recarregue a página e tente novamente.', 'error'); return; }
+        if (res.status === 409) { alert('Outro usuário modificou este modelo. Recarregue a página e tente novamente.'); return; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         _setUnsaved(false);
         _announce('Modelo salvo.');
         _toast('Modelo salvo.');
     } catch (e) {
-        notify('Erro ao salvar: ' + e.message, 'error');
+        alert('Erro ao salvar: ' + e.message);
     }
 }
 

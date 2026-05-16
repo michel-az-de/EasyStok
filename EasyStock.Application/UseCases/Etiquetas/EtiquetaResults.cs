@@ -23,6 +23,9 @@ public sealed record EmpresaRenderDto(string Nome, string? LogoUrl);
 public sealed record ProdutoRenderDto(
     Guid Id, string Nome, string? Marca,
     string? Emoji, string? Unidade,
+    // C2 (RDC 727/2022): peso unitário em gramas vindo do LoteItem.
+    // Null para Avulso (esperado), preenchido para Embalado (obrigatório).
+    int? PesoG,
     // Ficha técnica (null se não preenchida)
     decimal? FichaKcal, decimal? FichaProteinaG, decimal? FichaCarbsG,
     decimal? FichaGorduraG, decimal? FichaGorduraSaturadaG,

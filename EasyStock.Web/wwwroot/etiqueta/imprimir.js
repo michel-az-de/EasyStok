@@ -139,7 +139,7 @@ window.etqModelosAba = function(aba) {
 
 window.etqModelosCriar = function() {
   if (_offlineMode) {
-    (window.showToast || alert)('Criar modelos personalizados requer conexão com o servidor.', 'warning');
+    alert('Criar modelos personalizados requer conexão com o servidor.');
     return;
   }
   window.etqAbrirEditor && window.etqAbrirEditor(null);
@@ -518,7 +518,7 @@ window.etqModeloPreview = function(id) {
     renderCodes(wrap);
     document.getElementById('etq-tpl-preview-name').textContent = t.Nome;
     document.getElementById('etq-tpl-preview').classList.add('open');
-  } catch (err) { (window.showToast || alert)('Erro ao visualizar: ' + err.message, 'error'); }
+  } catch (err) { alert('Erro ao visualizar: ' + err.message); }
 };
 
 async function _renderThumbnail(t) {
