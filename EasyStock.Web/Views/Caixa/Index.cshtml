@@ -15,27 +15,10 @@
     <div class="pg-hd">
         <h1 class="flex items-center gap-3">
             Caixa do dia
-            @if (statusCaixa == "aberto")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-emerald-50 text-emerald-800 ring-emerald-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Aberto
-                </span>
-            }
-            else if (statusCaixa == "fechado")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-slate-50 text-slate-600 ring-slate-200">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    Fechado
-                </span>
-            }
-            else if (statusCaixa == "fechado-pendente")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-amber-50 text-amber-800 ring-amber-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Aguardando abertura
-                </span>
-            }
+            @{ var caixaStatus = StatusHelper.Resolve(statusCaixa); }
+            <span class="badge @caixaStatus.BadgeClass">
+                <span class="dot"></span> @caixaStatus.Label
+            </span>
         </h1>
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
