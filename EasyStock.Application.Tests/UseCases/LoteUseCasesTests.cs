@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -101,6 +102,11 @@ public class LoteUseCasesTests
         var dataProd = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc);
         _repo.GetNextSequencialDoDiaAsync(empresaId, Arg.Any<DateOnly>()).Returns(1);
 
+        var produtoPaoId = Guid.NewGuid();
+        var produtoBoloId = Guid.NewGuid();
+        _produtoRepo.GetTipoEmbalagemMapAsync(empresaId, Arg.Any<IEnumerable<Guid>>())
+            .Returns((IReadOnlyDictionary<Guid, TipoEmbalagem>)new Dictionary<Guid, TipoEmbalagem>());
+
         Lote? capturado = null;
         await _repo.AddAsync(Arg.Do<Lote>(l => capturado = l));
 
@@ -111,8 +117,8 @@ public class LoteUseCasesTests
             DataProducao: dataProd,
             Itens: new[]
             {
-                new CriarLoteItemInput("Pão de queijo", 10, ValidadeDias: 5),
-                new CriarLoteItemInput("Bolo", 3, ValidadeDias: null)  // sem validade
+                new CriarLoteItemInput("Pão de queijo", 10, ProdutoId: produtoPaoId, ValidadeDias: 5),
+                new CriarLoteItemInput("Bolo", 3, ProdutoId: produtoBoloId, ValidadeDias: null)  // sem validade
             }));
 
         capturado!.Itens.Should().HaveCount(2);
