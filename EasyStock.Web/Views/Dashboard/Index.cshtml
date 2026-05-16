@@ -269,12 +269,10 @@
                          'bg-emerald-50 border-emerald-200 text-emerald-800': insight.severidade === 'positive'
                      }">
                     <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <template x-if="insight.severidade === 'positive'">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </template>
-                        <template x-if="insight.severidade !== 'positive'">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </template>
+                        @* x-show no <path> ao inves de <template x-if> dentro de <svg>:
+                           <template> dentro de SVG quebra namespace e Alpine falha em cloneNode. *@
+                        <path x-show="insight.severidade === 'positive'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path x-show="insight.severidade !== 'positive'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <span x-text="insight.texto"></span>
                 </div>
@@ -822,12 +820,12 @@
                     date:     fmtDate,
                 },
 
-                alertasFiltrados() {
+                get alertasFiltrados() {
                     if (!this.data || !this.data.alertasEstoque) return [];
                     if (this.filtroAlerta === 'todos') return this.data.alertasEstoque;
                     return this.data.alertasEstoque.filter(a => a.tipo === this.filtroAlerta);
                 },
-                contarAlerta(tipo) {
+                contarTipo(tipo) {
                     if (!this.data || !this.data.alertasEstoque) return 0;
                     return this.data.alertasEstoque.filter(a => a.tipo === tipo).length;
                 },

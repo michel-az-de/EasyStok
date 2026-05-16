@@ -7,7 +7,10 @@ namespace EasyStock.Web.Controllers;
 
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
-    [Authorize]
+    // Pente-fino 2026-05-16: Index restrita a Admin/SuperAdmin.
+    // Sidebar ja oculta o link pra outros roles, mas a rota /diagnostico
+    // estava aberta a qualquer usuario autenticado se digitada na URL.
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
     {
