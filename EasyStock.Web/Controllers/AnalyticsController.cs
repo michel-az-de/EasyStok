@@ -7,7 +7,11 @@ namespace EasyStock.Web.Controllers;
 
 public class AnalyticsController(AnalyticsService svc, SessionService session) : BaseController(session)
 {
+    // /analises = alias PT-BR. O link no menu mostra "Análises", então usuários
+    // digitam /analises na URL e batem em 404. Mantemos /analytics por compatibilidade
+    // com bookmarks e command palette.
     [HttpGet("/analytics")]
+    [HttpGet("/analises")]
     public async Task<IActionResult> Index(int meses = 6)
     {
         ViewBag.Title = "Analytics";
@@ -81,6 +85,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
     }
 
     [HttpGet("/analytics/movimentacoes")]
+    [HttpGet("/analises/movimentacoes")]
     public async Task<IActionResult> Movimentacoes(
         int page = 1, string? tipo = null, string? de = null, string? ate = null)
     {

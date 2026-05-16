@@ -10,28 +10,47 @@ namespace EasyStock.Web.Controllers;
 public class MobileDevicesController(
     MobileDevicesService svc,
     OperacaoMobileService opSvc,
-    SessionService session) : BaseController(session)
+    SessionService session,
+    ILogger<MobileDevicesController> log) : BaseController(session)
 {
     [HttpGet("/dispositivos")]
     public async Task<IActionResult> Index()
     {
         ViewBag.Title = "Dispositivos";
         ViewBag.ActiveMenuItem = "Dispositivos";
+        // Garantir HealthById SEMPRE definido — view crashava antes do fallback
+        // se o controller retornasse cedo via HasError sem setar o ViewBag.
+        ViewBag.HealthById = new Dictionary<string, DeviceHealthApi>();
 
-        var listResult = await svc.ListarAsync();
-        if (HasError(listResult)) return View(new List<MobileDeviceApi>());
+        try
+        {
+            var listResult = await svc.ListarAsync();
+            if (!listResult.Success)
+            {
+                log.LogWarning("MobileDevices.Listar falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
+                    listResult.ErrorCode, listResult.ErrorMessage, listResult.HttpStatus, listResult.CorrelationId);
+                if (HasError(listResult)) return View(new List<MobileDeviceApi>());
+            }
 
-        ApiResult<List<DeviceHealthApi>> healthResult;
-        try { healthResult = await opSvc.ObterSaudeDevicesAsync(); }
-        catch { healthResult = ApiResult<List<DeviceHealthApi>>.Fail("ERR", "Falha ao carregar saúde dos dispositivos."); }
+            ApiResult<List<DeviceHealthApi>> healthResult;
+            try { healthResult = await opSvc.ObterSaudeDevicesAsync(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "ObterSaudeDevices lançou exceção");
+                healthResult = ApiResult<List<DeviceHealthApi>>.Fail("ERR", "Falha ao carregar saúde dos dispositivos.");
+            }
 
-        // Mapeia health por id pra view consultar O(1).
-        var healthById = healthResult.Success && healthResult.Data != null
-            ? healthResult.Data.ToDictionary(h => h.Id)
-            : new Dictionary<string, DeviceHealthApi>();
-        ViewBag.HealthById = healthById;
+            if (healthResult.Success && healthResult.Data != null)
+                ViewBag.HealthById = healthResult.Data.ToDictionary(h => h.Id);
 
-        return View(listResult.Data ?? []);
+            return View(listResult.Data ?? []);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha inesperada carregando /dispositivos");
+            Toast("warning", "Não foi possível carregar a lista de dispositivos agora. Tente novamente em instantes.");
+            return View(new List<MobileDeviceApi>());
+        }
     }
 
     [HttpPost("/dispositivos/parear")]

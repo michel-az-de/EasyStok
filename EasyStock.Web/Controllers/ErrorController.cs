@@ -1,3 +1,4 @@
+using System.Reflection;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,11 @@ public class ErrorController(SessionService session) : Controller
             ViewBag.Role = session.GetUsuarioRole();
             ViewBag.UserTheme = session.GetTemaPreferido();
         }
+
+        // ErrorController não herda de BaseController, então AppVersion ficava null
+        // e a sidebar caía no fallback "v1.0", divergindo das outras páginas (v1.10).
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        ViewBag.AppVersion = version is not null ? $"v{version.Major}.{version.Minor}" : "v1.0";
 
         if (code == 404)
             return View("NotFound");

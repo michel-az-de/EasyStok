@@ -4058,10 +4058,20 @@ html.theme-dark .kds-card {
 .kds-card--laranja { border-left-color: #f59e0b; }
 .kds-card--vermelho { border-left-color: #ef4444; animation: kdsPulse 2s ease-in-out infinite; }
 .kds-card--violeta { border-left-color: #8b5cf6; }
+.kds-card--abandonado {
+    border-left-color: #6b1818;
+    background: linear-gradient(180deg, #fef2f2 0%, #ffffff 60%);
+    animation: kdsPulseAbandonado 1.4s ease-in-out infinite;
+}
 
 @keyframes kdsPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .3); }
     50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, .12); }
+}
+
+@keyframes kdsPulseAbandonado {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(107, 24, 24, .45); }
+    50%      { box-shadow: 0 0 0 6px rgba(107, 24, 24, .18); }
 }
 
 .kds-card--saindo {
@@ -4106,8 +4116,10 @@ html.theme-dark .kds-card {
     letter-spacing: -0.02em;
 }
 
-.kds-card--vermelho .kds-card__tempo-valor { color: #b91c1c; }
-.kds-card--laranja  .kds-card__tempo-valor { color: #b45309; }
+.kds-card--vermelho   .kds-card__tempo-valor { color: #b91c1c; }
+.kds-card--laranja    .kds-card__tempo-valor { color: #b45309; }
+.kds-card--abandonado .kds-card__tempo-valor { color: #6b1818; }
+.kds-card--abandonado .kds-card__tempo-label { color: #6b1818; font-weight: 700; }
 
 .kds-card__tempo-label {
     font-size: 11px;
