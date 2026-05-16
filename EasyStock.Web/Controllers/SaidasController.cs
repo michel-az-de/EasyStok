@@ -8,7 +8,6 @@ namespace EasyStock.Web.Controllers;
 
 public class SaidasController(SaidasService svc, SessionService session) : BaseController(session)
 {
-    [HttpGet("/saidas")]
     [HttpGet("/saidas/nova")]
     public IActionResult Nova(string? produtoId = null)
     {
@@ -57,6 +56,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         return RedirectToAction(nameof(Historico));
     }
 
+    [HttpGet("/saidas")]
     [HttpGet("/saidas/historico")]
     public async Task<IActionResult> Historico(
         int page = 1, string? natureza = null, string? de = null, string? ate = null)
