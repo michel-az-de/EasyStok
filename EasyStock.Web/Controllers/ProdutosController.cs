@@ -1,4 +1,5 @@
 using EasyStock.Web.Constants;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Produtos;
@@ -551,7 +552,7 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
                 Qty = req.QtdInicial.Value,
                 Custo = custo,
                 Preco = req.PrecoReferencia,
-                Data = DateOnly.FromDateTime(DateTime.Today),
+                Data = BrazilTime.Today(),
                 Observacoes = "Entrada inicial — produto cadastrado pelo modal Novo pedido."
             };
             var entrada = await entradasSvc.CriarEntradaAsync(entradaVm);

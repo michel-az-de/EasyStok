@@ -109,8 +109,10 @@
                 </template>
             </div>
 
-            @* Ticket Médio *@
-            <div class="ws group" title="Receita dividida pelo número de pedidos pagos">
+            @* Ticket Médio = Receita / Vendas confirmadas (com VendaId). Denominador
+               diferente do card "Pedidos" porque pedidos cancelados/pendentes nao geram
+               venda — o tooltip explica pra evitar leitura tipo "795 / 17 = 47 != 61". *@
+            <div class="ws group" title="Receita dividida pelo número de vendas confirmadas no período (pedidos cancelados ou ainda em aberto não entram no denominador).">
                 <div class="kpi-lbl">Ticket médio</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-20 bg-slate-100 rounded animate-pulse mt-1"></div>
@@ -126,8 +128,9 @@
                 </template>
             </div>
 
-            @* Pedidos *@
-            <a href="/pedidos" class="ws group hover:border-slate-300 transition-colors" title="Total de pedidos criados, incluindo entregues e pendentes">
+            @* Pedidos: total criados (entregues + pendentes + cancelados). O sub-rotulo
+               de breakdown ajuda a conciliar com o ticket medio (que usa vendas, nao pedidos). *@
+            <a href="/pedidos" class="ws group hover:border-slate-300 transition-colors" title="Total de pedidos criados no período — inclui entregues, pendentes e cancelados. O ticket médio acima usa só os que viraram venda confirmada.">
                 <div class="kpi-lbl">Pedidos</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-12 bg-slate-100 rounded animate-pulse mt-1"></div>
@@ -137,14 +140,18 @@
                         <div class="kpi-val text-slate-900" x-text="data.kpis.pedidos"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.pedidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.pedidos)"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-show="data.kpis.pedidosEntregues != null">
+                                · <span x-text="data.kpis.pedidosEntregues"></span> entregues
+                            </span>
                         </div>
                     </div>
                 </template>
             </a>
 
-            @* Itens em Estoque *@
-            <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Unidades ativas com quantidade maior que zero">
+            @* Itens em Estoque (soma de QuantidadeAtual de lotes ativos com qty > 0).
+               O sub-rotulo "% critico" se refere a LOTES (rows ItemEstoque), nao a unidades —
+               antes ficava ambiguo e podia mostrar 100% no card e 88% no donut da mesma tela. *@
+            <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Unidades em lotes ativos (quantidade > 0). O '% crítico' abaixo se refere aos lotes, não às unidades.">
                 <div class="kpi-lbl">Itens em estoque</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-14 bg-slate-100 rounded animate-pulse mt-1"></div>
@@ -155,7 +162,7 @@
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.itensEmEstoque)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.itensEmEstoque)"></span>
                             <span class="text-xs text-slate-400" x-show="data.kpis.percentualCritico > 0">
-                                · <span x-text="fmt.pct(data.kpis.percentualCritico)"></span> crítico
+                                · <span x-text="fmt.pct(data.kpis.percentualCritico)"></span> dos lotes crítico
                             </span>
                         </div>
                     </div>
