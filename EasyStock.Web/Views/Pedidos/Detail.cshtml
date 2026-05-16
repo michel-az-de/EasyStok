@@ -225,9 +225,9 @@ else
                         <thead class="text-xs text-slate-500 uppercase tracking-wider">
                             <tr>
                                 <th class="text-left py-2">Item</th>
-                                <th class="text-right py-2">Qtd</th>
-                                <th class="text-right py-2">Preço</th>
-                                <th class="text-right py-2">Subtotal</th>
+                                <th class="col-num py-2">Qtd</th>
+                                <th class="col-num py-2">Preço</th>
+                                <th class="col-num py-2">Subtotal</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -239,7 +239,7 @@ else
                                     <span class="font-medium text-slate-900">@i.Emoji @i.Nome</span>
                                     @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400 ml-1">@i.Unidade</span>}
                                 </td>
-                                <td class="text-right text-slate-700">@i.Quantidade</td>
+                                <td class="col-num text-slate-700">@i.Quantidade</td>
                                 <td class="col-num text-slate-700">@i.PrecoUnitario.AsMoney()</td>
                                 <td class="col-num font-semibold text-slate-900">@i.Subtotal.AsMoney()</td>
                                 <td class="text-right">
