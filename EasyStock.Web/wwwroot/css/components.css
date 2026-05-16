@@ -175,6 +175,77 @@ button:focus-visible {
 .skeleton-card  { height: 120px; border-radius: 14px; }
 .skeleton-row   { height: 48px; border-radius: 8px; margin-bottom: 8px; }
 
+/* ---------- Money / numeric (pente fino onda 1 item 6) ----------
+   Use em valores monetarios soltos (fora de tabela). Em tabela, ja existe
+   .col-num em app.css. Aplicar em <span class="money">R$ 1.430,00</span>. */
+.money,
+.tabular {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- Soft alerts (pente fino onda 1 item 20) ----------
+   Alternativa de "soft style" pros banners de status, com fundo translucido
+   e barra colorida. Substitui banners com fundo saturado que agridem. */
+.alert-soft {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius-card);
+  border-left: 3px solid;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.alert-soft__title  { font-weight: 600; margin: 0 0 2px; }
+.alert-soft__body   { margin: 0; opacity: 0.95; }
+.alert-soft__action { margin-left: auto; flex: none; }
+.alert-soft--red    { background: rgba(220, 38, 38, 0.10);  border-left-color: #dc2626; color: #fca5a5; }
+.alert-soft--yellow { background: rgba(217, 154, 26, 0.12); border-left-color: var(--warn-600); color: var(--warn-700); }
+.alert-soft--blue   { background: rgba(30, 72, 168, 0.10);  border-left-color: var(--navy-500); color: var(--navy-700); }
+.alert-soft--green  { background: rgba(24, 135, 78, 0.10);  border-left-color: var(--ok-600); color: var(--ok-700); }
+/* Dark mode: ajusta cor de texto pra contraste em fundo navy */
+[data-theme="dark"] .alert-soft--yellow { color: var(--warn-300); }
+[data-theme="dark"] .alert-soft--blue   { color: var(--navy-100); }
+[data-theme="dark"] .alert-soft--green  { color: var(--ok-300); }
+
+/* ---------- Validity semaforo pill (pente fino onda 1 item 15) ----------
+   Pill colorida pro "dias ate vencer". Use ao lado da data, nao misturada.
+   Cores em escala semaforo:
+     >14d  verde   (.--ok)
+     7-14d amarelo (.--warn)
+     3-7d  laranja (.--alert)
+     <=3d  vermelho(.--crit)
+   Aplicar em <span class="validity-pill validity-pill--warn">7 d</span>. */
+.validity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.validity-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.validity-pill--ok    { background: var(--ok-50);    color: var(--ok-700);    border-color: var(--ok-200); }
+.validity-pill--warn  { background: var(--warn-50);  color: var(--warn-700);  border-color: var(--warn-200); }
+.validity-pill--alert { background: var(--orange-50);color: var(--orange-700);border-color: var(--orange-200); }
+.validity-pill--crit  { background: var(--crit-50);  color: var(--crit-700);  border-color: var(--crit-200); }
+
+/* ---------- Grid utility: altura igual entre filhos (pente fino onda 1 item 5) ----------
+   `grid-auto-rows: minmax(0, 1fr)` forca todas as linhas da grid a terem
+   altura igual a maior cell. Aplicar no container `.grid` quando os cards
+   filhos tem conteudo desigual (ex: alguns com 1 linha de texto, outros 3). */
+.grid-equal-rows {
+  grid-auto-rows: minmax(0, 1fr);
+}
+
 /* ---------- Entry animations (T1.9) ---------- */
 @keyframes anim-fadeInUp {
   from { opacity: 0; transform: translate3d(0, 8px, 0); }

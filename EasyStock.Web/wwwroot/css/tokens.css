@@ -99,6 +99,17 @@
   --r-lg: 14px;
   --r-xl: 20px;
   --r-pill: 999px;
+  /* Semantic aliases (pente fino onda 1 item 30): use --radius-card em vez de
+     escolher tamanho ad-hoc nas views. Cards inconsistentes (8/12/16) era ruido. */
+  --radius-card: var(--r-lg);
+  --radius-control: var(--r-md);
+  --radius-pill: var(--r-pill);
+
+  /* ----- Gap scale (pente fino onda 1 item 36) -----
+     Aliases semanticos sobre --s-* para uso consistente em grids/flex. */
+  --gap-tight: var(--s-2); /* 8px  — listas densas, badges */
+  --gap-base:  var(--s-4); /* 16px — cards, secoes */
+  --gap-loose: var(--s-6); /* 24px — separacao entre blocos grandes */
 
   /* ----- Shadows (cool tone) ----- */
   --shadow-sm: 0 1px 2px rgba(10, 21, 48, 0.06), 0 1px 1px rgba(10, 21, 48, 0.04);
