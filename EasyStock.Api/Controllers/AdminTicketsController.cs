@@ -20,6 +20,7 @@ public class AdminTicketsController(
     HelpdeskTicketService ticketService,
     HelpdeskAnexoService anexoService,
     HelpdeskBugFixService bugFixService,
+    HelpdeskDashboardService dashboardService,
     ObterPedidoDetalhesUseCase obterPedidoUseCase) : EasyStockControllerBase
 {
     [HttpGet]
@@ -315,6 +316,20 @@ public class AdminTicketsController(
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
         catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
+    }
+
+    /// <summary>
+    /// Onda 1.4 — resumo de tickets criticos para widget Operacao e badge global.
+    /// Critico = aberto/emAtendimento/aguardandoCliente com SLA violado OU prioridade Alta/Critica.
+    /// Quando empresaId omitido, agrega cross-tenant (badge global no _Layout admin).
+    /// </summary>
+    [HttpGet("criticos-resumo")]
+    public async Task<IActionResult> GetCriticosResumo([FromQuery] Guid? empresaId = null, [FromQuery] int limit = 5)
+    {
+        if (limit < 1) limit = 1;
+        if (limit > 20) limit = 20;
+        var resumo = await dashboardService.ObterCriticosAsync(empresaId, limit);
+        return DataOk(resumo);
     }
 
     /// <summary>
