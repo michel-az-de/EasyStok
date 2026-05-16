@@ -74,7 +74,7 @@
                     </td>
                     <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().AsDateTime()</td>
                     <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
-                    <td class="text-slate-600 text-sm tabular-nums">
+                    <td class="text-slate-600 text-sm col-num">
                         @if (l.TotalUnidades == 0)
                         {
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"
@@ -85,7 +85,7 @@
                             @l.ItensCount <text>item(s) · </text>@l.TotalUnidades <text>un</text>
                         }
                     </td>
-                    <td class="text-sm text-slate-600 tabular-nums">
+                    <td class="text-sm text-slate-600 col-num">
                         @if (l.TotalUnidades > 0) { <span>@l.EtiquetasConferidas/@l.TotalUnidades</span> }
                         else { <span class="text-slate-400">—</span> }
                         @if (l.EtiquetasDivergentes > 0) { <span class="text-xs text-red-600">· @l.EtiquetasDivergentes div</span> }

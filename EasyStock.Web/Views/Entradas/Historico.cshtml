@@ -106,13 +106,13 @@
                         <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
                         <td class="text-slate-400 text-xs">@(e.ProdutoVariacao?.Nome ?? "")</td>
                         <td class="text-center font-mono">@e.Qty.ToString("0.##", ptBr)</td>
-                        <td class="text-right font-mono text-slate-600 whitespace-nowrap">
-                            @(custoInformado ? e.Custo!.Value.ToString("C", ptBr) : Html.Raw("<span class=\"text-slate-300\" title=\"Custo unitário não informado\">—</span>"))
+                        <td class="col-num text-slate-600 whitespace-nowrap">
+                            @(e.Custo.HasValue ? e.Custo.Value.AsMoney() : "—")
                         </td>
-                        <td class="text-right font-mono font-semibold whitespace-nowrap">
-                            @(custoInformado ? total.ToString("C", ptBr) : Html.Raw("<span class=\"text-slate-300\">—</span>"))
+                        <td class="col-num font-semibold whitespace-nowrap">
+                            @(e.Custo.HasValue ? total.AsMoney() : "—")
                         </td>
-                        <td class="text-right text-slate-500">@e.Data.ToString("dd/MM/yyyy")</td>
+                        <td class="col-num text-slate-500">@e.Data.AsDate()</td>
                     </tr>
                 }
             </tbody>
