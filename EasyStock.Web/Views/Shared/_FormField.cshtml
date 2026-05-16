@@ -1,0 +1,55 @@
+@*
+    Wrapper de campo de formulário: label (acima) + input slot + helper text + erro inline.
+    API publica preservada — campos existentes (<input class="ui-field" />) continuam funcionando direto.
+    Use este partial em forms novos para garantir layout consistente.
+
+    Exemplo:
+    <partial name="_FormField" model='new {
+        Label = "E-mail",
+        For = "Email",
+        Required = true,
+        Helper = "Usamos para login e notificacoes",
+        Error = ViewData.ModelState["Email"]?.Errors.FirstOrDefault()?.ErrorMessage,
+        InputHtml = "<input class=\"ui-field\" id=\"Email\" name=\"Email\" type=\"email\" required />"
+    }' />
+*@
+@model dynamic
+@{
+    var label = (string?)Model.Label;
+    var forId = (string?)(Model.For ?? Model.Id);
+    var required = Model.Required != null && (bool)Model.Required;
+    var helperText = (string?)Model.Helper;
+    var error = (string?)Model.Error;
+    var inputHtml = (string?)Model.InputHtml;
+    var hasError = !string.IsNullOrEmpty(error);
+}
+<div class="ui-form-field@(hasError ? " ui-form-field--error" : "")">
+    @if (!string.IsNullOrEmpty(label))
+    {
+        <label for="@forId" class="ui-form-field__label">
+            @label
+            @if (required)
+            {
+                <span class="ui-form-field__required" aria-hidden="true">*</span>
+            }
+        </label>
+    }
+    <div class="ui-form-field__input">
+        @Html.Raw(inputHtml)
+    </div>
+    @if (hasError)
+    {
+        <p class="ui-form-field__error" role="alert">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>@error</span>
+        </p>
+    }
+    else if (!string.IsNullOrEmpty(helperText))
+    {
+        <p class="ui-form-field__helper">@helperText</p>
+    }
+</div>
