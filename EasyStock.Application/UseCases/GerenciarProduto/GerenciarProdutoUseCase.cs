@@ -70,7 +70,9 @@ public sealed record ProdutoDetalheResult(
     int? QuantidadeMinima = null,
     int? QuantidadeCritica = null,
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
-    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
+    // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
+    string? AtributosJson = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -597,7 +599,8 @@ public sealed class GerenciarProdutoUseCase(
             AlteradoEm: produto.AlteradoEm,
             QuantidadeMinima: produto.QuantidadeMinima,
             QuantidadeCritica: produto.QuantidadeCritica,
-            TipoEmbalagem: produto.TipoEmbalagem); // C2 (RDC 727/2022)
+            TipoEmbalagem: produto.TipoEmbalagem, // C2 (RDC 727/2022)
+            AtributosJson: produto.AtributosJson);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));
