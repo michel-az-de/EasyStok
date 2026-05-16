@@ -1106,6 +1106,104 @@ button:disabled {
 [data-theme="light"] .client-card { background: #fff; border-color: #dbe2ec; box-shadow: 0 8px 20px rgba(21,31,49,0.055); }
 [data-theme="light"] .client-stat { background: #f8fafc; border-color: #dbe2ec; }
 
+/* Onda 1 — recencia primaria, badges de categoria, telefone WA e mapa */
+.client-recency {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.client-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.client-badge:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.client-badge-top        { background: #14532d; color: #86efac; }
+.client-badge-recorrente { background: #1e3a8a; color: #93c5fd; }
+.client-badge-novo       { background: #4c1d95; color: #c4b5fd; }
+.client-badge-risco      { background: #7c2d12; color: #fdba74; }
+.client-badge-inativo    { background: #1f2937; color: #9ca3af; }
+[data-theme="light"] .client-badge-top        { background: #15803d; color: #ffffff; }
+[data-theme="light"] .client-badge-recorrente { background: #1d4ed8; color: #ffffff; }
+[data-theme="light"] .client-badge-novo       { background: #7c3aed; color: #ffffff; }
+[data-theme="light"] .client-badge-risco      { background: #c2410c; color: #ffffff; }
+[data-theme="light"] .client-badge-inativo    { background: #4b5563; color: #ffffff; }
+
+.client-wa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid rgba(37, 211, 102, 0.4);
+  border-radius: 999px;
+  background: rgba(37, 211, 102, 0.12);
+  color: #25d366;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.client-wa-btn:focus-visible {
+  outline: 2px solid #25d366;
+  outline-offset: 2px;
+}
+.client-wa-btn:active { transform: scale(0.97); }
+.client-meta-phone-invalid {
+  color: var(--ink-mute);
+  text-decoration: line-through dotted;
+}
+[data-theme="light"] .client-wa-btn {
+  background: rgba(20, 158, 70, 0.10);
+  border-color: rgba(20, 158, 70, 0.45);
+  color: #149e46;
+}
+
+.client-map-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  max-width: 220px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-map-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.client-map-btn:active { transform: scale(0.97); }
+.client-meta-addr-invalid {
+  color: var(--ink-mute);
+  font-style: italic;
+}
+[data-theme="light"] .client-map-btn {
+  background: #f1f5f9;
+  border-color: #dbe2ec;
+  color: var(--ink-dim);
+}
+
 .support-hero {
   border: 1px solid var(--border-strong);
   border-radius: 20px;
@@ -9795,6 +9893,26 @@ function escapeHtml(str) {
 function jsString(str) {
   return escapeHtml(JSON.stringify(String(str == null ? '' : str)));
 }
+// Normaliza telefone BR pra E.164 sem '+', ou retorna null se invalido.
+// Aceita 11 digitos (DDD+9+8) ou 13 digitos (55+DDD+9+8). Rejeita fixo
+// antigo (10 dig), 12 dig (55+fixo) e qualquer outro tamanho.
+function normalizePhoneBr(input) {
+  if (!input) return null;
+  const d = String(input).replace(/\D/g, '');
+  if (d.length === 11) return '55' + d;
+  if (d.length === 13 && d.startsWith('55')) return d;
+  return null;
+}
+// Formata pra "(11) 99999-8888" pra exibicao. Fallback: devolve original.
+function formatPhoneBr(input) {
+  const d = normalizePhoneBr(input);
+  if (!d) return String(input || '');
+  const ddd = d.slice(2, 4);
+  const n   = d.slice(4);
+  return n.length === 9
+    ? `(${ddd}) ${n.slice(0, 5)}-${n.slice(5)}`
+    : `(${ddd}) ${n.slice(0, 4)}-${n.slice(4)}`;
+}
 function timeOf(ts) {
   const d = new Date(ts);
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
@@ -12486,8 +12604,10 @@ function buildClientInsights() {
     const favorite = Array.from(row.products.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'sem favorito';
     const avg = row.orders ? row.total / row.orders : 0;
     const days = row.lastAt ? Math.floor((Date.now() - row.lastAt) / (24 * 60 * 60 * 1000)) : 9999;
-    return { ...row, favorite, avg, days };
-  }).sort((a, b) => (b.total - a.total) || (b.orders - a.orders) || (b.lastAt - a.lastAt));
+    const score = clientScore(row.orders, avg, days);
+    const category = clientCategory(row.orders, days);
+    return { ...row, favorite, avg, days, score, category };
+  }).sort((a, b) => (b.score - a.score) || (b.total - a.total) || (b.lastAt - a.lastAt));
 }
 
 function buildClientReturnMessage(row) {
@@ -12500,6 +12620,42 @@ function copyClientReturnMessage(clientId) {
   const row = buildClientInsights().find(x => x.client.id === clientId);
   if (!row) { showToast('Cliente nao encontrado'); return; }
   copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
+}
+
+// Categoria de cliente — matriz orders × days. Recencia > 30d sobrescreve
+// frequencia: ex-top sumido vira "risco"/"inativo" porque o que importa no
+// card e estado atual ("perdemos esse cliente, mande mensagem"), nao trofeu
+// historico. Janelas baseadas em ciclo semanal tipico de massas frescas;
+// calibrar com SQL apos 2 semanas de uso real.
+function clientCategory(orders, days) {
+  const o = Number(orders) || 0;
+  const d = days == null ? 9999 : Number(days);
+  if (o === 0) return null;
+  if (d > 60) return 'inativo';
+  if (d > 30) return 'risco';
+  if (o >= 5) return 'top';
+  if (o >= 2) return 'recorrente';
+  return 'novo';
+}
+
+const CLIENT_BADGE_META = {
+  top:        { label: 'Top',          cls: 'client-badge-top' },
+  recorrente: { label: 'Recorrente',   cls: 'client-badge-recorrente' },
+  novo:       { label: 'Novo',         cls: 'client-badge-novo' },
+  risco:      { label: 'Risco',        cls: 'client-badge-risco' },
+  inativo:    { label: 'Inativo 30d+', cls: 'client-badge-inativo' }
+};
+
+// Score 0..100 — frequencia (0..40) + ticket (0..30) + recencia (0..30).
+// Usado APENAS pra sort default (mais valiosos primeiro). UI mostra
+// categoria/badge, nao o numero.
+function clientScore(orders, avg, days) {
+  const freq = Math.min(40, (Number(orders) || 0) * 8);
+  const ticketRef = 50;
+  const ticket = Math.min(30, ((Number(avg) || 0) / ticketRef) * 30);
+  const d = days == null ? 9999 : Number(days);
+  const rec = d <= 7 ? 30 : d <= 30 ? 20 : d <= 60 ? 10 : d <= 120 ? 5 : 0;
+  return Math.round(freq + ticket + rec);
 }
 
 function renderClientesScreen() {
@@ -12524,25 +12680,50 @@ function renderClientesScreen() {
   }
   host.innerHTML = filtered.slice(0, 20).map((row, idx) => {
     const c = row.client || {};
-    const phone = c.phone ? ' · ' + c.phone : '';
-    const ref = c.address || c.ref || '';
     const name = c.name || 'Cliente sem nome';
     const idArg = jsString(c.id || '');
     const nameArg = jsString(name);
     const isRegistered = !!(c.id && (clients || []).some(x => x.id === c.id));
     const clientAction = isRegistered ? `openClientModal({editId: ${idArg}})` : `openClientModal(${nameArg})`;
     const clientActionLabel = isRegistered ? 'Editar' : 'Cadastrar';
+
+    const meta = row.category ? CLIENT_BADGE_META[row.category] : null;
+    const badgeHtml = meta
+      ? ` <span class="client-badge ${meta.cls}">${meta.label}</span>`
+      : '';
+
+    const recencyTxt = clientRecencyLabel(row.lastAt);
+    const pedidosTxt = `${row.orders} ${row.orders === 1 ? 'pedido' : 'pedidos'}`;
+
+    const phoneRaw = c.phone || '';
+    const phoneNorm = normalizePhoneBr(phoneRaw);
+    const phoneFmt = phoneNorm ? formatPhoneBr(phoneRaw) : phoneRaw;
+    const phoneHtml = phoneRaw
+      ? (phoneNorm
+          ? `<button type="button" class="client-wa-btn" onclick="event.stopPropagation(); openWhatsAppCliente(${idArg}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(name)}, telefone ${escapeHtml(phoneFmt)}"><span aria-hidden="true">💬</span> ${escapeHtml(phoneFmt)}</button>`
+          : `<span class="client-meta-phone-invalid" title="Telefone fora do padrão brasileiro">${escapeHtml(phoneRaw)}</span>`)
+      : '';
+
+    const addrRaw = c.address || c.ref || '';
+    const addrValid = addrRaw.trim().length >= 5 && /\d/.test(addrRaw);
+    const mapHtml = addrRaw
+      ? (addrValid
+          ? `${phoneHtml ? ' · ' : ''}<button type="button" class="client-map-btn" onclick="event.stopPropagation(); openMapsCliente(${idArg}); return false;" aria-label="Abrir endereço de ${escapeHtml(name)} no Google Maps"><span aria-hidden="true">📍</span> ${escapeHtml(addrRaw)}</button>`
+          : `${phoneHtml ? ' · ' : ''}<span class="client-meta-addr-invalid" title="Endereço incompleto — edite o cliente para adicionar número e logradouro">${escapeHtml(addrRaw)}</span>`)
+      : '';
+
     return `<div class="client-card">
       <div class="client-card-top">
         <div>
-          <div class="client-name">${escapeHtml(name)}</div>
-          <div class="client-meta">${escapeHtml(clientRecencyLabel(row.lastAt))}${escapeHtml(phone)}${ref ? ' · ' + escapeHtml(ref) : ''}</div>
+          <div class="client-name">${escapeHtml(name)}${badgeHtml}</div>
+          <div class="client-recency">${escapeHtml(recencyTxt)} · ${escapeHtml(pedidosTxt)}</div>
+          ${phoneHtml || mapHtml ? `<div class="client-meta">${phoneHtml}${mapHtml}</div>` : ''}
         </div>
         <div class="client-rank">#${idx + 1}</div>
       </div>
       <div class="client-stats">
-        <div class="client-stat"><span>Pedidos</span><strong>${row.orders}</strong></div>
         <div class="client-stat"><span>Ticket</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat"><span>Total</span><strong>${money(row.total)}</strong></div>
         <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
       </div>
       <div class="client-card-foot">
@@ -13072,6 +13253,8 @@ function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')    
 function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
 function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+const DEFAULT_EMPRESA_CIDADE = 'São Paulo';
+function getEmpresaCidade() { try { return localStorage.getItem('cdb-empresa-cidade') || DEFAULT_EMPRESA_CIDADE; } catch (e) { return DEFAULT_EMPRESA_CIDADE; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
 const SCAN_MODES = ['both', 'barcode', 'qr', 'none'];
 function getProdScanMode() {
@@ -14957,6 +15140,52 @@ function openWhatsAppSuporte() {
     window.open(url, '_blank') || (window.location.href = url);
   } catch (e) {
     showToast('Falha ao abrir WhatsApp: ' + (e.message || e));
+  }
+}
+
+// Mensagem template pro cliente — primeiro nome + nome da empresa.
+function buildClientWhatsTemplate(clientName) {
+  const first = (clientName || '').trim().split(/\s+/)[0] || 'Olá';
+  return `Oi ${first}, aqui é da ${getEmpresaName()}.`;
+}
+
+function openWhatsAppCliente(clientId) {
+  try {
+    const c = (clients || []).find(x => x.id === clientId);
+    if (!c) { showToast('Cliente não encontrado'); return; }
+    const phone = normalizePhoneBr(c.phone);
+    if (!phone) { showToast('Telefone fora do padrão brasileiro (use DDD + 9 + 8 dígitos)'); return; }
+    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(buildClientWhatsTemplate(c.name));
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir WhatsApp: ' + (e.message || e));
+  }
+}
+
+// CEP brasileiro (com ou sem hifen). CEP da resultado muito mais preciso
+// no Maps que endereco livre — por isso priorizamos o match quando existe.
+const CEP_BR_REGEX = /(\d{5})-?(\d{3})/;
+
+function buildMapsUrlCliente(address) {
+  const a = String(address || '').trim();
+  if (a.length < 5 || !/\d/.test(a)) return null;
+  const cidade = getEmpresaCidade();
+  const cepMatch = a.match(CEP_BR_REGEX);
+  const query = cepMatch
+    ? `${cepMatch[1]}-${cepMatch[2]}, ${cidade}`
+    : `${a}, ${cidade}`;
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+}
+
+function openMapsCliente(clientId) {
+  try {
+    const c = (clients || []).find(x => x.id === clientId);
+    if (!c) { showToast('Cliente não encontrado'); return; }
+    const url = buildMapsUrlCliente(c.address || c.ref || '');
+    if (!url) { showToast('Endereço incompleto'); return; }
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir mapa: ' + (e.message || e));
   }
 }
 
