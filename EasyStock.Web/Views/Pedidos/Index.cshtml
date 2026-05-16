@@ -156,7 +156,23 @@
                         <td class="text-slate-600 text-sm">@p.ItensCount</td>
                         <td class="text-slate-600 tabular-nums">@p.Total.ToString("C")</td>
                         <td>
-                            @if (p.Quitado)
+                            @if (p.Status == "cancelado")
+                            {
+                                @* Pedido cancelado nao tem cobranca em aberto — antes mostrava "Pendente". *@
+                                @if (p.TotalPago > 0)
+                                {
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-slate-50 text-slate-500 ring-slate-200 tabular-nums" title="Pedido cancelado com pagamento ja recebido">
+                                        Pago · @(p.TotalPago.ToString("C"))
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-slate-50 text-slate-400 ring-slate-200" title="Pedido cancelado nao gera cobranca">
+                                        Sem cobrança
+                                    </span>
+                                }
+                            }
+                            else if (p.Quitado)
                             {
                                 <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-emerald-50 text-emerald-800 ring-emerald-200">
                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Quitado
