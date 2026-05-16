@@ -245,13 +245,13 @@
                                 }
                             </td>
                             <td class="text-slate-500 text-xs hidden md:table-cell">
-                                @item.LastMov.ToString("dd/MM/yyyy")
+                                @item.LastMov.AsDate()
                             </td>
                             <td>
                                 @if (item.Validade.HasValue)
                                 {
                                     <span class="@(diasParaVencer <= 7 ? "text-red-600 font-semibold" : "text-slate-600") text-xs">
-                                        @item.Validade.Value.ToString("dd/MM/yyyy")
+                                        @item.Validade.Value.AsDate()
                                         @if (diasParaVencer <= 7)
                                         {
                                             <span class="badge-critical ml-1 px-1.5 py-0.5 rounded text-xs font-semibold">@diasParaVencer d</span>
