@@ -16,12 +16,19 @@
 <!-- Filtros -->
 <form method="get" class="ws mb-6">
     <div class="flex flex-wrap gap-3 items-end">
-        <div class="flex gap-2">
+        @* U1+U3 (2026-05-16): chips com scroll horizontal em mobile.
+           - whitespace-nowrap + shrink-0: nao truncam ("Todas..." em 360px).
+           - title + aria-label: tooltip nativo + screen reader = texto completo.
+           - overflow-x-auto: chips rolam se nao couberem.
+           - ring-2 ring-indigo-300 no ativo: indicador visual reforcado. *@
+        <div class="flex gap-2 overflow-x-auto -mx-2 px-2 snap-x snap-mandatory pb-1 max-w-full sm:overflow-visible sm:max-w-none"
+             role="tablist" aria-label="Filtrar movimentações">
             @foreach (var (val, label) in new[] { ("", "Todas"), ("entrada", "Entradas"), ("saida", "Saídas") })
             {
                 var isActive = Model.FiltroTipo == val || (val == "" && Model.FiltroTipo == null);
                 <a href="@Url.Action("Movimentacoes", "Analytics", new { tipo = val == "" ? null : val, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                   class="px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                   class="inline-flex items-center shrink-0 snap-start whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white ring-2 ring-indigo-300" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")"
+                   title="@label" aria-label="@label" role="tab" aria-selected="@(isActive ? "true" : "false")">
                     @label
                 </a>
             }

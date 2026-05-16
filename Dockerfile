@@ -10,6 +10,8 @@ COPY EasyStock.Infra.MongoDb/EasyStock.Infra.MongoDb.csproj   EasyStock.Infra.Mo
 COPY EasyStock.Infra.Sqlite/EasyStock.Infra.Sqlite.csproj     EasyStock.Infra.Sqlite/
 COPY EasyStock.Infra.Async/EasyStock.Infra.Async.csproj       EasyStock.Infra.Async/
 COPY EasyStock.Infra.Notifications/EasyStock.Infra.Notifications.csproj EasyStock.Infra.Notifications/
+COPY EasyStock.Contracts/EasyStock.Contracts.csproj           EasyStock.Contracts/
+COPY EasyStock.Infra.Integrations/EasyStock.Infra.Integrations.csproj EasyStock.Infra.Integrations/
 COPY EasyStock.Api/EasyStock.Api.csproj                       EasyStock.Api/
 
 RUN dotnet restore EasyStock.Api/EasyStock.Api.csproj
