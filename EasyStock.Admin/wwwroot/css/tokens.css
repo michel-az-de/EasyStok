@@ -294,6 +294,32 @@ html, body {
 .btn-sm { padding: 10px 14px; font-size: 14px; }
 .btn-lg { padding: 18px 28px; font-size: 17px; }
 
+/* loading state — mantem texto, prefixa spinner inline */
+.btn[aria-busy="true"] {
+  pointer-events: none;
+  cursor: progress;
+}
+.btn[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin var(--motion-slow) linear infinite;
+  flex: none;
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* touch target — viewports estreitos garantem 44x44px */
+@media (max-width: 640px) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+}
+
 /* ----- Cards ----- */
 .card {
   background: var(--bg-surface);
