@@ -54,20 +54,22 @@ public class GetDashboardFullUseCase(
 
     private static DashboardKpisDelta CalculateDelta(DashboardKpis current, DashboardKpis previous)
     {
+        // null = "sem base de comparação" (período anterior vazio). A view renderiza "—" em vez de
+        // confundir o usuário com "+100%" quando o valor anterior era zero.
         return new DashboardKpisDelta(
             Receita: CalcPct(current.Receita, previous.Receita),
             TicketMedio: CalcPct(current.TicketMedio, previous.TicketMedio),
             Pedidos: CalcPct(current.Pedidos, previous.Pedidos),
             ItensEmEstoque: CalcPct(current.ItensEmEstoque, previous.ItensEmEstoque),
             CustoEstoque: CalcPct(current.CustoEstoque, previous.CustoEstoque),
-            MargemBruta: current.MargemBruta - previous.MargemBruta,
+            MargemBruta: previous.Receita == 0 ? null : Math.Round(current.MargemBruta - previous.MargemBruta, 1),
             LotesProduzidos: CalcPct(current.LotesProduzidos, previous.LotesProduzidos),
             ClientesAtivos: CalcPct(current.ClientesAtivos, previous.ClientesAtivos));
     }
 
-    private static decimal CalcPct(decimal current, decimal previous)
+    private static decimal? CalcPct(decimal current, decimal previous)
     {
-        if (previous == 0) return current > 0 ? 100m : 0m;
+        if (previous == 0) return null;
         return Math.Round((current - previous) / previous * 100m, 1);
     }
 
@@ -76,10 +78,10 @@ public class GetDashboardFullUseCase(
     {
         var insights = new List<InsightDto>();
 
-        if (delta.Receita < -15m)
-            insights.Add(new InsightDto("receita", "alert", $"Receita caiu {Math.Abs(delta.Receita):0.#}% em relação ao período anterior."));
-        else if (delta.Receita > 15m)
-            insights.Add(new InsightDto("receita", "positive", $"Receita subiu {delta.Receita:0.#}%! Bom período para o negócio."));
+        if (delta.Receita is decimal dR && dR < -15m)
+            insights.Add(new InsightDto("receita", "alert", $"Receita caiu {Math.Abs(dR):0.#}% em relação ao período anterior."));
+        else if (delta.Receita is decimal dRp && dRp > 15m)
+            insights.Add(new InsightDto("receita", "positive", $"Receita subiu {dRp:0.#}%! Bom período para o negócio."));
 
         if (kpis.MargemBruta > 0 && kpis.MargemBruta < 20m)
             insights.Add(new InsightDto("margem", "warning", "Margem baixa. Revise seus custos ou ajuste preços de venda."));
@@ -94,8 +96,8 @@ public class GetDashboardFullUseCase(
         if (pendentesCount > 0)
             insights.Add(new InsightDto("pedidos", "warning", $"{pendentesCount} pedidos aguardando pagamento."));
 
-        if (delta.ClientesAtivos > 20m)
-            insights.Add(new InsightDto("clientes", "positive", $"Base de clientes cresceu {delta.ClientesAtivos:0.#}% no período."));
+        if (delta.ClientesAtivos is decimal dC && dC > 20m)
+            insights.Add(new InsightDto("clientes", "positive", $"Base de clientes cresceu {dC:0.#}% no período."));
 
         return insights;
     }

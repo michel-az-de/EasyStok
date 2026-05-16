@@ -181,14 +181,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal PercentualCritico);
 
     public sealed record DashboardKpisDelta(
-        decimal Receita,
-        decimal TicketMedio,
-        decimal Pedidos,
-        decimal ItensEmEstoque,
-        decimal CustoEstoque,
-        decimal MargemBruta,
-        decimal LotesProduzidos,
-        decimal ClientesAtivos);
+        decimal? Receita,
+        decimal? TicketMedio,
+        decimal? Pedidos,
+        decimal? ItensEmEstoque,
+        decimal? CustoEstoque,
+        decimal? MargemBruta,
+        decimal? LotesProduzidos,
+        decimal? ClientesAtivos);
 
     public sealed record EstoqueStatusDistribuicao(
         int Ok,

@@ -192,7 +192,7 @@
                              x-text="fmt.pct(data.kpis.margemBruta)"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.margemBruta)" class="text-xs font-semibold"
-                                  x-text="(data.delta.margemBruta > 0 ? '+' : '') + fmt.pct(data.delta.margemBruta) + ' pp'"></span>
+                                  x-text="data.delta.margemBruta == null ? '—' : (data.delta.margemBruta > 0 ? '+' : '') + data.delta.margemBruta.toFixed(1).replace('.', ',') + ' pp'"></span>
                             <span class="text-xs text-slate-400">vs anterior</span>
                         </div>
                     </div>
