@@ -7,9 +7,10 @@
 //    setar window.CDB_CONFIG = { apiBaseUrl: 'https://easystock.exemplo.com' }
 //    ANTES de carregar este script (via config.js ou capacitor.config).
 //
-// Offline-first: toda mutação vai pra uma fila persistente em localStorage.
-// Fila é drenada quando a rede volta ou a cada 30s. O app funciona 100% sem
-// rede — sync é oportunístico, nunca bloqueante.
+// Offline-first: toda mutação vai pra uma fila persistente (IndexedDB primário,
+// localStorage fallback). Fila é drenada quando a rede volta ou a cada 30s.
+// O app funciona 100% sem rede — sync é oportunístico, nunca bloqueante.
+// F10-C-2: queue-store.js provê IDB wrapper com migração dual-read.
 
 (function () {
   'use strict';
@@ -227,25 +228,61 @@
   }
 
   // ---- Fila persistente ----
-  function loadQueue() {
+  // F10-C-2: bridge sincrona pra cdbQueueStore (IDB async).
+  // _queueCache mantém cópia em memória pra chamadas sync (loadQueue/saveQueue)
+  // — IDB é atualizado em background. Boot chama _initQueueStore() pra
+  // popular o cache. Fallback: localStorage direto se IDB indisponível.
+  let _queueCache = null; // null = não inicializado; [] = vazio
+  let _queueStoreReady = false;
+
+  async function _initQueueStore() {
+    try {
+      if (typeof window.cdbQueueStore !== 'undefined') {
+        const result = await window.cdbQueueStore.init();
+        _queueStoreReady = true;
+        _queueCache = await window.cdbQueueStore.loadAll();
+        _trace('boot', 'queue-store inicializado', { storage: result.storage, items: _queueCache.length, degraded: result.degraded });
+        return result;
+      }
+    } catch (e) {
+      _trace('boot', 'queue-store init falhou, usando localStorage', { error: e && e.message });
+    }
+    // Fallback: carregar de localStorage
+    _queueCache = _loadQueueLS();
+    _queueStoreReady = true;
+    return { storage: 'localStorage', degraded: true };
+  }
+
+  function _loadQueueLS() {
     try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
   }
+
+  function loadQueue() {
+    if (_queueCache !== null) return _queueCache;
+    return _loadQueueLS();
+  }
+
   function saveQueue(q) {
+    _queueCache = q;
+    // Persist to IDB (async, fire-and-forget) + localStorage (sync fallback)
     try {
       localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
     } catch (e) {
-      // QuotaExceededError: localStorage cheio (~5MB). Não descarta a fila —
-      // avisar o operador para conectar à rede e sincronizar antes de continuar.
       if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
         console.error('[sync] localStorage quota excedido — fila nao salva, conecte e sincronize!');
         try {
           if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
             window.cdbApp.showToast('Memória local cheia. Conecte à internet para sincronizar.', 'error');
           }
-          // Força flush imediato se online — drena fila antes de acumular mais.
           if (navigator.onLine) setTimeout(flush, 500);
         } catch (_) {}
       }
+    }
+    // Async persist to IDB
+    if (_queueStoreReady && typeof window.cdbQueueStore !== 'undefined' && !window.cdbQueueStore.degraded) {
+      window.cdbQueueStore.saveAll(q).catch(function (e) {
+        console.warn('[sync] IDB saveAll falhou:', e && e.message);
+      });
     }
   }
 
@@ -291,14 +328,20 @@
     // Deep clone pra nao mutar o estado local — operador segue vendo as fotos.
     const clone = JSON.parse(JSON.stringify(batch));
     if (isHeavyDataUrl(clone.batchPhoto)) {
-      clone.batchPhotoHash = simpleHash(clone.batchPhoto);
+      const hash = simpleHash(clone.batchPhoto);
+      clone.batchPhotoHash = hash;
+      // F10-C-7: persiste foto no photo-store IDB antes de descartar bytes.
+      _persistPhotoAsync(hash, clone.batchPhoto, batch.id || '', 'batchPhoto');
       delete clone.batchPhoto;
     }
     if (Array.isArray(clone.items)) {
-      clone.items = clone.items.map(item => {
+      clone.items = clone.items.map((item, idx) => {
         if (item && isHeavyDataUrl(item.photo)) {
           const out = Object.assign({}, item);
-          out.photoHash = simpleHash(item.photo);
+          const hash = simpleHash(item.photo);
+          out.photoHash = hash;
+          // F10-C-7: persiste foto do item no photo-store IDB.
+          _persistPhotoAsync(hash, item.photo, batch.id || '', 'item:' + idx);
           delete out.photo;
           return out;
         }
@@ -306,6 +349,19 @@
       });
     }
     return clone;
+  }
+
+  // F10-C-7: fire-and-forget persist de foto no IDB photo-store.
+  // Falha silenciosa — se IDB indisponivel, foto se perde (mesmo
+  // comportamento de antes do F10-C-7, mas agora com tentativa de salvar).
+  function _persistPhotoAsync(hash, dataUrl, batchId, field) {
+    try {
+      if (window.cdbPhotoStore && window.cdbPhotoStore.ready) {
+        window.cdbPhotoStore.save(hash, dataUrl, batchId, field).catch(function (e) {
+          console.warn('[sync] photo-store save failed:', hash, e && e.message);
+        });
+      }
+    } catch (e) {}
   }
 
   // ---- Calcula diff entre estados e gera mutations ----
@@ -343,9 +399,47 @@
     return muts;
   }
 
+  // ---- F10-C-1: gerador de UUID v4 estavel pra mutation IDs ----
+  // crypto.randomUUID e' garantido em Chrome 92+/Safari 15.4+/Firefox 95+.
+  // Capacitor 6 minimum Chrome 100. Fallback formata bytes de
+  // crypto.getRandomValues pra v4 — mesma fonte de entropia,
+  // criptograficamente seguro, zero colisao em volumes realistas
+  // (122 bits aleatorios).
+  function generateMutationUuid() {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch (_) {}
+    // Fallback v4: 16 bytes random, set version 4 + variant 10xx
+    try {
+      const buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+      buf[8] = (buf[8] & 0x3f) | 0x80; // variant 10
+      const hex = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+      return hex.substring(0,8) + '-' + hex.substring(8,12) + '-' +
+             hex.substring(12,16) + '-' + hex.substring(16,20) + '-' +
+             hex.substring(20);
+    } catch (_) {
+      // Ultimo fallback (caso crypto.getRandomValues nao exista): timestamp
+      // + Math.random. Inferior, mas operacao continua funcionando.
+      return 'fb-' + Date.now() + '-' +
+             Math.random().toString(36).substr(2, 8) +
+             Math.random().toString(36).substr(2, 8);
+    }
+  }
+
   // ---- Enfileira mutations ----
   function enqueue(mutations) {
     if (!mutations.length) return;
+    // F10-C-5: bloqueia enqueues nao-criticas durante OTA.
+    if (_mutationsBlocked) {
+      mutations = mutations.filter(function (m) {
+        return CRITICAL_MUTATION_TYPES[m.type] === true;
+      });
+      if (!mutations.length) return;
+    }
     let queue = loadQueue();
     mutations.forEach(m => {
       // Dedup local: se ja tem mutation pendente pro mesmo (type, payload.id),
@@ -358,7 +452,11 @@
           !(q.type === m.type && q.payload && q.payload.id === m.payload.id));
       }
       queue.push({
-        id: 'm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+        // F10-C-1: UUID v4 via crypto.randomUUID (Chrome 92+, garantido no
+        // Capacitor 6 com Chrome 100+). Fallback usa crypto.getRandomValues
+        // formatado pra v4 — mesma fonte de entropia, sem Math.random fraco.
+        // Prefixo 'mut_' facilita filtro em logs e diferencia de UUIDs do server.
+        id: 'mut_' + generateMutationUuid(),
         deviceId,
         type: m.type,
         payload: m.payload,
@@ -438,7 +536,18 @@
   // OFFLINE-FIRST: se servidor indisponivel, fila persiste no localStorage
   // e proximo flush (30s ou quando rede voltar) tenta de novo. App continua
   // funcional sem rede em qualquer cenario.
-  let flushing = false;
+  // F10-C-1: promise-based mutex substitui o `flushing` boolean.
+  // Race condition antiga: Android suspende WebView entre `flushing = true`
+  // e o POST; outro tick (visibilitychange/setInterval) entra, le `flushing`
+  // ja como false porque `finally` rodou apos resume — 2 POSTs simultaneos
+  // com a mesma fila. Resultado: server processa 2x (idempotente por upsert
+  // mas gasta CPU+log, e em conflict-flow podia rejeitar a 2a wave inteira).
+  //
+  // Promise-based: chamadas concorrentes recebem a MESMA promise pendente.
+  // Re-entry vira merge automatico; ninguem perde resultado. Callers que
+  // ignoram retorno (fire-and-forget) seguem funcionando — promise so e'
+  // referenciada se quiserem await.
+  let flushPromise = null;
   // Marcador soft de pairing invalidado (revogado/expirado no server).
   // Não deletamos o pairing local — Felipe pode re-parear sem perder fila.
   // Quando true: stop tentando flush ate operador re-parear OU clearPairing.
@@ -451,7 +560,13 @@
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
   async function flush() {
-    if (flushing) return 'busy';
+    // F10-C-1: re-entry retorna a MESMA promise pendente. Sem race.
+    if (flushPromise) return flushPromise;
+    flushPromise = _flushInner().finally(() => { flushPromise = null; });
+    return flushPromise;
+  }
+
+  async function _flushInner() {
     if (_pairingInvalid) return 'auth'; // backoff até re-parear
     const queue = loadQueue();
     if (queue.length === 0) {
@@ -460,7 +575,6 @@
     }
     if (!navigator.onLine) return 'offline';
 
-    flushing = true;
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
       // Operador lido dinamicamente a cada sync — se o usuário trocar o nome
@@ -562,6 +676,12 @@
       updatePendingCount();
       // Sucesso — reseta backoff pra delay normal no proximo tick.
       _consecutiveFlushFailures = 0;
+      // F10-C-7: dispara upload de fotos em background apos flush bem-sucedido.
+      try {
+        if (window.cdbPhotoUpload && typeof window.cdbPhotoUpload.flush === 'function') {
+          window.cdbPhotoUpload.flush(); // fire-and-forget
+        }
+      } catch (_) {}
       return 'ok';
     } catch (e) {
       console.warn('Erro no sync:', e.message);
@@ -574,9 +694,8 @@
         );
       }
       return 'retry';
-    } finally {
-      flushing = false;
     }
+    // F10-C-1: o reset do flushPromise mora no `.finally(...)` do wrapper flush().
   }
 
   // ---- Pull: traz mudanças do servidor (outros devices) ----
@@ -814,6 +933,17 @@
   // a webview; no browser puro tambem cobre fechamento de aba.
   window.addEventListener('pagehide', stop);
 
+  // F10-C-5: limpa locks de OTA expirados (TTL 60s). Se app fechou durante
+  // OTA, heartbeat parou e o lock expirou — boot limpa.
+  try {
+    const lockTs = parseInt(localStorage.getItem(UPDATE_LOCK_KEY) || '0', 10);
+    if (lockTs && (Date.now() - lockTs > UPDATE_LOCK_TTL_MS)) {
+      localStorage.removeItem(UPDATE_LOCK_KEY);
+      localStorage.removeItem('cdb-mutations-blocked');
+      _trace('boot', 'OTA lock expirado — limpando');
+    }
+  } catch (_) {}
+
   setTimeout(() => {
     if (window.cdbApp) {
       const s = window.cdbApp.getState();
@@ -833,6 +963,18 @@
     // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
     // index.html escuta. Falha silenciosa nao bloqueia o app.
     maybeOfferRestoreOnReinstall();
+    // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
+    _initQueueStore().then(function () {
+      updatePendingCount();
+    }).catch(function (e) {
+      _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
+    });
+    // F10-C-7: inicializa photo-store IDB (separado do queue-store).
+    if (window.cdbPhotoStore && typeof window.cdbPhotoStore.init === 'function') {
+      window.cdbPhotoStore.init().catch(function (e) {
+        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+      });
+    }
     flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
     // Loop self-rescheduling com backoff exponencial em erro (substitui o
     // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
@@ -1356,8 +1498,6 @@
             // Outro device sincronizou — puxa atualizações.
             console.log('[realtime] mutations-applied de', data.originDeviceId);
             pull();
-            // KDS e outras views standalone escutam esse evento pra refazer
-            // fetch independente sem depender do estado local da PWA.
             try {
               window.dispatchEvent(new CustomEvent('cdb-mutations-applied', { detail: data }));
             } catch (_) {}
@@ -1581,7 +1721,34 @@
   // cdb-update-in-progress mora no localStorage — sobrevive a reload e impede
   // que um segundo ciclo dispare se o reload do controllerchange demorar.
   const UPDATE_LOCK_KEY = 'cdb-update-in-progress';
-  const UPDATE_LOCK_TTL_MS = 5 * 60 * 1000;
+  // F10-C-5: TTL reduzido pra 60s + heartbeat 5s. Se app fechar durante OTA,
+  // TTL expira rapido e boot seguinte limpa o lock.
+  const UPDATE_LOCK_TTL_MS = 60 * 1000;
+  const UPDATE_HEARTBEAT_MS = 5000;
+  let _updateHeartbeatTimer = null;
+
+  function startUpdateHeartbeat() {
+    stopUpdateHeartbeat();
+    _updateHeartbeatTimer = setInterval(function () {
+      try { localStorage.setItem(UPDATE_LOCK_KEY, String(Date.now())); } catch (_) {}
+    }, UPDATE_HEARTBEAT_MS);
+  }
+
+  function stopUpdateHeartbeat() {
+    if (_updateHeartbeatTimer) {
+      clearInterval(_updateHeartbeatTimer);
+      _updateHeartbeatTimer = null;
+    }
+  }
+
+  // F10-C-5: flag que bloqueia enqueues nao-criticas durante OTA.
+  let _mutationsBlocked = false;
+  const CRITICAL_MUTATION_TYPES = {
+    'order.upsert': true, 'order.update': true,
+    'cashEntry.upsert': true, 'cashEntry.update': true,
+    'batch.upsert': true, 'batch.update': true,
+    'cashClosing.upsert': true
+  };
   // Schema minimo do servidor que esta versao do PWA requer. Bate com
   // MobileVersionController.mobileSchemaVersion. Bump quando o PWA passar a
   // depender de mutations/comandos novos.
@@ -1726,6 +1893,16 @@
     }
 
     _pwaUpdating = true;
+    // F10-C-5: bloqueia mutations nao-criticas + heartbeat
+    _mutationsBlocked = true;
+    localStorage.setItem('cdb-mutations-blocked', 'true');
+    startUpdateHeartbeat();
+    try {
+      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+        window.cdbApp.showToast('Atualizando — aguarde 10s...', 'info');
+      }
+    } catch (_) {}
+
     let drainedOk = false;
     let drainRemaining = 0;
     let backupOk = false;
@@ -1818,7 +1995,13 @@
       // pra sempre se o reload nao acontecer. Tambem libera o lock persistente
       // (cdb-update-in-progress) caso a pagina nao recarregue (ex: registration
       // ja era nula). Em fluxo normal o reload limpa tudo via TTL.
-      setTimeout(() => { _pwaUpdating = false; releaseUpdateLock(); }, 5000);
+      setTimeout(() => {
+        _pwaUpdating = false;
+        _mutationsBlocked = false;
+        try { localStorage.removeItem('cdb-mutations-blocked'); } catch (_) {}
+        stopUpdateHeartbeat();
+        releaseUpdateLock();
+      }, 5000);
     }
   }
 
@@ -2259,6 +2442,15 @@
     lastBackupAt: () => parseInt(localStorage.getItem(LAST_BACKUP_KEY) || '0', 10) || 0,
     queueSize: () => loadQueue().length,
     clearQueue: () => { saveQueue([]); updatePendingCount(); },
+    // F10-C-2: acesso ao queue-store pra diagnostico e export/import
+    queueStore: typeof window.cdbQueueStore !== 'undefined' ? window.cdbQueueStore : null,
+    getQueueStats: async () => {
+      if (typeof window.cdbQueueStore !== 'undefined' && window.cdbQueueStore.ready) {
+        return window.cdbQueueStore.getStats();
+      }
+      var q = loadQueue();
+      return { queueCount: q.length, deadletterCount: 0, conflictCount: 0, storage: 'localStorage', degraded: true };
+    },
     pushAll, pushAllAndFlush,
     // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
     forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
