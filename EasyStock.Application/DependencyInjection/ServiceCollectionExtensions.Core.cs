@@ -53,6 +53,12 @@ using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
+using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
+using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
+using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
+using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
+using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
+using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -157,6 +163,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+
+        // Modulo Fiscal NFC-e (F1) — 6 use cases sobre Nfe*
+        services.AddScoped<EmitirNfceUseCase>();
+        services.AddScoped<CancelarNfeUseCase>();
+        services.AddScoped<InutilizarNumeracaoUseCase>();
+        services.AddScoped<ConsultarNfeUseCase>();
+        services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
+        services.AddScoped<ReprocessarContingenciaUseCase>();
 
         return services;
     }

@@ -1,0 +1,254 @@
+using EasyStock.Api.Http;
+using EasyStock.Api.Models.Fiscal;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Fiscal;
+using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
+using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
+using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
+using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
+using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Fiscal;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Swashbuckle.AspNetCore.Annotations;
+
+namespace EasyStock.Api.Controllers;
+
+/// <summary>
+/// Endpoints fiscais da NFC-e modelo 65. Tenant resolvido automaticamente via
+/// <see cref="ICurrentUserAccessor.EmpresaId"/>. Emissao + Cancelamento +
+/// Inutilizacao + Consulta + Listagem.
+/// </summary>
+[SwaggerTag("Notas Fiscais (NFC-e)")]
+[Authorize]
+[ValidateEmpresaId]
+[ApiController]
+[Route("api/notas-fiscais")]
+public class NotasFiscaisController(
+    EmitirNfceUseCase emitirUseCase,
+    CancelarNfeUseCase cancelarUseCase,
+    InutilizarNumeracaoUseCase inutilizarUseCase,
+    ConsultarNfeUseCase consultarUseCase,
+    INfeRepository nfeRepo,
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+{
+    [SwaggerOperation(Summary = "Emite uma NFC-e em homologacao ou producao conforme config do tenant")]
+    [ProducesResponseType(typeof(NfeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [HttpPost("emitir")]
+    [EnableRateLimiting("nfe-emitir")]
+    public async Task<IActionResult> Emitir(
+        [FromBody] EmitirNfceRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        var cmd = new EmitirNfceCommand(
+            EmpresaId: eid,
+            PedidoId: req.PedidoId,
+            IdempotencyKey: req.IdempotencyKey,
+            TotalNota: req.TotalNota,
+            Emitente: new DadosEmitenteInput(
+                req.Emitente.Cnpj,
+                req.Emitente.RazaoSocial,
+                req.Emitente.NomeFantasia,
+                req.Emitente.InscricaoEstadual,
+                req.Emitente.InscricaoMunicipal),
+            Destinatario: req.Destinatario is null
+                ? null
+                : new DadosDestinatarioInput(req.Destinatario.CpfCnpj, req.Destinatario.Nome, req.Destinatario.Email),
+            Itens: req.Itens
+                .Select(i => new EmitirNfceItemInput(
+                    NomeSnapshot: i.NomeSnapshot,
+                    Quantidade: i.Quantidade,
+                    PrecoUnitario: i.PrecoUnitario,
+                    Unidade: i.Unidade,
+                    Ncm: i.Ncm,
+                    Cfop: i.Cfop,
+                    ProdutoIdSnapshot: i.ProdutoIdSnapshot,
+                    OrigemMercadoria: i.OrigemMercadoria,
+                    CstOuCsosn: i.CstOuCsosn))
+                .ToList(),
+            UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
+            UsuarioNome: currentUser.Nome,
+            Origem: "api");
+
+        var result = await emitirUseCase.ExecuteAsync(cmd);
+        var nfe = await nfeRepo.GetByIdAsync(eid, result.NfeId, ct);
+        return DataOk(MapToResponse(nfe!));
+    }
+
+    [SwaggerOperation(Summary = "Cancela uma NFC-e autorizada (prazo SEFAZ 24h)")]
+    [ProducesResponseType(typeof(CancelarNfeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/cancelar")]
+    public async Task<IActionResult> Cancelar(
+        Guid id,
+        [FromBody] CancelarNfeRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        try
+        {
+            var result = await cancelarUseCase.ExecuteAsync(new CancelarNfeCommand(
+                EmpresaId: eid,
+                NfeId: id,
+                Motivo: req.Motivo,
+                UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
+                UsuarioNome: currentUser.Nome,
+                Origem: "api"));
+
+            return DataOk(new CancelarNfeResponse
+            {
+                Id = result.NfeId,
+                Status = result.Status,
+                ProtocoloEvento = result.ProtocoloEvento,
+            });
+        }
+        catch (RegraDeDominioVioladaException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Inutiliza uma faixa de numeracao no mesmo ano fiscal")]
+    [ProducesResponseType(typeof(InutilizarNumeracaoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("inutilizar")]
+    public async Task<IActionResult> Inutilizar(
+        [FromBody] InutilizarNumeracaoRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        var result = await inutilizarUseCase.ExecuteAsync(new InutilizarNumeracaoCommand(
+            EmpresaId: eid,
+            Serie: req.Serie,
+            NumeroInicial: req.NumeroInicial,
+            NumeroFinal: req.NumeroFinal,
+            Justificativa: req.Justificativa,
+            UsuarioId: currentUser.UserId == Guid.Empty ? null : currentUser.UserId,
+            UsuarioNome: currentUser.Nome,
+            Origem: "api"));
+
+        return DataOk(new InutilizarNumeracaoResponse
+        {
+            ProtocoloEvento = result.ProtocoloEvento,
+            DataInutilizacao = result.DataInutilizacao,
+        });
+    }
+
+    [SwaggerOperation(Summary = "Detalhe de uma NFC-e com itens e eventos")]
+    [ProducesResponseType(typeof(NfeDetalheResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> Detalhe(
+        Guid id,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        var result = await consultarUseCase.ExecuteAsync(new ConsultarNfeQuery(eid, id));
+        if (result is null) return DataNotFound("NFC-e nao encontrada.");
+
+        return DataOk(new NfeDetalheResponse
+        {
+            Nfe = new NfeResponse
+            {
+                Id = result.Id,
+                ChaveAcesso = result.ChaveAcesso,
+                Status = result.Status,
+                Modelo = result.Modelo,
+                Serie = result.Serie,
+                Numero = result.Numero,
+                ProtocoloAutorizacao = result.ProtocoloAutorizacao,
+                DataAutorizacao = result.DataAutorizacao,
+                MotivoRejeicao = result.MotivoRejeicao,
+                DanfeUrl = result.DanfeUrl,
+                TotalNota = result.TotalNota,
+                CriadoEm = result.CriadoEm,
+                AlteradoEm = result.AlteradoEm,
+            },
+            Itens = result.Itens.Select(i => new NfeItemResponse
+            {
+                Id = i.Id,
+                Ordem = i.Ordem,
+                NomeSnapshot = i.NomeSnapshot,
+                Quantidade = i.Quantidade,
+                PrecoUnitario = i.PrecoUnitario,
+                Unidade = i.Unidade,
+                Ncm = i.Ncm,
+                Cfop = i.Cfop,
+                CstOuCsosn = i.CstOuCsosn,
+            }).ToList(),
+            Eventos = result.Eventos.Select(e => new NfeEventoResponse
+            {
+                Id = e.Id,
+                Tipo = e.Tipo,
+                OcorridoEm = e.OcorridoEm,
+                UsuarioNome = e.UsuarioNome,
+                Origem = e.Origem,
+            }).ToList(),
+        });
+    }
+
+    [SwaggerOperation(Summary = "Lista NFC-e paginada por tenant + filtros opcionais")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet]
+    public async Task<IActionResult> Listar(
+        [FromQuery] Guid? empresaId,
+        [FromQuery] StatusNfe? status,
+        [FromQuery] DateTime? desde,
+        [FromQuery] DateTime? ate,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        var (p, sz) = NormalisePage(page, pageSize, maxPageSize: 100);
+        var (items, total) = await nfeRepo.GetByEmpresaAsync(eid, p, sz, status, desde, ate, search, ct);
+
+        var dtos = items.Select(n => new NfeListItemResponse
+        {
+            Id = n.Id,
+            ChaveAcesso = n.ChaveAcesso,
+            Status = n.Status,
+            Serie = n.Serie,
+            Numero = n.Numero,
+            TotalNota = n.TotalNota.Valor,
+            CriadoEm = n.CriadoEm,
+            DataAutorizacao = n.DataAutorizacao,
+        });
+
+        return DataPaged(dtos, total, p, sz);
+    }
+
+    private static NfeResponse MapToResponse(NfeDocumento nfe) => new()
+    {
+        Id = nfe.Id,
+        ChaveAcesso = nfe.ChaveAcesso,
+        Status = nfe.Status,
+        Modelo = nfe.Modelo,
+        Serie = nfe.Serie,
+        Numero = nfe.Numero,
+        ProtocoloAutorizacao = nfe.ProtocoloAutorizacao,
+        DataAutorizacao = nfe.DataAutorizacao,
+        MotivoRejeicao = nfe.MotivoRejeicao,
+        DanfeUrl = nfe.DanfeUrl,
+        TotalNota = nfe.TotalNota.Valor,
+        CriadoEm = nfe.CriadoEm,
+        AlteradoEm = nfe.AlteradoEm,
+    };
+}
