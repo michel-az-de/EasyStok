@@ -358,6 +358,76 @@ html, body {
 /* dot indicator */
 .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; display: inline-block; }
 
+/* ----- Form field primitive (consumido por _FormField.cshtml) ----- */
+.ui-form-field { display: flex; flex-direction: column; gap: 6px; }
+.ui-form-field__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ui-form-field__required { color: var(--crit-600); font-weight: 600; }
+.ui-form-field__input { display: flex; flex-direction: column; }
+.ui-form-field__helper { font-size: 13px; color: var(--text-muted); margin: 0; }
+.ui-form-field__error {
+  font-size: 13px;
+  color: var(--crit-700);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-form-field--error .ui-field,
+.ui-form-field--error input,
+.ui-form-field--error select,
+.ui-form-field--error textarea {
+  border-color: var(--crit-500);
+  box-shadow: 0 0 0 1px var(--crit-500);
+}
+.ui-form-field--error .ui-form-field__label { color: var(--crit-700); }
+
+/* ----- Tooltip primitive (CSS-only via [data-tooltip]) ----- */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--ink-900);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--z-dropdown);
+  animation: tooltip-fade var(--motion-base) var(--ease-out) 400ms forwards;
+  opacity: 0;
+}
+@keyframes tooltip-fade {
+  to { opacity: 1; }
+}
+.ui-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: help;
+  user-select: none;
+}
+.ui-tooltip:hover { background: var(--ink-200); color: var(--ink-900); }
+
 /* ----- Logo (cube + wordmark) ----- */
 .logo {
   display: inline-flex;
