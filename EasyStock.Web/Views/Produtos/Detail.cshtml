@@ -10,9 +10,12 @@
     // o HTML parser. JS recebe string e parsea internamente em fichaTecnicaForm._hidratar.
     var atributosJsonRaw = JsonSerializer.Serialize(p.AtributosJson);
     var temFicha = !string.IsNullOrWhiteSpace(p.AtributosJson) && p.AtributosJson.Trim() != "{}";
+    // Tab so aparece pra produto Alimento ou pra qualquer produto que ja tenha ficha
+    // (preserva visibilidade caso operador tenha cadastrado em produto Fisico antes).
+    var mostrarFichaNutricional = p.Tipo == 1 || temFicha;
 
     // ── Integrity score ──
-    var iFields = new (bool ok, string label, int pts)[]
+    var iFieldsBase = new (bool ok, string label, int pts)[]
     {
         (p.Fotos.Any(),                               "Foto",        20),
         (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descrição",   15),
@@ -20,12 +23,14 @@
         (p.PrecoReferencia is > 0,                    "Preço",       15),
         (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cód.Barras",  10),
         (p.Variacoes.Any(),                           "Variações",   10),
-        (temFicha,                                    "Nutricional", 10),
         (!string.IsNullOrWhiteSpace(p.Marca),         "Marca",        5),
         (p.Dimensoes != null,                         "Dimensões",    5),
         (true,                                        "Nome",         3),
         (true,                                        "Categoria",    2),
     };
+    var iFields = mostrarFichaNutricional
+        ? iFieldsBase.Concat(new (bool ok, string label, int pts)[] { (temFicha, "Nutricional", 10) }).ToArray()
+        : iFieldsBase;
     var score = iFields.Where(f => f.ok).Sum(f => f.pts);
     var missing = iFields.Where(f => !f.ok).Select(f => f.label).ToList();
     // Map missing labels to edit form step
@@ -367,19 +372,22 @@
         <button @@click="tab='detalhes'"
                 :class="tab==='detalhes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Detalhes</button>
-        <button @@click="tab='nutricional'"
-                :class="tab==='nutricional' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-                class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
-            Nutricional
-            @if (temFicha)
-            {
-                <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="Ficha cadastrada"></span>
-            }
-            else
-            {
-                <span class="w-2 h-2 rounded-full bg-slate-300 flex-shrink-0" title="Sem ficha"></span>
-            }
-        </button>
+        @if (mostrarFichaNutricional)
+        {
+            <button @@click="tab='nutricional'"
+                    :class="tab==='nutricional' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+                    class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
+                Nutricional
+                @if (temFicha)
+                {
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="Ficha cadastrada"></span>
+                }
+                else
+                {
+                    <span class="w-2 h-2 rounded-full bg-slate-300 flex-shrink-0" title="Sem ficha"></span>
+                }
+            </button>
+        }
     </div>
 
 <!-- ═══ TAB: VARIACOES ═══ -->
@@ -815,6 +823,8 @@
     </div>
 
     <!-- ═══ TAB: NUTRICIONAL ═══ -->
+    @if (mostrarFichaNutricional)
+    {
     <div x-show="tab==='nutricional'" x-cloak>
         <div class="ws produto-detail-tab-card"
              x-data='fichaTecnicaForm("@p.ProdutoId", @Html.Raw(atributosJsonRaw))'
@@ -955,6 +965,7 @@
             </div>
         </div>
     </div>
+    }
 
     <!-- ═══ MODAL: EXCLUIR ═══ -->
     <div x-show="showExcluir" x-cloak
