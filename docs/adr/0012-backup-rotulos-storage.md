@@ -1,7 +1,7 @@
 # ADR 0012 — Backup e storage de rótulos publicados
 
 **Status:** Accepted (2026-05-16)
-**Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — `~/.claude/plans/pesquise-na-internet-sobre-iridescent-haven.md`. Aborda os "3 furos reais" levantados em revisão: storage de PDFs/PNGs/snapshots, backup com retenção legal, processo de restore-test.
+**Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — [docs/plan/p-02-rotulagem-nutricional.md](../plan/p-02-rotulagem-nutricional.md). Aborda os "3 furos reais" levantados em revisão: storage de PDFs/PNGs/snapshots, backup com retenção legal, processo de restore-test.
 
 ## Decisão
 
