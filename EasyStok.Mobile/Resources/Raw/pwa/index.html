@@ -16159,6 +16159,24 @@ function goProducaoTab(tab) {
 let calcProdutoSelecionado = null;
 let calcUltimoResultado = null;
 let calcSearchTimer = null;
+// Cache de produtos da busca atual (chave = id) para event-delegation segura,
+// evitando JSON.stringify embutido em onclick= (XSS persistente quando nome
+// do produto contem aspas/HTML). Reescrito a cada nova busca.
+let calcProdutosBusca = {};
+
+// Escape HTML helper — evita XSS persistente em pontos que ainda usam innerHTML
+// com dados vindos do servidor (nome de produto, nome de insumo, aviso, etc).
+// Sempre que possivel, prefira textContent ou createElement. Use este helper
+// apenas quando a estrutura HTML precisar ser montada inline.
+function calcEscapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[c]);
+}
 
 function calcOnEntrarTab() {
   // Pre-fill via prod-demand chip (G1): se localStorage tem flag, popula form
@@ -16212,13 +16230,28 @@ async function calcBuscarProdutos() {
         return;
       }
       box.classList.add('show');
-      box.innerHTML = produtos.map(p => `
+      // Cache produtos para event-delegation segura (sem JSON.stringify em onclick=)
+      calcProdutosBusca = {};
+      produtos.forEach(p => { if (p && p.id) calcProdutosBusca[String(p.id)] = p; });
+      box.innerHTML = produtos.map(p => {
+        const rendNum = Number(p.rendimentoBase);
+        const rendimento = isFinite(rendNum) ? rendNum : 0;
+        return `
         <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
-             onclick='calcSelecionarProduto(${JSON.stringify(p).replace(/'/g, "\\'")})'>
-          <div style="font-weight:600;">${p.nome}</div>
-          <div style="font-size:11px;color:var(--ink-mute);">Rende ${p.rendimentoBase} ${p.rendimentoUnidade}</div>
+             data-calc-prod-id="${calcEscapeHtml(p.id)}">
+          <div style="font-weight:600;">${calcEscapeHtml(p.nome)}</div>
+          <div style="font-size:11px;color:var(--ink-mute);">Rende ${rendimento} ${calcEscapeHtml(p.rendimentoUnidade)}</div>
         </div>
-      `).join('');
+      `;
+      }).join('');
+      // Event-delegation: substitui onclick='calcSelecionarProduto(...)' inline
+      box.querySelectorAll('[data-calc-prod-id]').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-calc-prod-id');
+          const prod = calcProdutosBusca[id];
+          if (prod) calcSelecionarProduto(prod);
+        });
+      });
     } catch (e) {
       showToast('Erro ao buscar produtos');
     }
@@ -16233,11 +16266,16 @@ function calcSelecionarProduto(p) {
   document.getElementById('calcProdSelected').textContent = `${p.nome} (rende ${p.rendimentoBase} ${p.rendimentoUnidade})`;
   document.getElementById('calcEmptyState').style.display = 'none';
 
-  // G7: chips de unidade contextual — filtra por compativeis
+  // G7: chips de unidade contextual — filtra por compativeis.
+  // calcUnidadesCompativeis retorna constantes do enum (Un/G/Kg/...) mas escapamos
+  // por defesa em profundidade — assim qualquer regressao futura nao vira XSS.
   const unidadeBase = p.unidadeMedidaBase || 'Un';
   const select = document.getElementById('calcUnidade');
   const compativeis = calcUnidadesCompativeis(unidadeBase);
-  select.innerHTML = compativeis.map(u => `<option value="${u}"${u === unidadeBase ? ' selected' : ''}>${u}</option>`).join('');
+  select.innerHTML = compativeis.map(u => {
+    const safe = calcEscapeHtml(u);
+    return `<option value="${safe}"${u === unidadeBase ? ' selected' : ''}>${safe}</option>`;
+  }).join('');
 
   calcOnQtdChange();
 }
@@ -16353,26 +16391,40 @@ function calcRenderResultado(r) {
 
   const list = document.getElementById('calcInsumosList');
   list.innerHTML = r.insumos.map(i => {
+    // Cor e literal — escolha entre constantes seguras de tema. Nao escapar aqui.
     let cor = 'var(--basil)';
+    // Status texto pode conter unidade vinda do servidor — escapar abaixo na injecao.
+    const unidadeReceitaSafe = calcEscapeHtml(i.unidadeReceita);
+    const unidadeSaldoSafe = calcEscapeHtml(i.unidadeSaldo);
     let status = 'Cobre';
     if (i.conversaoFalhou) { cor = '#ef6b6b'; status = 'Unidade incompativel'; }
-    else if (i.falta != null && i.falta > 0) { cor = '#ef6b6b'; status = `Falta ${i.falta.toFixed(3)} ${i.unidadeReceita}`; }
+    else if (i.falta != null && i.falta > 0) {
+      cor = '#ef6b6b';
+      const faltaNum = Number(i.falta);
+      status = `Falta ${isFinite(faltaNum) ? faltaNum.toFixed(3) : '0'} ${unidadeReceitaSafe}`;
+    }
 
-    const custoTxt = i.custoEstimadoLinha != null
-      ? `R$ ${i.custoEstimadoLinha.toFixed(2).replace('.', ',')}`
+    const custoNum = Number(i.custoEstimadoLinha);
+    const custoTxt = (i.custoEstimadoLinha != null && isFinite(custoNum))
+      ? `R$ ${custoNum.toFixed(2).replace('.', ',')}`
       : '—';
+
+    const qtdNum = Number(i.quantidadeNecessaria);
+    const saldoNum = Number(i.saldoAtual);
+    const qtdNec = isFinite(qtdNum) ? qtdNum.toFixed(3) : '0';
+    const saldo = isFinite(saldoNum) ? saldoNum.toFixed(3) : '0';
 
     return `
       <div style="background:var(--bg-elev);border-radius:12px;padding:12px;margin-bottom:8px;border-left:3px solid ${cor};">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-          <strong style="font-size:14px;">${i.insumoNome}</strong>
+          <strong style="font-size:14px;">${calcEscapeHtml(i.insumoNome)}</strong>
           <span style="font-size:11px;color:var(--ink-mute);">${custoTxt}</span>
         </div>
         <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">
-          Precisa ${i.quantidadeNecessaria.toFixed(3)} ${i.unidadeReceita} • Saldo ${i.saldoAtual.toFixed(3)} ${i.unidadeSaldo}
+          Precisa ${qtdNec} ${unidadeReceitaSafe} • Saldo ${saldo} ${unidadeSaldoSafe}
         </div>
         <div style="font-size:11px;color:${cor};margin-top:4px;font-weight:600;">${status}</div>
-        ${i.aviso ? `<div style="font-size:11px;color:var(--gold);margin-top:4px;">${i.aviso}</div>` : ''}
+        ${i.aviso ? `<div style="font-size:11px;color:var(--gold);margin-top:4px;">${calcEscapeHtml(i.aviso)}</div>` : ''}
       </div>
     `;
   }).join('');
