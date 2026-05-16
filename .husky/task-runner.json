@@ -1,0 +1,18 @@
+{
+   "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
+   "tasks": [
+      {
+         "name": "rotulagem-tests",
+         "group": "pre-commit",
+         "command": "dotnet",
+         "args": [
+            "test",
+            "--filter",
+            "Category=Rotulagem|Category=PdfSnapshot|Category=AiExtractor|Category=Architecture",
+            "--nologo",
+            "--verbosity",
+            "minimal"
+         ]
+      }
+   ]
+}
