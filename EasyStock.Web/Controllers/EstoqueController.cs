@@ -22,10 +22,25 @@ public class EstoqueController(
         ViewBag.Title = "Estoque";
         ViewBag.ActiveMenuItem = "Estoque";
 
-        var result = await svc.ListarAsync(page, status, categoria, search);
+        // Listagem paginada + contadores agregados em paralelo. Contadores
+        // separam "cadastrados" (= Paginacao.Total, inclui qty 0) de "com saldo"
+        // (qty > 0) pra que o cabecalho da tela bata com o KPI "Unidades em
+        // estoque" do dashboard, que conta unidades dos lotes com saldo.
+        // Skip nos contadores quando ha search ativo: a busca usa endpoint
+        // separado (estoque/buscar) que nao tem paginacao real, entao contar
+        // o universo total nao agrega valor.
+        var listarTask = svc.ListarAsync(page, status, categoria, search);
+        var contadoresTask = string.IsNullOrEmpty(search)
+            ? svc.ContadoresAsync(status, categoria)
+            : null;
+
+        var result = await listarTask;
+        var contadoresResp = contadoresTask is null ? null : await contadoresTask;
+
         if (HasError(result)) return View(new EstoqueListViewModel());
 
         var paged = result.Data!;
+        var contadores = contadoresResp is { Success: true, Data: { } d } ? d : null;
         var vm = new EstoqueListViewModel
         {
             Itens = paged.Data,
@@ -38,7 +53,9 @@ public class EstoqueController(
                 Pages = paged.Meta.Pages,
                 Total = paged.Meta.Total,
                 Limit = paged.Meta.Limit
-            }
+            },
+            LotesCadastrados = contadores?.Cadastrados,
+            LotesComSaldo = contadores?.ComSaldo
         };
         return View(vm);
     }

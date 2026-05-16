@@ -226,7 +226,8 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             MargemBruta: margemBruta,
             LotesProduzidos: lotesProduzidos,
             ClientesAtivos: clientesAtivos,
-            PercentualCritico: pctCritico);
+            PercentualCritico: pctCritico,
+            LotesAtivos: estoqueAgg?.Count ?? 0);
     }
 
     public async Task<EstoqueStatusDistribuicao> GetEstoqueStatusDistribuicaoAsync(Guid empresaId, Guid? lojaId = null)
@@ -344,14 +345,14 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
     }
 
     public async Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(
-        Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+        Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0)
     {
         de = DateTime.SpecifyKind(de, DateTimeKind.Utc);
         ate = DateTime.SpecifyKind(ate, DateTimeKind.Utc);
         var periodoDias = Math.Max(1, (int)(ate - de).TotalDays);
         var porDia = periodoDias <= 30;
 
-        var cacheKey = $"analytics:receita-custo:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{lojaId}";
+        var cacheKey = $"analytics:receita-custo:{empresaId}:{de:yyyyMMdd}:{ate:yyyyMMdd}:{lojaId}:{timezoneOffsetMinutes}";
         var cached = await GetCachedAsync<List<ReceitaCustoDia>>(cacheKey);
         if (cached is not null) return cached;
 
@@ -381,31 +382,42 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         // Antes usava SortedDictionary<string,...> com chave "dd/MM" — ordenacao
         // alfabetica colocava 01/05 antes de 15/04 e o grafico mostrava abril
         // depois de maio no eixo X.
+        //
+        // tzOffset: minutos retornados por Date.getTimezoneOffset() do cliente.
+        // Positivo a oeste de UTC (BRT = 180). Usamos AddMinutes(-tz) para mover
+        // o timestamp UTC para a hora LOCAL do cliente. ToLocalTime() seria
+        // errado: usa fuso do servidor (UTC no Render), entao pedidos de 13/05
+        // 21:27 UTC (= 13/05 18:27 BRT) caiam no bucket "14/05".
         var buckets = new SortedDictionary<DateTime, (decimal Receita, decimal Custo)>();
         var fmtLabel = porDia ? "dd/MM" : "MM/yyyy";
+        DateTime ToLocal(DateTime utc) => utc.AddMinutes(-timezoneOffsetMinutes);
         DateTime BucketKey(DateTime d) => porDia
             ? d.Date
             : new DateTime(d.Year, d.Month, 1);
 
         if (porDia)
         {
-            for (var d = de.Date; d <= ate.Date; d = d.AddDays(1))
+            var inicio = ToLocal(de).Date;
+            var fim = ToLocal(ate).Date;
+            for (var d = inicio; d <= fim; d = d.AddDays(1))
                 buckets[d] = (0m, 0m);
         }
         else
         {
-            for (var d = new DateTime(de.Year, de.Month, 1); d <= ate; d = d.AddMonths(1))
+            var inicio = new DateTime(ToLocal(de).Year, ToLocal(de).Month, 1);
+            var fim = ToLocal(ate);
+            for (var d = inicio; d <= fim; d = d.AddMonths(1))
                 buckets[d] = (0m, 0m);
         }
 
         foreach (var v in vendasRaw)
         {
-            var k = BucketKey(porDia ? v.DataVenda.ToLocalTime() : v.DataVenda);
+            var k = BucketKey(porDia ? ToLocal(v.DataVenda) : v.DataVenda);
             if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita + v.Valor, b.Custo);
         }
         foreach (var c in custoRaw)
         {
-            var k = BucketKey(porDia ? c.DataMovimentacao.ToLocalTime() : c.DataMovimentacao);
+            var k = BucketKey(porDia ? ToLocal(c.DataMovimentacao) : c.DataMovimentacao);
             if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita, b.Custo + c.Valor);
         }
 

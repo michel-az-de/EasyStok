@@ -6,7 +6,13 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote" : "lotes") em estoque</p>
+        <p>
+            @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote cadastrado" : "lotes cadastrados")
+            @if (Model.LotesComSaldo.HasValue && Model.LotesComSaldo.Value != Model.Paginacao.Total)
+            {
+                <span class="text-slate-400">· @Model.LotesComSaldo com saldo</span>
+            }
+        </p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"

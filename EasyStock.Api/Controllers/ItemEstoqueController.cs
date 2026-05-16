@@ -48,6 +48,22 @@ public class ItemEstoqueController(
         return DataPaged(dtos, totalCount, p, ps);
     }
 
+    [SwaggerOperation(Summary = "Contadores rapidos de estoque (cadastrados vs com saldo)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("contadores")]
+    public async Task<IActionResult> GetContadores(
+        [FromQuery] Guid empresaId,
+        [FromQuery] string? status = null,
+        [FromQuery] Guid? categoriaId = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var (cadastrados, comSaldo) = await itemEstoqueRepository.GetContadoresEstoqueAsync(resolvedEmpresaId, status, categoriaId);
+        return DataOk(new { cadastrados, comSaldo });
+    }
+
     private static object MapItemToDto(EasyStock.Domain.Entities.ItemEstoque i) => new
     {
         id = i.Id.ToString(),
