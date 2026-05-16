@@ -46,6 +46,8 @@ public class ProdutosService(ApiClient api, SessionService session)
             descricaoBase = vm.DescricaoBase,
             marca = vm.Marca,
             tipo = vm.Tipo,
+            // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Ja string no VM.
+            tipoEmbalagem = string.IsNullOrEmpty(vm.TipoEmbalagem) ? "Avulso" : vm.TipoEmbalagem,
             skuBase = vm.SkuBase,
             codigoBarras = vm.CodigoBarras,
             controlaValidade = vm.ControlaValidade,
@@ -109,6 +111,8 @@ public class ProdutosService(ApiClient api, SessionService session)
             descricaoBase = vm.DescricaoBase,
             marca = vm.Marca,
             tipo = vm.Tipo,
+            // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Ja string no VM.
+            tipoEmbalagem = string.IsNullOrEmpty(vm.TipoEmbalagem) ? "Avulso" : vm.TipoEmbalagem,
             skuBase = vm.SkuBase,
             codigoBarras = vm.CodigoBarras,
             controlaValidade = vm.ControlaValidade,

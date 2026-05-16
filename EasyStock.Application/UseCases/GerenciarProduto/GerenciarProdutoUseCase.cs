@@ -33,7 +33,9 @@ public sealed record AtualizarProdutoCommand(
     Guid UsuarioId = default,
     string? Motivo = null,
     string? Observacao = null,
-    string? ObservacaoInterna = null);
+    string? ObservacaoInterna = null,
+    // C2 (RDC 727/2022): default Avulso para nao quebrar callers existentes.
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
 
 public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
@@ -66,7 +68,9 @@ public sealed record ProdutoDetalheResult(
     DateTime? CriadoEm = null,
     DateTime? AlteradoEm = null,
     int? QuantidadeMinima = null,
-    int? QuantidadeCritica = null);
+    int? QuantidadeCritica = null,
+    // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -227,6 +231,7 @@ public sealed class GerenciarProdutoUseCase(
         produto.DescricaoBase = Normalizar(command.DescricaoBase);
         produto.Marca = Normalizar(command.Marca);
         produto.Tipo = command.Tipo;
+        produto.TipoEmbalagem = command.TipoEmbalagem; // C2 (RDC 727/2022)
         produto.CodigoBarras = Normalizar(command.CodigoBarras);
         produto.ControlaValidade = command.ControlaValidade;
         produto.Dimensoes = command.Dimensoes.ToValueObjectOrNull();
@@ -585,7 +590,8 @@ public sealed class GerenciarProdutoUseCase(
             CriadoEm: produto.CriadoEm,
             AlteradoEm: produto.AlteradoEm,
             QuantidadeMinima: produto.QuantidadeMinima,
-            QuantidadeCritica: produto.QuantidadeCritica);
+            QuantidadeCritica: produto.QuantidadeCritica,
+            TipoEmbalagem: produto.TipoEmbalagem); // C2 (RDC 727/2022)
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));

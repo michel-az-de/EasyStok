@@ -218,6 +218,8 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             MargemEstimada = p.MargemEstimada,
             Status = p.Status,
             Tipo = p.Tipo,
+            // C2 (RDC 727/2022): default "Avulso" se nulo ou ausente no payload do API.
+            TipoEmbalagem = string.IsNullOrEmpty(p.TipoEmbalagem) ? "Avulso" : p.TipoEmbalagem,
             ControlaValidade = p.ControlaValidade,
             DimensoesPeso = p.Dimensoes?.Peso,
             DimensoesLargura = p.Dimensoes?.Largura,
@@ -586,7 +588,9 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             fotoUrl = p.PrimeiraFotoUrl,
             categoriaId = p.CategoriaId,
             custoReferencia = p.CustoReferencia?.Valor,
-            precoReferencia = p.PrecoReferencia?.Valor
+            precoReferencia = p.PrecoReferencia?.Valor,
+            // C2 (RDC 727/2022): usado pelo Lotes/Index.cshtml para validar peso.
+            tipoEmbalagem = p.TipoEmbalagem.ToString()
         });
         return Json(items);
     }

@@ -33,19 +33,74 @@
     <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar lotes">
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar por código, operador, obs..." aria-label="Buscar lote" class="ui-field flex-1 min-w-48" />
         <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">Buscar</button>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("em_producao", "Em produção"), ("finalizado", "Finalizados") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">@label</a>
+                   class="inline-flex items-center whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")"
+                   title="@label" aria-label="@label">@label</a>
+            }
+            @* C2 (R10): chip "Pendentes de peso" so aparece quando ha lotes embalados sem peso. *@
+            @if (Model.PendentesPesoCount > 0)
+            {
+                var pendActive = Model.FiltroStatus == "pendente_peso";
+                <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = "pendente_peso" })"
+                   class="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-sm font-medium @(pendActive ? "bg-amber-600 text-white" : "bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100")"
+                   title="@Model.PendentesPesoCount lote(s) com item embalado sem peso (RDC 727)"
+                   aria-label="Pendentes de peso (@Model.PendentesPesoCount)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Pendentes de peso (@Model.PendentesPesoCount)
+                </a>
             }
         </div>
     </form>
 </div>
 
 <div class="ws">
-    @if (!Model.Items.Any())
+    @* C2 (R10): visualizacao especifica do filtro "Pendentes de peso". *@
+    @if (Model.FiltroStatus == "pendente_peso")
+    {
+        if (Model.PendentesPeso is null || Model.PendentesPeso.Count == 0)
+        {
+            <div class="p-6 text-center text-slate-500">
+                <p class="text-sm">Nenhum lote pendente de peso. Tudo conforme RDC 727 ✓</p>
+            </div>
+        }
+        else
+        {
+            <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+                <strong>@Model.PendentesPeso.Count lote(s) com itens embalados sem peso.</strong>
+                Abra cada lote e informe o peso por unidade antes de finalizar (RDC 727/2022).
+            </div>
+            <div class="overflow-x-auto">
+                <table class="tbl-full">
+                    <thead><tr><th>Código</th><th>Data</th><th>Itens pendentes</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var p in Model.PendentesPeso)
+                    {
+                        <tr>
+                            <td class="font-mono text-sm">@p.Codigo</td>
+                            <td class="text-xs text-slate-500">@p.DataProducao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                    @p.ItensPendentes item(ns) sem peso
+                                </span>
+                            </td>
+                            <td class="text-right">
+                                <a href="/lotes/@p.Id" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Backfill →</a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIllustration", "box" },
@@ -118,16 +173,61 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Itens</label>
+                <p class="text-xs text-slate-500 mb-2">
+                    Selecione um produto cadastrado para cada item.
+                    Produtos marcados como <strong>Embalado</strong> exigem peso (RDC 727/2022).
+                </p>
                 <template x-for="(it, i) in form.itens" :key="i">
-                    <div class="grid grid-cols-12 gap-2 mb-2">
-                        <input type="text"   x-model="it.nome"             placeholder="Nome"   class="ui-field text-sm col-span-4" />
-                        <input type="number" x-model.number="it.quantidade" min="1" placeholder="Qtd" class="ui-field text-sm col-span-2" />
-                        <input type="number" x-model.number="it.pesoG"     placeholder="g/un"  class="ui-field text-sm col-span-2" />
-                        <input type="number" x-model.number="it.validadeDias" placeholder="Val. (dias)" class="ui-field text-sm col-span-2" />
-                        <button type="button" @@click="form.itens.splice(i, 1)" class="col-span-2 text-xs text-red-600 hover:text-red-700">Remover</button>
+                    <div class="grid grid-cols-12 gap-2 mb-2 relative">
+                        @* Campo de busca de produto com autocomplete *@
+                        <div class="col-span-4 relative">
+                            <input type="text"
+                                   x-model="it.nome"
+                                   @@input.debounce.250ms="buscarProduto(i, it.nome)"
+                                   @@focus="if (it.nome) buscarProduto(i, it.nome)"
+                                   @@blur="setTimeout(() => sugestoes[i] = null, 200)"
+                                   placeholder="Buscar produto..."
+                                   class="ui-field text-base w-full"
+                                   :aria-invalid="erros[i]?.produto ? 'true' : 'false'" />
+                            @* Dropdown de sugestões *@
+                            <div x-show="sugestoes[i] && sugestoes[i].length > 0" x-cloak
+                                 class="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
+                                <template x-for="s in (sugestoes[i] || [])" :key="s.id">
+                                    <button type="button"
+                                            @@click="selecionarProduto(i, s)"
+                                            class="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50">
+                                        <span x-text="s.nome"></span>
+                                        <span x-show="s.tipoEmbalagem === 'Embalado'"
+                                              class="ml-2 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                            Embalado
+                                        </span>
+                                    </button>
+                                </template>
+                            </div>
+                            <p x-show="erros[i]?.produto" x-cloak class="mt-1 text-xs text-red-600" x-text="erros[i]?.produto"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" x-model.number="it.quantidade" min="1" step="1" placeholder="Qtd"
+                                   class="ui-field text-base w-full"
+                                   :aria-invalid="erros[i]?.quantidade ? 'true' : 'false'" />
+                            <p x-show="erros[i]?.quantidade" x-cloak class="mt-1 text-xs text-red-600" x-text="erros[i]?.quantidade"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" x-model.number="it.pesoG" min="1" step="1"
+                                   :placeholder="exigePeso(i) ? 'g/un *' : 'g/un (opcional)'"
+                                   class="ui-field text-base w-full"
+                                   :aria-invalid="erros[i]?.pesoG ? 'true' : 'false'" />
+                            <p x-show="erros[i]?.pesoG" x-cloak class="mt-1 text-xs text-red-600" x-text="erros[i]?.pesoG"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" x-model.number="it.validadeDias" min="1" step="1" placeholder="Val. (dias)"
+                                   class="ui-field text-base w-full" />
+                        </div>
+                        <button type="button" @@click="form.itens.splice(i, 1); delete erros[i]; delete sugestoes[i]"
+                                class="col-span-2 text-xs text-red-600 hover:text-red-700 min-h-[40px]">Remover</button>
                     </div>
                 </template>
-                <button type="button" @@click="form.itens.push({nome:'',quantidade:1,pesoG:null,validadeDias:35})" class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
+                <button type="button" @@click="form.itens.push({nome:'',produtoId:null,tipoEmbalagem:null,quantidade:1,pesoG:null,validadeDias:35})" class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
@@ -150,16 +250,82 @@
 function novoLoteModal() {
     return {
         open: false, loading: false, erroMsg: '',
+        erros: {},        // { [i]: { produto?, quantidade?, pesoG? } }
+        sugestoes: {},    // { [i]: [{id, nome, tipoEmbalagem}] }
         form: { codigoCustom: '', operadorNome: '', observacoes: '', itens: [] },
+
+        // C2 (R2): exige peso quando produto associado e Embalado.
+        // Fallback conservador: se nao tem produto vinculado, true (precisa selecionar).
+        exigePeso(i) {
+            const it = this.form.itens[i];
+            if (!it || !it.produtoId) return true;
+            return it.tipoEmbalagem === 'Embalado';
+        },
+
+        async buscarProduto(i, termo) {
+            if (!termo || termo.length < 2) { this.sugestoes[i] = null; return; }
+            try {
+                const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(termo)}&limit=8`);
+                if (!res.ok) { this.sugestoes[i] = null; return; }
+                const items = await res.json();
+                this.sugestoes[i] = items;
+            } catch { this.sugestoes[i] = null; }
+        },
+
+        selecionarProduto(i, p) {
+            const it = this.form.itens[i];
+            it.nome = p.nome;
+            it.produtoId = p.id;
+            it.tipoEmbalagem = p.tipoEmbalagem || 'Avulso';
+            this.sugestoes[i] = null;
+            // Limpa erro anterior do campo produto se havia.
+            if (this.erros[i]) { delete this.erros[i].produto; }
+        },
+
+        validarItens() {
+            const novosErros = {};
+            this.form.itens.forEach((it, i) => {
+                const itemErros = {};
+                // R1: sem produtoId, bloqueia (server tambem valida).
+                if (!it.produtoId) itemErros.produto = 'Selecione um produto cadastrado.';
+                if (!it.quantidade || it.quantidade < 1) itemErros.quantidade = 'Mínimo 1.';
+                // R2: peso obrigatorio se Embalado.
+                if (this.exigePeso(i) && (it.pesoG == null || it.pesoG <= 0)) {
+                    itemErros.pesoG = it.produtoId
+                        ? 'Peso obrigatório (RDC 727).'
+                        : 'Selecione produto primeiro.';
+                }
+                if (Object.keys(itemErros).length) novosErros[i] = itemErros;
+            });
+            this.erros = novosErros;
+            return Object.keys(novosErros).length === 0;
+        },
+
         async submitForm() {
             this.loading = true; this.erroMsg = '';
+            if (this.form.itens.length === 0) {
+                this.erroMsg = 'Adicione pelo menos um item.';
+                this.loading = false;
+                return;
+            }
+            if (!this.validarItens()) {
+                this.erroMsg = 'Corrija os campos destacados.';
+                this.loading = false;
+                return;
+            }
             try {
                 const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
                 const payload = {
                     codigoCustom: this.form.codigoCustom || null,
                     operadorNome: this.form.operadorNome || null,
                     observacoes: this.form.observacoes,
-                    itens: this.form.itens.filter(i => i.nome && i.quantidade > 0)
+                    itens: this.form.itens.map(i => ({
+                        nome: i.nome,
+                        produtoId: i.produtoId,
+                        quantidade: i.quantidade,
+                        pesoG: i.pesoG,
+                        validadeDias: i.validadeDias
+                    }))
                 };
                 const res = await fetch('/lotes/json', {
                     method: 'POST',
@@ -168,7 +334,7 @@ function novoLoteModal() {
                 });
                 const data = await res.json();
                 if (res.ok && data.success) window.location.href = '/lotes/' + data.id;
-                else this.erroMsg = data.errorMessage || 'Erro ao criar lote.';
+                else this.erroMsg = (data.error && data.error.message) || data.errorMessage || 'Erro ao criar lote.';
             } catch { this.erroMsg = 'Não foi possível conectar ao servidor.'; }
             finally { this.loading = false; }
         }

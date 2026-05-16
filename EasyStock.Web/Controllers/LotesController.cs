@@ -12,6 +12,11 @@ public class CriarLoteWebRequest
     public List<CriarLoteItemInput>? Itens { get; set; }
 }
 
+public class AtualizarPesoWebRequest
+{
+    public int PesoG { get; set; }
+}
+
 public class LotesController(LotesService svc, SessionService session) : BaseController(session)
 {
     [HttpGet("/lotes")]
@@ -21,8 +26,27 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
         ViewBag.ActiveMenuItem = "Lotes";
         var vm = new LotesListViewModel { Search = search, FiltroStatus = status };
 
-        var result = await svc.ListarAsync(status, search);
-        if (result.Success && result.Data is not null) vm.Items = result.Data;
+        // C2 (R10): consulta pendentes em paralelo a list. Status "pendente_peso"
+        // e filtro client-side — chama endpoint dedicado.
+        var pendentesTask = svc.ListarPendentesPesoAsync();
+
+        if (status == "pendente_peso")
+        {
+            // Lista vazia — visualizacao usa PendentesPeso especificamente
+            vm.Items = new List<EasyStock.Web.Models.Api.Lote>();
+        }
+        else
+        {
+            var result = await svc.ListarAsync(status, search);
+            if (result.Success && result.Data is not null) vm.Items = result.Data;
+        }
+
+        var pendentes = await pendentesTask;
+        if (pendentes.Success && pendentes.Data is not null)
+        {
+            vm.PendentesPesoCount = pendentes.Data.Count;
+            if (status == "pendente_peso") vm.PendentesPeso = pendentes.Data;
+        }
 
         return View(vm);
     }
@@ -86,6 +110,30 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", $"Lote finalizado. {result.Data?.TotalUnidades} etiqueta(s) prontas. <a href='/lotes/{id}/imprimir'>Imprimir agora →</a>");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    /// <summary>
+    /// C2 backfill — PATCH peso de item. Bloqueado se lote ja finalizado (R3).
+    /// </summary>
+    [HttpPatch("/lotes/{loteId}/itens/{itemId}/peso")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarPeso(string loteId, string itemId, [FromBody] AtualizarPesoWebRequest req)
+    {
+        if (req.PesoG <= 0)
+            return BadRequest(new { success = false, error = new { code = "INVALID_PESO", message = "Peso deve ser maior que zero." } });
+
+        var result = await svc.AtualizarPesoItemAsync(loteId, itemId, req.PesoG);
+        if (!result.Success)
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao atualizar peso."
+                }
+            });
+        return Ok(new { success = true });
     }
 
     [HttpGet("/lotes/{id}/imprimir")]

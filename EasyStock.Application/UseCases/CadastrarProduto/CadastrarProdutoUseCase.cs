@@ -29,7 +29,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
         IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
         IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes,
-        Guid UsuarioId = default);
+        Guid UsuarioId = default,
+        // C2 (RDC 727/2022): default Avulso para nao quebrar callers existentes.
+        TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -145,6 +147,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 DescricaoBase = command.DescricaoBase?.Trim(),
                 Marca = command.Marca?.Trim(),
                 Tipo = command.Tipo,
+                TipoEmbalagem = command.TipoEmbalagem, // C2 (RDC 727/2022)
                 SkuBase = string.IsNullOrWhiteSpace(command.SkuBase) ? null : CodigoSku.From(command.SkuBase),
                 CodigoBarras = command.CodigoBarras?.Trim(),
                 ControlaValidade = command.ControlaValidade,

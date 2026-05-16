@@ -22,6 +22,7 @@ using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.RemoverItemLote;
+using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
@@ -100,6 +101,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarItemLoteUseCase>();
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
         services.AddScoped<ConferirEtiquetaUseCase>();
