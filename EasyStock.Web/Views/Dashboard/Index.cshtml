@@ -103,7 +103,10 @@
             <span x-show="loading" class="inline-block w-4 h-4 border-2 border-slate-200 border-t-navy-600 rounded-full animate-spin"></span>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        @* Pente fino onda 1 item 5: `grid-equal-rows` força todas as linhas terem altura
+           igual ao maior card. Antes, "sem custo informado" (3 linhas) deixava o card de
+           Margem mais alto que os outros, criando degraus visuais. *@
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 grid-equal-rows">
             @* Receita: soma de Vendas confirmadas (Vendas.ValorTotal). Pedido cancelado ou
                entregue-sem-cobranca nao gera Venda e nao soma aqui. Sub-rotulo expoe a
                contagem usada pra evitar o cenario "olhei a tela de Pedidos, somei 1.113,

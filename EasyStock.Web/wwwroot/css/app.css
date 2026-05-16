@@ -267,6 +267,9 @@ html:not(.theme-dark) .ws:hover {
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    /* Pente fino onda 1 item 6: "R$ 1.430,00" quebrava em duas linhas ("R$" /
+       "1.430,00") em grids estreitas. Nowrap mantem o valor coeso. */
+    white-space: nowrap;
 }
 .kpi-lbl {
     font-size: 11.5px;
