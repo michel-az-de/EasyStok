@@ -45,6 +45,7 @@ public class SyncController(
     IPedidoRepository pedidoRepo,
     CriarPedidoUseCase criarPedidoUseCase,
     ILoteRepository loteRepo,
+    IProdutoRepository produtoRepo,
     MobileSystemUserResolver systemUserResolver,
     IConfiguration appConfig,
     ILogger<SyncController> log) : ControllerBase
@@ -56,6 +57,7 @@ public class SyncController(
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
     private readonly CriarPedidoUseCase _criarPedidoUseCase = criarPedidoUseCase;
     private readonly ILoteRepository _loteRepo = loteRepo;
+    private readonly IProdutoRepository _produtoRepo = produtoRepo;
     private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncController> _log = log;
@@ -301,9 +303,16 @@ public class SyncController(
         if (lojaId.HasValue)
             productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
         var products = await productsQ.ToListAsync();
+        // C2 (RDC 727): batch lookup do TipoEmbalagem dos Produtos ERP linkados.
+        // Sem ErpProductId -> default "Avulso" (mobile-only ou nao linkado ainda).
+        var erpProductIds = products.Where(p => p.ErpProductId.HasValue)
+            .Select(p => p.ErpProductId!.Value).Distinct().ToList();
+        var tipoEmbMap = (empresaId.HasValue && erpProductIds.Count > 0)
+            ? await _produtoRepo.GetTipoEmbalagemMapAsync(empresaId.Value, erpProductIds)
+            : new Dictionary<Guid, TipoEmbalagem>();
         foreach (var p in products)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), p.LastDeviceId ?? "server",
-                "product.upsert", Serialize(ToDto(p)), new DateTimeOffset(p.UpdatedAt).ToUnixTimeMilliseconds()));
+                "product.upsert", Serialize(ToDto(p, tipoEmbMap)), new DateTimeOffset(p.UpdatedAt).ToUnixTimeMilliseconds()));
 
         var clientsQ = _db.Set<Client>().Where(c => c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
@@ -851,6 +860,35 @@ public class SyncController(
             .FirstOrDefaultAsync(b => b.Id == dto.Id && b.EmpresaId == empresaId);
         if (existing != null) return; // Batches são imutáveis — ignora re-envio
 
+        // C2 (RDC 727/2022): valida peso obrigatorio para itens cujo Produto
+        // (no ERP) esta marcado como Embalado. Avulso passa sem peso.
+        // Defesa em profundidade: PWA cliente ja valida com fallback conservador,
+        // mas devtools pode burlar. Exception aqui cai no catch generico de Push
+        // (linha ~147), que adiciona ao rejected com "rejected:validation".
+        if (empresaId.HasValue && dto.Items != null && dto.Items.Count > 0)
+        {
+            var produtoIdsErp = dto.Items
+                .Where(i => Guid.TryParse(i.ProductId, out _))
+                .Select(i => Guid.Parse(i.ProductId))
+                .Distinct()
+                .ToList();
+            var tipoMap = produtoIdsErp.Count > 0
+                ? await _produtoRepo.GetTipoEmbalagemMapAsync(empresaId.Value, produtoIdsErp)
+                : new Dictionary<Guid, TipoEmbalagem>();
+            foreach (var i in dto.Items)
+            {
+                if (Guid.TryParse(i.ProductId, out var pid)
+                    && tipoMap.TryGetValue(pid, out var t)
+                    && t == TipoEmbalagem.Embalado
+                    && (i.WeightG == null || i.WeightG <= 0))
+                {
+                    throw new InvalidOperationException(
+                        $"Item '{i.Name}' precisa de peso (produto Embalado — RDC 727/2022). " +
+                        $"Atualize o PWA e informe o peso por unidade.");
+                }
+            }
+        }
+
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var batch = new Batch
         {
@@ -969,6 +1007,21 @@ public class SyncController(
     private static ProductDto ToDto(Product p) =>
         new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
             p.Sku, p.DefaultWeightG, p.DefaultValidityDays);
+
+    /// <summary>
+    /// Overload C2 (RDC 727/2022): recebe map ErpProductId -> TipoEmbalagem para
+    /// popular o novo campo do DTO sem fazer N+1 queries no Pull.
+    /// Default "Avulso" para produtos sem ErpProductId (mobile-only) ou sem entrada
+    /// no map. PWA usa esse campo no fallback conservador de exigePesoPara().
+    /// </summary>
+    private static ProductDto ToDto(Product p, IReadOnlyDictionary<Guid, TipoEmbalagem> tipoEmbMap)
+    {
+        var tipo = "Avulso";
+        if (p.ErpProductId.HasValue && tipoEmbMap.TryGetValue(p.ErpProductId.Value, out var t))
+            tipo = t.ToString();
+        return new ProductDto(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, tipo);
+    }
 
     private static ClientDto ToDto(Client c) =>
         new(c.Id, c.Name, c.Apt, c.Address, c.Phone,
