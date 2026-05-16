@@ -22,7 +22,8 @@ public sealed record RegistrarPagamentoPedidoCommand(
 public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
     IUnitOfWork uow,
-    ILogger<RegistrarPagamentoPedidoUseCase> logger)
+    ILogger<RegistrarPagamentoPedidoUseCase> logger,
+    ICaixaRepository? caixaRepo = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -71,10 +72,31 @@ public class RegistrarPagamentoPedidoUseCase(
             Detalhes = $"+{pag.Valor:C} via {metodo}"
         });
 
+        await GarantirCaixaAbertoAsync(cmd, pedido, pag.PagoEm);
+
         await uow.CommitAsync();
 
         logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
             pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
         return CriarPedidoUseCase.Map(pedido);
+    }
+
+    private async Task GarantirCaixaAbertoAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm)
+    {
+        // Caixa segue Pedido: ao receber o primeiro pagamento do dia, abrimos o caixa
+        // automaticamente para evitar divergência "pedidos pagos mas caixa zerado".
+        if (caixaRepo is null) return;
+
+        var data = DateOnly.FromDateTime(pagoEm);
+        var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
+        if (movimentos.Any(m => m.Tipo == "abertura")) return;
+
+        var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
+        abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";
+        abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
+        abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
+        abertura.Origem = "auto-pagamento";
+        await caixaRepo.AddMovimentoAsync(abertura);
+        logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
     }
 }
