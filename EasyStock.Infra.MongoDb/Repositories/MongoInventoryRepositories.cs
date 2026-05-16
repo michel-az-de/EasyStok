@@ -107,9 +107,12 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         // categoriaId silently ignored (no Produto join in Mongo).
 
         var cadastrados = (int)await Collection.CountDocumentsAsync(filter);
+        // Alinhado com o estilo das linhas 52/84/164/167 deste arquivo: LINQ
+        // sobre `QuantidadeAtual.Value` em vez de comparar com VO Quantidade.Zero
+        // (cuja serializacao escalar funciona hoje mas trava futuras trocas).
         var comSaldoFilter = Builders<ItemEstoque>.Filter.And(
             filter,
-            Builders<ItemEstoque>.Filter.Gt(x => x.QuantidadeAtual, EasyStock.Domain.ValueObjects.Quantidade.Zero));
+            Builders<ItemEstoque>.Filter.Where(x => x.QuantidadeAtual.Value > 0));
         var comSaldo = (int)await Collection.CountDocumentsAsync(comSaldoFilter);
         return (cadastrados, comSaldo);
     }

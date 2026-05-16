@@ -36,6 +36,8 @@ public class EstoqueService(ApiClient api, SessionService session)
         var qs = $"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=20";
         if (!string.IsNullOrEmpty(status))
             qs += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
+            qs += $"&categoriaId={catId}";
 
         return await api.GetAsync<PagedResult<EstoqueSku>>(qs);
     }

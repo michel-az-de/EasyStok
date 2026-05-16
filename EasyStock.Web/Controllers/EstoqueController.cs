@@ -34,14 +34,13 @@ public class EstoqueController(
             ? svc.ContadoresAsync(status, categoria)
             : null;
 
-        await listarTask;
-        if (contadoresTask is not null) await contadoresTask;
+        var result = await listarTask;
+        var contadoresResp = contadoresTask is null ? null : await contadoresTask;
 
-        var result = listarTask.Result;
         if (HasError(result)) return View(new EstoqueListViewModel());
 
         var paged = result.Data!;
-        var contadores = contadoresTask?.Result is { Success: true, Data: { } d } ? d : null;
+        var contadores = contadoresResp is { Success: true, Data: { } d } ? d : null;
         var vm = new EstoqueListViewModel
         {
             Itens = paged.Data,
