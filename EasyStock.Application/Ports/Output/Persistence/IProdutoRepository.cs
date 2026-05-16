@@ -33,5 +33,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateAsync(Produto produto);
         Task<IReadOnlyList<string>> GetMarcasAsync(Guid empresaId, string? filtro = null, int max = 20);
         Task<int> CountByEmpresaAsync(Guid empresaId);
+
+        /// <summary>
+        /// Retorna o <see cref="TipoEmbalagem"/> dos produtos informados em uma unica query.
+        /// Usado por CriarLote/FinalizarLote/SyncController.ApplyBatch para validar
+        /// se peso e obrigatorio (RDC 727/2022 - peso so obrigatorio para Embalado).
+        /// Inserido 2026-05-16 (correcao C2).
+        /// </summary>
+        Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
+            Guid empresaId, IEnumerable<Guid> produtoIds);
     }
 }

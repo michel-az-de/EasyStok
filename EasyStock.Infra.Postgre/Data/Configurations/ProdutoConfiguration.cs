@@ -23,6 +23,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(p => p.Nome).IsRequired().HasMaxLength(180);
             builder.Property(p => p.Marca).HasMaxLength(120);
             builder.Property(p => p.Tipo).HasConversion<string>().IsRequired().HasMaxLength(50);
+            // Inserido 2026-05-16 (correcao C2 / RDC 727/2022). Persistido como string
+            // (padrao do projeto - veja Tipo/Status acima). Default "Avulso" para
+            // produtos existentes nao bloqueia comportamento atual ate triagem manual.
+            builder.Property(p => p.TipoEmbalagem)
+                .HasConversion<string>()
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue(EasyStock.Domain.Enums.TipoEmbalagem.Avulso);
             builder.Property(p => p.Status).HasConversion<string>().IsRequired().HasMaxLength(50);
             builder.Property(p => p.SkuBase)
                 .HasConversion(
