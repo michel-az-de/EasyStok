@@ -175,7 +175,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         int PedidosPendentes,
         int ItensEmEstoque,
         decimal CustoEstoque,
-        decimal MargemBruta,
+        decimal? MargemBruta,
         int LotesProduzidos,
         int ClientesAtivos,
         decimal PercentualCritico);

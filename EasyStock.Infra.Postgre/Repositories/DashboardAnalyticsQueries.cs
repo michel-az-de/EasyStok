@@ -156,7 +156,11 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             .Where(m => m.ItemEstoque != null)
             .SumAsync(m => (decimal)m.ItemEstoque!.CustoUnitario * (int)m.Quantidade);
 
-        var margemBruta = receita > 0 ? Math.Round((receita - custoVendas) / receita * 100m, 1) : 0m;
+        // null = "margem nao calculavel" (sem receita OU sem custo informado nas movimentacoes).
+        // Antes: custoVendas == 0 produzia margem 100% confiante mas falsa.
+        decimal? margemBruta = (receita > 0 && custoVendas > 0)
+            ? Math.Round((receita - custoVendas) / receita * 100m, 1)
+            : null;
 
         // Pedidos
         var pedidosQuery = dbContext.Pedidos.AsNoTracking()

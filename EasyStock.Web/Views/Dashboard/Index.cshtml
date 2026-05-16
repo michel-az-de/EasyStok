@@ -182,19 +182,23 @@
             </div>
 
             @* Margem Bruta *@
-            <div class="ws group" title="Quanto sobra depois de descontar o custo. Baseado no custo médio de entrada">
+            <div class="ws group"
+                 :title="data && data.kpis.margemBruta == null
+                    ? 'Margem indisponível: as movimentações de venda do período não têm custo unitário informado.'
+                    : 'Quanto sobra depois de descontar o custo. Baseado no custo médio de entrada'">
                 <div class="kpi-lbl">Margem bruta</div>
                 <template x-if="loading && !data">
                     <div class="h-7 w-16 bg-slate-100 rounded animate-pulse mt-1"></div>
                 </template>
                 <template x-if="data">
                     <div>
-                        <div class="kpi-val" :class="data.kpis.margemBruta >= 20 ? 'text-emerald-700' : 'text-amber-600'"
+                        <div class="kpi-val"
+                             :class="data.kpis.margemBruta == null ? 'text-slate-400' : data.kpis.margemBruta >= 20 ? 'text-emerald-700' : 'text-amber-600'"
                              x-text="fmt.pct(data.kpis.margemBruta)"></div>
                         <div class="flex items-center gap-1 mt-1">
                             <span :class="deltaClass(data.delta.margemBruta)" class="text-xs font-semibold"
                                   x-text="data.delta.margemBruta == null ? '—' : (data.delta.margemBruta > 0 ? '+' : '') + data.delta.margemBruta.toFixed(1).replace('.', ',') + ' pp'"></span>
-                            <span class="text-xs text-slate-400">vs anterior</span>
+                            <span class="text-xs text-slate-400" x-text="data.kpis.margemBruta == null ? 'sem custo informado' : 'vs anterior'"></span>
                         </div>
                     </div>
                 </template>

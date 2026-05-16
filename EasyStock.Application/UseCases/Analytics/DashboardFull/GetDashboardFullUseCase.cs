@@ -62,7 +62,9 @@ public class GetDashboardFullUseCase(
             Pedidos: CalcPct(current.Pedidos, previous.Pedidos),
             ItensEmEstoque: CalcPct(current.ItensEmEstoque, previous.ItensEmEstoque),
             CustoEstoque: CalcPct(current.CustoEstoque, previous.CustoEstoque),
-            MargemBruta: previous.Receita == 0 ? null : Math.Round(current.MargemBruta - previous.MargemBruta, 1),
+            MargemBruta: (previous.Receita == 0 || current.MargemBruta is null || previous.MargemBruta is null)
+                ? null
+                : Math.Round(current.MargemBruta.Value - previous.MargemBruta.Value, 1),
             LotesProduzidos: CalcPct(current.LotesProduzidos, previous.LotesProduzidos),
             ClientesAtivos: CalcPct(current.ClientesAtivos, previous.ClientesAtivos));
     }
@@ -83,7 +85,7 @@ public class GetDashboardFullUseCase(
         else if (delta.Receita is decimal dRp && dRp > 15m)
             insights.Add(new InsightDto("receita", "positive", $"Receita subiu {dRp:0.#}%! Bom período para o negócio."));
 
-        if (kpis.MargemBruta > 0 && kpis.MargemBruta < 20m)
+        if (kpis.MargemBruta is decimal mB && mB > 0 && mB < 20m)
             insights.Add(new InsightDto("margem", "warning", "Margem baixa. Revise seus custos ou ajuste preços de venda."));
 
         if (estoque.Total > 0 && estoque.Critico > 0)
