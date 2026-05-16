@@ -3,9 +3,16 @@
     ViewBag.Title = "KDS — Cozinha";
     Layout = "_Layout";
 
+    // Acima de 4h o pedido está pendurado — sinaliza como abandonado para a cozinha
+    // limpar (ninguém marcou pronto/cancelado). 30min/15min continuam sendo os limites
+    // operacionais normais. Status canônico só vai até "preparando" — o KDS não decide
+    // arquivar sozinho.
+    const int MinutosAbandonado = 240;
+
     string corPorTempo(DateTime criadoUtc)
     {
         var min = (DateTime.UtcNow - criadoUtc).TotalMinutes;
+        if (min >= MinutosAbandonado) return "kds-card--abandonado";
         if (min >= 30) return "kds-card--vermelho";   // crítico
         if (min >= 15) return "kds-card--laranja";    // atenção
         return "kds-card--verde";                       // tranquilo
@@ -16,8 +23,14 @@
         var diff = DateTime.UtcNow - criadoUtc;
         if (diff.TotalMinutes < 1) return "agora";
         if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min";
-        return $"{(int)diff.TotalHours}h{diff.Minutes:D2}";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h{diff.Minutes:D2}";
+        var dias = (int)diff.TotalDays;
+        var horas = diff.Hours;
+        return horas > 0 ? $"{dias}d {horas}h" : $"{dias}d";
     }
+
+    bool isAbandonado(DateTime criadoUtc) =>
+        (DateTime.UtcNow - criadoUtc).TotalMinutes >= MinutosAbandonado;
 }
 
 <div class="kds-toolbar">
@@ -87,7 +100,7 @@ else
                                 </div>
                                 <div class="kds-card__tempo">
                                     <div class="kds-card__tempo-valor">@tempoLabel(p.CriadoEm)</div>
-                                    <div class="kds-card__tempo-label">esperando</div>
+                                    <div class="kds-card__tempo-label">@(isAbandonado(p.CriadoEm) ? "⚠ Abandonado" : "esperando")</div>
                                 </div>
                             </header>
                             <div class="kds-card__itens">
@@ -133,7 +146,7 @@ else
                                 </div>
                                 <div class="kds-card__tempo">
                                     <div class="kds-card__tempo-valor">@tempoLabel(p.CriadoEm)</div>
-                                    <div class="kds-card__tempo-label">desde criação</div>
+                                    <div class="kds-card__tempo-label">@(isAbandonado(p.CriadoEm) ? "⚠ Abandonado" : "desde criação")</div>
                                 </div>
                             </header>
                             <div class="kds-card__itens">
