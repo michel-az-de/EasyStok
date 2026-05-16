@@ -20,4 +20,11 @@ public interface IProdutoComposicaoRepository
 
     /// <summary>Remove todas as linhas de uma receita (escopo: produtoFinal + loja) — usado no replace-all.</summary>
     Task DeleteByProdutoFinalAsync(Guid empresaId, Guid produtoFinalId, Guid? lojaId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lista os Produtos que tem pelo menos 1 linha de composicao cadastrada (= sao produto-final
+    /// em alguma receita) cujo nome casa com <paramref name="termo"/>. Usado pelo endpoint
+    /// /produtos-com-receita do PWA.
+    /// </summary>
+    Task<IReadOnlyList<Produto>> BuscarProdutosFinaisAsync(Guid empresaId, string? termo, int limit, Guid? lojaId, CancellationToken ct = default);
 }

@@ -95,4 +95,31 @@ public class ProdutoComposicaoRepository(EasyStockDbContext context) : IProdutoC
         if (linhas.Count > 0)
             context.ProdutosComposicao.RemoveRange(linhas);
     }
+
+    public async Task<IReadOnlyList<Produto>> BuscarProdutosFinaisAsync(
+        Guid empresaId, string? termo, int limit, Guid? lojaId, CancellationToken ct = default)
+    {
+        // Sub-query: ProdutoIds que tem pelo menos 1 composicao no escopo (LojaId override ou padrao null).
+        // Se lojaId informado, prefere produtos com override; mas tambem inclui os que so tem receita padrao.
+        var idsComReceita = context.ProdutosComposicao
+            .AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && (c.LojaId == lojaId || c.LojaId == null))
+            .Select(c => c.ProdutoFinalId)
+            .Distinct();
+
+        var query = context.Produtos
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && idsComReceita.Contains(p.Id));
+
+        if (!string.IsNullOrWhiteSpace(termo))
+        {
+            var pattern = $"%{termo.Trim()}%";
+            query = query.Where(p => EF.Functions.ILike(p.Nome, pattern));
+        }
+
+        return await query
+            .OrderBy(p => p.Nome)
+            .Take(Math.Clamp(limit, 1, 50))
+            .ToListAsync(ct);
+    }
 }
