@@ -5854,6 +5854,41 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-bottom: 8px;
 }
+/* Onda 1 audit — quick actions WA/Mapa no card de pedido pro entregador */
+.k-card .k-quick-actions {
+  display: flex; gap: 6px; margin: 6px 0 8px;
+}
+.k-card .k-quick-wa,
+.k-card .k-quick-map {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; min-height: 36px; padding: 6px 10px;
+  border-radius: 10px; font-size: 14px;
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: inherit;
+}
+.k-card .k-quick-wa {
+  border-color: rgba(37, 211, 102, 0.4);
+  background: rgba(37, 211, 102, 0.12);
+  color: #25d366;
+}
+.k-card .k-quick-map {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-dim);
+}
+.k-card .k-quick-wa:focus-visible { outline: 2px solid #25d366; outline-offset: 2px; }
+.k-card .k-quick-map:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.k-card .k-quick-wa:active,
+.k-card .k-quick-map:active { transform: scale(0.96); }
+[data-theme="light"] .k-card .k-quick-wa {
+  background: rgba(20, 158, 70, 0.10);
+  border-color: rgba(20, 158, 70, 0.45);
+  color: #149e46;
+}
+[data-theme="light"] .k-card .k-quick-map {
+  background: #f1f5f9;
+  border-color: #dbe2ec;
+  color: var(--ink-dim);
+}
 .k-card .k-chip {
   display: inline-flex; align-items: center; padding: 4px 8px;
   border-radius: 999px; background: rgba(255,255,255,0.04);
@@ -10757,7 +10792,11 @@ function _gsRenderCashEntry(e) {
   </button>`;
 }
 function _gsRenderClient(c) {
-  const meta = c.phone || c.doc || c.ref || '';
+  // Formata telefone se valido; senao mantem campo original. Item inteiro
+  // e um <button> (abre detalhe do cliente), por isso nao aninhamos botoes
+  // de WA/Mapa aqui — a tela Clientes ja oferece essas acoes.
+  const phoneDisplay = c.phone ? formatPhoneBr(c.phone) : '';
+  const meta = phoneDisplay || c.doc || c.ref || '';
   return `<button class="gs-result-item" data-gs-type="client" data-gs-id="${escapeHtml(c.id)}" type="button">
     <span class="gs-icon">👤</span>
     <span><span class="gs-label">${escapeHtml(c.name || '(sem nome)')}</span>${meta ? '<span class="gs-meta">' + escapeHtml(meta) + '</span>' : ''}</span>
@@ -13144,6 +13183,22 @@ function renderKanbanCard(o, col) {
   const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
   const conferBadge = `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
   const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
+
+  // Quick-actions WA + Mapa pro entregador. Phone vem do cliente cadastrado
+  // (lookup por clientId); pedidos sem cliente ou cliente sem phone valido
+  // omitem o botao WA. Mapa usa o ref do snapshot quando valido.
+  const cliente = o.clientId ? (clients || []).find(x => x.id === o.clientId) : null;
+  const waPhone = cliente ? normalizePhoneBr(cliente.phone) : null;
+  const waBtn = waPhone
+    ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente('${escapeHtml(o.clientId)}'); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
+    : '';
+  const refForMap = o.clientSnapshot?.ref || '';
+  const mapValid = refForMap.trim().length >= 5 && /\d/.test(refForMap);
+  const mapBtn = mapValid
+    ? `<button type="button" class="k-quick-map" onclick="event.stopPropagation(); openMapsPedidoRef(${jsString(refForMap)}); return false;" aria-label="Abrir endereço do pedido no Google Maps" title="Mapa"><span aria-hidden="true">📍</span></button>`
+    : '';
+  const quickActions = (waBtn || mapBtn) ? `<div class="k-quick-actions">${waBtn}${mapBtn}</div>` : '';
+
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
@@ -13154,6 +13209,7 @@ function renderKanbanCard(o, col) {
         <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
         <span class="k-total">${money(o.total)}</span>
       </div>
+      ${quickActions}
       <div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
@@ -15182,6 +15238,18 @@ function openMapsCliente(clientId) {
     const c = (clients || []).find(x => x.id === clientId);
     if (!c) { showToast('Cliente não encontrado'); return; }
     const url = buildMapsUrlCliente(c.address || c.ref || '');
+    if (!url) { showToast('Endereço incompleto'); return; }
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir mapa: ' + (e.message || e));
+  }
+}
+
+// Variante pra pedidos: ref vem direto do clientSnapshot (pode ser cliente
+// sem cadastro). Mesma logica de CEP-priority + cidade da empresa.
+function openMapsPedidoRef(ref) {
+  try {
+    const url = buildMapsUrlCliente(ref || '');
     if (!url) { showToast('Endereço incompleto'); return; }
     window.open(url, '_blank') || (window.location.href = url);
   } catch (e) {
