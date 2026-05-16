@@ -1,8 +1,6 @@
 @model DashboardViewModel
-@using System.Globalization
 @using System.Text.Json
 @{
-    var ptBR = new CultureInfo("pt-BR");
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
     var lojas = ViewBag.Lojas as List<EasyStock.Web.Models.Api.LojaApi> ?? new();
     var lojaAtualId = ViewBag.LojaAtualId as string;

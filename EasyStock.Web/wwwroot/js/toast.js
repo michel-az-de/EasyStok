@@ -76,7 +76,7 @@
         }
 
         // Force 8s minimum quando há retry/correlationId para o usuário copiar o CID.
-        const baseDur = retryFn || correlationId ? 8000 : (DURATION[type] || 3500);
+        const baseDur = (retryFn || correlationId) ? 8000 : (DURATION[type] || 3500);
         const dur = undoAction ? 5000 : ((duration != null) ? duration : baseDur);
         const c = getContainer();
 
