@@ -13190,7 +13190,7 @@ function renderKanbanCard(o, col) {
   const cliente = o.clientId ? (clients || []).find(x => x.id === o.clientId) : null;
   const waPhone = cliente ? normalizePhoneBr(cliente.phone) : null;
   const waBtn = waPhone
-    ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente('${escapeHtml(o.clientId)}'); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
+    ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente(${jsString(o.clientId)}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
     : '';
   const refForMap = o.clientSnapshot?.ref || '';
   const mapValid = refForMap.trim().length >= 5 && /\d/.test(refForMap);
