@@ -272,7 +272,10 @@
                             </td>
                             <td class="text-center">
                                 @{
-                                    var sClass = item.Status?.ToLower() switch
+                                    // Defesa em profundidade: Qty 0 SEMPRE renderiza como Esgotado, mesmo se
+                                    // Status no banco ficou desatualizado (itens legacy zerados antes da regra).
+                                    var statusEffective = item.Qty == 0 ? "esgotado" : (item.Status?.ToLower() ?? "");
+                                    var sClass = statusEffective switch
                                     {
                                         "ok" or "normal" => "badge-ok",
                                         "critico" or "crítico" or "critical" => "badge-critical",
@@ -280,9 +283,7 @@
                                         "parado" or "slow" => "badge-slow",
                                         _ => "badge-warn"
                                     };
-                                }
-                                @{
-                                    var statusLabel = (item.Status?.ToLower()) switch {
+                                    var statusLabel = statusEffective switch {
                                         "critico" or "critical" => "Crítico",
                                         "esgotado" => "Esgotado",
                                         "atencao" or "warn" => "Atenção",
