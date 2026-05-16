@@ -39,8 +39,10 @@
     <a href="#app-main" class="skip-link">Pular para o conteúdo</a>
 
     @* C1 (2026-05-16): aviso para viewports <320px (split-screen extremo).
-       CSS em mobile.css mostra este div e esconde o resto. *@
-    <div class="viewport-too-narrow-warning" role="alert" aria-live="assertive">
+       CSS em mobile.css mostra este div e esconde o resto. Atributo `hidden`
+       e fallback default — mobile.css carrega com media="(max-width: 768px)",
+       sem ele em desktop largo o div renderiza display:block default do browser. *@
+    <div class="viewport-too-narrow-warning" hidden role="alert" aria-live="assertive">
         <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
