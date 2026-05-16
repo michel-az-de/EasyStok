@@ -211,6 +211,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<ConfiguracaoCanal> NotifConfiguracoesCanal { get; set; } = null!;
         public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
+        public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {

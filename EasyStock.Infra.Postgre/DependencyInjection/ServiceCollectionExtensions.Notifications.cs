@@ -26,6 +26,8 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IBloqueioNotificacaoRepository, BloqueioNotificacaoRepository>();
         services.AddScoped<ILogEnvioNotificacaoRepository, LogEnvioNotificacaoRepository>();
         services.AddScoped<IVariavelTemplateCatalogoRepository, VariavelTemplateCatalogoRepository>();
+        // Onda 2.2 — subscriptions de Web Push (PWA).
+        services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
 
         // Dispatcher orchestrator — implementa também o port INotificationDispatcher (1 shard).
         // Singleton porque é stateless e cria scopes internamente via IServiceProvider.
