@@ -1,7 +1,7 @@
 # ADR 0011 — Nomenclatura PT-BR para o módulo Rotulagem Nutricional
 
 **Status:** Accepted (2026-05-16)
-**Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — `~/.claude/plans/pesquise-na-internet-sobre-iridescent-haven.md`.
+**Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — [docs/plan/p-02-rotulagem-nutricional.md](../plan/p-02-rotulagem-nutricional.md).
 
 ## Decisão
 

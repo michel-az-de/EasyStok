@@ -68,10 +68,10 @@ Normas Anvisa que o módulo precisa atender (todas seedeadas como `NormaRegulato
 | Calculadora Preview | 4 superfícies no MVP: aba Nutricional do Produto, Etapa 2 da Calculadora (quando mergear), PWA Pedidos (leitura cache), App mobile Casa da Babá (leitura cache). Modal "Simular ajuste" no Lote **removido** (link "Reformular este produto" → produto-pai). Simulador standalone + Comparador → F+1. | Q17, Q18 |
 | Multi-device drafts | `RascunhoNutricional` no servidor é fonte de verdade. `localStorage` apenas cache de sessão ativa. Sem edição offline-first no MVP. | Q19 |
 | Microcopy | Banner Preview: "Você está simulando. Mudanças aqui não afetam rótulos publicados." Banner Live: "Oficial · publicado por {user} em {data}." Botão primário: "Confirmar essa receita". | Q25 |
-| RT no MVP | Cadastro permitido para Suplementos/Infantis + bloqueio de publicação até RT aprovar (4º modo `AguardandoAprovacaoRt`). Hash de aprovação inclui secret de servidor — **NÃO é assinatura digital legal**, é "Comprovante de Aprovação Interna" (ADR-0013). | Q28, Q30 |
+| RT no MVP | Cadastro permitido para Suplementos/Infantis + bloqueio de publicação até RT aprovar (4º modo `AguardandoAprovacaoRt`). Hash de aprovação inclui secret de servidor — **NÃO é assinatura digital legal**, é "Comprovante de Aprovação Interna" (ADR-0017). | Q28, Q30 |
 | Nomenclatura | PT-BR para negócio, EN para sufixos técnicos. ADR-0011 fixa regra + teste de arquitetura automatizado. | Q37 |
 | Refator IA | `IClaudeStructuredExtractor<TIn,TOut>` + `IClaudeStreamingTextGenerator<TIn>` criados em F0.5. 3 classes Claude existentes refatoradas em worktree isolada `feat/claude-extractor-refactor` (commit 5e0aa622). | Q38 |
-| ADR numeração | Reservar 0002–0010 para ADRs futuros próximos. Usar **ADR-0011** (Nomenclatura + Rotulagem), **ADR-0012** (Backup + storage), **ADR-0013** (Comprovante Aprovação Interna RT). Sem colisão verificada (apenas ADR-0001 existe). | Decisão Felipe 2026-05-16 |
+| ADR numeração | Reservar 0002–0010 para ADRs futuros próximos. Usar **ADR-0011** (Nomenclatura + Rotulagem), **ADR-0012** (Backup + storage), **ADR-0017** (Comprovante Aprovação Interna RT). Sem colisão verificada (apenas ADR-0001 existe). | Decisão Felipe 2026-05-16 |
 | CI billing | Pagar billing GitHub Actions ANTES de F2. Custo R$ 50–200/mês << risco multa. | Q33 |
 | Storage de rótulos | Fly volume `/data/rotulos/{empresaId}/{rotuloId}.{pdf|png|json}` no MVP. Migração para Cloudflare R2 quando passar 50GB. Backup diário + restore-test mensal automatizados. | Q&A + ADR-0012 |
 | Provedor de email | **Resend** (free tier 100/dia, 3k/mês). Template engine `RazorLight`. | Q&A consolidação |
@@ -1710,7 +1710,7 @@ Cada fase tem: dias úteis estimados, critério "pronto" objetivo, bloqueadores,
 |---|---|---|---|
 | ADR-0011 (nomenclatura) | feito (commit 4b018b39) | 0.5 | — |
 | ADR-0012 (backup/storage) | feito (commit 4b018b39) | 0.5 | — |
-| ADR-0013 (Comprovante Aprovação Interna RT) | **pendente** | 0.5 | — |
+| ADR-0017 (Comprovante Aprovação Interna RT) | **pendente** | 0.5 | — |
 | Husky.Net + pre-commit | feito (4b018b39 + e3f70122) | 0.5 | — |
 | Workflows GHA drafts | feito (4b018b39) | 0.5 | — |
 | Pagar billing GHA + criar secrets (R2, Resend) | **pendente — Felipe manual** | 1 | externo |
@@ -1720,7 +1720,7 @@ Cada fase tem: dias úteis estimados, critério "pronto" objetivo, bloqueadores,
 
 **Total F0.5 pendente: ~4 dias úteis = ~1 semana (com Felipe paralelizando billing/secrets enquanto código avança).**
 
-**Critério pronto**: CI rodando + ADR-0013 commitado + snapshot test rodando + migration testada local em ≤ 5s.
+**Critério pronto**: CI rodando + ADR-0017 commitado + snapshot test rodando + migration testada local em ≤ 5s.
 
 ### F1 — Feature flag + sub-tipos (A1) — 3 dias
 
@@ -1869,7 +1869,7 @@ Cada fase tem: dias úteis estimados, critério "pronto" objetivo, bloqueadores,
 - FAQ Anvisa para usuário (15+ perguntas, ver Seção 13.3).
 - Troubleshooting guide (ver Seção 13.4).
 - Doc "Como rodar o MVP em produção" (Seção 11).
-- ADR-0011, ADR-0012, ADR-0013 revisados + commitados.
+- ADR-0011, ADR-0012, ADR-0017 revisados + commitados.
 
 **Critério pronto**: dashboard de métricas mostra dados reais em <1h após primeiro rótulo + FAQ tem 15 perguntas com citação RDC + Troubleshooting cobre 5 cenários listados + Felipe consegue "fly deploy" em <2min seguindo a doc.
 
@@ -1908,7 +1908,7 @@ Premissa: início F0.5 pendente em **2026-05-17 (segunda-feira)**. 17–19h/sema
 
 | Fase | Dias úteis | Início | Fim previsto | Marcos |
 |---|---|---|---|---|
-| F0.5 pendente | 4 | 2026-05-17 | 2026-05-22 | ADR-0013, snapshot test, migration validada |
+| F0.5 pendente | 4 | 2026-05-17 | 2026-05-22 | ADR-0017, snapshot test, migration validada |
 | F1 | 3 | 2026-05-23 | 2026-05-27 | Flag ativa em ambiente dev |
 | F2 | 8 | 2026-05-28 | 2026-06-09 | Migration em prod + seed completo |
 | F3 | 5 | 2026-06-10 | 2026-06-16 | Cadastrar Farinha Anaconda completo |
@@ -2362,7 +2362,7 @@ Consequences:
 Arquivo: docs/adr/0012-backup-rotulos-storage.md (já criado em F0.5)
 ```
 
-**ADR-0013 — Comprovante de Aprovação Interna do RT (não-substitui assinatura digital)**
+**ADR-0017 — Comprovante de Aprovação Interna do RT (não-substitui assinatura digital)**
 
 ```
 Status: Accepted (2026-05-16)
@@ -2629,9 +2629,9 @@ Resolução:
 | P# | Pendência | Resolução |
 |---|---|---|
 | P1 | Renomear `AssinaturaTextoHash` → `ComprovanteAprovacaoInternaHash` em todas referências | Aplicado em Seções 4.3.12, 5.4 (snapshot), 8.4 jornadas (não mais referenciado pelo nome antigo), 12.1 (`AprovacaoRtTests`). Anexo Q28 mantém referência histórica como contexto. |
-| P2 | Numeração ADRs | Confirmado: `docs/adr/` tem apenas 0001 (Mongo). Reservar 0002–0010 para ADRs futuros próximos. Usar **ADR-0011** (Nomenclatura), **ADR-0012** (Backup), **ADR-0013** (Comprovante RT — criar em F0.5 pendente). Sem colisão. |
+| P2 | Numeração ADRs | Confirmado: `docs/adr/` tem apenas 0001 (Mongo). Reservar 0002–0010 para ADRs futuros próximos. Usar **ADR-0011** (Nomenclatura), **ADR-0012** (Backup), **ADR-0017** (Comprovante RT — criar em F0.5 pendente). Sem colisão. |
 | P3 | Cronograma honesto | Recalculado em Seção 9: **10–12 semanas líquidas / 16 semanas calendário com buffer 20%**. Início F0.5 pendente 2026-05-17, MVP go-live 2026-09-12. F0.5 tem 8 itens, paralelizáveis (Felipe billing/secrets em paralelo com código). |
-| P4 | Secret RT | Resolvido em Seção 4.3.13 + ADR-0013: `Anvisa:AprovacaoSecret` em Fly Secrets (env var, não DB). Provisionado por comando admin `dotnet EasyStock.Api.dll seed-admin --gerar-secret-rt` no primeiro boot. Rotação via novo `Anvisa:AprovacaoSecret:Next` + transição 30 dias. Hashes antigos imutáveis (snapshot guarda). Auditoria em `AuditoriaRotacaoSecretRt` com motivo obrigatório. |
+| P4 | Secret RT | Resolvido em Seção 4.3.13 + ADR-0017: `Anvisa:AprovacaoSecret` em Fly Secrets (env var, não DB). Provisionado por comando admin `dotnet EasyStock.Api.dll seed-admin --gerar-secret-rt` no primeiro boot. Rotação via novo `Anvisa:AprovacaoSecret:Next` + transição 30 dias. Hashes antigos imutáveis (snapshot guarda). Auditoria em `AuditoriaRotacaoSecretRt` com motivo obrigatório. |
 | P5 | Reverso Auto→Manual congela último cálculo | Resolvido em Seção 10.4: cria nova `FichaTecnicaProduto vN+1` com `eh_snapshot_congelado=true` + `motivo_alteracao` obrigatório. Copia valores do último `ProdutoNutricaoCalculada` para `NutricaoManualProdutoFinal`. Retenção 5 anos mínimo (RDC 275/2002). |
 | P6 | Schema modo Manual | Resolvido em Seção 4.3.7: nova tabela `NutricaoManualProdutoFinal(produto_id PK, ...)` com RLS. Não viola princípio aditivo (tabela nova, não altera colunas em `Produto` além de adicionar `OrigemCalculoNutricional` com default). Decisão arquitetural justificada em Seção 10.1. |
 | P7 | Doc "Como rodar o MVP em produção" | Resolvido em Seção 11.4 — template completo com 10 itens (ambiente Fly, banco, admin, ativar flag, logs, alertas, restore-test manual, SSH console, rollback, critérios de incidente). Arquivo final em `docs/operacao/como-rodar-mvp-producao.md`, escrito em F13. |
@@ -2642,7 +2642,7 @@ Resolução:
 
 **Q17 (modal Simular no Lote removido)** — sem divergência. Link "Reformular este produto" implementado em F7 (Seção 9).
 
-**Q30 (RT no MVP)** — divergência refinada: a Q&A dizia "MVP entrega comprovante simplificado". Este plano dá nome explícito (Comprovante de Aprovação Interna, ADR-0013) + secret servidor (P4) + disclaimer honesto na UI. Limite legal documentado.
+**Q30 (RT no MVP)** — divergência refinada: a Q&A dizia "MVP entrega comprovante simplificado". Este plano dá nome explícito (Comprovante de Aprovação Interna, ADR-0017) + secret servidor (P4) + disclaimer honesto na UI. Limite legal documentado.
 
 **Q32 (corte radical de escopo)** — sem divergência. F+1 e F+2 expandidos em Seção 9.
 
@@ -2690,10 +2690,11 @@ Lista exaustiva de assunções operacionais não confirmadas:
 **Concorrentes (benchmark de paridade):** PriceFy, FoodTrace, EasyLabel, Linx Food, ConsiNet, Bluesoft (GS1).
 
 **ADRs do EasyStok:**
-- [ADR-0001 MongoDB descartado](C:\rep\EasyStok\docs\adr\0001-mongo-discarded.md)
-- [ADR-0011 Nomenclatura PT-BR](C:\rep\EasyStok\docs\adr\0011-nomenclatura-pt-br-rotulagem.md) (criado F0.5)
-- [ADR-0012 Backup + Storage](C:\rep\EasyStok\docs\adr\0012-backup-rotulos-storage.md) (criado F0.5)
-- [ADR-0013 Comprovante Aprovação Interna RT](C:\rep\EasyStok\docs\adr\0013-comprovante-aprovacao-interna-rt.md) (criar F0.5 pendente)
+- [ADR-0001 MongoDB descartado](../adr/0001-mongo-discarded.md)
+- [ADR-0011 Nomenclatura PT-BR](../adr/0011-nomenclatura-pt-br-rotulagem.md) (criado F0.5)
+- [ADR-0012 Backup + Storage](../adr/0012-backup-rotulos-storage.md) (criado F0.5)
+- [ADR-0013 CancellationToken IUseCase](../adr/0013-cancellation-token-iusecase.md) (alheio — plano Caixa Conciliado, commitado em `ed65680e`)
+- [ADR-0017 Comprovante Aprovação Interna RT](../adr/0017-comprovante-aprovacao-interna-rt.md) (criado neste commit, renumerado de 0013 por colisão)
 
 **Commits F0.5 executados:**
 - `4b018b39` — chore(p-02-f0.5): setup do módulo Rotulagem Nutricional (ADRs, Husky, workflows GHA)
