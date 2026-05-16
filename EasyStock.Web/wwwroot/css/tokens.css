@@ -435,6 +435,23 @@ html, body {
 }
 .ui-tooltip:hover { background: var(--ink-200); color: var(--ink-900); }
 
+/* ----- Form actions sticky — rodape pegajoso em forms longos ----- */
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-soft);
+  padding: var(--s-4);
+  display: flex;
+  gap: var(--s-3);
+  justify-content: flex-end;
+  align-items: center;
+  margin: var(--s-6) calc(var(--s-6) * -1) 0;
+  z-index: var(--z-sticky);
+  box-shadow: 0 -4px 8px -4px rgba(10, 21, 48, 0.06);
+}
+.form-actions-sticky .form-actions-sticky__cancel { margin-right: auto; }
+
 /* ----- Logo (cube + wordmark) ----- */
 .logo {
   display: inline-flex;
