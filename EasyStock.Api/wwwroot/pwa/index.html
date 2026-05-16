@@ -7130,6 +7130,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="section-label">Catálogo de produção</div>
       <div class="screen-tabs" id="producaoTabs">
         <button class="screen-tab active" data-ptab="catalogo" onclick="goProducaoTab('catalogo')">Catálogo</button>
+        <button class="screen-tab" data-ptab="calculadora" onclick="goProducaoTab('calculadora')">Calculadora</button>
         <button class="screen-tab" data-ptab="lotes" onclick="goProducaoTab('lotes')">Lotes</button>
       </div>
       <section class="producao-tab-section active" data-ptab="catalogo">
@@ -7164,6 +7165,56 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Registrar produção</button>
       </div>
       </section>
+
+      <!-- CALCULADORA DE PRODUÇÃO (Onda 3.1) -->
+      <section class="producao-tab-section" data-ptab="calculadora">
+        <div class="prod-hero">
+          <div>
+            <div class="prod-eyebrow">Calculadora</div>
+            <h2>O que vamos produzir?</h2>
+            <p>Calcule quanto de cada insumo precisa e gere lista de compras dos itens em falta.</p>
+          </div>
+        </div>
+
+        <div class="section-label">Receita base</div>
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="calcProdSearch" placeholder="Buscar produto com receita..." oninput="calcBuscarProdutos()" autocomplete="off">
+        </div>
+        <div id="calcProdSuggestions" class="suggestions"></div>
+        <div id="calcProdSelected" style="display:none;font-size:13px;color:var(--ink-dim);margin-top:6px;"></div>
+
+        <div class="section-label">Quantidade desejada</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="calcQtd" type="text" inputmode="decimal" placeholder="0" oninput="calcOnQtdChange()" style="flex:1;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--ink);">
+          <select id="calcUnidade" onchange="calcOnUnidadeChange()" style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--ink);">
+            <option value="Un">Un</option>
+          </select>
+        </div>
+        <div class="doc-hint" id="calcQtdHint"></div>
+
+        <div class="cta-row" style="margin-top:14px;">
+          <button class="cta-btn" onclick="calcLimpar()">Limpar</button>
+          <button class="cta-btn primary" id="calcCalcularBtn" onclick="calcExecutar()" disabled>Calcular</button>
+        </div>
+
+        <!-- Resultado -->
+        <div id="calcResultadoBox" style="display:none;margin-top:18px;" role="status" aria-live="polite" aria-busy="false">
+          <div id="calcResultadoBadge" style="padding:14px;border-radius:14px;font-weight:700;text-align:center;margin-bottom:12px;"></div>
+          <div id="calcResultadoCustoTotal" style="font-size:13px;color:var(--ink-dim);text-align:center;margin-bottom:10px;"></div>
+          <div id="calcInsumosList"></div>
+          <div class="cta-row" style="margin-top:14px;">
+            <button class="cta-btn" id="calcEditarReceitaBtn" onclick="calcAbrirAjusteReceita()" style="display:none;">Editar receita</button>
+            <button class="cta-btn primary" id="calcGerarCompraBtn" onclick="calcGerarCompra()" style="display:none;">Gerar lista de compras</button>
+          </div>
+        </div>
+
+        <!-- Empty state quando sem busca -->
+        <div id="calcEmptyState" class="attention-empty" style="margin-top:18px;">
+          <span>Digite o nome do produto para começar.</span>
+        </div>
+      </section>
+
       <section class="producao-tab-section" data-ptab="lotes">
         <div class="batch-tools">
           <button data-bfilter="open" class="active" onclick="setBatchFilter('open')">Abertos</button>
@@ -16100,6 +16151,353 @@ function goProducaoTab(tab) {
   document.querySelectorAll('[data-screen="producao"] .producao-tab-section').forEach(s => s.classList.toggle('active', s.dataset.ptab === producaoTab));
   if (producaoTab === 'lotes') renderProducaoBatches();
   if (producaoTab === 'catalogo') renderProductionDemand(); // F6
+  if (producaoTab === 'calculadora') calcOnEntrarTab(); // Onda 3.1
+}
+
+// === Calculadora de Producao (Onda 3.1) ===
+// Estado em memoria — produto selecionado, ultimo resultado, debounce timer
+let calcProdutoSelecionado = null;
+let calcUltimoResultado = null;
+let calcSearchTimer = null;
+
+function calcOnEntrarTab() {
+  // Pre-fill via prod-demand chip (G1): se localStorage tem flag, popula form
+  try {
+    const prefillRaw = localStorage.getItem('cdb-calc-prefill');
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw);
+      localStorage.removeItem('cdb-calc-prefill');
+      if (prefill.produtoId && prefill.produtoNome) {
+        calcSelecionarProduto({ id: prefill.produtoId, nome: prefill.produtoNome,
+          unidadeMedidaBase: prefill.unidadeMedidaBase || 'Un',
+          rendimentoBase: prefill.rendimentoBase, rendimentoUnidade: prefill.rendimentoUnidade });
+        if (prefill.qty) {
+          document.getElementById('calcQtd').value = prefill.qty;
+          calcOnQtdChange();
+        }
+      }
+    }
+  } catch (_) { /* silent */ }
+}
+
+function calcApiBase() {
+  return (window.CDB_CONFIG && window.CDB_CONFIG.apiBaseUrl) || '';
+}
+
+function calcAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = localStorage.getItem('cdb-auth-token') || localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  } catch (_) {}
+  return headers;
+}
+
+async function calcBuscarProdutos() {
+  if (calcSearchTimer) clearTimeout(calcSearchTimer);
+  calcSearchTimer = setTimeout(async () => {
+    const q = document.getElementById('calcProdSearch').value.trim();
+    const box = document.getElementById('calcProdSuggestions');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+    try {
+      const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+      const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
+      const res = await fetch(url, { headers: calcAuthHeaders() });
+      const json = await res.json();
+      const produtos = (json && json.data) || [];
+      if (produtos.length === 0) {
+        box.classList.add('show');
+        box.innerHTML = '<div style="padding:10px;color:var(--ink-mute);font-size:13px;">Nenhum produto com receita encontrado.</div>';
+        return;
+      }
+      box.classList.add('show');
+      box.innerHTML = produtos.map(p => `
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+             onclick='calcSelecionarProduto(${JSON.stringify(p).replace(/'/g, "\\'")})'>
+          <div style="font-weight:600;">${p.nome}</div>
+          <div style="font-size:11px;color:var(--ink-mute);">Rende ${p.rendimentoBase} ${p.rendimentoUnidade}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      showToast('Erro ao buscar produtos');
+    }
+  }, 300);
+}
+
+function calcSelecionarProduto(p) {
+  calcProdutoSelecionado = p;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSuggestions').classList.remove('show');
+  document.getElementById('calcProdSelected').style.display = 'block';
+  document.getElementById('calcProdSelected').textContent = `${p.nome} (rende ${p.rendimentoBase} ${p.rendimentoUnidade})`;
+  document.getElementById('calcEmptyState').style.display = 'none';
+
+  // G7: chips de unidade contextual — filtra por compativeis
+  const unidadeBase = p.unidadeMedidaBase || 'Un';
+  const select = document.getElementById('calcUnidade');
+  const compativeis = calcUnidadesCompativeis(unidadeBase);
+  select.innerHTML = compativeis.map(u => `<option value="${u}"${u === unidadeBase ? ' selected' : ''}>${u}</option>`).join('');
+
+  calcOnQtdChange();
+}
+
+function calcUnidadesCompativeis(base) {
+  const massa = ['Mg', 'G', 'Kg'];
+  const volume = ['Ml', 'L'];
+  const contagem = ['Un', 'Dz'];
+  if (massa.includes(base)) return massa;
+  if (volume.includes(base)) return volume;
+  if (contagem.includes(base)) return contagem;
+  return [base];
+}
+
+function calcOnQtdChange() {
+  const qtdStr = document.getElementById('calcQtd').value.replace(',', '.');
+  const qtd = parseFloat(qtdStr);
+  const hint = document.getElementById('calcQtdHint');
+  const btn = document.getElementById('calcCalcularBtn');
+  hint.classList.remove('invalid');
+  hint.textContent = '';
+  if (!calcProdutoSelecionado) { btn.disabled = true; return; }
+  if (!isFinite(qtd) || qtd < 0.0001) {
+    if (qtdStr) {
+      hint.classList.add('invalid');
+      hint.textContent = 'Quantidade minima 0.0001.';
+    }
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+}
+
+function calcOnUnidadeChange() {
+  // Recalcula valido novamente quando troca unidade
+  calcOnQtdChange();
+}
+
+async function calcExecutar() {
+  if (!calcProdutoSelecionado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const qtd = parseFloat(document.getElementById('calcQtd').value.replace(',', '.'));
+  const unidade = document.getElementById('calcUnidade').value;
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  const box = document.getElementById('calcResultadoBox');
+  box.setAttribute('aria-busy', 'true');
+  box.style.display = 'block';
+  document.getElementById('calcResultadoBadge').textContent = 'Calculando...';
+  document.getElementById('calcResultadoBadge').style.background = 'var(--bg-elev)';
+  document.getElementById('calcInsumosList').innerHTML = '';
+  document.getElementById('calcResultadoCustoTotal').textContent = '';
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        produtoFinalId: calcProdutoSelecionado.id,
+        quantidadeDesejada: qtd,
+        unidadeDesejada: unidade,
+        lojaId
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      showToast(`${code}: ${msg}`);
+      box.style.display = 'none';
+      return;
+    }
+    calcUltimoResultado = json.data;
+    calcRenderResultado(json.data);
+    calcSalvarHistorico(calcProdutoSelecionado, qtd, unidade);
+  } catch (e) {
+    showToast('Erro de conexao');
+    box.style.display = 'none';
+  } finally {
+    box.setAttribute('aria-busy', 'false');
+  }
+}
+
+function calcRenderResultado(r) {
+  const badge = document.getElementById('calcResultadoBadge');
+  const editarBtn = document.getElementById('calcEditarReceitaBtn');
+  const gerarBtn = document.getElementById('calcGerarCompraBtn');
+
+  if (r.tudoDisponivel) {
+    badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
+    badge.style.background = 'var(--basil-soft)';
+    badge.style.color = 'var(--basil)';
+    badge.style.border = '1px solid var(--basil)';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'none';
+  } else {
+    const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
+    badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
+    badge.style.background = 'rgba(239, 107, 107, 0.16)';
+    badge.style.color = '#ef6b6b';
+    badge.style.border = '1px solid #ef6b6b';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'inline-block';
+  }
+
+  if (r.custoEstimadoTotal != null) {
+    document.getElementById('calcResultadoCustoTotal').textContent = `Custo estimado total: R$ ${r.custoEstimadoTotal.toFixed(2).replace('.', ',')}`;
+  }
+
+  const list = document.getElementById('calcInsumosList');
+  list.innerHTML = r.insumos.map(i => {
+    let cor = 'var(--basil)';
+    let status = 'Cobre';
+    if (i.conversaoFalhou) { cor = '#ef6b6b'; status = 'Unidade incompativel'; }
+    else if (i.falta != null && i.falta > 0) { cor = '#ef6b6b'; status = `Falta ${i.falta.toFixed(3)} ${i.unidadeReceita}`; }
+
+    const custoTxt = i.custoEstimadoLinha != null
+      ? `R$ ${i.custoEstimadoLinha.toFixed(2).replace('.', ',')}`
+      : '—';
+
+    return `
+      <div style="background:var(--bg-elev);border-radius:12px;padding:12px;margin-bottom:8px;border-left:3px solid ${cor};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <strong style="font-size:14px;">${i.insumoNome}</strong>
+          <span style="font-size:11px;color:var(--ink-mute);">${custoTxt}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">
+          Precisa ${i.quantidadeNecessaria.toFixed(3)} ${i.unidadeReceita} • Saldo ${i.saldoAtual.toFixed(3)} ${i.unidadeSaldo}
+        </div>
+        <div style="font-size:11px;color:${cor};margin-top:4px;font-weight:600;">${status}</div>
+        ${i.aviso ? `<div style="font-size:11px;color:var(--gold);margin-top:4px;">${i.aviso}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function calcGerarCompra() {
+  if (!calcUltimoResultado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  // Coleta insumos faltantes
+  const insumosFaltantes = calcUltimoResultado.insumos
+    .filter(i => i.falta != null && i.falta > 0 && !i.conversaoFalhou)
+    .map(i => ({
+      insumoId: i.insumoId,
+      quantidadeFaltante: i.falta,
+      unidade: i.unidadeReceita
+    }));
+
+  if (insumosFaltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return;
+  }
+
+  // Step 1: preview (sem idempotency, livre pra refazer)
+  try {
+    const previewUrl = `${calcApiBase()}/api/mobile/calculadora/preview-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(previewUrl, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      showToast(`${code}: ${json.error?.message || ''}`);
+      return;
+    }
+    const preview = json.data;
+    // Mostra resumo via confirm nativo (padrao do PWA pra confirmacoes destrutivas)
+    const grupos = preview.porFornecedor || [];
+    const semFornecedor = grupos.find(g => !g.fornecedorId);
+    if (semFornecedor) {
+      showToast('Alguns insumos nao tem fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
+      return;
+    }
+    const resumo = grupos.map(g => `${g.fornecedorNome}: ${g.linhas.length} itens (R$ ${(g.subtotalEstimado || 0).toFixed(2)})`).join('\n');
+    const total = preview.totalEstimado != null ? `\nTotal: R$ ${preview.totalEstimado.toFixed(2)}` : '';
+    if (!confirm(`Criar ${grupos.length} pedido(s) de compra?\n\n${resumo}${total}`)) return;
+
+    // Step 2: criar com idempotency-key
+    const idempotencyKey = calcGerarUuid();
+    const fornecedores = grupos.map(g => ({
+      fornecedorId: g.fornecedorId,
+      itens: g.linhas.map(l => ({
+        insumoId: l.insumoId,
+        nome: l.insumoNome,
+        quantidade: l.quantidade,
+        unidade: l.unidade,
+        custoUnitario: l.custoUnitarioReferencia || 0,
+        observacao: null
+      }))
+    }));
+
+    const criarUrl = `${calcApiBase()}/api/mobile/calculadora/criar-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res2 = await fetch(criarUrl, {
+      method: 'POST',
+      headers: { ...calcAuthHeaders(), 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId,
+        canal: 'calculadora-pwa',
+        observacoes: null,
+        fornecedores
+      })
+    });
+    const json2 = await res2.json();
+    if (!res2.ok) {
+      const code = (json2 && json2.error && json2.error.code) || 'ERROR';
+      showToast(`${code}: ${json2.error?.message || ''}`);
+      return;
+    }
+    showToast(`${json2.data?.pedidosCriados?.length || 0} pedido(s) de compra criado(s).`);
+  } catch (e) {
+    showToast('Erro de conexao');
+  }
+}
+
+function calcAbrirAjusteReceita() {
+  // MVP: para versao 1 deixamos esse fluxo no admin web. Aqui apenas redireciona com toast.
+  showToast('Edicao de receita: acesse o admin web por enquanto.');
+}
+
+function calcLimpar() {
+  calcProdutoSelecionado = null;
+  calcUltimoResultado = null;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSelected').style.display = 'none';
+  document.getElementById('calcQtd').value = '';
+  document.getElementById('calcQtdHint').textContent = '';
+  document.getElementById('calcCalcularBtn').disabled = true;
+  document.getElementById('calcResultadoBox').style.display = 'none';
+  document.getElementById('calcEmptyState').style.display = 'block';
+}
+
+function calcSalvarHistorico(produto, qtd, unidade) {
+  try {
+    const raw = localStorage.getItem('cdb-calc-history') || '[]';
+    let history = JSON.parse(raw);
+    if (!Array.isArray(history)) history = [];
+    history.unshift({ produto: { id: produto.id, nome: produto.nome }, qtd, unidade, ts: Date.now() });
+    history = history.slice(0, 5);
+    localStorage.setItem('cdb-calc-history', JSON.stringify(history));
+  } catch (_) {}
+}
+
+function calcGerarUuid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback UUID v4 pseudo (suficiente p/ idempotency)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 function setBatchFilter(next) {
   batchFilter = next || 'open';
