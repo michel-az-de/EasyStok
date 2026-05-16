@@ -671,6 +671,30 @@ app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     }
 });
 
+// Onda 1.4 — proxy do resumo de tickets criticos.
+// - Sem empresaId: cross-tenant (badge global no _Layout admin)
+// - Com empresaId: por empresa (widget na pagina Operacao)
+app.MapGet("/api-proxy/admin/tickets/criticos-resumo", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/admin/tickets/criticos-resumo?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy admin/tickets/criticos-resumo falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 // Saúde dos devices da empresa (badge ok/warn/err + último visto).
 app.MapGet("/api-proxy/mobile/operacao/devices-health", async (
     EasyStock.Admin.Services.AdminApiClient api,
