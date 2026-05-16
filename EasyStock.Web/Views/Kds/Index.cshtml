@@ -91,7 +91,7 @@ else
                                 </div>
                             </header>
                             <div class="kds-card__itens">
-                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.AsMoney()</span>
                             </div>
                             <footer class="kds-card__actions">
                                 <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>
@@ -137,7 +137,7 @@ else
                                 </div>
                             </header>
                             <div class="kds-card__itens">
-                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.AsMoney()</span>
                             </div>
                             <footer class="kds-card__actions">
                                 <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>
@@ -183,7 +183,7 @@ else
                                 </div>
                             </header>
                             <div class="kds-card__itens">
-                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.ToString("C")</span>
+                                <span class="text-xs text-slate-500">@p.ItensCount @(p.ItensCount == 1 ? "item" : "itens") · @p.Total.AsMoney()</span>
                             </div>
                             <footer class="kds-card__actions">
                                 <a href="/pedidos/@p.Id" class="kds-card__link">Ver detalhes</a>

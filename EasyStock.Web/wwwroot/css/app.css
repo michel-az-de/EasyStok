@@ -4034,11 +4034,11 @@ html.theme-dark .kds-col__empty {
 .kds-card {
     background: #ffffff;
     border: 1px solid rgba(226, 232, 240, .85);
-    border-left-width: 4px;
+    border-left-width: 6px;
     border-radius: 12px;
-    padding: 14px;
+    padding: 18px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
-    transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+    transition: transform var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 
 html.theme-dark .kds-card {
@@ -4075,16 +4075,17 @@ html.theme-dark .kds-card {
 }
 
 .kds-card__cliente {
-    font-size: 16px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text-primary, #0f172a);
-    line-height: 1.2;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
 }
 
 .kds-card__meta {
-    font-size: 12px;
-    color: var(--text-secondary, #64748b);
-    margin-top: 2px;
+    font-size: 14px;
+    color: var(--text-secondary, #475569);
+    margin-top: 4px;
 }
 
 .kds-card__tempo {
@@ -4093,22 +4094,25 @@ html.theme-dark .kds-card {
 }
 
 .kds-card__tempo-valor {
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 32px;
+    font-weight: 800;
     font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
     color: var(--text-primary, #0f172a);
     line-height: 1;
+    letter-spacing: -0.02em;
 }
 
 .kds-card--vermelho .kds-card__tempo-valor { color: #b91c1c; }
 .kds-card--laranja  .kds-card__tempo-valor { color: #b45309; }
 
 .kds-card__tempo-label {
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-secondary, #94a3b8);
-    margin-top: 2px;
+    letter-spacing: .08em;
+    color: var(--text-muted, #6B7280);
+    margin-top: 4px;
 }
 
 .kds-card__itens {
