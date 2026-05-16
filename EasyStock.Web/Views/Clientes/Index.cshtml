@@ -99,11 +99,11 @@
                         <td class="text-slate-600 text-sm">@(c.Apt ?? "—")</td>
                         <td class="text-slate-600">@(c.Telefone ?? "—")</td>
                         <td class="text-slate-500 text-sm">@(c.Documento ?? "—")</td>
-                        <td class="text-slate-600 text-sm text-right tabular-nums">
+                        <td class="text-slate-600 text-sm col-num">
                             @c.OrderCount
                             @if (c.LastOrderAt.HasValue)
                             {
-                                <span class="text-xs text-slate-400 block">último em @c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")</span>
+                                <span class="text-xs text-slate-400 block">último em @c.LastOrderAt.Value.AsDate()</span>
                             }
                         </td>
                         <td>

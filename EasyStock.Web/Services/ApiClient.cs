@@ -123,9 +123,12 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         {
             var response = await http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
-                return ApiResult<Stream>.Fail("HTTP_ERROR", $"Erro HTTP {(int)response.StatusCode}.");
+                return ApiResult<Stream>.Fail("HTTP_ERROR",
+                    $"Erro HTTP {(int)response.StatusCode}.",
+                    (int)response.StatusCode,
+                    ExtractCorrelationId(response));
             var stream = await response.Content.ReadAsStreamAsync();
-            return ApiResult<Stream>.Ok(stream);
+            return ApiResult<Stream>.Ok(stream) with { CorrelationId = ExtractCorrelationId(response) };
         }
         catch (TaskCanceledException)
         {

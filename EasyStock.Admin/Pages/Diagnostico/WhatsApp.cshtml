@@ -1,0 +1,139 @@
+@page
+@model EasyStock.Admin.Pages.Diagnostico.WhatsAppModel
+@{
+    ViewData["Title"] = "Diagnóstico — WhatsApp";
+}
+
+<div x-data="diagWhatsApp()" class="space-y-4">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Diagnóstico · WhatsApp</h2>
+            <p class="text-es-ink-mute text-sm">Envia mensagem WhatsApp de teste via Meta Cloud API.</p>
+        </div>
+        <a href="/Diagnostico" class="text-es-accent hover:underline text-sm">← Voltar pro Diagnóstico</a>
+    </div>
+
+    <form @@submit.prevent="enviar()" class="rounded-xl p-5 space-y-3" style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+        <div>
+            <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Destino * (E.164)</label>
+            <input type="text" x-model="destino" required placeholder="+5511999999999"
+                   class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent font-mono" />
+            <span class="text-es-ink-mute text-xs">Sem espaço, formato internacional com '+'.</span>
+        </div>
+
+        <div>
+            <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Modo</label>
+            <div class="flex gap-3 mt-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" x-model="modo" value="text" />
+                    <span class="text-sm">Texto livre (só dentro da janela 24h)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" x-model="modo" value="template" />
+                    <span class="text-sm">Template aprovado Meta</span>
+                </label>
+            </div>
+        </div>
+
+        <template x-if="modo === 'text'">
+            <div>
+                <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Corpo *</label>
+                <textarea x-model="corpo" rows="3" placeholder="Mensagem livre..."
+                          class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent"></textarea>
+            </div>
+        </template>
+
+        <template x-if="modo === 'template'">
+            <div class="space-y-2">
+                <div>
+                    <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Template name *</label>
+                    <input type="text" x-model="templateName" placeholder="ticket_resposta_cliente"
+                           class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent font-mono" />
+                    <span class="text-es-ink-mute text-xs">Nome exato como aprovado na Meta Business Manager.</span>
+                </div>
+                <div>
+                    <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Language code</label>
+                    <input type="text" x-model="languageCode" placeholder="pt_BR"
+                           class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent font-mono" />
+                </div>
+                <div>
+                    <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Variáveis posicionais (uma por linha)</label>
+                    <textarea x-model="varsRaw" rows="3" placeholder="Felipe&#10;1234&#10;https://easystok.com/tickets/1234"
+                              class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent font-mono"></textarea>
+                    <span class="text-es-ink-mute text-xs">Substituem {{1}}, {{2}}, {{3}}... na ordem do template aprovado.</span>
+                </div>
+            </div>
+        </template>
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" :disabled="loading"
+                    class="btn-primary text-sm disabled:opacity-50"
+                    x-text="loading ? 'Enviando...' : '💬 Enviar teste'"></button>
+        </div>
+
+        <template x-if="resultado">
+            <div class="mt-3 p-3 rounded-lg text-sm"
+                 :class="resultado.sucesso ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'">
+                <div class="font-bold" x-text="resultado.sucesso ? '✓ Enviado' : '✗ Falha'"></div>
+                <div class="text-xs mt-1 opacity-80">
+                    Provedor: <span x-text="resultado.provedor" class="font-mono"></span> · <span x-text="resultado.duracaoMs"></span>ms
+                </div>
+                <div x-show="resultado.erro" class="text-xs mt-1 opacity-80 font-mono break-all" x-text="resultado.erro"></div>
+            </div>
+        </template>
+    </form>
+
+    <div class="text-xs text-es-ink-mute">
+        <strong>Como funciona:</strong> usa <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">MetaCloudWhatsAppProvider</code>.
+        Config: <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">Notifications:WhatsApp:Meta:AccessToken</code> +
+        <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">PhoneNumberId</code> via fly secrets.
+        Templates exigem aprovação prévia (24-72h) na Meta Business Manager.
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function diagWhatsApp() {
+    return {
+        destino: '',
+        modo: 'text',
+        corpo: '',
+        templateName: '',
+        languageCode: 'pt_BR',
+        varsRaw: '',
+        loading: false,
+        resultado: null,
+
+        async enviar() {
+            this.loading = true;
+            this.resultado = null;
+            try {
+                const vars = this.varsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+                const body = this.modo === 'template'
+                    ? { destino: this.destino, modo: 'template', templateName: this.templateName, languageCode: this.languageCode, vars }
+                    : { destino: this.destino, modo: 'text', corpo: this.corpo };
+                const r = await fetch('/api-proxy/diag/whatsapp-teste', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const data = await r.json();
+                const inner = data.data ?? data;
+                this.resultado = {
+                    sucesso: inner.sucesso === true,
+                    provedor: inner.provedor || 'meta',
+                    erro: inner.erro || null,
+                    duracaoMs: inner.duracaoMs || 0
+                };
+            } catch (e) {
+                this.resultado = { sucesso: false, provedor: 'meta', erro: e.message || String(e), duracaoMs: 0 };
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+}

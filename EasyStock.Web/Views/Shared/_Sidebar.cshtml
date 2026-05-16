@@ -22,7 +22,7 @@
                 <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
             </svg>
             <span class="brand-name font-bold text-base tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
-                <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stok</span>
+                <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stock</span>
             </span>
         </div>
         <!-- Close button (mobile only) -->
@@ -42,7 +42,9 @@
             <span class="text-lg leading-none">@lojaEmoji</span>
             <div class="flex-1 min-w-0">
                 <div class="text-white font-semibold truncate" style="font-size: 0.875rem;">@lojaNome</div>
-                <div style="color: var(--text-muted); font-size: 0.6875rem;">Loja selecionada</div>
+                @* Antes var(--text-muted) ficava quase invisivel em fundo navy escuro
+                   (contraste < 3:1, falhava WCAG AA). text-slate-400 da ~7:1 — passa AA. *@
+                <div class="text-slate-400" style="font-size: 0.6875rem;">Loja selecionada</div>
             </div>
             <svg class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -169,12 +171,9 @@
 
         <div class="nav-sep"><span>Sistema</span></div>
 
-        <a href="/dispositivos" class="ni @(activeItem is "Dispositivos" or "ProdutosMobile" or "Operacao" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Dispositivos
-        </a>
+        @* Pente-fino 2026-05-16: link /dispositivos removido porque DispositivosController nao existe (404).
+           Reintroduzir quando o modulo for implementado. ProdutosMobile/Operacao tinham seus proprios links
+           anteriormente; quando reintroduzir, restaurar este bloco. *@
         <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
            title="Abre o KDS num tablet/TV em nova aba. Precisa de device pareado nesse navegador.">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

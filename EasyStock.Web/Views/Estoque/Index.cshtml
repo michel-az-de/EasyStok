@@ -6,7 +6,13 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item" : "itens") em estoque</p>
+        <p>
+            @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote cadastrado" : "lotes cadastrados")
+            @if (Model.LotesComSaldo.HasValue && Model.LotesComSaldo.Value != Model.Paginacao.Total)
+            {
+                <span class="text-slate-400">· @Model.LotesComSaldo com saldo</span>
+            }
+        </p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"
@@ -108,12 +114,22 @@
                     <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
                         Quantidade
                     </label>
+                    @* U4 (2026-05-16): :disabled visual nos botoes +/- de quantidade.
+                       Math.max(1,...) ja existia, mas faltava aria-disabled e estilo
+                       opacity-50 cursor-not-allowed para feedback visual claro.
+                       Max 9999 limita o + para evitar overflow. *@
                     <div class="flex items-center gap-2">
                         <button type="button" @@click="qty = Math.max(1, qty - 1)"
+                                :disabled="qty <= 1"
+                                :aria-disabled="qty <= 1 ? 'true' : 'false'"
+                                :class="qty <= 1 ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">−</button>
-                        <input type="number" x-model.number="qty" min="1"
-                               class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                        <button type="button" @@click="qty = qty + 1"
+                        <input type="number" x-model.number="qty" min="1" max="9999"
+                               class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-base text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <button type="button" @@click="qty = Math.min(9999, qty + 1)"
+                                :disabled="qty >= 9999"
+                                :aria-disabled="qty >= 9999 ? 'true' : 'false'"
+                                :class="qty >= 9999 ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">+</button>
                     </div>
                     <p class="text-xs mt-1"
@@ -245,13 +261,13 @@
                                 }
                             </td>
                             <td class="text-slate-500 text-xs hidden md:table-cell">
-                                @item.LastMov.ToString("dd/MM/yyyy")
+                                @item.LastMov.AsDate()
                             </td>
                             <td>
                                 @if (item.Validade.HasValue)
                                 {
                                     <span class="@(diasParaVencer <= 7 ? "text-red-600 font-semibold" : "text-slate-600") text-xs">
-                                        @item.Validade.Value.ToString("dd/MM/yyyy")
+                                        @item.Validade.Value.AsDate()
                                         @if (diasParaVencer <= 7)
                                         {
                                             <span class="badge-critical ml-1 px-1.5 py-0.5 rounded text-xs font-semibold">@diasParaVencer d</span>
@@ -297,7 +313,7 @@
                                 }
                                 <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@statusLabel</span>
                             </td>
-                            <td class="min-w-[180px] whitespace-nowrap">
+                            <td class="min-w-48 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
                                        class="grid-action-btn grid-action-btn--ghost"

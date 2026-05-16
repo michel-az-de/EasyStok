@@ -181,6 +181,26 @@ public static class ApiServiceCollectionExtensions
                 limiter.QueueLimit = 20;
             });
 
+            // Modulo Fiscal (F3) — particionado por tenant para nao deixar um cliente
+            // saturar a quota global. 10/min e suficiente para PDV varejista normal;
+            // emissoes em rajada (batch) devem ir por outro canal (futuro).
+            options.AddPolicy("nfe-emitir", context =>
+            {
+                var partitionKey = context.User.FindFirst("empresaId")?.Value
+                    ?? context.User.FindFirst("EmpresaId")?.Value
+                    ?? context.Connection.RemoteIpAddress?.ToString()
+                    ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    });
+            });
+
             // Onda 7 — Rate limit pra endpoints mobile anônimos.
             // Cobre: GET /api/mobile/version, POST /api/mobile/devices/pair,
             // POST /api/mobile/diagnostics/errors. Particionado por IP pra

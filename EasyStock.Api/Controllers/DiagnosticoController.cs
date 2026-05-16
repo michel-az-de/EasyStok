@@ -61,21 +61,24 @@ public sealed class DiagnosticoController(
 
         // Determinar status geral — hierarquia: critical > degraded > ok.
         // Considera todos os subsistemas relevantes; status verde só com tudo saudável.
+        const long LatenciaBancoDegradedMs = 1000;
+
         var isCritical =
             result.Banco.Conexao == "falha" ||
-            result.Configuracoes.JwtSecretPresente == false ||
-            result.Configuracoes.ConnectionStringPresente == false;
+            !result.Configuracoes.JwtSecretPresente ||
+            !result.Configuracoes.ConnectionStringPresente;
 
         var isDegraded =
             result.Redis.Conexao == "falha" ||
             result.Banco.Fallback ||
+            // JwtSecretSeguro é nullable — só conta como degradação quando explicitamente inseguro.
             result.Configuracoes.JwtSecretSeguro == false ||
             // IA habilitada mas sem API Key configurada — recurso degradado.
             (result.Ia.Habilitado && !result.Ia.ApiKeyPresente) ||
-            // Storage configurado mas diretório inacessível.
+            // Storage configurado mas diretório inacessível (false != null: null = não verificado).
             (result.Storage.Configurado && result.Storage.DiretorioExiste == false) ||
-            // Latência de banco alta sinaliza degradação real.
-            result.Banco.LatenciaMs > 500;
+            // Latência de banco acima do threshold de boot/cold start sinaliza degradação real.
+            result.Banco.LatenciaMs > LatenciaBancoDegradedMs;
 
         if (isCritical)
             result.Status = "critical";

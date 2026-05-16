@@ -23,6 +23,7 @@ public class LayoutJsonValidator : AbstractValidator<LayoutJsonDocument>
     private static readonly HashSet<string> VariaveisPermitidas =
     [
         "produto.nome", "produto.marca",
+        "produto.peso_g", // C2 (RDC 727/2022): peso unitario obrigatorio para Embalado.
         "produto.ficha.kcal", "produto.ficha.proteina_g", "produto.ficha.carbs_g",
         "produto.ficha.gordura_g", "produto.ficha.gordura_saturada_g",
         "produto.ficha.fibras_g", "produto.ficha.sodio_mg", "produto.ficha.porcao_g",

@@ -94,15 +94,22 @@ public class GetDashboardFullUseCase(
             var pctCritico = (decimal)estoque.Critico / estoque.Total * 100m;
             if (pctCritico > 20)
             {
+                // Esclarece a unidade: "lotes" (rows de ItemEstoque ativas) vs
+                // "itens" (soma de quantidade). Antes só falava "estoque" e
+                // confundia com o card "Itens em estoque" do topo.
+                var lotesLabel = estoque.Total == 1 ? "lote ativo está crítico" : "lotes ativos estão críticos";
                 var msg = temFornecedoresAtivos
-                    ? $"{pctCritico:0}% do estoque está crítico. Considere repor agora."
-                    : $"{pctCritico:0}% do estoque está crítico — cadastre um fornecedor para conseguir repor.";
+                    ? $"{pctCritico:0}% dos {lotesLabel}. Considere repor agora."
+                    : $"{pctCritico:0}% dos {lotesLabel} — cadastre um fornecedor para conseguir repor.";
                 insights.Add(new InsightDto("estoque", "alert", msg));
             }
         }
 
         if (pendentesCount > 0)
-            insights.Add(new InsightDto("pedidos", "warning", $"{pendentesCount} pedidos aguardando pagamento."));
+        {
+            var pedidoLabel = pendentesCount == 1 ? "pedido aguardando pagamento" : "pedidos aguardando pagamento";
+            insights.Add(new InsightDto("pedidos", "warning", $"{pendentesCount} {pedidoLabel}."));
+        }
 
         if (delta.ClientesAtivos is decimal dC && dC > 20m)
             insights.Add(new InsightDto("clientes", "positive", $"Base de clientes cresceu {dC:0.#}% no período."));

@@ -23,13 +23,30 @@
                     @(c.Ativo ? "Ativo" : "Inativo")
                 </span>
             </div>
+            @{
+                // CriadoEm vem do banco do cliente; LastOrderAt e do pedido. Quando o cliente
+                // foi promovido a partir de pedido ad-hoc / sync mobile, LastOrderAt pode ser
+                // anterior a CriadoEm — antes a header dizia "cadastrado em 13/05/2026" com
+                // pedido em 28/04/2026 e parecia integridade violada. Aqui explicamos.
+                // Tambem padroniza formato de data (era "dd/MM/yy" + "dd/MM/yyyy" misturados).
+                var lastOrderLocal = c.LastOrderAt?.ToLocalTime();
+                var criadoLocal = c.CriadoEm.ToLocalTime();
+                var pedidoAntesDoCadastro = lastOrderLocal.HasValue && lastOrderLocal.Value < criadoLocal;
+            }
             <p class="text-sm text-slate-500 mt-1">
                 @c.OrderCount @(c.OrderCount == 1 ? "pedido" : "pedidos")
-                @if (c.LastOrderAt.HasValue)
+                @if (lastOrderLocal.HasValue)
                 {
-                    <text> · último em @c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")</text>
+                    <text> · último em @lastOrderLocal.Value.AsDate()</text>
                 }
-                · cadastrado em @c.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy")
+                @if (pedidoAntesDoCadastro)
+                {
+                    <text> · ficha cadastral criada em @criadoLocal.AsDate() (a partir de pedido anterior)</text>
+                }
+                else
+                {
+                    <text> · cadastrado em @criadoLocal.AsDate()</text>
+                }
             </p>
         </div>
         <div class="flex gap-2 shrink-0">

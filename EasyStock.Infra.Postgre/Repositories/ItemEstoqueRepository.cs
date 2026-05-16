@@ -159,6 +159,23 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
+        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+        {
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId);
+
+            if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
+                query = query.Where(i => i.Status == statusEnum);
+
+            if (categoriaId.HasValue)
+                query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
+
+            var cadastrados = await query.CountAsync();
+            var comSaldo = await query.CountAsync(i => (int)i.QuantidadeAtual > 0);
+            return (cadastrados, comSaldo);
+        }
+
         public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
         {
             var resumo = await dbContext.ItensEstoque

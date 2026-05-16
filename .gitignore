@@ -395,3 +395,7 @@ publish-web/
 publish-admin/
 *.zip
 EasyStock.Api/easystock.db*
+
+# Build artifact que escapou pra raiz em 2026-05-16 (incidente wip(snapshot))
+# Ver: docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
+/admin/

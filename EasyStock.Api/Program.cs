@@ -11,6 +11,8 @@ using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -175,6 +177,10 @@ switch (resolvedProvider)
             .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
             .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapter Focus NFe + cert A1
+        builder.Services.AddEasyStockIntegrationResilience();
+        builder.Services.AddFocusNFeAdapter(builder.Configuration);
+        builder.Services.AddDataProtection();
         break;
 
     case "sqlite":

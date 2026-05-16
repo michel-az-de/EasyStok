@@ -12,6 +12,6 @@ public class GetReceitaCustoUseCase(IAnalyticsRepository analyticsRepository)
         var ate = DateTime.UtcNow.AddMinutes(-cmd.TimezoneOffsetMinutes);
         var de = ate.AddDays(-cmd.PeriodoDias);
 
-        return await analyticsRepository.GetReceitaCustoSerieAsync(cmd.EmpresaId, de, ate, cmd.LojaId);
+        return await analyticsRepository.GetReceitaCustoSerieAsync(cmd.EmpresaId, de, ate, cmd.LojaId, cmd.TimezoneOffsetMinutes);
     }
 }

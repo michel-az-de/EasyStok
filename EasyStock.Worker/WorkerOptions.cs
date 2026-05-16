@@ -21,4 +21,13 @@ public sealed class WorkerOptions
 
     /// <summary>Intervalo (em segundos) entre ticks do EndpointHealthMonitorService. Mínimo 60. Padrão 300 (5 min).</summary>
     public int EndpointHealthIntervalSeconds { get; set; } = 300;
+
+    /// <summary>Intervalo (em segundos) entre ticks do ReprocessarContingenciaBackgroundService. Mínimo 30. Padrão 60 (1 min).</summary>
+    public int NfeContingenciaIntervalSeconds { get; set; } = 60;
+
+    /// <summary>Tamanho do batch de NFC-e em FalhaTransiente processado por tick. Default 50, max 500.</summary>
+    public int NfeContingenciaBatchSize { get; set; } = 50;
+
+    /// <summary>Intervalo (em segundos) entre ticks do RenovacaoCertificadoA1BackgroundService. Mínimo 3600 (1h). Padrão 21600 (6h).</summary>
+    public int NfeRenovacaoCertIntervalSeconds { get; set; } = 21600;
 }

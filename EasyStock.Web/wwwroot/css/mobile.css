@@ -455,6 +455,31 @@
         padding: 14px 16px !important;
     }
 
+    /* === A1 (WCAG 1.4.4) ===
+     * Anti-zoom iOS - aplica a TODOS os inputs em viewport <=768px, nao
+     * apenas form[novalidate] acima. Inputs com text-sm (14px) ou text-xs
+     * (12px) disparam zoom automatico no focus em iOS Safari.
+     *
+     * Excecao legitima de !important porque utilitarios Tailwind tem mesma
+     * especificidade. Esta e A UNICA excecao - A11y obrigatoria (WCAG 1.4.4).
+     *
+     * Para input compacto especifico (toolbar, badge), use seletor mais
+     * especifico (sem !important): .toolbar input { font-size: 16px; }
+     * Mantenha 16px minimo no font-size - degrade outras dimensoes em vez.
+     */
+    input:not([type=checkbox]):not([type=radio]):not([type=range]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* === C1: scroll-padding para sticky topbar ===
+     * Compensa altura da topbar quando href#hash ou scrollIntoView. */
+    .app-main {
+        scroll-padding-top: calc(var(--topbar-h, 56px) + env(safe-area-inset-top));
+        scroll-behavior: smooth;
+    }
+
     /* Preservar padding-left para inputs com prefixo R$ posicionado absolutamente */
     form[novalidate] .relative > input.pl-9 {
         padding-left: 36px !important;
@@ -857,5 +882,38 @@
         flex-direction: column !important;
         align-items: flex-start !important;
         gap: 8px !important;
+    }
+}
+
+/* === C1: Floor de viewport 320px ===
+ * Em viewports <320px (split-screen extremo, janelas estranhas de desktop),
+ * mostra mensagem "Gire o aparelho ou use tela maior" em vez de tentar
+ * espremer o layout em 1 letra por linha. Celular real = 320-414px.
+ * Inserido 2026-05-16 (correcao C1).
+ */
+.viewport-too-narrow-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--app-bg, #0f1626);
+    color: var(--ink, #f1f5f9);
+    z-index: 99999;
+    padding: 16px;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@media (max-width: 319px) {
+    .viewport-too-narrow-warning {
+        /* !important para sobrescrever o atributo HTML `hidden` no _Layout.cshtml. */
+        display: flex !important;
+    }
+    /* Esconde o app principal abaixo de 320px (split-screen casos extremos). */
+    body > div.flex.h-screen {
+        opacity: 0;
+        pointer-events: none;
     }
 }

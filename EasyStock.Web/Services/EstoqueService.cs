@@ -36,8 +36,63 @@ public class EstoqueService(ApiClient api, SessionService session)
         var qs = $"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=20";
         if (!string.IsNullOrEmpty(status))
             qs += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
+            qs += $"&categoriaId={catId}";
 
-        return await api.GetAsync<PagedResult<EstoqueSku>>(qs);
+        var result = await api.GetAsync<PagedResult<EstoqueSku>>(qs);
+
+        // Defesa em profundidade: a API estava devolvendo itens que nao batiam
+        // com o filtro de status (ex: pill "Critico" mostrava itens com badge
+        // "Atencao"). Aqui aplicamos um segundo filtro client-side espelhando
+        // a logica que a view usa para renderizar o badge — assim filtro e
+        // badge sempre concordam visualmente, ate o backend corrigir.
+        if (!string.IsNullOrEmpty(status)
+            && result.Success
+            && result.Data is { Data: { } items } paged
+            && items.Count > 0)
+        {
+            var filtered = items.Where(i => MatchesStatusFilter(i, status)).ToList();
+            if (filtered.Count != items.Count)
+            {
+                return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
+                {
+                    Data = filtered,
+                    Meta = new Meta(filtered.Count, paged.Meta.Page, 1, filtered.Count)
+                });
+            }
+        }
+
+        return result;
+    }
+
+    // Espelha o switch da view Estoque/Index.cshtml (statusEffective). Qty 0
+    // override para "esgotado" — mesmo se Status no banco veio outra coisa.
+    private static bool MatchesStatusFilter(EstoqueSku item, string filterStatus)
+    {
+        var effective = item.Qty == 0
+            ? "esgotado"
+            : (item.Status ?? string.Empty).ToLowerInvariant();
+        var filter = filterStatus.ToLowerInvariant();
+
+        return filter switch
+        {
+            "ok"       => effective is "ok" or "normal",
+            "critico"  => effective is "critico" or "crítico" or "critical",
+            "atencao"  => effective is "atencao" or "warn",
+            "parado"   => effective is "parado" or "slow",
+            "esgotado" => effective is "esgotado",
+            _ => effective == filter
+        };
+    }
+
+    public async Task<ApiResult<EstoqueContadores>> ContadoresAsync(string? status = null, string? categoria = null)
+    {
+        var qs = $"estoque/contadores?empresaId={GetEmpresaId()}";
+        if (!string.IsNullOrEmpty(status))
+            qs += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
+            qs += $"&categoriaId={catId}";
+        return await api.GetAsync<EstoqueContadores>(qs);
     }
 
     public Task<ApiResult<EstoqueSku>> ObterAsync(string id) =>

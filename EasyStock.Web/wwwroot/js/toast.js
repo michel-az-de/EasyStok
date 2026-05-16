@@ -1,19 +1,25 @@
 /**
  * EasyStock Toast System v2
- * window.showToast(message, type, duration?)
- * type: 'success' | 'error' | 'warning' | 'info'
+ * window.showToast(message, type, duration?, undoAction?)
+ * type: 'success' | 'success-undo' | 'error' | 'warning' | 'info'
+ *
+ * C3 (2026-05-16): botao "Desfazer" agora APENAS em type === 'success-undo'
+ * com undoAction funcao. Antes, qualquer toast com 4o argumento callback
+ * mostrava o botao - causou bug "Thatiane viu DESFAZER em busca por codigo
+ * inexistente".
  */
 (function () {
     'use strict';
 
     const CONFIG = {
-        success: { bg: '#059669', icon: '✓' },
-        error:   { bg: '#DC2626', icon: '✕' },
-        warning: { bg: '#D97706', icon: '⚠' },
-        info:    { bg: '#4F46E5', icon: 'ℹ' },
+        success:        { bg: '#059669', icon: '✓' },
+        'success-undo': { bg: '#059669', icon: '✓' }, // C3: alias visual de success
+        error:          { bg: '#DC2626', icon: '✕' },
+        warning:        { bg: '#D97706', icon: '⚠' },
+        info:           { bg: '#4F46E5', icon: 'ℹ' },
     };
 
-    const DURATION = { success: 3500, error: 6000, warning: 5000, info: 3500 };
+    const DURATION = { success: 3500, 'success-undo': 5000, error: 6000, warning: 5000, info: 3500 };
 
     let container = null;
 
@@ -76,7 +82,7 @@
         }
 
         // Force 8s minimum quando há retry/correlationId para o usuário copiar o CID.
-        const baseDur = retryFn || correlationId ? 8000 : (DURATION[type] || 3500);
+        const baseDur = (retryFn || correlationId) ? 8000 : (DURATION[type] || 3500);
         const dur = undoAction ? 5000 : ((duration != null) ? duration : baseDur);
         const c = getContainer();
 
@@ -203,7 +209,10 @@
             body.appendChild(retryBtn);
         }
 
-        if (undoAction) {
+        // C3 guard: botao "Desfazer" SO em success-undo COM funcao executavel.
+        // Antes desse guard, qualquer tipo de toast com 4o argumento callback
+        // mostrava "Desfazer" - bug encontrado em busca por codigo inexistente.
+        if (type === 'success-undo' && typeof undoAction === 'function') {
             const undoBtn = document.createElement('button');
             undoBtn.textContent = 'Desfazer';
             Object.assign(undoBtn.style, {
@@ -221,7 +230,7 @@
             });
             undoBtn.onclick = function () {
                 dismiss();
-                undoAction();
+                try { undoAction(); } catch (e) { console.warn('[toast] undo falhou:', e); }
             };
             body.appendChild(undoBtn);
         }

@@ -48,6 +48,7 @@ public class MontarPayloadRenderUseCase(
                 produto.Marca,
                 e.LoteItem?.Emoji,
                 e.LoteItem?.Unidade,
+                e.LoteItem?.PesoG, // C2 (RDC 727/2022): peso por unidade vai pra etiqueta.
                 ficha?.Kcal,
                 ficha?.ProteinaG,
                 ficha?.CarbsG,

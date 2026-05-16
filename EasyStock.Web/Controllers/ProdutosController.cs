@@ -1,4 +1,5 @@
 using EasyStock.Web.Constants;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Produtos;
@@ -217,6 +218,8 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             MargemEstimada = p.MargemEstimada,
             Status = p.Status,
             Tipo = p.Tipo,
+            // C2 (RDC 727/2022): default "Avulso" se nulo ou ausente no payload do API.
+            TipoEmbalagem = string.IsNullOrEmpty(p.TipoEmbalagem) ? "Avulso" : p.TipoEmbalagem,
             ControlaValidade = p.ControlaValidade,
             DimensoesPeso = p.Dimensoes?.Peso,
             DimensoesLargura = p.Dimensoes?.Largura,
@@ -304,6 +307,20 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
 
         Toast("success", "Produto atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpPost("/produtos/{id}/ficha-tecnica")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SalvarFichaTecnica(string id, [FromBody] FichaTecnicaCommand cmd)
+    {
+        if (cmd is null)
+            return BadRequest(new { erro = "Comando vazio." });
+
+        var result = await svc.SalvarFichaTecnicaAsync(id, cmd);
+        if (!result.Success)
+            return BadRequest(new { erro = result.ErrorMessage ?? "Erro ao salvar ficha tecnica." });
+
+        return Json(new { sucesso = true });
     }
 
     [HttpPost("/produtos/{id}/excluir")]
@@ -551,7 +568,7 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
                 Qty = req.QtdInicial.Value,
                 Custo = custo,
                 Preco = req.PrecoReferencia,
-                Data = DateOnly.FromDateTime(DateTime.Today),
+                Data = BrazilTime.Today(),
                 Observacoes = "Entrada inicial — produto cadastrado pelo modal Novo pedido."
             };
             var entrada = await entradasSvc.CriarEntradaAsync(entradaVm);
@@ -585,7 +602,9 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             fotoUrl = p.PrimeiraFotoUrl,
             categoriaId = p.CategoriaId,
             custoReferencia = p.CustoReferencia?.Valor,
-            precoReferencia = p.PrecoReferencia?.Valor
+            precoReferencia = p.PrecoReferencia?.Valor,
+            // C2 (RDC 727/2022): usado pelo Lotes/Index.cshtml para validar peso.
+            tipoEmbalagem = p.TipoEmbalagem.ToString()
         });
         return Json(items);
     }

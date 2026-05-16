@@ -83,10 +83,12 @@ a { color: inherit; }
   position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
   background: var(--bg-app);
   padding: 24px;
-  display: flex; flex-direction: column; gap: 14px;
+  flex-direction: column; gap: 14px;
   border-top: 1px solid var(--border-soft);
   z-index: 49;
+  overflow-y: auto;
 }
+.site-mobile-nav:not([hidden]) { display: flex; }
 .site-mobile-nav a {
   text-decoration: none; color: var(--ink-900);
   font-size: 18px; font-weight: 500; padding: 10px 0;
@@ -132,7 +134,7 @@ a { color: inherit; }
   position: relative; z-index: 2;
   display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items: center;
 }
-@media (max-width: 980px) { .site-hero-grid { grid-template-columns: 1fr; gap: 32px; } }
+@media (max-width: 1024px) { .site-hero-grid { grid-template-columns: 1fr; gap: 32px; } }
 
 .site-hero-pill {
   display: inline-flex; align-items: center; gap: 8px;
@@ -458,18 +460,19 @@ a { color: inherit; }
 
 /* ========== WHATSAPP FLOAT ========== */
 .site-wa-float {
-  position: fixed; right: 20px; bottom: 20px; z-index: 80;
+  position: fixed; right: 24px; bottom: 24px; z-index: 80;
   display: inline-flex; align-items: center; gap: 8px;
   background: #25D366; color: white;
-  padding: 14px 18px; border-radius: 999px;
+  padding: 12px 16px; border-radius: 999px;
   text-decoration: none; font-weight: 600; font-size: 14px;
   box-shadow: 0 12px 30px rgba(37,211,102,0.45);
   transition: transform .15s ease, box-shadow .15s ease;
 }
 .site-wa-float:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(37,211,102,0.55); }
+.site-wa-float svg { width: 22px; height: 22px; flex: none; }
 .site-wa-float-label { display: inline; }
 @media (max-width: 600px) {
-  .site-wa-float { padding: 14px; }
+  .site-wa-float { padding: 12px; right: 16px; bottom: 16px; }
   .site-wa-float-label { display: none; }
 }
 

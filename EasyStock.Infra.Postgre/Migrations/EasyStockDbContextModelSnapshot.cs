@@ -4409,6 +4409,63 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("notif_variaveis_template_catalogo", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Notifications.WebPushSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UltimoUso")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique()
+                        .HasDatabaseName("ux_web_push_endpoint");
+
+                    b.HasIndex("EmpresaId", "Ativo")
+                        .HasDatabaseName("ix_web_push_empresa_ativo");
+
+                    b.HasIndex("UsuarioId", "Ativo")
+                        .HasDatabaseName("ix_web_push_usuario_ativo");
+
+                    b.ToTable("notif_web_push_subscriptions", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4937,6 +4994,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("TipoEmbalagem")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Avulso");
 
                     b.Property<string>("UnidadeMedidaBase")
                         .IsRequired()
@@ -7470,6 +7534,23 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Notifications.WebPushSubscription", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("EasyStock.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>

@@ -13,6 +13,9 @@ public record ProdutoDetalhe
     public string? Marca { get; init; }
     [JsonConverter(typeof(EnumStringOrIntConverter))]
     public int Tipo { get; init; }
+    // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Serializado pelo API
+    // como string (HasConversion<string>). Optional para retrocompatibilidade.
+    public string? TipoEmbalagem { get; init; }
     public string? SkuBase { get; init; }
     public string? CodigoBarras { get; init; }
     public bool ControlaValidade { get; init; }
@@ -39,6 +42,10 @@ public record ProdutoDetalhe
 
     public int? QuantidadeMinima { get; init; }
     public int? QuantidadeCritica { get; init; }
+
+    // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
+    // Preenchido via PUT /api/produtos/{id}/ficha-tecnica.
+    public string? AtributosJson { get; init; }
 
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 }

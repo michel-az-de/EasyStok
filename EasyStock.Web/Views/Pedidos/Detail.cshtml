@@ -4,15 +4,7 @@
     ViewBag.Title = $"Pedido {p.Id.Substring(0, 8)}";
     Layout = "_Layout";
 
-    string statusBadgeClass(string? s) => s switch
-    {
-        "aguardando" => "bg-amber-100 text-amber-800",
-        "preparando" => "bg-blue-100 text-blue-700",
-        "pronto"     => "bg-violet-100 text-violet-700",
-        "entregue"   => "bg-green-100 text-green-700",
-        "cancelado"  => "bg-slate-100 text-slate-500",
-        _            => "bg-slate-100 text-slate-600"
-    };
+    var statusInfo = StatusHelper.Resolve(p.Status);
     string nextStatus(string s) => s switch
     {
         "aguardando" => "preparando",
@@ -50,7 +42,7 @@
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
-    <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+    <span class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
     <div class="ml-auto flex gap-2">
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
             🖨 Recibo
@@ -112,7 +104,7 @@ else
             <div class="font-semibold">Pedido cancelado</div>
             @if (p.CanceladoEm.HasValue)
             {
-                <div class="text-xs opacity-80">em @p.CanceladoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                <div class="text-xs opacity-80">em @p.CanceladoEm.Value.ToLocalTime().AsDateTime()</div>
             }
         </div>
     </div>
@@ -141,7 +133,19 @@ else
         <div class="ws">
             <div class="flex items-baseline justify-between mb-2">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pagamento</span>
-                @if (p.Quitado)
+                @if (isCancelado)
+                {
+                    @* Pedido cancelado nao gera cobranca em aberto. *@
+                    if (p.TotalPago > 0)
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full" title="Pagamento recebido antes do cancelamento — verifique se ha reembolso pendente.">Pago antes do cancelamento</span>
+                    }
+                    else
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">Sem cobrança</span>
+                    }
+                }
+                else if (p.Quitado)
                 {
                     <span class="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Quitado</span>
                 }
@@ -154,20 +158,29 @@ else
                     <span class="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full">Pendente</span>
                 }
             </div>
-            <div class="text-3xl font-bold text-slate-900 mb-1">@p.Total.ToString("C")</div>
-            <div class="ped-progress" role="progressbar" aria-valuenow="@progressoPagamento" aria-valuemin="0" aria-valuemax="100">
-                <div class="ped-progress__bar @(p.Quitado ? "ped-progress__bar--done" : "")" style="width: @(progressoPagamento)%"></div>
-            </div>
-            <div class="flex items-baseline justify-between text-sm mt-2">
-                <div>
-                    <span class="text-slate-500">Pago</span>
-                    <span class="font-semibold text-slate-900 ml-1">@p.TotalPago.ToString("C")</span>
+            <div class="text-3xl font-bold @(isCancelado ? "text-slate-400 line-through" : "text-slate-900") mb-1 tabular-nums">@p.Total.AsMoney()</div>
+            @if (!isCancelado)
+            {
+                <div class="ped-progress" role="progressbar" aria-valuenow="@progressoPagamento" aria-valuemin="0" aria-valuemax="100">
+                    <div class="ped-progress__bar @(p.Quitado ? "ped-progress__bar--done" : "")" style="width: @(progressoPagamento)%"></div>
                 </div>
-                <div>
-                    <span class="text-slate-500">Falta</span>
-                    <span class="font-semibold ml-1 @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.ToString("C")</span>
+                <div class="flex items-baseline justify-between text-sm mt-2">
+                    <div>
+                        <span class="text-slate-500">Pago</span>
+                        <span class="font-semibold text-slate-900 ml-1 tabular-nums">@p.TotalPago.AsMoney()</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">Falta</span>
+                        <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
+                    </div>
                 </div>
-            </div>
+            }
+            else if (p.TotalPago > 0)
+            {
+                <p class="text-xs text-slate-500 mt-2">
+                    Já havia <span class="font-semibold text-slate-700">@p.TotalPago.ToString("C")</span> recebido antes do cancelamento — verifique se há reembolso a processar.
+                </p>
+            }
         </div>
 
         <!-- Card de detalhes -->
@@ -189,8 +202,8 @@ else
                 @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt / Mesa</dt><dd>@p.ClienteApt</dd></div> }
                 @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
                 <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
-                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
-                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().AsDateTime()</dd></div>
+                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().AsDateTime()</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
                     <div><dt class="text-slate-500">ID externo (app)</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
@@ -233,9 +246,9 @@ else
                         <thead class="text-xs text-slate-500 uppercase tracking-wider">
                             <tr>
                                 <th class="text-left py-2">Item</th>
-                                <th class="text-right py-2">Qtd</th>
-                                <th class="text-right py-2">Preço</th>
-                                <th class="text-right py-2">Subtotal</th>
+                                <th class="col-num py-2">Qtd</th>
+                                <th class="col-num py-2">Preço</th>
+                                <th class="col-num py-2">Subtotal</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -247,9 +260,11 @@ else
                                     <span class="font-medium text-slate-900">@i.Emoji @i.Nome</span>
                                     @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400 ml-1">@i.Unidade</span>}
                                 </td>
-                                <td class="text-right text-slate-700">@i.Quantidade</td>
-                                <td class="text-right text-slate-700">@i.PrecoUnitario.ToString("C")</td>
-                                <td class="text-right font-semibold text-slate-900">@i.Subtotal.ToString("C")</td>
+                                @* Antes mostrava "3,000" quando a quantidade era decimal 3.000M
+                                   (precisao do tipo). 0.## suprime trailing zeros — vira "3" ou "3,5". *@
+                                <td class="col-num text-slate-700">@i.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                <td class="col-num text-slate-700">@i.PrecoUnitario.AsMoney()</td>
+                                <td class="col-num font-semibold text-slate-900">@i.Subtotal.AsMoney()</td>
                                 <td class="text-right">
                                     @if (p.Status != "entregue" && !isCancelado)
                                     {
@@ -266,7 +281,7 @@ else
                         <tfoot>
                             <tr class="border-t-2 border-slate-200">
                                 <td colspan="3" class="pt-3 text-right text-sm font-semibold text-slate-500 uppercase tracking-wider">Total</td>
-                                <td class="pt-3 text-right text-base font-bold text-slate-900">@p.Total.ToString("C")</td>
+                                <td class="pt-3 col-num text-base font-bold text-slate-900">@p.Total.AsMoney()</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -307,12 +322,12 @@ else
                     {
                         <li class="py-3 flex items-center justify-between gap-2">
                             <div class="text-sm">
-                                <div class="font-semibold text-slate-900">@pg.Valor.ToString("C") <span class="text-[10px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded uppercase tracking-wider ml-1">@pg.Metodo</span></div>
-                                <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
+                                <div class="font-semibold text-slate-900 tabular-nums">@pg.Valor.AsMoney() <span class="text-[10px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded uppercase tracking-wider ml-1">@pg.Metodo</span></div>
+                                <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
                             <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post"
-                                  x-data @@submit.prevent="if (confirm('Estornar pagamento de @pg.Valor.ToString("C")?')) $el.submit()">
+                                  x-data @@submit.prevent="if (confirm('Estornar pagamento de @pg.Valor.AsMoney()?')) $el.submit()">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar pagamento">✕</button>
                             </form>
@@ -348,10 +363,10 @@ else
                             <div class="ped-add-row__title">Registrar pagamento</div>
                             <div class="flex gap-2">
                                 <button type="button" class="ped-quick-btn" @@click="valor = @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
-                                    Pendente (@p.Pendente.ToString("C"))
+                                    Pendente (@p.Pendente.AsMoney())
                                 </button>
                                 <button type="button" class="ped-quick-btn" @@click="valor = @p.Total.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
-                                    Total (@p.Total.ToString("C"))
+                                    Total (@p.Total.AsMoney())
                                 </button>
                             </div>
                         </div>
@@ -385,7 +400,7 @@ else
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().AsDateTime()</span>
                                 <span class="font-medium text-slate-900">@e.Tipo</span>
                                 @if (!string.IsNullOrEmpty(e.StatusAntigo) && !string.IsNullOrEmpty(e.StatusNovo))
                                 {

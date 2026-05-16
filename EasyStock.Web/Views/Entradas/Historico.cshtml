@@ -60,42 +60,59 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var e in Model.Entradas)
-                {
-                    var tipoBadge = e.Tipo?.ToLower() switch
+                @{
+                    // Traducao centralizada — antes "PRODUCAO" e "reposicao" iam pra UI cruas.
+                    static string naturezaPt(string? raw) => raw?.ToLowerInvariant() switch
                     {
-                        "entrada" => "badge-ok",
+                        "entrada" => "Entrada",
+                        "producao" or "produção" => "Produção",
+                        "reposicao" or "reposição" => "Reposição",
+                        "compra" => "Compra",
+                        "transferencia" or "transferência" => "Transferência",
+                        "ajuste" => "Ajuste",
+                        "venda" => "Venda",
+                        "saida" or "saída" => "Saída",
+                        "perda" => "Perda",
+                        "prejuizo" or "prejuízo" => "Prejuízo",
+                        "vencimento" => "Vencimento",
+                        "doacao" or "doação" => "Doação",
+                        "usointerno" or "uso interno" => "Uso interno",
+                        null => "—",
+                        var x => char.ToUpperInvariant(x[0]) + x[1..].ToLowerInvariant()
+                    };
+                    static string badgeFor(string? raw) => raw?.ToLowerInvariant() switch
+                    {
+                        "entrada" or "compra" => "badge-ok",
+                        "producao" or "produção" => "badge-ok",
                         "reposicao" or "reposição" => "badge-slow",
-                        "saida" or "saída" => "badge-critical",
+                        "saida" or "saída" or "perda" or "prejuizo" or "prejuízo" or "vencimento" => "badge-critical",
                         _ => "badge-slow"
                     };
-                    var naturezaBadge = e.Natureza?.ToLower() switch
-                    {
-                        "reposicao" or "reposição" => "badge-slow",
-                        "saida" or "saída" => "badge-critical",
-                        _ => tipoBadge
-                    };
+                }
+                @foreach (var e in Model.Entradas)
+                {
+                    var natRaw = e.Natureza ?? e.Tipo;
+                    var naturezaLabel = naturezaPt(natRaw);
+                    var naturezaBadge = badgeFor(natRaw);
+                    // Custo 0 = nao informado (ex: entrada de producao sem custeio).
+                    // Antes mostrava "R$ 0,00" e induzia a leitura gerencial errada.
+                    var custoInformado = e.Custo.HasValue && e.Custo.Value > 0;
                     var total = (e.Custo ?? 0) * e.Qty;
-                    var naturezaLabel = (e.Natureza ?? e.Tipo) switch
-                    {
-                        "Saida" => "Saída",
-                        "saida" => "Saída",
-                        _ => e.Natureza ?? e.Tipo
-                    };
+                    var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
                     <tr>
                         <td>
                             <span class="badge @naturezaBadge px-2 py-0.5 rounded-full text-xs font-semibold">@naturezaLabel</span>
                         </td>
                         <td class="font-medium">@(e.Produto?.Nome ?? e.ProdutoId)</td>
                         <td class="text-slate-400 text-xs">@(e.ProdutoVariacao?.Nome ?? "")</td>
-                        <td class="text-center font-mono">@e.Qty</td>
-                        <td class="text-right font-mono text-slate-600 whitespace-nowrap">
-                            @(e.Custo.HasValue ? e.Custo.Value.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
+                        <td class="text-center font-mono">@e.Qty.ToString("0.##", ptBr)</td>
+                        <td class="col-num text-slate-600 whitespace-nowrap">
+                            @(e.Custo.HasValue ? e.Custo.Value.AsMoney() : "—")
                         </td>
-                        <td class="text-right font-mono font-semibold whitespace-nowrap">
-                            @(e.Custo.HasValue ? total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "—")
+                        <td class="col-num font-semibold whitespace-nowrap">
+                            @(e.Custo.HasValue ? total.AsMoney() : "—")
                         </td>
-                        <td class="text-right text-slate-500">@e.Data.ToString("dd/MM/yyyy")</td>
+                        <td class="col-num text-slate-500">@e.Data.AsDate()</td>
                     </tr>
                 }
             </tbody>

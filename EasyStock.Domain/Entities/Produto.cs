@@ -15,6 +15,9 @@ namespace EasyStock.Domain.Entities
         public string? DescricaoBase { get; set; }
         public string? Marca { get; set; }
         public TipoProduto Tipo { get; set; } // FISICO, ALIMENTO, SERVICO
+        // Inserido 2026-05-16 (correcao C2 / RDC 727/2022): peso obrigatorio
+        // na etiqueta SO para Embalado. Default Avulso por seguranca.
+        public TipoEmbalagem TipoEmbalagem { get; set; } = TipoEmbalagem.Avulso;
         public CodigoSku? SkuBase { get; set; }
         public string? CodigoBarras { get; set; }
         public bool ControlaValidade { get; set; }

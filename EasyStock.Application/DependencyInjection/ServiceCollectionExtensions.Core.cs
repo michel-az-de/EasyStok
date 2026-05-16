@@ -22,6 +22,7 @@ using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.RemoverItemLote;
+using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
@@ -58,6 +59,12 @@ using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
+using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
+using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
+using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
+using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
+using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
+using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -99,6 +106,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarItemLoteUseCase>();
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
         services.AddScoped<ConferirEtiquetaUseCase>();
@@ -169,6 +177,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+
+        // Modulo Fiscal NFC-e (F1) — 6 use cases sobre Nfe*
+        services.AddScoped<EmitirNfceUseCase>();
+        services.AddScoped<CancelarNfeUseCase>();
+        services.AddScoped<InutilizarNumeracaoUseCase>();
+        services.AddScoped<ConsultarNfeUseCase>();
+        services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
+        services.AddScoped<ReprocessarContingenciaUseCase>();
 
         return services;
     }
