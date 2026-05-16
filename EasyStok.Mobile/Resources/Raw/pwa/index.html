@@ -99,7 +99,6 @@ body {
 /* Phone frame */
 .phone {
   width: 100%;
-  max-width: 430px;
   height: 100vh;
   height: 100dvh;           /* viewport dinâmico em mobile — exclui URL bar */
   max-height: 932px;
@@ -243,6 +242,44 @@ body {
 .sync-chip.offline .dot {
   background: var(--accent);
   box-shadow: 0 0 8px rgba(231, 104, 69, 0.45);
+}
+
+/* F4 — banner offline persistente. Aparece SOBRE o topbar quando navigator
+   .onLine===false. Felipe falou que não via nada se sync acontecia: agora
+   é gritante. Some sozinho ao voltar a rede. */
+#offlineBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: none;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, rgba(231, 104, 69, 0.96), rgba(231, 104, 69, 0.86));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  animation: offlineBannerSlideIn 0.25s ease-out;
+}
+#offlineBanner.show { display: block; }
+#offlineBanner .ob-emoji { margin-right: 6px; }
+#offlineBanner .ob-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  font-size: 12px;
+}
+@keyframes offlineBannerSlideIn {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #offlineBanner { animation: none; }
 }
 
 /* Content — padding-bottom inclui altura do nav + safe-area.
@@ -2174,6 +2211,30 @@ button:disabled {
   background: rgba(214, 80, 51, 0.18);
   color: var(--accent);
 }
+/* Saldo projetado: estoque atual + produzido. Aparece so quando count>0. */
+.stock-after-prod {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--basil);
+  border: 1px dashed currentColor;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.prod-summary .ps-after {
+  display: block;
+  font-size: 11px;
+  color: var(--basil);
+  margin-top: 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .sr-warn { color: var(--accent); font-weight: 700; }
 .product-tile.add-tile {
   background: transparent;
@@ -3556,6 +3617,9 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: grid;
   gap: 8px;
 }
+#orientModeOptions {
+  grid-template-columns: 1fr 1fr;
+}
 .scan-mode-card {
   display: grid;
   grid-template-columns: 36px 1fr auto;
@@ -4525,6 +4589,89 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .retroactive-fields .hint { font-size: 11px; color: var(--ink-mute); margin-top: 6px; }
 
+/* F5 — Pedido agendado (data/hora futura). Mesma estrutura do retroativo,
+   cor azul pra distinguir (futuro vs passado). */
+.schedule-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-dim);
+  cursor: pointer; padding: 6px 10px;
+  border: 1px dashed var(--line); border-radius: 8px;
+  background: transparent; font-family: inherit;
+  margin-bottom: 12px; margin-left: 6px;
+}
+.schedule-toggle.active {
+  background: rgba(74, 144, 226, 0.10); color: #4a90e2;
+  border-color: rgba(74, 144, 226, 0.4); border-style: solid;
+}
+.schedule-fields {
+  display: none;
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px;
+  margin-bottom: 12px;
+}
+.schedule-fields.show { display: block; }
+.schedule-fields label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.schedule-fields input {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink); font-size: 14px;
+  font-family: inherit;
+}
+.schedule-fields .hint { font-size: 11px; color: var(--ink-mute); margin-top: 6px; }
+
+/* Badge azul de pedido agendado (cards de pedido + KDS). */
+.scheduled-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(74, 144, 226, 0.14); color: #4a90e2;
+  border: 1px solid rgba(74, 144, 226, 0.32);
+}
+.scheduled-badge.atrasado {
+  background: rgba(231, 104, 69, 0.14); color: var(--accent);
+  border-color: rgba(231, 104, 69, 0.4);
+}
+
+/* F6 — Resumo de demanda na tela Producao. Agrega items dos pedidos abertos
+   pra que o operador veja quanto precisa produzir sem entrar em cada pedido. */
+.prod-demand {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+.prod-demand .pd-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.prod-demand .pd-title {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+}
+.prod-demand .pd-count {
+  font-size: 11px; color: var(--ink-mute);
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+}
+.prod-demand .pd-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.prod-demand .pd-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: 8px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  color: var(--ink); cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.12s ease;
+}
+.prod-demand .pd-chip:active { transform: scale(0.96); }
+.prod-demand .pd-chip:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.prod-demand .pd-chip .pd-qty {
+  font-weight: 800; color: var(--accent);
+  margin-right: 2px;
+}
+.prod-demand .pd-chip .pd-emoji { font-size: 13px; }
+
 /* ========== Print: etiqueta 58mm térmica ========== */
 .print-area {
   display: none;
@@ -4894,6 +5041,19 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   backdrop-filter: blur(8px);
 }
 .etq-overlay.show { display: flex; }
+.etq-tpl-preview-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7,10,16,0.92);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 12000; padding: 16px; gap: 12px;
+}
+.etq-tpl-preview-overlay.open { display: flex; }
+.etq-tpl-preview-name { color: #fff; font-size: 14px; font-weight: 700; }
+.etq-tpl-preview-wrap { max-width: 100%; max-height: 70vh; overflow: auto; background: #fff; border-radius: 8px; }
+.etq-tpl-preview-close {
+  padding: 10px 22px; background: var(--gold, #F0B84A); color: #1c1408;
+  border: 0; border-radius: 8px; font-weight: 700; cursor: pointer;
+}
 .etq-sheet {
   flex: 1;
   display: flex; flex-direction: column;
@@ -4910,13 +5070,76 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .etq-head h3 { margin: 0; font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); }
 .etq-head .etq-sub { font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
-.etq-mode-chip {
-  display: inline-flex; align-items: center;
-  margin-top: 8px; padding: 5px 9px;
-  border-radius: 999px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04); color: var(--gold);
-  font-size: 11px; font-weight: 850; letter-spacing: 0.04em;
-  text-transform: uppercase;
+.etq-config-bar {
+  padding: 10px 16px; border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.etq-config-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.etq-config-lbl {
+  font-size: 11px; font-weight: 700; color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  min-width: 72px;
+}
+.etq-config-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.etq-chip {
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: transparent;
+  color: var(--ink-mute); font-size: 11px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.etq-chip.active {
+  background: var(--gold, #E0A64A); color: #000;
+  border-color: var(--gold, #E0A64A);
+}
+/* Etiqueta horizontal — producao */
+.etq-card.etq-horiz {
+  width: 380px;
+  display: flex; flex-direction: row; gap: 12px;
+  padding: 14px;
+}
+.etq-card.etq-horiz .et-main { flex: 1; min-width: 0; }
+.etq-card.etq-horiz .et-side {
+  flex-shrink: 0; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; justify-content: center;
+  min-width: 110px;
+}
+.etq-card.etq-horiz .et-scan {
+  border: none; padding: 0; margin: 0; background: transparent;
+}
+.etq-card.etq-horiz .et-qr svg { width: 90px; height: 90px; }
+/* ── Pedido horizontal — classe explicita sem :has() ── */
+.etq-card.etq-order-horiz {
+  width: 620px;
+  display: block; padding: 16px 14px 14px;
+}
+.etq-card .pa-receipt.pa-horiz {
+  display: flex; flex-direction: row; gap: 14px; align-items: stretch;
+}
+.etq-card .pa-receipt.pa-horiz .pa-receipt-main {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 0;
+}
+.etq-card .pa-receipt.pa-horiz .pa-receipt-side {
+  flex-shrink: 0; width: 180px;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-left: 12px; border-left: 1px dashed #d0d4db;
+}
+.etq-card .pa-receipt.pa-horiz .et-brand { justify-content: flex-start !important; margin-bottom: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-kicker { text-align: left; }
+.etq-card .pa-receipt.pa-horiz .pa-title { text-align: left; font-size: 17px; margin-bottom: 1px; }
+.etq-card .pa-receipt.pa-horiz .pa-center { text-align: left; font-size: 14px; }
+.etq-card .pa-receipt.pa-horiz .pa-meta { text-align: left; margin-bottom: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-grid { margin-top: 6px; }
+.etq-card .pa-receipt.pa-horiz .pa-confer {
+  align-items: center; text-align: center; padding-top: 4px;
+}
+.etq-card .pa-receipt.pa-horiz .pa-confer-qr svg { max-width: 96px; }
+.etq-card .pa-receipt.pa-horiz .pa-confer-bars svg { max-width: 160px; }
+.etq-card .pa-receipt.pa-horiz .pa-pix {
+  margin-top: auto; padding-top: 8px; border-top: 1px dashed #d0d4db;
 }
 .etq-success-banner {
   display: flex; align-items: center; gap: 10px;
@@ -4929,7 +5152,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   font-size: 14px;
 }
 .etq-body {
-  flex: 1; overflow-y: auto;
+  flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: 22px 16px 30px;
   background:
     linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
@@ -4938,136 +5161,176 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background-size: 18px 18px, auto, auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
+.etq-card-wrap {
+  /* Wrapper que absorve o espaço de layout após scale */
+  overflow: hidden;
+  display: block;
+}
 .etq-card {
-  width: 320px; max-width: 100%;
+  width: 384px;
   background: #fff; color: #000;
-  /* Manrope: tipografia robusta para etiqueta (visualmente coerente com o
-     que sai impresso na termica). Pesos 600-800 dao traço largo, sem o
-     visual "falhado" do monospace antigo. */
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-  font-size: 15px; line-height: 1.38; font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-size: 13px; line-height: 1.4; font-weight: 500;
   -webkit-font-smoothing: antialiased;
-  padding: 17px 15px 15px;
-  border: 1px solid #ececec;
-  border-radius: 6px;
-  box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+  padding: 16px 14px 14px;
+  border: 1px solid #e2e5ea;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
   position: relative;
 }
 .etq-card::before,
 .etq-card::after {
-  content: ''; position: absolute; left: 12px; right: 12px; height: 1px;
-  background: repeating-linear-gradient(90deg, #d8d8d8 0 5px, transparent 5px 10px);
+  content: ''; position: absolute; left: 10px; right: 10px; height: 1px;
+  background: repeating-linear-gradient(90deg, #d0d4db 0 4px, transparent 4px 8px);
 }
-.etq-card::before { top: 7px; }
-.etq-card::after { bottom: 7px; }
-.etq-card .et-title,
-.etq-card .pa-title { overflow-wrap: anywhere; }
-.etq-card .pa-logo,
-.print-area .pa-logo {
-  display: flex;
-  justify-content: center;
-  margin: 0 auto 6px;
+.etq-card::before { top: 5px; }
+.etq-card::after { bottom: 5px; }
+/* ── Logo EasyStok ── */
+.etq-card .et-brand {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
 }
-.etq-card .pa-logo img,
-.print-area .pa-logo img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-.etq-card .et-title {
-  text-align: center; font-size: 20px; font-weight: 950;
-  margin-bottom: 2px; line-height: 1.08;
-}
-.etq-card .et-kicker,
-.etq-card .pa-kicker {
-  text-align: center; font-size: 11px; font-weight: 900;
-  letter-spacing: 0.16em; text-transform: uppercase; color: #555;
-  margin-bottom: 8px;
-}
+.etq-card .et-brand img { width: 28px; height: 28px; }
+.etq-card .et-brand-name { font-size: 15px; font-weight: 800; color: #1A2E5A; letter-spacing: -0.01em; }
+.etq-card .et-brand-name b { color: #E85814; font-weight: 800; }
+/* ── Produção ── */
 .etq-card .et-prod {
-  text-align: center; font-size: 18px; font-weight: 950;
-  margin: 10px 0 9px; padding: 9px 8px;
-  border: 2px solid #000; border-radius: 8px;
-  line-height: 1.2; overflow-wrap: anywhere;
+  font-size: 17px; font-weight: 800; line-height: 1.15;
+  margin: 0 0 2px; overflow-wrap: anywhere; color: #000;
+  border: none; padding: 0; border-radius: 0;
 }
+.etq-card .et-unit { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 8px; }
 .etq-card .et-photo-wrap {
-  display: flex; justify-content: center; margin: 8px 0 4px;
+  display: flex; justify-content: center; margin: 6px 0;
 }
 .etq-card .et-photo {
-  max-width: 90%; max-height: 140px; object-fit: contain;
-  border: 1px solid #000; border-radius: 4px; background: #fff;
+  max-width: 90%; max-height: 120px; object-fit: contain;
+  border: 1px solid #e2e5ea; border-radius: 6px; background: #fff;
 }
+.etq-card .et-info { margin-bottom: 8px; }
+.etq-card .et-info-row {
+  display: flex; gap: 8px; padding: 2px 0; font-size: 13px;
+}
+.etq-card .et-lbl {
+  font-weight: 800; color: #1A2E5A; min-width: 42px;
+  font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.etq-card .et-val { font-weight: 600; color: #000; font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
+.etq-card .et-conserv {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #555; font-weight: 500; margin: 4px 0 8px;
+}
+/* ── Scan area ── */
 .etq-card .et-scan {
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  border: 2px solid #000; border-radius: 10px;
-  padding: 12px 10px; margin: 10px 0 12px;
-  background: #fafafa;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 1.5px solid #e2e5ea; border-radius: 8px;
+  padding: 10px; margin: 6px 0;
+  background: #fafbfc;
 }
 .etq-card .et-bars {
-  display: flex; height: 58px; margin: 4px auto 2px;
+  display: flex; height: 50px; margin: 0 auto;
   align-items: stretch; justify-content: center;
-  background: #fff;
-  max-width: 100%; overflow: hidden;
+  background: #fff; max-width: 100%; overflow: hidden;
 }
-.etq-card .et-bars svg { display: block; max-width: 100%; height: 58px; }
+.etq-card .et-bars svg { display: block; max-width: 100%; height: 50px; }
 .etq-card .et-bars .bar { background: #000; height: 100%; }
 .etq-card .et-bars .gap { background: transparent; height: 100%; }
 .etq-card .et-code {
-  text-align: center; font-size: 14px; font-weight: 900;
-  letter-spacing: 0.04em; line-height: 1.25; overflow-wrap: anywhere;
+  text-align: center; font-size: 11px; font-weight: 700;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  letter-spacing: 0.03em; color: #333; overflow-wrap: anywhere;
 }
 .etq-card .et-qr {
   display: flex; justify-content: center; align-items: center;
-  margin: 0 0 3px;
 }
-.etq-card .et-qr svg { display: block; width: 128px; height: 128px; }
-.etq-card .et-hint { font-size: 11px; color: #555; font-weight: 800; }
+.etq-card .et-qr svg { display: block; width: 110px; height: 110px; }
+.etq-card .et-hint { font-size: 10px; color: #888; font-weight: 500; }
+/* ── Dados grid (pedido) ── */
 .etq-card .et-grid,
 .etq-card .pa-grid {
-  border: 1.5px solid #000; border-radius: 9px; padding: 10px 12px;
-  background: #fff;
+  border: 1.5px solid #e2e5ea; border-radius: 8px; padding: 8px 10px;
+  background: #fafbfc;
 }
 .etq-card .et-row {
   display: flex; justify-content: space-between;
-  gap: 10px; padding: 5px 0; font-size: 14px; font-weight: 800;
-  border-bottom: 1px dotted #c9c9c9;
+  gap: 8px; padding: 3px 0; font-size: 13px; font-weight: 600;
+  border-bottom: 1px solid #eef0f3;
 }
 .etq-card .et-row:last-child { border-bottom: 0; }
-.etq-card .et-row .lbl { font-weight: 900; }
-.etq-card .pa-title  { text-align: center; font-size: 21px; font-weight: 950; margin-bottom: 2px; line-height: 1.08; }
-.etq-card .pa-center { text-align: center; font-weight: 800; }
-.etq-card .pa-meta   { text-align: center; font-size: 11px; color: #555; margin-bottom: 8px; }
-.etq-card .pa-sep    { border-top: 1px dashed #000; height: 0; margin: 8px 0; }
+.etq-card .et-row .lbl { font-weight: 800; color: #1A2E5A; font-size: 11px; text-transform: uppercase; }
+/* ── Pedido (recibo) ── */
+.etq-card .pa-title,
+.etq-card .et-title { overflow-wrap: anywhere; }
+.etq-card .pa-logo,
+.print-area .pa-logo {
+  display: flex; justify-content: center; margin: 0 auto 6px;
+}
+.etq-card .pa-logo img,
+.print-area .pa-logo img {
+  width: 48px; height: 48px; object-fit: contain; border-radius: 8px;
+}
+.etq-card .et-title {
+  text-align: center; font-size: 18px; font-weight: 800;
+  margin-bottom: 2px; line-height: 1.1; color: #000;
+}
+.etq-card .et-kicker,
+.etq-card .pa-kicker {
+  text-align: center; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: #1A2E5A;
+  margin-bottom: 6px;
+}
+.etq-card .pa-title  { text-align: center; font-size: 19px; font-weight: 800; margin-bottom: 2px; line-height: 1.1; }
+.etq-card .pa-center { text-align: center; font-weight: 700; }
+.etq-card .pa-meta   { text-align: center; font-size: 11px; color: #888; margin-bottom: 6px; }
+.etq-card .pa-sep    { border-top: 1px solid #e2e5ea; height: 0; margin: 6px 0; }
 .etq-card .pa-block  { margin: 6px 0; }
 .etq-card .pa-label  {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
-  font-weight: 900; color: #555; margin-bottom: 3px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; color: #1A2E5A; margin-bottom: 2px;
 }
 .etq-card .pa-item   { display: flex; justify-content: space-between; gap: 6px; padding: 3px 0; align-items: flex-start; }
 .etq-card .pa-item .pi-main { flex: 1; min-width: 0; }
-.etq-card .pa-item .pi-name { display: block; font-weight: 900; word-break: break-word; }
-.etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #666; margin-top: 1px; }
-.etq-card .pa-item .pi-qty { font-weight: 900; min-width: 28px; }
-.etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 900; }
+.etq-card .pa-item .pi-name { display: block; font-weight: 700; overflow-wrap: anywhere; }
+.etq-card .pa-item .pi-unit { display: block; font-size: 11px; color: #888; margin-top: 1px; }
+.etq-card .pa-item .pi-qty { font-weight: 700; min-width: 26px; }
+.etq-card .pa-item .pi-price { white-space: nowrap; font-weight: 700; }
 .etq-card .pa-row    { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
-.etq-card .pa-bold   { font-weight: 900; }
+.etq-card .pa-bold   { font-weight: 700; }
 .etq-card .pa-large  {
-  font-size: 22px; border: 2px solid #000; border-radius: 9px;
-  padding: 8px 10px; margin-top: 8px; background: #f7f7f7;
+  font-size: 20px; border: 1.5px solid #1A2E5A; border-radius: 8px;
+  padding: 8px 10px; margin-top: 6px; background: #f8f9fb;
 }
 .etq-card .pa-note {
-  border: 1px dashed #000; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  border: 1px solid #e2e5ea; border-radius: 8px; padding: 8px 10px; margin-top: 6px;
+  background: #fafbfc;
 }
+.etq-card .pa-nota-rapida {
+  border: 1.5px solid #f97316; border-radius: 8px; padding: 6px 10px; margin-top: 6px;
+  background: rgba(249,115,22,0.06); overflow-wrap: break-word;
+}
+.etq-card .pa-nota-rapida .pa-label { color: #c2410c; }
 .etq-card .pa-confer {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  border: 1.5px solid #000; border-radius: 12px; padding: 12px;
-  margin: 10px 0;
+  border: 1.5px solid #e2e5ea; border-radius: 8px; padding: 10px;
+  margin: 8px 0; background: #fafbfc;
 }
-.etq-card .pa-confer-qr svg { display: block; max-width: 130px; height: auto; }
-.etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 268px; height: auto; margin: 6px auto; }
-.etq-card .pa-confer-code { font-size: 16px; letter-spacing: 0.05em; }
-.etq-card .pa-confer-hint { font-size: 11px; color: #555; }
+.etq-card .pa-confer-qr svg { display: block; max-width: 120px; height: auto; }
+.etq-card .pa-confer-bars svg { display: block; width: 100%; max-width: 260px; height: auto; margin: 4px auto; }
+.etq-card .pa-confer-code { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+.etq-card .pa-confer-hint { font-size: 10px; color: #888; }
+.etq-note-bar {
+  padding: 8px 16px 0;
+  background: var(--bg-elev);
+}
+.etq-note-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  background: var(--bg); color: var(--ink);
+  outline: none;
+}
+.etq-note-input:focus { border-color: var(--gold, #F0B84A); }
+.etq-note-input::placeholder { color: var(--ink-mute); }
 .etq-actions {
   display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background:
@@ -5085,6 +5348,10 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .etq-actions .etq-save   { background: rgba(96,165,250,0.18); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
 .etq-actions .etq-share  { background: rgba(37,211,102,0.18); color: #25D366; border: 1px solid rgba(37,211,102,0.3); }
 .etq-actions .etq-btn:active { transform: scale(0.97); }
+@media (max-width: 380px) {
+  .etq-actions { flex-wrap: wrap; gap: 6px; }
+  .etq-actions .etq-btn { flex: 1 1 auto; font-size: 13px; }
+}
 @media (min-width: 720px) {
   .etq-overlay { align-items: center; justify-content: center; padding: 28px; }
   .etq-sheet {
@@ -5333,6 +5600,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   color: #c24e32;
   border-color: rgba(207,87,56,0.22);
 }
+[data-theme="light"] .stock-after-prod { color: #168f7a; }
+[data-theme="light"] .prod-summary .ps-after { color: #168f7a; }
 .product-tile .prod-tile-action.danger {
   color: var(--accent);
   border-color: rgba(214,80,51,0.32);
@@ -6530,6 +6799,69 @@ body.ux-calm [data-screen="producao"] .section-label {
    printer fora de alcance, backup desatualizado, etc). Click no
    "Resolver" abre Diagnostico unificado. NAO bloqueia o app.
    =========================================================== */
+/* ===========================================================
+   Modal Initial Pull Report
+   Card central com contadores do que o pull inicial baixou.
+   Disparado por sync.js apos pareamento. Auto-dismiss 3s.
+   =========================================================== */
+.ipr-overlay {
+  position: fixed; inset: 0; z-index: 13000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 24px;
+  animation: ipr-fade-in 200ms ease-out;
+}
+.ipr-overlay[hidden] { display: none; }
+.ipr-card {
+  background: #1a1410; color: #f5e6d3;
+  border-radius: 16px; padding: 24px;
+  max-width: 360px; width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(212, 162, 58, 0.3);
+}
+.ipr-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #4a8a3a; color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 700;
+  margin: 0 auto 12px;
+}
+.ipr-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 24px; text-align: center; margin-bottom: 16px;
+}
+.ipr-counts {
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px; padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.ipr-row {
+  display: flex; justify-content: space-between;
+  font-size: 14px; line-height: 1.4;
+}
+.ipr-row b { color: #d4a23a; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ipr-actions { display: flex; gap: 8px; }
+.ipr-btn {
+  flex: 1; padding: 10px 16px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit;
+}
+.ipr-btn-primary { background: #d4a23a; color: #1a1410; }
+.ipr-btn-secondary { background: rgba(255, 255, 255, 0.08); color: #f5e6d3; }
+.ipr-details {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px; color: #b8a890;
+}
+.ipr-details[hidden] { display: none; }
+.ipr-detail-line { margin: 4px 0; }
+.ipr-detail-line span { color: #f5e6d3; font-family: monospace; }
+@keyframes ipr-fade-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 .health-banner {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -6580,206 +6912,17 @@ body.ux-calm [data-screen="producao"] .section-label {
   to   { transform: translateY(0); }
 }
 
-/* ========== KDS (Kitchen Display System — alpha) ==========
-   Tela paralela pra cozinha. Tema escuro forcado pra contraste alto em
-   ambiente bem iluminado, tipografia grande pra leitura a 1-2m de distancia,
-   botoes grandes pra "bumpar" com luva ou maos molhadas. Layout adaptativo:
-   tablet/TV em landscape (>=900px) vira grid amplo; mobile portrait vira
-   pilha de cards. */
-[data-screen="kds"] {
-  background: #0b1220;
-  color: #e8eef9;
-  min-height: 100vh;
-  padding: 0;
-  font-family: 'Manrope', system-ui, sans-serif;
-}
-[data-screen="kds"].active { display: flex; flex-direction: column; }
-.kds-topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px;
-  background: linear-gradient(180deg, #131c30 0%, #0b1220 100%);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  position: sticky; top: 0; z-index: 5;
-  gap: 12px;
-}
-.kds-topbar h1 {
-  margin: 0;
-  font-size: 18px; font-weight: 800;
-  letter-spacing: 0.02em;
-  color: #f0b84a;
-  display: flex; align-items: center; gap: 8px;
-}
-.kds-topbar h1::before { content: '👨‍🍳'; font-size: 22px; }
-.kds-topbar-meta {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: #94a3c5;
-}
-.kds-conn { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
-.kds-conn::before {
-  content: ''; width: 8px; height: 8px; border-radius: 50%;
-  background: #4fbf9f; box-shadow: 0 0 0 0 rgba(79,191,159,.6);
-  animation: kds-pulse 1.8s infinite;
-}
-.kds-conn.offline::before { background: #ef6a6a; animation: none; }
-.kds-conn.offline { color: #ef6a6a; }
-@keyframes kds-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(79,191,159,.5); }
-  70% { box-shadow: 0 0 0 8px rgba(79,191,159,0); }
-  100% { box-shadow: 0 0 0 0 rgba(79,191,159,0); }
-}
-.kds-toggle {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: #e8eef9; border-radius: 999px;
-  padding: 6px 12px; font-size: 12px; font-weight: 700;
-  cursor: pointer;
-}
-.kds-toggle.on { background: rgba(240,184,74,0.18); border-color: #f0b84a; color: #f0b84a; }
-.kds-back {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: #e8eef9;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px; font-weight: 700;
-  cursor: pointer;
-}
-.kds-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-  padding: 14px;
-  align-content: start;
-}
-@media (min-width: 720px) {
-  .kds-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (min-width: 1100px) {
-  .kds-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; }
-  .kds-topbar h1 { font-size: 22px; }
-}
-@media (min-width: 1500px) {
-  .kds-grid { grid-template-columns: repeat(4, 1fr); }
-}
-.kds-card {
-  background: #131c30;
-  border: 2px solid rgba(255,255,255,0.06);
-  border-left: 6px solid #4fbf9f;
-  border-radius: 14px;
-  padding: 14px 14px 12px;
-  display: flex; flex-direction: column; gap: 10px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-.kds-card.warn   { border-left-color: #f0b84a; box-shadow: 0 6px 20px rgba(240,184,74,0.18); }
-.kds-card.alert  {
-  border-left-color: #ef6a6a;
-  box-shadow: 0 6px 22px rgba(239,106,106,0.28);
-  animation: kds-flash 1.6s ease-in-out infinite;
-}
-.kds-card.ready  { opacity: 0.78; border-left-color: #6b7896; }
-@keyframes kds-flash {
-  0%, 100% { border-color: rgba(255,255,255,0.06) rgba(255,255,255,0.06) rgba(255,255,255,0.06) #ef6a6a; }
-  50%      { border-color: rgba(239,106,106,0.55) rgba(239,106,106,0.55) rgba(239,106,106,0.55) #ef6a6a; }
-}
-.kds-card-head {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  border-bottom: 1px dashed rgba(255,255,255,0.08);
-  padding-bottom: 8px;
-}
-.kds-card-cliente {
-  font-size: 18px; font-weight: 800; line-height: 1.15;
-  color: #f5f8ff;
-  flex: 1;
-  word-break: break-word;
-}
-.kds-card-ref {
-  font-size: 12px; font-weight: 600; color: #94a3c5; margin-top: 2px;
-}
-.kds-card-timer {
-  font-variant-numeric: tabular-nums;
-  font-size: 22px; font-weight: 900;
-  color: #4fbf9f;
-  min-width: 64px; text-align: right;
-  letter-spacing: 0.02em;
-}
-.kds-card.warn  .kds-card-timer { color: #f0b84a; }
-.kds-card.alert .kds-card-timer { color: #ef6a6a; }
-.kds-card.ready .kds-card-timer { color: #6b7896; }
-.kds-status-pill {
-  display: inline-block; font-size: 10px; font-weight: 800;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 2px 8px; border-radius: 999px;
-  background: rgba(255,255,255,0.08); color: #e8eef9;
-  margin-left: 8px;
-}
-.kds-status-pill.aguardando { background: rgba(79,191,159,0.18); color: #4fbf9f; }
-.kds-status-pill.preparando { background: rgba(240,184,74,0.18); color: #f0b84a; }
-.kds-status-pill.pronto     { background: rgba(107,120,150,0.22); color: #c2cce0; }
-.kds-card-itens {
-  margin: 0; padding: 0; list-style: none;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.kds-card-item {
-  display: flex; align-items: baseline; gap: 8px;
-  font-size: 16px; line-height: 1.25; color: #e8eef9;
-}
-.kds-card-item .qty {
-  font-weight: 900; color: #f0b84a; min-width: 40px;
-  font-variant-numeric: tabular-nums;
-}
-.kds-card-item .nome { font-weight: 600; flex: 1; }
-.kds-card-item .emoji { font-size: 18px; }
-.kds-card-notes {
-  background: rgba(231,104,69,0.10);
-  border-left: 3px solid #e76845;
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 13px; font-weight: 700; color: #ffb89e;
-  white-space: pre-wrap;
-}
-.kds-card-actions { display: flex; gap: 8px; margin-top: auto; }
-.kds-pronto-btn {
-  flex: 1;
-  background: linear-gradient(180deg, #4fbf9f 0%, #3aa589 100%);
-  color: #062018;
-  border: none; border-radius: 12px;
-  padding: 14px;
-  font-size: 16px; font-weight: 900;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  cursor: pointer; min-height: 56px;
-  box-shadow: 0 4px 14px rgba(79,191,159,0.30);
-  transition: transform 0.08s ease, box-shadow 0.2s ease;
-}
-.kds-pronto-btn:hover { box-shadow: 0 6px 18px rgba(79,191,159,0.45); }
-.kds-pronto-btn:active { transform: scale(0.98); }
-.kds-pronto-btn.entregar {
-  background: linear-gradient(180deg, #6b7896 0%, #4a5470 100%);
-  color: #f5f8ff;
-  box-shadow: 0 4px 14px rgba(107,120,150,0.30);
-}
-.kds-pronto-btn[disabled] { opacity: 0.5; cursor: progress; }
-.kds-empty {
-  grid-column: 1 / -1;
-  text-align: center; padding: 40px 20px;
-  color: #94a3c5; font-size: 16px;
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-}
-.kds-empty::before {
-  content: '☕'; font-size: 56px;
-}
-@media (min-width: 1100px) {
-  .kds-card { padding: 18px; }
-  .kds-card-cliente { font-size: 22px; }
-  .kds-card-timer { font-size: 28px; }
-  .kds-card-item { font-size: 18px; }
-  .kds-pronto-btn { font-size: 18px; padding: 18px; min-height: 64px; }
-}
 </style>
 </head>
 <body>
+
+<!-- F4 — banner offline. Mostrado por updateSync() quando navigator.onLine===false.
+     Posição fixed top, sobrepõe o topbar. Some sozinho ao voltar a rede. -->
+<div id="offlineBanner" role="status" aria-live="polite">
+  <span class="ob-emoji">📡</span>
+  <span>Sem conexão — operando localmente</span>
+  <span class="ob-count" id="offlineBannerCount" hidden>0 na fila</span>
+</div>
 
 <!-- Splash animation: visivel ate o JS rodar e remover a classe no DOMContentLoaded
      + ~600ms de animacao suave. Logo Casa da Baba (gold) num fundo gradiente
@@ -6987,6 +7130,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="section-label">Catálogo de produção</div>
       <div class="screen-tabs" id="producaoTabs">
         <button class="screen-tab active" data-ptab="catalogo" onclick="goProducaoTab('catalogo')">Catálogo</button>
+        <button class="screen-tab" data-ptab="calculadora" onclick="goProducaoTab('calculadora')">Calculadora</button>
         <button class="screen-tab" data-ptab="lotes" onclick="goProducaoTab('lotes')">Lotes</button>
       </div>
       <section class="producao-tab-section active" data-ptab="catalogo">
@@ -6995,6 +7139,16 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button type="button" data-pcat="massa" onclick="setProductionCategory('massa')">Massas</button>
         <button type="button" data-pcat="molho" onclick="setProductionCategory('molho')">Molhos</button>
         <button type="button" data-pcat="extra" onclick="setProductionCategory('extra')">Extras</button>
+      </div>
+      <!-- F6 — Resumo de demanda em tempo real. Agrega items de pedidos abertos
+           (aguardando + preparando) pra mostrar quanto produzir. Atualiza via SSE
+           quando outro device sincroniza. Tocar num produto pré-seleciona quantidade. -->
+      <div class="prod-demand" id="prodDemand" hidden>
+        <div class="pd-head">
+          <span class="pd-title">📋 Demanda dos pedidos abertos</span>
+          <span class="pd-count" id="prodDemandCount">0 pedidos</span>
+        </div>
+        <div class="pd-chips" id="prodDemandChips"></div>
       </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
@@ -7011,6 +7165,56 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Registrar produção</button>
       </div>
       </section>
+
+      <!-- CALCULADORA DE PRODUÇÃO (Onda 3.1) -->
+      <section class="producao-tab-section" data-ptab="calculadora">
+        <div class="prod-hero">
+          <div>
+            <div class="prod-eyebrow">Calculadora</div>
+            <h2>O que vamos produzir?</h2>
+            <p>Calcule quanto de cada insumo precisa e gere lista de compras dos itens em falta.</p>
+          </div>
+        </div>
+
+        <div class="section-label">Receita base</div>
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="calcProdSearch" placeholder="Buscar produto com receita..." oninput="calcBuscarProdutos()" autocomplete="off">
+        </div>
+        <div id="calcProdSuggestions" class="suggestions"></div>
+        <div id="calcProdSelected" style="display:none;font-size:13px;color:var(--ink-dim);margin-top:6px;"></div>
+
+        <div class="section-label">Quantidade desejada</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="calcQtd" type="text" inputmode="decimal" placeholder="0" oninput="calcOnQtdChange()" style="flex:1;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--ink);">
+          <select id="calcUnidade" onchange="calcOnUnidadeChange()" style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--ink);">
+            <option value="Un">Un</option>
+          </select>
+        </div>
+        <div class="doc-hint" id="calcQtdHint"></div>
+
+        <div class="cta-row" style="margin-top:14px;">
+          <button class="cta-btn" onclick="calcLimpar()">Limpar</button>
+          <button class="cta-btn primary" id="calcCalcularBtn" onclick="calcExecutar()" disabled>Calcular</button>
+        </div>
+
+        <!-- Resultado -->
+        <div id="calcResultadoBox" style="display:none;margin-top:18px;" role="status" aria-live="polite" aria-busy="false">
+          <div id="calcResultadoBadge" style="padding:14px;border-radius:14px;font-weight:700;text-align:center;margin-bottom:12px;"></div>
+          <div id="calcResultadoCustoTotal" style="font-size:13px;color:var(--ink-dim);text-align:center;margin-bottom:10px;"></div>
+          <div id="calcInsumosList"></div>
+          <div class="cta-row" style="margin-top:14px;">
+            <button class="cta-btn" id="calcEditarReceitaBtn" onclick="calcAbrirAjusteReceita()" style="display:none;">Editar receita</button>
+            <button class="cta-btn primary" id="calcGerarCompraBtn" onclick="calcGerarCompra()" style="display:none;">Gerar lista de compras</button>
+          </div>
+        </div>
+
+        <!-- Empty state quando sem busca -->
+        <div id="calcEmptyState" class="attention-empty" style="margin-top:18px;">
+          <span>Digite o nome do produto para começar.</span>
+        </div>
+      </section>
+
       <section class="producao-tab-section" data-ptab="lotes">
         <div class="batch-tools">
           <button data-bfilter="open" class="active" onclick="setBatchFilter('open')">Abertos</button>
@@ -7080,10 +7284,18 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
           🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
         </button>
+        <button class="schedule-toggle" id="scheduleToggle" onclick="toggleAgendamento()">
+          📅 <span id="scheduleToggleLabel">Agendar para depois? (entrega futura)</span>
+        </button>
         <div class="retroactive-fields" id="retroFields">
           <label>Quando aconteceu?</label>
           <input type="datetime-local" id="retroDatetime" />
           <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
+        </div>
+        <div class="schedule-fields" id="scheduleFields">
+          <label>Entregar em</label>
+          <input type="datetime-local" id="scheduleDatetime" />
+          <div class="hint">Pedido entra na esteira como <b>aguardando</b>; aparece com badge <b>📅</b> e ordenado pela data agendada.</div>
         </div>
 
         <div class="cta-row">
@@ -7342,28 +7554,6 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div id="stockTimeline"></div>
     </div>
 
-    <!-- KDS (Kitchen Display System — alpha). Tela paralela pra cozinha:
-         lista pedidos abertos com tempo decorrido e botão "Pronto" grande.
-         Renderizada por startKdsScreen() / stopKdsScreen(); fonte de dados
-         vem direto do backend via /api/kds/pedidos (não usa o estado local
-         do PWA balcão pra evitar drift). Real-time via evento
-         'cdb-mutations-applied' disparado pelo sync.js no SSE existente. -->
-    <div class="screen" data-screen="kds">
-      <div class="kds-topbar">
-        <button class="kds-back" onclick="goBack()" aria-label="Voltar">← Voltar</button>
-        <h1>KDS — Cozinha</h1>
-        <div class="kds-topbar-meta">
-          <button class="kds-toggle" id="kdsToggleProntos" onclick="toggleKdsProntos()" aria-pressed="false">
-            <span>Mostrar prontos</span>
-          </button>
-          <span class="kds-conn" id="kdsConn">Online</span>
-        </div>
-      </div>
-      <div class="kds-grid" id="kdsGrid">
-        <div class="kds-empty">Sem pedidos no momento.</div>
-      </div>
-    </div>
-
   </div>
 
   <!-- Modal novo produto -->
@@ -7528,6 +7718,33 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
+  <!-- Modal de relatorio do pull inicial pos-pareamento.
+       Dispara quando sync.js seta cdb-pull-report-pending=1 ou via evento
+       cdb-initial-pull-done. Auto-dismiss 3s + botao "Detalhes". -->
+  <div id="initialPullReport" class="ipr-overlay" role="dialog" aria-modal="true" hidden>
+    <div class="ipr-card">
+      <div class="ipr-icon">✓</div>
+      <div class="ipr-title">Sincronizado</div>
+      <div class="ipr-counts">
+        <div class="ipr-row"><span>Produtos</span><b id="iprProducts">0</b></div>
+        <div class="ipr-row"><span>Clientes</span><b id="iprClients">0</b></div>
+        <div class="ipr-row"><span>Pedidos</span><b id="iprOrders">0</b></div>
+        <div class="ipr-row"><span>Lotes</span><b id="iprBatches">0</b></div>
+        <div class="ipr-row"><span>Caixa</span><b id="iprCash">0</b></div>
+      </div>
+      <div class="ipr-actions">
+        <button type="button" class="ipr-btn ipr-btn-secondary" onclick="iprToggleDetails()">Detalhes</button>
+        <button type="button" class="ipr-btn ipr-btn-primary" onclick="iprDismiss()">OK</button>
+      </div>
+      <div class="ipr-details" id="iprDetails" hidden>
+        <div class="ipr-detail-line">Loja: <span id="iprLoja">—</span></div>
+        <div class="ipr-detail-line">Pareado em: <span id="iprPairedAt">—</span></div>
+        <div class="ipr-detail-line">Endpoint: <span id="iprEndpoint">—</span></div>
+        <div class="ipr-detail-line">Última sync: <span id="iprLastSync">agora</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Health Banner: warning nao-bloqueante no topo quando algo esta errado
        (impressora desconectada, BT desligado, sem backup ha muito tempo, etc).
        Inserido pelo runHealthCheck() no boot e em visibilitychange. Click
@@ -7619,40 +7836,74 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="ajustes-section ajustes-section-feature" data-group="loja">
         <h4>Formato das etiquetas</h4>
-        <p class="hint">Escolha se as etiquetas de produção saem com QR Code, codigo de barras ou os dois.</p>
+        <p class="hint">Defina o que aparece na etiqueta e como ela fica disposta. Vale para todas as etiquetas de produção.</p>
         <div class="field">
           <label>Codigo impresso na produção</label>
           <select id="ajusteProdScanMode" class="scan-mode-select">
             <option value="both">QR + codigo de barras</option>
             <option value="barcode">Somente codigo de barras</option>
             <option value="qr">Somente QR Code</option>
+            <option value="none">Sem codigo</option>
           </select>
           <div class="scan-mode-options" id="scanModeOptions">
-            <button type="button" class="scan-mode-card" data-mode="both" onclick="setScanModeChoice('both', true)">
+            <button type="button" class="scan-mode-card" data-mode="both" aria-pressed="false" onclick="setScanModeChoice('both', true)">
               <span class="scan-mode-icon">2</span>
               <span class="scan-mode-text">
                 <strong>QR + barras</strong>
-                <span>Mais completo para câmera e leitor dedicado.</span>
+                <span>Funciona tanto na câmera quanto no leitor.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="barcode" onclick="setScanModeChoice('barcode', true)">
+            <button type="button" class="scan-mode-card" data-mode="barcode" aria-pressed="false" onclick="setScanModeChoice('barcode', true)">
               <span class="scan-mode-icon">|||</span>
               <span class="scan-mode-text">
                 <strong>Codigo de barras</strong>
-                <span>Melhor para operação com leitor fisico.</span>
+                <span>Para quem usa leitor de mão. Conferência mais rápida.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="qr" onclick="setScanModeChoice('qr', true)">
+            <button type="button" class="scan-mode-card" data-mode="qr" aria-pressed="false" onclick="setScanModeChoice('qr', true)">
               <span class="scan-mode-icon">QR</span>
               <span class="scan-mode-text">
                 <strong>QR Code</strong>
-                <span>Mais limpo para leitura pela câmera do app.</span>
+                <span>Lê só pelo celular. Visual mais limpo.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-mode="none" aria-pressed="false" onclick="setScanModeChoice('none', true)">
+              <span class="scan-mode-icon">—</span>
+              <span class="scan-mode-text">
+                <strong>Sem codigo</strong>
+                <span>Sem código nenhum. Operador identifica visualmente.</span>
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
           </div>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>Orientação da etiqueta</label>
+          <div class="scan-mode-options" id="orientModeOptions">
+            <button type="button" class="scan-mode-card" data-orient="vertical" aria-pressed="false" onclick="setOrientChoice('vertical', true)">
+              <span class="scan-mode-icon" aria-hidden="true"><svg width="14" height="20" viewBox="0 0 14 20"><rect x="1" y="1" width="12" height="18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
+              <span class="scan-mode-text">
+                <strong>Vertical</strong>
+                <span>Texto em cima, código embaixo. Padrão para pote.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+            <button type="button" class="scan-mode-card" data-orient="horizontal" aria-pressed="false" onclick="setOrientChoice('horizontal', true)">
+              <span class="scan-mode-icon" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><rect x="1" y="1" width="18" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
+              <span class="scan-mode-text">
+                <strong>Horizontal</strong>
+                <span>Texto à esquerda, código à direita. Boa para embalagem larga.</span>
+              </span>
+              <span class="scan-mode-check">✓</span>
+            </button>
+          </div>
+        </div>
+        <div class="etq-thumb-wrap" style="margin-top:12px;display:flex;align-items:center;gap:12px">
+          <span class="hint" style="margin:0">Prévia:</span>
+          <canvas id="ajustesEtqThumb" width="160" height="80" style="background:#fff;border:1px solid var(--border-soft, #e2e5ea);border-radius:4px"></canvas>
         </div>
       </div>
 
@@ -8008,15 +8259,38 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div>
           <h3 id="etqTitle">Etiquetas geradas</h3>
           <div class="etq-sub" id="etqSubtitle">—</div>
-          <div class="etq-mode-chip" id="etqModeChip">QR + barras</div>
         </div>
         <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
+      </div>
+      <div class="etq-config-bar" id="etqConfigBar">
+        <div class="etq-config-row">
+          <span class="etq-config-lbl">Código</span>
+          <div class="etq-config-chips" id="etqCodeChips">
+            <button class="etq-chip active" onclick="setEtqCode('both')">QR + Barras</button>
+            <button class="etq-chip" onclick="setEtqCode('qr')">Só QR</button>
+            <button class="etq-chip" onclick="setEtqCode('barcode')">Só Barras</button>
+            <button class="etq-chip" onclick="setEtqCode('none')">Sem código</button>
+          </div>
+        </div>
+        <div class="etq-config-row">
+          <span class="etq-config-lbl">Orientação</span>
+          <div class="etq-config-chips" id="etqOrientChips">
+            <button class="etq-chip active" onclick="setEtqOrient('vertical')">Vertical</button>
+            <button class="etq-chip" onclick="setEtqOrient('horizontal')">Horizontal</button>
+          </div>
+        </div>
       </div>
       <div class="etq-success-banner" id="etqSuccessBanner" style="display:none">
         <span class="etq-success-icon">✓</span>
         <span class="etq-success-text" id="etqSuccessText">Produção cadastrada</span>
       </div>
       <div class="etq-body" id="etqBody"></div>
+      <div class="etq-note-bar">
+        <input class="etq-note-input" id="etqNoteInput" type="text"
+               placeholder="Observação na imagem (opcional)" maxlength="40" autocomplete="off"
+               aria-label="Observação rápida para a etiqueta" title="Máximo 40 caracteres"
+               oninput="onEtqNoteInput()">
+      </div>
       <div class="etq-actions">
         <button class="etq-btn etq-print"  onclick="etqAction('print')">Imprimir</button>
         <button class="etq-btn etq-save"   onclick="etqAction('save')">Salvar PNG</button>
@@ -8061,14 +8335,14 @@ body.ux-calm [data-screen="producao"] .section-label {
       <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
     </div>
     <div class="more-menu-grid">
-      <button class="more-menu-item" onclick="go('kds')"><strong>KDS Cozinha</strong><span>Painel da cozinha em tempo real (alpha).</span></button>
-      <button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
+<button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
       <button class="more-menu-item" onclick="go('estoque')"><strong>Estoque</strong><span>Saldo, rastreabilidade e saídas.</span></button>
       <button class="more-menu-item" onclick="go('clientes')"><strong>Clientes</strong><span>Recorrencia, ticket e retorno.</span></button>
       <button class="more-menu-item" onclick="go('compras')"><strong>Compras</strong><span>Itens que faltam para produzir.</span></button>
       <button class="more-menu-item" onclick="go('caixa')"><strong>Caixa</strong><span>Saldo, lancamentos e fechamento.</span></button>
       <button class="more-menu-item" onclick="go('finalizados')"><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></button>
       <button class="more-menu-item" onclick="go('suporte')"><strong>Suporte</strong><span>Chamado com diagnóstico.</span></button>
+      <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><strong>Etiquetas</strong><span>Modelos de impressão e layout.</span></button>
       <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><strong>Ajustes</strong><span>Loja, impressora, backup e demo.</span></button>
       <button class="more-menu-item" onclick="closeMoreMenu(); openGlobalSearch()"><strong>Busca</strong><span>Cliente, pedido, produto ou lote.</span></button>
     </div>
@@ -9437,7 +9711,7 @@ function go(screen, opts) {
     s.classList.toggle('active', active);
     s.setAttribute('aria-hidden', active ? 'false' : 'true');
   });
-  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte', 'kds'];
+  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte'];
   document.querySelectorAll('.nav-btn').forEach(n => {
     const nav = n.dataset.nav;
     n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
@@ -9461,8 +9735,6 @@ function go(screen, opts) {
   if (screen === 'conferencia')  renderConferenciaScreen();
   if (screen === 'finalizados')  renderFinalizadosScreen();
   if (screen === 'caixa')        renderCashDetails();
-  if (screen === 'kds')          { try { startKdsScreen(); } catch (e) { console.error('startKdsScreen', e); } }
-  else                           { try { stopKdsScreen(); } catch (e) {} }
   if (typeof updateFab === 'function') updateFab(screen);
 }
 
@@ -9511,8 +9783,22 @@ function syncNow() {
 function updateSync() {
   const chip = document.getElementById('syncChip');
   const txt = document.getElementById('syncText');
+  const banner = document.getElementById('offlineBanner');
+  const bannerCount = document.getElementById('offlineBannerCount');
   const offline = navigator.onLine === false;
   if (chip) chip.classList.toggle('offline', offline);
+  // F4 — banner offline visivel quando sem rede; some sozinho ao voltar.
+  if (banner) {
+    banner.classList.toggle('show', offline);
+    if (bannerCount) {
+      if (offline && pendingSync > 0) {
+        bannerCount.textContent = pendingSync + (pendingSync === 1 ? ' na fila' : ' na fila');
+        bannerCount.hidden = false;
+      } else {
+        bannerCount.hidden = true;
+      }
+    }
+  }
   if (offline) {
     chip.classList.add('pending');
     txt.textContent = pendingSync > 0
@@ -9535,6 +9821,17 @@ function updateSync() {
 window.addEventListener('online', updateSync);
 window.addEventListener('offline', updateSync);
 
+// F4 — feedback visual proativo de sync. sync.js dispara cdb-sync-success
+// com {count} sempre que mutações foram aceitas pelo servidor.
+// Felipe não via NADA quando o app sincronizava — agora vê toast claro.
+window.addEventListener('cdb-sync-success', function (ev) {
+  const n = (ev.detail && ev.detail.count) || 0;
+  if (n <= 0) return;
+  pendingSync = Math.max(0, pendingSync - n);
+  updateSync();
+  showToast('✓ ' + n + (n === 1 ? ' item sincronizado' : ' itens sincronizados'));
+});
+
 // =========================
 // UTILS
 // =========================
@@ -9556,6 +9853,29 @@ function isToday(ts) {
   const d = new Date(ts);
   const now = new Date();
   return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+// F5 — Badge "📅 ter 14:00" pra pedidos agendados. Vermelho/atrasado se a data
+// agendada já passou e o pedido continua aberto. Usa Intl pra formato pt-BR
+// curto (3 letras do dia da semana minusculas).
+function renderScheduledBadge(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const isLate = ms < Date.now();
+  const today = isToday(ms);
+  // Formato: "hoje 14:00" se hoje, senão "ter 14:00"
+  const horario = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  let label;
+  if (today) {
+    label = 'hoje ' + horario;
+  } else {
+    const dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    const dia = d.getDate() + ' ' + dias[d.getDay()];
+    label = dia + ' ' + horario;
+  }
+  const cls = isLate ? 'scheduled-badge atrasado' : 'scheduled-badge';
+  const titulo = isLate ? 'Atrasado: agendado para ' : 'Agendado: ';
+  return `<span class="${cls}" title="${titulo}${d.toLocaleString('pt-BR')}">📅 ${label}</span>`;
 }
 
 // =========================
@@ -10959,6 +11279,63 @@ function setProductionCategory(cat) {
   renderProductGrid();
 }
 
+// F6 — Resumo de demanda dos pedidos abertos. Agrega items por productId e
+// renderiza chips clicáveis. Tap pré-popula a quantidade do produto no grid
+// (operador só revisa e toca "Registrar produção"). Update em tempo real via
+// SSE: outro device sincroniza → cdb-mutations-applied → re-render.
+function aggregateProductionDemand() {
+  const open = orders.filter(o => o.status === 'aguardando' || o.status === 'preparando');
+  const byProduct = new Map();
+  open.forEach(o => {
+    (o.items || []).forEach(i => {
+      const key = i.productId || ('adhoc:' + (i.name || ''));
+      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', qty: 0 };
+      prev.qty += Number(i.qty) || 0;
+      byProduct.set(key, prev);
+    });
+  });
+  return { items: Array.from(byProduct.values()).sort((a,b) => b.qty - a.qty), pedidos: open.length };
+}
+
+function renderProductionDemand() {
+  const wrap = document.getElementById('prodDemand');
+  if (!wrap) return;
+  const { items, pedidos } = aggregateProductionDemand();
+  if (pedidos === 0 || items.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  document.getElementById('prodDemandCount').textContent =
+    pedidos + (pedidos === 1 ? ' pedido' : ' pedidos');
+  document.getElementById('prodDemandChips').innerHTML = items.map(i => {
+    // Só permite tap se o produto existe no catálogo (productId resolve)
+    const inCatalog = i.productId && products.some(p => p.id === i.productId);
+    const dataAttr = inCatalog ? `data-pid="${escapeHtml(i.productId)}" data-qty="${i.qty}"` : 'aria-disabled="true"';
+    const onclick = inCatalog ? `onclick="prefillFromDemand('${i.productId}', ${i.qty})"` : '';
+    const emoji = i.emoji ? `<span class="pd-emoji">${escapeHtml(i.emoji)}</span>` : '';
+    const title = inCatalog ? `Tocar pra pré-selecionar ${i.qty} no catálogo` : 'Item não está no catálogo de produção';
+    return `<button type="button" class="pd-chip" ${dataAttr} ${onclick} title="${title}" style="${inCatalog ? '' : 'opacity:0.5;cursor:default'}">
+      <span class="pd-qty">${i.qty}×</span>${emoji}<span>${escapeHtml(i.name)}</span>
+    </button>`;
+  }).join('');
+}
+
+function prefillFromDemand(productId, qty) {
+  const p = products.find(x => x.id === productId);
+  if (!p) { showToast('Produto não está no catálogo'); return; }
+  p.count = Math.max(p.count || 0, Number(qty) || 0);
+  renderProductGrid();
+  haptic();
+  showToast(`✓ Pré-selecionado ${p.count}× ${p.name}`);
+}
+
+// Re-render quando o sync trouxer mutations de outros devices.
+window.addEventListener('cdb-mutations-applied', function () {
+  // Só faz sentido se a tela Producao está visível.
+  if (document.querySelector('[data-screen="producao"].active')) renderProductionDemand();
+});
+
 function attachTileHandlers(tile, p) {
   // Tap curto: +1. Press 500ms: prompt de qty exata. Press 1500ms: abre
   // menu de ações (Editar / Arquivar). O menu cancela o prompt setando
@@ -11041,6 +11418,7 @@ function renderProductGrid() {
             <div class="punit">
               ${escapeHtml(p.unit || '')}
               <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
+              ${qty > 0 ? `<span class="stock-after-prod" title="Saldo previsto apos registrar essa producao">&rarr; ${stock + qty} apos</span>` : ''}
               <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
             </div>
           </div>
@@ -11177,12 +11555,21 @@ function openProductionConfirm() {
   currentBatchCode = buildBatchCode(items);
 
   const summary = document.getElementById('prodSummary');
-  summary.innerHTML = items.map(i => `
+  summary.innerHTML = items.map(i => {
+    const stockAtual = Number(i.stock) || 0;
+    const apos = stockAtual + (Number(i.count) || 0);
+    return `
     <div class="ps-item">
-      <div class="n"><span class="e">${i.emoji}</span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></div>
+      <div class="n">
+        <span class="e">${i.emoji}</span>
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
+          <span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></span>
+          <span class="ps-after">${stockAtual} no estoque &rarr; ${apos} apos</span>
+        </span>
+      </div>
       <div class="q">×${i.count}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
   populateProdDetailList(items);
@@ -12581,10 +12968,13 @@ function renderKanban() {
     return;
   }
 
-  // Por coluna, ordenar por createdAt asc (mais antigo primeiro — fila natural)
+  // Por coluna, ordenar por scheduledDeliveryAt (se houver) ou createdAt asc.
+  // F5 — pedidos agendados aparecem na ordem da entrega, não da criação.
   const byStatus = { aguardando: [], preparando: [], pronto: [] };
   openItems.forEach(o => { byStatus[o.status].push(o); });
-  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) => a.createdAt - b.createdAt));
+  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) =>
+    (a.scheduledDeliveryAt || a.createdAt) - (b.scheduledDeliveryAt || b.createdAt)
+  ));
 
   const overview = `
     <div class="kanban-overview" aria-label="Resumo da esteira">
@@ -12636,6 +13026,7 @@ function renderKanbanCard(o, col) {
       <div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
+        ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
       ${notes}
@@ -12732,7 +13123,7 @@ function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder') 
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
 function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
-const SCAN_MODES = ['both', 'barcode', 'qr'];
+const SCAN_MODES = ['both', 'barcode', 'qr', 'none'];
 function getProdScanMode() {
   try {
     const mode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
@@ -12744,7 +13135,7 @@ function getProdScanMode() {
 // de producao) — antes ficava espalhada com flags _csm/_cshowQr/_cshowBars.
 function scanModeFlags(mode) {
   const m = mode || getProdScanMode();
-  return { mode: m, showQr: m !== 'barcode', showBars: m !== 'qr' };
+  return { mode: m, showQr: m === 'both' || m === 'qr', showBars: m === 'both' || m === 'barcode' };
 }
 
 // Helper de console: cdbSetPix(key, holder, type, empresa).
@@ -13052,27 +13443,105 @@ function refreshBodyModalClass() {
 // AJUSTES — operador, PIX, impressora térmica
 // ================================================================
 let ajustesListenersBound = false;
+
+// Getter centralizado com whitelist + warn (problema N do plano)
+function getEtqOrient() {
+  const raw = localStorage.getItem('cdb-etq-orient');
+  if (raw && raw !== 'vertical' && raw !== 'horizontal') {
+    console.warn('cdb-etq-orient invalido, fallback para vertical:', raw);
+    return 'vertical';
+  }
+  return raw || 'vertical';
+}
+
+// Toast unificado mostrando estado completo das etiquetas
+function showToastEtiquetaState() {
+  const mode = getProdScanMode();
+  const orient = getEtqOrient();
+  showToast('Etiquetas: ' + prodScanModeLabel(mode) + ', ' + (orient === 'horizontal' ? 'horizontal' : 'vertical'));
+}
+
+// Mini-thumb live em Ajustes (anti-retrabalho do ciclo "fecha-testa-reabre")
+function redrawAjustesEtqThumb() {
+  const canvas = document.getElementById('ajustesEtqThumb');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 160, 80);
+  // Sample com weightG (problema O) e tipos number consistente com fmtDateBR(ms) (problema P)
+  const sample = {
+    productName: 'Bolo de Cenoura',
+    unit: '500g',
+    productionDate: Date.now(),
+    expiresAt: Date.now() + 7 * 86400000,
+    lote: 'L260514',
+    codigoBarras: '7891234567890',
+    weightG: 480
+  };
+  ctx.save();
+  ctx.scale(0.42, 0.42);
+  drawProducaoEtiquetaCanvas(ctx, sample, 384, 0, 190, null);
+  ctx.restore();
+}
+
 function setScanModeChoice(mode, persistNow = false) {
-  const normalized = ['both','barcode','qr'].includes(mode) ? mode : 'both';
+  const prev = getProdScanMode();
+  const normalized = SCAN_MODES.includes(mode) ? mode : 'both';
   const select = document.getElementById('ajusteProdScanMode');
   if (select) select.value = normalized;
-  document.querySelectorAll('.scan-mode-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.mode === normalized);
+  // Escopo: so os cards de scan mode, nao os de orientacao (bug A)
+  document.querySelectorAll('#scanModeOptions .scan-mode-card').forEach(card => {
+    const isActive = card.dataset.mode === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
+  redrawAjustesEtqThumb();
   if (persistNow) {
     try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {}
     const modeChip = document.getElementById('etqModeChip');
     if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
-    const previewBody = document.getElementById('etqBody');
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
-    if (previewOpen && previewBody && currentEtiquetas.length) {
-      if (currentEtiquetasKind === 'order') {
-        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
-      } else {
-        previewBody.innerHTML = currentEtiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
-      }
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    // Audit inline (mitigacao L) — corrige bug retroativo: antes ficava preso ao saveAjustes
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Codigo da etiqueta: ' + prodScanModeLabel(normalized),
+        diff: { prodScanMode: { from: prev, to: normalized } }
+      });
     }
-    showToast('Formato das etiquetas: ' + prodScanModeLabel(normalized));
+  }
+}
+
+function setOrientChoice(orient, persistNow = false) {
+  const prev = currentEtqOrient;
+  const normalized = ['vertical','horizontal'].includes(orient) ? orient : 'vertical';
+  currentEtqOrient = normalized;
+  // Atualiza cards em Ajustes (escopo: #orientModeOptions)
+  document.querySelectorAll('#orientModeOptions .scan-mode-card').forEach(card => {
+    const isActive = card.dataset.orient === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  // Atualiza chips na Preview overlay
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === (normalized === 'horizontal' ? 'Horizontal' : 'Vertical'))
+  );
+  redrawAjustesEtqThumb();
+  if (persistNow) {
+    try { localStorage.setItem('cdb-etq-orient', normalized); } catch (e) {}
+    const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Orientacao da etiqueta: ' + normalized,
+        diff: { orientation: { from: prev, to: normalized } }
+      });
+    }
   }
 }
 function openAjustes() {
@@ -13082,6 +13551,8 @@ function openAjustes() {
   document.getElementById('ajustePixKey').value    = getPixKey();
   document.getElementById('ajustePixHolder').value = getPixHolder();
   setScanModeChoice(getProdScanMode());
+  setOrientChoice(getEtqOrient());
+  redrawAjustesEtqThumb();
   if (!ajustesListenersBound) {
     document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
     document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
@@ -13178,33 +13649,30 @@ function saveAjustes() {
   const type    = document.getElementById('ajustePixType').value;
   const key     = (document.getElementById('ajustePixKey').value    || '').trim();
   const holder  = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
-  const prodScanMode = (document.getElementById('ajusteProdScanMode')?.value || 'both');
   if (key && !validatePixKey(key, type)) {
     showToast('Chave PIX inválida pra esse tipo');
     return;
   }
   // Calcula diff antes de salvar pra registrar no log o que mudou
+  // (prodScanMode e orientation tem audit inline no setScanModeChoice / setOrientChoice)
   const before = {
     operator: operatorName,
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder(),
-    prodScanMode: getProdScanMode()
+    pixHolder: getPixHolder()
   };
   if (op) saveOperatorName(op);
   cdbSetPix(key || null, holder || null, type, empresa || null);
-  try { localStorage.setItem('cdb-prod-scan-mode', ['both','barcode','qr'].includes(prodScanMode) ? prodScanMode : 'both'); } catch (e) {}
   renderBrandName();
   const after = {
     operator: operatorName,
     empresa: getEmpresaName(),
     pixType: getPixType(),
     pixKey: getPixKey(),
-    pixHolder: getPixHolder(),
-    prodScanMode: getProdScanMode()
+    pixHolder: getPixHolder()
   };
-  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder','prodScanMode']);
+  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder']);
   if (diff) {
     logAction({
       action: 'settings.update',
@@ -13820,6 +14288,88 @@ async function diagBackupNow() {
 // flush. Idempotente no servidor (last-write-wins por (Id, EmpresaId)).
 // Pré-condição operacional: device deve estar pareado E backup local
 // recente — confirmação dupla aqui pra evitar acidente.
+// CONTINGÊNCIA — Diagnostico estendido: copia trace, envia ao server,
+// força pareamento manual quando auto-pair não rolou.
+async function diagCopyTrace() {
+  try {
+    const text = (window.cdbSync && window.cdbSync.exportTraceText)
+      ? window.cdbSync.exportTraceText()
+      : '(sync.js sem trace exportável)';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('Trace copiado pro clipboard. Cole no chat/ticket pro suporte.');
+    } else {
+      // Fallback: prompt com texto pra operador copiar manualmente
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('Trace copiado (fallback).');
+    }
+  } catch (e) {
+    try { logError(e, 'diagCopyTrace'); } catch (_) {}
+    showToast('Falha ao copiar trace: ' + (e.message || e));
+  }
+}
+
+async function diagSendTrace() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.getTrace) {
+      showToast('Trace indisponível (sync.js antigo).');
+      return;
+    }
+    const cfg = window.CDB_CONFIG || {};
+    const apiBase = cfg.apiBaseUrl || '';
+    if (!apiBase) {
+      showToast('apiBaseUrl ausente — APK sem config. Use "Copiar trace" e envie manualmente.');
+      return;
+    }
+    const pair = (function () {
+      try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); }
+      catch (_) { return null; }
+    })();
+    const body = {
+      deviceId: localStorage.getItem('cdb-device-id') || '(unknown)',
+      apiBaseUrl: apiBase,
+      hasConfig: typeof window.CDB_CONFIG !== 'undefined',
+      hasProvisioning: !!cfg.forcedProvisioningSecret,
+      hasPairing: !!pair,
+      userAgent: (navigator.userAgent || '').slice(0, 300),
+      trace: window.cdbSync.getTrace(),
+      notes: prompt('Descreva rapido o problema (opcional):') || null
+    };
+    const r = await fetch(apiBase + '/api/mobile/diag/trace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) showToast('Trace enviado ao suporte. Ref: device ' + (body.deviceId || '').slice(-8));
+    else showToast('Servidor rejeitou (status ' + r.status + '). Tente "Copiar trace" e envie pelo chat.');
+  } catch (e) {
+    try { logError(e, 'diagSendTrace'); } catch (_) {}
+    showToast('Falha ao enviar trace: ' + (e.message || e) + '. Use "Copiar trace".');
+  }
+}
+
+async function diagForcePairNow() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.forcePairNow) {
+      showToast('sync.js antigo — atualize o app.');
+      return;
+    }
+    showToast('Tentando parear...');
+    const result = await window.cdbSync.forcePairNow();
+    if (result && result.apiKey) {
+      showToast('✓ Pareado com sucesso! Loja: ' + (result.label || result.lojaId || ''));
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('Pareamento sem resposta. Veja "Copiar trace" pra detalhes.');
+    }
+  } catch (e) {
+    try { logError(e, 'diagForcePairNow'); } catch (_) {}
+    showToast('Pareamento falhou: ' + (e.message || e) + '. Veja "Copiar trace".');
+  }
+}
+
 async function diagPushAll() {
   if (!window.cdbSync || typeof window.cdbSync.pushAllAndFlush !== 'function') {
     showToast('Sync indisponivel'); return;
@@ -14097,9 +14647,12 @@ function openDiagnostics() {
           + (p
               ? '<button class="diag-action" onclick="diagPushAll()">Sincronizar tudo agora</button>'
               : '')
+          + '<button class="diag-action" onclick="diagCopyTrace()">Copiar trace</button>'
+          + '<button class="diag-action" onclick="diagSendTrace()">Enviar trace ao suporte</button>'
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
-              : '<button class="diag-action" onclick="pairDevicePrompt()">Parear dispositivo</button>')
+              : '<button class="diag-action" onclick="diagForcePairNow()">Forçar pareamento agora</button>'
+              + '<button class="diag-action" onclick="pairDevicePrompt()">Parear com código</button>')
         , '');
       })()
     + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
@@ -14115,6 +14668,22 @@ function openDiagnostics() {
               '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.ctx || '') + ': ' + escapeHtml(e.msg) + '</div>'
             ).join('') + '</div>'
           : ''))
+    // F10-C-6: Seção "Fila Avançada" com dead-letter, conflitos, export/import
+    + (function () {
+        var qs = window.cdbQueueStore;
+        if (!qs || !qs.ready) return '';
+        var level = 'ok';
+        // Será atualizado async — por agora mostra placeholder
+        return section('Fila Avançada', level, ''
+          + _diagRow('Storage', qs.degraded ? 'localStorage (degradado)' : 'IndexedDB', qs.degraded ? 'warn' : '')
+          + '<div id="diagQueueStatsBody"><em style="font-size:11px;color:var(--ink-mute)">Carregando stats...</em></div>'
+        , ''
+          + '<button class="diag-action" onclick="diagExportQueue()">Exportar fila JSON</button>'
+          + '<button class="diag-action" onclick="diagImportQueue()">Importar fila</button>'
+          + '<button class="diag-action" onclick="diagViewDeadletter()">Ver dead-letter</button>'
+          + '<button class="diag-action" onclick="diagViewConflicts()">Ver conflitos</button>'
+        , '');
+      })()
     + section('Atalhos de emergência', 'ok',
         '<div style="font-size:11px;color:var(--ink-mute);line-height:1.5;margin-bottom:8px">Use só se algo estiver claramente travado.</div>'
       , ''
@@ -14123,12 +14692,95 @@ function openDiagnostics() {
       , '');
 
   toggleModal('diagnosticsModal', true);
+
+  // F10-C-6: carrega stats async do queue-store
+  (async function () {
+    try {
+      if (!window.cdbSync || !window.cdbSync.getQueueStats) return;
+      var stats = await window.cdbSync.getQueueStats();
+      var el = document.getElementById('diagQueueStatsBody');
+      if (!el) return;
+      el.innerHTML = ''
+        + _diagRow('Fila principal', stats.queueCount + ' mutations')
+        + _diagRow('Dead-letter', stats.deadletterCount || 0, stats.deadletterCount > 0 ? 'warn' : '')
+        + _diagRow('Conflitos', stats.conflictCount || 0, stats.conflictCount > 0 ? 'warn' : '')
+        + (stats.oldestItemAge > 0 ? _diagRow('Item mais antigo', _fmtRelTime(Date.now() - stats.oldestItemAge),
+            stats.oldestItemAge > 86400000 ? 'warn' : '') : '')
+        + (stats.criticalPending > 0 ? _diagRow('Criticas pendentes', stats.criticalPending, 'warn') : '');
+    } catch (e) {}
+  })();
 }
 function diagClearErrorLog() {
   if (!confirm('Limpar log de erros?\n\nIrreversivel — exporte antes se precisar investigar.')) return;
   clearErrorLog();
   showToast('Log de erros limpo');
   openDiagnostics();
+}
+
+// F10-C-6: Funções de export/import/dead-letter/conflitos
+async function diagExportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.exportAll) { showToast('Queue store indisponivel'); return; }
+    var bundle = await qs.exportAll();
+    var json = JSON.stringify(bundle, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'cdb-export-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Fila exportada (' + (bundle.queue || []).length + ' mutations)');
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagImportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.importBundle) { showToast('Queue store indisponivel'); return; }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async function () {
+      try {
+        var file = input.files[0];
+        if (!file) return;
+        var text = await file.text();
+        var bundle = JSON.parse(text);
+        var result = await qs.importBundle(bundle);
+        showToast('Importado: ' + result.imported + ' itens');
+        openDiagnostics();
+      } catch (e) { showToast('Erro import: ' + (e && e.message)); }
+    };
+    input.click();
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewDeadletter() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getDeadletter) { showToast('Queue store indisponivel'); return; }
+    var items = await qs.getDeadletter();
+    if (items.length === 0) { showToast('Dead-letter vazia'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' (' + (i.deadletterReason || '?') + ') — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Dead-letter (' + items.length + '):\n\n' + msg + (items.length > 20 ? '\n\n... e mais ' + (items.length - 20) : ''));
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewConflicts() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getConflicts) { showToast('Queue store indisponivel'); return; }
+    var items = await qs.getConflicts();
+    if (items.length === 0) { showToast('Nenhum conflito pendente'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Conflitos (' + items.length + '):\n\n' + msg);
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
 }
 
 // Onda 0: pinga /api/mobile/version e re-renderiza diagnostico com resposta
@@ -14459,6 +15111,39 @@ function toggleRetroactive() {
   setRetroActive(fields ? !fields.classList.contains('show') : true);
 }
 function resetRetroToggle() { setRetroActive(false); }
+
+// ================================================================
+// F5 — AGENDAMENTO (data/hora futura) — espelho do retroativo
+// ================================================================
+const SCHED_LABEL_OFF = '📅 Agendar para depois? (entrega futura)';
+const SCHED_LABEL_ON  = '📅 Agendamento ATIVO — clique para desativar';
+
+function setAgendaActive(active) {
+  const fields = document.getElementById('scheduleFields');
+  const toggle = document.getElementById('scheduleToggle');
+  const label  = document.getElementById('scheduleToggleLabel');
+  if (!fields || !toggle) return;
+  fields.classList.toggle('show', active);
+  toggle.classList.toggle('active', active);
+  if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
+  if (active) {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt && !dt.value) {
+      // default 1h adiante pra forçar operador a confirmar quando
+      const future = new Date(Date.now() + 60*60*1000);
+      const off = future.getTimezoneOffset() * 60000;
+      dt.value = new Date(future - off).toISOString().slice(0,16);
+    }
+  } else {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt) dt.value = '';
+  }
+}
+function toggleAgendamento() {
+  const fields = document.getElementById('scheduleFields');
+  setAgendaActive(fields ? !fields.classList.contains('show') : true);
+}
+function resetAgendaToggle() { setAgendaActive(false); }
 
 // ================================================================
 // CONFERÊNCIA — antes de marcar entregue, abre modal de revisão
@@ -14925,13 +15610,43 @@ function setupGlobalErrorHandlers() {
   window.__cdbErrorHooked = true;
   window.addEventListener('error', function (ev) {
     const err = ev && ev.error ? ev.error : (ev && ev.message ? new Error(ev.message) : new Error('window.onerror'));
-    logError(err, 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : ''));
+    const ctx = 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : '');
+    logError(err, ctx);
+    _maybeOpenTicketForException(err, ctx);
   });
   window.addEventListener('unhandledrejection', function (ev) {
     const reason = ev && ev.reason;
-    logError(reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection')), 'unhandledrejection');
+    const err = reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection'));
+    logError(err, 'unhandledrejection');
+    _maybeOpenTicketForException(err, 'unhandledrejection');
   });
 }
+
+// Abre ticket automatico em exception grave — anti-spam controlado pelo
+// proprio openTicketAuto (cooldown 1h + max 5/dia/device).
+function _maybeOpenTicketForException(err, ctx) {
+  try {
+    if (!window.cdbSync || typeof window.cdbSync.openTicketAuto !== 'function') return;
+    const msg = String((err && err.message) || err || '').slice(0, 300);
+    const stack = String((err && err.stack) || '').split('\n').slice(0, 6).join('\n');
+    window.cdbSync.openTicketAuto(
+      'Exceção não capturada no app',
+      'Contexto: ' + ctx + '\n\nMensagem: ' + msg + '\n\nStack:\n' + stack,
+      'Bug',
+      'unhandled-exception'
+    );
+  } catch (_) {}
+}
+// Toast discreto quando ticket auto eh aberto pelo sync.js.
+window.addEventListener('cdb-ticket-opened', function (ev) {
+  try {
+    const id = ev && ev.detail && ev.detail.ticketId;
+    const titulo = ev && ev.detail && ev.detail.titulo;
+    if (!id) return;
+    const shortId = String(id).slice(0, 8);
+    showToast('Ticket #' + shortId + ' aberto — ' + (titulo || 'suporte avisado'));
+  } catch (_) {}
+});
 
 const CAM_ERRORS_KEY = 'cdb-cam-errors';
 const CAM_ERRORS_MAX = 10;
@@ -15435,6 +16150,354 @@ function goProducaoTab(tab) {
   document.querySelectorAll('#producaoTabs .screen-tab').forEach(b => b.classList.toggle('active', b.dataset.ptab === producaoTab));
   document.querySelectorAll('[data-screen="producao"] .producao-tab-section').forEach(s => s.classList.toggle('active', s.dataset.ptab === producaoTab));
   if (producaoTab === 'lotes') renderProducaoBatches();
+  if (producaoTab === 'catalogo') renderProductionDemand(); // F6
+  if (producaoTab === 'calculadora') calcOnEntrarTab(); // Onda 3.1
+}
+
+// === Calculadora de Producao (Onda 3.1) ===
+// Estado em memoria — produto selecionado, ultimo resultado, debounce timer
+let calcProdutoSelecionado = null;
+let calcUltimoResultado = null;
+let calcSearchTimer = null;
+
+function calcOnEntrarTab() {
+  // Pre-fill via prod-demand chip (G1): se localStorage tem flag, popula form
+  try {
+    const prefillRaw = localStorage.getItem('cdb-calc-prefill');
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw);
+      localStorage.removeItem('cdb-calc-prefill');
+      if (prefill.produtoId && prefill.produtoNome) {
+        calcSelecionarProduto({ id: prefill.produtoId, nome: prefill.produtoNome,
+          unidadeMedidaBase: prefill.unidadeMedidaBase || 'Un',
+          rendimentoBase: prefill.rendimentoBase, rendimentoUnidade: prefill.rendimentoUnidade });
+        if (prefill.qty) {
+          document.getElementById('calcQtd').value = prefill.qty;
+          calcOnQtdChange();
+        }
+      }
+    }
+  } catch (_) { /* silent */ }
+}
+
+function calcApiBase() {
+  return (window.CDB_CONFIG && window.CDB_CONFIG.apiBaseUrl) || '';
+}
+
+function calcAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = localStorage.getItem('cdb-auth-token') || localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  } catch (_) {}
+  return headers;
+}
+
+async function calcBuscarProdutos() {
+  if (calcSearchTimer) clearTimeout(calcSearchTimer);
+  calcSearchTimer = setTimeout(async () => {
+    const q = document.getElementById('calcProdSearch').value.trim();
+    const box = document.getElementById('calcProdSuggestions');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+    try {
+      const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+      const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
+      const res = await fetch(url, { headers: calcAuthHeaders() });
+      const json = await res.json();
+      const produtos = (json && json.data) || [];
+      if (produtos.length === 0) {
+        box.classList.add('show');
+        box.innerHTML = '<div style="padding:10px;color:var(--ink-mute);font-size:13px;">Nenhum produto com receita encontrado.</div>';
+        return;
+      }
+      box.classList.add('show');
+      box.innerHTML = produtos.map(p => `
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+             onclick='calcSelecionarProduto(${JSON.stringify(p).replace(/'/g, "\\'")})'>
+          <div style="font-weight:600;">${p.nome}</div>
+          <div style="font-size:11px;color:var(--ink-mute);">Rende ${p.rendimentoBase} ${p.rendimentoUnidade}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      showToast('Erro ao buscar produtos');
+    }
+  }, 300);
+}
+
+function calcSelecionarProduto(p) {
+  calcProdutoSelecionado = p;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSuggestions').classList.remove('show');
+  document.getElementById('calcProdSelected').style.display = 'block';
+  document.getElementById('calcProdSelected').textContent = `${p.nome} (rende ${p.rendimentoBase} ${p.rendimentoUnidade})`;
+  document.getElementById('calcEmptyState').style.display = 'none';
+
+  // G7: chips de unidade contextual — filtra por compativeis
+  const unidadeBase = p.unidadeMedidaBase || 'Un';
+  const select = document.getElementById('calcUnidade');
+  const compativeis = calcUnidadesCompativeis(unidadeBase);
+  select.innerHTML = compativeis.map(u => `<option value="${u}"${u === unidadeBase ? ' selected' : ''}>${u}</option>`).join('');
+
+  calcOnQtdChange();
+}
+
+function calcUnidadesCompativeis(base) {
+  const massa = ['Mg', 'G', 'Kg'];
+  const volume = ['Ml', 'L'];
+  const contagem = ['Un', 'Dz'];
+  if (massa.includes(base)) return massa;
+  if (volume.includes(base)) return volume;
+  if (contagem.includes(base)) return contagem;
+  return [base];
+}
+
+function calcOnQtdChange() {
+  const qtdStr = document.getElementById('calcQtd').value.replace(',', '.');
+  const qtd = parseFloat(qtdStr);
+  const hint = document.getElementById('calcQtdHint');
+  const btn = document.getElementById('calcCalcularBtn');
+  hint.classList.remove('invalid');
+  hint.textContent = '';
+  if (!calcProdutoSelecionado) { btn.disabled = true; return; }
+  if (!isFinite(qtd) || qtd < 0.0001) {
+    if (qtdStr) {
+      hint.classList.add('invalid');
+      hint.textContent = 'Quantidade minima 0.0001.';
+    }
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+}
+
+function calcOnUnidadeChange() {
+  // Recalcula valido novamente quando troca unidade
+  calcOnQtdChange();
+}
+
+async function calcExecutar() {
+  if (!calcProdutoSelecionado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const qtd = parseFloat(document.getElementById('calcQtd').value.replace(',', '.'));
+  const unidade = document.getElementById('calcUnidade').value;
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  const box = document.getElementById('calcResultadoBox');
+  box.setAttribute('aria-busy', 'true');
+  box.style.display = 'block';
+  document.getElementById('calcResultadoBadge').textContent = 'Calculando...';
+  document.getElementById('calcResultadoBadge').style.background = 'var(--bg-elev)';
+  document.getElementById('calcInsumosList').innerHTML = '';
+  document.getElementById('calcResultadoCustoTotal').textContent = '';
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        produtoFinalId: calcProdutoSelecionado.id,
+        quantidadeDesejada: qtd,
+        unidadeDesejada: unidade,
+        lojaId
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      showToast(`${code}: ${msg}`);
+      box.style.display = 'none';
+      return;
+    }
+    calcUltimoResultado = json.data;
+    calcRenderResultado(json.data);
+    calcSalvarHistorico(calcProdutoSelecionado, qtd, unidade);
+  } catch (e) {
+    showToast('Erro de conexao');
+    box.style.display = 'none';
+  } finally {
+    box.setAttribute('aria-busy', 'false');
+  }
+}
+
+function calcRenderResultado(r) {
+  const badge = document.getElementById('calcResultadoBadge');
+  const editarBtn = document.getElementById('calcEditarReceitaBtn');
+  const gerarBtn = document.getElementById('calcGerarCompraBtn');
+
+  if (r.tudoDisponivel) {
+    badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
+    badge.style.background = 'var(--basil-soft)';
+    badge.style.color = 'var(--basil)';
+    badge.style.border = '1px solid var(--basil)';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'none';
+  } else {
+    const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
+    badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
+    badge.style.background = 'rgba(239, 107, 107, 0.16)';
+    badge.style.color = '#ef6b6b';
+    badge.style.border = '1px solid #ef6b6b';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'inline-block';
+  }
+
+  if (r.custoEstimadoTotal != null) {
+    document.getElementById('calcResultadoCustoTotal').textContent = `Custo estimado total: R$ ${r.custoEstimadoTotal.toFixed(2).replace('.', ',')}`;
+  }
+
+  const list = document.getElementById('calcInsumosList');
+  list.innerHTML = r.insumos.map(i => {
+    let cor = 'var(--basil)';
+    let status = 'Cobre';
+    if (i.conversaoFalhou) { cor = '#ef6b6b'; status = 'Unidade incompativel'; }
+    else if (i.falta != null && i.falta > 0) { cor = '#ef6b6b'; status = `Falta ${i.falta.toFixed(3)} ${i.unidadeReceita}`; }
+
+    const custoTxt = i.custoEstimadoLinha != null
+      ? `R$ ${i.custoEstimadoLinha.toFixed(2).replace('.', ',')}`
+      : '—';
+
+    return `
+      <div style="background:var(--bg-elev);border-radius:12px;padding:12px;margin-bottom:8px;border-left:3px solid ${cor};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <strong style="font-size:14px;">${i.insumoNome}</strong>
+          <span style="font-size:11px;color:var(--ink-mute);">${custoTxt}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">
+          Precisa ${i.quantidadeNecessaria.toFixed(3)} ${i.unidadeReceita} • Saldo ${i.saldoAtual.toFixed(3)} ${i.unidadeSaldo}
+        </div>
+        <div style="font-size:11px;color:${cor};margin-top:4px;font-weight:600;">${status}</div>
+        ${i.aviso ? `<div style="font-size:11px;color:var(--gold);margin-top:4px;">${i.aviso}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function calcGerarCompra() {
+  if (!calcUltimoResultado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  // Coleta insumos faltantes
+  const insumosFaltantes = calcUltimoResultado.insumos
+    .filter(i => i.falta != null && i.falta > 0 && !i.conversaoFalhou)
+    .map(i => ({
+      insumoId: i.insumoId,
+      quantidadeFaltante: i.falta,
+      unidade: i.unidadeReceita
+    }));
+
+  if (insumosFaltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return;
+  }
+
+  // Step 1: preview (sem idempotency, livre pra refazer)
+  try {
+    const previewUrl = `${calcApiBase()}/api/mobile/calculadora/preview-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(previewUrl, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      showToast(`${code}: ${json.error?.message || ''}`);
+      return;
+    }
+    const preview = json.data;
+    // Mostra resumo via confirm nativo (padrao do PWA pra confirmacoes destrutivas)
+    const grupos = preview.porFornecedor || [];
+    const semFornecedor = grupos.find(g => !g.fornecedorId);
+    if (semFornecedor) {
+      showToast('Alguns insumos nao tem fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
+      return;
+    }
+    const resumo = grupos.map(g => `${g.fornecedorNome}: ${g.linhas.length} itens (R$ ${(g.subtotalEstimado || 0).toFixed(2)})`).join('\n');
+    const total = preview.totalEstimado != null ? `\nTotal: R$ ${preview.totalEstimado.toFixed(2)}` : '';
+    if (!confirm(`Criar ${grupos.length} pedido(s) de compra?\n\n${resumo}${total}`)) return;
+
+    // Step 2: criar com idempotency-key
+    const idempotencyKey = calcGerarUuid();
+    const fornecedores = grupos.map(g => ({
+      fornecedorId: g.fornecedorId,
+      itens: g.linhas.map(l => ({
+        insumoId: l.insumoId,
+        nome: l.insumoNome,
+        quantidade: l.quantidade,
+        unidade: l.unidade,
+        custoUnitario: l.custoUnitarioReferencia || 0,
+        observacao: null
+      }))
+    }));
+
+    const criarUrl = `${calcApiBase()}/api/mobile/calculadora/criar-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res2 = await fetch(criarUrl, {
+      method: 'POST',
+      headers: { ...calcAuthHeaders(), 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId,
+        canal: 'calculadora-pwa',
+        observacoes: null,
+        fornecedores
+      })
+    });
+    const json2 = await res2.json();
+    if (!res2.ok) {
+      const code = (json2 && json2.error && json2.error.code) || 'ERROR';
+      showToast(`${code}: ${json2.error?.message || ''}`);
+      return;
+    }
+    showToast(`${json2.data?.pedidosCriados?.length || 0} pedido(s) de compra criado(s).`);
+  } catch (e) {
+    showToast('Erro de conexao');
+  }
+}
+
+function calcAbrirAjusteReceita() {
+  // MVP: para versao 1 deixamos esse fluxo no admin web. Aqui apenas redireciona com toast.
+  showToast('Edicao de receita: acesse o admin web por enquanto.');
+}
+
+function calcLimpar() {
+  calcProdutoSelecionado = null;
+  calcUltimoResultado = null;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSelected').style.display = 'none';
+  document.getElementById('calcQtd').value = '';
+  document.getElementById('calcQtdHint').textContent = '';
+  document.getElementById('calcCalcularBtn').disabled = true;
+  document.getElementById('calcResultadoBox').style.display = 'none';
+  document.getElementById('calcEmptyState').style.display = 'block';
+}
+
+function calcSalvarHistorico(produto, qtd, unidade) {
+  try {
+    const raw = localStorage.getItem('cdb-calc-history') || '[]';
+    let history = JSON.parse(raw);
+    if (!Array.isArray(history)) history = [];
+    history.unshift({ produto: { id: produto.id, nome: produto.nome }, qtd, unidade, ts: Date.now() });
+    history = history.slice(0, 5);
+    localStorage.setItem('cdb-calc-history', JSON.stringify(history));
+  } catch (_) {}
+}
+
+function calcGerarUuid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback UUID v4 pseudo (suficiente p/ idempotency)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 function setBatchFilter(next) {
   batchFilter = next || 'open';
@@ -15802,7 +16865,7 @@ function escPosBarcode128(data) {
   return out;
 }
 
-function escPosOrderLabel(o) {
+function escPosOrderLabel(o, nota) {
   const empresa = (getEmpresaName() || 'EASY STOCK MOBILE').toUpperCase();
   const pixType = getPixType();
   const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
@@ -15832,6 +16895,12 @@ function escPosOrderLabel(o) {
     const obs = asciiNorm(o.notes);
     b.line('Obs: ' + obs.slice(0, PRINT_COLS - 5));
     if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
+  }
+  // Nota rapida digitada na hora (campo da tela de preview)
+  if (nota) {
+    const n = asciiNorm(String(nota));
+    b.bold().line('* NOTA: ' + n.slice(0, PRINT_COLS - 8)).boldOff();
+    if (n.length > PRINT_COLS - 8) b.line('  ' + n.slice(PRINT_COLS - 8, PRINT_COLS - 8 + PRINT_COLS - 2));
   }
   b.line(divider());
   // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo.
@@ -16012,6 +17081,7 @@ function fmtPesoG(g)     { return g >= 1000 ? (g/1000).toFixed(2).replace('.',',
  * Retorna string SVG inline com width/height fixos pra controlar layout.
  */
 function generateQrSvg(data, size = 96) {
+  if (!data) return '';
   if (typeof qrcode !== 'function') return ''; // lib não carregada — silencioso
   try {
     const qr = qrcode(0, 'L');
@@ -16117,30 +17187,47 @@ function etiquetasFromBatch(batch) {
   return out;
 }
 
-function etiquetaProducaoHtml(et) {
-  const peso = et.weightG ? `<div class="et-row"><span class="lbl">Peso</span><span>${fmtPesoG(et.weightG)}</span></div>` : '';
+function safePhotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'data:') ? url : '';
+  } catch { return ''; }
+}
+
+function etiquetaProducaoHtml(et, nota) {
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
-  // Foto opcional do produto entre nome e barcode
-  const photo = et.photo ? `<div class="et-photo-wrap"><img class="et-photo" src="${et.photo}" alt="Foto do produto"/></div>` : '';
-  return `
-    <div class="et-kicker">Etiqueta de lote</div>
-    <div class="et-title">${escapeHtml(et.empresa)}</div>
-    <div class="et-prod">${escapeHtml(et.productName)}${et.unit ? ' · ' + escapeHtml(et.unit) : ''}</div>
-    ${photo}
-    <div class="et-scan">
-      ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, 132)}</div>` : ''}
-      ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, 268, 58)}</div>` : ''}
-      <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
-      <div class="et-hint">Escaneie no app para conferir</div>
-    </div>
-    <div class="et-grid">
-      ${peso}
-      <div class="et-row"><span class="lbl">Produção</span><span>${fmtDateBR(et.productionDate)}</span></div>
-      <div class="et-row"><span class="lbl">Validade</span><span>${escapeHtml(venc)}</span></div>
-      <div class="et-row"><span class="lbl">Lote</span><span>${escapeHtml(et.lote)}</span></div>
-    </div>
-  `;
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const photoSrc = safePhotoUrl(et.photo);
+  const photo = photoSrc ? `<div class="et-photo-wrap"><img class="et-photo" src="${photoSrc}" alt="Foto do produto"/></div>` : '';
+  const hasCodes = showQr || showBarcode;
+  const horiz = currentEtqOrient === 'horizontal';
+
+  const brand = `<div class="et-brand">
+    <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+    <span class="et-brand-name">Easy<b>Stok</b></span>
+  </div>`;
+  const prodBlock = `<div class="et-prod">${escapeHtml(et.productName)}</div>
+    ${et.unit ? `<div class="et-unit">${escapeHtml(et.unit)}</div>` : ''}`;
+  const infoBlock = `<div class="et-info">
+    <div class="et-info-row"><span class="et-lbl">FAB:</span><span class="et-val">${fmtDateBR(et.productionDate)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">VAL:</span><span class="et-val">${escapeHtml(venc)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">LOTE:</span><span class="et-val">${escapeHtml(et.lote)}</span></div>
+    ${et.weightG ? `<div class="et-info-row"><span class="et-lbl">PESO:</span><span class="et-val">${fmtPesoG(et.weightG)}</span></div>` : ''}
+  </div>`;
+  const scanBlock = hasCodes ? `<div class="et-scan">
+    ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, horiz ? 90 : 110)}</div>` : ''}
+    ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, horiz ? 160 : 260, 50)}</div>` : ''}
+    <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+  </div>` : '';
+  const notaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
+
+  if (horiz) {
+    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
+  }
+  return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
 
 function escPosLabelProducao(et) {
@@ -16160,20 +17247,17 @@ function escPosLabelProducao(et) {
   wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
   b.boldOff();
   b.line(divider());
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
+  const { showQr, showBars: showBarcode } = scanModeFlags();
   if (showQr) {
-    // QR: mais robusto no scanner do app e mais legivel em termica.
-    // moduleSize=8 dots + ECL=M (no escPosQrCommands) compensam o bleed
-    // termico da WTP05; 2 LFs garantem quiet zone inferior.
     b.push(...escPosQrCommands(et.codigoBarras, 0x08));
     b.push(0x0A, 0x0A);
   }
-  b.bold().line(et.codigoBarras).boldOff();
-  b.line('Escaneie no app para conferir');
+  if (showQr || showBarcode) {
+    b.bold().line(et.codigoBarras).boldOff();
+    b.line('Escaneie no app para conferir');
+  }
   if (showBarcode) {
     b.line(divider());
-    // Barcode CODE128 (HRI = texto sob as barras automatico via GS H 2)
-    // Mantido por compatibilidade com leitores de codigo de barras.
     b.push(...escPosBarcode128(et.codigoBarras));
     b.push(0x0A);
   }
@@ -16183,6 +17267,10 @@ function escPosLabelProducao(et) {
   b.line(padLine('Producao', fmtDateBR(et.productionDate)));
   b.line(padLine('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
   b.line(padLine('Lote',     et.lote));
+  if (et._nota) {
+    b.line(divider());
+    b.bold().line('* NOTA: ' + asciiNorm(String(et._nota)).slice(0, PRINT_COLS - 8)).boldOff();
+  }
   return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
 }
 
@@ -16191,25 +17279,52 @@ function escPosLabelProducao(et) {
  * Largura fixa 384px (= 58mm a 200dpi). Cada etiqueta ocupa ~280px + 20px gap.
  * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
  */
-function etiquetasToPng(etiquetas, kind) {
-  // 384px ≈ 50mm @ ~195dpi — bate com a impressora térmica de 50mm.
-  const W = 384;
-  // order: blocos com cliente, itens, total, observacao e PIX.
-  // producao: branding, barcode e grade de lote/validade.
-  // ROW_H: producao sem foto = 510; com foto = 670 (QR + barras + miniatura).
-  const hasAnyPhoto = kind !== 'order' && etiquetas.some(et => et && et.photo);
-  const ROW_H = kind === 'order' ? 620 : (hasAnyPhoto ? 670 : 510);
+function etiquetasToPng(etiquetas, kind, note) {
+  const horizOrder = kind === 'order' && currentEtqOrient === 'horizontal';
+  const W = horizOrder ? 620 : 384;
   const GAP = 20;
-  const H = etiquetas.length * (ROW_H + GAP) + GAP;
+  const NOTA_H = note ? 44 : 0; // altura extra por etiqueta quando nota presente
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  function calcRowH(et) {
+    if (kind === 'order') {
+      const o = et.order || {};
+      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24), 0);
+      if (horizOrder) {
+        // Horizontal: duas colunas. Altura = max(left, right).
+        // Left: brand(30)+kicker(14)+title(24)+ref(18)+date(16)+cliente(70)+items+ITENS(12)+total(48)+notes+nota
+        const leftH = 30 + 14 + 24 + 18 + 16 + 70 + 12 + itemsH + 48 + (o.notes ? 50 : 0) + NOTA_H;
+        // Right: 18 top + codeBox(QR106+bars46+38) + pixSpacer(10) + pix(76)
+        const codeBoxH = (showQr ? 106 : 0) + (showBarcode ? 46 : 0) + 38;
+        const rightH = 18 + codeBoxH + 10 + 76;
+        return Math.max(leftH, rightH) + 28;
+      }
+      const notesH = o.notes ? 64 : 0;
+      const codesH = (showQr ? 148 : 0) + (showBarcode ? 74 : 0) + (hasCodes ? 46 : 0);
+      const refTextH = 38;
+      const pixH = 84;
+      return 340 + itemsH + notesH + codesH + refTextH + pixH + NOTA_H;
+    }
+    const horiz = currentEtqOrient === 'horizontal';
+    const hasPhoto = et && et.photo;
+    if (horiz) {
+      return hasPhoto ? 360 + NOTA_H : 240 + NOTA_H;
+    }
+    return (hasPhoto ? 670 : (hasCodes ? 510 : 340)) + NOTA_H;
+  }
+
+  const rowHeights = etiquetas.map(et => calcRowH(et));
+  const labelsH = rowHeights.reduce((s, h) => s + h + GAP, GAP);
+
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = W; canvas.height = labelsH;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  if (!ctx) throw new Error('canvas ctx unavailable');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, labelsH);
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
 
-  // Pre-carrega TODAS as fotos antes de desenhar — Image.onload é async,
-  // se não esperarmos o canvas sai sem fotos. Pre-load idempotente.
   const photoPromises = etiquetas.map(et => {
     if (!et || !et.photo) return Promise.resolve(null);
     return new Promise(resolve => {
@@ -16221,13 +17336,14 @@ function etiquetasToPng(etiquetas, kind) {
   });
 
   return Promise.all(photoPromises).then(images => {
+    let yTop = GAP;
     etiquetas.forEach((et, i) => {
-      const yTop = GAP + i * (ROW_H + GAP);
       if (kind === 'order') {
-        drawOrderEtiquetaCanvas(ctx, et, W, yTop, ROW_H);
+        drawOrderEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], horizOrder, note);
       } else {
-        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, ROW_H, images[i]);
+        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], images[i], note);
       }
+      yTop += rowHeights[i] + GAP;
     });
     return new Promise((resolve, reject) => {
       try {
@@ -16240,87 +17356,244 @@ function etiquetasToPng(etiquetas, kind) {
   });
 }
 
-function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg) {
+function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
+  const horiz = currentEtqOrient === 'horizontal';
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  if (horiz) {
+    // ── Layout horizontal: info esquerda, códigos direita ──
+    const sideW = hasCodes ? 140 : 0;
+    const mainW = W - sideW;
+    const lx = 24;
+    let y = y0 + 16;
+
+    // Logo EasyStok
+    ctx.fillStyle = '#1A2E5A';
+    ctx.fillRect(lx, y, 22, 22);
+    ctx.fillStyle = '#E85814';
+    ctx.fillRect(lx + 4, y + 4, 14, 6);
+    ctx.fillStyle = '#1A2E5A';
+    ctx.textAlign = 'left';
+    ctx.font = '800 16px Inter, Arial, sans-serif';
+    ctx.fillText('EasyStok', lx + 30, y + 14);
+    y += 34;
+
+    // Nome do produto
+    ctx.fillStyle = '#000';
+    ctx.font = '800 18px Inter, Arial, sans-serif';
+    const maxChars = Math.max(8, Math.floor((mainW - lx - 8) / 10));
+    wordWrap(et.productName, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
+    if (et.unit) {
+      ctx.fillStyle = '#555';
+      ctx.font = '500 12px Inter, Arial, sans-serif';
+      ctx.fillText(et.unit, lx, y); y += 16;
+    }
+
+    // Foto (menor na coluna esquerda)
+    if (photoImg && photoImg.width && photoImg.height) {
+      const maxPW = mainW - lx - 16, maxPH = 80;
+      const ratio = Math.min(maxPW / photoImg.width, maxPH / photoImg.height);
+      const dw = Math.floor(photoImg.width * ratio);
+      const dh = Math.floor(photoImg.height * ratio);
+      ctx.drawImage(photoImg, lx, y, dw, dh);
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+      ctx.strokeRect(lx, y, dw, dh);
+      y += dh + 6;
+    }
+    y += 4;
+
+    // Info rows
+    const infoX = lx + 48;
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('FAB:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('VAL:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('LOTE:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.lote, infoX, y); y += 18;
+
+    if (et.weightG) {
+      ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+      ctx.fillText('PESO:', lx, y);
+      ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+      ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 18;
+    }
+
+    // Coluna direita: códigos
+    if (hasCodes) {
+      const sx = mainW + 8;
+      const sideCenter = mainW + sideW / 2;
+      let sy = y0 + 16;
+
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(sx - 4, y0 + 8, sideW - 8, H - 16);
+
+      if (showQr) {
+        const qrSz = 90;
+        drawQrOnCanvas(ctx, et.codigoBarras, sideCenter - qrSz / 2, sy, qrSz);
+        sy += qrSz + 8;
+      }
+      if (showBarcode) {
+        drawCode128OnCanvas(ctx, et.codigoBarras, sx, sy, sideW - 16, 40);
+        sy += 48;
+      }
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+      ctx.font = '700 10px JetBrains Mono, Courier New, monospace';
+      ctx.fillText(et.codigoBarras, sideCenter, sy);
+      ctx.textAlign = 'left';
+    }
+    if (nota) {
+      const ny = y0 + H - 44;
+      const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+      ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(lx, ny, W - lx - 24, 36);
+      ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+      ctx.fillText('NOTA', lx + 6, ny + 6);
+      ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+      ctx.fillText(String(nota).slice(0, 42), lx + 6, ny + 20);
+      ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+    }
+    return;
+  }
+
+  // ── Layout vertical (original) ──
   const cx = W / 2;
-  let y = y0 + 14;
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 18px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', lx + 30, y + 16);
+  y += 36;
+  // Product name
   ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.font = '900 12px monospace';
-  ctx.fillText('ETIQUETA DE LOTE', cx, y); y += 18;
-  ctx.font = '900 28px monospace';
-  ctx.fillText(et.empresa.toUpperCase().slice(0, 22), cx, y); y += 34;
-  ctx.font = '900 22px monospace';
-  // Nome do produto com word-wrap (preserva palavras inteiras)
-  wordWrap(et.productName, 24).forEach(l => { ctx.fillText(l, cx, y); y += 26; });
-  if (et.unit) { ctx.font = '700 14px monospace'; ctx.fillText(et.unit, cx, y); y += 18; }
-  ctx.fillRect(26, y, W - 52, 2); y += 10;
-  // Foto opcional (preserva aspect ratio, max 140px de altura)
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  wordWrap(et.productName, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
+  if (et.unit) {
+    ctx.fillStyle = '#555';
+    ctx.font = '500 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.unit, lx, y); y += 16;
+  }
+  // Photo
   if (photoImg && photoImg.width && photoImg.height) {
-    const maxW = W - 60;
-    const maxH = 140;
+    const maxW = W - 60, maxH = 120;
     const ratio = Math.min(maxW / photoImg.width, maxH / photoImg.height);
     const dw = Math.floor(photoImg.width * ratio);
     const dh = Math.floor(photoImg.height * ratio);
-    const dx = Math.floor((W - dw) / 2);
-    ctx.drawImage(photoImg, dx, y, dw, dh);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
-    ctx.strokeRect(dx, y, dw, dh);
-    y += dh + 10;
+    ctx.drawImage(photoImg, lx, y, dw, dh);
+    ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+    ctx.strokeRect(lx, y, dw, dh);
+    y += dh + 8;
   }
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  const { mode: scanMode, showQr, showBars: showBarcode } = scanModeFlags();
-  const qrSize = scanMode === 'both' ? 104 : 124;
-  const boxH = (showQr ? qrSize + 14 : 0) + (showBarcode ? 64 : 0) + 56;
-  ctx.strokeRect(20, y - 2, W - 40, boxH);
-  if (showQr) {
-    drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y + 10, qrSize);
-    y += qrSize + 18;
-  }
-  if (showBarcode) {
-    drawCode128OnCanvas(ctx, et.codigoBarras, 36, y, W - 72, 58);
-    y += 70;
-  }
-  ctx.font = '900 15px monospace';
-  wordWrap(et.codigoBarras, 28).forEach(l => { ctx.fillText(l, cx, y); y += 18; });
-  ctx.font = '700 11px monospace';
-  ctx.fillText('Escaneie no app para conferir', cx, y); y += 24;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(20, y - 2, W - 40, 118);
-  ctx.font = '900 17px monospace';
-  ctx.textAlign = 'left';
-  const lx = 34, rx = W - 34;
+  y += 6;
+  // Info rows: FAB, VAL, LOTE
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  const infoX = lx + 52;
+  ctx.fillText('FAB:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 20;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('VAL:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 20;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('LOTE:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(et.lote, infoX, y); y += 20;
   if (et.weightG) {
-    ctx.fillText('Peso', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtPesoG(et.weightG), rx, y + 10); ctx.textAlign = 'left'; y += 26;
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('PESO:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+    ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 20;
   }
-  ctx.fillText('Producao', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(fmtDateBR(et.productionDate), rx, y + 10); ctx.textAlign = 'left'; y += 26;
-  ctx.fillText('Validade', lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '-', rx, y + 10); ctx.textAlign = 'left'; y += 26;
-  ctx.fillText('Lote',     lx, y + 10); ctx.textAlign = 'right'; ctx.fillText(et.lote, rx, y + 10); ctx.textAlign = 'left';
+  y += 6;
+  // Scan area
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+  const scanY = y;
+  const qrSize = showQr ? 100 : 0;
+  const barsH = showBarcode ? 50 : 0;
+  const scanH = (showQr ? qrSize + 10 : 0) + (showBarcode ? barsH + 10 : 0) + 30;
+  if (hasCodes) {
+    ctx.strokeRect(lx - 4, scanY, W - 40, scanH);
+    y = scanY + 8;
+    if (showQr) {
+      drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBarcode) {
+      drawCode128OnCanvas(ctx, et.codigoBarras, lx, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+    ctx.font = '700 11px JetBrains Mono, Courier New, monospace';
+    ctx.fillText(et.codigoBarras, cx, y); y += 16;
+    ctx.textAlign = 'left';
+  }
+  if (nota) {
+    const lx2 = 24;
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx2, ny, W - lx2 * 2, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx2 + 6, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 42), lx2 + 6, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
 }
 
-function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
-  // et = { order: o }
+function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
   const o = et.order;
   const pixText = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
-  const cx = W / 2;
-  let y = y0 + 14;
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.font = '900 12px Arial, sans-serif';
-  ctx.fillStyle = '#4b5563';
-  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 18;
-  ctx.fillStyle = '#000';
-  ctx.font = '900 28px Arial, sans-serif';
-  ctx.fillText((getEmpresaName() || 'Easy Stock Mobile').toUpperCase().slice(0, 22), cx, y); y += 34;
-  ctx.font = '900 17px Arial, sans-serif';
   const orderRef = (o.id || '').slice(-8);
-  ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
-  ctx.fillStyle = '#4b5563';
-  ctx.font = '700 12px Arial, sans-serif';
-  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
+  const { showQr, showBars } = scanModeFlags();
+
+  if (horizontal) {
+    drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota);
+    return;
+  }
+
+  const cx = W / 2;
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(cx - 11, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(cx - 7, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'center';
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', cx, y + 38); y += 52;
+  // Header
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 16;
   ctx.fillStyle = '#000';
-  ctx.fillRect(24, y, W - 48, 2); y += 12;
+  ctx.font = '800 24px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 22), cx, y); y += 28;
+  ctx.font = '700 16px Inter, Arial, sans-serif';
+  ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
+  ctx.fillStyle = '#888';
+  ctx.font = '500 12px Inter, Arial, sans-serif';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
+  ctx.fillStyle = '#e2e5ea';
+  ctx.fillRect(lx, y, W - 48, 1); y += 10;
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
@@ -16376,29 +17649,39 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
     y += 64;
   }
   // QR / codigo de barras de conferencia (respeita modo configurado)
-  const { showQr, showBars } = scanModeFlags();
-  const qrSize = showQr ? 130 : 0;
-  const barsH = showBars ? 56 : 0;
-  const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(20, y - 4, W - 40, boxH);
-  if (showQr) {
-    drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
-    y += qrSize + 8;
+  if (showQr || showBars) {
+    const qrSize = showQr ? 130 : 0;
+    const barsH = showBars ? 56 : 0;
+    const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, y - 4, W - 40, boxH);
+    if (showQr) {
+      drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBars) {
+      drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 16px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
+    ctx.textAlign = 'left';
+  } else {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '700 13px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo', cx, y); y += 18;
+    ctx.textAlign = 'left';
   }
-  if (showBars) {
-    drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
-    y += barsH + 8;
-  }
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#000';
-  ctx.font = '900 16px Arial, sans-serif';
-  ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
-  ctx.fillStyle = '#4b5563';
-  ctx.font = '700 11px Arial, sans-serif';
-  ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
-  ctx.textAlign = 'left';
   ctx.fillStyle = '#000';
   ctx.strokeRect(20, y, W - 40, 68);
   ctx.fillStyle = '#4b5563';
@@ -16411,6 +17694,185 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H) {
   ctx.font = '700 12px Arial, sans-serif';
   ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
   ctx.fillStyle = '#000';
+  if (nota) {
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(20, ny, W - 40, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', 28, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 50), 28, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+}
+
+// Pedido em formato landscape — coluna esquerda com info, coluna direita com QR + PIX.
+// Usado quando o operador escolhe Orientação: Horizontal no preview do recibo.
+function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota) {
+  const sideW = 180;
+  const lx = 18;
+  const mainW = W - sideW - 36;
+  const sx = lx + mainW + 18;
+  let y = y0 + 16;
+
+  // Separador vertical entre colunas
+  ctx.strokeStyle = '#d0d4db';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx - 8, y0 + 12);
+  ctx.lineTo(sx - 8, y0 + H - 12);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── COLUNA ESQUERDA ──
+  // Logo + brand
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', lx + 28, y + 14);
+  y += 30;
+
+  // Kicker + título
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', lx, y); y += 14;
+  ctx.fillStyle = '#000';
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 26), lx, y); y += 24;
+  ctx.font = '700 14px Inter, Arial, sans-serif';
+  ctx.fillText('Pedido ' + orderRef, lx, y); y += 18;
+  ctx.fillStyle = '#888';
+  ctx.font = '500 11px Inter, Arial, sans-serif';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), lx, y); y += 16;
+
+  // Cliente — box com 3 linhas; fillText usa baseline, logo +10/+24/+38 dentro de 52px
+  const clientH = o.clientSnapshot?.ref ? 58 : 44;
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(lx, y, mainW, clientH);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('CLIENTE', lx + 8, y + 10);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 14px Arial, sans-serif';
+  ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 32), lx + 8, y + 26);
+  if (o.clientSnapshot?.ref) {
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 36), lx + 8, y + 42);
+  }
+  y += clientH + 12;
+
+  // Itens
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('ITENS', lx, y); y += 12;
+  (o.items || []).forEach(it => {
+    ctx.fillStyle = '#000';
+    ctx.font = '700 12px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText((it.qty + 'x  ' + it.name).slice(0, 30), lx, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(money(it.qty * it.unitPrice), lx + mainW - 4, y);
+    if (it.unit) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#888';
+      ctx.font = '400 10px Arial, sans-serif';
+      ctx.fillText(String(it.unit).slice(0, 24), lx + 20, y + 13);
+    }
+    y += it.unit ? 28 : 18;
+  });
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + mainW, y); ctx.stroke();
+  y += 8;
+
+  // Total
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+  ctx.strokeRect(lx, y, mainW, 38);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 18px Arial, sans-serif';
+  // textBaseline='top': 18px font em caixa 38px → topo em y+10 centraliza (38-18)/2=10
+  ctx.fillText('TOTAL', lx + 10, y + 10);
+  ctx.textAlign = 'right';
+  ctx.fillText(money(o.total), lx + mainW - 10, y + 10);
+  ctx.textAlign = 'left';
+  y += 48;
+
+  if (o.notes) {
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 40);
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '900 10px Arial, sans-serif';
+    ctx.fillText('OBSERVACAO', lx + 8, y + 6);
+    ctx.fillStyle = '#000';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText(String(o.notes).slice(0, 40), lx + 8, y + 20);
+    y += 50;
+  }
+  if (nota) {
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx + 6, y + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 40), lx + 6, y + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+
+  // ── COLUNA DIREITA ──
+  let sy = y0 + 18;
+  const sCenter = sx + sideW / 2;
+  // codeBoxH: 106 por QR (96 drawável + 10 gap), 46 por barcode (38 + 8 gap), 38 fixo pra "Codigo" + hint
+  const codeBoxH = (showQr ? 106 : 0) + (showBars ? 46 : 0) + 38;
+
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
+  ctx.strokeRect(sx, sy, sideW, codeBoxH);
+  sy += 8; // padding interno topo
+
+  if (showQr) {
+    drawQrOnCanvas(ctx, orderRef, sCenter - 48, sy, 96);
+    sy += 106; // avança 106 (alocação do codeBoxH para QR)
+  }
+  if (showBars) {
+    drawCode128OnCanvas(ctx, orderRef, sx + 4, sy, sideW - 8, 38);
+    sy += 46;
+  }
+  // Texto "Codigo" e "Confira" dentro do box — sem offset extra para caber nos 38px finais
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
+  ctx.font = '700 12px Arial, sans-serif';
+  ctx.fillText('Codigo: ' + orderRef, sCenter, sy); sy += 14;
+  ctx.fillStyle = '#888';
+  ctx.font = '400 9px Arial, sans-serif';
+  ctx.fillText(showQr || showBars ? 'Confira no app' : 'Ref. do pedido', sCenter, sy);
+  sy = y0 + 18 + codeBoxH + 10; // avança para depois do box + gap
+  ctx.textAlign = 'left';
+
+  // PIX (sempre na base da coluna direita — equivale ao margin-top:auto do CSS)
+  const pixY = y0 + H - 76;
+  ctx.strokeStyle = '#d0d4db'; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx, pixY - 4);
+  ctx.lineTo(sx + sideW, pixY - 4);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 10px Arial, sans-serif';
+  ctx.fillText('PAGAMENTO PIX', sx, pixY + 6);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 12px Arial, sans-serif';
+  ctx.fillText(pixText.slice(0, 26), sx, pixY + 22);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '500 10px Arial, sans-serif';
+  ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 24), sx, pixY + 38);
 }
 
 /**
@@ -16484,26 +17946,129 @@ function drawCode128OnCanvas(ctx, data, x, y, w, h) {
 // Estado do preview de etiquetas
 let currentEtiquetas = [];
 let currentEtiquetasKind = 'producao'; // 'producao' | 'order'
+let currentEtqOrient = 'vertical';     // 'vertical' | 'horizontal'
+
+function setEtqCode(mode) {
+  setScanModeChoice(mode, true);
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === prodScanModeLabel(mode)));
+  refreshEtqPreview();
+}
+// Alias: chama o setOrientChoice unificado que cuida de Ajustes + Preview + state + audit
+function setEtqOrient(orient) { setOrientChoice(orient, true); }
+
+function getEtqNota() {
+  return (document.getElementById('etqNoteInput')?.value || '').trim();
+}
+
+let _etqNoteDebounce;
+function onEtqNoteInput() {
+  clearTimeout(_etqNoteDebounce);
+  _etqNoteDebounce = setTimeout(refreshEtqPreview, 150);
+}
+
+function refreshEtqPreview() {
+  const body = document.getElementById('etqBody');
+  if (!body || !currentEtiquetas.length) return;
+  const horiz = currentEtqOrient === 'horizontal';
+  const isOrder = currentEtiquetasKind === 'order';
+  // etq-order-horiz: classe explicita para pedido horizontal (sem :has() que nao roda em WebView antigo)
+  const cls = horiz
+    ? (isOrder ? 'etq-card etq-order-horiz' : 'etq-card etq-horiz')
+    : 'etq-card';
+  const nota = getEtqNota();
+  if (isOrder) {
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
+    ).join('');
+  } else {
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
+    ).join('');
+  }
+  // setTimeout em vez de rAF: garante que o layout ja foi calculado antes de medir
+  setTimeout(scaleEtqCards, 0);
+}
+
+function scaleEtqCards() {
+  const body = document.getElementById('etqBody');
+  if (!body) return;
+  const avail = body.clientWidth - 32;
+  if (avail <= 0) return;
+  body.querySelectorAll('.etq-card-wrap').forEach(wrap => {
+    const card = wrap.firstElementChild;
+    if (!card) return;
+    // Reset all inline styles so we read natural dimensions below
+    card.style.transform = '';
+    card.style.transformOrigin = '';
+    card.style.position = '';
+    card.style.top = '';
+    card.style.left = '';
+    wrap.style.position = '';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+    const cardW = card.offsetWidth;
+    const cardH = card.offsetHeight;
+    if (!cardH || !cardW) return; // guard: not yet rendered
+    const isHorizOrder = card.classList.contains('etq-order-horiz');
+    if (isHorizOrder) {
+      // Rotaciona +90deg (CW): coluna ESQUERDA (empresa/itens) vai para o TOPO.
+      // Scale limita AMBAS as dimensões: largura (avail) e altura (body.clientHeight)
+      // para caber na tela sem precisar de scroll.
+      // Após rotate(90°): largura na tela = cardH*s, altura na tela = cardW*s.
+      const availH = Math.max(200, body.clientHeight - 64);
+      const s = Math.min(1, avail / cardH, availH / cardW);
+      // position:absolute tira o card do fluxo — sem isso o card de 620px causa overflow
+      // no etqBody e quebra o layout flex, travando a tela.
+      card.style.position = 'absolute';
+      card.style.top = '0';
+      card.style.left = '0';
+      wrap.style.position = 'relative';
+      wrap.style.width  = Math.ceil(cardH * s) + 'px';
+      wrap.style.height = Math.ceil(cardW * s) + 'px';
+      wrap.style.overflow = 'hidden';
+      card.style.transformOrigin = '0 0';
+      card.style.transform = `translate(${Math.ceil(cardH * s)}px, 0) rotate(90deg) scale(${s})`;
+    } else {
+      wrap.style.width = Math.min(cardW, avail) + 'px';
+      if (cardW <= avail) {
+        wrap.style.height = cardH + 'px';
+      } else {
+        const s = avail / cardW;
+        card.style.transformOrigin = '0 0';
+        card.style.transform = `scale(${s})`;
+        wrap.style.height = Math.ceil(cardH * s) + 'px';
+      }
+    }
+  });
+}
 
 function prodScanModeLabel(mode) {
-  return mode === 'barcode' ? 'Codigo de barras'
-       : mode === 'qr' ? 'QR Code'
+  return mode === 'barcode' ? 'Só barras'
+       : mode === 'qr' ? 'Só QR'
+       : mode === 'none' ? 'Sem código'
        : 'QR + barras';
 }
 
 function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   if (!etiquetas || !etiquetas.length) return;
-  currentEtiquetas = etiquetas;
+  currentEtiquetas = etiquetas.map(e => Object.assign({}, e));
   currentEtiquetasKind = kind || 'producao';
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { currentEtqOrient = getEtqOrient(); } catch(e) {}
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
-  const modeChip = document.getElementById('etqModeChip');
-  if (modeChip) {
-    modeChip.textContent = prodScanModeLabel(getProdScanMode());
-  }
 
-  // Banner verde de confirmação. Garante que o operador veja "cadastrado"
-  // antes do passo de imprimir, mesmo que feche o modal sem imprimir.
+  // Sync config chips
+  const curMode = getProdScanMode();
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => {
+    const lbl = b.textContent.trim();
+    b.classList.toggle('active', lbl === prodScanModeLabel(curMode));
+  });
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (currentEtqOrient === 'horizontal' ? 'Horizontal' : 'Vertical'));
+  });
+
   const banner = document.getElementById('etqSuccessBanner');
   if (successMsg) {
     document.getElementById('etqSuccessText').textContent = successMsg;
@@ -16512,18 +18077,13 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
     banner.style.display = 'none';
   }
 
-  const body = document.getElementById('etqBody');
-  if (kind === 'order') {
-    // 1 etiqueta de pedido — mesmo container, mas usa orderLabelHtml.
-    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${orderLabelHtml(et.order)}</div>`).join('');
-  } else {
-    body.innerHTML = etiquetas.map(et => `<div class="etq-card">${etiquetaProducaoHtml(et)}</div>`).join('');
-  }
+  refreshEtqPreview();
   document.getElementById('etiquetasPreview').classList.add('show');
 }
 
 function closeEtiquetasPreview() {
   document.getElementById('etiquetasPreview').classList.remove('show');
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
   if (currentEtiquetasKind === 'producao') go('home');
   currentEtiquetas = [];
@@ -16711,16 +18271,23 @@ async function etqAction(action) {
       }
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
-        printViaBluetooth(escPosOrderLabel(et.order), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        const printNota = getEtqNota() || null;
+        printViaBluetooth(escPosOrderLabel(et.order, printNota), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
+        const prodNota = getEtqNota() || null;
         let totalLen = 0;
         const parts = currentEtiquetas.map(et => {
-          const b = escPosLabelProducao(et);
-          totalLen += b.length;
-          return b;
+          if (prodNota) et._nota = prodNota;
+          try {
+            const b = escPosLabelProducao(et);
+            totalLen += b.length;
+            return b;
+          } finally {
+            delete et._nota;
+          }
         });
         const totalBytes = new Uint8Array(totalLen);
         let off = 0;
@@ -16729,20 +18296,20 @@ async function etqAction(action) {
       }
       return;
     }
-    if (action === 'save') {
-      showToast('Gerando imagem…');
-      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
+    if (action === 'save' || action === 'share') {
+      const note = getEtqNota();
+      const label = action === 'save' ? 'Gerando imagem…' : 'Preparando…';
+      showToast(label);
+      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind, note || null);
       if (!blob) { showToast('Falha ao gerar imagem'); return; }
       const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      await saveImageToDevice(blob, filename);
-      return;
-    }
-    if (action === 'share') {
-      showToast('Preparando…');
-      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind);
-      if (!blob) { showToast('Falha ao gerar imagem'); return; }
-      const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
-      await shareImageNative(blob, filename);
+      if (action === 'save') {
+        await saveImageToDevice(blob, filename);
+      } else {
+        await shareImageNative(blob, filename);
+      }
+      // Limpa o campo de observação após uso
+      try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
       return;
     }
   } catch (e) {
@@ -16759,7 +18326,7 @@ function printEtiqueta(orderId) {
   showEtiquetasPreview([{ order: o }], 'order', `Pedido ${(o.id||'').slice(-8)}`);
 }
 
-function orderLabelHtml(o) {
+function orderLabelHtml(o, horizontal, nota) {
   const items = (o.items || []).map(it =>
     `<div class="pa-item">
       <span class="pi-qty">${it.qty}×</span>
@@ -16776,18 +18343,31 @@ function orderLabelHtml(o) {
   const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
   const orderRef = (o.id || '').slice(-8);
   const { showQr, showBars } = scanModeFlags();
-  return `
-    <div class="pa-receipt">
-    ${storeLogoHtml()}
+  const hasCodes = showQr || showBars;
+
+  const brandBlock = `
+    <div class="et-brand" style="justify-content:center">
+      <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+      <span class="et-brand-name">Easy<b>Stok</b></span>
+    </div>
     <div class="pa-kicker">Recibo de pedido</div>
     <div class="pa-title">${escapeHtml(empresa)}</div>
     <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
     <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
+    ${o.scheduledDeliveryAt ? `<div class="pa-meta pa-meta-scheduled" style="font-weight:800">📅 Entregar em: ${new Date(o.scheduledDeliveryAt).toLocaleString('pt-BR')}</div>` : ''}`;
+
+  const clientBlock = `
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
       <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
       ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
-    </div>
+    </div>`;
+
+  const notaRapidaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
+
+  const itemsBlock = `
     <div class="pa-block">
       <div class="pa-label">Itens</div>
       ${items}
@@ -16796,18 +18376,46 @@ function orderLabelHtml(o) {
       <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
     </div>
     ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
+    ${notaRapidaBlock}`;
+
+  const conferBlock = `
     <div class="pa-confer">
-      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, 120)}</div>` : ''}
-      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, 268, 54)}</div>` : ''}
+      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, horizontal ? 96 : 120)}</div>` : ''}
+      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, horizontal ? 180 : 268, horizontal ? 42 : 54)}</div>` : ''}
       <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
-      <div class="pa-confer-hint">Confira no app pelo codigo${showQr ? ' ou QR' : ''}</div>
-    </div>
-    <div class="pa-grid">
+      <div class="pa-confer-hint">${hasCodes ? ('Confira no app pelo codigo' + (showQr ? ' ou QR' : '')) : 'Referencia do pedido'}</div>
+    </div>`;
+
+  const pixBlock = `
+    <div class="pa-grid pa-pix">
       <div class="pa-label">Pagamento PIX</div>
       <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
       <div>Titular: ${escapeHtml(getPixHolder())}</div>
       ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
-    </div>
+    </div>`;
+
+  if (horizontal) {
+    return `
+      <div class="pa-receipt pa-horiz">
+        <div class="pa-receipt-main">
+          ${brandBlock}
+          ${clientBlock}
+          ${itemsBlock}
+        </div>
+        <div class="pa-receipt-side">
+          ${conferBlock}
+          ${pixBlock}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="pa-receipt">
+      ${brandBlock}
+      ${clientBlock}
+      ${itemsBlock}
+      ${conferBlock}
+      ${pixBlock}
     </div>`;
 }
 
@@ -17663,6 +19271,24 @@ function saveOrder() {
     retroAtMs = t;
   }
 
+  // F5 — Agendamento: data/hora FUTURA. Pedido entra como 'aguardando' normal,
+  // mas com scheduledDeliveryAt preenchido — UI ordena/badge no card e KDS.
+  // Mutuamente exclusivo com retroativo (faz sentido um OU outro).
+  const scheduleFields = document.getElementById('scheduleFields');
+  const isScheduled = scheduleFields && scheduleFields.classList.contains('show');
+  let scheduledAtMs = null;
+  if (isScheduled && isRetro) {
+    showToast('Não dá pra agendar e cadastrar retroativo ao mesmo tempo'); return;
+  }
+  if (isScheduled) {
+    const dtRaw = (document.getElementById('scheduleDatetime')?.value || '').trim();
+    if (!dtRaw) { showToast('Data de entrega em branco'); return; }
+    const t = new Date(dtRaw).getTime();
+    if (!isFinite(t) || isNaN(t)) { showToast('Data de entrega inválida'); return; }
+    if (t <= Date.now()) { showToast('Data agendada precisa ser no futuro'); return; }
+    scheduledAtMs = t;
+  }
+
   const nowMs = Date.now();
   const order = {
     id: 'o-' + nowMs,
@@ -17677,6 +19303,7 @@ function saveOrder() {
     lastOperatorName: operatorName || null,
     history: [],
     factAt: retroAtMs || null,
+    scheduledDeliveryAt: scheduledAtMs || null,
     confirmedBy: retroAtMs ? (operatorName || null) : null,
     confirmedAt: retroAtMs ? nowMs : null
   };
@@ -17704,6 +19331,7 @@ function saveOrder() {
   });
 
   if (isRetro) resetRetroToggle();
+  if (isScheduled) resetAgendaToggle();
 
   currentOrderItems = [];
   document.getElementById('orderNotes').value = '';
@@ -18319,6 +19947,66 @@ function showToast(msg) {
 }
 
 // ============================================================
+// MODAL DE RELATORIO PULL INICIAL
+// ============================================================
+// Disparado por sync.js apos pareamento (pairAuto/pairWithCode) ter feito
+// pull inicial. Le contadores atuais do state, mostra modal com auto-dismiss
+// 3s. Botao "Detalhes" expande info de pareamento. Botao "OK" fecha imediato.
+let _iprDismissTimer = null;
+function iprShow() {
+  const el = document.getElementById('initialPullReport');
+  if (!el) return;
+  const state = (typeof window.cdbApp !== 'undefined' && window.cdbApp.getState)
+    ? window.cdbApp.getState() : {};
+  document.getElementById('iprProducts').textContent = (state.products || []).length;
+  document.getElementById('iprClients').textContent  = (state.clients || []).length;
+  document.getElementById('iprOrders').textContent   = (state.orders || []).length;
+  document.getElementById('iprBatches').textContent  = (state.batches || []).length;
+  document.getElementById('iprCash').textContent     = (state.cashEntries || []).length;
+  // Preenche detalhes (visiveis so apos click)
+  try {
+    const pairing = window.cdbSync && window.cdbSync.getPairing && window.cdbSync.getPairing();
+    if (pairing) {
+      document.getElementById('iprLoja').textContent = String(pairing.label || pairing.lojaId || '—').slice(0, 40);
+      document.getElementById('iprPairedAt').textContent = pairing.pairedAt
+        ? new Date(pairing.pairedAt).toLocaleString('pt-BR') : '—';
+    }
+    const cfg = window.CDB_CONFIG || {};
+    document.getElementById('iprEndpoint').textContent = cfg.apiBaseUrl || '(mesmo host)';
+  } catch (_) {}
+  el.hidden = false;
+  // Auto-dismiss em 3s
+  if (_iprDismissTimer) clearTimeout(_iprDismissTimer);
+  _iprDismissTimer = setTimeout(iprDismiss, 3000);
+}
+function iprDismiss() {
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const el = document.getElementById('initialPullReport');
+  if (el) el.hidden = true;
+  try { localStorage.removeItem('cdb-pull-report-pending'); } catch (_) {}
+}
+function iprToggleDetails() {
+  // Click em Detalhes cancela auto-dismiss e mostra info estendida
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const d = document.getElementById('iprDetails');
+  if (d) d.hidden = !d.hidden;
+}
+// Boot: se a flag estiver setada (pull causou reload), mostra o modal.
+// Espera 600ms pro cdbApp inicializar antes de ler state.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    if (localStorage.getItem('cdb-pull-report-pending') !== '1') return;
+    setTimeout(iprShow, 600);
+  } catch (_) {}
+});
+// Evento sincronizo do sync.js quando pull rodou sem causar reload
+// (nenhuma mutation nova) — UI ainda quer mostrar o modal.
+window.addEventListener('cdb-initial-pull-done', function () {
+  if (document.getElementById('initialPullReport') && document.getElementById('initialPullReport').hidden === false) return;
+  iprShow();
+});
+
+// ============================================================
 // MENSAGENS DE ERRO HUMANIZADAS
 // ============================================================
 // Felipe reportou que erros do app vinham crípticos ("Broken pipe",
@@ -18566,7 +20254,7 @@ try {
 
 // Exposição pro sync.js
 window.cdbApp = {
-  getState: () => ({ products, clients, orders, cashEntries, batches }),
+  getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
@@ -18593,7 +20281,10 @@ window.cdbApp = {
 </script>
 
 <script src="qrcode.min.js?v=20260429a"></script>
-<script src="sync.js?v=20260429a"></script>
+<script src="queue-store.js?v=20260514a"></script>
+<script src="photo-store.js?v=20260514b"></script>
+<script src="upload-photos.js?v=20260514b"></script>
+<script src="sync.js?v=20260514b"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
 // Sem isso, o plugin faz rollback automatico apos appReadyTimeout (30s).
@@ -18983,6 +20674,41 @@ function closeUpdateModal() {
 //     reg.update() — se ha SW novo, o updatefound listener abaixo manda
 //     SKIP_WAITING pra ele ativar imediatamente, e o controllerchange recarrega.
 // (c) Web Admin pode forcar isso via comando pwa_update (ver sync.js executor).
+// D2 (Robustez): detecta se a runtime atual nao suporta Service Worker
+// (Capacitor WebView Android antigo, WebView corporativa restrita, etc).
+// Marca flag pra Diagnostico exibir + telemetria; cache offline degrada
+// mas app segue funcionando online-only.
+if (!('serviceWorker' in navigator)) {
+  try { localStorage.setItem('cdb-degraded-mode', 'no-sw'); } catch (_) {}
+  try { console.warn('[degraded] runtime sem ServiceWorker — cache offline desabilitado'); } catch (_) {}
+} else {
+  try { localStorage.removeItem('cdb-degraded-mode'); } catch (_) {}
+}
+
+// F10-C-2/C-4: Banner persistente de quota + dead-letter
+window.addEventListener('cdb-storage-exhausted', function () {
+  try {
+    var el = document.getElementById('storageBanner');
+    if (el) { el.hidden = false; return; }
+    var banner = document.createElement('div');
+    banner.id = 'storageBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:12px 16px;font-size:14px;font-weight:600;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    banner.textContent = 'Armazenamento local cheio. Conecte a internet e sincronize para liberar espaco.';
+    document.body.appendChild(banner);
+  } catch (_) {}
+});
+window.addEventListener('cdb-deadletter-full', function () {
+  try {
+    var el = document.getElementById('deadletterBanner');
+    if (el) { el.hidden = false; return; }
+    var banner = document.createElement('div');
+    banner.id = 'deadletterBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:#f59e0b;color:#000;padding:12px 16px;font-size:14px;font-weight:600;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    banner.textContent = 'Fila de erros cheia (200). Exporte pelo Diagnostico antes de continuar.';
+    document.body.appendChild(banner);
+  } catch (_) {}
+});
+
 if ('serviceWorker' in navigator) {
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -19067,241 +20793,174 @@ document.addEventListener('DOMContentLoaded', function () {
   }, true);
 });
 
-// =========================
-// KDS — Kitchen Display System (alpha)
-// =========================
-// View paralela do operador da cozinha. Lê /api/kds/pedidos com X-Mobile-Api-Key
-// (mesmo pareamento da PWA balcão), escuta evento 'cdb-mutations-applied'
-// disparado pelo sync.js (via SSE existente) pra refazer fetch sem polling.
-// Polling de fallback de 20s caso SSE caia.
-// Wakelock pra prevenir sleep do tablet em parede.
-(function () {
-  const POLL_MS = 20000;
-  const LS_INCLUDE_PRONTOS = 'cdb-kds-include-prontos';
-
-  let kdsTimer = null;
-  let kdsTickTimer = null;
-  let kdsWakeLock = null;
-  let kdsPedidos = [];
-  let kdsIncludeProntos = false;
-  let kdsBumping = new Set();
-  let kdsActive = false;
-
-  function readPairing() {
-    try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); } catch (e) { return null; }
-  }
-  function kdsApiHeaders(extra) {
-    const p = readPairing();
-    const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
-    if (p && p.apiKey) h['X-Mobile-Api-Key'] = p.apiKey;
-    if (p && p.deviceId) h['X-Device-Id'] = p.deviceId;
-    return h;
-  }
-
-  async function kdsFetch() {
-    const statuses = kdsIncludeProntos ? 'aguardando,preparando,pronto' : 'aguardando,preparando';
-    try {
-      const resp = await fetch('/api/kds/pedidos?statuses=' + encodeURIComponent(statuses), {
-        headers: kdsApiHeaders(),
-      });
-      if (!resp.ok) {
-        kdsSetConn(false);
-        return;
-      }
-      kdsSetConn(true);
-      kdsPedidos = await resp.json() || [];
-      kdsRender();
-    } catch (e) {
-      kdsSetConn(false);
-    }
-  }
-
-  function kdsSetConn(online) {
-    const el = document.getElementById('kdsConn');
-    if (!el) return;
-    if (online) { el.classList.remove('offline'); el.textContent = 'Online'; }
-    else        { el.classList.add('offline');    el.textContent = 'Offline — vou tentar de novo'; }
-  }
-
-  function fmtAge(criadoMs) {
-    const diffSec = Math.max(0, Math.floor((Date.now() - criadoMs) / 1000));
-    const m = Math.floor(diffSec / 60);
-    const s = diffSec % 60;
-    if (m < 60) return m + ':' + String(s).padStart(2, '0');
-    const h = Math.floor(m / 60);
-    return h + 'h' + String(m % 60).padStart(2, '0');
-  }
-  function ageBucket(criadoMs) {
-    const min = (Date.now() - criadoMs) / 60000;
-    if (min < 5)  return '';
-    if (min < 10) return 'warn';
-    return 'alert';
-  }
-  function escapeHtmlKds(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[m]));
-  }
-
-  function kdsRender() {
-    const grid = document.getElementById('kdsGrid');
-    if (!grid) return;
-    if (!kdsPedidos.length) {
-      grid.innerHTML = '<div class="kds-empty">Sem pedidos no momento.</div>';
-      return;
-    }
-    // Ordena: prontos no fim; ativos por idade asc (mais antigo primeiro).
-    const ordered = kdsPedidos.slice().sort((a, b) => {
-      const ap = a.status === 'pronto' ? 1 : 0;
-      const bp = b.status === 'pronto' ? 1 : 0;
-      if (ap !== bp) return ap - bp;
-      return a.criadoEm - b.criadoEm;
-    });
-    grid.innerHTML = ordered.map(renderCard).join('');
-  }
-
-  function renderCard(p) {
-    const isReady = p.status === 'pronto';
-    const bucket = isReady ? 'ready' : ageBucket(p.criadoEm);
-    const cls = ['kds-card'];
-    if (bucket) cls.push(bucket);
-    const itensHtml = (p.itens || []).map(i =>
-      '<li class="kds-card-item">' +
-        (i.emoji ? '<span class="emoji">' + escapeHtmlKds(i.emoji) + '</span>' : '') +
-        '<span class="qty">' + (i.quantidade || 1) + '×</span>' +
-        '<span class="nome">' + escapeHtmlKds(i.nome) + (i.unidade ? ' <small style="opacity:.6">' + escapeHtmlKds(i.unidade) + '</small>' : '') + '</span>' +
-      '</li>'
-    ).join('');
-    const notes = p.notes ? '<div class="kds-card-notes">⚠️ ' + escapeHtmlKds(p.notes) + '</div>' : '';
-    const cliente = escapeHtmlKds(p.clienteNome || 'Pedido balcão');
-    const ref = p.clienteRef ? '<div class="kds-card-ref">' + escapeHtmlKds(p.clienteRef) + '</div>' : '';
-    const bumping = kdsBumping.has(p.id);
-
-    let acaoLabel, acaoCls = 'kds-pronto-btn', proximoStatus;
-    if (p.status === 'aguardando') { acaoLabel = '▶ Iniciar preparo';   proximoStatus = 'preparando'; }
-    else if (p.status === 'preparando') { acaoLabel = '✓ Pronto';        proximoStatus = 'pronto'; }
-    else                                { acaoLabel = 'Entregar';        proximoStatus = 'entregue'; acaoCls += ' entregar'; }
-
-    const dis = bumping ? 'disabled' : '';
-    return (
-      '<article class="' + cls.join(' ') + '" data-id="' + escapeHtmlKds(p.id) + '">' +
-        '<div class="kds-card-head">' +
-          '<div>' +
-            '<div class="kds-card-cliente">' + cliente +
-              '<span class="kds-status-pill ' + escapeHtmlKds(p.status) + '">' + escapeHtmlKds(p.status) + '</span>' +
-            '</div>' +
-            ref +
-          '</div>' +
-          '<div class="kds-card-timer" data-criado="' + p.criadoEm + '">' + fmtAge(p.criadoEm) + '</div>' +
-        '</div>' +
-        '<ul class="kds-card-itens">' + itensHtml + '</ul>' +
-        notes +
-        '<div class="kds-card-actions">' +
-          '<button class="' + acaoCls + '" ' + dis + ' onclick="bumpKdsPedido(\'' + escapeHtmlKds(p.id) + '\', \'' + proximoStatus + '\')">' +
-            (bumping ? 'Enviando...' : acaoLabel) +
-          '</button>' +
-        '</div>' +
-      '</article>'
-    );
-  }
-
-  function tickTimers() {
-    document.querySelectorAll('#kdsGrid .kds-card-timer').forEach(el => {
-      const ms = parseInt(el.dataset.criado, 10);
-      if (!ms) return;
-      el.textContent = fmtAge(ms);
-      const card = el.closest('.kds-card');
-      if (!card || card.classList.contains('ready')) return;
-      const want = ageBucket(ms);
-      card.classList.remove('warn', 'alert');
-      if (want) card.classList.add(want);
-    });
-  }
-
-  window.bumpKdsPedido = async function (id, novoStatus) {
-    if (kdsBumping.has(id)) return;
-    kdsBumping.add(id);
-    kdsRender();
-    try {
-      const resp = await fetch('/api/kds/pedidos/' + encodeURIComponent(id) + '/status', {
-        method: 'PATCH',
-        headers: kdsApiHeaders(),
-        body: JSON.stringify({ status: novoStatus }),
-      });
-      if (!resp.ok) {
-        kdsSetConn(false);
-        kdsBumping.delete(id);
-        kdsRender();
-        return;
-      }
-      const updated = await resp.json();
-      // Atualiza local; refetch garantirá consistência se broker já notificou.
-      const idx = kdsPedidos.findIndex(p => p.id === id);
-      if (idx >= 0) kdsPedidos[idx] = updated;
-      kdsBumping.delete(id);
-      kdsRender();
-    } catch (e) {
-      kdsBumping.delete(id);
-      kdsSetConn(false);
-      kdsRender();
-    }
-  };
-
-  window.toggleKdsProntos = function () {
-    kdsIncludeProntos = !kdsIncludeProntos;
-    try { localStorage.setItem(LS_INCLUDE_PRONTOS, kdsIncludeProntos ? '1' : '0'); } catch (_) {}
-    const btn = document.getElementById('kdsToggleProntos');
-    if (btn) {
-      btn.classList.toggle('on', kdsIncludeProntos);
-      btn.setAttribute('aria-pressed', String(kdsIncludeProntos));
-    }
-    kdsFetch();
-  };
-
-  function kdsHandleMutations() { if (kdsActive) kdsFetch(); }
-
-  async function kdsRequestWakeLock() {
-    try {
-      if ('wakeLock' in navigator && navigator.wakeLock.request) {
-        kdsWakeLock = await navigator.wakeLock.request('screen');
-      }
-    } catch (_) { /* ignore — alguns browsers/SO não suportam */ }
-  }
-  function kdsReleaseWakeLock() {
-    try { if (kdsWakeLock) kdsWakeLock.release(); } catch (_) {}
-    kdsWakeLock = null;
-  }
-
-  window.startKdsScreen = function () {
-    if (kdsActive) return;
-    kdsActive = true;
-    try { kdsIncludeProntos = localStorage.getItem(LS_INCLUDE_PRONTOS) === '1'; } catch (_) {}
-    const btn = document.getElementById('kdsToggleProntos');
-    if (btn) { btn.classList.toggle('on', kdsIncludeProntos); btn.setAttribute('aria-pressed', String(kdsIncludeProntos)); }
-    kdsFetch();
-    kdsTimer = setInterval(kdsFetch, POLL_MS);
-    kdsTickTimer = setInterval(tickTimers, 1000);
-    window.addEventListener('cdb-mutations-applied', kdsHandleMutations);
-    kdsRequestWakeLock();
-  };
-  window.stopKdsScreen = function () {
-    if (!kdsActive) return;
-    kdsActive = false;
-    if (kdsTimer)     { clearInterval(kdsTimer);     kdsTimer = null; }
-    if (kdsTickTimer) { clearInterval(kdsTickTimer); kdsTickTimer = null; }
-    window.removeEventListener('cdb-mutations-applied', kdsHandleMutations);
-    kdsReleaseWakeLock();
-  };
-
-  // Reentrega wakelock se vier de background (Android Chrome libera em hide).
-  document.addEventListener('visibilitychange', function () {
-    if (kdsActive && document.visibilityState === 'visible') {
-      kdsRequestWakeLock();
-      kdsFetch();
-    }
-  });
-})();
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Módulo de etiquetas — F4 (imprimir + modelos + ficha técnica)
+     ══════════════════════════════════════════════════════════════════════ -->
+<link rel="stylesheet" href="/etiqueta/etiqueta.css">
+
+<!-- Overlay: Imprimir etiquetas -->
+<div id="etq-imprimir-overlay" class="etq-overlay" role="dialog" aria-modal="true" style="display:none">
+  <div class="etq-sheet etq-sheet--tall">
+    <div class="etq-head">
+      <div>
+        <h3 class="etq-page-title" id="etq-imp-title">Imprimir etiquetas</h3>
+        <div class="etq-caption" id="etq-imp-subtitle"></div>
+      </div>
+      <button class="cobranca-close" onclick="etqImpFechar()" aria-label="Fechar">×</button>
+    </div>
+
+    <div style="padding:12px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px">
+      <!-- Seletor de modelo -->
+      <div>
+        <label class="etq-section-lbl">Modelo</label>
+        <div class="etq-caption" style="margin-bottom:6px">Use o padrão ou escolha outro.</div>
+        <select id="etq-imp-template-sel" class="etq-select" onchange="etqImpAtualizarPreview()" style="width:100%;padding:8px;border:1px solid var(--border-soft,#D8DCE3);border-radius:6px;font-size:13px"></select>
+        <div style="text-align:right;margin-top:4px">
+          <a href="#" onclick="etqAbrirModelos();return false" class="etq-caption" style="color:var(--navy-700,#1A2E5A)">Criar ou editar modelos →</a>
+        </div>
+      </div>
+
+      <!-- Range -->
+      <div>
+        <label class="etq-section-lbl">Etiquetas</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <input type="radio" name="etq-range" value="todas" checked onchange="etqImpRangeChange()"> Todas (<span id="etq-imp-count-todas">0</span>)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <input type="radio" name="etq-range" value="pendentes" onchange="etqImpRangeChange()"> Pendentes (<span id="etq-imp-count-pendentes">0</span>)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <input type="radio" name="etq-range" value="intervalo" onchange="etqImpRangeChange()">
+            Intervalo: do nº <input type="number" id="etq-imp-from" min="1" style="width:52px;padding:2px 4px" oninput="etqImpRangeChange()">
+            até <input type="number" id="etq-imp-to" min="1" style="width:52px;padding:2px 4px" oninput="etqImpRangeChange()">
+          </label>
+        </div>
+      </div>
+
+      <!-- Preview da 1ª etiqueta -->
+      <div id="etq-imp-preview-wrap">
+        <label class="etq-section-lbl">Prévia</label>
+        <div class="etq-caption" id="etq-imp-preview-chip" style="margin-bottom:8px"></div>
+        <div id="etq-imp-preview-area" class="etq-preview-wrap" style="min-height:120px;align-items:flex-start"></div>
+      </div>
+
+      <!-- Avisos -->
+      <div id="etq-imp-predeploy-banner" hidden style="background:var(--ink-100,#ECEFF5);border-left:3px solid var(--ink-400,#8E99A8);border-radius:0 4px 4px 0;padding:6px 10px;font-size:11px;color:var(--ink-600,#4D5665)">
+        Lote anterior ao novo sistema de modelos. Usando layout atual.
+      </div>
+      <div id="etq-imp-sem-ficha" style="display:none" class="etq-disclaimer">
+        <strong id="etq-imp-sem-ficha-count"></strong> sem ficha técnica. Campos nutricionais ficarão em branco.
+        <a href="#" id="etq-imp-sem-ficha-link" style="color:var(--navy-700,#1A2E5A)">Preencher agora ↗</a>
+      </div>
+    </div>
+
+    <!-- CTAs -->
+    <div style="padding:12px 16px;border-top:1px solid var(--border-soft,#D8DCE3);display:flex;flex-direction:column;gap:8px">
+      <div id="etq-imp-status-badges" style="display:flex;flex-wrap:wrap;gap:6px;min-height:20px"></div>
+      <div id="etq-imp-status-msg" role="status" aria-live="polite" style="font-size:12px;color:var(--ink-600,#4D5665);text-align:center;min-height:18px"></div>
+      <button class="etq-btn-primary" id="etq-imp-btn-imprimir" onclick="etqImpImprimir()">Imprimir agora</button>
+      <div style="display:flex;gap:8px">
+        <button class="etq-btn-secondary" onclick="etqImpBaixarPdf()" style="flex:1">Baixar PDF</button>
+        <button class="etq-btn-secondary" onclick="etqMarcarImpressas()" style="flex:1">Marcar como impressas</button>
+        <button class="etq-btn-secondary" onclick="etqReverterPendente()" style="flex:1;font-size:11px">Reverter para pendente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: Lista de modelos -->
+<div id="etq-tpl-preview" class="etq-tpl-preview-overlay" onclick="this.classList.remove('open')">
+  <div class="etq-tpl-preview-name" id="etq-tpl-preview-name"></div>
+  <div class="etq-tpl-preview-wrap" id="etq-tpl-preview-wrap" onclick="event.stopPropagation()"></div>
+  <button class="etq-tpl-preview-close" onclick="document.getElementById('etq-tpl-preview').classList.remove('open')">Fechar</button>
+</div>
+<div id="etq-modelos-overlay" class="etq-overlay" role="dialog" aria-modal="true" style="display:none">
+  <div class="etq-sheet etq-sheet--tall">
+    <div class="etq-head">
+      <div>
+        <h3 class="etq-page-title">Modelos de etiqueta</h3>
+        <div class="etq-caption">Layouts reutilizáveis para imprimir etiquetas de lotes.</div>
+      </div>
+      <button class="cobranca-close" onclick="etqModelosFechar()" aria-label="Fechar">×</button>
+    </div>
+    <div role="tablist" style="display:flex;border-bottom:1px solid var(--border-soft,#D8DCE3)">
+      <button id="etq-tab-sistema" role="tab" aria-selected="true" onclick="etqModelosAba('sistema')" style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--navy-700,#1A2E5A);font-weight:600;font-size:13px;cursor:pointer">Prontos do EasyStok</button>
+      <button id="etq-tab-empresa" role="tab" aria-selected="false" onclick="etqModelosAba('empresa')" style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid transparent;font-size:13px;cursor:pointer">Personalizados (<span id="etq-tab-empresa-count">0</span>)</button>
+    </div>
+    <div id="etq-modelos-lista" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border-soft,#D8DCE3)">
+      <button id="etq-modelos-criar-btn" class="etq-btn-primary" onclick="etqModelosCriar()" style="width:100%">+ Novo modelo personalizado</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal genérico de confirmação (modais pré-impressão) -->
+<div id="etq-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:12px 12px 0 0;padding:20px 16px;width:100%;max-width:480px">
+    <h4 id="etq-confirm-title" style="font-size:15px;font-weight:700;margin:0 0 8px"></h4>
+    <p id="etq-confirm-body" style="font-size:13px;color:#4D5665;margin:0 0 16px"></p>
+    <div id="etq-confirm-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<script type="module" src="/etiqueta/imprimir.js?v=2"></script>
+
+<!-- ── Editor visual de etiquetas (F5) ──────────────────────────────────── -->
+<link rel="stylesheet" href="/etiqueta/editor/editor.css">
+<div id="etq-editor-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Editor de modelo de etiqueta">
+  <!-- Toolbar -->
+  <div class="etq-ed-toolbar"></div>
+  <!-- Body -->
+  <div class="etq-ed-body">
+    <!-- Sidebar -->
+    <aside class="etq-ed-sidebar" aria-label="Elementos disponíveis"></aside>
+    <!-- Canvas area -->
+    <div class="etq-ed-canvas-area" role="main">
+      <div class="etq-ed-canvas-wrap">
+        <div class="etq-ed-canvas" tabindex="0" aria-label="Canvas de edição da etiqueta">
+          <!-- grid, safe-area, elements injected by JS -->
+        </div>
+        <div class="etq-ed-val-overlay" aria-live="polite" aria-label="Avisos de validação"></div>
+      </div>
+    </div>
+    <!-- Properties panel -->
+    <aside class="etq-ed-props" aria-label="Propriedades do elemento">
+      <div class="etq-ed-props-empty">Selecione um elemento no layout para editar.</div>
+    </aside>
+  </div>
+  <!-- First-run -->
+  <div class="etq-ed-firstrun" style="display:none" role="dialog" aria-modal="true">
+    <div class="etq-ed-firstrun-card">
+      <div class="etq-ed-firstrun-step"></div>
+      <div class="etq-ed-firstrun-title"></div>
+      <div class="etq-ed-firstrun-body"></div>
+      <div class="etq-ed-firstrun-dots"></div>
+      <div class="etq-ed-firstrun-actions">
+        <button class="etq-ed-firstrun-next">Próximo →</button>
+        <button class="etq-ed-firstrun-skip">Pular</button>
+      </div>
+    </div>
+  </div>
+  <!-- Confirm dialog -->
+  <div class="etq-ed-confirm" role="dialog" aria-modal="true">
+    <div class="etq-ed-confirm-card">
+      <div class="etq-ed-confirm-title"></div>
+      <div class="etq-ed-confirm-body"></div>
+      <div class="etq-ed-confirm-btns"></div>
+    </div>
+  </div>
+</div>
+<!-- Autocomplete dropdown (outside overlay so z-index works) -->
+<div id="etq-ed-autocomplete" class="etq-ed-autocomplete" style="display:none" role="listbox" aria-label="Sugestões de variáveis"></div>
+<!-- Live region for a11y -->
+<div id="etq-ed-live" aria-live="polite" role="status"></div>
+
+<script type="module">
+import { initEditor } from '/etiqueta/editor/editor.js';
+initEditor();
+</script>
 </body>
 </html>
