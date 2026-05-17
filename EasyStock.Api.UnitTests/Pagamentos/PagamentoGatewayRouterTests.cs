@@ -21,12 +21,28 @@ public class PagamentoGatewayRouterTests
         return g;
     }
 
+    private static IGatewayRoutingRuleRepository NoOpRules()
+    {
+        var r = Substitute.For<IGatewayRoutingRuleRepository>();
+        r.ObterRegrasAplicaveisAsync(Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<EasyStock.Domain.Entities.Pagamentos.GatewayRoutingRule>());
+        return r;
+    }
+
+    private static IGatewayHealthStore NoOpHealth()
+    {
+        var h = Substitute.For<IGatewayHealthStore>();
+        h.PodeUsar(Arg.Any<string>()).Returns(true);
+        return h;
+    }
+
     [Fact]
     public void Resolver_RetornaPrimeiroQueSuportaMetodo()
     {
         var pix = StubGateway("EfiPix", "pix");
         var manual = StubGateway("Manual", "manual", "dinheiro");
-        var router = new PagamentoGatewayRouter(new[] { pix, manual });
+        var router = new PagamentoGatewayRouter(new[] { pix, manual }, NoOpRules(), NoOpHealth());
 
         router.Resolver(Guid.NewGuid(), "pix").Should().BeSameAs(pix);
         router.Resolver(Guid.NewGuid(), "dinheiro").Should().BeSameAs(manual);
@@ -37,7 +53,7 @@ public class PagamentoGatewayRouterTests
     public void Resolver_RetornaNullQuandoNenhumGatewaySuporta()
     {
         var pix = StubGateway("EfiPix", "pix");
-        var router = new PagamentoGatewayRouter(new[] { pix });
+        var router = new PagamentoGatewayRouter(new[] { pix }, NoOpRules(), NoOpHealth());
 
         router.Resolver(Guid.NewGuid(), "cripto").Should().BeNull();
         router.Resolver(Guid.NewGuid(), "").Should().BeNull();
@@ -47,7 +63,7 @@ public class PagamentoGatewayRouterTests
     [Fact]
     public void Resolver_SemGateways_RetornaNull()
     {
-        var router = new PagamentoGatewayRouter(Array.Empty<IPagamentoGateway>());
+        var router = new PagamentoGatewayRouter(Array.Empty<IPagamentoGateway>(), NoOpRules(), NoOpHealth());
         router.Resolver(Guid.NewGuid(), "pix").Should().BeNull();
     }
 
@@ -56,7 +72,7 @@ public class PagamentoGatewayRouterTests
     {
         var pix = StubGateway("EfiPix", "pix");
         var manual = StubGateway("Manual", "manual");
-        var router = new PagamentoGatewayRouter(new[] { pix, manual });
+        var router = new PagamentoGatewayRouter(new[] { pix, manual }, NoOpRules(), NoOpHealth());
 
         router.ResolverPorProvedor("EfiPix").Should().BeSameAs(pix);
         router.ResolverPorProvedor("efipix").Should().BeSameAs(pix);
@@ -67,7 +83,7 @@ public class PagamentoGatewayRouterTests
     public void ResolverPorProvedor_RetornaNullQuandoNaoExiste()
     {
         var pix = StubGateway("EfiPix", "pix");
-        var router = new PagamentoGatewayRouter(new[] { pix });
+        var router = new PagamentoGatewayRouter(new[] { pix }, NoOpRules(), NoOpHealth());
 
         router.ResolverPorProvedor("Stripe").Should().BeNull();
         router.ResolverPorProvedor("").Should().BeNull();

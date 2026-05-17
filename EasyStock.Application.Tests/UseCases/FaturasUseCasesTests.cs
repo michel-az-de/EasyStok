@@ -204,7 +204,7 @@ public class FaturasUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var fatura = NovaFaturaEmitida(empresaId, total: 100m);
-        fatura.RegistrarPagamento(FaturaPagamento.CriarConfirmado(fatura.Id, "pix", 100m, "EfiPix"));
+        fatura.RegistrarPagamento(FaturaPagamento.CriarConfirmado(fatura.Id, "pix", 100m, "EfiPix", empresaId));
         _repo.GetByIdAsync(empresaId, fatura.Id, Arg.Any<CancellationToken>()).Returns(fatura);
 
         var uc = new CancelarFaturaUseCase(_repo, _uow, Substitute.For<ILogger<CancelarFaturaUseCase>>());

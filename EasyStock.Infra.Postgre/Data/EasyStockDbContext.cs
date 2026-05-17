@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
@@ -212,6 +213,12 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaEvento> FaturaEventos { get; set; } = null!;
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
+
+        // Payment Orchestration (Onda P0)
+        public DbSet<PaymentAttempt> PaymentAttempts { get; set; } = null!;
+        public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
+        public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
+        public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;
 
         // Modulo Financeiro AR/AP — lancamentos previstos/realizados do tenant
         public DbSet<Lancamento> Lancamentos { get; set; } = null!;
@@ -430,13 +437,15 @@ namespace EasyStock.Infra.Postgre.Data
             if (clrType == typeof(ReportRun)) return true;
 
             // Admin tooling — auditoria/feature flags cross-tenant.
+            // GatewayRoutingRule: EmpresaId nullable (NULL = regra global) e o repository
+            // filtra manualmente "EmpresaId == tenant OR EmpresaId IS NULL". Filtro
+            // automatico por igualdade eliminaria as regras globais.
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
             // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
-            // fallback; sem necessidade de filter — em background sem JWT o filter
-            // global zeraria a leitura no fallback nao-PG e o numerador retornaria
-            // contador zerado, gerando reset silencioso de numeracao por race.
+            // fallback; sem necessidade de filter.
             return clrType == typeof(AdminImpersonationLog)
                 || clrType == typeof(TenantFeatureFlag)
+                || clrType == typeof(GatewayRoutingRule)
                 || clrType == typeof(FaturaContador);
         }
     }

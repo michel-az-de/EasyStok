@@ -99,6 +99,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
+
+            // Onda P0 Payment Orchestration
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IPaymentAttemptRepository,
+                Repositories.Pagamentos.PaymentAttemptRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
+                Repositories.Pagamentos.GatewayRoutingRuleRepository>();
+
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
             services.AddScoped<IFaqRepository, FaqRepository>();
