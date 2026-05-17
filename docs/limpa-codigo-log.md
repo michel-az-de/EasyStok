@@ -197,6 +197,34 @@ Tarefa agendada `revisao-diaria-de-codigo` rodando em worktree `dev/festive-clar
 
 ---
 
+## 2026-05-08 — Cleanup Ports/Output (Application) + Adapters internacionais (Infra.Async)
+
+### Achados (revisao diaria automatica)
+
+Sem commits nas ultimas 30min. Vistoria nos arquivos adjacentes ao trabalho F10-F14 (commits fb4f08e + 4f9c259) revelou padroes residuais:
+
+| Arquivo | Fix |
+|---|---|
+| `IFaturaNumeradorService.cs` | usings BCL redundantes removidos (System, System.Threading, System.Threading.Tasks) |
+| `IUnitOfWork.cs` | using System.Threading.Tasks removido + namespace file-scoped |
+| `IDbTransactionScope.cs` | usings BCL redundantes removidos + namespace file-scoped |
+| `IGeradorDescricaoAnuncio.cs` | using System.Threading.Tasks removido + namespace file-scoped |
+| `IAsyncInfrastructure.cs` | using System.Text.Json nao utilizado removido |
+| `StripeGatewayAdapter.cs` | adiciona using System.Text.Json + remove fully-qualified JsonSerializer |
+| `MercadoPagoGatewayAdapter.cs` | mesma padronizacao System.Text.Json |
+
+### Validacao
+
+- `dotnet build EasyStok.sln` — 0 erros, 0 warnings.
+- Mesmo padrao do cleanup recente (consistencia com fb4f08e que fez isso em MercadoPagoSignatureValidator).
+
+### Padroes nao tocados (intencionais)
+
+- `EfiPixWebhookProcessor.cs` linha 174 (`assinatura.DataFim = baseDate.AddDays(30)`) hardcoda 30 dias — design decision para Pix mensal; refator para usar Plano.CicloMeses fica fora do escopo de cleanup, vai pro tech-debt.
+- `AutoTicketFalhaPagamento.cs` parametro `empresaId` so usado em log fallback — assinatura do port precisa do parametro mesmo quando faturaId nao resolve; nao e dead code.
+- `ConsoleEmailService` em `ServiceCollectionExtensions.cs` (Infra.Async, fora do namespace de DI) — fallback dev intencional, nao remover.
+---
+
 ## 2026-05-07 (segunda rodada) — Admin + Web redesign/landing (Program.cs, Faturas, Tickets, DiagnosticoController)
 
 ### Contexto da rodada

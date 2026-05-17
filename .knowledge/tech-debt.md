@@ -56,6 +56,10 @@
 13. Sem health-check estruturado completo (`/health/live`, `/health/ready`) — middleware existe parcial.
 14. Status de pedido como `string` — adicionar enum-string converter pra evitar typos em transição.
 15. Logs sem `correlationId` propagado consistentemente em todas requests.
+16. **`EfiPixWebhookProcessor` renova vigência hard-coded em 30 dias**
+    - `assinatura.DataFim = baseDate.AddDays(30)` ignora `Plano.CicloMeses` (anual/semestral renovam errado).
+    - Fix: usar `Plano.CicloMeses ?? 1` × 30, ou método de domínio `assinatura.RenovarVigencia(plano.CicloMeses)`.
+    - Hoje só impacta planos não-mensais — billing atual é Pix mensal, então não é crítico ainda.
 
 ---
 
