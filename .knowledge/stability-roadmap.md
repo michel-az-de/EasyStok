@@ -11,10 +11,15 @@
 ## Bloco 1 — Confiabilidade (P0)
 
 - [ ] **Deploy estável GCP**: Cloud Run + Cloud SQL com 1 prod + 1 staging. Dockerfiles prontos (`Dockerfile.cloudrun.{api,web,admin}`). Aguarda Project ID. Ver `.knowledge/gcp-deploy.md`.
-- [ ] **Backup Postgres + restore testado**: Cloud SQL faz daily, mas restore precisa ser exercitado. Documentar passo-a-passo no runbook.
-- [ ] **CI rodando 474 testes em cada PR**: GitHub Actions com `dotnet build` + `dotnet test` + lint. Bloquear merge se vermelho.
-- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. (Parcial: 2026-05-07 — `/health/api` (PG+Redis+Config) e `/health/dispatcher` (heartbeat dos 3 loops Hosted) separados pra evitar cascata API↔Outbox quando `Notifications:Hosting:Mode=Hosted`. Falta plugar no Cloud Run/App Service e cobrir Worker via Kestrel mínimo.)
+- [~] **Backup Postgres + restore testado** — 2026-05-07 (Onda 1 R6). Runbook manual escrito (`docs/runbook/pg-restore-pitr.md`). **Pendente**: exercicio mensal de restore + backup pre-deploy automatizado via CI (Onda 2, depende de Service Principal Azure).
+- [~] **CI rodando testes em cada PR** — 2026-05-07 (Onda 1 R6). `.github/workflows/ci.yml` criado com unit tests + SeedFlow integration tests. **Pendente**: estender pra rodar todos os 474 testes + branch protection no master exigindo `seed-flow-integration-tests`.
+- [x] **R6 — Seed fragil mitigado (Onda 1)** — 2026-05-07. Pipeline fail-loud, advisory lock no startup, double opt-in `/seed/*` em prod, fail-fast `SuperAdminSeed`, skip `SeedData` fora de Development, testes integracao DB-do-zero + idempotencia 3x. Ver `recent-evolution.md` snapshot 2026-05-07.
+- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. (Parcial: 2026-05-07 — `/health/api` (PG+Redis+Config) e `/health/dispatcher` (heartbeat dos 3 loops Hosted) separados pra evitar cascata API↔Outbox quando `Notifications:Hosting:Mode=Hosted`. Falta plugar no Cloud Run/App Service e cobrir Worker via Kestrel mínimo.) Pipeline Azure ja usa `/health/ready` com retry (R6 Onda 1).
 - [ ] **Compras → estoque ponta-a-ponta testado**: `PedidoFornecedorItem` foi criada (commit recente) mas fluxo de recebimento → entrada de movimentação **sem teste de integração**.
+
+### R6 Onda 2 e 3 (proximos)
+- [ ] **R6 Onda 2 (P1)**: migration formal `IsSeedData` (remove `[NotMapped]`), dupla checagem em `UpsertEmpresaAsync` (CNPJ colision proof), dry-run mode, backup pre-deploy automatizado, alertas em prod quando seed roda.
+- [ ] **R6 Onda 3 (P2)**: `SeedFingerprint` table, endpoint rollback `/seed/rollback/{runId}`, cleanup script CLI, sentinela `Empresa.Source` enum.
 
 ## Bloco 2 — Observabilidade (P0/P1)
 
@@ -56,14 +61,14 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 
 ## Bloco 6 — Operacional (P2)
 
-- [ ] **Runbook básico** (`docs/runbook.md`):
-  - Restaurar backup PG
-  - Suspender tenant
-  - Reprocessar webhook Pix perdido
-  - Rollback Cloud Run revision
-  - Rotacionar secret
+- [~] **Runbook básico** (`docs/runbook/`):
+  - [x] Restaurar backup PG (`docs/runbook/pg-restore-pitr.md` — Onda 1 R6)
+  - [ ] Suspender tenant
+  - [ ] Reprocessar webhook Pix perdido
+  - [ ] Rollback Azure App Service deployment slot
+  - [ ] Rotacionar secret
 - [ ] **Migrations idempotentes auditadas** (lição do `AddAdminModule` duplicando tabela).
-- [ ] **Seed de demo** confiável pra onboarding e screenshot.
+- [x] **Seed de demo** confiável pra onboarding e screenshot — 2026-05-07 (Onda 1 R6). Bloqueado em prod sem double opt-in, idempotencia testada 3x consecutivas em CI.
 - [ ] **PWA versioning + cache busting**: hoje `sw.js` controla, update fica preso pra usuários (Casa da Babá já viu). Estratégia formal de update.
 
 ---
