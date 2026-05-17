@@ -1,0 +1,330 @@
+/* EasyStok Admin — Modulo de Notificacoes
+   Estilos especificos do hub de notificacoes (Templates, Rotinas, Canais, Envios,
+   Broadcast, Consentimentos). Carregado APOS admin.css em _Layout.cshtml.
+*/
+
+/* ── 1. Aliases de compatibilidade ─────────────────────────────── */
+
+.input-dark {
+    width: 100%;
+    background: var(--es-bg);
+    border: 1px solid var(--es-border-strong);
+    border-radius: var(--es-radius-sm);
+    color: var(--es-ink);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--es-transition), box-shadow var(--es-transition);
+}
+.input-dark::placeholder { color: var(--es-ink-mute); }
+.input-dark:focus {
+    border-color: var(--es-accent);
+    box-shadow: 0 0 0 3px var(--es-accent-soft);
+}
+select.input-dark {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238793a7' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.25rem;
+}
+
+.label-dark {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--es-ink-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.375rem;
+}
+
+.badge-green,
+.badge-yellow,
+.badge-red,
+.badge-gray,
+.badge-blue {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--es-radius-pill);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid;
+    white-space: nowrap;
+}
+.badge-green  { background: var(--es-basil-soft);          color: var(--es-basil);   border-color: rgba(79,191,159,.30); }
+.badge-yellow { background: var(--es-gold-soft);           color: var(--es-gold);    border-color: rgba(240,184,74,.30); }
+.badge-red    { background: rgba(239, 68, 68, .12);        color: #f87171;           border-color: rgba(239, 68, 68, .25); }
+.badge-gray   { background: rgba(135,147,167,.10);         color: var(--es-ink-mute);border-color: rgba(135,147,167,.22); }
+.badge-blue   { background: rgba(56, 130, 244, .12);       color: #7aa6f4;           border-color: rgba(56, 130, 244, .25); }
+
+/* ── 2. Subnav do hub ─────────────────────────────────────────── */
+
+.notif-subnav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--es-border);
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+}
+.notif-subnav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    color: var(--es-ink-mute);
+    border-bottom: 2px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--es-transition), border-color var(--es-transition), background var(--es-transition);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.notif-subnav-item:hover {
+    color: var(--es-ink);
+    background: rgba(247,242,232,0.04);
+}
+.notif-subnav-item.active {
+    color: var(--es-accent);
+    border-bottom-color: var(--es-accent);
+}
+
+/* ── 3. Editor de Template ─────────────────────────────────────── */
+
+.tpl-editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.5rem;
+}
+@media (max-width: 1180px) {
+    .tpl-editor-grid { grid-template-columns: 1fr; }
+}
+
+.var-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.6rem;
+    background: var(--es-surface-2);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius-pill);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--es-accent);
+    cursor: pointer;
+    transition: all var(--es-transition);
+    user-select: none;
+}
+.var-chip:hover {
+    background: var(--es-accent-soft);
+    border-color: var(--es-accent);
+    color: var(--es-accent);
+    transform: translateY(-1px);
+}
+
+.snippet-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--es-surface-2);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius-sm);
+    color: var(--es-ink);
+    font-size: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--es-transition);
+    width: 100%;
+}
+.snippet-btn:hover {
+    border-color: var(--es-accent);
+    background: rgba(232, 88, 20, .08);
+}
+.snippet-btn .snip-name {
+    font-weight: 600;
+    color: var(--es-ink);
+}
+.snippet-btn .snip-desc {
+    font-size: 0.65rem;
+    color: var(--es-ink-mute);
+}
+
+.preview-frame-wrap {
+    background: #f3f4f6;
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius-md);
+    padding: 0.75rem;
+    display: flex;
+    justify-content: center;
+}
+.preview-frame {
+    width: 100%;
+    height: 28rem;
+    background: white;
+    border-radius: var(--es-radius-sm);
+    border: 0;
+    transition: width var(--es-transition), max-width var(--es-transition);
+}
+.preview-frame.is-mobile {
+    width: 375px;
+    max-width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.preview-toggle {
+    display: inline-flex;
+    background: var(--es-surface-2);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius-sm);
+    overflow: hidden;
+}
+.preview-toggle button,
+.preview-toggle a {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--es-ink-mute);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: all var(--es-transition);
+    text-decoration: none;
+}
+.preview-toggle button.active,
+.preview-toggle a.active {
+    background: var(--es-accent);
+    color: white;
+}
+.preview-toggle button:not(.active):hover,
+.preview-toggle a:not(.active):hover {
+    color: var(--es-ink);
+    background: rgba(247,242,232,0.05);
+}
+
+.var-unknown-warning {
+    background: rgba(240, 184, 74, .10);
+    border: 1px solid rgba(240, 184, 74, .35);
+    color: var(--es-gold);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--es-radius-sm);
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+.var-unknown-warning code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: rgba(240, 184, 74, .15);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    margin: 0 0.15rem;
+}
+
+/* ── 4. Listagem de Templates ─────────────────────────────────── */
+
+.tpl-categoria-titulo {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--es-ink);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.tpl-categoria-titulo .badge-categoria {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--es-radius-pill);
+    background: var(--es-surface-2);
+    color: var(--es-ink-mute);
+}
+
+.tpl-evento-card {
+    background: var(--es-card);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius-md);
+    padding: 1rem;
+    transition: border-color var(--es-transition);
+}
+.tpl-evento-card:hover { border-color: var(--es-accent); }
+.tpl-evento-titulo {
+    font-weight: 600;
+    color: var(--es-ink);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+.tpl-evento-codigo {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--es-ink-mute);
+    margin-bottom: 0.75rem;
+}
+
+.canal-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+.canal-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.25rem;
+    border-radius: var(--es-radius-sm);
+    border: 1px solid var(--es-border);
+    background: var(--es-bg);
+    font-size: 0.65rem;
+    color: var(--es-ink-mute);
+    text-decoration: none;
+    transition: all var(--es-transition);
+}
+.canal-pill:hover {
+    border-color: var(--es-accent);
+    color: var(--es-ink);
+}
+.canal-pill.has-template {
+    border-color: rgba(79,191,159,.35);
+    background: var(--es-basil-soft);
+    color: var(--es-basil);
+}
+.canal-pill .canal-icon { font-size: 1rem; }
+.canal-pill .canal-status {
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.notif-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--es-bg);
+    border: 1px solid var(--es-border-strong);
+    border-radius: var(--es-radius-sm);
+    padding: 0.4rem 0.75rem;
+    flex: 1;
+    max-width: 320px;
+}
+.notif-search input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--es-ink);
+    font-size: 0.875rem;
+}
+.notif-search input::placeholder { color: var(--es-ink-mute); }
+.notif-search .icon { color: var(--es-ink-mute); }

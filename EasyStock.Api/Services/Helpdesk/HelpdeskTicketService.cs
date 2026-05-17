@@ -38,6 +38,15 @@ public class HelpdeskTicketService(
                 ?? throw new KeyNotFoundException("Fatura nao encontrada para esta empresa.");
         }
 
+        // Onda 1.1 — valida pedido pertence a empresa quando informado (espelha guard de Fatura).
+        Domain.Entities.Pedido? pedido = null;
+        if (cmd.PedidoId.HasValue && cmd.PedidoId.Value != Guid.Empty)
+        {
+            pedido = await db.Pedidos
+                .FirstOrDefaultAsync(p => p.Id == cmd.PedidoId.Value && p.EmpresaId == cmd.EmpresaId, ct)
+                ?? throw new KeyNotFoundException("Pedido nao encontrado para esta empresa.");
+        }
+
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
 
         // Em contexto de webhook (anonimo) currentUser.UsuarioId retorna Guid.Empty;
@@ -55,11 +64,12 @@ public class HelpdeskTicketService(
             prazoResolucao: sla.PrazoResolucao,
             criadoPorId: autorId);
         ticket.FaturaId = fatura?.Id;
+        ticket.PedidoId = pedido?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
             ticket.Id, autorId, TicketAcaoHistorico.Criado,
-            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
+            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id, pedidoId = pedido?.Id })));
 
         // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
         // primeiro ticket sobre ela (idempotente — se ja vinculada, mantem).
@@ -175,6 +185,24 @@ public class HelpdeskTicketService(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.StatusAlterado,
             valorAntes: statusAntes.ToString(),
             valorDepois: cmd.NovoStatus.ToString()));
+
+        // Onda 1.1 — trilha cruzada Pedido <-> Ticket. Quando ticket vinculado a
+        // pedido eh resolvido, registra PedidoEvento "ticket_resolvido". Apenas
+        // registro; nao altera estado do pedido (operador faz mutacao explicita
+        // se a resolucao envolver reembolso/cancelamento).
+        if (cmd.NovoStatus == TicketStatus.Resolvido && ticket.PedidoId.HasValue)
+        {
+            db.Set<Domain.Entities.PedidoEvento>().Add(new Domain.Entities.PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = ticket.PedidoId.Value,
+                Tipo = "ticket_resolvido",
+                Detalhes = JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
+                UsuarioId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                Origem = "api",
+                OcorridoEm = DateTime.UtcNow
+            });
+        }
 
         await db.CommitAsync();
 

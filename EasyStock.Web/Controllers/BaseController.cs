@@ -23,8 +23,26 @@ public abstract class BaseController(SessionService session) : Controller
     private static readonly HashSet<string> ControllersAllowedWithoutLoja = new(StringComparer.OrdinalIgnoreCase)
     {
         "Lojas",
-        "Assinatura"
+        "Assinatura",
+        // KDS filtra por empresaId (não lojaId) — funciona sem loja selecionada.
+        // Sem esta entrada, login com múltiplas lojas redireciona para SelecionarLoja
+        // antes que o usuário possa acessar a tela de cozinha.
+        "Kds"
     };
+
+    protected bool IsAdmin()
+    {
+        var role = session.GetUsuarioRole() ?? string.Empty;
+        return role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected bool IsGerente()
+    {
+        var role = session.GetUsuarioRole() ?? string.Empty;
+        return IsAdmin()
+            || role.Equals("Gerente", StringComparison.OrdinalIgnoreCase);
+    }
 
     protected void Toast(string type, string message, string? undoUrl = null) =>
         TempData["Toast"] = undoUrl is not null ? $"{type}|{message}|{undoUrl}" : $"{type}|{message}";
@@ -37,6 +55,21 @@ public abstract class BaseController(SessionService session) : Controller
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Igual a <see cref="HasError"/>, mas expõe code+HTTP+mensagem crua no toast.
+    /// Use em operações de escrita (POST/PATCH/DELETE) onde "redirect silencioso"
+    /// dá a impressão de "clicou e nada aconteceu". O end-user precisa saber se
+    /// foi 401 (sessão), 403 (empresa), 404 (recurso) ou 400 (validação).
+    /// </summary>
+    protected bool HasErrorVerbose<T>(ApiResult<T> result, string acao)
+    {
+        if (result.Success) return false;
+        var code = result.ErrorCode ?? "?";
+        var msg = result.ErrorMessage ?? "Erro ao processar requisição.";
+        Toast("error", $"{acao} falhou ({code} · HTTP {result.HttpStatus}): {msg}");
+        return true;
     }
 
     protected IActionResult? RedirectIfLimitReached<T>(ApiResult<T> result)

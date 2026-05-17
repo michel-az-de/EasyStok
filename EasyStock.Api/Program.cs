@@ -11,6 +11,8 @@ using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -23,10 +25,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 // Handler global para exceções não tratadas que derrubam o processo
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -73,12 +78,32 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
     {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         opts.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
+
+// Response compression — Brotli/Gzip para JSON e estaticos (PWA). Reduz bandwidth
+// significativamente em listagens grandes (catalogos, mobile sync). Render cobra
+// bandwidth acima do free tier; CPU overhead e' marginal.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
@@ -149,17 +174,23 @@ switch (resolvedProvider)
     case "postgresql":
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            .AddNotificationsHosting();
+        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapter Focus NFe + cert A1
+        builder.Services.AddEasyStockIntegrationResilience();
+        builder.Services.AddFocusNFeAdapter(builder.Configuration);
+        builder.Services.AddDataProtection();
         break;
 
     case "sqlite":
         builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready"
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            .AddNotificationsHosting();
         break;
 
     default:
@@ -168,6 +199,7 @@ switch (resolvedProvider)
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
+builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
@@ -188,6 +220,20 @@ builder.Services
     .AddPostgresOutboxSignaler(builder.Configuration);
 builder.Services.AddScoped<PostgresAdvisoryLock>();
 
+// Aviso explicito quando o pipeline de notificacoes vai rodar in-process: nao ha bulkhead
+// real entre HTTP da API e os 3 loops (compartilham ThreadPool, GC e memoria). Modo
+// suportado para Render free tier ou dev/teste; em producao prefira Worker como deploy
+// separado (Notifications:Hosting:Mode=Disabled aqui + Mode=Hosted no Worker).
+{
+    var notifMode = builder.Configuration["Notifications:Hosting:Mode"];
+    if (string.Equals(notifMode, "Hosted", StringComparison.OrdinalIgnoreCase))
+    {
+        Log.Warning(
+            "Notifications:Hosting:Mode=Hosted na API — pipeline rodando in-process. " +
+            "Sem isolamento de processo entre HTTP e loops; monitore /health/dispatcher.");
+    }
+}
+
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
 builder.Services.AddHttpClient(); // for DiagnosticoInfraController self-testing
@@ -197,6 +243,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
 // Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>();
+// F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
+// (tabelas com UsuarioId NOT NULL). Lookup-or-create idempotente por empresa.
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSystemUserResolver>();
 // Onda 5: SSE realtime entre devices da mesma loja.
 // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
 // Em multi-instance, evoluir pra Redis pubsub.
@@ -217,6 +266,17 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
+// X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
+app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
+    KnownNetworks = { },
+    KnownProxies = { }
+});
+
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 // Em produção com múltiplas réplicas, desabilitar via RunMigrationsOnStartup=false
 // e rodar migrations em init-container ou job separado antes do deploy.
@@ -232,6 +292,14 @@ app.Logger.LogInformation(
 
 if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
+    // R6: serializa migrations + seeds entre replicas via advisory lock pg_try_advisory_lock.
+    // Replica que adquirir o lock executa todo o bloco; outras logam skip e seguem boot.
+    // Health check /health/ready bloqueia trafego ate a primeira replica concluir.
+    using var lockScope = app.Services.CreateScope();
+    var advisoryLock = lockScope.ServiceProvider.GetRequiredService<PostgresAdvisoryLock>();
+
+    var acquired = await advisoryLock.TentarExecutarAsync(LockKeys.StartupMigrationsAndSeed, async lockToken =>
+    {
     var migrationsHouveErro = false;
     try
     {
@@ -359,31 +427,49 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
     // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
     // de empresa). Idempotente: no-op se ja existe.
+    // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
+    // por bug de config (env var ausente, senha fraca) e blocker — melhor falhar deploy
+    // do que subir API silenciosamente quebrada.
     try
     {
         using var superSeedScope = app.Services.CreateScope();
         var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         // RLS: SuperAdmin seed cria registros sem tenant fixo — bypass obrigatório.
         using var _ = superSeedDb.UseRowLevelSecurityBypass();
-        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger);
+        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
     }
-    catch (Exception ex)
+    catch (Exception ex) when (!app.Environment.IsProduction())
     {
-        app.Logger.LogError(ex, "Erro durante SuperAdminSeed. Painel admin pode ficar inacessivel.");
+        app.Logger.LogError(ex, "Erro durante SuperAdminSeed (nao-Production, continuando). Painel admin pode ficar inacessivel.");
     }
+    // Em Production: nao captura — exception sobe e derruba o startup com mensagem clara.
 
-    try
+    // R6: SeedData popula tenants demo (PastaBella, CasaDaBaba, etc.) — proibido em Production.
+    // Roda apenas se Development OU SEED_DEMO_DATA=true (opt-in explicito pra staging).
+    // SuperAdminSeed e NotificacoesGlobaisSeed seguem rodando (sao infra, nao demo).
+    var seedDemoEnabled = app.Environment.IsDevelopment()
+        || string.Equals(Environment.GetEnvironmentVariable("SEED_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
+    if (seedDemoEnabled)
     {
-        using var seedScope = app.Services.CreateScope();
-        // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
-        // do scope para que use cases internos enxerguem o universo todo.
-        var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        using var _ = seedDb.UseRowLevelSecurityBypass();
-        await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        try
+        {
+            using var seedScope = app.Services.CreateScope();
+            // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
+            // do scope para que use cases internos enxerguem o universo todo.
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var __ = seedDb.UseRowLevelSecurityBypass();
+            await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        }
     }
-    catch (Exception ex)
+    else
     {
-        app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        app.Logger.LogInformation(
+            "[SeedData] Skipped — env={Env}, SEED_DEMO_DATA nao e 'true'. Demo seed bloqueado fora de Development (R6).",
+            app.Environment.EnvironmentName);
     }
 
     try
@@ -408,6 +494,14 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+    }
+    }, CancellationToken.None);
+
+    if (!acquired)
+    {
+        app.Logger.LogInformation(
+            "[Startup] Outra replica detem advisory lock 0x{LockKey:X} — pulando migrations/seeds. Health check /health/ready confirmara consistencia.",
+            LockKeys.StartupMigrationsAndSeed);
     }
 }
 
@@ -482,6 +576,13 @@ Log.Information("""
     app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
+// ExceptionHandler deve ser o primeiro middleware para capturar exceções de qualquer
+// middleware abaixo, incluindo swagger, static files e autenticação.
+app.UseExceptionHandler();
+
+// ResponseCompression precisa rodar cedo, antes de StaticFiles e do request logging,
+// pra ter chance de capturar o output dos middlewares seguintes.
+app.UseResponseCompression();
 app.UseMiddleware<EasyStock.Api.Middleware.SecurityHeadersMiddleware>();
 
 // Correlation ID propagation
@@ -577,13 +678,19 @@ app.UseSerilogRequestLogging(options =>
         var originalBody = context.Response.Body;
         using var buffer = new System.IO.MemoryStream();
         context.Response.Body = buffer;
-        await next();
+        try
+        {
+            await next();
+        }
+        finally
+        {
+            context.Response.Body = originalBody;
+        }
         buffer.Position = 0;
         var body = buffer.ToArray();
         var contentType = context.Response.ContentType ?? "application/json";
         swaggerCache[path] = (body, contentType, DateTimeOffset.UtcNow);
         context.Response.Headers["X-Swagger-Cache"] = "MISS";
-        context.Response.Body = originalBody;
         await originalBody.WriteAsync(body);
     });
 }
@@ -642,7 +749,6 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
 // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
 EasyStock.Api.Mobile.MobileModule.UseMobilePwa(app);
 
-app.UseExceptionHandler(); // deve ser o primeiro para capturar exceções de qualquer middleware abaixo
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -656,7 +762,8 @@ EasyStock.Api.Middleware.IdempotencyMiddlewareExtensions.UseIdempotency(app, opt
     .Add("/api/vendas")
     .Add("/api/mobile/vendas")
     .Add("/api/movimentacoes")
-    .Add("/api/itensestoque/repor"));
+    .Add("/api/itensestoque/repor")
+    .Add("/api/mobile/calculadora/criar-compra"));
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
@@ -665,7 +772,9 @@ app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
 // /console e /api-docs apontam pro EasyStock Console (UI dark sci-fi alternativa ao /swagger).
 app.MapGet("/console", () => Results.Redirect("/api-docs/", permanent: false))
    .ExcludeFromDescription();
-app.MapGet("/api-docs", () => Results.Redirect("/api-docs/", permanent: false))
+app.MapGet("/api-docs", () => Results.Redirect("/api-docs/index.html", permanent: false))
+   .ExcludeFromDescription();
+app.MapGet("/api-docs/", () => Results.Redirect("/api-docs/index.html", permanent: false))
    .ExcludeFromDescription();
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
@@ -679,10 +788,49 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 
+// /health/api: dependencias HTTP da API (PG + Redis + config) — NAO inclui dispatcher.
+// Loop de notificacoes preso nao deve marcar a API inteira como down nos LBs.
+app.MapHealthChecks("/health/api", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("api"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+// /health/dispatcher: heartbeats dos 3 BackgroundServices do pipeline de notificacoes.
+// Healthy quando Mode=Disabled (pipeline em Worker separado). Unhealthy quando algum
+// loop nao bate dentro de 5x intervalo configurado — sinal de pendurada.
+app.MapHealthChecks("/health/dispatcher", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("dispatcher"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     ResponseWriter = WriteHealthCheckJsonResponse
 });
+
+// /health/version — endpoint do schema gate do PWA.
+// Retorna a versao do contrato Mobile e SHA do build para que o cliente
+// decida se pode aplicar update OTA (sync.js > maybeApplyPwaUpdate gate).
+// Mantido separado do /api/mobile/version (que carrega features e OTA info)
+// para que probes leves de health/version nao precisem subir a stack toda.
+app.MapGet("/health/version", () =>
+{
+    var asm = Assembly.GetExecutingAssembly();
+    var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+               ?? asm.GetName().Version?.ToString()
+               ?? "unknown";
+    return Results.Ok(new
+    {
+        apiVersion = info,
+        mobileSchemaVersion = 2,
+        buildSha = Environment.GetEnvironmentVariable("BUILD_SHA") ?? "master",
+        serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+    });
+})
+.AllowAnonymous()
+.ExcludeFromDescription();
 
 // Aviso de seguranca em Production: o default agora e RequireApiKey=true
 // (appsettings.Production.json). Se algum operador setou Mobile__RequireApiKey=false

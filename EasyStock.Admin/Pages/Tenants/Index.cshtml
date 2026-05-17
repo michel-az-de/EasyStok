@@ -38,7 +38,8 @@
 <div class="flex items-center gap-3 mb-6 flex-wrap">
     <form method="get" class="flex items-center gap-3 flex-1 flex-wrap">
         <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome ou CNPJ…  ( / )"
-               x-ref="busca" class="form-input max-w-xs" />
+               x-ref="busca" class="form-input max-w-xs"
+               @@input="clearTimeout($data._debounce); $data._debounce = setTimeout(() => $el.form.submit(), 300)" />
         <select name="status" class="form-input max-w-[180px]">
             <option value="">Todos os status</option>
             <option value="Ativa" selected="@(Model.Status == "Ativa")">Ativa</option>
@@ -52,7 +53,7 @@
         }
     </form>
     <div class="flex items-center gap-3">
-        <div class="text-es-ink-mute text-sm">@Model.Total resultado(s)</div>
+        <div class="text-es-ink-mute text-sm">@(Model.Total == 1 ? "1 resultado" : $"{Model.Total} resultados")</div>
         <button type="button" @@click="modalCadastro = true"
                 title="Atalho: N"
                 class="btn-primary">+ Cadastrar cliente</button>
@@ -69,9 +70,9 @@
         <table class="table-admin">
             <thead>
                 <tr>
-                    <th>Nome</th>
+                    <th class="min-w-[160px]">Nome</th>
                     <th>Documento</th>
-                    <th>Plano</th>
+                    <th class="whitespace-nowrap">Plano</th>
                     <th>Status</th>
                     <th>Usuários</th>
                     <th>Lojas</th>
@@ -98,9 +99,9 @@
                         _ => "badge-expirada"
                     };
                     <tr>
-                        <td class="font-medium text-es-ink">@nome</td>
+                        <td class="font-medium text-es-ink whitespace-nowrap">@nome</td>
                         <td class="text-es-ink-dim">@(doc ?? "—")</td>
-                        <td class="text-es-ink-dim">@(plano ?? "—")</td>
+                        <td class="text-es-ink-dim whitespace-nowrap overflow-hidden text-ellipsis max-w-[160px]" title="@(plano ?? "—")">@(plano ?? "—")</td>
                         <td><span class="status-badge @statusClass">@(status ?? "—")</span></td>
                         <td class="text-es-ink-dim text-center">@usuarios</td>
                         <td class="text-es-ink-dim text-center">@lojas</td>
@@ -110,6 +111,7 @@
                                 <a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream text-xs font-medium">Ver</a>
                                 @if (status == "Ativa")
                                 {
+                                    <span class="text-es-ink-mute/30 select-none">|</span>
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'suspender'"
                                             class="text-es-gold hover:text-es-cream text-xs font-medium">
@@ -118,12 +120,14 @@
                                 }
                                 else if (status == "Suspensa")
                                 {
+                                    <span class="text-es-ink-mute/30 select-none">|</span>
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'reativar'"
                                             class="text-es-basil hover:text-es-cream text-xs font-medium">
                                         Reativar
                                     </button>
                                 }
+                                <span class="text-es-ink-mute/30 select-none">|</span>
                                 <form method="post" asp-page-handler="Impersonar">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@id" />
@@ -180,7 +184,7 @@
                 <div class="flex gap-3 justify-end">
                     <button type="button" @@click="confirmId = null" class="btn-secondary">Cancelar</button>
                     <button type="submit"
-                            x-bind:class="confirmAcao === 'suspender' ? 'btn-danger' : 'btn-primary'">
+                            x-bind:class="confirmAcao === 'suspender' ? 'btn-warning' : 'btn-primary'">
                         <span x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
                     </button>
                 </div>

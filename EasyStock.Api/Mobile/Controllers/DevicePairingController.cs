@@ -31,10 +31,12 @@ namespace EasyStock.Api.Mobile.Controllers;
 public class DevicePairingController(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
+    IConfiguration appConfig,
     ILogger<DevicePairingController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
     private readonly ICurrentUserAccessor _currentUser = currentUser;
+    private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<DevicePairingController> _log = log;
 
     /// <summary>
@@ -208,6 +210,150 @@ public class DevicePairingController(
             Label: device.Label,
             DefaultOperatorName: device.DefaultOperatorName,
             PairedAt: device.PairedAt!.Value
+        ));
+    }
+
+    /// <summary>
+    /// Auto-provisionamento de device a partir de token compartilhado.
+    ///
+    /// Casa da Babá (e qualquer cliente cujo APK é gerado pré-configurado)
+    /// embute um secret de longa vida no APK + config das envs no server
+    /// apontando a empresa/loja default. O app pareia sozinho no primeiro
+    /// boot, sem operador digitar codigo de 6 digitos.
+    ///
+    /// Server precisa de 3 env vars (ou seção `AppProvisioning` em
+    /// appsettings):
+    ///   <c>AppProvisioning:Secret</c>     — token compartilhado (>= 16 chars)
+    ///   <c>AppProvisioning:EmpresaId</c>  — Guid da empresa default
+    ///   <c>AppProvisioning:LojaId</c>     — Guid da loja default
+    /// Se qualquer uma faltar, retorna 503. Comparação do secret é
+    /// time-constant. Rate limit `mobile-anonymous` cobre brute-force.
+    /// Idempotente: mesmo deviceId chamando 2x rotaciona apiKey sem duplicar.
+    /// </summary>
+    [HttpPost("pair-auto")]
+    [AllowAnonymous]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("mobile-anonymous")]
+    public async Task<ActionResult<PairResponse>> PairAuto(
+        [FromBody] PairAutoRequest req,
+        CancellationToken ct)
+    {
+        if (req == null) return BadRequest(new { error = "payload obrigatório" });
+        if (string.IsNullOrWhiteSpace(req.ProvisioningSecret))
+            return BadRequest(new { error = "provisioningSecret obrigatório" });
+        if (string.IsNullOrWhiteSpace(req.DeviceId))
+            return BadRequest(new { error = "deviceId obrigatório" });
+
+        var expectedSecret = _appConfig["AppProvisioning:Secret"];
+        var empresaIdStr   = _appConfig["AppProvisioning:EmpresaId"];
+        var lojaIdStr      = _appConfig["AppProvisioning:LojaId"];
+
+        if (string.IsNullOrWhiteSpace(expectedSecret)
+            || string.IsNullOrWhiteSpace(empresaIdStr)
+            || string.IsNullOrWhiteSpace(lojaIdStr))
+        {
+            _log.LogWarning("pair-auto chamado mas AppProvisioning não configurado no server");
+            return StatusCode(503, new { error = "auto-provisioning desabilitado neste servidor" });
+        }
+
+        if (!Guid.TryParse(empresaIdStr, out var empresaId) || !Guid.TryParse(lojaIdStr, out var lojaId))
+            return StatusCode(500, new { error = "AppProvisioning EmpresaId/LojaId mal configurados" });
+
+        // Time-constant comparison pra mitigar timing attack na descoberta do secret.
+        var providedBytes = System.Text.Encoding.UTF8.GetBytes(req.ProvisioningSecret.Trim());
+        var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expectedSecret.Trim());
+        if (providedBytes.Length != expectedBytes.Length
+            || !CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes))
+        {
+            _log.LogWarning("pair-auto recebido com secret inválido ip={IP}", HttpContext.Connection.RemoteIpAddress);
+            return Unauthorized(new { error = "provisioning token inválido" });
+        }
+
+        // Valida loja existe e pertence à empresa configurada.
+        // IgnoreQueryFilters: endpoint anônimo (sem JWT) então o Global Query Filter
+        // tenant veria CurrentTenantId=Guid.Empty e descartaria tudo. A validação
+        // cross-tenant aqui é segura porque (a) secret bate, (b) empresaId/lojaId
+        // vêm de env vars no server.
+        var loja = await _db.Set<Loja>().IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Id == lojaId && l.EmpresaId == empresaId, ct);
+        if (loja == null)
+        {
+            _log.LogWarning("pair-auto: loja {LojaId}/empresa {EmpresaId} configurada não existe", lojaId, empresaId);
+            return StatusCode(500, new { error = "loja default configurada não existe" });
+        }
+        if (!loja.Ativa)
+            return StatusCode(503, new { error = "loja default desativada" });
+
+        var deviceFromApp = req.DeviceId.Trim();
+        var apiKey = GenerateApiKey();
+        var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
+        var now = DateTime.UtcNow;
+        var labelFinal = !string.IsNullOrWhiteSpace(req.Label) ? req.Label! : "auto-provisioned";
+
+        // Idempotente: se mesmo deviceId já existe e não foi revogado, rotaciona apiKey
+        // (re-install do APK, troca de aparelho com mesmo install token, etc).
+        // IgnoreQueryFilters pelo mesmo motivo do SELECT da loja acima — sem JWT
+        // o filter tenant zera o resultado.
+        var existing = await _db.Set<MobileDevice>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(d => d.Id == deviceFromApp && !d.Revoked, ct);
+
+        if (existing != null)
+        {
+            existing.ApiKeyHash = apiKeyHash;
+            existing.EmpresaId = empresaId;
+            existing.LojaId = lojaId;
+            existing.PairingCode = null;
+            existing.PairingExpiresAt = null;
+            existing.PairedAt = now;
+            existing.LastSeenAt = now;
+            existing.LastSeenIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            existing.UpdatedAt = now;
+            if (!string.IsNullOrWhiteSpace(req.Label)) existing.Label = req.Label;
+            await _db.SaveChangesAsync(ct);
+
+            _log.LogInformation("Device re-auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId}",
+                existing.Id, empresaId, lojaId);
+
+            return Ok(new PairResponse(
+                DeviceId: existing.Id,
+                ApiKey: apiKey,
+                EmpresaId: existing.EmpresaId,
+                LojaId: existing.LojaId,
+                Label: existing.Label,
+                DefaultOperatorName: existing.DefaultOperatorName,
+                PairedAt: existing.PairedAt!.Value
+            ));
+        }
+
+        var device = new MobileDevice
+        {
+            Id = deviceFromApp,
+            ApiKeyHash = apiKeyHash,
+            EmpresaId = empresaId,
+            LojaId = lojaId,
+            PairedByUserId = null,
+            Label = labelFinal,
+            PairingCode = null,
+            PairingExpiresAt = null,
+            PairedAt = now,
+            LastSeenAt = now,
+            LastSeenIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _db.Set<MobileDevice>().Add(device);
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Device auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId} label={Label}",
+            device.Id, empresaId, lojaId, labelFinal);
+
+        return Ok(new PairResponse(
+            DeviceId: device.Id,
+            ApiKey: apiKey,
+            EmpresaId: empresaId,
+            LojaId: lojaId,
+            Label: device.Label,
+            DefaultOperatorName: null,
+            PairedAt: now
         ));
     }
 
@@ -489,6 +635,8 @@ public record CreatePairCodeRequest(
 public record PairCodeResponse(string PairingCode, DateTime ExpiresAt, string DeviceRecordId);
 
 public record PairRequest(string PairingCode, string DeviceId, string? Label);
+
+public record PairAutoRequest(string ProvisioningSecret, string DeviceId, string? Label);
 
 public record PairResponse(
     string DeviceId,

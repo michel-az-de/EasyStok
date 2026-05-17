@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,8 +42,6 @@ public sealed class FaturaReconciliacaoJob(
     IServiceProvider serviceProvider,
     ILogger<FaturaReconciliacaoJob> logger) : BackgroundService
 {
-    private const long LockKeyJob = 0x4661_7475_5265_636FL; // "FaturRec\0"
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("FaturaReconciliacaoJob iniciado");
@@ -55,7 +54,7 @@ public sealed class FaturaReconciliacaoJob(
         {
             try
             {
-                await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarReconciliacaoAsync, stoppingToken);
+                await RunWithAdvisoryLockAsync(LockKeys.FaturaReconciliacao, ProcessarReconciliacaoAsync, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)

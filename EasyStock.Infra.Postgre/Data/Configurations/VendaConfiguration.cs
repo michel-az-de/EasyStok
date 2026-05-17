@@ -22,6 +22,23 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             builder.Property(x => x.LojaId).HasColumnType("uuid");
             builder.HasOne(x => x.Loja).WithMany(l => l.Vendas).HasForeignKey(x => x.LojaId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+
+            // --- Colunas de relatório (PR-B) ---
+            builder.Property(v => v.VendedorId).HasColumnType("uuid");
+            builder.HasOne(v => v.Vendedor).WithMany().HasForeignKey(v => v.VendedorId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+
+            builder.Property(v => v.FormaPagamentoPrincipal).HasMaxLength(20);
+
+            builder.Property(v => v.Subtotal)
+                .HasConversion(d => d == null ? (decimal?)null : d.Valor,
+                               v => v == null ? null : Dinheiro.FromDecimal(v.Value))
+                .HasColumnType("numeric(18,2)");
+
+            builder.Property(v => v.ValorDesconto)
+                .HasConversion(d => d == null ? (decimal?)null : d.Valor,
+                               v => v == null ? null : Dinheiro.FromDecimal(v.Value))
+                .HasColumnType("numeric(18,2)");
         }
     }
 }

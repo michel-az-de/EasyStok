@@ -1,4 +1,4 @@
-@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojasOverviewViewModel
+﻿@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojasOverviewViewModel
 @using System.Globalization
 @{
     var ptBR = new CultureInfo("pt-BR");
@@ -158,7 +158,7 @@ else
 
 @if (Model.Lojas.Count > 1)
 {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var ctx = document.getElementById('healthChart');

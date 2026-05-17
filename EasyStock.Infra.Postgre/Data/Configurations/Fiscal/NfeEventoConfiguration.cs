@@ -15,6 +15,7 @@ public class NfeEventoConfiguration : IEntityTypeConfiguration<NfeEvento>
         builder.Property(e => e.DadosJson).HasColumnType("jsonb");
         builder.Property(e => e.UsuarioNome).HasMaxLength(120);
         builder.Property(e => e.Origem).HasMaxLength(20);
+        builder.Property(e => e.ProtocoloEvento).HasMaxLength(50);
 
         builder.HasIndex(e => new { e.NfeDocumentoId, e.OcorridoEm })
             .HasDatabaseName("ix_nfe_eventos_documento_ocorrido");

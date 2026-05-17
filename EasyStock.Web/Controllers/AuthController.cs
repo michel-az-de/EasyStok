@@ -14,7 +14,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, string? bye = null)
     {
         if (session.IsLoggedIn())
             return RedirectToAction("Index", "Dashboard");
@@ -24,6 +24,12 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         {
             ViewBag.SessionExpired = true;
             Response.Cookies.Delete("_se");
+        }
+        else if (bye == "1")
+        {
+            // Logout intencional — mostra confirmação no toast/banner.
+            // Expiração prevalece se ambos vierem juntos.
+            ViewBag.LogoutSuccess = true;
         }
 
         ViewBag.ReturnUrl = returnUrl;
@@ -391,7 +397,9 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         session.Clear();
         Response.Cookies.Delete("_rt");
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction(nameof(Login));
+        // bye=1 sinaliza pro GET Login mostrar feedback de logout intencional
+        // (toast verde + banner). Veja AuthController.Login (GET).
+        return RedirectToAction(nameof(Login), new { bye = "1" });
     }
 
     [Authorize]

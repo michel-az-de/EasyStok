@@ -11,16 +11,15 @@ public class EntradasService(ApiClient api, SessionService session)
     public Task<ApiResult<PagedResult<Movimentacao>>> HistoricoAsync(
         int page = 1, string? tipo = null, string? periodoInicio = null, string? periodoFim = null)
     {
-        var tipoApi = tipo?.ToLowerInvariant() switch
-        {
-            "saida" or "saída" => "Saida",
-            "reposicao" or "reposição" => "Entrada",
-            _ => "Entrada"
-        };
+        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page={page}&pageSize=20&tipo=Entrada";
 
-        var qs = $"movimentacoes?empresaId={GetEmpresaId()}&page={page}&pageSize=20&tipo={Uri.EscapeDataString(tipoApi)}";
-        if (tipo?.ToLowerInvariant() is "reposicao" or "reposição")
+        var tipoNorm = tipo?.ToLowerInvariant();
+        if (tipoNorm is "reposicao" or "reposição")
             qs += "&natureza=Reposicao";
+        else if (tipoNorm is "compra" or "entrada")
+            qs += "&natureza=Compra";
+        // null = sem filtro de natureza (mostra Compra + Reposicao)
+
         if (!string.IsNullOrEmpty(periodoInicio)) qs += $"&de={Uri.EscapeDataString(periodoInicio)}";
         if (!string.IsNullOrEmpty(periodoFim)) qs += $"&ate={Uri.EscapeDataString(periodoFim)}";
         return api.GetAsync<PagedResult<Movimentacao>>(qs);

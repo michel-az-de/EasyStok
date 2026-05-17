@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Financeiro;
+using EasyStock.Domain.Financeiro.Events;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Integration;
 using System.Linq.Expressions;
@@ -9,6 +11,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
 using Microsoft.Extensions.Logging;
 
@@ -112,6 +115,7 @@ namespace EasyStock.Infra.Postgre.Data
                 _previous = previous;
             }
 
+
             public void Dispose()
             {
                 if (_disposed) return;
@@ -143,12 +147,19 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FornecedorAlteracao> FornecedorAlteracoes { get; set; } = null!;
         public DbSet<VendaAlteracao> VendaAlteracoes { get; set; } = null!;
         public DbSet<Lote> Lotes { get; set; } = null!;
+        public DbSet<EtiquetaTemplateSistema> EtiquetaTemplatesSistema { get; set; } = null!;
+        public DbSet<EtiquetaTemplate> EtiquetaTemplates { get; set; } = null!;
+        public DbSet<EtiquetaEmpresaDefault> EtiquetaEmpresaDefaults { get; set; } = null!;
         public DbSet<ListaCompras> ListasCompras { get; set; } = null!;
         public DbSet<PedidoFornecedor> PedidosFornecedor { get; set; } = null!;
         public DbSet<ConfiguracaoLoja> ConfiguracoesLoja { get; set; } = null!;
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
+        public DbSet<ProdutoComposicao> ProdutosComposicao { get; set; } = null!;
+        public DbSet<ProdutoComposicaoAlteracao> ProdutosComposicaoAlteracoes { get; set; } = null!;
+        public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
+        public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
 
         // Admin Module DbSets
@@ -160,11 +171,24 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
         public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
         public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
+
+        // FAQ — base global publica (sem multi-tenant)
+        public DbSet<FaqCategoria> FaqCategorias { get; set; } = null!;
+        public DbSet<FaqItem> FaqItens { get; set; } = null!;
+        public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
+        public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
+
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;
         public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
+
+        // Endpoint health monitoring (Worker EndpointHealthMonitorService)
+        public DbSet<EndpointHealthState> EndpointHealthStates { get; set; } = null!;
+
+        // Releases de APK distribuidos via CapacitorUpdater (Casa da Baba e outros).
+        public DbSet<EasyStock.Domain.Entities.Mobile.ApkRelease> ApkReleases { get; set; } = null!;
 
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
@@ -189,6 +213,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
+        // Modulo Financeiro AR/AP — lancamentos previstos/realizados do tenant
+        public DbSet<Lancamento> Lancamentos { get; set; } = null!;
+        public DbSet<LancamentoBaixa> LancamentoBaixas { get; set; } = null!;
+
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 
@@ -204,6 +232,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<NfeItem> NfeItens { get; set; } = null!;
         public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
 
+        // Módulo de Relatórios — motor assíncrono multi-tenant
+        public DbSet<ReportRun> ReportRuns { get; set; } = null!;
+
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
         public DbSet<VariavelTemplateCatalogo> NotifVariaveisTemplate { get; set; } = null!;
@@ -215,6 +246,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<ConfiguracaoCanal> NotifConfiguracoesCanal { get; set; } = null!;
         public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
+        public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {
@@ -322,6 +354,11 @@ namespace EasyStock.Infra.Postgre.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Domain events nao sao entidades persistidas — sao publicados pelo UseCase
+            // apos commit. EF Core descobriria via convencao a partir das colecoes
+            // de eventos pendentes nos agregados, daria erro de PK obrigatoria.
+            modelBuilder.Ignore<LancamentoBaixadoEvent>();
+
             // Apply all IEntityTypeConfiguration implementations in this assembly
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -384,6 +421,13 @@ namespace EasyStock.Infra.Postgre.Data
             // Modulo Casa da Baba Mobile — esquema mobile_* e escopo proprio.
             if (clrType.Namespace?.StartsWith("EasyStock.Domain.Entities.Mobile", StringComparison.Ordinal) == true)
                 return true;
+
+            // ReportRun — EmpresaId é nullable (null para contexto AdminSaaS).
+            // Isolamento multi-tenant tratado manualmente em WorkerCurrentUserAccessor
+            // e ITenantScopedQueryBuilder (defesa em profundidade §ADR-R07).
+            // Se aplicarmos o filtro global, runs AdminSaaS (EmpresaId=null)
+            // jamais seriam retornadas e o filter quebraria para elas.
+            if (clrType == typeof(ReportRun)) return true;
 
             // Admin tooling — auditoria/feature flags cross-tenant.
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).

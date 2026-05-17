@@ -4,6 +4,8 @@
     ViewData["Title"] = "Rotinas de Notificação";
 }
 
+<partial name="../_Subnav" />
+
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
@@ -14,7 +16,7 @@
     </div>
 
     <form method="get" class="flex gap-3">
-        <select name="ativa" class="input-dark text-sm">
+        <select name="ativa" class="form-input text-sm">
             <option value="">Todas</option>
             <option value="true">Ativas</option>
             <option value="false">Inativas</option>
@@ -52,6 +54,8 @@
                         var cron = r.TryGetProperty("cronExpression", out var ce) ? ce.GetString() : "";
                         var template = r.TryGetProperty("templateCodigo", out var tc) ? tc.GetString() : "";
                         var ativa = r.TryGetProperty("ativa", out var at) && at.GetBoolean();
+                        var atualizadaEm = r.TryGetProperty("atualizadaEm", out var aem) ? aem.GetString() : null;
+                        var atualizadaPor = r.TryGetProperty("atualizadaPor", out var apr) ? apr.GetString() : null;
 
                         <tr class="border-b border-slate-800 hover:bg-slate-800/40">
                             <td class="px-4 py-3">
@@ -63,7 +67,7 @@
                                 @trigger
                                 @if (!string.IsNullOrWhiteSpace(cron))
                                 {
-                                    <br /><code class="text-slate-500">@cron</code>
+                                    <br /><code class="text-slate-500" title="@cron">@cron</code>
                                 }
                             </td>
                             <td class="px-4 py-3 text-slate-400 font-mono text-xs">@template</td>
@@ -76,16 +80,34 @@
                                 {
                                     <span class="badge-gray">Inativa</span>
                                 }
+                                @if (!string.IsNullOrWhiteSpace(atualizadaEm))
+                                {
+                                    <div class="text-xs text-slate-500 mt-1" x-data x-init="$el.textContent = tempoRelativo('@atualizadaEm')" title="@atualizadaEm — @atualizadaPor"></div>
+                                }
                             </td>
-                            <td class="px-4 py-3 flex gap-2">
+                            <td class="px-4 py-3 flex gap-2 items-center">
                                 <a href="/Notificacoes/Rotinas/Edit?id=@id" class="text-blue-400 hover:text-blue-300 text-xs">Editar</a>
-                                <form method="post" asp-page-handler="Toggle" class="inline">
-                                    <input type="hidden" name="id" value="@id" />
-                                    <input type="hidden" name="ativa" value="@ativa.ToString().ToLower()" />
-                                    <button type="submit" class="text-xs @(ativa ? "text-red-400 hover:text-red-300" : "text-green-400 hover:text-green-300")">
-                                        @(ativa ? "Desativar" : "Ativar")
-                                    </button>
-                                </form>
+                                @if (ativa)
+                                {
+                                    <button type="button"
+                                            @@click="$dispatch('open-justificar', {
+                                                endpoint: '?handler=Toggle',
+                                                acao: 'Desativar rotina',
+                                                resumo: 'A rotina @nome (@codigo) deixará de rodar até ser reativada.',
+                                                variant: 'danger',
+                                                confirmLabel: 'Desativar (auditado)',
+                                                extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@id&quot; /><input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;true&quot; />'
+                                            })"
+                                            class="text-xs text-red-400 hover:text-red-300">Desativar</button>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-page-handler="Toggle" class="inline">
+                                        <input type="hidden" name="id" value="@id" />
+                                        <input type="hidden" name="ativa" value="false" />
+                                        <button type="submit" class="text-xs text-green-400 hover:text-green-300">Ativar</button>
+                                    </form>
+                                }
                             </td>
                         </tr>
                     }
@@ -94,3 +116,22 @@
         </table>
     </div>
 </div>
+
+@await Html.PartialAsync("_ModalJustificativa")
+
+<script>
+function tempoRelativo(iso) {
+    if (!iso) return '';
+    const diff = Date.now() - new Date(iso).getTime();
+    if (isNaN(diff) || diff < 0) return '';
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return 'atualizada há ' + s + 's';
+    const m = Math.floor(s / 60);
+    if (m < 60) return 'atualizada há ' + m + ' min';
+    const h = Math.floor(m / 60);
+    if (h < 24) return 'atualizada há ' + h + 'h';
+    const d = Math.floor(h / 24);
+    if (d < 30) return 'atualizada há ' + d + 'd';
+    return 'atualizada há ' + Math.floor(d / 30) + ' mês(es)';
+}
+</script>

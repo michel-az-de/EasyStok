@@ -94,6 +94,9 @@ public class HelpdeskController(
         if (de == default || ate == default)
             return DataBadRequest("Parametros 'de' e 'ate' sao obrigatorios (yyyy-MM-dd).");
 
+        if (de > ate)
+            return DataBadRequest("Parametro 'de' deve ser anterior ou igual a 'ate'.");
+
         try
         {
             var bytes = await relatorioService.GerarCsvAsync(currentUser.EmpresaId, de, ate, ct);

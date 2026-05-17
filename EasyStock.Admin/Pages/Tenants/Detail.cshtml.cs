@@ -74,6 +74,26 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         return Page();
     }
 
+    /// <summary>
+    /// F4 — Handler AJAX para o card "Sincronização Mobile" no Detail.
+    /// Proxy direto pro endpoint API GetMobileSyncHealth. Retorna JSON com
+    /// counts de mobile_* sem erp_*_id pra detectar gap de sync.
+    /// </summary>
+    public async Task<IActionResult> OnGetMobileSyncHealthAsync()
+    {
+        try
+        {
+            var data = await api.GetAsync<JsonElement>($"api/admin/tenants/{Id}/mobile-sync-health");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Falha ao carregar mobile-sync-health do tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message });
+        }
+    }
+
     public async Task<IActionResult> OnPostSuspenderAsync(string motivo)
     {
         var motivoT = (motivo ?? "").Trim();

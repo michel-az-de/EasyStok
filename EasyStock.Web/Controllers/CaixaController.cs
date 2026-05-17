@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Caixa;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,9 @@ public class CaixaController(CaixaService svc, SessionService session) : BaseCon
     {
         ViewBag.Title = "Caixa";
         ViewBag.ActiveMenuItem = "Caixa";
-        var d = data ?? DateOnly.FromDateTime(DateTime.Now);
+        // Servidor roda UTC (Render). Em janela 21–23h BRT, DateTime.Now retorna
+        // o dia seguinte e o Caixa abria a tela errada — usar BrazilTime.Today().
+        var d = data ?? BrazilTime.Today();
         var vm = new CaixaOperacaoViewModel { DataSelecionada = d };
 
         var result = await svc.ObterDiaAsync(d);

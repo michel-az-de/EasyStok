@@ -10,6 +10,6 @@ public record VariacaoDetalhe
     public string? CodigoBarras { get; init; }
     public string? Sku { get; init; }
     public bool Ativa { get; init; }
-    public int QuantidadeEmEstoque { get; init; }
+    public decimal QuantidadeEmEstoque { get; init; }
     public DateTime? UltimaEntradaEm { get; init; }
 }

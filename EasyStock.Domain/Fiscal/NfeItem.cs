@@ -39,6 +39,22 @@ public class NfeItem
     /// <summary>CST (regime nao-Simples) ou CSOSN (regime Simples). 4 digitos. Determinado pelo regime tributario do emitente.</summary>
     public string? CstOuCsosn { get; set; }
 
+    // ── Tributos por linha (§F-1 / PR-D) ────────────────────────────────────
+    // Populados pelo parser/emissor da NFC-e a partir da Fase F2.
+    // NULL em NFC-e legadas (antes da migration AddNfceTaxFields) — exibir como "Não rastreado".
+
+    /// <summary>Base de cálculo do ICMS em R$. NULL para NFC-e legadas.</summary>
+    public decimal? BaseIcms { get; set; }
+
+    /// <summary>Valor do ICMS em R$. NULL para NFC-e legadas.</summary>
+    public decimal? ValorIcms { get; set; }
+
+    /// <summary>Valor do PIS em R$. NULL para NFC-e legadas.</summary>
+    public decimal? Pis { get; set; }
+
+    /// <summary>Valor do COFINS em R$. NULL para NFC-e legadas.</summary>
+    public decimal? Cofins { get; set; }
+
     public DateTime CriadoEm { get; set; }
 
     public static NfeItem Criar(

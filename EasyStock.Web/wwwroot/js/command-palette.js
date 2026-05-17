@@ -79,6 +79,38 @@
         };
     }
 
+    // Mapa rota atual -> "Novo X" (consumido pelo atalho `N`)
+    var ROTA_PARA_NOVO = {
+        '/pedidos':        '/pedidos#novo-pedido',
+        '/clientes':       '/clientes#novo-cliente',
+        '/fornecedores':   '/fornecedores#novo-fornecedor',
+        '/produtos':       '/produtos/novo',
+        '/entradas':       '/entradas/nova',
+        '/saidas':         '/saidas/nova',
+        '/lotes':          '/lotes#novo-lote',
+    };
+    function rotaNovo() {
+        var path = (location.pathname || '/').toLowerCase();
+        for (var k in ROTA_PARA_NOVO) {
+            if (path.indexOf(k) === 0) return ROTA_PARA_NOVO[k];
+        }
+        return null;
+    }
+
+    // Guarda compartilhada: bloqueia atalhos quando ha overlay aberto ou foco esta em campo editavel
+    function shouldHandleShortcut() {
+        var el = document.activeElement;
+        if (!el || el === document.body) return true;
+        var tag = el.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+        if (el.isContentEditable) return false;
+        if (el.matches && el.matches('[contenteditable], [contenteditable="true"]')) return false;
+        // Bloqueia se ha overlay aberto (modal-panel, command palette, confirm modal)
+        if (document.querySelector('.modal-panel:not([style*="display: none"]):not([hidden])')) return false;
+        if (document.querySelector('[data-confirm-modal][data-open="true"]')) return false;
+        return true;
+    }
+
     window.commandPalette = function () {
         return {
             open: false,
@@ -87,6 +119,7 @@
             clienteResults: [],
             selectedIdx: 0,
             loading: false,
+            showCheatsheet: false,
 
             init() {
                 var self = this;
@@ -95,9 +128,29 @@
                     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                         e.preventDefault();
                         self.toggle();
+                        return;
+                    }
+                    // Bloqueia atalhos sem modifier quando foco em input ou overlay aberto
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    if (self.open || self.showCheatsheet) return;
+                    if (!shouldHandleShortcut()) return;
+
+                    if (e.key === 'n' || e.key === 'N') {
+                        var dest = rotaNovo();
+                        if (dest) {
+                            e.preventDefault();
+                            window.location.href = dest;
+                        } else if (window.showToast) {
+                            window.showToast('Sem ação de novo nesta página.', 'info');
+                        }
+                    } else if (e.key === '?') {
+                        e.preventDefault();
+                        self.showCheatsheet = true;
                     }
                 });
             },
+
+            closeCheatsheet() { this.showCheatsheet = false; },
 
             toggle() {
                 this.open = !this.open;

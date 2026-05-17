@@ -25,14 +25,18 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
 
         // Carrega pedidos abertos (aguardando + preparando + pronto).
         // Como o filtro é por status único na API, fazemos 3 chamadas paralelas.
-        var aguardando = svc.ListarAsync(status: "aguardando");
-        var preparando = svc.ListarAsync(status: "preparando");
-        var pronto     = svc.ListarAsync(status: "pronto");
-        await Task.WhenAll(aguardando, preparando, pronto);
+        var aguardandoTask = svc.ListarAsync(status: "aguardando");
+        var preparandoTask = svc.ListarAsync(status: "preparando");
+        var prontoTask     = svc.ListarAsync(status: "pronto");
+        await Task.WhenAll(aguardandoTask, preparandoTask, prontoTask);
 
-        vm.Aguardando = (aguardando.Result.Success ? aguardando.Result.Data : null) ?? new List<Pedido>();
-        vm.Preparando = (preparando.Result.Success ? preparando.Result.Data : null) ?? new List<Pedido>();
-        vm.Pronto     = (pronto.Result.Success     ? pronto.Result.Data     : null) ?? new List<Pedido>();
+        var aguardando = await aguardandoTask;
+        var preparando = await preparandoTask;
+        var pronto     = await prontoTask;
+
+        vm.Aguardando = (aguardando.Success ? aguardando.Data : null) ?? new List<Pedido>();
+        vm.Preparando = (preparando.Success ? preparando.Data : null) ?? new List<Pedido>();
+        vm.Pronto     = (pronto.Success     ? pronto.Data     : null) ?? new List<Pedido>();
 
         // Ordenação: mais antigo primeiro (FIFO da cozinha).
         vm.Aguardando = vm.Aguardando.OrderBy(p => p.CriadoEm).ToList();
@@ -46,16 +50,20 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
     [HttpGet("/kds/json")]
     public async Task<IActionResult> Json()
     {
-        var aguardando = svc.ListarAsync(status: "aguardando");
-        var preparando = svc.ListarAsync(status: "preparando");
-        var pronto     = svc.ListarAsync(status: "pronto");
-        await Task.WhenAll(aguardando, preparando, pronto);
+        var aguardandoTask = svc.ListarAsync(status: "aguardando");
+        var preparandoTask = svc.ListarAsync(status: "preparando");
+        var prontoTask     = svc.ListarAsync(status: "pronto");
+        await Task.WhenAll(aguardandoTask, preparandoTask, prontoTask);
+
+        var aguardando = await aguardandoTask;
+        var preparando = await preparandoTask;
+        var pronto     = await prontoTask;
 
         return Ok(new
         {
-            aguardando = (aguardando.Result.Success ? aguardando.Result.Data : null) ?? new List<Pedido>(),
-            preparando = (preparando.Result.Success ? preparando.Result.Data : null) ?? new List<Pedido>(),
-            pronto     = (pronto.Result.Success     ? pronto.Result.Data     : null) ?? new List<Pedido>(),
+            aguardando = (aguardando.Success ? aguardando.Data : null) ?? new List<Pedido>(),
+            preparando = (preparando.Success ? preparando.Data : null) ?? new List<Pedido>(),
+            pronto     = (pronto.Success     ? pronto.Data     : null) ?? new List<Pedido>(),
             servidoEm  = DateTimeOffset.UtcNow
         });
     }
@@ -66,10 +74,8 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
     public async Task<IActionResult> Avancar(string id, string status)
     {
         var result = await svc.AtualizarStatusAsync(id, status);
-        if (HasError(result))
-        {
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage });
-        }
+        if (!result.Success)
+            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao atualizar pedido." });
         return Ok(new { success = true });
     }
 }
