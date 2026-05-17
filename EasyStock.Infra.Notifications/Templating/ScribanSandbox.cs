@@ -5,15 +5,36 @@ using System.Reflection;
 namespace EasyStock.Infra.Notifications.Templating;
 
 /// <summary>
-/// Configura o contexto Scriban com restrições de segurança para evitar RCE
-/// quando super-admins editam templates HTML livremente.
+/// Cria um <see cref="TemplateContext"/> hardened para renderizar templates editados
+/// por super-admin sem permitir RCE, ReDoS ou DoS por consumo de memoria/CPU.
 /// </summary>
 internal static class ScribanSandbox
 {
     private const int LoopLimit = 500;
     private const int RecursiveLimit = 50;
+    private const int ObjectRecursionLimit = 50;
+    private const int LimitInterpolatedString = 100_000;
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
 
-    internal static TemplateContext CriarContexto(IDictionary<string, object?> variaveis)
+    private static readonly HashSet<Type> TiposBloqueados =
+    [
+        typeof(Type),
+        typeof(Assembly),
+        typeof(MemberInfo),
+        typeof(MethodBase),
+        typeof(MethodInfo),
+        typeof(ConstructorInfo),
+        typeof(PropertyInfo),
+        typeof(FieldInfo),
+        typeof(EventInfo),
+        typeof(Module),
+        typeof(Delegate),
+        typeof(IServiceProvider)
+    ];
+
+    internal static TemplateContext CriarContexto(
+        IDictionary<string, object?> variaveis,
+        CancellationToken cancellationToken)
     {
         var scriptObj = new ScriptObject();
 
@@ -22,40 +43,55 @@ internal static class ScribanSandbox
 
         var context = new TemplateContext
         {
-            // Impede acesso a arquivos e imports externos
+            // Sem TemplateLoader -> include/import disparam ScriptRuntimeException
+            // (testado: "Unable to include <X>. No TemplateLoader registered").
             TemplateLoader = null,
 
-            // Limites de segurança contra loops infinitos e recursão profunda
+            // Limites contra DoS por loops/recursao/strings gigantes
             LoopLimit = LoopLimit,
             RecursiveLimit = RecursiveLimit,
+            ObjectRecursionLimit = ObjectRecursionLimit,
+            LimitToString = LimitInterpolatedString,
+            RegexTimeOut = RegexTimeout,
 
-            // Variáveis indefinidas retornam string vazia em vez de exceção
+            // Variaveis indefinidas viram string vazia em vez de exception
             StrictVariables = false,
 
-            // Bloqueia acesso a membros de objetos .NET arbitrários —
-            // retornar string vazia impede que templates acessem reflect/IO
-            MemberRenamer = BlockMemberAccess,
+            // Bloqueia acesso a membros .NET potencialmente perigosos via reflection
+            // (Type, Assembly, MethodInfo, etc.) — defesa principal contra RCE.
+            MemberFilter = AceitarApenasMembrosSeguros,
 
-            // Desativa acessos relaxados a métodos, indexers e targets
-            EnableRelaxedMemberAccess = false
+            // Hardening: nao tentar coercao implicita de targets/indexers/funcoes
+            EnableRelaxedMemberAccess = false,
+            EnableRelaxedTargetAccess = false,
+            EnableRelaxedIndexerAccess = false,
+            EnableRelaxedFunctionAccess = false,
+
+            // CancellationToken e honrado por RenderAsync (testado: dispara
+            // ScriptAbortException ao expirar).
+            CancellationToken = cancellationToken
         };
 
         context.PushGlobal(scriptObj);
-
-        RemoverFuncoesPerigosas(context);
-
         return context;
     }
 
-    private static string BlockMemberAccess(MemberInfo member) => string.Empty;
-
-    private static void RemoverFuncoesPerigosas(TemplateContext context)
+    private static bool AceitarApenasMembrosSeguros(MemberInfo member)
     {
-        var builtins = context.BuiltinObject;
-        foreach (var nome in new[] { "include", "import" })
+        var memberType = member switch
         {
-            if (builtins.Contains(nome))
-                builtins.Remove(nome);
-        }
+            PropertyInfo p => p.PropertyType,
+            FieldInfo f => f.FieldType,
+            MethodInfo m => m.ReturnType,
+            _ => null
+        };
+
+        if (memberType is null)
+            return true;
+
+        if (TiposBloqueados.Any(b => b.IsAssignableFrom(memberType)))
+            return false;
+
+        return true;
     }
 }

@@ -1,0 +1,66 @@
+@model EasyStock.Web.Models.ViewModels.Faq.FaqDetalheViewModel
+@{
+    Layout = "_LayoutSite";
+    ViewData["Title"] = $"{Model.Item.Titulo} | FAQ";
+    ViewData["Description"] = (Model.Item.Conteudo?.Length ?? 0) > 160
+        ? Model.Item.Conteudo!.Substring(0, 160).TrimEnd() + "..."
+        : Model.Item.Conteudo ?? string.Empty;
+}
+
+<section class="bg-es-surface py-10">
+    <div class="container mx-auto px-4 max-w-3xl">
+        <nav class="text-xs text-es-ink-2 mb-4">
+            <a asp-action="Index" class="hover:underline">Central de Ajuda</a>
+            <span class="mx-1">/</span>
+            <a asp-action="Index" asp-route-categoriaId="@Model.Item.CategoriaId" class="hover:underline">@Model.Item.CategoriaNome</a>
+        </nav>
+
+        <h1 class="text-2xl md:text-3xl font-bold text-es-ink mb-4">@Model.Item.Titulo</h1>
+
+        @if (Model.Item.Tags.Length > 0)
+        {
+            <div class="flex flex-wrap gap-2 mb-6">
+                @foreach (var t in Model.Item.Tags)
+                {
+                    <span class="text-xs rounded bg-es-surface-2 text-es-ink-2 px-2 py-0.5">#@t</span>
+                }
+            </div>
+        }
+
+        @* Render simples: preserva quebras de linha. Markdown completo em milestone seguinte. *@
+        <article class="prose max-w-none text-es-ink whitespace-pre-wrap break-words">@Model.Item.Conteudo</article>
+
+        <div class="mt-10 rounded border border-es-border bg-es-surface-2 p-4">
+            <h3 class="text-base font-semibold text-es-ink mb-3">Esse artigo foi util?</h3>
+
+            @if (TempData["FaqFeedback"] != null)
+            {
+                <p class="text-green-700">@TempData["FaqFeedback"]</p>
+            }
+            else
+            {
+                <form method="post" asp-action="Feedback" asp-route-itemId="@Model.Item.Id" class="flex flex-col gap-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@Url.Action("Detalhe", new { categoriaSlug = Model.Item.CategoriaSlug, itemSlug = Model.Item.Slug })" />
+                    <textarea name="comentario" maxlength="1000" rows="2"
+                              placeholder="Comentario opcional"
+                              class="form-input text-sm"></textarea>
+                    <div class="flex gap-2">
+                        <button type="submit" name="util" value="true" class="btn-primary text-sm">👍 Sim</button>
+                        <button type="submit" name="util" value="false" class="btn-secondary text-sm">👎 Nao</button>
+                    </div>
+                </form>
+            }
+
+            <p class="text-xs text-es-ink-2 mt-3">
+                @Model.Item.UtilCount pessoas acharam util · @Model.Item.NaoUtilCount nao acharam
+            </p>
+        </div>
+
+        <div class="mt-6 text-center">
+            <a class="btn-secondary text-sm" asp-controller="Site" asp-action="Contato" asp-route-origem="faq-detalhe" asp-route-assunto="@Model.Item.Titulo">
+                Ainda preciso de ajuda
+            </a>
+        </div>
+    </div>
+</section>

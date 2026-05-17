@@ -131,7 +131,7 @@ public sealed partial class SuporteViewModel : BaseViewModel
 	[RelayCommand]
 	private Task AbrirWebAsync() => RunAsync(async () =>
 	{
-		await Launcher.Default.OpenAsync(new Uri("https://easystok.azurewebsites.net"));
+		await Launcher.Default.OpenAsync(new Uri(AppConfig.GetBaseUrl()));
 	});
 
 	[RelayCommand]

@@ -23,6 +23,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(c => c.EmpresaId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Suporta GetNovosClientesPorMesAsync (filtra EmpresaId + CriadoEm).
+            builder.HasIndex(c => new { c.EmpresaId, c.CriadoEm });
+
             builder.HasMany(c => c.Enderecos)
                 .WithOne(e => e.Cliente)
                 .HasForeignKey(e => e.ClienteId)
@@ -99,7 +102,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.ValorNovo).HasColumnType("text");
             b.Property(x => x.AlteradoPorNome).HasMaxLength(120);
             b.Property(x => x.Origem).HasMaxLength(20);
-            b.HasIndex(x => new { x.ClienteId, x.AlteradoEm });
+            // F10-A: index composto inclui EmpresaId pra queries por tenant.
+            // ApplyTenantQueryFilters do DbContext agora aplica filter automático
+            // porque a entity tem EmpresaId.
+            b.HasIndex(x => new { x.EmpresaId, x.ClienteId, x.AlteradoEm });
         }
     }
 }

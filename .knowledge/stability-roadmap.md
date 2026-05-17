@@ -14,7 +14,7 @@
 - [~] **Backup Postgres + restore testado** — 2026-05-07 (Onda 1 R6). Runbook manual escrito (`docs/runbook/pg-restore-pitr.md`). **Pendente**: exercicio mensal de restore + backup pre-deploy automatizado via CI (Onda 2, depende de Service Principal Azure).
 - [~] **CI rodando testes em cada PR** — 2026-05-07 (Onda 1 R6). `.github/workflows/ci.yml` criado com unit tests + SeedFlow integration tests. **Pendente**: estender pra rodar todos os 474 testes + branch protection no master exigindo `seed-flow-integration-tests`.
 - [x] **R6 — Seed fragil mitigado (Onda 1)** — 2026-05-07. Pipeline fail-loud, advisory lock no startup, double opt-in `/seed/*` em prod, fail-fast `SuperAdminSeed`, skip `SeedData` fora de Development, testes integracao DB-do-zero + idempotencia 3x. Ver `recent-evolution.md` snapshot 2026-05-07.
-- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. Pipeline Azure ja usa `/health/ready` com retry (R6 Onda 1).
+- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. (Parcial: 2026-05-07 — `/health/api` (PG+Redis+Config) e `/health/dispatcher` (heartbeat dos 3 loops Hosted) separados pra evitar cascata API↔Outbox quando `Notifications:Hosting:Mode=Hosted`. Falta plugar no Cloud Run/App Service e cobrir Worker via Kestrel mínimo.) Pipeline Azure ja usa `/health/ready` com retry (R6 Onda 1).
 - [ ] **Compras → estoque ponta-a-ponta testado**: `PedidoFornecedorItem` foi criada (commit recente) mas fluxo de recebimento → entrada de movimentação **sem teste de integração**.
 
 ### R6 Onda 2 e 3 (proximos)
@@ -47,7 +47,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 ## Bloco 4 — Segurança operacional (P1)
 
 - [ ] **Rotação de secrets**: JWT key, Efí keys, SMTP. Mover de `appsettings` pra Secret Manager + processo documentado.
-- [ ] **Rate limiting** nos endpoints públicos: `/auth/login`, `/auth/registrar`, `/api/webhooks/pix`.
+- [ ] **Rate limiting `/api/webhooks/pix`** (login/register/refresh/forgot/reset cobertos pela policy `auth` desde B-015 — ver "Itens resolvidos").
 - [ ] **Auditoria de `[AllowAnonymous]` restantes**: DiagnosticoController OK; conferir Mobile e outros Webhooks.
 - [ ] **HTTPS-only + HSTS** no Cloud Run.
 - [ ] **CSP / anti-XSS** no Web e Admin (Razor escapa por padrão, mas inline scripts são comuns).
@@ -55,7 +55,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 ## Bloco 5 — Tech debt que vira incidente (P1)
 
 - [ ] **Decisão `Infra.MongoDb`**: mata ou alinha. Hoje código parcial divergente do Postgre, com fallback exótico em transação que vai dar bug em prod.
-- [ ] **Cache no `SubscriptionGateMiddleware`**: bate no DB toda request autenticada. Em escala = latência cumulativa.
+- [x] **Cache no `SubscriptionGateMiddleware`** — 2026-05-07. `ISubscriptionStatusCache` (IMemoryCache, TTL 60s, `Cache:SubscriptionStatusDuration` configurável) + `AssinaturaCacheInvalidationInterceptor` (EF SaveChangesInterceptor) invalidando o tenant após qualquer mutação em `AssinaturaEmpresa`. Snapshot imutável `SubscriptionStatusSnapshot` evita cachear entidade rastreada cross-request.
 - [ ] **Auditoria de `Math.Round`/`Quantidade`** em todas movimentações: transferência, devolução, ajuste, inventário (já fixado em saída de pedido).
 - [ ] **Idempotência de webhook duplicado**: Efí pode mandar 2x simultâneo dentro da janela de replay (5 min) — race condition possível em `ProcessarPagamentoAsync`.
 
@@ -97,6 +97,8 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 - [x] **Notifications PR1–PR7 completo** — 2026-05-06. Outbox + adapters + Worker + painel Admin + LGPD + métricas OTel.
 - [x] **Helpdesk core E2E** — 2026-05-06. AdminTicket reformado + SLA monitor + 9 eventos globais + UI multi-nível.
 - [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
+- [x] **Cascata API+Worker mitigada (parcial)** — 2026-05-07. `/health/dispatcher` separado de `/health/api`; heartbeat singleton dos 3 loops Hosted; warning de startup quando `Notifications:Hosting:Mode=Hosted` na API. Bulkhead real continua sendo Worker como deploy separado (default).
+- [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` fixed-window 10/min/IP cobre login + register + refresh + forgot-password + reset-password. Teste em `AuthRateLimitTests.cs`. Webhook Pix segue como item residual.
 
 ---
 

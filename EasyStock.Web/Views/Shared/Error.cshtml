@@ -1,18 +1,101 @@
 @{
     ViewBag.Title = "Erro";
-    Layout = "_Layout";
+    Layout = null;
+    var traceId = System.Diagnostics.Activity.Current?.Id ?? Context.TraceIdentifier;
+    var path = Context.Request.Headers["Referer"].ToString();
+    var voltarPara = string.IsNullOrEmpty(path) ? "/" : path;
 }
-
-<div class="ws max-w-lg mx-auto mt-16 text-center">
-    <div class="text-7xl font-extrabold text-slate-200 mb-2">500</div>
-    <h1 class="text-xl font-bold text-slate-900 mb-2">Algo deu errado</h1>
-    <p class="text-slate-500 text-sm mb-6">Não foi possível concluir sua solicitação. Se o problema persistir, entre em contato com o suporte.</p>
-    <div class="flex items-center justify-center gap-3">
-        <a href="/dashboard" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
-            Voltar ao início
-        </a>
-        <button onclick="history.back()" class="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-            Voltar
-        </button>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Erro — EasyStock</title>
+    <link rel="icon" href="~/img/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .err-card {
+            max-width: 520px;
+            width: 100%;
+            padding: 40px 32px;
+            background: rgba(15, 23, 42, .8);
+            border: 1px solid rgba(71, 85, 105, .4);
+            border-radius: 16px;
+            text-align: center;
+        }
+        .err-code {
+            font-size: 84px;
+            font-weight: 800;
+            line-height: 1;
+            color: #ef4444;
+            margin-bottom: 12px;
+        }
+        .err-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #f1f5f9; }
+        .err-msg   { font-size: 14px; color: #94a3b8; line-height: 1.55; margin: 0 0 20px; }
+        .err-trace {
+            display: inline-block;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 11px;
+            padding: 6px 10px;
+            background: rgba(30, 41, 59, .9);
+            border: 1px solid rgba(71, 85, 105, .5);
+            border-radius: 6px;
+            color: #cbd5e1;
+            word-break: break-all;
+            margin-bottom: 24px;
+        }
+        .err-cta {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .err-btn {
+            display: inline-block;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: background .12s ease, border-color .12s ease;
+        }
+        .err-btn--primary { background: #4f46e5; color: #fff; }
+        .err-btn--primary:hover { background: #4338ca; }
+        .err-btn--ghost {
+            background: transparent;
+            color: #cbd5e1;
+            border: 1px solid rgba(71, 85, 105, .55);
+        }
+        .err-btn--ghost:hover { background: rgba(71, 85, 105, .25); }
+    </style>
+</head>
+<body>
+    <div class="err-card" role="alert">
+        <div class="err-code">500</div>
+        <h1 class="err-title">Algo deu errado</h1>
+        <p class="err-msg">
+            Não foi possível concluir sua solicitação. Se o problema persistir, mande o código abaixo pro suporte.
+        </p>
+        <div class="err-trace" aria-label="Identificador desta requisição">
+            @traceId
+        </div>
+        <div class="err-cta">
+            <a href="/" class="err-btn err-btn--primary">Página inicial</a>
+            <button type="button" onclick="history.back()" class="err-btn err-btn--ghost">Voltar</button>
+        </div>
     </div>
-</div>
+</body>
+</html>

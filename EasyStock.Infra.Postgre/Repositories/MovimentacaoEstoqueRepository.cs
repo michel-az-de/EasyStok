@@ -96,9 +96,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(m => m.EmpresaId == empresaId);
 
             if (de.HasValue)
-                query = query.Where(m => m.DataMovimentacao >= de.Value);
+                query = query.Where(m => m.DataMovimentacao >= DateTime.SpecifyKind(de.Value, DateTimeKind.Utc));
             if (ate.HasValue)
-                query = query.Where(m => m.DataMovimentacao <= ate.Value);
+                query = query.Where(m => m.DataMovimentacao <= DateTime.SpecifyKind(ate.Value, DateTimeKind.Utc));
             if (tipo.HasValue)
                 query = query.Where(m => m.Tipo == tipo.Value);
             if (natureza.HasValue)

@@ -21,8 +21,11 @@ public class OperacaoMobileController(
         var devicesTask = devicesSvc.ListarAsync();
         await Task.WhenAll(dashTask, devicesTask);
 
-        var dash = dashTask.Result.Success ? dashTask.Result.Data : null;
-        var devices = devicesTask.Result.Success ? devicesTask.Result.Data ?? [] : [];
+        var dashResult = await dashTask;
+        var devicesResult = await devicesTask;
+
+        var dash = dashResult.Success ? dashResult.Data : null;
+        var devices = devicesResult.Success ? devicesResult.Data ?? [] : [];
 
         ViewBag.Devices = devices;
         return View(dash);

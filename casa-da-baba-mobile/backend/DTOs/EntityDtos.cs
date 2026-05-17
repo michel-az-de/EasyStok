@@ -14,7 +14,9 @@ public record ProductDto(
     string? Unit,
     decimal? Price,
     int Stock,
-    bool? Custom
+    bool? Custom,
+    string? DefaultUnit = null,
+    int? DefaultGrams = null
 );
 
 public record ClientDto(
@@ -47,7 +49,10 @@ public record OrderDto(
     decimal Total,
     string Status,
     long CreatedAt,
-    long UpdatedAt
+    long UpdatedAt,
+    // Agendamento (Frente 2). Formato ISO yyyy-MM-dd em ScheduledFor.
+    string? ScheduledFor = null,
+    string? ScheduledWindow = null
 );
 
 public record BatchItemDto(
@@ -56,7 +61,8 @@ public record BatchItemDto(
     string? Emoji,
     string? Unit,
     int Qty,
-    string? Photo
+    string? Photo,
+    int? WeightGrams = null
 );
 
 public record BatchDto(

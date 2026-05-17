@@ -22,7 +22,9 @@ public sealed record GerarPdfFaturaResult(
     string ContentType,
     string FileName,
     string StorageKey,
-    bool VeioDoCache
+    bool VeioDoCache,
+    /// <summary>EmpresaId da fatura — controllers admin operacional usam para checagem cross-tenant.</summary>
+    Guid EmpresaId
 );
 
 /// <summary>
@@ -77,7 +79,7 @@ public class GerarPdfFaturaUseCase(
                 {
                     logger.LogDebug("PDF cache hit. FaturaId={FaturaId} StorageKey={Key}",
                         fatura.Id, fatura.PdfStorageKey);
-                    return new GerarPdfFaturaResult(cached, "application/pdf", fileName, fatura.PdfStorageKey, true);
+                    return new GerarPdfFaturaResult(cached, "application/pdf", fileName, fatura.PdfStorageKey, true, fatura.EmpresaId);
                 }
             }
             catch (Exception ex)
@@ -109,6 +111,6 @@ public class GerarPdfFaturaUseCase(
             "PDF de fatura gerado. FaturaId={FaturaId} Numero={Numero} Tamanho={Size}B",
             fatura.Id, fatura.Numero, bytes.Length);
 
-        return new GerarPdfFaturaResult(bytes, "application/pdf", fileName, stored.StorageKey, false);
+        return new GerarPdfFaturaResult(bytes, "application/pdf", fileName, stored.StorageKey, false, fatura.EmpresaId);
     }
 }

@@ -77,11 +77,11 @@ public sealed class PedidoEstoqueIntegrationService(
             }
 
             var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
-            var alvo = itens
+            var alvoCandidate = itens
                 ?.Where(i => i.LojaId == lojaId)
                 .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
                 .FirstOrDefault();
-            if (alvo is null)
+            if (alvoCandidate is null)
             {
                 if (RequerEstoqueExistente)
                     throw new UseCaseValidationException(
@@ -92,41 +92,48 @@ public sealed class PedidoEstoqueIntegrationService(
                 continue;
             }
 
-            // Conversão decimal → int. ItemEstoque.QuantidadeAtual ainda é
-            // int (legado do domínio); pedido com qty fracionária (kg/L)
-            // arredonda banker's rounding e loga warning para o operador.
-            // Cap superior: ceiling 99999 evita overflow.
-            var qtdDecimal = item.Quantidade;
-            if (qtdDecimal > 99_999m)
+            // Re-lê com FOR UPDATE para serializar atualizações concorrentes
+            // no mesmo item. Sem isso dois pedidos simultâneos podem ambos ler
+            // a mesma quantidade e gerar saldo negativo.
+            var alvo = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, alvoCandidate.Id) ?? alvoCandidate;
+
+            // Quantidade agora é decimal — suporta frações (kg, litros, etc.).
+            // Cap superior: 99.999 evita valores absurdos.
+            var qtd = item.Quantidade;
+            if (qtd > 99_999m)
                 throw new UseCaseValidationException(
-                    $"Item '{item.Nome}': quantidade {qtdDecimal} excede o teto de 99.999 unidades.");
+                    $"Item '{item.Nome}': quantidade {qtd} excede o teto de 99.999 unidades.");
 
-            var qtdInt = (int)Math.Round(qtdDecimal, MidpointRounding.AwayFromZero);
-            if (qtdInt != qtdDecimal)
-            {
-                logger.LogWarning(
-                    "Pedido {Id} item {ItemId}: quantidade {Qtd} arredondada para {QtdInt} (estoque trabalha com unidades inteiras).",
-                    pedido.Id, item.Id, qtdDecimal, qtdInt);
-            }
-            if (qtdInt <= 0) continue;
+            if (qtd <= 0m) continue;
 
-            var atual = alvo.QuantidadeAtual?.Value ?? 0;
+            var atual = alvo.QuantidadeAtual?.Value ?? 0m;
 
             // Estoque insuficiente: throw por padrão (status não muda),
             // ou clamp se PermiteEstoqueNegativo=true.
-            if (atual < qtdInt)
+            if (atual < qtd)
             {
                 if (!PermiteEstoqueNegativo)
                     throw new EstoqueInsuficienteException(
-                        item.ProdutoId.Value, qtdInt, atual);
+                        item.ProdutoId.Value, qtd, atual);
 
                 logger.LogWarning(
                     "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — descontando só {AtualDescontado} (PermiteEstoqueNegativo=true).",
-                    pedido.Id, item.ProdutoId, atual, qtdInt, atual);
-                qtdInt = atual; // só desconta o que tem
+                    pedido.Id, item.ProdutoId, atual, qtd, atual);
+                qtd = atual; // só desconta o que tem
             }
 
-            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual - qtdInt);
+            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual - qtd);
+
+            // Atualiza velocidade de saída (média 30 dias) para manter rotatividade
+            // correta no estoque — o caminho RegistrarSaidaEstoqueUseCase faz o mesmo.
+            var agora = DateTime.UtcNow;
+            const int janelaDias = 30;
+            var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
+                pedido.EmpresaId, item.ProdutoId.Value,
+                agora.AddDays(-janelaDias), agora);
+            var velocidadeAtualizada = (taxaAnterior * janelaDias + qtd) / janelaDias;
+            alvo.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
+
             await itemEstoqueRepo.UpdateAsync(alvo);
 
             await movRepo.InsertAsync(new MovimentacaoEstoque
@@ -137,13 +144,13 @@ public sealed class PedidoEstoqueIntegrationService(
                 ItemEstoqueId = alvo.Id,
                 Tipo = TipoMovimentacaoEstoque.Saida,
                 Natureza = NaturezaMovimentacaoEstoque.Venda,
-                Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtdInt),
+                Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtd),
                 ValorUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario),
-                ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtdInt),
+                ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtd),
                 DocumentoReferencia = refDocItem,
-                DataMovimentacao = DateTime.UtcNow,
+                DataMovimentacao = agora,
                 Descricao = $"Pedido {pedido.Id} item {item.Id}",
-                CriadoEm = DateTime.UtcNow
+                CriadoEm = agora
             });
         }
     }
@@ -169,16 +176,27 @@ public sealed class PedidoEstoqueIntegrationService(
                 continue;
 
             var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
-            var alvo = itens
+            var alvoCandidate = itens
                 ?.Where(i => i.LojaId == lojaId)
                 .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
                 .FirstOrDefault();
-            if (alvo is null) continue;
+            if (alvoCandidate is null) continue;
 
-            var qtdInt = (int)Math.Round(item.Quantidade, MidpointRounding.AwayFromZero);
-            if (qtdInt <= 0) continue;
-            var atual = alvo.QuantidadeAtual?.Value ?? 0;
-            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual + qtdInt);
+            var alvo = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, alvoCandidate.Id) ?? alvoCandidate;
+
+            var qtd = item.Quantidade;
+            if (qtd <= 0m) continue;
+            var atual = alvo.QuantidadeAtual?.Value ?? 0m;
+            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual + qtd);
+
+            var agora = DateTime.UtcNow;
+            const int janelaDias = 30;
+            var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
+                pedido.EmpresaId, item.ProdutoId.Value,
+                agora.AddDays(-janelaDias), agora);
+            var velocidadeAtualizada = Math.Max(0m, (taxaAnterior * janelaDias - qtd) / janelaDias);
+            alvo.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
+
             await itemEstoqueRepo.UpdateAsync(alvo);
 
             await movRepo.InsertAsync(new MovimentacaoEstoque
@@ -189,13 +207,13 @@ public sealed class PedidoEstoqueIntegrationService(
                 ItemEstoqueId = alvo.Id,
                 Tipo = TipoMovimentacaoEstoque.Entrada,
                 Natureza = NaturezaMovimentacaoEstoque.Estorno,
-                Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtdInt),
+                Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtd),
                 ValorUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario),
-                ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtdInt),
+                ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtd),
                 DocumentoReferencia = refDocItem,
-                DataMovimentacao = DateTime.UtcNow,
+                DataMovimentacao = agora,
                 Descricao = $"Cancelamento pedido {pedido.Id} item {item.Id}",
-                CriadoEm = DateTime.UtcNow
+                CriadoEm = agora
             });
         }
     }

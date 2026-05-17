@@ -1,0 +1,77 @@
+@page "{id?}"
+@model EasyStock.Admin.Pages.Faq.EditModel
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Editar FAQ" : "Novo FAQ";
+}
+
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-es-ink text-xl font-semibold">@(Model.Id.HasValue ? "Editar item" : "Novo item")</h1>
+    <a asp-page="/Faq/Index" class="btn-secondary text-sm">Voltar</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Erro))
+{
+    <div class="mb-4 rounded bg-red-100 px-4 py-2 text-red-800">@Model.Erro</div>
+}
+
+@if (Model.Status != null)
+{
+    <div class="mb-4 text-sm text-es-ink-2">Status atual: <strong>@Model.Status</strong></div>
+}
+
+<form method="post" class="space-y-4 max-w-3xl">
+    <div>
+        <label class="block text-sm mb-1">Categoria</label>
+        <select asp-for="CategoriaId" class="form-input w-full" required disabled="@Model.Id.HasValue">
+            <option value="">— selecione —</option>
+            @foreach (var cat in Model.Categorias)
+            {
+                var id = cat.GetProperty("id").GetGuid();
+                var nome = cat.GetProperty("nome").GetString();
+                <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label class="block text-sm mb-1">Titulo *</label>
+        <input asp-for="Titulo" class="form-input w-full" maxlength="200" required />
+    </div>
+
+    @if (!Model.Id.HasValue)
+    {
+        <div>
+            <label class="block text-sm mb-1">Slug *</label>
+            <input asp-for="Slug" class="form-input w-full" maxlength="200" required
+                   placeholder="ex: como-cadastrar-produto" />
+            <p class="text-xs text-es-ink-2 mt-1">Use somente letras minusculas, numeros e hifen.</p>
+        </div>
+    }
+
+    <div>
+        <label class="block text-sm mb-1">Conteudo (Markdown) *</label>
+        <textarea asp-for="Conteudo" rows="14" class="form-input w-full font-mono text-xs" required></textarea>
+    </div>
+
+    <div>
+        <label class="block text-sm mb-1">Conteudo de busca (opcional, texto plano)</label>
+        <textarea asp-for="ConteudoBusca" rows="3" class="form-input w-full text-xs"></textarea>
+        <p class="text-xs text-es-ink-2 mt-1">Se vazio, sera derivado do Markdown automaticamente.</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm mb-1">Tags (separadas por virgula)</label>
+            <input asp-for="Tags" class="form-input w-full" maxlength="500" />
+        </div>
+        <div>
+            <label class="block text-sm mb-1">Ordem</label>
+            <input asp-for="Ordem" type="number" class="form-input w-full" />
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+        <button type="submit" class="btn-primary">Salvar</button>
+        <a asp-page="/Faq/Index" class="btn-secondary">Cancelar</a>
+    </div>
+</form>

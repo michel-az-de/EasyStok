@@ -42,6 +42,12 @@ public class ProdutoFormViewModel
     // TipoProduto: 0 = Fisico, 1 = Alimento, 2 = Servico
     public int Tipo { get; set; } = 0;
 
+    // C2 (RDC 727/2022): "Avulso" (default) ou "Embalado".
+    // Embalado exige peso por unidade nas etiquetas (Lotes).
+    // string em vez de enum porque EasyStock.Web nao referencia EasyStock.Domain
+    // — o API serializa Produto.TipoEmbalagem como string (HasConversion<string>).
+    public string TipoEmbalagem { get; set; } = "Avulso";
+
     // StatusProduto: 0 = Ativo, 1 = Inativo (only used on edit)
     public int Status { get; set; } = 0;
 

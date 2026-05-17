@@ -2,64 +2,92 @@ name: CI
 
 on:
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
   push:
-    branches: [ master, main ]
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  DOTNET_VERSION: '9.x'
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
-  # ── Build + unit tests ──────────────────────────────────────────────────────
-  build-and-unit-tests:
-    name: Build + Unit tests
+  build-and-test:
+    name: Build + dotnet test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
-        run: dotnet restore EasyStok.sln
-
-      - name: Build (Release)
-        run: dotnet build EasyStok.sln -c Release --no-restore --nologo
-
-      - name: Unit tests
-        run: |
-          dotnet test EasyStock.Api.UnitTests/EasyStock.Api.UnitTests.csproj -c Release --no-build --nologo --logger "console;verbosity=normal"
-          dotnet test EasyStock.Application.Tests/EasyStock.Application.Tests.csproj -c Release --no-build --nologo --logger "console;verbosity=normal"
-          dotnet test EasyStock.Domain.Tests/EasyStock.Domain.Tests.csproj -c Release --no-build --nologo --logger "console;verbosity=normal"
-
-  # ── Seed flow integration tests (Testcontainers Postgres) ───────────────────
-  # R6: gateia merge contra regressao em migrations + seed em DB do zero +
-  # idempotencia 3x. Custo ~30s por run (container postgres + factory startup).
-  seed-flow-integration-tests:
-    name: Seed flow integration tests (R6)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: build-and-unit-tests
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore EasyStok.sln
+        run: dotnet restore EasyStok.CI.slnf
 
-      - name: Build (Release)
-        run: dotnet build EasyStok.sln -c Release --no-restore --nologo
+      - name: Build
+        run: dotnet build EasyStok.CI.slnf -c Release --no-restore -warnaserror
 
-      - name: Run SeedFlow integration tests
+      - name: Test
+        run: >-
+          dotnet test EasyStok.CI.slnf
+          -c Release --no-build --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults/**/*.trx
+          retention-days: 14
+
+      - name: Open helpdesk ticket on failure
+        if: failure() && env.CI_TICKETS_API_URL != ''
+        env:
+          CI_TICKETS_API_URL: ${{ secrets.CI_TICKETS_API_URL }}
+          CI_AUTO_TICKET_KEY: ${{ secrets.CI_AUTO_TICKET_KEY }}
         run: |
-          dotnet test EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj \
-            -c Release --no-build --nologo \
-            --filter "FullyQualifiedName~SeedFlowIntegrationTests" \
-            --logger "console;verbosity=normal"
+          # Auto-ticket em falha de CI. Signature deterministico (run_id + ref)
+          # garante idempotencia diaria — re-trigger do mesmo workflow nao
+          # multiplica tickets. /api/ci/tickets coalesca como comentario.
+          SIG=$(echo -n "ci-${GITHUB_RUN_ID}-${GITHUB_REF}" | sha256sum | awk '{print $1}')
+          # Anexa ultimas 80 linhas do test results (best-effort)
+          CONTEXTO=$(find ./TestResults -name '*.trx' -print0 \
+            | xargs -0 grep -h '<Message>' 2>/dev/null \
+            | tail -n 80 \
+            | sed 's/"/\\"/g' \
+            | tr -d '\r' \
+            | awk '{printf "%s\\n", $0}' \
+            || echo "(sem trx)")
+          curl -sS -X POST "${CI_TICKETS_API_URL}/api/ci/tickets" \
+            -H "Content-Type: application/json" \
+            -H "X-Ci-Key: ${CI_AUTO_TICKET_KEY}" \
+            -d "{
+              \"origin\": \"ci\",
+              \"signature\": \"${SIG}\",
+              \"titulo\": \"CI falhou em ${GITHUB_REF_NAME} (${GITHUB_RUN_ID})\",
+              \"descricao\": \"Run ${GITHUB_RUN_ID} falhou no commit ${GITHUB_SHA}\",
+              \"contexto\": \"${CONTEXTO}\"
+            }" || echo "(auto-ticket falhou — checar manualmente)"

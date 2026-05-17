@@ -181,8 +181,10 @@ public sealed class NotificadorService(
 
         try
         {
+            // Assunto sempre texto puro; corpo HTML em canais que renderizam markup (Email, InApp).
             assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
-            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, ct);
+            var corpoEscapaHtml = canalPrimario is CanalNotificacao.Email or CanalNotificacao.InApp;
+            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
         }
         catch (Exception ex)
         {
