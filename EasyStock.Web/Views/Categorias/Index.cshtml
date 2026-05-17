@@ -183,12 +183,18 @@
                                         </svg>
                                         Editar
                                     </button>
+                                    @{
+                                        var temLimiares = c.QuantidadeMinima.HasValue || c.QuantidadeCritica.HasValue;
+                                        var avisoExtra = temLimiares
+                                            ? "<br><br>⚠ Esta categoria possui limiares de estoque configurados. Removê-la desativará os alertas associados."
+                                            : "";
+                                    }
                                     <button type="button"
                                             data-nome="@c.Nome"
                                             @@click="$dispatch('confirm-action', {
                                                 titulo: 'Remover categoria',
-                                                mensagem: 'Remover <strong>' + $el.dataset.nome + '</strong>? Produtos nessa categoria ficarão sem categoria.',
-                                                textoBotao: 'Remover',
+                                                mensagem: 'Remover <strong>' + $el.dataset.nome + '</strong>? Produtos nessa categoria ficarão sem categoria.@Html.Raw(avisoExtra)',
+                                                textoBotao: 'Sim, remover',
                                                 classBotao: 'bg-red-600 hover:bg-red-700',
                                                 formAction: '/categorias/@c.Id/excluir'
                                             })"

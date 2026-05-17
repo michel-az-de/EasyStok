@@ -160,7 +160,7 @@
                     }
                     else
                     {
-                        <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
+                        <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque.AsQuantity("un.") em estoque</span>
                     }
                 </div>
                 <h1 class="produto-detail-title text-2xl font-extrabold text-slate-900 leading-tight mb-1">@p.Nome</h1>
@@ -567,8 +567,7 @@
                 <h3 class="font-bold text-slate-800">Estoque por variação</h3>
                 <div class="flex items-center gap-2">
                     <span class="text-sm text-slate-500">Total:</span>
-                    <span class="text-xl font-extrabold @(p.QuantidadeTotalEstoque == 0 ? "text-red-600" : "text-slate-900")">@p.QuantidadeTotalEstoque</span>
-                    <span class="text-sm text-slate-400">un.</span>
+                    <span class="text-xl font-extrabold @(p.QuantidadeTotalEstoque == 0 ? "text-red-600" : "text-slate-900")">@p.QuantidadeTotalEstoque.AsQuantity("un.")</span>
                 </div>
             </div>
 
@@ -744,11 +743,11 @@
                                           :class="(item.natureza||'').toLowerCase().includes('entrada')
                                               ? 'bg-emerald-50 text-emerald-800'
                                               : 'bg-red-50 text-red-600'"
-                                          x-text="item.natureza ?? '-'"></span>
+                                          x-text="({Producao:'Produção',Devolucao:'Devolução',Doacao:'Doação',UsoInterno:'Uso Interno',Prejuizo:'Prejuízo'})[item.natureza] ?? item.natureza ?? '-'"></span>
                                 </td>
                                 <td class="text-center font-bold" x-text="item.quantidade ?? 0"></td>
                                 <td class="text-right text-sm font-semibold"
-                                    x-text="item.valorTotal!=null ? 'R$ '+Number(item.valorTotal).toFixed(2) : '-'"></td>
+                                    x-text="item.valorTotal!=null ? fmt.money(item.valorTotal) : '-'"></td>
                                 <td class="text-sm text-slate-500 max-w-xs truncate"
                                     x-text="item.observacoes ?? '-'"></td>
                             </tr>
