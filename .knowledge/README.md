@@ -17,11 +17,11 @@ Dono é **Felipe Azevedo** (`@michel-az-de` no GitHub, Avanade Brasil, .NET sên
 
 ## Estado atual da infra
 
-- **Azure App Service ATIVO** (workflow `.github/workflows/deploy-azure.yml` faz auto-deploy em push pra master/main).
-- **Azure PostgreSQL Flexible** `pg-easystock` é o banco transacional vivo.
-- **GCP Cloud Run** documentado em `gcp-deploy.md` como plano alternativo (scripts em `scripts/gcp-deploy.sh`); **não migrado**, só preparação.
-- **Render** NÃO está em uso (referência antiga em memória de abril/2026 — desconsiderar).
-- **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público.
+- **Render** é o canal único de producao (workflow `.github/workflows/deploy-render.yml` + Blueprint `render.yaml`). Services: `easystok-api`, `easystok-web`, `easystok-admin`, `easystok-worker` em `easystok-*.onrender.com`. Preview Environments por PR habilitados.
+- **Postgres Render** managed e o banco transacional vivo (string em `easystok-secrets` envVarGroup).
+- **Azure App Service descomissionado** em 2026-05-11 junto com workflows `deploy-azure.yml` e `azure-static-web-apps-*.yml`. Plano antigo GCP (`gcp-deploy.md`, `scripts/gcp-deploy.sh`) tambem removido — nunca foi executado.
+- **APK Casa da Baba** publicado pelo CI em `EasyStock.Web/wwwroot/downloads/`; clientes baixam de `https://easystok-web.onrender.com/downloads`. Capacitor Updater poll-a `/downloads/apk/manifest` para OTA.
+- **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público (dev local).
 
 ## Estado do código
 
@@ -32,7 +32,7 @@ P0 antigos (`tech-debt.md`) RESOLVIDOS:
 - ✅ Webhook Pix valida valor pago vs cobrança
 - ✅ `DiagnosticoController` `[Authorize(Policy="Admin")]`
 
-P0 atuais: NF-e, rate limiting endpoints públicos, CI gate de qualidade.
+P0 atuais: NF-e, rate limiting em `/api/webhooks/pix` (auth/* já coberto — B-015 fechado em 2026-05-07), CI gate de qualidade.
 
 Qualidade por área (auditoria `audit-brutal.md` 2026-04-30 — sem mudança estrutural desde):
 
@@ -83,7 +83,6 @@ Veja `do-not-do.md`. Top 5:
 - `quick-reference.md` — comandos Bash/dotnet/git mais usados
 - `audit-brutal.md` — auditoria sênior pessimista de 2026-04-30 (não regenere)
 - `dual-frontend-policy.md` — **POLÍTICA OBRIGATÓRIA**: PWA + MAUI coexistem; merge unidirecional `PWA → MAUI`
-- `gcp-deploy.md` — passo-a-passo do deploy GCP (plano alternativo)
 - `stability-roadmap.md` — **checklist vivo** do que falta pra estabilizar (deploy, CI, observabilidade, testes integração). Atualizar marcando `[x]` ao resolver.
 
 ## Como usar isso pra economizar tokens
@@ -92,7 +91,7 @@ Veja `do-not-do.md`. Top 5:
 
 **Cenário 2 — usuário pediu pedido/estoque:** abre `domain-glossary.md` + `current-state.md` + arquivo do código relevante.
 
-**Cenário 3 — usuário pediu deploy:** abre `current-state.md` (seção Infra) + `gcp-deploy.md` se for migração.
+**Cenário 3 — usuário pediu deploy:** abre `current-state.md` (seção Infra) + `render.yaml` + `.github/workflows/deploy-render.yml`.
 
 **Cenário 4 — usuário pediu auditoria:** abre `audit-brutal.md` (não roda novos agentes — já tem dados).
 

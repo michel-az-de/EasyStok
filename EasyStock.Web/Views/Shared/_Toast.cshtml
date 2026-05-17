@@ -8,7 +8,15 @@
     var toastMsg  = parts.Length > 1 ? parts[1] : toastRaw;
     var undoUrl   = parts.Length > 2 ? parts[2] : null;
 
-    if (undoUrl is not null)
+    // C3 (2026-05-16): undoUrl so vale para tipos success/success-undo.
+    // Antes, qualquer tipo (inclusive error) podia receber undoUrl e o
+    // botao Desfazer aparecia indevidamente. Tipos error/warning/info perdem
+    // capacidade de undo (auditoria mostrou que nenhum call-site usa hoje).
+    var isUndoable = !string.IsNullOrEmpty(undoUrl)
+                     && (toastType == "success" || toastType == "success-undo");
+    var effectiveType = isUndoable ? "success-undo" : toastType;
+
+    if (isUndoable)
     {
         <script>
             document.addEventListener('DOMContentLoaded', function () {
@@ -28,12 +36,19 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
-                window.showToast(@Json.Serialize(toastMsg), @Json.Serialize(toastType), 5000, __undoToast);
+                window.showToast(@Json.Serialize(toastMsg), @Json.Serialize(effectiveType), 5000, __undoToast);
             }, { once: true });
         </script>
     }
     else
     {
+        @* Detecta caso onde undoUrl veio mas tipo nao e undoable - log no console pra triagem. *@
+        @if (!string.IsNullOrEmpty(undoUrl))
+        {
+            <script>
+                console.warn('[toast] undoUrl ignorado em tipo "@toastType". Para acao reversivel use type=success ou success-undo.');
+            </script>
+        }
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 if (window.showToast) {

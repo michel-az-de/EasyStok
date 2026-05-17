@@ -109,6 +109,14 @@ public class MobileDevice
     [Column("push_token")]
     public string? PushToken { get; set; }
 
+    /// <summary>
+    /// Canary device — recebe versao nova do PWA/APK antes da frota geral.
+    /// Casa da Baba inteira fica em stable por default; admin marca 1-2 devices
+    /// internos como canary pra validar update sem afetar producao.
+    /// </summary>
+    [Column("is_canary")]
+    public bool IsCanary { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

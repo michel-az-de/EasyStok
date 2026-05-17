@@ -29,10 +29,23 @@ public enum TipoEventoNotificacao
     PagamentoConfirmado = 23,
     PagamentoFalhou = 24,
 
+    // Modulo Helpdesk — convite CSAT pos fechamento
+    ConviteCsat = 25,
+
+    // Pedido agendado (mobile) — lembretes disparados pelo AgendamentoNotificacaoService.
+    PedidoAgendadoHoje = 26,
+    PedidoAgendadoEm1Hora = 27,
+    PedidoAgendadoEm10Minutos = 28,
+
+    // Módulo de Relatórios (PR-C0)
+    RelatorioPronto = 29,
+    RelatorioFalhou = 30,
+    RelatorioExpirado = 31,
+
     // Contas a Pagar / Contas a Receber (CAP/CAR)
-    ContaPagarVencendo = 25,
-    ContaPagarVencida = 26,
-    ContaReceberVencendo = 27,
-    ContaReceberVencida = 28,
-    ParcelaRecebida = 29
+    ContaPagarVencendo = 32,
+    ContaPagarVencida = 33,
+    ContaReceberVencendo = 34,
+    ContaReceberVencida = 35,
+    ParcelaRecebida = 36
 }

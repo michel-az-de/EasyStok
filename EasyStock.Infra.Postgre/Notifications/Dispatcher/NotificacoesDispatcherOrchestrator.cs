@@ -32,9 +32,6 @@ public sealed class NotificacoesDispatcherOrchestrator(
     private static readonly Histogram<double> RunDuration = NotifMeter.CreateHistogram<double>(
         "notifications.dispatcher.run.duration", "ms", "Duração de 1 rodada completa do dispatcher (todos os shards)");
 
-    // Base de lock: 0x4E4F5449 = "NOTI" em ASCII
-    private const long LockBase = 0x4E4F_5449_0000_0000L;
-
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
         Converters = { new JsonStringEnumConverter() }
@@ -70,7 +67,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var advisoryLock = sp.GetRequiredService<PostgresAdvisoryLock>();
 
         var processadas = 0;
-        await advisoryLock.TentarExecutarAsync(LockBase + shardKey, async token =>
+        await advisoryLock.TentarExecutarAsync(LockKeys.NotificacoesDispatcherBase + shardKey, async token =>
         {
             var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
             var logRepo = sp.GetRequiredService<ILogEnvioNotificacaoRepository>();
@@ -227,7 +224,8 @@ public sealed class NotificacoesDispatcherOrchestrator(
         try
         {
             assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
-            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, ct);
+            var corpoEscapaHtml = proximoCanal is CanalNotificacao.Email or CanalNotificacao.InApp;
+            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
         }
         catch (Exception ex)
         {

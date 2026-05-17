@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -14,13 +15,16 @@ namespace EasyStock.Api.Services.Helpdesk;
 /// Cada operacao registra entrada em ticket_historico e (quando aplicavel)
 /// dispara evento via outbox de notificacoes.
 /// </summary>
-public sealed class HelpdeskTicketService(
+public class HelpdeskTicketService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    SlaResolver slaResolver,
+    ISlaResolver slaResolver,
     INotificadorService notificador)
 {
-    public async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
+    // virtual para permitir Substitute.For em testes (AutoTicketFalhaPagamentoTests).
+    // Sem essa marcacao a classe seria mockada apenas via interface — overhead nao
+    // justificado para um servico interno da camada Api.
+    public virtual async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
     {
         var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
             ?? throw new KeyNotFoundException("Empresa nao encontrada.");
@@ -34,7 +38,20 @@ public sealed class HelpdeskTicketService(
                 ?? throw new KeyNotFoundException("Fatura nao encontrada para esta empresa.");
         }
 
+        // Onda 1.1 — valida pedido pertence a empresa quando informado (espelha guard de Fatura).
+        Domain.Entities.Pedido? pedido = null;
+        if (cmd.PedidoId.HasValue && cmd.PedidoId.Value != Guid.Empty)
+        {
+            pedido = await db.Pedidos
+                .FirstOrDefaultAsync(p => p.Id == cmd.PedidoId.Value && p.EmpresaId == cmd.EmpresaId, ct)
+                ?? throw new KeyNotFoundException("Pedido nao encontrado para esta empresa.");
+        }
+
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
+
+        // Em contexto de webhook (anonimo) currentUser.UsuarioId retorna Guid.Empty;
+        // o FK p/ Usuarios falha. Normaliza para null quando nao autenticado.
+        var autorId = currentUser.UsuarioId == Guid.Empty ? (Guid?)null : currentUser.UsuarioId;
 
         var ticket = AdminTicket.Criar(
             empresaId: cmd.EmpresaId,
@@ -45,13 +62,14 @@ public sealed class HelpdeskTicketService(
             nivel: cmd.Nivel,
             prazoResposta: sla.PrazoResposta,
             prazoResolucao: sla.PrazoResolucao,
-            criadoPorId: currentUser.UsuarioId);
+            criadoPorId: autorId);
         ticket.FaturaId = fatura?.Id;
+        ticket.PedidoId = pedido?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
-            ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.Criado,
-            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
+            ticket.Id, autorId, TicketAcaoHistorico.Criado,
+            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id, pedidoId = pedido?.Id })));
 
         // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
         // primeiro ticket sobre ela (idempotente — se ja vinculada, mantem).
@@ -155,10 +173,36 @@ public sealed class HelpdeskTicketService(
         if (cmd.NovoStatus == TicketStatus.Resolvido && ticket.ResolvidoEm is null)
             ticket.ResolvidoEm = DateTime.UtcNow;
 
+        // Convite CSAT no fechamento — uma vez por ticket. Carimbo idempotente
+        // evita reenvio caso ticket reabra (cliente respondeu) e feche de novo.
+        var enviarConviteCsat = cmd.NovoStatus == TicketStatus.Fechado
+            && ticket.ConviteCsatEnviadoEm is null
+            && ticket.CriadoPorId.HasValue;
+        if (enviarConviteCsat)
+            ticket.ConviteCsatEnviadoEm = DateTime.UtcNow;
+
         db.TicketHistoricos.Add(TicketHistorico.Criar(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.StatusAlterado,
             valorAntes: statusAntes.ToString(),
             valorDepois: cmd.NovoStatus.ToString()));
+
+        // Onda 1.1 — trilha cruzada Pedido <-> Ticket. Quando ticket vinculado a
+        // pedido eh resolvido, registra PedidoEvento "ticket_resolvido". Apenas
+        // registro; nao altera estado do pedido (operador faz mutacao explicita
+        // se a resolucao envolver reembolso/cancelamento).
+        if (cmd.NovoStatus == TicketStatus.Resolvido && ticket.PedidoId.HasValue)
+        {
+            db.Set<Domain.Entities.PedidoEvento>().Add(new Domain.Entities.PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = ticket.PedidoId.Value,
+                Tipo = "ticket_resolvido",
+                Detalhes = JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
+                UsuarioId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                Origem = "api",
+                OcorridoEm = DateTime.UtcNow
+            });
+        }
 
         await db.CommitAsync();
 
@@ -168,6 +212,21 @@ public sealed class HelpdeskTicketService(
             usuarioDestinoId: ticket.CriadoPorId,
             payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, statusAntes = statusAntes.ToString(), statusDepois = cmd.NovoStatus.ToString() }),
             ct: ct);
+
+        if (enviarConviteCsat)
+        {
+            await notificador.PublicarEventoAsync(
+                TipoEventoNotificacao.ConviteCsat,
+                ticket.EmpresaId,
+                usuarioDestinoId: ticket.CriadoPorId,
+                payloadJson: JsonSerializer.Serialize(new
+                {
+                    ticketId = ticket.Id,
+                    titulo = ticket.Titulo,
+                    avaliarUrl = $"/api/helpdesk/tickets/{ticket.Id}/avaliacao"
+                }),
+                ct: ct);
+        }
     }
 
     public async Task AlterarPrioridadeAsync(AlterarPrioridadeTicketCommand cmd, CancellationToken ct = default)

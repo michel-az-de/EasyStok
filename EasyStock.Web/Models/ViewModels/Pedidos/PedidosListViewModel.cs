@@ -8,6 +8,7 @@ public class PedidosListViewModel
     public string? Search { get; set; }
     public string? FiltroStatus { get; set; }
     public List<Cliente> Clientes { get; set; } = [];
+    public List<CategoriaApi> Categorias { get; set; } = [];
 }
 
 public class PedidoDetailViewModel

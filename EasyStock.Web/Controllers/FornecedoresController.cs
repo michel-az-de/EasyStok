@@ -62,11 +62,18 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (result.Data is null) return RedirectToAction(nameof(Index));
         var vm = new FornecedorDetailViewModel { Fornecedor = result.Data };
 
-        var historicoResult = await svc.ObterHistoricoAsync(id);
+        var historicoTask     = svc.ObterHistoricoAsync(id);
+        var estatisticasTask  = svc.ObterEstatisticasAsync(id);
+        var alteracoesTask    = svc.ObterAlteracoesAsync(id);
+        await Task.WhenAll(historicoTask, estatisticasTask, alteracoesTask);
+
+        var historicoResult    = historicoTask.Result;
+        var estatisticasResult = estatisticasTask.Result;
+        var alteracoesResult   = alteracoesTask.Result;
+
         if (historicoResult.Success && historicoResult.Data is not null)
             vm.Historico = historicoResult.Data;
 
-        var estatisticasResult = await svc.ObterEstatisticasAsync(id);
         if (estatisticasResult.Success && estatisticasResult.Data is not null)
         {
             var stats = estatisticasResult.Data;
@@ -75,8 +82,6 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
             vm.QuantidadePedidos = stats.QuantidadePedidos;
         }
 
-        // Onda P4 — trail de alterações.
-        var alteracoesResult = await svc.ObterAlteracoesAsync(id);
         if (alteracoesResult.Success && alteracoesResult.Data is not null)
             vm.Alteracoes = alteracoesResult.Data;
 
@@ -108,11 +113,19 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (req is null)
         {
             logger.LogWarning("CriarJson: corpo nulo ou inválido (modelbinder retornou null)");
-            return BadRequest(new { success = false, errorMessage = "Corpo da requisição inválido." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Corpo da requisição inválido." }
+            });
         }
 
         if (string.IsNullOrWhiteSpace(req.Nome))
-            return BadRequest(new { success = false, errorMessage = "Nome é obrigatório." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Informe o nome do fornecedor." }
+            });
 
         var result = await svc.CriarAsync(
             req.Nome, req.Documento, req.Contato, req.Email, req.Telefone,
@@ -122,7 +135,15 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (!result.Success)
         {
             logger.LogWarning("CriarJson falhou: {Code} — {Msg}", result.ErrorCode, result.ErrorMessage);
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar fornecedor." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar fornecedor."
+                }
+            });
         }
 
         return Ok(new { success = true, id = result.Data?.Id });
@@ -150,6 +171,12 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Excluir(string id)
     {
+        if (!IsAdmin())
+        {
+            Toast("error", "Apenas administradores podem desativar fornecedores.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
         var result = await svc.ExcluirAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 

@@ -4,16 +4,15 @@
 
 ## P0 — Bloqueia produção real
 
-> Os 3 P0 antigos (PedidoFornecedor.Itens, Webhook Pix valor, DiagnosticoController) estão RESOLVIDOS — ver "Resolvidos" no fim deste arquivo.
+> Os 3 P0 antigos (PedidoFornecedor.Itens, Webhook Pix valor, DiagnosticoController) estão RESOLVIDOS — ver "Resolvidos" no fim deste arquivo. Rate limit em `/auth/*` (B-015) também resolvido — falta cobrir `/api/webhooks/pix`.
 
 1. **Sem NF-e/NFC-e**
    - Cliente brasileiro real exigiu desde a primeira conversa de venda. Bling/Tiny tem de fábrica.
    - Decisão pendente: integrar emissor third-party (Focus NFe / eNotas) ou construir interno.
 
-2. **Sem rate limiting em endpoints públicos**
-   - `/auth/login`, `/auth/registrar`, `/api/webhooks/pix` sem limite por IP.
-   - Risco: brute-force credentials + DOS em webhook + replay attack.
-   - Fix: ASP.NET 9 RateLimiter middleware com policies por endpoint.
+2. **Rate limiting parcial em endpoints públicos**
+   - `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/api/auth/forgot-password`, `/api/auth/reset-password` cobertos pela policy `auth` (10/min/IP, fixed-window).
+   - Falta cobrir `/api/webhooks/pix` (DOS + replay attack ainda em aberto).
 
 3. **CI não bloqueia merge com teste vermelho**
    - Workflows `deploy-azure.yml` deploy direto, sem gate de qualidade prévio.
@@ -48,8 +47,7 @@
 10. **`appsettings.Production.json` com placeholders não-óbvios**
     - `Efi:ClientId`, `Stripe:Webhook`, etc. Onboarding novo dev confuso.
 
-11. **`SubscriptionGateMiddleware` não tem cache**
-    - Bate no DB toda request autenticada. Latência cumulativa em escala.
+11. ~~**`SubscriptionGateMiddleware` não tem cache**~~ — RESOLVIDO 2026-05-07 (ver "Resolvidos").
 
 ## P3 — Cosmético / Future
 
@@ -57,6 +55,10 @@
 13. Sem health-check estruturado completo (`/health/live`, `/health/ready`) — middleware existe parcial.
 14. Status de pedido como `string` — adicionar enum-string converter pra evitar typos em transição.
 15. Logs sem `correlationId` propagado consistentemente em todas requests.
+16. **`EfiPixWebhookProcessor` renova vigência hard-coded em 30 dias**
+    - `assinatura.DataFim = baseDate.AddDays(30)` ignora `Plano.CicloMeses` (anual/semestral renovam errado).
+    - Fix: usar `Plano.CicloMeses ?? 1` × 30, ou método de domínio `assinatura.RenovarVigencia(plano.CicloMeses)`.
+    - Hoje só impacta planos não-mensais — billing atual é Pix mensal, então não é crítico ainda.
 
 ---
 
@@ -70,3 +72,5 @@
 - [x] **Pedido → estoque com idempotência** — 2026-04 (`340aff0`). Chave `{pedidoId}:{itemId}`.
 - [x] **xmin RowVersion em entidades-chave** — 2026-04. Produto, Pedido, ItemEstoque, AssinaturaEmpresa.
 - [x] **Mongo descartado como provedor transacional** — 2026-05-01 (`820843c`). ADR 0001 formal.
+- [x] **`SubscriptionGateMiddleware` sem cache** — 2026-05-07. `ISubscriptionStatusCache` (IMemoryCache, TTL 60s configurável via `Cache:SubscriptionStatusDuration`) com snapshot imutável `SubscriptionStatusSnapshot`. Invalidação automática via `AssinaturaCacheInvalidationInterceptor` (EF SaveChangesInterceptor) — captura `Added/Modified/Deleted` em `AssinaturaEmpresa` e dispara `Invalidate(empresaId)` apenas após SaveChanges bem-sucedido. Cobre webhook Pix, cancelar, alterar plano, jobs e admin sem precisar tocar cada call site.
+- [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` (fixed-window 10/min particionada por IP, `QueueLimit=0`) ativa em login/register/refresh/forgot-password/reset-password. Resposta 429 com `Retry-After` + envelope `RATE_LIMIT_EXCEEDED`. Coberto por `EasyStock.Api.IntegrationTests/AuthRateLimitTests.cs`. `/api/webhooks/pix` ainda fora — virou item residual no P0 #2.

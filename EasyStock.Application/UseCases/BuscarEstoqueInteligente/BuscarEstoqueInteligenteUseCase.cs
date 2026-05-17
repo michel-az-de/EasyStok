@@ -29,7 +29,7 @@ namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
         string ChaveExibicao,
         int Score,
         string? Sku = null,
-        int? QuantidadeAtual = null,
+        decimal? QuantidadeAtual = null,
         string? Status = null,
         string? FornecedorNome = null,
         string? Loja = null);

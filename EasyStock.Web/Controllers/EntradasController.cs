@@ -56,15 +56,31 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-            return BadRequest(new { success = false, errorMessage = string.Join(" ", errors) });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = string.Join(" ", errors) }
+            });
         }
 
         if (!ValidarProdutoId(vm))
-            return BadRequest(new { success = false, errorMessage = "Selecione um produto válido." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Selecione um produto válido." }
+            });
 
         var result = await svc.CriarEntradaAsync(vm);
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao registrar entrada." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao registrar entrada."
+                }
+            });
 
         return Ok(new { success = true });
     }
@@ -132,6 +148,16 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
     {
         ViewBag.Title = "Histórico de Entradas";
         ViewBag.ActiveMenuItem = "Entradas";
+
+        // BUG 10: defaults usavam UTC e concatenavam ":T23:59:59" em periodoFim.
+        // Input <input type="date"> não aceita componente de hora — campo "até"
+        // ficava vazio na UI. Fuso BR + apenas data nua.
+        if (string.IsNullOrEmpty(periodoInicio) && string.IsNullOrEmpty(periodoFim))
+        {
+            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            periodoInicio = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
+            periodoFim = hojeBr.ToString("yyyy-MM-dd");
+        }
 
         var result = await svc.HistoricoAsync(page, tipo, periodoInicio, periodoFim);
         if (HasError(result)) return View(new EntradasHistoricoViewModel());

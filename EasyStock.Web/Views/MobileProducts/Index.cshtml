@@ -63,7 +63,7 @@
                             </button>
                             <span class="text-xs text-slate-300">|</span>
                             <form method="post" action="/produtos-mobile/@p.Id/aprovar" class="inline"
-                                  onsubmit="return confirm('Aprovar como produto mobile-only (sem link com ERP)?');">
+                                  data-confirm='{"titulo":"Aprovar produto mobile-only?","mensagem":"O produto sera aprovado sem link com ERP. Voce ainda pode linkar manualmente depois.","textoBotao":"Aprovar","classBotao":"bg-emerald-600 hover:bg-emerald-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">
                                     Aprovar (mobile-only)
@@ -158,13 +158,13 @@
                             }
                             else
                             {
-                                <span class="inline-block px-2 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded">Mobile-only</span>
+                                <span class="inline-block px-2 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded">Mobile-only</span>
                             }
                         </td>
                         <td class="px-4 py-3 text-sm text-slate-700">@p.ApprovedAt?.ToString("dd/MM HH:mm")</td>
                         <td class="px-4 py-3 text-right">
                             <form method="post" action="/produtos-mobile/@p.Id/desfazer" class="inline"
-                                  onsubmit="return confirm('Desfazer aprovação? Produto volta pra lista de pendentes.');">
+                                  data-confirm='{"titulo":"Desfazer aprovacao?","mensagem":"O produto volta para a lista de pendentes.","textoBotao":"Desfazer","classBotao":"bg-slate-600 hover:bg-slate-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-slate-500 hover:text-red-600 font-medium">
                                     Desfazer

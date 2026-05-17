@@ -209,6 +209,22 @@ public class AdminApiClient(HttpClient httpClient)
         return json.RootElement.Clone();
     }
 
+    public async Task<JsonElement> PostMultipartRawAsync(string path, MultipartFormDataContent multipart)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = multipart };
+        using var response = await httpClient.SendAsync(request);
+        ThrowIfUnauthorized(response);
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            var fallback = $"{{\"error\":{{\"code\":\"EMPTY_RESPONSE\",\"message\":\"HTTP {(int)response.StatusCode} sem corpo.\"}}}}";
+            using var fb = JsonDocument.Parse(fallback);
+            return fb.RootElement.Clone();
+        }
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
     public async Task<T> PatchAsync<T>(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Patch, path, body));
@@ -216,6 +232,14 @@ public class AdminApiClient(HttpClient httpClient)
         await EnsureSuccessOrThrowAsync(response);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return UnwrapData<T>(json.RootElement);
+    }
+
+    /// <summary>PUT sem corpo de retorno relevante (204 NoContent ou similar).</summary>
+    public async Task PutAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Put, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
     }
 
     public async Task PatchRawAsync(string path, object body)

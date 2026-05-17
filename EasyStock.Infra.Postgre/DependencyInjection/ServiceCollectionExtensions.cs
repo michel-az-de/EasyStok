@@ -1,12 +1,15 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Events;
+using EasyStock.Infra.Postgre.Hosting;
 using EasyStock.Infra.Postgre.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +32,10 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
             services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddSingleton<SetTenantOnConnectionInterceptor>();
+            services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
+            services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
+            services.AddScoped<EntityChangeInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
@@ -40,7 +47,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
                 })
-                .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
+                .AddInterceptors(
+                    sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                    sp.GetRequiredService<SetTenantOnConnectionInterceptor>(),
+                    sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
+                    sp.GetRequiredService<EntityChangeInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
@@ -61,6 +72,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IPedidoRepository, PedidoRepository>();
             services.AddScoped<ICaixaRepository, CaixaRepository>();
             services.AddScoped<ILoteRepository, LoteRepository>();
+            services.AddScoped<IEtiquetaTemplateRepository, EtiquetaTemplateRepository>();
             services.AddScoped<IListaComprasRepository, ListaComprasRepository>();
             services.AddScoped<IPedidoFornecedorRepository, PedidoFornecedorRepository>();
             services.AddScoped<IUsuarioRepository, UsuarioRepository>();
@@ -78,11 +90,14 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
+            services.AddScoped<IProdutoComposicaoRepository, ProdutoComposicaoRepository>();
+            services.AddScoped<IProdutoComposicaoAlteracaoRepository, ProdutoComposicaoAlteracaoRepository>();
             services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
             services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
             services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
             services.AddScoped<IFaturaRepository, FaturaRepository>();
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
+            services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
 
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
@@ -92,6 +107,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
+            services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
+            services.AddScoped<IFaqRepository, FaqRepository>();
+            services.AddScoped<IFaqAdminRepository, FaqAdminRepository>();
             services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
@@ -107,6 +125,21 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Integration.PublicadorEventoIntegracao>();
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventDispatcher,
                 Integration.IntegrationEventDispatcher>();
+
+            // Modulo Fiscal NFC-e (F1) — repositorios + servicos sobre Nfe*
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.INfeRepository,
+                Repositories.Fiscal.NfeRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.INumeracaoNfeService,
+                Repositories.Fiscal.NumeracaoNfeService>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGeradorChaveAcesso,
+                Repositories.Fiscal.GeradorChaveAcesso>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.ICertificadoA1Repository,
+                Repositories.Fiscal.NfeCertificadoA1Repository>();
+            services.AddScoped<EasyStock.Application.Services.Fiscal.IConfigFiscalResolver,
+                Services.ConfigFiscalResolver>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
+                Security.RowLevelSecurityBypass>();
+            // TODO F2: registrar IGatewayFiscal (FocusNFeAdapter) e INfeCertificadoA1Service em EasyStock.Infra.Integrations.Fiscal
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
@@ -135,6 +168,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
+
+            // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
+            services.AddHostedService<EntityAlteracaoRetentionService>();
+            // F10-D: Mobile alert service — verifica devices offline a cada 30min.
+            services.AddHostedService<MobileAlertService>();
 
             return services;
         }

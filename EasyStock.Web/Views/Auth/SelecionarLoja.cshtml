@@ -1,4 +1,4 @@
-@model List<Loja>
+﻿@model List<Loja>
 @{
     Layout = null;
     ViewBag.Title = "Selecionar Loja";
@@ -9,7 +9,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Selecionar Loja — EasyStock</title>
+    <title>Selecionar Loja - EasyStock</title>
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
@@ -24,13 +24,13 @@
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
     <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
     <div class="w-full max-w-lg mx-auto px-4">
         <div class="text-center mb-8">
-            <span class="text-4xl">🏪</span>
+            <es-icon name="store" class="w-10 h-10 mx-auto" style="color: var(--orange-600);"></es-icon>
             <h1 class="text-2xl font-extrabold auth-title mt-2">
                 @(Model.Any() ? "Selecione sua loja" : "Cadastre sua primeira loja")
             </h1>
@@ -77,12 +77,10 @@
                      get telefoneOk() { return !this.telefone || /^[0-9()+\-\s]{8,20}$/.test(this.telefone); },
                      get podeEnviar() { return this.nomeOk && this.telefoneOk; }
                  }">
-                <div class="flex items-start gap-3 mb-4 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);">
-                    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:#3b82f6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                <div class="flex items-start gap-3 mb-4 p-3 rounded-lg auth-info-banner">
+                    <es-icon name="info" class="w-5 h-5 flex-shrink-0 mt-0.5 auth-info-banner__icon"></es-icon>
                     <p class="text-xs auth-card-subtitle leading-relaxed">
-                        Para começar, configure sua primeira loja. Esta etapa é obrigatória — você poderá editar depois ou cadastrar mais lojas em <strong>Configurações → Lojas</strong>.
+                        Para começar, configure sua primeira loja. Esta etapa é obrigatória, você poderá editar depois ou cadastrar mais lojas em <strong>Configurações &rarr; Lojas</strong>.
                     </p>
                 </div>
 
