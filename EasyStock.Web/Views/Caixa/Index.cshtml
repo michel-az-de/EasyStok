@@ -5,14 +5,38 @@
     var d = Model.Dia;
 }
 
-<div class="flex items-center justify-between mb-6">
+@{
+    var statusCaixa = Model.Dia is null ? "indisponivel"
+                    : Model.Dia.Fechado ? "fechado"
+                    : Model.Dia.Aberto  ? "aberto"
+                                        : "fechado-pendente";
+}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
-        <h1>Caixa do dia</h1>
-        <p>@(Model.DataSelecionada.ToString("dd/MM/yyyy"))</p>
+        <h1 class="flex items-center gap-3">
+            Caixa do dia
+            @{ var caixaStatus = StatusHelper.Resolve(statusCaixa); }
+            <span class="badge @caixaStatus.BadgeClass">
+                <span class="dot"></span> @caixaStatus.Label
+            </span>
+        </h1>
+        <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
-    <div class="flex gap-3">
-        <a href="/caixa-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">📱 Lançamentos do app</a>
-        <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">📚 Histórico</a>
+    <div class="flex gap-3 flex-wrap">
+        <a href="/caixa-mobile"
+           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Lançamentos do app
+        </a>
+        <a href="/caixa/historico"
+           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Histórico
+        </a>
     </div>
 </div>
 
@@ -96,6 +120,9 @@
                 <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
                     Ver histórico de fechamentos
                 </a>
+                <a href="/configuracoes#suporte" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                    Falar com suporte
+                </a>
             }
         </div>
     </div>
@@ -105,20 +132,20 @@ else
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Saldo esperado</h3>
-            <div class="text-2xl font-bold text-slate-900">@d.SaldoEsperado.ToString("C")</div>
+            <div class="text-2xl font-bold text-slate-900 tabular-nums">@d.SaldoEsperado.AsMoney()</div>
             <div class="text-xs text-slate-500 mt-1">
                 @(d.Fechado ? "Caixa fechado" : (d.Aberto ? "Caixa aberto" : "Caixa não aberto"))
             </div>
         </div>
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Vendas + pagamentos</h3>
-            <div class="text-2xl font-bold text-green-600">@((d.TotalVendas + d.TotalPagamentosPedidos).ToString("C"))</div>
-            <div class="text-xs text-slate-500 mt-1">Vendas: @d.TotalVendas.ToString("C") · Pagamentos: @d.TotalPagamentosPedidos.ToString("C")</div>
+            <div class="text-2xl font-bold text-green-600 tabular-nums">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
+            <div class="text-xs text-slate-500 mt-1 tabular-nums">Vendas: @d.TotalVendas.AsMoney() · Pagamentos: @d.TotalPagamentosPedidos.AsMoney()</div>
         </div>
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Entradas/saídas extras</h3>
-            <div class="text-2xl font-bold text-slate-900">@((d.TotalEntradasExtras - d.TotalSaidasExtras).ToString("C"))</div>
-            <div class="text-xs text-slate-500 mt-1">Entradas: +@d.TotalEntradasExtras.ToString("C") · Saídas: -@d.TotalSaidasExtras.ToString("C")</div>
+            <div class="text-2xl font-bold text-slate-900 tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
+            <div class="text-xs text-slate-500 mt-1 tabular-nums">Entradas: +@d.TotalEntradasExtras.AsMoney() · Saídas: −@d.TotalSaidasExtras.AsMoney()</div>
         </div>
     </div>
 
@@ -127,17 +154,11 @@ else
         <div class="flex flex-wrap gap-3 items-center">
             @if (!d.Aberto && !d.Fechado)
             {
-                <form asp-action="Abrir" asp-controller="Caixa" method="post" data-validate class="flex gap-2 items-center" x-data>
-                    @Html.AntiForgeryToken()
-                    <input type="number" step="0.01" min="0" name="saldoInicial" placeholder="Saldo inicial" required
-                           aria-label="Saldo inicial do caixa"
-                           data-error-message="Informe um saldo inicial válido (use 0 se não houver caixa físico)."
-                           class="ui-field text-sm" />
-                    <input type="text" name="observacoes" placeholder="Obs (opcional)" maxlength="200" aria-label="Observações" class="ui-field text-sm" />
-                    <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                        🔓 Abrir caixa
-                    </button>
-                </form>
+                <button type="button" x-data @@click="$dispatch('open-modal', 'abrir-caixa')"
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    🔓 Abrir caixa do dia
+                </button>
+                <span class="text-sm text-slate-500">Comece informando o saldo inicial em dinheiro.</span>
             }
             @if (d.Aberto && !d.Fechado)
             {
@@ -145,21 +166,17 @@ else
                         class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                     + Lançar entrada/saída
                 </button>
-                <form asp-action="Fechar" asp-controller="Caixa" method="post" class="flex gap-2 items-center"
-                      onsubmit="return confirm('Fechar caixa do dia? Saldo final: @d.SaldoEsperado.ToString("C")');">
-                    @Html.AntiForgeryToken()
-                    <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" aria-label="Observações do fechamento" class="ui-field text-sm" />
-                    <button type="submit" class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50">
-                        🔒 Fechar caixa
-                    </button>
-                </form>
+                <button type="button" x-data @@click="$dispatch('open-modal', 'fechar-caixa')"
+                        class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-800 text-sm font-medium rounded-lg hover:bg-amber-50">
+                    🔒 Fechar caixa
+                </button>
             }
             @if (d.Fechado && d.Fechamento != null)
             {
                 <span class="text-sm text-slate-600">
-                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().ToString("dd/MM HH:mm")
+                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().AsDateTime()
                     @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span class="text-slate-400">por @d.Fechamento.FechadoPorNome</span> }
-                    · Saldo final: <strong>@d.Fechamento.SaldoFinal.ToString("C")</strong>
+                    · Saldo final: <strong class="tabular-nums">@d.Fechamento.SaldoFinal.AsMoney()</strong>
                 </span>
             }
         </div>
@@ -192,7 +209,7 @@ else
                         <td class="text-xs text-slate-500">@m.DataMovimento.ToLocalTime().ToString("HH:mm")</td>
                         <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@m.Tipo</span></td>
                         <td class="font-medium @(m.Tipo == "saida" ? "text-red-700" : "text-slate-900")">
-                            @(m.Tipo == "saida" ? "-" : "+")@m.Valor.ToString("C")
+                            @(m.Tipo == "saida" ? "−" : "+")@m.Valor.AsMoney()
                         </td>
                         <td class="text-sm text-slate-600">@(m.Descricao ?? "—")</td>
                         <td class="text-xs text-slate-500">@(m.Categoria ?? "—")</td>
@@ -200,9 +217,10 @@ else
                         <td>
                             @if (m.Tipo != "abertura" && m.Tipo != "fechamento" && !d.Fechado)
                             {
-                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post" onsubmit="return confirm('Estornar este movimento?');">
+                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post"
+                                      x-data @@submit.prevent="if (confirm('Estornar @m.Tipo de @m.Valor.AsMoney()? Esta ação registra o estorno no histórico.')) $el.submit()">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs text-red-600 hover:text-red-700">Estornar</button>
+                                    <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
                                 </form>
                             }
                         </td>
@@ -214,66 +232,274 @@ else
         }
     </div>
 
-    <!-- Modal lançar entrada/saída -->
-    <div x-data="lancamentoCaixaModal()" @@open-modal.window="if ($event.detail === 'lancar-mov') open = true"
+    @* Modais movidos para o final do arquivo (após if/else completo). *@
+}
+
+@* ===== Modais de Caixa (fora do if/else para sempre serem renderizados quando aplicável) ===== *@
+
+@if (d != null && !d.Aberto && !d.Fechado)
+{
+    <!-- Modal: abrir caixa -->
+    <div x-data="abrirCaixaModal()"
          x-show="open" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-         @@click.self="open = false" @@keydown.escape.window="open = false">
-        <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-xl p-6">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">Lançar entrada/saída</h2>
-            <form asp-action="RegistrarMovimento" asp-controller="Caixa" method="post" data-validate class="space-y-3">
-                @Html.AntiForgeryToken()
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
-                        <select name="tipo" required class="ui-select w-full text-sm">
-                            <option value="entrada">Entrada (recebimento)</option>
-                            <option value="saida">Saída (despesa, sangria)</option>
-                        </select>
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="dialog" aria-modal="true" aria-labelledby="fm-abrir-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 540px"
+              method="post" action="/caixa/abrir"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-abrir-title" class="fm-header__title">Abrir caixa do dia</h2>
+                    <p class="fm-header__subtitle">Informe o saldo em dinheiro físico que está no caixa para começar.</p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <fieldset class="fm-section">
+                    <div class="fm-grid">
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="abrir-saldo">
+                                Saldo inicial em dinheiro<span class="fm-field__required" aria-hidden="true">*</span>
+                            </label>
+                            <input id="abrir-saldo" type="number" name="saldoInicial" step="0.01" min="0" required
+                                   placeholder="0,00"
+                                   class="ui-field w-full text-sm" />
+                            <span class="fm-field__hint">Use 0 se não há caixa físico (só registros eletrônicos)</span>
+                        </div>
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="abrir-obs">Observações</label>
+                            <input id="abrir-obs" type="text" name="observacoes" maxlength="200"
+                                   placeholder="Ex: troco do dia anterior, conferência..."
+                                   class="ui-field w-full text-sm" />
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Valor *</label>
-                        <input type="number" name="valor" step="0.01" min="0.01" required
-                               data-error-message="Informe um valor maior que zero."
-                               class="ui-field w-full text-sm" />
+                </fieldset>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    🔓 Abrir caixa
+                </button>
+            </footer>
+        </form>
+    </div>
+}
+
+@if (d != null && d.Aberto && !d.Fechado)
+{
+    <!-- Modal: lançar entrada/saída -->
+    <div x-data="lancamentoCaixaModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="dialog" aria-modal="true" aria-labelledby="fm-mov-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 640px"
+              method="post" action="/caixa/registrar-movimento" data-validate
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-mov-title" class="fm-header__title">Registrar movimento</h2>
+                    <p class="fm-header__subtitle">Entradas extras (vendas, recebimentos) ou saídas (despesas, sangrias) que afetam o saldo do caixa.</p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <!-- Tabs entrada / saída -->
+                <div class="ped-tabs" role="tablist">
+                    <button type="button" role="tab" class="ped-tab"
+                            :class="{ 'ped-tab--active': tipo === 'entrada' }"
+                            :aria-selected="tipo === 'entrada'"
+                            @@click="tipo = 'entrada'">
+                        ➕ Entrada
+                    </button>
+                    <button type="button" role="tab" class="ped-tab"
+                            :class="{ 'ped-tab--active': tipo === 'saida' }"
+                            :aria-selected="tipo === 'saida'"
+                            @@click="tipo = 'saida'">
+                        ➖ Saída
+                    </button>
+                </div>
+                <input type="hidden" name="tipo" :value="tipo" />
+
+                <fieldset class="fm-section">
+                    <div class="fm-grid">
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="mov-valor">
+                                Valor<span class="fm-field__required" aria-hidden="true">*</span>
+                            </label>
+                            <input id="mov-valor" type="number" name="valor" step="0.01" min="0.01" required
+                                   placeholder="0,00"
+                                   data-error-message="Informe um valor maior que zero."
+                                   class="ui-field w-full text-sm text-right" />
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="mov-metodo">Método</label>
+                            <select id="mov-metodo" name="metodo" class="ui-select w-full text-sm">
+                                <option value="">— Selecionar —</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="credito">Crédito</option>
+                                <option value="debito">Débito</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="mov-desc">Descrição</label>
+                            <input id="mov-desc" type="text" name="descricao"
+                                   :placeholder="tipo === 'entrada' ? 'Ex: venda balcão, recebimento de cliente' : 'Ex: pagamento embalagem, sangria, troco'"
+                                   class="ui-field w-full text-sm" />
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="mov-cat">Categoria</label>
+                            <input id="mov-cat" type="text" name="categoria"
+                                   :placeholder="tipo === 'entrada' ? 'venda, devolução' : 'embalagem, sangria, fornecedor'"
+                                   class="ui-field w-full text-sm" />
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="mov-ref">Referência</label>
+                            <input id="mov-ref" type="text" name="referencia"
+                                   placeholder="txid, NSU, nº NF"
+                                   class="ui-field w-full text-sm" />
+                        </div>
                     </div>
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                        <input type="text" name="descricao" class="ui-field w-full text-sm" />
+                </fieldset>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        :class="tipo === 'saida' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'"
+                        class="app-primary-btn px-4 py-2 text-white text-sm font-medium rounded-lg">
+                    <span x-show="tipo === 'entrada'">Registrar entrada</span>
+                    <span x-show="tipo === 'saida'">Registrar saída</span>
+                </button>
+            </footer>
+        </form>
+    </div>
+
+    <!-- Modal: fechar caixa -->
+    <div x-data="fecharCaixaModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="alertdialog" aria-modal="true" aria-labelledby="fm-fechar-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 540px"
+              method="post" action="/caixa/fechar"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa do dia?</h2>
+                    <p class="fm-header__subtitle">Após o fechamento, novos lançamentos vão pro caixa de amanhã. Esta ação não pode ser desfeita.</p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <div class="caixa-fechar-resumo">
+                    <div class="caixa-fechar-resumo__item">
+                        <span class="text-xs text-slate-500 uppercase tracking-wider">Saldo final esperado</span>
+                        <span class="caixa-fechar-resumo__valor tabular-nums">@d.SaldoEsperado.AsMoney()</span>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Método</label>
-                        <select name="metodo" class="ui-select w-full text-sm">
-                            <option value="">—</option>
-                            <option value="dinheiro">Dinheiro</option>
-                            <option value="pix">PIX</option>
-                            <option value="credito">Crédito</option>
-                            <option value="debito">Débito</option>
-                            <option value="transferencia">Transferência</option>
-                            <option value="outro">Outro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
-                        <input type="text" name="categoria" placeholder="Ex: embalagem, sangria" class="ui-field w-full text-sm" />
-                    </div>
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Referência</label>
-                        <input type="text" name="referencia" placeholder="txid, NSU, n° NF" class="ui-field w-full text-sm" />
+                    <div class="caixa-fechar-resumo__split">
+                        <div>
+                            <span class="text-xs text-slate-500">Vendas + pagamentos</span>
+                            <strong class="text-green-700 block tabular-nums">+@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</strong>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-500">Entradas extras</span>
+                            <strong class="text-green-700 block tabular-nums">+@d.TotalEntradasExtras.AsMoney()</strong>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-500">Saídas extras</span>
+                            <strong class="text-red-700 block tabular-nums">−@d.TotalSaidasExtras.AsMoney()</strong>
+                        </div>
                     </div>
                 </div>
-                <div class="flex justify-end gap-3 pt-3 border-t">
-                    <button type="button" @@click="open = false" class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Registrar</button>
-                </div>
-            </form>
-        </div>
+
+                <fieldset class="fm-section" style="margin-top: 16px">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="fechar-obs">Observações do fechamento</label>
+                        <textarea id="fechar-obs" name="observacoes" rows="2"
+                                  placeholder="Ex: diferença de troco, conferência..."
+                                  class="ui-textarea w-full text-sm"></textarea>
+                        <span class="fm-field__hint">Fica registrado no histórico do dia</span>
+                    </div>
+                </fieldset>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Voltar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
+                    🔒 Sim, fechar caixa
+                </button>
+            </footer>
+        </form>
     </div>
 }
 
 @section Scripts {
 <script>
-function lancamentoCaixaModal() { return { open: false }; }
+function _caixaModalBase(eventId) {
+    return {
+        open: false,
+        _previousFocus: null,
+        init() {
+            window.addEventListener('open-modal', (e) => {
+                if (e.detail !== eventId) return;
+                this._previousFocus = document.activeElement;
+                this.open = true;
+                this.$nextTick(() => {
+                    const el = this.$refs.panel?.querySelector('input:not([type=hidden]), select, textarea');
+                    if (el) el.focus();
+                });
+            });
+            this.$watch('open', (v) => {
+                document.body.style.overflow = v ? 'hidden' : '';
+                if (!v && this._previousFocus) this._previousFocus.focus?.();
+            });
+        },
+        close() { this.open = false; }
+    };
+}
+
+function abrirCaixaModal()       { return _caixaModalBase('abrir-caixa'); }
+function fecharCaixaModal()      { return _caixaModalBase('fechar-caixa'); }
+function lancamentoCaixaModal()  {
+    return Object.assign(_caixaModalBase('lancar-mov'), {
+        tipo: 'entrada'
+    });
+}
 
 // Auto-retry exponencial pra falhas transitórias na carga do Caixa.
 // 3 tentativas com backoff (5s, 10s, 20s); usuário pode cancelar ou disparar agora.

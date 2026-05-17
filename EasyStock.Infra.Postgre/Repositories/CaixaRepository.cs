@@ -38,10 +38,13 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, total);
         }
 
+        private static DateTime ToUtc(DateOnly d) =>
+            DateTime.SpecifyKind(d.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
         public async Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = data.ToDateTime(TimeOnly.MinValue);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var inicio = ToUtc(data);
+            var fim    = ToUtc(data.AddDays(1));
 
             var q = db.MovimentosCaixa.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null
@@ -74,8 +77,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = data.ToDateTime(TimeOnly.MinValue);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var inicio = ToUtc(data);
+            var fim    = ToUtc(data.AddDays(1));
 
             var q = db.Vendas.AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId && v.DataVenda >= inicio && v.DataVenda < fim);
@@ -87,8 +90,8 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = data.ToDateTime(TimeOnly.MinValue);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var inicio = ToUtc(data);
+            var fim    = ToUtc(data.AddDays(1));
 
             var pagamentos = await db.Set<PedidoPagamento>().AsNoTracking()
                 .Where(pg => pg.PagoEm >= inicio && pg.PagoEm < fim)

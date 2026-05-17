@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
@@ -13,7 +12,6 @@ using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -266,6 +264,7 @@ public class AdminFaturasController(
     public async Task<IActionResult> Metricas(
         [FromQuery] int dias = 30,
         [FromQuery] Guid? empresaId = null,
+        [FromQuery] bool forcarRefresh = false,
         CancellationToken ct = default)
     {
         if (!RequerPermissao(Permissao.VisualizarFaturas, out var err)) return err!;
@@ -275,7 +274,7 @@ public class AdminFaturasController(
             : currentUser.EmpresaId;
 
         var result = await metricasUseCase.ExecuteAsync(
-            new MetricasFinanceirasCommand(dias, efetivoEmpresaId),
+            new MetricasFinanceirasCommand(dias, efetivoEmpresaId, forcarRefresh),
             ct);
 
         return DataOk(result);

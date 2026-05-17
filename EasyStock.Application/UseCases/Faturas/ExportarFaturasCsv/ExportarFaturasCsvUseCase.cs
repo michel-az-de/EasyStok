@@ -35,7 +35,9 @@ public class ExportarFaturasCsvUseCase(IFaturaRepository repo)
 
     public async Task<byte[]> ExecuteAsync(ExportarFaturasCsvCommand cmd, CancellationToken ct = default)
     {
-        var pageSize = Math.Min(cmd.LimiteMaximo, 10000);
+        // Clamp positivo + teto 10k. LimiteMaximo <= 0 viraria pageSize <= 0 e quebraria
+        // a paginacao do repo (Take(0) retornaria vazio mesmo havendo dados).
+        var pageSize = Math.Clamp(cmd.LimiteMaximo, 1, 10000);
         var (itens, _) = await repo.ListarAdminAsync(
             cmd.EmpresaId,
             cmd.Status,

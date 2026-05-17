@@ -74,3 +74,5 @@
 *.yaml      text eol=lf   working-tree-encoding=UTF-8
 *.xml       text eol=crlf working-tree-encoding=UTF-8
 *.editorconfig text eol=lf working-tree-encoding=UTF-8
+# Shell scripts: SEMPRE LF (não importa SO local) — quebra entrypoint Linux se virar CRLF
+*.sh        text eol=lf   working-tree-encoding=UTF-8

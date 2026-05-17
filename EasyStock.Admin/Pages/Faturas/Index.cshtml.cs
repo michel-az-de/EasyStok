@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Faturas;
 
+/// <summary>
+/// Listagem de faturas com filtros (status, origem, empresa, período, valor,
+/// busca). Exportação CSV via <c>OnGetExportCsvAsync</c> reusa os mesmos filtros.
+/// </summary>
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public new int Page { get; set; } = 1;

@@ -1,0 +1,29 @@
+@*
+    Subnav do hub de Notificacoes. Renderizado no topo de TODAS as paginas
+    sob /Notificacoes/* para dar acesso rapido aos 6 sub-modulos.
+*@
+@{
+    var rota = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+    bool Active(string prefix) => rota.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+}
+
+<nav class="notif-subnav" aria-label="Sub-navegacao de Notificacoes">
+    <a href="/Notificacoes/Templates" class="notif-subnav-item @(Active("/Notificacoes/Templates") ? "active" : "")">
+        <span>📝</span><span>Templates</span>
+    </a>
+    <a href="/Notificacoes/Rotinas" class="notif-subnav-item @(Active("/Notificacoes/Rotinas") ? "active" : "")">
+        <span>⚙️</span><span>Rotinas</span>
+    </a>
+    <a href="/Notificacoes/Canais" class="notif-subnav-item @(Active("/Notificacoes/Canais") ? "active" : "")">
+        <span>📡</span><span>Canais</span>
+    </a>
+    <a href="/Notificacoes/Envios" class="notif-subnav-item @(Active("/Notificacoes/Envios") ? "active" : "")">
+        <span>📬</span><span>Envios</span>
+    </a>
+    <a href="/Notificacoes/Broadcast" class="notif-subnav-item @(Active("/Notificacoes/Broadcast") ? "active" : "")">
+        <span>📢</span><span>Broadcast</span>
+    </a>
+    <a href="/Notificacoes/Consentimentos" class="notif-subnav-item @(Active("/Notificacoes/Consentimentos") ? "active" : "")">
+        <span>🔐</span><span>Consentimentos</span>
+    </a>
+</nav>

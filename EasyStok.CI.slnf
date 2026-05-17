@@ -1,0 +1,24 @@
+{
+  "solution": {
+    "path": "EasyStok.sln",
+    "projects": [
+      "EasyStock.Domain\\EasyStock.Domain.csproj",
+      "EasyStock.Application\\EasyStock.Application.csproj",
+      "EasyStock.Contracts\\EasyStock.Contracts.csproj",
+      "EasyStock.Infra.Postgre\\EasyStock.Infra.Postgre.csproj",
+      "EasyStock.Infra.MongoDb\\EasyStock.Infra.MongoDb.csproj",
+      "EasyStock.Infra.Sqlite\\EasyStock.Infra.Sqlite.csproj",
+      "EasyStock.Infra.Async\\EasyStock.Infra.Async.csproj",
+      "EasyStock.Infra.Notifications\\EasyStock.Infra.Notifications.csproj",
+      "EasyStock.Infra.Integrations\\EasyStock.Infra.Integrations.csproj",
+      "EasyStock.Api\\EasyStock.Api.csproj",
+      "EasyStock.Web\\EasyStock.Web.csproj",
+      "EasyStock.Admin\\EasyStock.Admin.csproj",
+      "EasyStock.Worker\\EasyStock.Worker.csproj",
+      "EasyStock.Domain.Tests\\EasyStock.Domain.Tests.csproj",
+      "EasyStock.Application.Tests\\EasyStock.Application.Tests.csproj",
+      "EasyStock.ArchitectureTests\\EasyStock.ArchitectureTests.csproj",
+      "EasyStock.Api.UnitTests\\EasyStock.Api.UnitTests.csproj"
+    ]
+  }
+}

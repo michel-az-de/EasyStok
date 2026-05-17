@@ -18,14 +18,33 @@ const assert = require('assert');
 const HTML_PATH = process.env.PWA_HTML
   || path.resolve(__dirname, '../web/index.html');
 
-// ---------- 1. Carrega index.html e extrai scripts inline ----------
+// ---------- 1. Carrega index.html e extrai scripts inline + externos locais ----------
+// Scripts inline rodam diretamente. Scripts externos com src local (ex: sync.js,
+// qrcode.min.js) sao carregados via fs e injetados na mesma ordem que aparecem
+// no HTML — necessario pra testar sync.js (que esta em arquivo separado e
+// expõe window.cdbSync). URLs externas e absolutas sao puladas (silenciosas).
 const html = fs.readFileSync(HTML_PATH, 'utf8');
+const HTML_DIR = path.dirname(HTML_PATH);
 const scriptBodies = [];
 const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
 let m;
 while ((m = re.exec(html)) !== null) {
   const attrs = m[1] || '';
-  if (/\bsrc=/.test(attrs)) continue; // skip <script src=...>
+  const srcMatch = attrs.match(/\bsrc\s*=\s*(['"])([^'"]+)\1/i);
+  if (srcMatch) {
+    const src = srcMatch[2];
+    // Pula URLs absolutas e protocolo-relativas — nao baixamos rede.
+    if (/^(?:https?:)?\/\//i.test(src) || src.startsWith('data:')) continue;
+    // Resolve relativo ao diretorio do index.html (strip query string).
+    const cleanPath = src.split('?')[0].split('#')[0];
+    const fullPath = path.resolve(HTML_DIR, cleanPath);
+    try {
+      scriptBodies.push(fs.readFileSync(fullPath, 'utf8'));
+    } catch (_) {
+      // Arquivo nao existe (ex: build artifact ausente) — segue em frente.
+    }
+    continue;
+  }
   scriptBodies.push(m[2]);
 }
 
@@ -179,6 +198,10 @@ for (const f of testFiles) {
 let pass = 0, fail = 0;
 const failures = [];
 (async () => {
+  // Aguarda boot do sync.js: setTimeout(500) cria window.cdbSync.
+  // Sem essa espera, testes que dependem de cdbSync veem undefined
+  // por race condition. 600ms cobre 500ms boot + folga pra event loop.
+  await new Promise(r => setTimeout(r, 600));
   for (const t of tests) {
     try {
       reset();

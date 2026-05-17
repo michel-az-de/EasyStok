@@ -202,7 +202,7 @@
                 <div class="row">
                     <div class="name">
                         @i.Emoji @i.Nome
-                        <span class="qty">@i.Quantidade @i.Unidade × @i.PrecoUnitario.ToString("C")</span>
+                        <span class="qty">@i.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) @i.Unidade × @i.PrecoUnitario.ToString("C")</span>
                     </div>
                     <div class="price">@i.Subtotal.ToString("C")</div>
                 </div>

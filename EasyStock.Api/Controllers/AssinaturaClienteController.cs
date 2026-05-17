@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AlterarPlano;
 using EasyStock.Application.UseCases.CancelarAssinatura;
 using EasyStock.Application.UseCases.ListarFaturas;
+using EasyStock.Application.UseCases.PagarAgora;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -25,6 +26,7 @@ public class AssinaturaClienteController(
     ListarFaturasUseCase listarFaturasUseCase,
     CancelarAssinaturaUseCase cancelarUseCase,
     AlterarPlanoUseCase alterarPlanoUseCase,
+    PagarAgoraUseCase pagarAgoraUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Get current subscription status")]
@@ -76,6 +78,19 @@ public class AssinaturaClienteController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
         await cancelarUseCase.ExecuteAsync(new CancelarAssinaturaCommand(eid, body?.Imediata ?? false));
         return DataOk(new { message = "Assinatura cancelada com sucesso." });
+    }
+
+    [SwaggerOperation(
+        Summary = "Gera cobranca Pix imediata pra reativacao/upgrade",
+        Description = "Self-service. Cria cobranca via Efi sem esperar o job diario. Idempotente: se ja existe pendente nao expirada, retorna a mesma.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("pagar-agora")]
+    public async Task<IActionResult> PagarAgora([FromQuery] Guid empresaId, CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        var result = await pagarAgoraUseCase.ExecuteAsync(new PagarAgoraCommand(eid), ct);
+        return DataOk(result);
     }
 
     public sealed record AlterarPlanoRequest(Guid NovoPlanoId);

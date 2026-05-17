@@ -19,10 +19,15 @@
     <template x-if="!empresaId">
         <div class="rounded-xl p-6"
              style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
-            <p class="text-es-ink-dim text-sm">
-                Selecione um cliente em
-                <a href="/Tenants" class="text-es-accent hover:underline">/Tenants</a>
-                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>.
+            <p class="text-es-ink-dim text-sm mb-3">Selecione um cliente para ver os dados de operação.</p>
+            <button type="button"
+                    class="btn-secondary text-sm flex items-center gap-2"
+                    @@click="$dispatch('open-cmdk', { onPick: id => window.location.href = '/Operacao?empresaId=' + id })">
+                🔍 Buscar cliente…
+                <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute font-mono">Ctrl K</kbd>
+            </button>
+            <p class="text-es-ink-mute text-xs mt-3">
+                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>
             </p>
         </div>
     </template>
@@ -110,6 +115,36 @@
         </div>
     </template>
 
+    <!-- Onda 1.4 — widget Tickets criticos do helpdesk SaaS -->
+    <template x-if="empresaId && tk.total > 0">
+        <div class="rounded-xl p-5"
+             style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="text-es-ink text-sm font-semibold uppercase tracking-widest">⚠ Tickets críticos</h3>
+                    <p class="text-xs text-es-ink-mute mt-0.5">SLA violado ou prioridade Alta/Crítica · atualiza a cada 60s</p>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                    <span class="text-red-400 font-bold"><span x-text="tk.slaViolados"></span> SLA</span>
+                    <span class="text-amber-300 font-bold"><span x-text="tk.altaOuCritica"></span> alta/crit</span>
+                    <a :href="'/Tickets?empresaId=' + empresaId + '&slaStatus=violado'" class="text-es-accent hover:underline">ver todos →</a>
+                </div>
+            </div>
+            <ul class="divide-y divide-es-surface-2">
+                <template x-for="t in tk.top" :key="t.id">
+                    <li class="py-2 flex items-center gap-3 text-sm">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                              :class="t.prioridade === 'Critica' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'"
+                              x-text="t.prioridade"></span>
+                        <a :href="'/Tickets/Detail/' + t.id" class="text-es-ink hover:text-es-accent flex-1 truncate" x-text="t.titulo"></a>
+                        <span class="text-xs text-es-ink-mute" x-text="t.status"></span>
+                        <span x-show="t.slaRespostaViolado || t.slaResolucaoViolado" class="text-red-400 text-xs" title="SLA violado">⏱</span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </template>
+
     <p x-show="erro" x-cloak class="text-red-400 text-sm" x-text="erro"></p>
 </div>
 
@@ -120,14 +155,18 @@ function operacaoPage() {
         empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
         lojaId: '@(Model.LojaId?.ToString() ?? "")',
         d: {},
+        tk: { total: 0, slaViolados: 0, altaOuCritica: 0, top: [] },
         erro: '',
         ultimaAtualizacao: 0,
         _timer: null,
+        _tkTimer: null,
 
         async init() {
             if (!this.empresaId) return;
-            await this.fetchDashboard();
+            await Promise.all([this.fetchDashboard(), this.fetchTicketsCriticos()]);
             this._timer = setInterval(() => this.fetchDashboard(), 15000);
+            // Onda 1.4 — tickets criticos atualizam a cada 60s (mais lento, menor frequencia de mudanca)
+            this._tkTimer = setInterval(() => this.fetchTicketsCriticos(), 60000);
         },
 
         async fetchDashboard() {
@@ -146,6 +185,21 @@ function operacaoPage() {
             } catch (e) {
                 this.erro = 'Falha ao carregar dashboard: ' + (e.message || e);
             }
+        },
+
+        async fetchTicketsCriticos() {
+            try {
+                const url = '/api-proxy/admin/tickets/criticos-resumo?empresaId=' + this.empresaId + '&limit=5';
+                const r = await fetch(url, { credentials: 'same-origin' });
+                if (!r.ok) return; // silencioso — widget se esconde se total=0
+                const data = await r.json();
+                this.tk = {
+                    total: data.total || 0,
+                    slaViolados: data.slaViolados || 0,
+                    altaOuCritica: data.altaOuCritica || 0,
+                    top: Array.isArray(data.top) ? data.top : []
+                };
+            } catch { /* falha silenciosa — não quebra o resto do dashboard */ }
         },
 
         brl(v) {

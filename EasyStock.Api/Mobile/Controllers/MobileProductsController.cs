@@ -176,8 +176,8 @@ public class MobileProductsController(
                 ErpProductId: mp.ErpProductId!.Value,
                 LojaId: mp.LojaId,
                 MobileStock: mp.Stock,
-                ErpStock: erpStock,
-                Delta: erpStock - mp.Stock,
+                ErpStock: (int)erpStock,
+                Delta: (int)erpStock - mp.Stock,
                 ItemEstoqueExists: item != null,
                 LastDeviceId: mp.LastDeviceId,
                 LastOperatorName: mp.LastOperatorName,
@@ -209,7 +209,7 @@ public class MobileProductsController(
             return BadRequest(new { error = "ItemEstoque não existe no ERP. Crie o estoque inicial primeiro." });
 
         var oldStock = product.Stock;
-        product.Stock = item.QuantidadeAtual?.Value ?? 0;
+        product.Stock = (int)(item.QuantidadeAtual?.Value ?? 0m);
         product.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 

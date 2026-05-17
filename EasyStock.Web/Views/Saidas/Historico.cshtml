@@ -68,15 +68,19 @@
                 </a>
             }
         </div>
+        @* BUG 10: input type="date" não aceita componente de hora, então o valor
+           passado pelo controller é truncado em yyyy-MM-dd. O Substring(0, 10)
+           garante que, se algum período antigo ainda tiver "T23:59:59", o input
+           continua exibindo a parte de data. *@
         <!-- Date range -->
-        <div class="flex gap-2 items-center ml-auto">
-            <input type="date" name="de" value="@Model.PeriodoInicio"
+        <div class="flex flex-wrap gap-2 items-center ml-auto">
+            <input type="date" name="de" value="@(Model.PeriodoInicio is { Length: >= 10 } d ? d[..10] : Model.PeriodoInicio)"
                    class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
             <span class="text-slate-400 text-sm">a</span>
-            <input type="date" name="ate" value="@Model.PeriodoFim"
+            <input type="date" name="ate" value="@(Model.PeriodoFim is { Length: >= 10 } a ? a[..10] : Model.PeriodoFim)"
                    class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
             <button type="submit"
-                    class="px-4 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
+                    class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Filtrar
             </button>
         </div>
@@ -155,18 +159,39 @@
                         </td>
                         <td class="font-medium @(isEstornada ? "line-through" : "")">@s.Qty</td>
                         <td>
-                            @if (s.Custo.HasValue)
+                            @* BUG 6: a coluna mostrava `s.Custo` (que é ValorUnitario) em
+                               vez do ValorTotal da movimentação. Em vendas, o usuario
+                               espera ver o valor total da saída (preço de venda × qty),
+                               coincidente com a Receita Total do KPI. Se ValorTotal não
+                               vier do backend, fallback pra ValorUnitario × Qty. *@
+                            @{
+                                var valorExibir = s.ValorTotal?.Valor
+                                    ?? (s.Custo.HasValue ? s.Custo.Value * s.Qty : (decimal?)null);
+                            }
+                            @if (valorExibir.HasValue && valorExibir.Value > 0m)
                             {
-                                <span class="@(isEstornada ? "line-through" : "")">R$ @s.Custo.Value.ToString("N2")</span>
+                                <span class="@(isEstornada ? "line-through" : "")">R$ @valorExibir.Value.ToString("N2")</span>
                             }
                             else
                             {
-                                <span class="text-slate-400">—</span>
+                                <span class="text-slate-400" title="Saída registrada sem valor monetário (perda, doação, uso interno ou venda sem preço informado)">—</span>
                             }
                         </td>
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
                         <td class="text-slate-500 text-sm">@(s.DocumentoReferencia ?? "—")</td>
-                        <td class="text-slate-500 text-sm">@(s.Descricao ?? "—")</td>
+                        <td class="text-slate-500 text-sm">
+                            @if (s.Descricao?.StartsWith("DIVERGENCIA_SYNC") == true)
+                            {
+                                <span class="text-xs text-slate-400"
+                                      title="@(User.IsInRole("Admin") ? s.Descricao : null)">
+                                    Sync automático
+                                </span>
+                            }
+                            else
+                            {
+                                <span>@(s.Descricao ?? "—")</span>
+                            }
+                        </td>
                         <td class="text-xs text-slate-500">
                             @if (!string.IsNullOrEmpty(s.UsuarioId) || !string.IsNullOrEmpty(s.Ip) || !string.IsNullOrEmpty(s.MotivoEstorno))
                             {
@@ -180,7 +205,7 @@
                                 }
                                 if (!string.IsNullOrEmpty(s.MotivoEstorno))
                                 {
-                                    <div class="text-amber-700" title="Motivo">↪ @s.MotivoEstorno</div>
+                                    <div class="text-amber-800" title="Motivo">↪ @s.MotivoEstorno</div>
                                 }
                             }
                             else

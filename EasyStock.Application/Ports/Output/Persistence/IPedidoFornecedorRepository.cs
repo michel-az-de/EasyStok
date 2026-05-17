@@ -6,6 +6,10 @@ public interface IPedidoFornecedorRepository
 {
     Task<PedidoFornecedor?> GetByIdAsync(Guid id);
     Task AddAsync(PedidoFornecedor pedido);
+
+    /// <summary>Adiciona um item a um PedidoFornecedor existente (rastreado pelo DbContext).</summary>
+    Task AddItemAsync(PedidoFornecedorItem item);
+
     Task UpdateAsync(PedidoFornecedor pedido);
     Task<IReadOnlyCollection<PedidoFornecedor>> GetHistoricoPorFornecedorAsync(Guid empresaId, Guid fornecedorId);
     Task<IReadOnlyCollection<PedidoFornecedor>> GetPedidosAtrasadosAsync(Guid empresaId, DateTime referencia);

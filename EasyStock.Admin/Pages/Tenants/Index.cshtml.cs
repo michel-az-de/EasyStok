@@ -22,6 +22,14 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     public IEnumerable<JsonElement> Tenants => Data.ValueKind == JsonValueKind.Array
         ? Data.EnumerateArray() : Enumerable.Empty<JsonElement>();
 
+    /// <summary>
+    /// Senha temporária do usuário admin recém-criado. Exibida 1 vez no banner
+    /// dourado (padrão de Admins/Index.cshtml). Limpa do TempData após renderizar.
+    /// </summary>
+    public string? NovaSenhaTemporaria => TempData["NovaSenhaTemporaria"] as string;
+    public string? NovoTenantNome => TempData["NovoTenantNome"] as string;
+    public string? NovoTenantAdminEmail => TempData["NovoTenantAdminEmail"] as string;
+
     public async Task OnGetAsync()
     {
         if (Page < 1) Page = 1;
@@ -47,6 +55,85 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         {
             log.LogError(ex, "Falha ao listar tenants");
             Erro = "Não foi possível carregar a lista de tenants. Tente recarregar a página.";
+        }
+    }
+
+    /// <summary>
+    /// Cadastra um cliente manualmente (empresa + usuário admin + trial 14d).
+    /// A senha temporária retorna 1 vez no TempData — banner exibe e limpa em seguida.
+    /// </summary>
+    public async Task<IActionResult> OnPostCriarAsync(
+        string motivo,
+        string nomeEmpresa,
+        string? documento,
+        string nomeAdmin,
+        string emailAdmin,
+        bool enviarEmail = true)
+    {
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10)
+        {
+            SetErro("Justificativa obrigatória (mínimo 10 caracteres) — fica registrada no audit log.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        if (string.IsNullOrWhiteSpace(nomeEmpresa) || nomeEmpresa.Trim().Length < 2)
+        {
+            SetErro("Razão social ou nome é obrigatório (mín. 2 caracteres).");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        if (string.IsNullOrWhiteSpace(nomeAdmin) || nomeAdmin.Trim().Length < 2)
+        {
+            SetErro("Nome do responsável é obrigatório.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        if (string.IsNullOrWhiteSpace(emailAdmin))
+        {
+            SetErro("E-mail do responsável é obrigatório.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>("api/admin/tenants", new
+            {
+                motivo = motivoT,
+                nomeEmpresa = nomeEmpresa.Trim(),
+                documento = string.IsNullOrWhiteSpace(documento) ? null : documento.Trim(),
+                nomeAdmin = nomeAdmin.Trim(),
+                emailAdmin = emailAdmin.Trim(),
+                enviarEmail
+            });
+
+            var tenantId = resp.TryGetProperty("tenantId", out var tip) ? tip.GetGuid() : Guid.Empty;
+            var senha = resp.TryGetProperty("senhaTemporaria", out var sp) ? sp.GetString() : null;
+            var nome = resp.TryGetProperty("nomeEmpresa", out var np) ? np.GetString() : nomeEmpresa.Trim();
+            var emailFinal = resp.TryGetProperty("emailAdmin", out var ep) ? ep.GetString() : emailAdmin.Trim();
+            var emailEnviado = resp.TryGetProperty("emailEnviado", out var eep) && eep.GetBoolean();
+
+            // Senha temp viaja por TempData (server-side cookie protegido) só até o
+            // próximo GET. Não vai pra logger e some no refresh seguinte.
+            if (!string.IsNullOrEmpty(senha))
+            {
+                TempData["NovaSenhaTemporaria"] = senha;
+                TempData["NovoTenantNome"] = nome;
+                TempData["NovoTenantAdminEmail"] = emailFinal;
+            }
+
+            SetSucesso(emailEnviado
+                ? $"Cliente \"{nome}\" cadastrado. Trial de 14 dias ativo. Senha enviada para {emailFinal}."
+                : $"Cliente \"{nome}\" cadastrado. Trial de 14 dias ativo. Anote a senha temporária — o e-mail NÃO foi enviado.");
+
+            // Redireciona pra detalhe do novo tenant pra continuar o trabalho lá.
+            return tenantId != Guid.Empty
+                ? RedirectToPage("Detail", new { id = tenantId })
+                : RedirectToPage(new { Page, Search, Status });
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao cadastrar tenant manualmente");
+            SetErro($"Falha ao cadastrar cliente: {ex.Message}");
+            return RedirectToPage(new { Page, Search, Status });
         }
     }
 

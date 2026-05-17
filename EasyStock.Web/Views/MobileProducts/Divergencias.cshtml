@@ -28,7 +28,7 @@
 {
     <div class="ws mb-6">
         <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-amber-700">⚠ Sem ItemEstoque no ERP</h2>
+            <h2 class="text-base font-semibold text-amber-800">⚠ Sem ItemEstoque no ERP</h2>
             <span class="text-xs text-slate-500">Crie estoque inicial pelo módulo Estoque ERP</span>
         </div>
         <div class="overflow-x-auto">
@@ -101,13 +101,17 @@
                             }
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <form method="post" action="/produtos-mobile/@d.MobileProductId/reconciliar" class="inline"
-                                  onsubmit="return confirm('Reconciliar estoque?\n\nMobile @(d.MobileStock) → ERP @(d.ErpStock).\nO valor do ERP vai prevalecer.');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                                    Usar valor do ERP
-                                </button>
-                            </form>
+                            <button type="button"
+                                    @@click="$dispatch('confirm-action', {
+                                        titulo: 'Reconciliar estoque de @d.ProductName?',
+                                        mensagem: 'Mobile (@d.MobileStock) vira ERP (@d.ErpStock). O valor do ERP prevalece e a próxima sync atualiza o app.',
+                                        textoBotao: 'Usar valor do ERP',
+                                        classBotao: 'bg-indigo-600 hover:bg-indigo-700',
+                                        formAction: '/produtos-mobile/@d.MobileProductId/reconciliar'
+                                    })"
+                                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                Usar valor do ERP
+                            </button>
                         </td>
                     </tr>
                 }

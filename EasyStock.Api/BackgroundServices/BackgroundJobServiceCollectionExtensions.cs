@@ -58,9 +58,9 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableFaturaBackfillJob)
             services.AddHostedService<FaturaBackfillJob>();
 
-        // FaturaReconciliacaoJob (F6) — consulta gateway hora em hora para
-        // fechar gaps de webhooks perdidos. NO-OP enquanto adapter Pix retorna
-        // Desconhecido (estender IEfiPixService.GetCobrancaAsync em release futura).
+        // FaturaReconciliacaoJob (F6/F11) — consulta gateway hora em hora para
+        // fechar gaps de webhooks perdidos. Pix funciona ponta-a-ponta desde F11
+        // (IEfiPixService.ConsultarCobrancaAsync via GET /v2/cob/{txid}).
         if (options.EnableFaturaReconciliacaoJob)
             services.AddHostedService<FaturaReconciliacaoJob>();
 
