@@ -13,6 +13,19 @@ public class DashboardViewModel
     public int ProdutosParados { get; set; }
     public int SugestoesReposicao { get; set; }
 
+    // Resumo do dia (Pulso de hoje) — vem de /analytics/dia
+    public int PedidosEntreguesHoje { get; set; }
+    public decimal FaturamentoHoje { get; set; }
+    public decimal TicketMedioHoje { get; set; }
+    public int PedidosPendentes { get; set; }
+    public decimal ValorPedidosPendentes { get; set; }
+    public bool CaixaAbertaHoje { get; set; }
+    public bool CaixaFechadaHoje { get; set; }
+    public decimal SaldoCaixaAtual { get; set; }
+    public int PixRecebidosHoje { get; set; }
+    public decimal ValorPixHoje { get; set; }
+    public bool OnboardingCompleto { get; set; } = true;
+
     public List<MovimentacaoRecente> MovimentacoesRecentes { get; set; } = [];
     public List<string> GraficoLabels { get; set; } = [];
     public List<decimal> GraficoDados { get; set; } = [];

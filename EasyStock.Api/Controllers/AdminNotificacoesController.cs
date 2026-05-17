@@ -23,7 +23,7 @@ public sealed class AdminNotificacoesController(
     AtualizarTemplateUseCase atualizarTemplate,
     AprovarTemplateUseCase aprovarTemplate,
     PreviewTemplateUseCase previewTemplate,
-    PreviewTemplateRawUseCase previewTemplateRaw,
+    PreviewDraftTemplateUseCase previewDraftTemplate,
     CriarRotinaUseCase criarRotina,
     AtualizarRotinaUseCase atualizarRotina,
     AtivarRotinaUseCase ativarRotina,
@@ -97,13 +97,18 @@ public sealed class AdminNotificacoesController(
         return DataOk(result);
     }
 
-    [HttpPost("templates/preview-raw")]
-    public async Task<IActionResult> PreviewTemplateRaw([FromBody] PreviewTemplateRawRequest req)
+    /// <summary>
+    /// Renderiza um template em modo "draft" -- assunto/corpo fornecidos no body
+    /// sem precisar salvar antes. Usado pelo editor da Admin para preview ao vivo
+    /// enquanto o usuario digita.
+    /// </summary>
+    [HttpPost("templates/preview-draft")]
+    public async Task<IActionResult> PreviewDraftTemplate([FromBody] PreviewDraftRequest req)
     {
-        var result = await previewTemplateRaw.ExecuteAsync(
-            new PreviewTemplateRawCommand(
-                req.AssuntoTemplate ?? "",
-                req.CorpoTemplate ?? "",
+        var result = await previewDraftTemplate.ExecuteAsync(
+            new PreviewDraftTemplateCommand(
+                req.AssuntoTemplate ?? string.Empty,
+                req.CorpoTemplate ?? string.Empty,
                 req.Variaveis ?? new Dictionary<string, object?>()));
         return DataOk(result);
     }
@@ -116,6 +121,7 @@ public sealed class AdminNotificacoesController(
         var items = await variaveisRepo.ListarPorTipoEventoAsync(tipo);
         return DataOk(items);
     }
+
 
     // ── Rotinas ────────────────────────────────────────────────────────────────
 
@@ -257,7 +263,7 @@ public sealed class AdminNotificacoesController(
         Guid TemplateId,
         IDictionary<string, object?>? Variaveis = null);
 
-    public record PreviewTemplateRawRequest(
+    public record PreviewDraftRequest(
         string? AssuntoTemplate,
         string? CorpoTemplate,
         IDictionary<string, object?>? Variaveis = null);

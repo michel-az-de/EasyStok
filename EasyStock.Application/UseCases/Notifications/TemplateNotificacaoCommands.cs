@@ -131,32 +131,20 @@ public sealed class PreviewTemplateUseCase(
     }
 }
 
-// ── Preview Raw (sem persistir, para editor ao vivo) ────────────────────────
+// ── Preview de DRAFT (assunto/corpo direto, sem template salvo) ──────────────
 
-public sealed record PreviewTemplateRawCommand(
+public sealed record PreviewDraftTemplateCommand(
     string AssuntoTemplate,
     string CorpoTemplate,
     IDictionary<string, object?> Variaveis) : ICommand;
 
-public sealed record PreviewTemplateRawResult(
-    string AssuntoRenderizado,
-    string CorpoRenderizado,
-    string? Erro);
-
-public sealed class PreviewTemplateRawUseCase(IRendererTemplate renderer)
-    : IUseCase<PreviewTemplateRawCommand, PreviewTemplateRawResult>
+public sealed class PreviewDraftTemplateUseCase(IRendererTemplate renderer)
+    : IUseCase<PreviewDraftTemplateCommand, PreviewTemplateResult>
 {
-    public async Task<PreviewTemplateRawResult> ExecuteAsync(PreviewTemplateRawCommand command)
+    public async Task<PreviewTemplateResult> ExecuteAsync(PreviewDraftTemplateCommand command)
     {
-        try
-        {
-            var assunto = await renderer.RenderizarAsync(command.AssuntoTemplate ?? "", command.Variaveis);
-            var corpo = await renderer.RenderizarAsync(command.CorpoTemplate ?? "", command.Variaveis);
-            return new PreviewTemplateRawResult(assunto, corpo, null);
-        }
-        catch (Exception ex)
-        {
-            return new PreviewTemplateRawResult("", "", ex.Message);
-        }
+        var assunto = await renderer.RenderizarAsync(command.AssuntoTemplate ?? string.Empty, command.Variaveis);
+        var corpo = await renderer.RenderizarAsync(command.CorpoTemplate ?? string.Empty, command.Variaveis);
+        return new PreviewTemplateResult(assunto, corpo);
     }
 }

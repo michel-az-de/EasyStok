@@ -904,30 +904,28 @@ app.MapGet("/api-proxy/mobile/version", async (
     }
 });
 
-// Proxy /api-proxy/notificacoes/templates/preview-raw — usado pelo editor de
-// templates (Notificacoes/Templates/Edit) para render Scriban ao vivo sem
-// precisar salvar. Aceita { assuntoTemplate, corpoTemplate, variaveis } e
-// devolve { assuntoRenderizado, corpoRenderizado, erro? }.
-app.MapPost("/api-proxy/notificacoes/templates/preview-raw", async (
+// ── Proxy /api-proxy/notif/preview-draft ────────────────────────────────────
+// Editor de Template (Admin) chama isto pra preview ao vivo (debounce 400ms).
+app.MapPost("/api-proxy/notif/preview-draft", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
-    HttpContext ctx,
+    HttpRequest req,
     ILogger<Program> log) =>
 {
     if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
     try
     {
-        using var doc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
-        var body = doc.RootElement.Clone();
-        var data = await api.PostAsync<System.Text.Json.JsonElement>(
-            "api/admin/notificacoes/templates/preview-raw", body);
-        return Results.Ok(new { data });
+        using var reader = new System.IO.StreamReader(req.Body);
+        var body = await reader.ReadToEndAsync();
+        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var data = await api.PostRawAsync("api/admin/notificacoes/templates/preview-draft", payload);
+        return Results.Content(data.GetRawText(), "application/json");
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
     catch (Exception ex)
     {
-        log.LogWarning(ex, "Proxy templates/preview-raw falhou");
-        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+        log.LogWarning(ex, "Proxy notif/preview-draft falhou");
+        return Results.Json(new { error = new { message = ex.Message } }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
 

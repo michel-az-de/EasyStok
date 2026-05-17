@@ -860,6 +860,9 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
     public Task<IReadOnlyList<IndicadorAcao>> GetIndicadoresAcaoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
         => throw new NotImplementedException("Store intelligence not yet implemented for MongoDB. Use PostgreSQL provider.");
 
+    public Task<ResumoDia> GetResumoDiaAsync(Guid empresaId, Guid? lojaId = null)
+        => throw new NotImplementedException("Resumo do dia not implemented for MongoDB. Use PostgreSQL provider.");
+
     // ── Dashboard Extras (not implemented for MongoDB) ───────────────────────
 
     public Task<IReadOnlyList<FluxoCaixaDia>> GetFluxoCaixaAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)

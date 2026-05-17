@@ -34,7 +34,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AtualizarTemplateUseCase>();
         services.AddScoped<AprovarTemplateUseCase>();
         services.AddScoped<PreviewTemplateUseCase>();
-        services.AddScoped<PreviewTemplateRawUseCase>();
+        services.AddScoped<PreviewDraftTemplateUseCase>();
 
         // Use cases — rotinas
         services.AddScoped<CriarRotinaUseCase>();

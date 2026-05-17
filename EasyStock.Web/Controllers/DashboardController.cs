@@ -19,12 +19,14 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var vm = new DashboardViewModel();
 
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
+        var diaTask = api.GetAsync<ResumoDiaApi>("analytics/dia");
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
         var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>($"analytics/receita?meses={meses}");
         var iaUsoTask = api.GetAsync<IaUsoApi>("ia/uso");
 
         var dashResult = await dashTask;
+        var diaResult = await diaTask;
         var reposResult = await reposTask;
         var movsResult = await movsTask;
         var receitaResult = await receitaTask;
@@ -40,6 +42,21 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.EstoqueCritico = d.AlertasEstoqueBaixo;
             vm.ProximosVencimento = d.AlertasVencimento;
             vm.ProdutosParados = d.AlertasItensParados;
+        }
+
+        if (diaResult.Success && diaResult.Data is { } dia)
+        {
+            vm.PedidosEntreguesHoje = dia.PedidosEntreguesHoje;
+            vm.FaturamentoHoje = dia.FaturamentoHoje;
+            vm.TicketMedioHoje = dia.TicketMedioHoje;
+            vm.PedidosPendentes = dia.PedidosPendentes;
+            vm.ValorPedidosPendentes = dia.ValorPedidosPendentes;
+            vm.CaixaAbertaHoje = dia.CaixaAbertaHoje;
+            vm.CaixaFechadaHoje = dia.CaixaFechadaHoje;
+            vm.SaldoCaixaAtual = dia.SaldoCaixaAtual;
+            vm.PixRecebidosHoje = dia.PixRecebidosHoje;
+            vm.ValorPixHoje = dia.ValorPixHoje;
+            vm.OnboardingCompleto = dia.OnboardingCompleto;
         }
 
         if (reposResult.Success && reposResult.Data is { } repos)
