@@ -12,6 +12,7 @@ public class CriarPedidoWebRequest
     public string? TelefoneAdHoc { get; set; }
     public string? Observacoes { get; set; }
     public List<CriarItemInput>? Itens { get; set; }
+    public DateTime? AgendadoParaEm { get; set; }
 }
 
 public class PedidosController(
@@ -83,7 +84,7 @@ public class PedidosController(
             });
 
         var result = await svc.CriarAsync(req.ClienteId, req.NomeAdHoc, req.AptAdHoc, req.TelefoneAdHoc,
-            req.Observacoes, req.Itens);
+            req.Observacoes, req.Itens, req.AgendadoParaEm);
         if (!result.Success)
             return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
             {

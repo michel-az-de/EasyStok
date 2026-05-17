@@ -43,7 +43,7 @@ public class PedidosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<Pedido>> CriarAsync(
         Guid? clienteId, string? nomeAdHoc, string? aptAdHoc, string? telefoneAdHoc,
-        string? observacoes, List<CriarItemInput>? itens)
+        string? observacoes, List<CriarItemInput>? itens, DateTime? agendadoParaEm = null)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
@@ -56,7 +56,8 @@ public class PedidosService(ApiClient api, SessionService session)
             clienteTelefoneAdHoc = telefoneAdHoc,
             observacoes,
             origem = "web",
-            itens
+            itens,
+            agendadoParaEm
         });
     }
 

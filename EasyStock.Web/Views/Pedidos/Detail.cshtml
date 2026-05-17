@@ -203,6 +203,19 @@ else
                 @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
                 <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
                 <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().AsDateTime()</dd></div>
+                @if (p.AgendadoParaEm.HasValue)
+                {
+                    var agBadge = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                    var agPrefix = p.IsAtrasado ? "⚠ Atrasado:" : "📅";
+                    <div>
+                        <dt class="text-slate-500">Agendado para</dt>
+                        <dd>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @agBadge">
+                                @agPrefix @p.AgendadoParaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </span>
+                        </dd>
+                    </div>
+                }
                 @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().AsDateTime()</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
