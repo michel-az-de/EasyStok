@@ -33,7 +33,9 @@ public sealed record AtualizarProdutoCommand(
     Guid UsuarioId = default,
     string? Motivo = null,
     string? Observacao = null,
-    string? ObservacaoInterna = null);
+    string? ObservacaoInterna = null,
+    // C2 (RDC 727/2022): default Avulso para nao quebrar callers existentes.
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
 
 public sealed record ProdutoDetalheResult(
     Guid ProdutoId,
@@ -52,7 +54,7 @@ public sealed record ProdutoDetalheResult(
     decimal? PrecoReferencia,
     decimal? MargemEstimada,
     DimensoesDetalheResult? Dimensoes,
-    int QuantidadeTotalEstoque,
+    decimal QuantidadeTotalEstoque,
     DateTime? UltimaEntradaEm,
     IReadOnlyCollection<ProdutoFotoResult> Fotos,
     IReadOnlyCollection<ProdutoVariacaoDetalheResult> Variacoes,
@@ -66,7 +68,11 @@ public sealed record ProdutoDetalheResult(
     DateTime? CriadoEm = null,
     DateTime? AlteradoEm = null,
     int? QuantidadeMinima = null,
-    int? QuantidadeCritica = null);
+    int? QuantidadeCritica = null,
+    // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
+    TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
+    // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
+    string? AtributosJson = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,
@@ -83,7 +89,7 @@ public sealed record ProdutoVariacaoDetalheResult(
     string? Sku,
     string? CodigoBarras,
     bool Ativa,
-    int QuantidadeEmEstoque,
+    decimal QuantidadeEmEstoque,
     DateTime? UltimaEntradaEm);
 
 public sealed record ProdutoCaracteristicaDetalheResult(
@@ -106,7 +112,7 @@ public sealed record ProdutoHistoricoItemResult(
     Guid MovimentacaoId,
     TipoMovimentacaoEstoque Tipo,
     string Natureza,
-    int Quantidade,
+    decimal Quantidade,
     decimal? ValorTotal,
     DateTime DataMovimentacao,
     Guid? ItemEstoqueId,
@@ -115,7 +121,7 @@ public sealed record ProdutoHistoricoItemResult(
 
 public sealed record ProdutoEstatisticasResult(
     Guid ProdutoId,
-    int QuantidadeEmEstoque,
+    decimal QuantidadeEmEstoque,
     decimal? MargemRealPercentual,
     decimal Velocidade30Dias,
     int? PrevisaoZeramentoDias,
@@ -206,6 +212,8 @@ public sealed class GerenciarProdutoUseCase(
         if (!string.IsNullOrWhiteSpace(command.CodigoBarras))
         {
             var codigoBarras = command.CodigoBarras.Trim();
+            try { _ = Gtin.Parse(codigoBarras); }
+            catch (ArgumentException ex) { throw new UseCaseValidationException(ex.Message); }
             if (await produtoRepository.ExistsCodigoBarrasAsync(command.EmpresaId, codigoBarras, command.ProdutoId))
             {
                 throw new UseCaseValidationException("Código de barras (EAN) duplicado para esta empresa.");
@@ -227,14 +235,25 @@ public sealed class GerenciarProdutoUseCase(
         produto.DescricaoBase = Normalizar(command.DescricaoBase);
         produto.Marca = Normalizar(command.Marca);
         produto.Tipo = command.Tipo;
+        produto.TipoEmbalagem = command.TipoEmbalagem; // C2 (RDC 727/2022)
         produto.CodigoBarras = Normalizar(command.CodigoBarras);
         produto.ControlaValidade = command.ControlaValidade;
         produto.Dimensoes = command.Dimensoes.ToValueObjectOrNull();
         produto.CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null;
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
-        produto.AtributosJson = command.AtributosJson;
-        produto.Status = command.Status;
+        // Preserva ficha tecnica quando o command omite AtributosJson. Form.cshtml de
+        // produtos nao carrega/devolve esse campo — sem este guard, qualquer edicao via
+        // Form zerava a ficha cadastrada via PUT /api/produtos/{id}/ficha-tecnica.
+        if (command.AtributosJson != null)
+            produto.AtributosJson = command.AtributosJson;
+        // Gating: nao deixa Ativo sem preco de venda. Antes o usuario podia salvar
+        // produto Ativo sem preco e ele aparecia na vitrine como "Definir preco →"
+        // mas vendavel — gerava pedido com R$0 (auditoria QA 2026-05-16).
+        var precoValido = command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0;
+        produto.Status = (command.Status == StatusProduto.Ativo && !precoValido)
+            ? StatusProduto.Inativo
+            : command.Status;
         produto.ObservacaoInterna = command.ObservacaoInterna;
         produto.AlteradoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
@@ -579,7 +598,9 @@ public sealed class GerenciarProdutoUseCase(
             CriadoEm: produto.CriadoEm,
             AlteradoEm: produto.AlteradoEm,
             QuantidadeMinima: produto.QuantidadeMinima,
-            QuantidadeCritica: produto.QuantidadeCritica);
+            QuantidadeCritica: produto.QuantidadeCritica,
+            TipoEmbalagem: produto.TipoEmbalagem, // C2 (RDC 727/2022)
+            AtributosJson: produto.AtributosJson);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));

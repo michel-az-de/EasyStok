@@ -16,13 +16,13 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         Guid? ItemEstoqueId,
         [property: Required] Guid ProdutoId,
         Guid? ProdutoVariacaoId,
-        [property: Range(1, int.MaxValue)] int Quantidade,
+        [property: Range(typeof(decimal), "0.001", "999999999999")] decimal Quantidade,
         [property: Range(0, double.MaxValue)] decimal ValorVendaUnitario,
         string? Descricao)
     {
         public RegistrarSaidaEstoqueItemCommand(
             Guid itemEstoqueId,
-            int quantidade,
+            decimal quantidade,
             decimal valorVendaUnitario,
             string? descricao)
             : this(itemEstoqueId, Guid.Empty, null, quantidade, valorVendaUnitario, descricao)
@@ -32,7 +32,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         public RegistrarSaidaEstoqueItemCommand(
             Guid produtoId,
             Guid? produtoVariacaoId,
-            int quantidade,
+            decimal quantidade,
             decimal valorVendaUnitario,
             string? descricao)
             : this(null, produtoId, produtoVariacaoId, quantidade, valorVendaUnitario, descricao)
@@ -49,15 +49,17 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         string? NotaFiscal,
         NaturezaMovimentacaoEstoque Natureza,
         CanalVenda Canal,
-        string? Observacoes);
+        string? Observacoes,
+        Guid? VendedorId = null,
+        string? FormaPagamentoPrincipal = null);
 
     public sealed record RegistrarSaidaEstoqueItemResult(
         Guid ItemEstoqueId,
         Guid ProdutoId,
         Guid ItemVendaId,
         Guid MovimentacaoId,
-        int QuantidadeSaida,
-        int QuantidadeRestante,
+        decimal QuantidadeSaida,
+        decimal QuantidadeRestante,
         string? Motivo);
 
     public sealed record RegistrarSaidaEstoqueResult(
@@ -118,7 +120,9 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 command.DataEnvio,
                 command.NotaFiscal,
                 command.Observacoes,
-                agora);
+                agora,
+                vendedorId: command.VendedorId,
+                formaPagamentoPrincipal: command.FormaPagamentoPrincipal);
 
             var itensVenda = new List<ItemVenda>();
             var movimentacoes = new List<MovimentacaoEstoque>();
@@ -184,7 +188,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     throw new EstoqueInsuficienteException(produto.Id, quantidadeSolicitada.Value, disponivel);
 
                 var restante = quantidadeSolicitada.Value;
-                var totalSaidoNoComando = 0;
+                decimal totalSaidoNoComando = 0m;
                 var lotesTocados = new List<ItemEstoque>();
 
                 foreach (var lote in lotes)
@@ -293,7 +297,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             return item;
         }
 
-        private async Task AtualizarIndicadoresFifoAsync(Guid empresaId, Guid produtoId, IEnumerable<ItemEstoque> lotesTocados, int quantidadeSaidaAtual, DateTime dataSaida)
+        private async Task AtualizarIndicadoresFifoAsync(Guid empresaId, Guid produtoId, IEnumerable<ItemEstoque> lotesTocados, decimal quantidadeSaidaAtual, DateTime dataSaida)
         {
             const int janelaDias = 30;
             var inicioJanela = dataSaida.AddDays(-janelaDias);

@@ -18,7 +18,7 @@ export function openSearch() {
         <div class="es-search-card" role="dialog" aria-modal="true" aria-labelledby="es-search-input">
             <header class="es-search-head">
                 <span class="es-search-icon">${icon('search', 18)}</span>
-                <input type="text" id="es-search-input" placeholder="Buscar endpoint, schema, tag..." autocomplete="off" spellcheck="false" aria-label="Buscar">
+                <input type="text" id="es-search-input" placeholder="Buscar endpoints, schemas e tags…" autocomplete="off" spellcheck="false" aria-label="Buscar">
                 <kbd>esc</kbd>
             </header>
             <div class="es-search-results" id="es-search-results"></div>
@@ -48,7 +48,7 @@ export function openSearch() {
             return;
         }
         if (!state.spec) {
-            resultsEl.innerHTML = `<p class="es-search-hint">Spec ainda não carregada.</p>`;
+            resultsEl.innerHTML = `<p class="es-search-hint">Spec não carregada ainda.</p>`;
             return;
         }
         const epMatches = state.spec.endpoints
@@ -70,7 +70,7 @@ export function openSearch() {
         activeIdx = 0;
 
         if (currentResults.length === 0) {
-            resultsEl.innerHTML = `<p class="es-search-hint">Sem resultados pra <strong>${escapeHtml(q)}</strong></p>`;
+            resultsEl.innerHTML = `<p class="es-search-hint">Sem resultados para <strong>${escapeHtml(q)}</strong></p>`;
             return;
         }
 

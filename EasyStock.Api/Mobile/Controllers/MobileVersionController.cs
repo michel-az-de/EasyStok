@@ -95,19 +95,50 @@ public class MobileVersionController(
         );
 
         // OTA / atualização do app (PWA + APK).
-        // PwaCacheVersion vem do IPwaVersionProvider, que lê o CACHE_VERSION
+        // PwaCacheVersionCanary vem do IPwaVersionProvider, que lê o CACHE_VERSION
         // diretamente do wwwroot/pwa/sw.js — fonte da verdade do bundle servido.
-        // PWA compara o valor recebido com o cdb-pwa-installed-version local; se
-        // diferir, dispara update do SW + reload (ver sync.js > checkPwaUpdate).
-        // ApkUrl/ApkVersion/ApkSha256: APK lê esses campos no boot e oferece
-        // download da nova build quando ApkVersion > versão local. URL aponta
-        // pro Azure Blob Storage do bucket easystock-apk.
+        // PwaCacheVersionStable vem de Mobile:Pwa:StableCacheVersion em
+        // appsettings — snapshot conhecido como bom. Admin promove canary→stable
+        // alterando essa config quando confiar na versão.
+        // PwaCacheVersion (campo legado) resolve pra Canary ou Stable conforme o
+        // device tem flag IsCanary. Devices anônimos (sem X-Device-Id) sempre
+        // recebem Stable, pra Casa da Babá inteira ficar em stable por default.
+        //
+        // Kill switch: Ota:Enabled=false congela TUDO — devices recebem
+        // PwaCacheVersion="" e nao atualizam. Util quando estamos testando.
+        var otaEnabled = _configuration.GetValue<bool>("Ota:Enabled", true);
+        var canaryCacheVersion = _pwaVersion.GetCurrentCacheVersion();
+        var stableCacheVersion = _configuration["Mobile:Pwa:StableCacheVersion"]
+            ?? canaryCacheVersion; // sem stable configurado → atual vira stable
+
+        var isCanaryDevice = false;
+        if (HttpContext.Request.Headers.TryGetValue("X-Device-Id", out var deviceIdHeader))
+        {
+            var deviceId = deviceIdHeader.ToString();
+            if (!string.IsNullOrWhiteSpace(deviceId) && deviceId.Length <= 64)
+            {
+                isCanaryDevice = await _db.Set<MobileDevice>()
+                    .AsNoTracking()
+                    .Where(d => d.Id == deviceId && !d.Revoked)
+                    .Select(d => d.IsCanary)
+                    .FirstOrDefaultAsync(ct);
+            }
+        }
+
+        var resolvedPwaVersion = !otaEnabled
+            ? string.Empty
+            : (isCanaryDevice ? canaryCacheVersion : stableCacheVersion);
+
         var ota = new MobileOtaInfo(
-            PwaCacheVersion: _pwaVersion.GetCurrentCacheVersion(),
+            PwaCacheVersion: resolvedPwaVersion,
+            PwaCacheVersionStable: stableCacheVersion,
+            PwaCacheVersionCanary: canaryCacheVersion,
             ApkVersion: _configuration["Mobile:Apk:Version"] ?? "0.0.0",
             ApkUrl: _configuration["Mobile:Apk:Url"] ?? "",
             ApkSha256: _configuration["Mobile:Apk:Sha256"] ?? "",
-            MinSupportedSchemaVersion: _configuration.GetValue<int>("Mobile:MinSupportedSchemaVersion", 1)
+            MinSupportedSchemaVersion: _configuration.GetValue<int>("Mobile:MinSupportedSchemaVersion", 1),
+            OtaEnabled: otaEnabled,
+            IsCanaryDevice: isCanaryDevice
         );
 
         return Ok(new MobileVersionResponse(
@@ -140,10 +171,14 @@ public record MobileVersionResponse(
 /// <summary>Metadados de atualização (OTA) — usados pelo PWA e pelo APK.</summary>
 public record MobileOtaInfo(
     string PwaCacheVersion,
+    string PwaCacheVersionStable,
+    string PwaCacheVersionCanary,
     string ApkVersion,
     string ApkUrl,
     string ApkSha256,
-    int MinSupportedSchemaVersion
+    int MinSupportedSchemaVersion,
+    bool OtaEnabled,
+    bool IsCanaryDevice
 );
 
 /// <summary>Capabilities do servidor que o PWA usa pra UI condicional.</summary>

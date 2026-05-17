@@ -119,8 +119,8 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
     }
 
     // ── Audit (Onda P4) ───────────────────────────────────────
-    // Mongo backend não está em produção (Postgre é o ativo). Stub
-    // mantém o contrato sem custo: retorna lista vazia e ignora write.
+    // Mongo backend não está em produção (Postgre é o ativo). Implementação
+    // funcional: lê e grava em Mongo se o backend Mongo for ativado.
     private IMongoCollection<FornecedorAlteracao> AlteracoesCollection =>
         Context.Database.GetCollection<FornecedorAlteracao>("fornecedor_alteracoes");
 
@@ -149,6 +149,14 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
     {
         EnqueueInsert(Collection, pedido);
         return Task.CompletedTask;
+    }
+
+    public Task AddItemAsync(PedidoFornecedorItem item)
+    {
+        // Em Mongo itens sao embedded no PedidoFornecedor — caller deve manter coerencia
+        // adicionando a item a pedido.Itens e chamando UpdateAsync(pedido).
+        throw new NotSupportedException(
+            "Mongo armazena itens embedded em PedidoFornecedor. Adicione a pedido.Itens e chame UpdateAsync.");
     }
 
     public Task UpdateAsync(PedidoFornecedor pedido)

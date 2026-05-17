@@ -6,8 +6,8 @@
 
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-3">
-        <a asp-action="Index" asp-controller="Fornecedores" class="text-slate-400 hover:text-slate-600">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <a asp-action="Index" asp-controller="Fornecedores" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para fornecedores">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
         </a>
@@ -186,10 +186,10 @@ else
 {
     <div class="ws">
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "✓" },
+            { "EmptyIllustration", "chart" },
             { "EmptyTitle", "Nenhum pedido em aberto" },
             { "EmptyDescription", "Todos os pedidos foram concluídos. Crie um novo pedido quando precisar." },
-            { "EmptyCta", "+ Novo Pedido" },
+            { "EmptyCta", "Novo pedido" },
             { "EmptyCtaModal", "novo-pedido" }
         })
     </div>

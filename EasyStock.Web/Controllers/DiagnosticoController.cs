@@ -5,9 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
+/// <summary>
+/// Diagnóstico da infra para operadores e admins. Todos os endpoints /diagnostico/api/*
+/// são proxies para a API principal — mantém a sessão cookie do Web e injeta o Bearer
+/// via <see cref="DiagnosticoWebService"/>.
+/// </summary>
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    [HttpGet]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
     {
@@ -29,6 +35,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/json")]
     public async Task<IActionResult> Json()
     {
@@ -48,6 +55,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     // ──────────────────────────────────────────────────────────────────────
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/endpoints")]
     public async Task<IActionResult> ProxyEndpoints()
     {
@@ -58,6 +66,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/historico")]
     public async Task<IActionResult> ProxyHistorico()
     {
@@ -68,6 +77,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
     }
 
     [Authorize]
+    [HttpGet]
     [Route("diagnostico/api/logs-enhanced")]
     public async Task<IActionResult> ProxyEnhancedLogs([FromQuery] int hours = 48)
     {
@@ -77,7 +87,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/limpar")]
@@ -89,7 +99,8 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    [HttpGet]
     [Route("diagnostico/api/logs/exportar")]
     public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
     {
@@ -100,7 +111,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return File(stream, "text/plain; charset=utf-8", fileName ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/salvar-storage")]
@@ -114,7 +125,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
 
     // ── Novos proxies ──────────────────────────────────────────────────────
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [HttpGet]
     [Route("diagnostico/api/logs/lixeira")]
     public async Task<IActionResult> ProxyLixeira()
@@ -124,7 +135,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/lixeira/esvaziar")]

@@ -91,8 +91,8 @@
                                 healthById.TryGetValue(d.Id, out var h);
                                 var healthBadgeClass = h?.Status switch
                                 {
-                                    "ok" => "bg-emerald-100 text-emerald-700",
-                                    "warn" => "bg-amber-100 text-amber-700",
+                                    "ok" => "bg-emerald-100 text-emerald-800",
+                                    "warn" => "bg-amber-100 text-amber-800",
                                     "err" => "bg-red-100 text-red-700",
                                     _ => "bg-slate-100 text-slate-700"
                                 };
@@ -119,7 +119,7 @@
                             }
                             else if (d.PendingPair)
                             {
-                                <span class="inline-block px-2 py-1 text-xs font-semibold bg-amber-100 text-amber-700 rounded">Aguardando app</span>
+                                <span class="inline-block px-2 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded">Aguardando app</span>
                             }
                             else
                             {
@@ -133,13 +133,18 @@
                             @if (!d.Revoked)
                             {
                                 <span class="text-slate-200">·</span>
-                                <form method="post" action="/dispositivos/@d.Id/revogar" class="inline ml-1"
-                                      onsubmit="return confirm('Revogar este dispositivo? O app correspondente vai parar de funcionar.');">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-medium">
-                                        Revogar
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        @@click="$dispatch('confirm-action', {
+                                            titulo: 'Revogar este dispositivo?',
+                                            mensagem: 'O app correspondente vai parar de funcionar imediatamente. Para usar de novo, será preciso parear o dispositivo novamente. <strong>Esta ação não pode ser desfeita.</strong>',
+                                            textoBotao: 'Revogar dispositivo',
+                                            classBotao: 'bg-red-600 hover:bg-red-700',
+                                            formAction: '/dispositivos/@d.Id/revogar',
+                                            requireText: 'revogar'
+                                        })"
+                                        class="text-xs text-red-600 hover:text-red-800 font-medium ml-1">
+                                    Revogar
+                                </button>
                             }
                             else
                             {

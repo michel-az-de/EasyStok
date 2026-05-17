@@ -34,7 +34,7 @@ public class CadastrarProdutoUseCaseTests
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
-        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
 
         var command = new CadastrarProdutoCommand(
             empresaId,
@@ -45,7 +45,7 @@ public class CadastrarProdutoUseCaseTests
             "Samsung",
             TipoProduto.Fisico,
             "BUDS-FE",
-            "7890000000001",
+            "7890000000000",
             false,
             new DimensoesInput(0.3m, 10m, 5m, 8m),
             250m,
@@ -55,7 +55,7 @@ public class CadastrarProdutoUseCaseTests
             "[\"foto1.jpg\"]",
             [new ProdutoCaracteristicaInput("Cor", "Cor principal", null, "Grafite", 1)],
             [new ProdutoEmbalagemInput("Caixa", "Caixa padrao", new DimensoesInput(0.4m, 12m, 6m, 10m), true)],
-            [new ProdutoVariacaoInput("Grafite", "Grafite", "Unico", "Buds FE Grafite", "BUDS-FE-GRAF", "7890000000002", null, null)]);
+            [new ProdutoVariacaoInput("Grafite", "Grafite", "Unico", "Buds FE Grafite", "BUDS-FE-GRAF", "7891000100103", null, null)]);
 
         var result = await useCase.ExecuteAsync(command);
 
@@ -101,7 +101,7 @@ public class CadastrarProdutoUseCaseTests
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
-        categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio" });
         produtoRepository.ExistsSkuBaseAsync(empresaId, "BUDS-FE", Arg.Any<Guid?>()).Returns(true);
 
         var command = new CadastrarProdutoCommand(
@@ -150,9 +150,9 @@ public class CadastrarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         var subcategoriaId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
-        categoriaRepository.GetByIdAsync(subcategoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, subcategoriaId)
             .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = categoriaId });
 
         var command = new CadastrarProdutoCommand(
@@ -187,10 +187,10 @@ public class CadastrarProdutoUseCaseTests
         var outraCategoriaId = Guid.NewGuid();
         var subcategoriaId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos" });
         // subcategoria pertence a outra categoria
-        categoriaRepository.GetByIdAsync(subcategoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, subcategoriaId)
             .Returns(new Categoria { Id = subcategoriaId, EmpresaId = empresaId, Nome = "Fones", CategoriaPaiId = outraCategoriaId });
 
         var command = new CadastrarProdutoCommand(
@@ -223,7 +223,7 @@ public class CadastrarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         var variacaoId = Guid.NewGuid();
 
-        categoriaRepository.GetByIdAsync(categoriaId)
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
             .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Roupas" });
 
         var command = new CadastrarProdutoCommand(
